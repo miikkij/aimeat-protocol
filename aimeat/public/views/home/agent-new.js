@@ -22,6 +22,10 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.5.1 — 2026-10-12 — The names of the watched workspace's spaces go into the agent's tasks
+ *     when it is made (services/agent-draft-known.js withSpaceNote). In the production run of
+ *     2026-10-12 an agent wrote its answers into the space it watched, because its definition
+ *     named no space.
  *   v1.5.0 — 2026-10-12 — Under the watched spaces, the tick "Also work on the records that are
  *     already there" (Jouni, 2026-10-12: "haluan myös valinnan käsittele myös vanhat"), offered
  *     when the computer's agent program names `record_backfill`. What a computer's agent program
@@ -137,6 +141,9 @@ export default function AgentNewView({ navigate }) {
   // ('<organism id>/<workspace id>') and the namespaces of the spaces the person ticked.
   const [watchPlace, setWatchPlace] = useState('');
   const [watched, setWatched] = useState([]);
+  // The record spaces of that workspace, by name: written into the agent's tasks, so it knows
+  // which space it watches and where a result can go.
+  const [watchSpaces, setWatchSpaces] = useState([]);
   // Whether it also works on the records that are already in those spaces. Off unless the person ticks it.
   const [backfill, setBackfill] = useState(false);
 
@@ -259,7 +266,10 @@ export default function AgentNewView({ navigate }) {
     // definition; for a draft it is the workspace and the spaces the person chose here.
     const slashAt = watchPlace.indexOf('/');
     const watch = when === 'records' && !proposal
-      ? { organism_id: watchPlace.slice(0, Math.max(slashAt, 0)), workspace_id: watchPlace.slice(slashAt + 1), spaces: watched, backfill: backfill && canBackfill }
+      ? {
+        organism_id: watchPlace.slice(0, Math.max(slashAt, 0)), workspace_id: watchPlace.slice(slashAt + 1), spaces: watched, backfill: backfill && canBackfill,
+        workspace_name: decodeEntities(places.find((pl) => `${pl.organism_id}/${pl.workspace_id}` === watchPlace)?.workspace_name ?? ''), all: watchSpaces,
+      }
       : null;
     if (watch && !canWatch) { setProblem(n('badWatchComputer', 'The computer you chose cannot start an agent from a workspace. Choose another computer, or another answer to "When it works".')); return; }
     if (watch && (!watch.organism_id || !watch.workspace_id)) { setProblem(n('badWatchPlace', 'Choose the workspace the agent watches.')); return; }
@@ -447,7 +457,7 @@ export default function AgentNewView({ navigate }) {
             options=${[['weekdays', n('weekdays', 'Weekdays')], ['daily', n('daily', 'Every day')]]} />
           <${TextField} type="time" label=${n('time', 'At what time')} value=${clock} onInput=${setClock} />`}
         ${when === 'records' && !proposal && canWatch && html`
-          <${WatchChoice} places=${places} place=${watchPlace} onPlace=${setWatchPlace} watched=${watched} onWatched=${setWatched}
+          <${WatchChoice} places=${places} place=${watchPlace} onPlace=${setWatchPlace} watched=${watched} onWatched=${setWatched} onSpaces=${setWatchSpaces}
             canBackfill=${canBackfill} backfill=${backfill} onBackfill=${setBackfill} />`}
         ${when === 'records' && proposal && proposalWatches.length > 0 && html`
           <${WatchedFacts} spaces=${proposalWatches} places=${places} />`}

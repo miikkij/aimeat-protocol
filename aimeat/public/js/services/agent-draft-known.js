@@ -31,12 +31,16 @@
  * @structure DEFAULT_TOOL_MENU · clipLine(text, max) · knownBlock(menu, known) · namedIn(crewDef, known) ·
  *   withNeededTools(crewDef, named, offered) · readOnlyTools(crewDef) · extraScopes(crewDef) ·
  *   RECORDS_FEATURE · BACKFILL_FEATURE · recordsBlock(known, features) · watchedPlace(when, known) · recordSpacesOf(crewDef) ·
- *   withRecordSpaces(crewDef, watch)
+ *   withRecordSpaces(crewDef, watch) · withSpaceNote(crewDef, watch)
  * @usage
  *   const prompt = base + knownBlock(menu, { apps, places }) + recordsBlock({ places }, features);
  *   const named = namedIn(draft.crewDef, { apps, places });
  *   const def = withRecordSpaces(draft.crewDef, { organism_id, workspace_id, spaces: ['shared.requests'] });
  * @version-history
+ *   v1.3.0 — 2026-10-12 — withSpaceNote(): every task of an agent that works on a workspace's
+ *     records names the workspace's spaces and marks the watched ones, so a result is not written
+ *     into the space it came from (seen in the production run of 2026-10-12). The prompt says the
+ *     page does this, so the model names no space.
  *   v1.2.0 — 2026-10-12 — `backfill`: a watch can ask for the records that are already in its
  *     spaces, written per item of `record_spaces` and read back by recordSpacesOf (Jouni,
  *     2026-10-12: "haluan myös valinnan käsittele myös vanhat"). BACKFILL_FEATURE names the
@@ -326,7 +330,7 @@ export function recordsBlock(known, features) {
   if (!Array.isArray(features) || !features.includes(RECORDS_FEATURE)) return '';
   if (!(known?.places ?? []).length) return '';
   return '\n\n' + [
-    'One more kind of "when" is "records": the agent is given one task each time a record is published in a workspace. Choose it when the sentence says the agent acts on what arrives or is added in one of the workspaces listed above (a new request, a new order, a filled form). Write it as "when": { "kind": "records", "workspace": "the workspace id" }, add "organism": "the organism id" when the list above gives one for that workspace, and set "listen_for" to ["tasks", "records"]. The person chooses on the page which parts of the workspace the agent watches.',
+    'One more kind of "when" is "records": the agent is given one task each time a record is published in a workspace. Choose it when the sentence says the agent acts on what arrives or is added in one of the workspaces listed above (a new request, a new order, a filled form). Write it as "when": { "kind": "records", "workspace": "the workspace id" }, add "organism": "the organism id" when the list above gives one for that workspace, and set "listen_for" to ["tasks", "records"]. The person chooses on the page which parts of the workspace the agent watches. When the agent is made, the page adds the workspace\'s spaces by name to each task and marks the ones the agent watches, so name no space yourself.',
     'For such a task {{ctx.prompt}} is the record itself: the workspace and its id, the organism id, the part of the workspace, the record\'s id, and the record as it was published.',
     'The agent is also given tasks with no record in them: one when it is made, and any the person writes by hand. Write the first task\'s description so that for a task with no record the agent says in one sentence what it does when a record arrives, and writes nothing.',
   ].join('\n');
@@ -358,6 +362,50 @@ export function recordSpacesOf(crewDef) {
   return crewDef.record_spaces
     .filter((s) => s && typeof s === 'object' && text(s.organism_id) && text(s.ws) && text(s.space))
     .map((s) => ({ organism_id: s.organism_id, ws: s.ws, space: s.space, ...(s.backfill === true ? { backfill: true } : {}) }));
+}
+
+/** How a space note opens. A description that already holds it is not given a second one. */
+const SPACES_NOTE = 'Spaces of the workspace';
+/** The longest description of one space the note carries: its first sentence, cut to this. */
+const SPACE_DESCRIPTION_MAX = 120;
+
+/**
+ * A definition whose every task names the spaces of the workspace it watches, and says which of
+ * them the agent watches.
+ *
+ * WHY. The model that writes a draft knows the person's workspaces and not the spaces inside
+ * them (85 workspaces with their spaces would not fit the prompt), so a draft says "save it in
+ * the same workspace" and names no space. Seen on aimeat.io on 2026-10-12: such an agent wrote
+ * its three answers into the space it watched, although the workspace had a space for answers.
+ * The crew runtime makes no task of an agent's own write, so nothing looped; each such write
+ * still starts a worker once, and requests and answers end in one list. The page knows the
+ * spaces once the person has chosen the workspace, so it writes them where the agent reads them.
+ *
+ * `watch` is { workspace_id, workspace_name, spaces, all }: `spaces` the watched namespaces, `all`
+ * the workspace's record spaces as { name, namespace, description }. A name and a description are
+ * another person's text and go in as one line each; a description gives its first sentence.
+ * Returns the same object when there is nothing to add or the note is already there.
+ */
+export function withSpaceNote(crewDef, watch) {
+  const all = Array.isArray(watch?.all) ? watch.all.filter((s) => s && typeof s.name === 'string' && s.name) : [];
+  const tasks = Array.isArray(crewDef?.tasks) ? crewDef.tasks : [];
+  if (all.length === 0 || tasks.length === 0 || !watch?.workspace_id) return crewDef;
+  if (tasks.every((x) => typeof x?.description === 'string' && x.description.includes(SPACES_NOTE))) return crewDef;
+  const watched = new Set(Array.isArray(watch.spaces) ? watch.spaces : []);
+  const lines = all.map((s) => {
+    const what = clipLine(String(s.description ?? '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s/)[0], SPACE_DESCRIPTION_MAX);
+    const named = what ? `- ${nameLine(s.name)}: ${what}` : `- ${nameLine(s.name)}`;
+    return watched.has(s.namespace) ? `${named}${/[.!?…]$/.test(named) ? '' : '.'} You watch this space: its records are your work.` : named;
+  });
+  const note = [
+    `${SPACES_NOTE} "${nameLine(watch.workspace_name || watch.workspace_id)}" (id ${watch.workspace_id}), by name:`,
+    ...lines,
+    'Write a result into a space you do not watch, and never over the record you were given. Only when no other space fits what you were asked to store, write it as a new record in a space you watch.',
+  ].join('\n');
+  return {
+    ...crewDef,
+    tasks: tasks.map((x) => (typeof x?.description === 'string' && !x.description.includes(SPACES_NOTE) ? { ...x, description: `${x.description}\n\n${note}` } : x)),
+  };
 }
 
 /**

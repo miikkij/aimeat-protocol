@@ -17,10 +17,12 @@
  *   and a model run, so with more than one space the person says which.
  *
  *   Composed from library components only; it has no sheet of its own.
- * @structure WatchChoice({ places, place, onPlace, watched, onWatched, canBackfill, backfill, onBackfill }) ·
+ * @structure WatchChoice({ places, place, onPlace, watched, onWatched, onSpaces, canBackfill, backfill, onBackfill }) ·
  *   WatchedFacts({ spaces, places })
  * @usage html`<${WatchChoice} places=${places} place=${watchPlace} onPlace=${setWatchPlace} watched=${watched} onWatched=${setWatched} />`
  * @version-history
+ *   v1.1.1 — 2026-10-12 — `onSpaces`: the chosen workspace's record spaces are handed to the page,
+ *     which writes their names into the agent's tasks.
  *   v1.1.0 — 2026-10-12 — The tick "Also work on the records that are already there", with how
  *     many published records the ticked spaces hold now, offered when the computer's agent program
  *     can do it (Jouni, 2026-10-12: "haluan myös valinnan käsittele myös vanhat"). A proposal's
@@ -63,12 +65,12 @@ const inOrganism = (pl) => w('inOrganism', 'In the organism {organism}').replace
  * the agent is made, and nowhere later: the agent program reads it the first time it looks at a
  * space and never again.
  */
-export function WatchChoice({ places, place, onPlace, watched, onWatched, canBackfill, backfill, onBackfill }) {
+export function WatchChoice({ places, place, onPlace, watched, onWatched, onSpaces, canBackfill, backfill, onBackfill }) {
   // undefined: being read · null: the read failed · an array: the workspace's record spaces
   const [spaces, setSpaces] = useState(undefined);
 
   useEffect(() => {
-    if (!place) { setSpaces(undefined); return undefined; }
+    if (!place) { setSpaces(undefined); onSpaces?.([]); return undefined; }
     let live = true;
     setSpaces(undefined);
     const slash = place.indexOf('/');
@@ -76,11 +78,13 @@ export function WatchChoice({ places, place, onPlace, watched, onWatched, canBac
       .then((list) => {
         if (!live) return;
         setSpaces(list);
+        // The page writes the spaces' names into the agent's definition (withSpaceNote).
+        onSpaces?.(list);
         // Keep what is already ticked and still there (a draft opened again); else the one space.
         const kept = (watched ?? []).filter((ns) => list.some((s) => s.namespace === ns));
         onWatched(kept.length ? kept : list.length === 1 ? [list[0].namespace] : []);
       })
-      .catch((err) => { swallowed('agent-watch: spaces', err); if (live) { setSpaces(null); onWatched([]); } });
+      .catch((err) => { swallowed('agent-watch: spaces', err); if (live) { setSpaces(null); onWatched([]); onSpaces?.([]); } });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the spaces are read once per workspace and per what the computer can do; a tick must not read them again
   }, [place, !!canBackfill]);
