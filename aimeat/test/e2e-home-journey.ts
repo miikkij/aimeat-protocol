@@ -19,6 +19,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-home-journey
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The connector's upload (5c) and the agent refusal (6) use the agent's own
+ *     token, as `aimeat connect` does; the MCP OAuth token stays on the MCP endpoint, where node 4.0.0
+ *     keeps it. Test 6 had passed on 4.0.0 only because the MCP token was refused on REST at all.
  *   v1.1.0 — 2026-10-03 — The profile is the first stage: the interview's answers and the published card.
  *   v1.0.0 — 2026-10-01 — Initial.
  */
@@ -117,7 +120,15 @@ async function provision(tag: string) {
         method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: reg.body.client_id, client_secret: reg.body.client_secret, ...tokenParams(pkce) }),
     });
     assert(tok.status === 200, `mcp token ${tok.status}`);
-    return { ownerName, ownerToken, mcpToken: tok.body.access_token as string };
+    // The agent's own token, the one `aimeat connect` holds and sends to REST routes. The MCP OAuth
+    // token is for the MCP endpoint only, and node 4.0.0 refuses it on a REST route
+    // (MCP_TOKEN_ON_REST_REMOVED_IN, src/auth/mcp-token-on-rest.ts).
+    const ats = new Date().toISOString();
+    const agentTok = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ gaii: agentGaii, timestamp: ats, signature: await signMsg(agentPriv, agentGaii + ats) }),
+    });
+    assert(agentTok.status === 200, `agent token ${agentTok.status}: ${JSON.stringify(agentTok.body.error)}`);
+    return { ownerName, ownerToken, mcpToken: tok.body.access_token as string, agentToken: agentTok.body.data.token as string };
 }
 
 async function journeyOf(token: string) {
@@ -227,7 +238,7 @@ await test('5a. FAILURE: a page the owner switched off stays off when their AI p
 await test('5c. the JSON upload the connector sends takes the same `enable`, and answers `served`', async () => {
     const third = await provision('c');
     const html = '<!doctype html><html><body><h1>Via the connector</h1></body></html>';
-    const up = await json('/v1/portfolio/upload', auth(third.mcpToken, { method: 'PUT', body: JSON.stringify({ html, enable: true }) }));
+    const up = await json('/v1/portfolio/upload', auth(third.agentToken, { method: 'PUT', body: JSON.stringify({ html, enable: true }) }));
     assert(up.status === 200 && up.body.data.served === true, `upload ${up.status}: ${JSON.stringify(up.body)}`);
     const pub = await json(`/v1/portfolio/data/${third.ownerName}`);
     assert(pub.status === 200 && String(pub.body.data.portfolio_html).includes('Via the connector'), `served ${pub.status}`);
@@ -243,7 +254,7 @@ await test('5b. FAILURE: a note, an app or a shared place without a card does no
 });
 
 await test('6. FAILURE: an agent token cannot read its owner\'s home state', async () => {
-    const { status } = await json('/v1/home/state', auth(me.mcpToken));
+    const { status } = await json('/v1/home/state', auth(me.agentToken));
     assert(status === 401 || status === 403, `agent must be refused, got ${status}`);
 });
 
