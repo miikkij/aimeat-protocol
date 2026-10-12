@@ -12,6 +12,7 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-12 -- An agent that hands work to the owner's other agents asks agent:read.
  *   v1.1.0 -- 2026-10-12 -- Step 0: before a new tool is proposed, look at the tools the person's
  *     apps publish; the rule is in skill aimeat-agent-capability
  *     (wish-noden-skilli-agentin-kyvykkyys-suunnitellaan-sovelluksena-ja).
@@ -125,7 +126,9 @@ validate and a new agent has none.
 run by a crew runtime needs \`memory:read\` and \`memory:write\` whatever its job: the runtime reads
 its own definition with the first and stores the result with the second. The node adds both to
 every proposal and every approval, so you need not ask for them (measured 2026-10-02: an agent
-approved with \`memory:write\` alone could not read its definition and never ran).
+approved with \`memory:write\` alone could not read its definition and never ran). An agent that
+hands work to the owner's other agents asks \`agent:read\` as well: the agent list needs it from
+node 4.0.0.
 It needs no \`agent:write\` to report its own tags or its own runtime; that word lets an agent approve new agents and
 change other agents' settings, so give it only to an agent whose job is that. An agent
 that reads and writes the owner's memory needs \`memory:read\` and \`memory:write\`; one that takes

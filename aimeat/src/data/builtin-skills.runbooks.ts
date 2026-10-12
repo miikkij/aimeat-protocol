@@ -12,6 +12,7 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.12.0 — 2026-10-12 — manage-my-agents: listing agents needs agent:read from node 4.0.0.
  *   v1.11.0 — 2026-10-11 — manage-my-agents: stop an agent and start it again (aimeat_agent_stop,
  *     aimeat_agent_start), and what a stop does, in the words to say to the owner.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
@@ -202,7 +203,8 @@ flowchart LR
 
 ## Common tasks
 - **List agents:** \`aimeat_agents_list\` — name, GAII, tags, mode, last-seen, and its permissions
-  (\`default_scopes\`).
+  (\`default_scopes\`). An agent needs \`agent:read\` for it from node 4.0.0; the node's default
+  permissions carry it.
 - **Why an agent's tasks do not move:** in the same list, \`refusals\` names every call the node
   refused the agent for a permission it still lacks (the permission, the call, how many times,
   when last), and \`scope_request\` says what the agent asked for at its last approval. A refusal is
