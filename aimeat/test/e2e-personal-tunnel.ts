@@ -32,6 +32,8 @@
  *   heartbeat timeout.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-personal-tunnel
  * @version-history
+ *   v1.3.0 — 2026-10-12 — Phase 5: a second owner's node acks the first node's item id and the item
+ *     stays. It failed on the source, where the ack deleted any id it was sent.
  *   v1.2.0 — 2026-10-09 — The socket opens with a ticket (POST /v1/ws/ticket, then ?ticket=), as the SDK
  *     lib now does, never with the session token in the URL (secrets audit 2026-10-09, d3). New: a spent
  *     ticket is 401 INVALID_TICKET, a realtime ticket is 401 TICKET_WRONG_SOCKET, the header still opens
@@ -484,6 +486,28 @@ async function sharedNodePhases() {
 
     // ─── Phase 5: The ack that deletes ───
     console.log('Phase 5 — Mailbox ack');
+
+    // The ack deleted every id it was sent, whoever sent it, so a second home node that learned an
+    // item id took the first node's work out of its mailbox (wish-henkil-kohtaisen-noden-mailbox-ack-
+    // poistaa-vain-oman-nodensa). It deletes only the sending node's own items now.
+    await test('another node\'s mailbox_ack for this node\'s item id leaves the item where it is', async () => {
+        const otherNodeId = `personal-tunnel-b-${stamp}`;
+        const anchor = await json('/v1/personal/anchor', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${strangerToken}` },
+            body: JSON.stringify({ node_id: otherNodeId, owner_name: strangerName, public_key: 'test-key-b', agent_gaiis: [], visibility: 'private' }),
+        });
+        assert(anchor.status === 201, `anchor node B ${anchor.status}: ${JSON.stringify(anchor.body)}`);
+        const other = await HomeNodeSocket.connect(BASE, strangerToken);
+        openSockets.push(other);
+        other.send({ type: 'mailbox_ack', id: `ack-b-${stamp}`, payload: JSON.stringify([mailboxItemId]), timestamp: new Date().toISOString() });
+        await other.heartbeat(`hb-b-${stamp}`);
+        await sleep(500);
+        const mail = await json(`/v1/personal/mailbox/${encodeURIComponent(personalNodeId)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(mail.body?.data?.items === 1, `node B's ack deleted node A's item: mailbox says ${JSON.stringify(mail.body?.data)}`);
+        other.send({ type: 'disconnect', id: `dc-b-${stamp}`, timestamp: new Date().toISOString() });
+        await other.waitClosed();
+    });
 
     await test('mailbox_ack deletes the acknowledged item', async () => {
         socket1.send({ type: 'mailbox_ack', id: `ack-${stamp}`, payload: JSON.stringify([mailboxItemId]), timestamp: new Date().toISOString() });
