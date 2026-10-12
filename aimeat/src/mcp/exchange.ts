@@ -18,6 +18,8 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.6.1 — 2026-10-13 — aimeat_exchange_offering_get states an ext action's toll through
+ *     extActionDeclaredToll, as the REST detail does.
  *   v1.6.0 — 2026-10-12 — aimeat_exchange_accept prices an extension action with resolveExtActionPricing,
  *     as REST does, so an action in the 4.0.0 form (its own tollMorsels) is contracted, not NOT_PRICED.
  *     aimeat_exchange_need_post refuses budget_unit "morsels" from 4.0.0 with MORSEL_PRICE_REMOVED, as
@@ -59,7 +61,7 @@ import {
 } from '../services/metered-entitlements.js';
 import {
     type Offering, type Need, type Bid,
-    resolveExtActionPricing, resolveOfferingPricing, newNeedId, newBidId,
+    resolveExtActionPricing, extActionDeclaredToll, resolveOfferingPricing, newNeedId, newBidId,
     getOffering, getOfferingWithMeta, listOfferings, matchOfferings, filterOfferings,
     putNeed, getNeed, parseNeedSpec, listNeeds, putBid, getBid, acceptBid,
     offeringStats, offeringConsumers, enrichNeeds, presentOffering, presentContractTerms, budgetFloorText,
@@ -176,7 +178,7 @@ export function registerExchangeTools(
             const act = extRec?.actions.find(a => a.id === o.action);
             return ok({
                 // A raw ext offering paces at the action's live toll, as the REST detail states it.
-                offering: presentOffering(config, o, { declaredToll: act ? (act.tollMorsels ?? null) : o.tollMorsels }),
+                offering: presentOffering(config, o, { declaredToll: act ? extActionDeclaredToll(act) : o.tollMorsels }),
                 capability: act ? {
                     input_schema: act.inputSchema ?? {},
                     output_schema: act.outputSchema ?? {},
