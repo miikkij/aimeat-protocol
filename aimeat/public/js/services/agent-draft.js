@@ -31,6 +31,8 @@
  *   const draft = await draftAgent('Sort my incoming mail and draft the answers', { tools, known: { apps, places } });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.5.1 — 2026-10-12 — definitionFor writes the names of the watched workspace's spaces into
+ *     every task (agent-draft-known.js withSpaceNote).
  *   v1.5.0 — 2026-10-12 — An agent can work when a record is published in a workspace ("records").
  *     runtimeMenu() reads the runtime's `features` beside its tools; the draft prompt describes the
  *     kind only when the runtime names `record_spaces` (additive: the text follows what was there);
@@ -65,7 +67,7 @@ import { buildTemplate } from '/views/profile/agents/crew-templates.js';
 import { SCOPE_TEMPLATES } from '/views/profile/agents/scope-model.js';
 import {
   DEFAULT_TOOL_MENU, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
-  RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces,
+  RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, withSpaceNote,
 } from '/js/services/agent-draft-known.js';
 
 /** When an agent works, as the pages offer it. */
@@ -284,8 +286,10 @@ function offersUnder(crewDef, name) {
 
 /**
  * The definition a draft starts with, shaped by when it works. `watch` is what an agent that works
- * on records watches: { organism_id, workspace_id, spaces }. For every other "when" the definition
- * names no space and does not listen for records, whatever the model wrote.
+ * on records watches: { organism_id, workspace_id, spaces, backfill, workspace_name, all }, where
+ * `all` is the workspace's record spaces with their names (withSpaceNote writes them into each
+ * task). For every other "when" the definition names no space and does not listen for records,
+ * whatever the model wrote.
  */
 export function definitionFor(draft, when, watch) {
   // An agent the person lets read only is given the read tool for a workspace, never the write tool.
@@ -293,7 +297,9 @@ export function definitionFor(draft, when, watch) {
   const named = written
     ? { ...written, agent_name: draft.name, ...offersUnder(written, draft.name) }
     : buildTemplate(draft.template || 'researcher', draft.name);
-  const def = withRecordSpaces(named, when === 'records' ? watch : null);
+  // The watched spaces go into the definition, and every task is told the workspace's spaces by
+  // name: the draft was written without them, so it could not say where a result belongs.
+  const def = withSpaceNote(withRecordSpaces(named, when === 'records' ? watch : null), when === 'records' ? watch : null);
   const hears = new Set(Array.isArray(def.listen_for) && def.listen_for.length ? def.listen_for : ['tasks']);
   if (when === 'talk' || when === 'always') { hears.add('messages'); hears.add('dms'); }
   // AN AGENT THAT HEARS A MESSAGE MUST BE ABLE TO ANSWER IT. The `dm` tool is what sends a reply, and
