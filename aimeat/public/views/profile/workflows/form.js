@@ -12,6 +12,7 @@
  * @structure renderForm · basics · varsBlock · stepFold · offerWords · endFold
  * @usage import { renderForm } from './form.js';
  * @version-history
+ *   v1.13.1 — 2026-10-13 — A trigger the form does not draw (an app's event, rows added to a row space, a trigger with coalesce) is saved back as it was unless the person changes a trigger field. An app's event used to be saved back as "by hand".
  *   v1.13.0 — 2026-10-02 — The question marks that explain the workflow settings: schedule.cron, schedule.timezone (TextField help), workflow.step_timeout (Field group help), workflow.skip_done, workflow.fresh, workflow.parallel (yn() help argument), workflow.llm_checks (HelpTip beside its Choice); their grey hints moved into them (components/HelpTip.js).
  *   v1.12.0 —2026-09-26 — The form is the Field family (page group G5): the fields are TextField and Select with their row labels, the yes-and-no and the other one-of settings the Choice, "starts when" the Tabs where several are on at once, "wait for an answer" the Check, the timeout's own number the TextField beside its Choice; the rail's checks are plain lines (a failing one in coral), the crumb's way back is data. It writes no class.
  *   v1.11.0 — 2026-09-26 — "Wait for an answer" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -248,8 +249,19 @@ function undeclaredVars(f) {
   return [...used].filter(v => !declared.has(v));
 }
 
+/** The trigger fields of a form state as one string: equal strings mean the person changed none of them. */
+const triggerFieldsOf = (f) => [f.triggerKind, f.cron, f.timezone, f.eventOn, f.eventMatch].join('\n');
+
 /** The form state out of a definition (edit), or empty (create). */
 export function formOf(def) {
+  const f = formFieldsOf(def);
+  // The trigger as saved, and what the fields showed when the form opened. The form draws three
+  // kinds of trigger; one it does not draw (an app's event, rows added to a row space, a trigger
+  // with `coalesce`) is saved back as it was unless the person changes a trigger field (defOf).
+  return { ...f, trigger0: def?.trigger || null, triggerFields0: triggerFieldsOf(f) };
+}
+
+function formFieldsOf(def) {
   const loc0 = (x) => loc(x);
   return {
     id: def?.id || '', title: loc0(def?.title), description: loc0(def?.description),
@@ -269,7 +281,9 @@ export function formOf(def) {
 
 /** The definition out of the form state, in the shape PUT /v1/workflows/:id takes. */
 export function defOf(f) {
-  const trigger = f.triggerKind === 'schedule' ? { kind: 'schedule', cron: f.cron, ...(f.timezone ? { timezone: f.timezone } : {}) }
+  const untouched = f.trigger0 && f.triggerFields0 === triggerFieldsOf(f);
+  const trigger = untouched ? f.trigger0
+    : f.triggerKind === 'schedule' ? { kind: 'schedule', cron: f.cron, ...(f.timezone ? { timezone: f.timezone } : {}) }
     : f.triggerKind === 'event' ? { kind: 'event', on: f.eventOn, match: f.eventOn === 'memory.write' ? { key: f.eventMatch } : { offer: f.eventMatch } }
     : { kind: 'manual' };
   return {

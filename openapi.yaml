@@ -6403,11 +6403,33 @@ components:
       type: object
       required: [kind]
       properties:
-        kind: { type: string, enum: [schedule, manual, event] }
+        kind: { type: string, enum: [schedule, manual, event, ecosystem.event] }
         cron: { type: string, description: 'schedule kind' }
         timezone: { type: string }
-        on: { type: string, enum: [memory.write, offer.ordered], description: 'event kind' }
-        match: { type: object, additionalProperties: { type: string }, description: 'event kind' }
+        on:
+          type: string
+          description: >-
+            event kind: one of memory.write, offer.ordered, workspace.rows. ecosystem.event kind: the
+            bound app's own event name.
+        match:
+          type: object
+          additionalProperties: { type: string }
+          description: >-
+            Globs the event is tested against. memory.write: `key`. offer.ordered: `offer`.
+            workspace.rows: `organism` and `workspace` (both required, refused at save without them)
+            and optionally `space`, tested against the row space's name and its namespace.
+            ecosystem.event: fields of the app's payload.
+        coalesce:
+          type: boolean
+          description: >-
+            event and ecosystem.event kinds. One run of a workflow is live at a time, and an event
+            that arrives during a run starts nothing. With `coalesce: true` every event that arrives
+            during a run is kept, and ONE more run starts when the live run ends: its `event_folded`
+            variable says how many events it stands for, `event_at` is the time of the first, a row
+            count is summed and row ids are joined. Refused beside `parallel`. Do not set it on a
+            workflow whose own step writes what its trigger matches.
+        app: { type: string, description: 'ecosystem.event kind: the bound app name' }
+        version: { type: integer, description: 'ecosystem.event kind: the pinned major version of the event' }
     WorkflowDefInput:
       type: object
       required: [title, description, trigger, vars, steps, on_step_fail]
@@ -6423,6 +6445,13 @@ components:
             {run} (the run id) and {date} (the run date, YYYY-MM-DD). Template deliverable/signal keys
             with one of these to give each run its own keyspace (run-scoped keys) — the non-destructive
             way to keep re-runs from seeing a prior run's output. A declared var of the same name wins.
+            A run an event trigger starts also has the event as variables, in key templates and sent
+            to an agent step as `var.<name>` scope entries: `event_on`, `event_at` (ISO 8601),
+            `event_folded` (how many events the run stands for), and by event `event_key`
+            (memory.write), `event_offer` (offer.ordered), or `event_organism`, `event_workspace`,
+            `event_space`, `event_count` and `event_row_ids` (workspace.rows: one run per append call;
+            at most 50 ids, comma-separated, and only ids made of letters, digits and `. _ : @ + = -`).
+            An ecosystem.event run has `event_app` and the payload fields its own `match` names.
         steps: { type: array, items: { $ref: '#/components/schemas/WorkflowStep' } }
         on_step_fail: { type: string, enum: [inspect] }
         notify_on_finish:

@@ -26,6 +26,8 @@
  *   v1.5.0 — 2026-10-11 — emitRecordChange: a `memory` or `files` change to a private or
  *     owner-visible record carries its owner, so it reaches that owner's streams only. Every such
  *     change was global, which v1.3.0's owner scope never reached.
+ *   v1.6.0 — 2026-10-13 — The `rowsAppended` channel: one event per append call to a workspace row
+ *     space, which the workflow engine's `workspace.rows` triggers start from.
  */
 import { EventEmitter } from 'node:events';
 
@@ -214,4 +216,38 @@ export function onMemoryWrittenEvent(handler: (evt: MemoryWriteEvent) => void): 
 
 export function offMemoryWrittenEvent(handler: (evt: MemoryWriteEvent) => void): void {
   bus.off('memoryWritten', handler);
+}
+
+// ── Rows-appended channel ───────────────────────────────────────────────────
+// A row of a workspace row space is not a memory record, so appending one emits no `memoryWritten`
+// and until 2026-10-13 nothing but the open pages heard of it (`emitChange('organisms')`). The row
+// service emits this once per append call, after the insert; the workflow engine starts the
+// `workspace.rows` triggers it matches. It carries the node id because the bus is one per process
+// and a process may serve more than one node: a subscriber answers only for its own node.
+
+export interface RowsAppendedEvent {
+  nodeId: string;
+  organismId: string;
+  wsId: string;
+  /** The space's name in the manifest (what a caller passes as `space`). */
+  space: string;
+  /** The space's storage namespace. */
+  namespace: string;
+  /** The rows this call wrote, in the order they were written. */
+  rowIds: string[];
+  /** The resolved identity that wrote them (the row's `createdBy`). */
+  createdBy: string;
+  timestamp: number;
+}
+
+export function emitRowsAppended(evt: Omit<RowsAppendedEvent, 'timestamp'>): void {
+  bus.emit('rowsAppended', { ...evt, timestamp: Date.now() } satisfies RowsAppendedEvent);
+}
+
+export function onRowsAppendedEvent(handler: (evt: RowsAppendedEvent) => void): void {
+  bus.on('rowsAppended', handler);
+}
+
+export function offRowsAppendedEvent(handler: (evt: RowsAppendedEvent) => void): void {
+  bus.off('rowsAppended', handler);
 }

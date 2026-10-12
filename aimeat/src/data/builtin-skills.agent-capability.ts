@@ -21,7 +21,9 @@
  *   the first text of this skill said "a call creates a task", which a reviewer checked against
  *   the route and found false on 2026-10-12), services/extension-ctx-contract.ts (what an extension's action is given),
  *   services/connect-tunnel-push.ts onMemoryWrite (a published record wakes a subscribed agent;
- *   services/workspace-rows/row-service.ts does not call it, so a row wakes nobody),
+ *   services/workspace-rows/row-service.ts does not call it, so a row wakes no agent by itself),
+ *   services/workflow/engine-triggers.ts fireWorkspaceRows with workflow-event.ts (a workflow starts
+ *   on an append and its run carries the event as `event_*` variables; `coalesce`),
  *   services/refinery/pipeline.ts (mail arrives as rows), data/library-packs/ (the libraries
  *   named), routes/outbound.ts with services/connections/ (mail sent through a connected
  *   account), and crewaimeat's crew_def.py TOOL_REGISTRY (the tool ids `workspace`,
@@ -31,6 +33,9 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.1.0 — 2026-10-13 — A row still wakes no agent by itself, and a workflow now starts on it: the
+ *     `workspace.rows` event, the `event_*` variables a run carries, and `coalesce`. The table, question
+ *     4 and the email example said "a new row wakes nobody" and named the clock as the only way.
  *   v1.0.1 — 2026-10-12 — "When you propose the agent" names the scopes the tools use: ext:invoke
  *     for an app tool (services/capability-invoke.ts calls the extension action with the caller's
  *     token, and auth/rest-scope-gate.ts refuses that call without the word from node 4.0.0),
@@ -132,9 +137,9 @@ free time) and \`aimeat-workflows\` (a run with a step that waits for a person).
 
 | Source | How it reaches AIMEAT | What wakes the agent |
 |---|---|---|
-| Email | The mail refinery reads a connected mailbox on a clock and writes each message as a workspace row (skill \`aimeat-refinery\`) | A clock, set a few minutes after the refinery's. A new row wakes nobody. |
+| Email | The mail refinery reads a connected mailbox on a clock and writes each message as a workspace row (skill \`aimeat-refinery\`) | A clock, set a few minutes after the refinery's, or a workflow that starts on the new rows (below) |
 | A visitor on the web | An intake form writes a record into a workspace | The new record, for an agent that holds a workspace contract |
-| An outside system | An extension fetches on a clock and writes rows | A clock or a workflow. A new row wakes nobody. |
+| An outside system | An extension fetches on a clock and writes rows | A clock, or a workflow that starts on the new rows (below) |
 | A person in an app | The app writes into a workspace, or gives the agent a task | The task or the record |
 | Sound | The app transcribes it (\`aimeat-ai\` in the browser, or the extension's \`ctx.ai\` for a stored file) and writes the text into a workspace | The task or the record |
 | Another agent | An offer, a workflow step, or an app tool bought through a checkout and fulfilled as a task | The task |
@@ -144,6 +149,37 @@ An agent is woken by a task, a message, a schedule and a **published workspace r
 that reads named spaces of a workspace and is woken by their records is a contract agent, and that
 way exists: skill \`aimeat-workspace-contracts\`. Use it, and build no second way for an agent to
 follow a workspace.
+
+**A row is not a record, and a new row wakes no agent by itself.** Two ways give an agent work from
+rows. The simple one is a clock: the agent runs a few minutes after whatever writes the rows. The
+other is a workflow that starts on the event, for when the delay matters or the rows come at no
+fixed time. Its definition has this trigger and an agent step:
+
+\`\`\`json
+{ "trigger": { "kind": "event", "on": "workspace.rows",
+               "match": { "organism": "<organism id>", "workspace": "<workspace id>", "space": "<row space>" },
+               "coalesce": true },
+  "steps": [ { "id": "handle", "agent": "<agent>", "offer": "<offer>", "description": "Handle the new rows" } ] }
+\`\`\`
+
+- The workflow starts **once for each append call**, whether the call wrote one row or five
+  hundred. It starts for an owner only while that owner is a member who may read the space.
+- The run carries what arrived as variables, and an agent step gets them with its task as
+  \`var.event_organism\`, \`var.event_workspace\`, \`var.event_space\`, \`var.event_count\`,
+  \`var.event_row_ids\` (at most 50 ids, and only ids made of letters, digits and \`. _ : @ + = -\`),
+  \`var.event_at\` and \`var.event_folded\`. The event carries ids and a count, never a row's
+  content: the agent reads the rows through an app tool.
+- One run of a workflow is live at a time. Without \`coalesce\` an append that arrives during a run
+  starts nothing. With \`"coalesce": true\` the appends that arrive during a run start **one** more
+  run when it ends; \`event_folded\` says how many events it stands for, \`event_count\` is their
+  rows together, and \`event_at\` is the time of the first, so "everything since \`event_at\`" misses
+  nothing. Leave \`coalesce\` out of a workflow whose own step writes what its trigger matches: it
+  would start itself again after every run.
+- The same variables come with the other events: \`event_key\` for \`memory.write\`, \`event_offer\`
+  for \`offer.ordered\`. Save the workflow with \`aimeat_workflow_save\`.
+- An agent is a workflow step only when its offer declares its workflow signals (skill
+  \`add-a-crew-agent\`, "What it offers"). Where no agent is needed, the step can be an extension
+  action or the owner's model instead, and \`{event_row_ids}\` goes into its input or prompt.
 
 "Where its work goes" is a different choice. It decides who reads the agent's finished result (its
 owner only, or the members of one workspace). It gives the agent nothing to read and wakes it for
@@ -172,7 +208,7 @@ definition is not that approval.
    another agent.
 3. **Which workspace holds it, and in what shape?** Records or rows, and their fields.
 4. **What wakes the agent?** A new record (a contract agent), a task, a message or a clock. A row
-   does not.
+   does not by itself: a clock after the writer, or a workflow that starts on \`workspace.rows\`.
 5. **What do plain rules settle before a model reads anything?** Rules drop the noise first; the
    model reads what is left.
 6. **What does the agent decide, and what does it only prepare?**
@@ -192,8 +228,9 @@ definition is not that approval.
 - **The tools:** the mail app publishes "new messages" and "one message". The extension behind them
   reads the rows (\`ctx.workspace.readRows\`), because the agent's own \`workspace\` tool reads records
   and not rows.
-- **The agent:** runs on a clock after the refinery, calls those tools (\`app_tools\`), and writes a
-  reply draft and its own classification back (\`workspace_write\`).
+- **The agent:** runs on a clock after the refinery, or as the step of a workflow that starts on
+  the new rows. It calls those tools (\`app_tools\`), and writes a reply draft and its own
+  classification back (\`workspace_write\`).
 - **The person:** reads the drafts in the app and presses Send. The app sends through the connected
   account.
 - **The runtime gets no mail tool.**

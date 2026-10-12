@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.29.0 -- 2026-10-13 -- Workflows: the three events, the event_* variables and coalesce.
  *   v1.28.1 -- 2026-10-11 -- The agent guide is named by its GitHub address; a repository path does not
  *            open from a node.
  *   v1.28.0 -- 2026-10-11 -- An offer for other owners has a money price and/or a pacing amount
@@ -130,6 +131,9 @@ fired. Each step names an agent + an offer and inherits that offer's success/req
 deliverable location (an agent is "workflow-compatible" only when its offer publishes these). Use a
 workflow instead of chaining separate schedules when steps depend on each other; one trigger
 (schedule / manual / event) drives the whole chain, and a RED step fails only its dependent subtree.
+An event is a memory write, an offer order or rows appended to a workspace row space; the run carries
+it as \`event_*\` variables, and \`coalesce: true\` on the trigger starts one more run for what arrived
+while a run was live.
 \`maxCostUsd\` on the definition caps what one run may spend on AI through its ai steps, in US dollars:
 the run stops before its next ai step once that much is spent, and says so on the run. A save makes you
 the workflow's saver: a run its own trigger starts answers to you, and does not start while you lack

@@ -10,6 +10,7 @@
  * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · toneStatus · verdictOf · workflowRows · crumb · renderPage
  * @usage import { renderPage, verdictOf, signalWords } from './frame.js';
  * @version-history
+ *   v1.10.1 -- 2026-10-13 -- triggerWords says a workspace.rows trigger in words ("when rows are added to inbox").
  *   v1.3.1 -- 2026-09-26 -- A run stopped because its next AI step's estimate did not fit in what was
  *            left of the spending limit says so: the step, the estimate, the spend and the limit.
  *   v1.10.0 -- 2026-09-26 -- The page frame is the SettingsPage (the crumb and the rail's groups and page links as data), the workflows table the List (the last run's word a Tinted word in its tone, main's .wp-m--ok/--bad/--wait), a state the Status Mark (statusMark); the file writes no class (page group G5).
@@ -88,6 +89,7 @@ export const isRed = (s) => s === 'output-red' || s === 'input-red' || s === 'ti
 export function triggerWords(trigger) {
   if (!trigger) return '';
   if (trigger.kind === 'schedule') return `${cronWords(trigger.cron)}${trigger.timezone ? ` (${trigger.timezone.split('/').pop()})` : ''}`;
+  if (trigger.kind === 'event' && trigger.on === 'workspace.rows') return c('trigger.rows', { space: trigger.match?.space || trigger.match?.workspace || '' });
   if (trigger.kind === 'event') return c('trigger.event', { what: trigger.match?.key || trigger.match?.offer || trigger.on });
   if (trigger.kind === 'ecosystem.event') return c('trigger.app', { app: trigger.app });
   return c('trigger.manual');

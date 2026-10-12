@@ -109,6 +109,10 @@
  *   v1.19.2 — 2026-10-04 — A declined task ends its step like a done or failed one
  *     (isTerminalTaskStatus); the step is then judged by its output, as before.
  *   v1.20.0 — 2026-10-05 — A run keeps who its AI calls run as (ai-caller.ts; secaudit 2026-10, AI-3).
+ *   v1.21.0 — 2026-10-13 — A run a trigger starts carries its event as `event_*` variables; a
+ *     `workspace.rows` trigger starts from the row service's bus event; with `coalesce` an event whose
+ *     start meets a live run waits, and one more run starts when that run ends. StartRunOpts and
+ *     StartRunResult moved to engine-types.ts (max-file-lines), exported from here as before.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -117,15 +121,18 @@ import { isTerminalTaskStatus } from '../../storage/interface.js';
 import type { createWebhookDispatcher } from '../webhook-dispatcher.js';
 import type { PushService } from '../push.js';
 import type { EmailService } from '../email.js';
-import { emitChange } from '../event-bus.js';
+import { emitChange, onRowsAppendedEvent, offRowsAppendedEvent, type RowsAppendedEvent } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { localAccountName, runAsNode } from '../../utils/gaii.js';
 import { buildEvalCtx } from './eval-context.js';
 import { evalSignal, recordProgress, evalRunSignals } from './engine-observe.js';
 import { getWorkflow, validateWorkflow, listRuns, runKey, reservedStepKeys, reservedStepKeyErrors, type ResolvedStep } from './store.js';
-import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
+import { missingStepScopes, stepScopeRefusal } from './step-authority.js';
+import { eventVars, coalesces } from './workflow-event.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
-import { fireMemoryWrite, fireOfferOrdered, fireEcosystemEvent, type TriggerDeps } from './engine-triggers.js';
+import {
+  fireMemoryWrite, fireOfferOrdered, fireEcosystemEvent, fireWorkspaceRows, holdForLater, startWaiting, startOrphans, type TriggerDeps,
+} from './engine-triggers.js';
 import { template, resolveRunVars } from './engine-util.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import {
@@ -159,28 +166,9 @@ export { HUMAN_TIMEOUT_MIN_DEFAULT } from './engine-human.js';
 import { computeReadySteps, runOutcome, failDownstream } from './engine-readiness.js';
 export { computeReadySteps, runOutcome } from './engine-readiness.js';
 
-export interface StartRunOpts {
-  // full-sandbox dispatches like full-live but namespaces every key under `wf-test.<runId>.` so a
-  // test run never clobbers production keys (the dispatched step is told the prefix so a cooperating
-  // agent writes there; signal eval reads/writes under it).
-  mode: 'signals-only' | 'full-live' | 'full-sandbox';
-  vars?: Record<string, string>;
-  /** The principal starting the run, which answers for its steps (step-authority.ts). Absent for a
-   *  run the workflow's own trigger starts: that answers to whoever saved it (trigger-authority.ts). */
-  caller?: WorkflowCaller;
-}
-
-/**
- * What startRun answers. `skipped: true` means NOTHING STARTED: a live run of this workflow is
- * already in flight, the definition does not set `parallel`, and `runId` is that run's id, not a
- * new one. Every door passes the flag on, because a skip that looks like a start is the failure no
- * metric shows (a partner's intake logged a case as started on exactly that, 2026-09-09). With
- * `refused`, nothing started either: a trigger's start found its saver gone or short of a word, and
- * `runId` is the refusal's record.
- */
-export type StartRunResult =
-  | { runId: string; skipped: boolean; refused?: string }
-  | { error: string[]; denied?: { needed: string[]; message: string } };
+// StartRunOpts and StartRunResult live in engine-types.ts (moved 2026-10-13, max-file-lines).
+import type { StartRunOpts, StartRunResult } from './engine-types.js';
+export type { StartRunOpts, StartRunResult } from './engine-types.js';
 
 export class WorkflowEngine {
   private config: AimeatConfig;
@@ -218,13 +206,15 @@ export class WorkflowEngine {
   /** Start the watchdog (timeouts + due retries). Idempotent; the timer is unref'd. */
   async start(): Promise<void> {
     await this.resumeInflight();
+    await startOrphans(this.triggerDeps()).catch(err => logger.error('workflow waiting events not started', { error: String(err) }));
     if (!this.sweepTimer) {
+      onRowsAppendedEvent(this.rowsHandler);
       this.sweepTimer = setInterval(() => { this.sweep().catch(err => logger.error('workflow sweep failed', { error: String(err) })); }, 60_000);
       this.sweepTimer.unref?.();
     }
   }
 
-  stop(): void { if (this.sweepTimer) { clearInterval(this.sweepTimer); this.sweepTimer = undefined; } }
+  stop(): void { if (this.sweepTimer) { clearInterval(this.sweepTimer); this.sweepTimer = undefined; offRowsAppendedEvent(this.rowsHandler); } }
 
   /** Run a single run's mutation under its lock (serializes concurrent advances). */
   private async withLock<T>(runId: string, fn: () => Promise<T>): Promise<T> {
@@ -277,13 +267,15 @@ export class WorkflowEngine {
       const active = await readActiveRuns(this.storage, this.config.nodeId);
       const inFlight = active.find(a => a.workflowId === workflowId && a.ownerGhii === ownerGhii);
       if (inFlight) {
+        // `coalesce`: a trigger's event waits for the live run to end and starts one more run then.
+        if (opts.event && coalesces(def.trigger)) await holdForLater(this.triggerDeps(), ownerGhii, workflowId, opts.event);
         logger.info(`workflow "${workflowId}": a run is already in flight (${inFlight.runId}); skipping this start`);
         return { runId: inFlight.runId, skipped: true };
       }
     }
 
     const runId = randomUUID();
-    const vars = this.resolveVars(def, opts.vars, runId);
+    const vars = { ...eventVars(opts.event), ...this.resolveVars(def, opts.vars, runId) }; // a declared variable of the same name wins
     // The finished keys, now that the variables are fixed for the whole run: no step writes, or sends
     // out, a key the node trusts (store.ts reservedStepKeys; save judged only what the templates spell).
     const reserved = reservedStepKeys(def.steps, v.resolved, vars, opts.mode === 'full-sandbox' ? `wf-test.${runId}.` : '');
@@ -585,9 +577,15 @@ export class WorkflowEngine {
       startRun: (o, n, w, opts) => this.startRun(o, n, w, opts),
       // Handed over rather than imported there: lifecycle.ts reaches the scheduler, which reaches
       // this engine, and a second import path into that circle is what check:deps refuses.
-      readEventTriggers, readEcosystemEventTriggers,
+      readEventTriggers, readEcosystemEventTriggers, readActiveRuns,
     };
   }
+
+  /** The bus is one per process: answer for this node's row spaces only, as this node. */
+  private readonly rowsHandler = (evt: RowsAppendedEvent): void => {
+    if (evt.nodeId !== this.config.nodeId) return;
+    runAsNode(this.config.nodeId, () => { void fireWorkspaceRows(this.triggerDeps(), evt).catch(err => logger.error('workspace.rows trigger failed', { error: String(err) })); });
+  };
 
   async onMemoryWrite(ownerGhii: string, key: string): Promise<void> {
     return fireMemoryWrite(this.triggerDeps(), ownerGhii, key);
@@ -793,5 +791,7 @@ export class WorkflowEngine {
       createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
     await reconcileActiveRun(this.storage, this.config.nodeId, ownerGhii, run);
+    // A live run that just ended: what waited for it (`coalesce`) starts one more run.
+    if (run.mode === 'full-live' && run.status !== 'running' && run.status !== 'waiting-step') startWaiting(this.triggerDeps(), ownerGhii, run.workflowId);
   }
 }

@@ -320,11 +320,15 @@ export interface WorkflowStep {
 export type WorkflowTrigger =
   | { kind: 'schedule'; cron: string; timezone?: string }
   | { kind: 'manual' }
-  | { kind: 'event'; on: 'memory.write' | 'offer.ordered'; match: Record<string, string> }
+  // `workspace.rows` fires once per append call to a row space the workflow's owner may read;
+  // `match` names it with globs: `organism` and `workspace` (both required), `space` (optional).
+  // `coalesce`: the events that arrive while a run is in flight start ONE more run when it ends,
+  // instead of starting nothing (services/workflow/engine-coalesce.ts).
+  | { kind: 'event'; on: 'memory.write' | 'offer.ordered' | 'workspace.rows'; match: Record<string, string>; coalesce?: boolean }
   // Fires when a bound ecosystem app (GEAI) emits an inbound event. `app` is the bound app name
   // (e.g. 'zendesk'), `on` the inbound event name (e.g. 'ticket.resolved'). `version` pins the
   // event's MAJOR version — the trigger is fail-safe (does NOT fire) on a major mismatch.
-  | { kind: 'ecosystem.event'; app: string; on: string; version: number; match?: Record<string, string> };
+  | { kind: 'ecosystem.event'; app: string; on: string; version: number; match?: Record<string, string>; coalesce?: boolean };
 
 /**
  * The principal whose save of a workflow is in force. `id` is how it is found again: the owner's GHII,
@@ -721,13 +725,14 @@ const WorkflowStepSchema = z.object({
 const WorkflowTriggerSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('schedule'), cron: z.string().min(1).max(120), timezone: z.string().max(60).optional() }),
   z.object({ kind: z.literal('manual') }),
-  z.object({ kind: z.literal('event'), on: z.enum(['memory.write', 'offer.ordered']), match: z.record(z.string().max(120), z.string().max(400)) }),
+  z.object({ kind: z.literal('event'), on: z.enum(['memory.write', 'offer.ordered', 'workspace.rows']), match: z.record(z.string().max(120), z.string().max(400)), coalesce: z.boolean().optional() }),
   z.object({
     kind: z.literal('ecosystem.event'),
     app: z.string().min(1).max(100),                          // the bound app name, e.g. 'zendesk'
     on: z.string().min(1).max(120),                           // inbound event name, e.g. 'ticket.resolved'
     version: z.number().int().min(1),                         // pinned MAJOR of the event type; fail-safe (no fire) on major mismatch
     match: z.record(z.string().max(120), z.string().max(400)).optional(),
+    coalesce: z.boolean().optional(),
   }),
 ]);
 

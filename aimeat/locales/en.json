@@ -20711,6 +20711,7 @@
   "profile.workflows.cover.step.pending": "Not yet",
   "profile.workflows.cover.trigger.event": "when {what} is written",
   "profile.workflows.cover.trigger.app": "when {app} sends an event",
+  "profile.workflows.cover.trigger.rows": "when rows are added to {space}",
   "profile.workflows.cover.trigger.manual": "by hand",
   "profile.workflows.cover.trigger.scheduleWord": "on a schedule",
   "profile.workflows.cover.trigger.eventWord": "when memory is written",
