@@ -15,6 +15,8 @@
  *                                      consumer debited) · and a STALE session token (named error, no charge)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-exchange-mcp.ts
  * @version-history
+ *   v1.4.2 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED): the
+ *     agent-work listing states `toll_morsels: 5` and the app tool `tollMorsels: 3`, which 3.x accepts too.
  *   v1.4.1 — 2026-10-11 — The no-contract case prices its tool in money: a morsel figure is pacing
  *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa), and a tool with only that is free.
  *   v1.4.0 — 2026-10-08 — aiprov D1: a delivery whose declaration the provider's agent may not make
@@ -111,7 +113,7 @@ await test('Setup: provider registers an agent + lists an agent-work offering (5
     const reg = await json('/v1/agents', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ name: 'worker', owner: provider.name, capabilities: ['actions'] }) });
     assert(reg.status === 201, `agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
     const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
-        kind: 'agent-work', agent_name: 'worker', task_type: 'summarize', title: 'Doc summarization', price_morsels: 5, usage_terms: validTerms,
+        kind: 'agent-work', agent_name: 'worker', task_type: 'summarize', title: 'Doc summarization', toll_morsels: 5, usage_terms: validTerms,
         input_schema: { type: 'object', required: ['text'], properties: { text: { type: 'string' } } },
         output_schema: { type: 'object', properties: { summary: { type: 'string' } } },
     }) });
@@ -316,7 +318,7 @@ await test('Setup: provider installs a priced extension and sells it as an app-t
         key: 'apps.plotter.tools', visibility: 'public',
         value: { tools: [{
             name: 'run', action_id: `ext:${EXT}:echo`, description: 'echo the input',
-            price: { morsels: 3, unit: 'per-call' },
+            tollMorsels: 3,
             inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
         }] },
     }) });

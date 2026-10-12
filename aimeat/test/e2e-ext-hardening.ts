@@ -26,6 +26,9 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   v1.4.0 — 2026-10-12 — 3e on node 4.0.0: `commercial.payMorsels` is refused outright with 400
+ *     MORSEL_PRICE_REMOVED (asserted there in place of its ceiling), and the ordinary-price install is a
+ *     money price with a toll; on 3.x the morsel-price ceiling and its ordinary install are asserted as before.
  *   v1.3.0 — 2026-10-09 — 3b: an encrypted value inside a secret field's descriptor default is not
  *     stored (secrets audit 2026-10-09, finding 1.1).
  *   v1.2.0 — 2026-09-16 — 3a: install, update, activate and deactivate answer with secret config
@@ -51,6 +54,8 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 async function setupOwner(label: string) {
   const name = `eh${label}${Date.now()}`;
   const reg0 = () => json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Hardening', password: 'Hardening1234' }) });
@@ -481,14 +486,23 @@ async function run() {
   });
 
   // ── 3e. A price nobody meant to type ───────────────────────────────────────────────────────
-  await test('a manifest price and toll are bounded by the node\'s ceilings', async () => {
+  // The morsel price (`commercial.payMorsels`) is a 3.x field: on 3.x it answers to its ceiling, and
+  // on 4.0.0 it is refused outright with MORSEL_PRICE_REMOVED, whatever the number. The toll ceiling
+  // and an ordinary money price with a toll hold on both releases.
+  await test('a manifest price and toll are bounded by the node\'s ceilings (4.0.0 refuses the 3.x morsel price outright)', async () => {
+    const gone = await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
     const priced = await installManifest(ownerA.token, {
       metadata: { name: `pricecap${Date.now()}`, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
       actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo', commercial: { payMorsels: 100_000_000 } }],
       limits: { timeout_ms: 5000, max_api_calls: 1 },
     }, { echo: ECHO });
-    assert(priced.status === 400,
-      `a price of 100 million morsels must be refused, got ${priced.status}: ${JSON.stringify(priced.body?.data)}`);
+    if (gone) {
+      assert(priced.status === 400 && priced.body?.error?.code === 'MORSEL_PRICE_REMOVED',
+        `4.0.0 refuses commercial.payMorsels with 400 MORSEL_PRICE_REMOVED, got ${priced.status}: ${JSON.stringify(priced.body?.error)}`);
+    } else {
+      assert(priced.status === 400,
+        `a price of 100 million morsels must be refused, got ${priced.status}: ${JSON.stringify(priced.body?.data)}`);
+    }
 
     // A toll BURNS the caller's morsels and returns nothing, so it answers to the burn ceiling
     // (extensionMaxDebitPerCall, 100 by default) rather than the price one.
@@ -503,10 +517,19 @@ async function run() {
     // And an ordinary price still installs, so the ceiling is a bound and not a ban.
     const ok = await installManifest(ownerA.token, {
       metadata: { name: `priceok${Date.now()}`, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
-      actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo', commercial: { payMorsels: 5 }, tollMorsels: 2 }],
+      actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo', commercial: { payMoney: { amount: 5_000, currency: 'EUR' } }, tollMorsels: 2 }],
       limits: { timeout_ms: 5000, max_api_calls: 1 },
     }, { echo: ECHO });
     assert(ok.status === 201, `an ordinary price must still install, got ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+    if (!gone) {
+      // On 3.x an ordinary morsel price installs too: its ceiling is a bound and not a ban.
+      const okMorsels = await installManifest(ownerA.token, {
+        metadata: { name: `pricemok${Date.now()}`, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
+        actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo', commercial: { payMorsels: 5 }, tollMorsels: 2 }],
+        limits: { timeout_ms: 5000, max_api_calls: 1 },
+      }, { echo: ECHO });
+      assert(okMorsels.status === 201, `an ordinary 3.x morsel price must still install, got ${okMorsels.status}: ${JSON.stringify(okMorsels.body?.error)}`);
+    }
   });
 
   // ── 3f. H-17: a binding the manifest owner typed, believed by the layer underneath ──────────

@@ -27,6 +27,12 @@
  *   - Phase 5: the provider side (consumers) and the refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-exchange
  * @version-history
+ *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
+ *     fixtures use the 4.0.0 form, which 3.x accepts too: the extension actions and the app tool state
+ *     `tollMorsels`, and both needs carry a money budget. Morsel-rail offerings and contracts are read
+ *     through assertPacingRail: `toll_morsels` on both releases, the deprecated mirrors on 3.x only.
+ *     20a: aimeat_exchange_need_post with a morsel budget, stored on 3.x and refused with
+ *     MORSEL_PRICE_REMOVED and nothing stored on 4.0.0, as REST POST /v1/exchange/needs answers.
  *   v1.1.0 — 2026-09-19 — Phase 6: an app tool's input is checked against its published schema on
  *     both doors, and one refusal names every missing field.
  *   v1.0.0 — 2026-09-08 — Initial: all ten tools of src/mcp/exchange.ts, both branches of
@@ -36,9 +42,28 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+
+// Node 4.0.0 drops the deprecated mirrors of a morsel-rail offering or contract (`unit`, `basePrice`,
+// `price_per_call`, `currency`) and keeps `toll_morsels` as the only figure (services/exchange-market.ts
+// presentOffering, presentContractTerms). A 3.x node still answers with the mirrors, marked deprecated.
+const MIRRORS_GONE = await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
+/**
+ * A morsel-rail offering or contract states `amount` morsels of pacing per use. On 3.x the mirror
+ * `priceKey` and `unit: 'morsels'` carry the same amount and are named in `deprecated`; on 4.0.0 they are absent.
+ */
+function assertPacingRail(x: any, amount: number, priceKey: 'basePrice' | 'price_per_call', label: string) {
+    assert(x?.toll_morsels === amount, `${label}: toll_morsels ${amount}: ${JSON.stringify(x)}`);
+    if (MIRRORS_GONE) {
+        assert(!('unit' in x) && !(priceKey in x) && !('deprecated' in x), `${label}: no 3.x mirrors on 4.0.0: ${JSON.stringify(x)}`);
+    } else {
+        assert(x.unit === 'morsels' && x[priceKey] === amount && !!x.deprecated?.[priceKey], `${label}: the 3.x mirrors: ${JSON.stringify(x)}`);
+    }
+}
 
 let passed = 0;
 let failed = 0;
@@ -192,15 +217,15 @@ const manifest = JSON.stringify({
     actions: [
         {
             id: 'validate', method: 'POST', path: '/validate', script: 'echo',
-            input: IN_SCHEMA, output: OUT_SCHEMA, commercial: { payMorsels: 10 },
+            input: IN_SCHEMA, output: OUT_SCHEMA, tollMorsels: 10,
         },
         {
             id: 'legacy', method: 'POST', path: '/legacy', script: 'echo',
-            input: IN_SCHEMA, output: OUT_SCHEMA, commercial: { payMorsels: 6 },
+            input: IN_SCHEMA, output: OUT_SCHEMA, tollMorsels: 6,
         },
         {
             id: 'bidme', method: 'POST', path: '/bidme', script: 'echo',
-            input: IN_SCHEMA, output: OUT_SCHEMA, commercial: { payMorsels: 4 },
+            input: IN_SCHEMA, output: OUT_SCHEMA, tollMorsels: 4,
         },
         { id: 'unpriced', method: 'POST', path: '/unpriced', script: 'echo', input: IN_SCHEMA, output: OUT_SCHEMA },
     ],
@@ -248,7 +273,7 @@ await test('2. The provider lists an ext-action OFFERING through POST /v1/exchan
     });
     assert(r.status === 201, `list offering ${r.status}: ${JSON.stringify(r.body?.error)}`);
     extOfferingId = r.body.data.offering.offeringId;
-    assert(r.body.data.offering.basePrice === 10, `authoritative price: ${JSON.stringify(r.body.data.offering)}`);
+    assertPacingRail(r.body.data.offering, 10, 'basePrice', 'authoritative pacing');
 });
 
 await test('3. The provider lists an APP-TOOL offering, so offering_get has both branches to answer', async () => {
@@ -262,7 +287,7 @@ await test('3. The provider lists an APP-TOOL offering, so offering_get has both
                     name: 'getbrief', description: 'Company brief',
                     action_id: `ext:${EXT}:legacy`,
                     inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA,
-                    price: { morsels: 8 },
+                    tollMorsels: 8,
                 }],
             },
         }),
@@ -284,7 +309,7 @@ await test('4. A need and a bid are seeded over REST, so the MCP reads have a re
         method: 'POST', headers: authed(consumerAgent),
         body: JSON.stringify({
             ext: EXT, action: 'bidme', description: 'REST-seeded need, read back over MCP',
-            app_id: `${consumer.owner}/lookup-app`, budget_unit: 'morsels', budget_cap: 60,
+            app_id: `${consumer.owner}/lookup-app`, budget_unit: 'money', budget_cap: 600000,
         }),
     });
     assert(n.status === 201, `post need ${n.status}: ${JSON.stringify(n.body?.error)}`);
@@ -391,8 +416,8 @@ await test('13. aimeat_exchange_accept by offering_id mints the contract the RES
     });
     assert(!out.isError, `accept refused: ${out.text.slice(0, 300)}`);
     const e = out.data.entitlement;
-    assert(e.price_per_call === 10 && e.unit === 'morsels' && e.state === 'active',
-        `the price is the provider's, not the caller's: ${JSON.stringify(e)}`);
+    assertPacingRail(e, 10, 'price_per_call', 'the pacing is the provider\'s, not the caller\'s');
+    assert(e.state === 'active', `state: ${JSON.stringify(e)}`);
     assert(e.budget.cap_units === 40 && e.budget.spent_units === 0, `budget: ${JSON.stringify(e.budget)}`);
     assert(e.contract_ref === `offering:${extOfferingId}`, `the contract names the offering: ${e.contract_ref}`);
     assert(e.consumer_gaii === consumerGaii,
@@ -402,14 +427,16 @@ await test('13. aimeat_exchange_accept by offering_id mints the contract the RES
     const list = await json('/v1/exchange/entitlements', { headers: authed(consumerAgent) });
     assert(list.status === 200, `entitlements ${list.status}`);
     const rest = (list.body.data.entitlements ?? []).find((x: any) => x.action === 'validate');
-    assert(rest && rest.price_per_call === 10, `REST must show the contract MCP minted: ${JSON.stringify(rest)}`);
+    assert(!!rest, `REST must show the contract MCP minted: ${JSON.stringify(list.body.data.entitlements)}`);
+    assertPacingRail(rest, 10, 'price_per_call', 'REST must show the contract MCP minted');
 });
 
 await test('14. aimeat_exchange_accept on the legacy ext+action branch mints its own contract ref', async () => {
     const out = await callTool(consumerSession, 'aimeat_exchange_accept', { ext: EXT, action: 'legacy', cap_units: 30 });
     assert(!out.isError, `legacy accept refused: ${out.text.slice(0, 300)}`);
     const e = out.data.entitlement;
-    assert(e.price_per_call === 6 && e.action === 'legacy', `authoritative legacy price: ${JSON.stringify(e)}`);
+    assert(e.action === 'legacy', `the legacy contract: ${JSON.stringify(e)}`);
+    assertPacingRail(e, 6, 'price_per_call', 'authoritative legacy pacing');
     assert(String(e.contract_ref).startsWith('mcp:'),
         `a contract with no offering behind it gets an mcp: reference, got ${e.contract_ref}`);
     assert(e.provider === `${provider.owner}@${NODE_ID}`, `the provider is the extension's installer: ${e.provider}`);
@@ -490,7 +517,7 @@ await test('20. aimeat_exchange_need_post writes a need REST then finds, with ma
         app_id: `${consumer.owner}/lookup-app`,
         ext: EXT, action: 'validate',
         usage_intent: 'Enriching a customer list the owner already holds',
-        budget_unit: 'morsels', budget_cap: 50, autonomy: 'supervised',
+        budget_unit: 'money', budget_cap: 500000, autonomy: 'supervised',
     });
     assert(!out.isError, `need_post refused: ${out.text.slice(0, 300)}`);
     mcpNeedId = out.data.need.needId;
@@ -503,6 +530,28 @@ await test('20. aimeat_exchange_need_post writes a need REST then finds, with ma
     const rest = await json('/v1/exchange/needs?open=1');
     assert(rest.body.data.needs.some((n: any) => n.needId === mcpNeedId),
         'the need the tool wrote must be the need the REST browse returns');
+});
+
+// A budget in morsels is a 3.x form: REST POST /v1/exchange/needs refuses it from 4.0.0, and the MCP
+// tool has to answer the same, or the removed form stays reachable through the agent's door.
+await test('20a. aimeat_exchange_need_post with a morsel budget is stored and browsable on 3.x; 4.0.0 refuses it with MORSEL_PRICE_REMOVED and stores nothing', async () => {
+    const description = `Morsel-budget need over MCP ${Date.now()}`;
+    const out = await callTool(consumerSession, 'aimeat_exchange_need_post', {
+        description, app_id: `${consumer.owner}/lookup-app`, ext: EXT, action: 'validate',
+        budget_unit: 'morsels', budget_cap: 50,
+    });
+    const rest = await json('/v1/exchange/needs?open=1');
+    assert(rest.status === 200, `needs ${rest.status}`);
+    const stored = (rest.body.data.needs as any[]).filter(n => n.description === description);
+    if (MIRRORS_GONE) {
+        assert(out.isError && out.text.startsWith('MORSEL_PRICE_REMOVED'),
+            `4.0.0 refuses a morsel budget with MORSEL_PRICE_REMOVED: ${out.text.slice(0, 300)}`);
+        assert(stored.length === 0, `nothing was stored: ${JSON.stringify(stored)}`);
+        return;
+    }
+    assert(!out.isError, `need_post refused: ${out.text.slice(0, 300)}`);
+    assert(out.data.need.budgetUnit === 'morsels' && out.data.need.budgetCap === 50, `the budget is stored as sent: ${JSON.stringify(out.data.need)}`);
+    assert(stored.length === 1 && stored[0].needId === out.data.need.needId, `the need is browsable over REST: ${JSON.stringify(stored)}`);
 });
 
 await test('21. aimeat_exchange_bid bids with an action the caller\'s own extension owns', async () => {
