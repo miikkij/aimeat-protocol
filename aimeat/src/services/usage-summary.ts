@@ -24,11 +24,15 @@
  *   v1.2.0 — 2026-07-14 — Perf: memory bytes via a single sumMemoryBytesForOwners aggregate; the
  *     storage/micro/actions/counts fan-outs run concurrently (Promise.all) instead of ~500 serial
  *     round-trips per cache-miss.
+ *   v1.3.0 — 2026-10-13 — `ai.own_key` counts a key on one of the owner's providers
+ *     (own-key-coverage.ts hasOwnAiKey), not only the legacy openrouter.apikey record, which node
+ *     4.0.0 no longer writes.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { cached, invalidateKey, TTL } from './cache.js';
 import { readAllowance, remainingOf } from './ai-allowance.js';
+import { hasOwnAiKey } from './own-key-coverage.js';
 import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
 
@@ -135,9 +139,9 @@ async function computeOwnerUsageSummary(
 
   // The AI allowance, read through the same function the chat status uses so the two can never
   // disagree about a number the person is told twice.
-  const [allowance, ownKeyRecord] = await Promise.all([
+  const [allowance, ownKey] = await Promise.all([
     readAllowance(storage, config, ghii),
-    storage.getMemory(ghii, 'openrouter.apikey'),
+    hasOwnAiKey(storage, ghii),
   ]);
   const allowanceRemaining = remainingOf(allowance);
 
@@ -164,7 +168,7 @@ async function computeOwnerUsageSummary(
     },
     morsels: { balance: ghiiRecord?.morselBalance ?? 0 },
     ai: {
-      own_key: !!ownKeyRecord,
+      own_key: ownKey,
       granted_usd: allowance.granted_usd,
       spent_usd: allowance.spent_usd,
       remaining_usd: allowanceRemaining,
