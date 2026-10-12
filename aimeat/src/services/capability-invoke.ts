@@ -6,6 +6,10 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.6.0 - 2026-10-12 - The extension case's loopback request carries the node's loopback pass for
+ *     the caller's token (auth/loopback-pass.ts), so aimeat_capabilities_invoke and
+ *     aimeat_app_tool_invoke keep working from 4.0.0 for a session whose token is bound to the MCP
+ *     endpoint, which `/v1/ext` refuses from outside. Identity, scopes and the paywall are unchanged.
  *   v1.5.0 - 2026-09-24 - `authority` replaces `callerScopes`: the scopes AND whether the caller is the
  *     owner in person, which the `mcp` case hands to the chokepoint. It passed the resolved identity
  *     alone, so an app under a grant was taken for its owner and called the owner's server.
@@ -27,6 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { INTERNAL_PASS_HEADER } from '../routes/extensions/internal-pass.js';
+import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../auth/loopback-pass.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { buildGEAI, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
@@ -104,26 +109,36 @@ export async function invokeCapability(
       // `internalPass` (when present) tells the paywall on the other end that this call was already
       // settled by the route that knows which product was bought. Absent on every other path, so a
       // capability reached any other way is charged normally.
-      const response = await fetch(`http://127.0.0.1:${config.port}/v1/ext/${extName}/${actionId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}`,
-          ...(internalPass ? { [INTERNAL_PASS_HEADER]: internalPass } : {}),
-        },
-        body: JSON.stringify(input),
-      });
-      const body = await response.json() as Record<string, unknown>;
+      // The loopback pass (auth/loopback-pass.ts) says the node sent this request for the caller's
+      // own token. A session that signed in over MCP OAuth holds a token bound to the MCP endpoint,
+      // which `/v1/ext` refuses from 4.0.0 when it comes from outside; with the pass the route reads
+      // the same token, so the caller's identity, scopes and the paywall are as before.
+      const loopbackPass = mintLoopbackPass(jwt);
+      try {
+        const response = await fetch(`http://127.0.0.1:${config.port}/v1/ext/${extName}/${actionId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}`,
+            [LOOPBACK_PASS_HEADER]: loopbackPass,
+            ...(internalPass ? { [INTERNAL_PASS_HEADER]: internalPass } : {}),
+          },
+          body: JSON.stringify(input),
+        });
+        const body = await response.json() as Record<string, unknown>;
 
-      if (!body.ok) {
-        if (response.status === 401) {
-          throw Object.assign(
-            new Error(`Cannot invoke "${capability.id}": the caller's token was rejected (expired or revoked). Refresh the session token and call again.`),
-            { statusCode: 401, code: 'CALLER_TOKEN_INVALID' },
-          );
+        if (!body.ok) {
+          if (response.status === 401) {
+            throw Object.assign(
+              new Error(`Cannot invoke "${capability.id}": the caller's token was rejected (expired or revoked). Refresh the session token and call again.`),
+              { statusCode: 401, code: 'CALLER_TOKEN_INVALID' },
+            );
+          }
+          throw Object.assign(new Error((body.error as { message?: string } | undefined)?.message || 'Extension invoke failed'), { statusCode: response.status, code: 'EXTENSION_ERROR' });
         }
-        throw Object.assign(new Error((body.error as { message?: string } | undefined)?.message || 'Extension invoke failed'), { statusCode: response.status, code: 'EXTENSION_ERROR' });
+        result = mode === 'raw' ? body : body.data;
+      } finally {
+        revokeLoopbackPass(loopbackPass);
       }
-      result = mode === 'raw' ? body : body.data;
       break;
     }
 

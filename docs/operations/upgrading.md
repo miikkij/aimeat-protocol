@@ -64,6 +64,7 @@ node log names each kind once a day. When a count stays at zero, nothing on that
 | **The AI settings routes from before providers**: `/v1/openrouter/settings`, `/v1/openrouter/models`, `/v1/openrouter/test`, `/v1/ai/settings` | `AIMEAT_AI_LEGACY_SETTINGS_ROUTES` (on by default in 3.x) | 410, naming `/v1/ai/providers` | use `/v1/ai/providers` |
 | **A fixed TURN user name and password** for voice and video relay | `AIMEAT_TURN_USERNAME`, `AIMEAT_TURN_CREDENTIAL` (used only when `AIMEAT_TURN_SECRET` is not set) | the fixed pair is no longer served: the TURN entry carries the address alone | set `AIMEAT_TURN_SECRET` (the coturn shared secret); the node then gives each client a credential that expires (`AIMEAT_TURN_TTL_SECONDS`) |
 | **The MCP OAuth flow without PKCE or a resource** | none | 400 `invalid_request` or `invalid_target` | the AI client sends PKCE (S256) and `resource` naming the node's MCP endpoint, as current clients do |
+| **An MCP OAuth access token on a REST route.** The token an AI gets from `POST /v1/mcp/token` names the node's MCP endpoint as its audience, and RFC 8707 says it is for that endpoint only. Counted as `mcp_token_on_rest` | none: the node refuses it by itself when it runs 4.0.0 | 401 `INVALID_TOKEN` with `WWW-Authenticate: Bearer error="invalid_token"`. The MCP endpoints (`/v1/mcp`, `/mcp`, `/v2/mcp/<role>`) keep taking it, and so do the node's own MCP tools that reach REST routes for the session (`aimeat_invoke`, `aimeat_capabilities_invoke`, `aimeat_app_tool_invoke`) | a script or app that calls REST routes uses an agent token from device authorization or a personal access token, and keeps the MCP token for the MCP endpoint. The node log names the route and the agent once a day |
 
 Each removal is named in the code by its own constant, beside the code it gates, and the version
 that removes it is read from there:
@@ -77,6 +78,7 @@ that removes it is read from there:
 | `AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN` | `aimeat/src/config-ai-models.ts` |
 | `TURN_STATIC_PAIR_REMOVED_IN` | `aimeat/src/config-turn.ts` |
 | `MCP_OAUTH_LAX_REMOVED_IN` | `aimeat/src/mcp/oauth-binding.ts` |
+| `MCP_TOKEN_ON_REST_REMOVED_IN` | `aimeat/src/auth/mcp-token-on-rest.ts` |
 
 ## What else changes in 4.0.0
 

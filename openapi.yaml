@@ -65,7 +65,10 @@ info:
     `GET /v1/stats` (`deprecated_use_by_type`). Removed in 4.0.0: the owner-key sign-in on
     `POST /v1/auth/token`, `?token=` on a WebSocket upgrade, federation messages without the audience
     proof, an optional relay claim, the morsel price fields, `costCapMorsels` on a workflow, the AI
-    settings routes from before providers and the static TURN pair. Also from 4.0.0: a consent made
+    settings routes from before providers, the static TURN pair, and an MCP OAuth access token
+    (audience: this node's MCP endpoint) on a REST route, which is refused with 401 `INVALID_TOKEN`
+    and `WWW-Authenticate: Bearer error="invalid_token"` (counted before 4.0.0 as
+    `mcp_token_on_rest`; the MCP endpoints keep taking it). Also from 4.0.0: a consent made
     without a reach is `local`, a public node takes only `https://` peer addresses, and a public node
     records AI provenance whatever `AIMEAT_AI_PROVENANCE` says.
   version: 3.26.1
@@ -274,6 +277,14 @@ components:
         a personal access token (`aimeat_pat_…`, created with `POST /v1/access/tokens`); or an
         access token from OAuth for MCP (`POST /v1/mcp/token`). All but the personal access token are
         JWTs. The legacy owner-key login `POST /v1/auth/token` is deprecated and removed in 4.0.0.
+        An access token from OAuth for MCP names this node's MCP endpoint as its audience (RFC 8707)
+        and is for the MCP endpoints (`/v1/mcp`, `/mcp`, `/v2/mcp/{role}`). On a REST route it is
+        refused from 4.0.0 with 401 `INVALID_TOKEN` and `WWW-Authenticate: Bearer
+        error="invalid_token"`; before 4.0.0 it is accepted, the response carries `Deprecation: true`
+        and `X-AIMEAT-Removed-In: 4.0.0`, and `GET /v1/stats` counts the use
+        (`deprecated_use_by_type.mcp_token_on_rest`). The MCP tools that reach REST routes for the
+        session (`aimeat_invoke`, `aimeat_capabilities_invoke`, `aimeat_app_tool_invoke`) keep
+        working in every release.
         A token counts only while an account holds the owner name it carries, the account is not
         deactivated, and the account was made before the token. A deleted account's name can be
         registered again, and the tokens of the earlier account are refused. Each token carries its
@@ -1464,6 +1475,7 @@ components:
           description: |
             Machine-readable error code. Common codes:
             - AUTH_REQUIRED: Missing authentication
+            - INVALID_TOKEN: The token verified but is not for this route (from 4.0.0, an MCP OAuth access token on a REST route)
             - ACCESS_DENIED: Insufficient permissions
             - NOT_FOUND: Resource not found
             - INSUFFICIENT_MORSELS: Wallet balance too low
@@ -35150,8 +35162,11 @@ paths:
         access token names this node's MCP endpoint as its audience (`aud`), and the MCP endpoint
         refuses a token whose audience is another resource. From 4.0.0 a code issued without PKCE is
         not redeemed and the MCP endpoint refuses an MCP OAuth token without an audience; before
-        4.0.0 the latter is accepted and counted in GET /v1/stats (`mcp_oauth_legacy`). Errors are
-        bare OAuth error objects, not the AIMEAT envelope.
+        4.0.0 the latter is accepted and counted in GET /v1/stats (`mcp_oauth_legacy`). The access
+        token is for the MCP endpoints only: from 4.0.0 a REST route refuses it with 401
+        `INVALID_TOKEN` (`WWW-Authenticate: Bearer error="invalid_token"`), and before 4.0.0 it is
+        accepted with the Deprecation headers and counted (`deprecated_use_by_type.mcp_token_on_rest`).
+        Errors are bare OAuth error objects, not the AIMEAT envelope.
       tags: [MCP]
       requestBody:
         required: true

@@ -10,6 +10,9 @@
  *   MCP tool call flows over the single persistent WS without per-tool changes.
  * @usage Imported by `aimeat connect` subcommands and MCP tools.
  * @version-history
+ *   v1.8.0 -- 2026-10-12 -- `setNodeHeaders`: headers sent only on a direct node-relative request.
+ *     The node's loopback dispatcher sends its loopback pass there (auth/loopback-pass.ts), so a
+ *     session bound to the MCP endpoint keeps reaching the REST routes from 4.0.0.
  *   v1.7.0 -- 2026-09-24 -- A CURRENT credential, and a dead one is not sent again every few seconds
  *     (production refusal log L-3). A client that knows whose credential it carries asks
  *     `resolveToken` at send time on the direct path (a key mints, a stored bearer is read), instead
@@ -124,8 +127,19 @@ export class AimeatClient {
   setTransport(t: Transport | null): void { this.transport = t; }
   hasTransport(): boolean { return this.transport !== null; }
 
-  private headers(token: string | null): Record<string, string> {
+  /**
+   * Headers sent on every node-relative request this client makes directly, never on an absolute
+   * URL and never through a transport. The node's own loopback dispatcher (services/node-invoke.ts)
+   * sets its loopback pass here (auth/loopback-pass.ts), which must not leave this host.
+   */
+  private nodeHeaders: Record<string, string> = {};
+
+  /** Set the headers above. Replaces what was set before. */
+  setNodeHeaders(headers: Record<string, string>): void { this.nodeHeaders = { ...headers }; }
+
+  private headers(token: string | null, nodeRelative = false): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json', Connection: 'close' };
+    if (nodeRelative) Object.assign(h, this.nodeHeaders);
     if (token) h['Authorization'] = `Bearer ${token}`;
     return h;
   }
@@ -258,7 +272,7 @@ export class AimeatClient {
     }
     const res = await fetch(url, {
       method,
-      headers: this.headers(token),
+      headers: this.headers(token, !path.startsWith('http')),
       body: body !== undefined && body !== null ? JSON.stringify(body) : undefined,
     });
     this.lastStatus = res.status;
