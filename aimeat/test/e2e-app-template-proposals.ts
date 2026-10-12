@@ -9,6 +9,9 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-template-proposals).
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The REST routes are called with the agent's own token from POST
+ *     /v1/auth/token, the one the connector holds; the MCP OAuth token stays on /v1/mcp, because node
+ *     4.0.0 refuses it on a REST route (401 INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN).
  *   v1.1.0 — 2026-10-06 — POST /v1/appdev/templates and GET /v1/appdev/pitfalls/index, the routes the
  *     connector's tools call now: the same answer as the MCP tools, and their refusals
  *     (secaudit 2026-10 follow-up, Part B).
@@ -72,6 +75,8 @@ function parseSSE(text: string): any[] {
 
 class McpSession {
     token = '';
+    /** The agent's own REST token (POST /v1/auth/token); the MCP OAuth token stays on /v1/mcp. */
+    restToken = '';
     sessionId = '';
     private nextId = 1;
 
@@ -138,6 +143,13 @@ async function setupOwnerAgentSession(ownerName: string, agentName: string): Pro
     });
     const session = new McpSession();
     session.token = tok.access_token;
+    const ts3 = new Date().toISOString();
+    const { status: rs, body: rb } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: ab.data.agent.gaii, timestamp: ts3, signature: await signMsg(ab.data.private_key, ab.data.agent.gaii + ts3) }),
+    });
+    assert(rs === 200 && typeof rb.data?.token === 'string', `agent token ${rs}: ${JSON.stringify(rb.error)}`);
+    session.restToken = rb.data.token;
     await session.rpc('initialize', {
         protocolVersion: '2025-03-26', capabilities: {},
         clientInfo: { name: 'Template Proposals E2E', version: '1.0.0' },
@@ -285,8 +297,10 @@ await test('delete removes the proposal', async () => {
 // calls a route that runs the node MCP tool's own function, and these tests hold the two to the same
 // answer.
 
+// The connector holds the agent's own token, never the MCP OAuth token: node 4.0.0 refuses that one
+// on a REST route (401 INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN).
 const rest = (s: McpSession, path: string, opts: RequestInit = {}) =>
-    json(path, { ...opts, headers: { Authorization: `Bearer ${s.token}`, ...opts.headers } });
+    json(path, { ...opts, headers: { Authorization: `Bearer ${s.restToken}`, ...opts.headers } });
 
 await test('POST /v1/appdev/templates proposes through the same function, and the MCP list shows it', async () => {
     const { status, body } = await rest(A, '/v1/appdev/templates', {

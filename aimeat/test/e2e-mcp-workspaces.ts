@@ -36,6 +36,11 @@
  *   v1.10.0 — 2026-10-06 — Test 48: a provenance declaration without provenance:write answers 403
  *     SCOPE_DENIED on the drafts route (it answered 500) and on the tool, also from a session narrower
  *     than its grant (secaudit 2026-10 last items, F2).
+ *   v1.11.0 — 2026-10-12 — The REST/connector path (tests 7b, 19-30, 44-48) holds the agent's own
+ *     token from POST /v1/auth/token, the one the connector gets, and the MCP OAuth token stays on
+ *     /v1/mcp: node 4.0.0 refuses an MCP token on a REST route (401 INVALID_TOKEN,
+ *     MCP_TOKEN_ON_REST_REMOVED_IN). Test 48 mints both tokens of a session at the same moment, so
+ *     "the session's token does not hold the word" stays true on the route.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -120,7 +125,18 @@ async function setupAgent(label: string) {
     const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret, ...tokenParams(pkce) }) });
     const client = mcpClient(); client.setToken(tk.body.access_token);
     await client.rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'WS MCP', version: '1.0.0' } });
-    return { ownerName, ownerToken, client, agentToken: tk.body.access_token as string, agentGaii };
+    // The REST/connector path holds the agent's own token, the one the connector gets: node 4.0.0
+    // refuses the MCP OAuth token on a REST route (401 INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN).
+    const agentToken = await agentRestToken(agentGaii, agentPriv);
+    return { ownerName, ownerToken, client, agentToken, agentGaii };
+}
+
+/** The agent's own REST token: POST /v1/auth/token with gaii + a signature over gaii + timestamp. */
+async function agentRestToken(gaii: string, priv: string): Promise<string> {
+    const ts = new Date().toISOString();
+    const r = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(priv, gaii + ts) }) });
+    assert(r.status === 200 && typeof r.body.data?.token === 'string', `agent token ${r.status}: ${JSON.stringify(r.body.error)}`);
+    return r.body.data.token as string;
 }
 
 console.log('\n=== AIMEAT MCP Workspaces E2E Test ===\n');
@@ -988,16 +1004,10 @@ await test('47. an agent with memory:write and no organism:write writes a draft 
     const narrowed = await json(`/v1/agents/${name}/scopes`, { method: 'PATCH', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ scopes: ['memory:read', 'memory:write'] }) });
     assert(narrowed.status === 200, `scopes ${narrowed.status}: ${JSON.stringify(narrowed.body.error)}`);
     const gaii = ag.body.data.agent.gaii, priv = ag.body.data.private_key;
-    const cl = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'WS narrow', redirect_uris: [] }) });
-    const ts = new Date().toISOString();
-    const pkce = mcpPkce(BASE);
-    const params = new URLSearchParams({ response_type: 'code', client_id: cl.body.client_id, gaii, signature: await signMsg(priv, gaii + NODE_ID + ts), timestamp: ts, ...authorizeParams(pkce) });
-    const auth = await json(`/v1/mcp/authorize?${params}`);
-    const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret, ...tokenParams(pkce) }) });
-    const token = tk.body.access_token as string;
-    assert(!!token, `no token: ${JSON.stringify(tk.body).slice(0, 200)}`);
+    // The route the connector calls takes the agent's own token, as the connector holds it.
+    const token = await agentRestToken(gaii, priv);
 
-    const w = await restAs(token, `/v1/organisms/${orgId}/workspace/drafts`, {
+    const w = await restAs(token,`/v1/organisms/${orgId}/workspace/drafts`, {
         method: 'POST', body: JSON.stringify({ ws: WS, space: 'note', id: 'narrow-1', value: { title: 'memory:write only' } }),
     });
     assert(w.status === 200, `drafts with memory:write answered ${w.status}: ${JSON.stringify(w.body.error)}`);
@@ -1017,7 +1027,9 @@ await test('48. a provenance declaration without provenance:write → 403 SCOPE_
     const setScopes = (scopes: string[]) => json(`/v1/agents/${name}/scopes`, { method: 'PATCH', headers: { Authorization: `Bearer ${A.ownerToken}` }, body: JSON.stringify({ scopes }) });
     assert((await setScopes(['memory:read', 'memory:write'])).status === 200, 'narrow the grant');
     const gaii = ag.body.data.agent.gaii, priv = ag.body.data.private_key;
-    const mint = async (): Promise<string> => {
+    // Each session is a pair minted at the same moment: the MCP OAuth token for /v1/mcp and the
+    // agent's own token for the REST route (node 4.0.0 refuses the MCP token on REST).
+    const mint = async (): Promise<{ mcp: string; rest: string }> => {
         const cl = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'WS prov', redirect_uris: [] }) });
         const ts = new Date().toISOString();
         const pkce = mcpPkce(BASE);
@@ -1025,10 +1037,11 @@ await test('48. a provenance declaration without provenance:write → 403 SCOPE_
         const auth = await json(`/v1/mcp/authorize?${params}`);
         const tk = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code: auth.body.code, client_id: cl.body.client_id, client_secret: cl.body.client_secret, ...tokenParams(pkce) }) });
         assert(!!tk.body.access_token, `no token: ${JSON.stringify(tk.body).slice(0, 200)}`);
-        return tk.body.access_token as string;
+        return { mcp: tk.body.access_token as string, rest: await agentRestToken(gaii, priv) };
     };
-    const token = await mint();
-    const client = mcpClient(); client.setToken(token);
+    const session = await mint();
+    const token = session.rest;
+    const client = mcpClient(); client.setToken(session.mcp);
     await client.rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'WS prov', version: '1.0.0' } });
     const declared = { level: 'ai-generated', model: 'test-model' };
     const restWrite = (t: string, id: string) => restAs(t, `/v1/organisms/${orgId}/workspace/drafts`, {
@@ -1056,7 +1069,7 @@ await test('48. a provenance declaration without provenance:write → 403 SCOPE_
     assert(t2?.isError === true && /^SCOPE_DENIED/.test(t2.content?.[0]?.text ?? ''), `narrowed session, tool answered ${JSON.stringify(t2).slice(0, 300)}`);
 
     // A token minted after the grant carries the word, and declares.
-    const r3 = await restWrite(await mint(), 'prov-5');
+    const r3 = await restWrite((await mint()).rest, 'prov-5');
     assert(r3.status === 200, `a session holding provenance:write was refused: ${r3.status} ${JSON.stringify(r3.body.error)}`);
 });
 

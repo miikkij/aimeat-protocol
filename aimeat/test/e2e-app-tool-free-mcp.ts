@@ -4,6 +4,10 @@
  * @structure Authenticated fixtures; free calls and caller identity; refusal paths; cleanup.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tool-free-mcp
  * @version-history
+ *   2026-10-12 — Both agents hold ext:invoke, the word node 4.0.0 asks on the extension action route
+ *     behind an app tool (REST scope gates). Without it every call there was refused at the route, so
+ *     the pacing and the action money price were never reached, and the limited agent's refusal was
+ *     not only for exchange:write.
  *   2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
  *     kaksi-arvoa): the `priced` tool (price.morsels 5) is free with 5 morsels of pacing on both
  *     surfaces; only the money-priced `usd` tool still needs a contract.
@@ -92,8 +96,10 @@ console.log('Free app-tool MCP parity at ' + BASE);
 let seller: Owner | undefined;
 try {
   seller = await makeOwner('fts'); const buyer = await makeOwner('ftb');
-  const actor = await makeAgent(buyer, ['exchange:write', 'social:read']);
-  const limited = await makeAgent(buyer, ['exchange:read', 'social:read']);
+  // Both hold ext:invoke, the word the backing extension action route asks from 4.0.0, so the
+  // limited agent's refusal is for exchange:write alone.
+  const actor = await makeAgent(buyer, ['exchange:write', 'social:read', 'ext:invoke']);
+  const limited = await makeAgent(buyer, ['exchange:read', 'social:read', 'ext:invoke']);
   const agentSession = await session(actor.token), limitedSession = await session(limited.token);
   const manifest = JSON.stringify({ metadata: { name: EXT, version: '1.0.0', description: 'Free app tool parity fixture', author: 'e2e' },
     actions: [{ id: 'echo', method: 'POST', path: '/echo', script: 'echo' },

@@ -9,6 +9,9 @@
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-members-only-payments
  * @version-history
  *   v1.0.0 — 2026-10-01 — Initial (wish-members-only-refuses-a-non-member-before-checkout-or-a-contr).
+ *   v1.1.0 — 2026-10-12 — The MCP test's two agents hold ext:invoke beside exchange:write: node 4.0.0
+ *     asks that word on the extension action route behind an app tool (REST scope gates), and the
+ *     member was refused there.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -165,8 +168,10 @@ await test('members-only: the REST app-tool route refuses the outsider before it
 
 await test('members-only: the MCP app-tool tool refuses the outsider before it charges', async () => {
     const before = await carriedCalls(stranger.name);
-    const theirAgent = await agentOf(stranger, ['exchange:write']);
-    const memberAgent = await agentOf(member, ['exchange:write']);
+    // ext:invoke is the word the app tool's backing action route asks from 4.0.0; the outsider holds
+    // it too, so the refusal asserted for them is MEMBERS_ONLY and nothing else.
+    const theirAgent = await agentOf(stranger, ['exchange:write', 'ext:invoke']);
+    const memberAgent = await agentOf(member, ['exchange:write', 'ext:invoke']);
     const r = await mcpCall(theirAgent, 'aimeat_app_tool_invoke', { owner: owner.name, app: APP, tool: TOOL, input: { q: 'x' } });
     assert(r.isError && /MEMBERS_ONLY/.test(r.text), `the outsider was served over MCP: ${r.status} ${r.text.slice(0, 200)}`);
     assert(await carriedCalls(stranger.name) === before, 'and nothing was settled for the refused call');

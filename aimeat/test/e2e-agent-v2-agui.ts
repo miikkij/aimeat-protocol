@@ -15,10 +15,17 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2-agui
  * @version-history
  *   v1.0.0 — 2026-09-01 — Initial, with the feature.
+ *   v1.1.0 — 2026-10-12 — The narrow-agent test asks the node which release it runs
+ *     (helpers/node-release.ts). "A read needs no scope" is the 3.x statement and stays as it was;
+ *     from 4.0.0 the watch route asks task:read (REST scope gates), so the agent without it is
+ *     refused 403 SCOPE_DENIED by name, and an agent holding task:read and not task:write is refused
+ *     the run and may watch.
  */
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../src/utils/rest-scope-release.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -291,15 +298,36 @@ async function run(): Promise<void> {
         assert(anon.status === 401, `and no credential is 401, got ${anon.status}`);
     });
 
-    await test('an agent whose scopes do not carry task:write cannot start a run, but may watch', async () => {
+    await test('an agent whose scopes do not carry task:write cannot start a run, but may watch (3.x: a read needs no scope; 4.0.0: a read needs task:read, 403 SCOPE_DENIED without it)', async () => {
         const start = await json(`/v1/agui/${a.owner}/${worker.name}`, {
             method: 'POST', headers: { Authorization: `Bearer ${reader.token}` },
             body: JSON.stringify({ messages: [{ id: 'z', role: 'user', content: 'start something' }] }),
         });
         assert(start.status === 403, `expected 403, got ${start.status}`);
 
-        const watching = await openAgui(`/v1/agui/${a.owner}/${worker.name}/${taskId}`, reader.token);
-        assert(watching.status === 200, `a read needs no scope, got ${watching.status}`);
+        if (!(await removedOn(BASE, REST_SCOPE_GATES_ENFORCED_IN))) {
+            const watching = await openAgui(`/v1/agui/${a.owner}/${worker.name}/${taskId}`, reader.token);
+            assert(watching.status === 200, `a read needs no scope, got ${watching.status}`);
+            watching.stream?.close();
+            await watching.stream?.done;
+            return;
+        }
+
+        // 4.0.0: the watch route asks task:read. Without it the read is refused by name ...
+        const refused = await openAgui(`/v1/agui/${a.owner}/${worker.name}/${taskId}`, reader.token);
+        assert(refused.status === 403 && refused.body?.error?.code === 'SCOPE_DENIED',
+            `4.0.0: a read without task:read must be 403 SCOPE_DENIED, got ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+        assert(/task:read/.test(String(refused.body?.error?.message)), `the refusal names the word: ${refused.body?.error?.message}`);
+
+        // ... and an agent holding task:read and not task:write still cannot start a run, but may watch.
+        const watcher = await addAgent(a.owner, a.ownerToken, 'agui-watcher', ['task:read']);
+        const watcherStart = await json(`/v1/agui/${a.owner}/${worker.name}`, {
+            method: 'POST', headers: { Authorization: `Bearer ${watcher.token}` },
+            body: JSON.stringify({ messages: [{ id: 'z2', role: 'user', content: 'start something' }] }),
+        });
+        assert(watcherStart.status === 403, `task:read alone starts no run, got ${watcherStart.status}`);
+        const watching = await openAgui(`/v1/agui/${a.owner}/${worker.name}/${taskId}`, watcher.token);
+        assert(watching.status === 200, `an agent with task:read may watch, got ${watching.status} ${JSON.stringify(watching.body)}`);
         watching.stream?.close();
         await watching.stream?.done;
     });
