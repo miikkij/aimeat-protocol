@@ -17,6 +17,8 @@
  *   deliberately different and checks the unrelated domain does NOT arrive.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-sse-parity
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The MCP OAuth sign-in sends PKCE and resource (helpers/mcp-oauth-pkce.ts), and
+ *     the suite's refusal case: a stream ticket opens one stream, and a used or unknown one is refused.
  *   v1.1.0 — 2026-09-29 — aimeat_classification (set, with the person's words) reaches 'classification'.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit: the side-effect sweep).
  */
@@ -285,6 +287,22 @@ async function run() {
             assert(!stream.domains().includes('boards'),
                 `the bus is broadcasting: a memory write delivered [${[...new Set(stream.domains())].join(', ')}]`);
         } finally { stream.close(); }
+    });
+
+    // ── The refusal: a stream ticket opens one stream ──────────────────────────────────────────
+    // The ticket is what keeps the owner's session token out of the stream URL, so it must work
+    // once: a second GET with the same ticket, or one with a ticket the node never minted, is refused.
+    await test('a stream ticket opens one stream: used again, or never minted, it is refused (401)', async () => {
+        const t = await json('/v1/events/ticket', { method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` } });
+        assert(t.status === 200 && !!t.body.data.ticket, `ticket: ${t.status} ${JSON.stringify(t.body)}`);
+        const ctrl = new AbortController();
+        const first = await fetch(`${BASE}/v1/events?ticket=${t.body.data.ticket}`, { signal: ctrl.signal });
+        assert(first.status === 200, `the first use opens the stream: ${first.status}`);
+        ctrl.abort();
+        const again = await json(`/v1/events?ticket=${t.body.data.ticket}`);
+        assert(again.status === 401, `a used ticket must be refused, got ${again.status}`);
+        const bogus = await json('/v1/events?ticket=never-minted-ticket');
+        assert(bogus.status === 401, `a ticket the node never minted must be refused, got ${bogus.status}`);
     });
 
     console.log('\nCleanup');
