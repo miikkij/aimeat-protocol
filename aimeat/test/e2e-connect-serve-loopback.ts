@@ -22,6 +22,10 @@
 //     stays up. A request with no secret is refused with 401 as well.
 //
 // Version history:
+//   2026-10-12 — /local/call answers for tools that had a connector MCP handler only: a company is
+//     registered, corrected and listed, a notification reaches the owner, an email invitation is
+//     made, listed and cancelled; an undeclared parameter, a decision outside its routes, a
+//     company that does not exist and an exempt operator tool are each refused where they should be.
 //   2026-09-29 — A request with no secret is refused with 401 at four endpoints, shutdown included, whatever the version.
 //   2026-09-27 — A tool that moved into aimeat_app_manage answers TOOL_MOVED on the connector MCP and /local/call.
 //   2026-09-26 — A wrong secret is refused at four endpoints. A request with no
@@ -707,6 +711,71 @@ await test('POST /local/call/:tool — unknown tool returns 404 UNKNOWN_TOOL', a
   const r = await json(loopbackBase, '/local/call/not_a_real_tool', { method: 'POST', body: '{}' });
   assert(r.status === 404, `status ${r.status}`);
   assert(r.body.error?.code === 'UNKNOWN_TOOL', `code ${r.body.error?.code}`);
+});
+
+await test('POST /local/call/:tool — tools that had a connector MCP handler only answer here too (companies, notify, organism email invitations, contacts)', async () => {
+  // UNTIL 2026-10-12 THIRTY AGENT TOOLS ANSWERED UNKNOWN_TOOL HERE. Each had a handler on the
+  // connector MCP and none on the CLI dispatch, the catalog said `cliFallback: false` for them, and
+  // the gate asked for a handler only where the catalog said true. This is the round trip for four
+  // of the six groups against a real daemon, a real tunnel and a real node; the unit probe
+  // (cli-tool-param-forwarding) invokes all thirty against a recording client.
+  const stamp = Date.now().toString(36);
+  const call = (tool: string, body: unknown) => json(loopbackBase, `/local/call/${tool}`, { method: 'POST', body: JSON.stringify(body) });
+  const short = (v: unknown) => JSON.stringify(v).slice(0, 300);
+
+  // ── Companies: register one, correct one field, and the list holds it with both.
+  const made = await call('aimeat_company_create', { name: `Loopback ${stamp} Oy`, business_id: '1234567-8', city: 'Helsinki' });
+  assert(made.status === 200 && made.body.ok === true, `company_create: ${made.status} ${short(made.body)}`);
+  const companyId = made.body.data?.company?.id as string;
+  assert(typeof companyId === 'string' && companyId.length > 0, `no company id in ${short(made.body.data)}`);
+  const updated = await call('aimeat_company_update', { company_id: companyId, iban: 'FI2112345600000785' });
+  assert(updated.status === 200 && updated.body.ok === true, `company_update: ${updated.status} ${short(updated.body)}`);
+  assert(JSON.stringify(updated.body.data?.updated_fields) === '["iban"]', `updated_fields: ${short(updated.body.data?.updated_fields)}`);
+  const listed = await call('aimeat_company_list', {});
+  const mine = ((listed.body.data?.companies ?? []) as { id: string; iban?: string; businessId?: string; city?: string }[]).find(c => c.id === companyId);
+  assert(mine !== undefined, `the company is missing from the list: ${short(listed.body.data)}`);
+  // PUT replaces the record, so the update read it first and merged: the earlier fields are still there.
+  assert(mine!.iban === 'FI2112345600000785' && mine!.businessId === '1234567-8' && mine!.city === 'Helsinki',
+    `a one-field update must keep the others: ${short(mine)}`);
+
+  // ── Notify: the agent tells its own owner, and the owner reads it on the node.
+  const title = `Loopback notice ${stamp}`;
+  const told = await call('aimeat_notify', { title, body: 'sent through /local/call', link: '/profile' });
+  assert(told.status === 200 && told.body.ok === true, `notify: ${told.status} ${short(told.body)}`);
+  const bell = await json(BASE, '/v1/notifications', { headers: { Authorization: `Bearer ${account.ownerToken}` } });
+  assert(JSON.stringify(bell.body.data ?? {}).includes(title), `the owner's notifications do not hold "${title}": ${short(bell.body.data)}`);
+
+  // ── Organism email invitations: invite, read the pending list, cancel.
+  const org = await call('aimeat_organism_create', { name: `Loopback invite org ${stamp}`, description: 'email invitation probe', join_policy: 'open' });
+  const orgId = (org.body.data?.organism?.id ?? org.body.data?.id) as string;
+  assert(typeof orgId === 'string' && orgId.length > 0, `organism_create: ${org.status} ${short(org.body)}`);
+  const email = `guest.${stamp}@example.fi`;
+  const invited = await call('aimeat_organism_invite_email', { organism_id: orgId, email, org_role: 'member', expires_in_days: 2 });
+  assert(invited.status === 200 && invited.body.ok === true, `invite_email: ${invited.status} ${short(invited.body)}`);
+  const invitationId = invited.body.data?.invitation?.id as string;
+  const pending = await call('aimeat_organism_invitations_email', { organism_id: orgId });
+  assert(JSON.stringify(pending.body.data ?? {}).includes(email), `the pending list does not hold ${email}: ${short(pending.body.data)}`);
+  const cancelled = await call('aimeat_organism_invitation_email_cancel', { organism_id: orgId, invitation_id: invitationId });
+  assert(cancelled.status === 200 && cancelled.body.data?.status === 'cancelled', `invitation cancel: ${cancelled.status} ${short(cancelled.body)}`);
+
+  // ── Contacts: the owner's address book reads through the dispatch.
+  const book = await call('aimeat_contact_list', {});
+  assert(book.status === 200 && Array.isArray(book.body.data?.contacts), `contact_list: ${book.status} ${short(book.body)}`);
+
+  // ── The refusals. A parameter the tool does not declare stops in the dispatch, with its name.
+  const extra = await call('aimeat_notify', { title: 'x', urgency: 'high' });
+  assert(extra.status === 400 && extra.body.error?.code === 'UNKNOWN_PARAMETER', `undeclared parameter: ${extra.status} ${short(extra.body)}`);
+  // A decision that is none of the three routes is refused before anything is sent.
+  const odd = await call('aimeat_exchange_proposal_decide', { proposal_id: 'p-1', decision: '../../admin' });
+  assert(odd.status === 400 && odd.body.error?.code === 'TOOL_CALL_ERROR', `odd decision: ${odd.status} ${short(odd.body)}`);
+  // The node's own refusal arrives with the node's code: the route decides, the handler decides nothing.
+  const gone = await call('aimeat_company_front_page', { company_id: 'no-such-company', kind: 'none' });
+  assert(gone.status === 400 && gone.body.ok === false && typeof gone.body.error?.code === 'string'
+    && !['UNKNOWN_TOOL', 'UNKNOWN_PARAMETER', 'TOOL_CALL_ERROR'].includes(gone.body.error.code),
+  `a company that does not exist must be refused by the node: ${gone.status} ${short(gone.body)}`);
+  // A tool the exemptions file keeps off connect serve is unknown here (security/connect-serve-parity-exemptions.json).
+  const minted = await call('aimeat_admin_mint', { gaii: `${agentName}#${account.ownerName}@${NODE_ID}`, amount: 1 });
+  assert(minted.status === 404 && minted.body.error?.code === 'UNKNOWN_TOOL', `aimeat_admin_mint: ${minted.status} ${short(minted.body)}`);
 });
 
 await test('P3 — aimeat_agent_statistics rides the tunnel (own reputation rollup, no direct node GET)', async () => {

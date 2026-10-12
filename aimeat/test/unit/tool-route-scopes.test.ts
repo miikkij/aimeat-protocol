@@ -16,6 +16,10 @@
  *   entry that no longer differs.
  * @usage pnpm test -- tool-route-scopes
  * @version-history
+ *   v1.2.0 — 2026-10-12 — Thirty tools got a dispatch definition and are paired for the first time.
+ *     Three pairs differed: aimeat_organism_invitations_email now asks organism:invite as its route
+ *     does, and aimeat_company_update (a read before the write) and aimeat_commerce_beneficiary_payout
+ *     (a quote route and a settlement route, by a written decision) are listed with their reason.
  *   v1.1.2 — 2026-10-06 — aimeat_workspace_write leaves KNOWN: since Part B its first dispatch call is
  *     the drafts route itself, so the LOOKUP reason was false and hid a pair that differed
  *     (secaudit 2026-10 follow-up audit, finding 2).
@@ -133,6 +137,14 @@ function pairs(): { tool: string; route: string; tool_words: string[]; route_wor
 const KNOWN: Record<string, string> = {
   aimeat_workspace_object_delete: 'LOOKUP: lists the memory keys of the object before it deletes them.',
   aimeat_offer_price_set: 'LOOKUP: reads the agent\'s offers before it sets the price.',
+  // Two pairs that the 2026-10-12 dispatch definitions made visible: the tools had a handler on the
+  // connector MCP only, which this test does not read.
+  aimeat_company_update: 'LOOKUP: reads the company (GET, company:read) before the PUT that replaces it (company:write, '
+    + 'the word the tool asks), so the fields the caller did not send are kept.',
+  aimeat_commerce_beneficiary_payout: 'TWO ROUTES, DECIDED: the handler\'s first call is the quote (GET, wallet:read) and the '
+    + 'tool\'s act is the settlement (POST, exchange:beneficiary). The catalog entry takes the write word on purpose and says '
+    + 'why (definitions/commerce.ts). On the connector, an agent that holds exchange:beneficiary and not wallet:read is refused '
+    + 'the quote by the route; on the node MCP the tool quotes for it.',
   // The 30 UNREVIEWED pairs were triaged on 2026-10-06 (secaudit 2026-10 follow-up, A4): the tools
   // ask the words their route asks. aimeat_skill_list left this list in Part B: its first call is now
   // the binding filter on GET /v1/skills, which asks no word, and only view=linked calls

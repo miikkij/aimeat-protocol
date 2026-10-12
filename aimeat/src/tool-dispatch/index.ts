@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.8.0 -- 2026-10-12 -- contactCliTools, companyCliTools, beneficiaryCliTools, exchangeRunCliTools,
+ *     organismOwnerCliTools and notifyUsageCliTools: the 30 agent tools that had a handler on the
+ *     connector MCP only, so /local/call refused them (wish: every MCP tool on aimeat connect serve).
  *   v1.7.0 -- 2026-10-09 -- docsignCliTools: aimeat_docsign_validate, _lookup, _request_create,
  *     _requests, _request_get, _sign and _cancel.
  *   v1.6.0 -- 2026-10-08 -- visibilityCliTools: aimeat_visibility_report and aimeat_visibility_settings_set.
@@ -43,6 +46,12 @@ import { adminCliTools } from './tool-call-defs-admin.js';
 import { themeCliTools } from './tool-call-defs-themes.js';
 import { visibilityCliTools } from './tool-call-defs-visibility.js';
 import { docsignCliTools } from './tool-call-defs-docsign.js';
+import { contactCliTools } from './tool-call-defs-contacts.js';
+import { companyCliTools } from './tool-call-defs-companies.js';
+import { beneficiaryCliTools } from './tool-call-defs-beneficiaries.js';
+import { exchangeRunCliTools } from './tool-call-defs-exchange-run.js';
+import { organismOwnerCliTools } from './tool-call-defs-organism-owners.js';
+import { notifyUsageCliTools } from './tool-call-defs-notify-usage.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -79,6 +88,12 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...themeCliTools,
     ...visibilityCliTools,
     ...docsignCliTools,
+    ...contactCliTools,
+    ...companyCliTools,
+    ...beneficiaryCliTools,
+    ...exchangeRunCliTools,
+    ...organismOwnerCliTools,
+    ...notifyUsageCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

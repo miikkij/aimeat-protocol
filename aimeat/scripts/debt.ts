@@ -31,6 +31,7 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   v1.4.0 — 2026-10-12 — The node MCP tools that `aimeat connect serve` does not offer join the report.
  *   v1.3.0 — 2026-10-05 — The single-entry ceilings join the report (secaudit 2026-10, C1, C2, C7).
  *   v1.2.0 — 2026-09-13 — The substitute-answering catches join the report. Their file is keyed by
  *     file with a per-file ceiling rather than one key per site, so the count is the sum of the
@@ -78,6 +79,7 @@ const RATCHETS: Ratchet[] = [
     { file: 'aimeat/security/outbound-fetch-exemptions.json', label: 'Bare outbound fetches', check: 'check:outbound-fetch', count: exemptMap },
     { file: 'aimeat/security/denial-coverage-exemptions.json', label: 'Suites with no denial case', check: 'check:denial-coverage', count: exemptMap },
     { file: 'aimeat/security/storage-parity-exemptions.json', label: 'Tables outside the cascades', check: 'check:storage-parity', count: exemptMap },
+    { file: 'aimeat/security/connect-serve-parity-exemptions.json', label: 'MCP tools not on connect serve', check: 'check:mcp-tools', count: exemptMap },
     {
         file: 'aimeat/security/silent-catch-substitutes.json',
         label: 'Catches answering a substitute',

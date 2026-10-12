@@ -11,6 +11,8 @@
  *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-10-12 — The six beneficiary tools declare all three interfaces (agentEverywhere). They declared
+ *     connectorMcp: false while the connector registered them, and had no CLI dispatch definition.
  *   2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
  *     kaksi-arvoa): aimeat_offer_price_set sets the money price and `toll_morsels` (price_morsels and
  *     clear_morsels stay as deprecated 3.x names until 4.0.0); the checkout tools describe the money
@@ -50,9 +52,9 @@ export const commerceTools = [
         name: 'aimeat_commerce_beneficiary_split_set',
         description: 'Declare who shares what one of YOUR capabilities earns. A second rake, shaped like the platform one: the platform rake takes a percent of what the BUYER pays, this takes a percent of what YOU earn and routes it to other accounts by weight. The pool comes out of your cut, after the platform rake, NEVER out of the buyer\'s price - declaring a split makes nothing more expensive for anyone, it makes your own revenue land somewhere else. `pool_percent` is how much of your cut leaves you; `weight` divides that pool (two rows at weight 1 split it evenly, 3 and 1 split it 75/25). Set `dynamic: true` when WHO deserves a share depends on what the call was about: the capability then names destinations per call by returning a `_revenue` key, which the node strips before the buyer sees it. That key names destinations ONLY, so it can redirect a share you already committed and can never enlarge its own payout. Always written against YOUR OWN revenue. The coordinate is the metered pair: an extension name, `apptool:{owner}/{appId}`, or `agentwork:{owner}/{agent}`, plus the action id, tool name or task type.',
         caller: 'agent',
-        // MCP-server only: no connector REST twin and no CLI handler, so the catalog says so
-        // rather than promising surfaces that would 404. (audit-mcp-tools enforces the parity.)
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        // On the connector the six beneficiary tools are thin proxies over /v1/commerce/beneficiary*
+        // (tool-dispatch/tool-call-defs-beneficiaries.ts).
+        visibility: agentEverywhere,
         annotations: { title: 'Declare a Revenue Split', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // aimeat_app_tools_get is intentionally ungated — it reads PUBLIC manifests (own always).
         // Beneficiary splitting. Declaring who shares your revenue, and paying one of them, both move
@@ -97,9 +99,9 @@ export const commerceTools = [
         name: 'aimeat_commerce_beneficiary_splits',
         description: 'Every beneficiary split YOU have declared, with its pool percent, whether it accepts per-call destinations, and who shares it. Owner-scoped: your own only, never another seller\'s. Pass `remove_ext` + `remove_action` to WITHDRAW one instead. Future calls then keep your whole cut, while shares already accrued still stand, because what was earned does not un-happen when the arrangement ends.',
         caller: 'agent',
-        // MCP-server only: no connector REST twin and no CLI handler, so the catalog says so
-        // rather than promising surfaces that would 404. (audit-mcp-tools enforces the parity.)
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        // On the connector the six beneficiary tools are thin proxies over /v1/commerce/beneficiary*
+        // (tool-dispatch/tool-call-defs-beneficiaries.ts).
+        visibility: agentEverywhere,
         annotations: { title: 'Your Revenue Splits', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'exchange:beneficiary',
         surfaces: ['service', 'commerce'],
@@ -112,9 +114,9 @@ export const commerceTools = [
         name: 'aimeat_commerce_beneficiary_earnings',
         description: 'What YOU have been given a share of, and whether it can be paid yet. A share is owed by the PROVIDER whose call it came from, out of what they earned, not by the buyer. `accrued` means booked and unpaid; the `verification` block is the honest answer to "when do I get this" - false means the amount is real and booked but no operator has verified your account, and it stays booked until one does. Totals are keyed per unit and NEVER summed: a currency code for real money in integer micro-units, and `morsels` for the node\'s pacing meter, which is capacity to call things rather than income. Set `role: "provider"` to see the other side instead: what YOU owe your beneficiaries, each with the tracking code a release needs.',
         caller: 'agent',
-        // MCP-server only: no connector REST twin and no CLI handler, so the catalog says so
-        // rather than promising surfaces that would 404. (audit-mcp-tools enforces the parity.)
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        // On the connector the six beneficiary tools are thin proxies over /v1/commerce/beneficiary*
+        // (tool-dispatch/tool-call-defs-beneficiaries.ts).
+        visibility: agentEverywhere,
         annotations: { title: 'Beneficiary Shares Owed', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'wallet:read',
         surfaces: ['service', 'commerce'],
@@ -128,9 +130,9 @@ export const commerceTools = [
         name: 'aimeat_commerce_beneficiary_release',
         description: 'Pay one accrued share you owe. Only the provider who owes it can, and only their own obligations. GATED: refuses with BENEFICIARY_UNVERIFIED until an operator has recorded that the beneficiary may be paid, because paying a party nobody has checked is how a self-declared claimant collects on somebody else\'s identity. What release DOES differs by rail, and `settled_here` reports which happened: a morsel share transfers from your balance to theirs and COMPLETES here, because morsels are the node\'s own pacing meter; a money share is booked onto their payable book and the fiat leg is invoiced off-node, because a node that pushed fiat would first have to hold it. Read `settled_here` as "is there anything left to do", never as "which rail is the real one". Idempotent: releasing the same share twice is refused.',
         caller: 'agent',
-        // MCP-server only: no connector REST twin and no CLI handler, so the catalog says so
-        // rather than promising surfaces that would 404. (audit-mcp-tools enforces the parity.)
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        // On the connector the six beneficiary tools are thin proxies over /v1/commerce/beneficiary*
+        // (tool-dispatch/tool-call-defs-beneficiaries.ts).
+        visibility: agentEverywhere,
         annotations: { title: 'Release a Beneficiary Share', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'exchange:beneficiary',
         surfaces: ['service', 'commerce'],
@@ -143,9 +145,9 @@ export const commerceTools = [
         name: 'aimeat_commerce_beneficiary_approve',
         description: 'OPERATOR ONLY. Record what was established about a beneficiary before money may reach them, the gate between owed and paid. A gate a provider could open for their own payees would not be a gate. `method` says HOW representation was established (suomifi-valtuudet, manual-operator, contract-on-file) and is REQUIRED when verifying: the node keeps no list of acceptable methods, because which evidence suffices is a legal judgement that varies by jurisdiction. `subject` optionally names the external identity the approval attests the account may act for (e.g. fi-ytunnus:3323553-5) and is opaque to the node. Absence of an approval means unverified: the gate fails closed. Omit `state` to READ the current approval instead of setting one; anyone may read their own, another account needs the operator role.',
         caller: 'agent',
-        // MCP-server only: no connector REST twin and no CLI handler, so the catalog says so
-        // rather than promising surfaces that would 404. (audit-mcp-tools enforces the parity.)
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        // On the connector the six beneficiary tools are thin proxies over /v1/commerce/beneficiary*
+        // (tool-dispatch/tool-call-defs-beneficiaries.ts).
+        visibility: agentEverywhere,
         annotations: { title: 'Approve a Beneficiary for Payout', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // The approval gate is operator-only at the handler; the scope keeps a narrow agent from even
         // seeing the tool, so it is not offered to somebody who could never use it.
@@ -168,9 +170,9 @@ export const commerceTools = [
         name: 'aimeat_commerce_beneficiary_payout',
         description: 'Pay a beneficiary what you owe them, onchain. The last leg, and the one no existing payout could do: neither money handler can push a provider\'s funds to a third party (Stripe has no Connect platform here by design, and x402\'s payout is a no-op because the money moved buyer-to-seller at collect time), so a provider-to-beneficiary transfer is a DIFFERENT payment that its payer has to authorise. Call with no `payment` to QUOTE: you get what is owed plus the x402 exact-scheme requirements to sign with the wallet that holds the funds. Sign them, then call again with the signed `payment` to settle. AGGREGATED across everything released and unpaid in one currency, so one signature clears the balance instead of paying gas on every sub-euro share. The quote is rebuilt server-side on settle, so a signature can only move what is genuinely owed at that instant. Entries become `paid` only after the facilitator confirms, so a failed settlement leaves them payable and a confirmation arriving twice cannot pay twice. A beneficiary who has set no payout address returns BENEFICIARY_NO_ADDRESS and the obligation simply stays owed, which is what an unpaid invoice is. The node holds no key and no funds at any instant.',
         caller: 'agent',
-        // MCP-server only: no connector REST twin and no CLI handler, so the catalog says so
-        // rather than promising surfaces that would 404. (audit-mcp-tools enforces the parity.)
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        // On the connector the six beneficiary tools are thin proxies over /v1/commerce/beneficiary*
+        // (tool-dispatch/tool-call-defs-beneficiaries.ts).
+        visibility: agentEverywhere,
         annotations: { title: 'Pay a Beneficiary Onchain', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         // Paying moves value out of the owner's own wallet, so it sits with the seller-side config
         // rather than with the reads.
