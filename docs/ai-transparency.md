@@ -276,6 +276,6 @@ AIMEAT_AI_COP_SIGNED_ON="2026-08-01"
 ## See also
 
 - `GET /v1/ai-transparency` — the live, machine-readable statement for a running node
-- [RFC v4.0 Platform §3.6](AIMEAT-RFC-v4.0-Platform-full.md) — the normative description of the record, the planes and the posture
+- [AIMEAT Core 2026-11 §10](AIMEAT-Core-2026-11.md): the normative description of the record, its carriers, detection and the posture, normative from node 4.0.0 (until then [RFC v4.0 Platform §3.6](AIMEAT-RFC-v4.0-Platform-full.md))
 - [`openapi.yaml`](../openapi.yaml) — the canonical API contract
 - Private EUAct research and role-analysis notes are not distributed in this repository.

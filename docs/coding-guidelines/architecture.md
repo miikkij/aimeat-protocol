@@ -7,7 +7,7 @@
 - **Core**: a thin, generic protocol that nodes can federate. It has three principals (human GHII, agent GAII, ecosystem app GEAI), consent-governed memory and file storage, an authorization stack (consent, access guard, IAM and scoped delegation), collaboration primitives (organisms and workspaces), an economy of *meters* (morsels and real-currency metering) behind an optional payment interface, and federation, whose live use is cross-node identity and login.
 - **Platform (aimeat.io)**: what is built on the Core. The app platform (app grants and H-2 origin isolation), the agent fleet plane, sandboxed compute with metered AI (extensions, cortex, scheduler, workflows), and skills and capabilities. Most of the value a person gets is here, because AI-generated apps on generic APIs replace purpose-built protocol features.
 
-The specification is [Core v4.0](../AIMEAT-RFC-v4.0-Core-full.md) and [Platform v4.0](../AIMEAT-RFC-v4.0-Platform-full.md), corrected by the [errata](../AIMEAT-RFC-v4.0-errata.md). The API contract is [openapi.yaml](../../openapi.yaml). This repository holds the specification and the reference implementation, a Node.js and TypeScript server under `aimeat/`.
+The specification is [AIMEAT Core 2026-11](../AIMEAT-Core-2026-11.md), normative from node 4.0.0, with its [conformance evidence](../AIMEAT-Core-2026-11-evidence.md); the [Platform reference](../AIMEAT-Platform-reference.md) describes what the node builds on it. Until 4.0.0, [Core v4.0](../AIMEAT-RFC-v4.0-Core-full.md) and [Platform v4.0](../AIMEAT-RFC-v4.0-Platform-full.md) stay as published, corrected by the [errata](../AIMEAT-RFC-v4.0-errata.md). The API contract is [openapi.yaml](../../openapi.yaml). This repository holds the specification and the reference implementation, a Node.js and TypeScript server under `aimeat/`.
 
 ---
 
@@ -349,7 +349,9 @@ Translations are in `aimeat/locales/`, not under `public/`. See the [frontend gu
 
 | Path | Purpose |
 |------|---------|
-| `docs/AIMEAT-RFC-v4.0-*.md` | The specification (Core, Platform, errata) |
+| `docs/AIMEAT-Core-2026-11.md`, `docs/AIMEAT-Core-2026-11-evidence.md` | The specification and its conformance evidence |
+| `docs/AIMEAT-Platform-reference.md` | The architecture note of the platform on top of Core |
+| `docs/AIMEAT-RFC-v4.0-*.md` | The v4.0 specification (Core, Platform, errata), kept until node 4.0.0 |
 | `docs/a-endpoints.md`, `docs/b-config.md` | API reference and configuration reference |
 | `docs/coding-guidelines/` | Development standards (this folder) |
 | `docs/frontend-development-guide.md` | Frontend architecture and conventions |

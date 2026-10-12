@@ -44,6 +44,6 @@ The actual checks are defined in
 
 [The documentation index](../README.md) covers both documentation trees.
 [OpenAPI](../../openapi.yaml) is the API contract. The conceptual specifications
-are [Core](../AIMEAT-RFC-v4.0-Core-full.md) and
-[Platform](../AIMEAT-RFC-v4.0-Platform-full.md).
+are [AIMEAT Core 2026-11](../AIMEAT-Core-2026-11.md), normative from node 4.0.0, and the
+[Platform reference](../AIMEAT-Platform-reference.md).
 Plans and build notes live on the node, in the AIMEAT development organism.

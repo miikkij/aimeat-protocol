@@ -4,7 +4,7 @@ How an operator connects a node to other AIMEAT nodes, what each level of peerin
 request between nodes carries, what to watch, and how to remove a peer. The routes and their bodies
 are in [openapi.yaml](../../openapi.yaml); the catalogue and memory exchange between genesis peers is
 in [cross-federation](../aimeat-cross-federation.md); the protocol is in the
-[Core RFC](../AIMEAT-RFC-v4.0-Core-full.md).
+[Core specification](../AIMEAT-Core-2026-11.md), §9.
 
 ## What federation gives
 

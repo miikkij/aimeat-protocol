@@ -3,6 +3,7 @@
 ## What Is Built On The Core
 
 **Status:** v4.0 (Two-Layer Re-baseline: Platform & Ecosystem)
+**Successor:** the [Platform reference](AIMEAT-Platform-reference.md), versioned with the node, on top of [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md), from node 4.0.0. This document stays until that release.
 **Errata:** known errata and pending changes are listed in [AIMEAT-RFC-v4.0-errata.md](AIMEAT-RFC-v4.0-errata.md). Read it before you build against this document.
 **Date:** 2026-07-12 · §3.6 (AI Provenance & Transparency) added 2026-08-01
 **Author:** Jouni Miikki (Overscale Solutions Oy)
