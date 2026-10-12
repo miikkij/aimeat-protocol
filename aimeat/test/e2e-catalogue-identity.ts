@@ -13,6 +13,9 @@
  *   person activates over REST publishes its actions under the same GHII.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=catalogue-identity
  * @version-history
+ *   v1.4.1 — 2026-10-12 — The service and the action are published with their pacing amount as
+ *     toll_morsels / pricing.toll_morsels; node 4.0.0 refuses the old price_morsels and
+ *     pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the same on 3.x.
  *   v1.4.0 — 2026-09-26 — An ecosystem app of the person activates their cortex: its action is under
  *     the app's GEAI, the work on it reaches the person's inbox and Work tab, and deactivation by the
  *     person takes the action away.
@@ -69,7 +72,7 @@ await test('Setup: two owners', async () => {
 });
 
 await test('Owner A publishes a service; the stored provider_gaii is A\'s GHII, not a bare name', async () => {
-    const pub = await json('/v1/catalogue', { ...auth(aTok), method: 'POST', body: JSON.stringify({ display_name: 'Summarise', description: 'summarises text', category: 'text', price_morsels: 0 }) });
+    const pub = await json('/v1/catalogue', { ...auth(aTok), method: 'POST', body: JSON.stringify({ display_name: 'Summarise', description: 'summarises text', category: 'text', toll_morsels: 0 }) });
     assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
     actionId = pub.body.data?.id ?? pub.body.data?.action?.id;
     assert(!!actionId, `an action id comes back: ${JSON.stringify(pub.body.data)}`);
@@ -102,7 +105,7 @@ await test('An owner publishes an action through POST /v1/actions; it is stored 
     cTok = (await registerOwner(cName)).token;
     const pub = await json('/v1/actions', {
         ...auth(aTok), method: 'POST',
-        body: JSON.stringify({ id: workActionId, display_name: 'Proofread', description: 'proofreads text', category: 'language', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+        body: JSON.stringify({ id: workActionId, display_name: 'Proofread', description: 'proofreads text', category: 'language', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { toll_morsels: 10 } }),
     });
     assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
     assert(pub.body.data?.provider_gaii === aGhii, `provider_gaii must be the GHII "${aGhii}", got "${pub.body.data?.provider_gaii}"`);
@@ -369,7 +372,7 @@ await test("An ecosystem app of the person activates their cortex: the work on i
 });
 
 await test('Publishing a service without a credential is refused (401)', async () => {
-    const pub = await json('/v1/catalogue', { method: 'POST', body: JSON.stringify({ display_name: 'Anon', description: 'no auth', category: 'text', price_morsels: 0 }) });
+    const pub = await json('/v1/catalogue', { method: 'POST', body: JSON.stringify({ display_name: 'Anon', description: 'no auth', category: 'text', toll_morsels: 0 }) });
     assert(pub.status === 401, `an unauthenticated publish must be refused, got ${pub.status}`);
 });
 

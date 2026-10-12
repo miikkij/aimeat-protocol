@@ -26,6 +26,9 @@
  *            line in the other side's ledger, no cortex and no ecosystem app
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.12.1 — 2026-10-12 — 55-59 publish their actions with the pacing amount as pricing.toll_morsels;
+ *     node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the
+ *     same on 3.x.
  *   v1.12.0 — 2026-10-10 — 49: the erasure deletes the account's connectivity keys, so the old key
  *     is INVALID_KEY. 49b: a key minted by an erased account creates no agent under the next holder of
  *     the name (secaudit 2026-10-10 C0). 54b: `%25zz` as an agent name answers 4xx, not 500 (I0).
@@ -970,7 +973,7 @@ await test('55. A name registered again after its owner deleted the account hold
         body: JSON.stringify({
             id: actionId, display_name: 'Published in person', description: 'An action its owner published without an agent.',
             // The search matches a tag, not the id, so the id is a tag as well.
-            input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 0 }, tags: ['test', actionId],
+            input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { toll_morsels: 0 }, tags: ['test', actionId],
         }),
     });
     assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
@@ -1013,7 +1016,7 @@ await test('56. When an account is deleted, open work its agent was to do is can
     for (const [who, id] of [[worker, firstAction], [client, otherAction]] as const) {
         const pub = await json('/v1/actions', {
             method: 'POST', headers: auth(who.token),
-            body: JSON.stringify({ id, display_name: id, description: 'Work between two accounts.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+            body: JSON.stringify({ id, display_name: id, description: 'Work between two accounts.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { toll_morsels: 10 } }),
         });
         assert(pub.status === 201, `publish ${id} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
     }
@@ -1092,7 +1095,7 @@ await test('57. When a person who published an action in person deletes the acco
     const publish = async (o: Owner, id: string) => {
         const pub = await json('/v1/actions', {
             method: 'POST', headers: auth(o.token),
-            body: JSON.stringify({ id, display_name: id, description: 'Work between two people.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+            body: JSON.stringify({ id, display_name: id, description: 'Work between two people.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { toll_morsels: 10 } }),
         });
         assert(pub.status === 201, `publish ${id} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
         return pub.body.data.provider_gaii as string;
@@ -1171,7 +1174,7 @@ await test('58. When an owner deletes an agent, its open work is cancelled, the 
     const actionId = `agent-gone-${Date.now().toString(36)}`;
     const pub = await json('/v1/actions', {
         method: 'POST', headers: auth(worker.token),
-        body: JSON.stringify({ id: actionId, display_name: actionId, description: 'Work an agent does.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+        body: JSON.stringify({ id: actionId, display_name: actionId, description: 'Work an agent does.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { toll_morsels: 10 } }),
     });
     assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
     const request = async () => {
@@ -1220,7 +1223,7 @@ await test('59. When an account is deleted, the other side\'s ledger lines name 
     const publish = async (o: Owner, id: string) => {
         const pub = await json('/v1/actions', {
             method: 'POST', headers: auth(o.token),
-            body: JSON.stringify({ id, display_name: id, description: 'Work between two people.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+            body: JSON.stringify({ id, display_name: id, description: 'Work between two people.', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { toll_morsels: 10 } }),
         });
         assert(pub.status === 201, `publish ${id} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
         return pub.body.data.provider_gaii as string;

@@ -1,3 +1,16 @@
+/**
+ * @file e2e-hooks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description T-7: hook execution end to end. A webhook action bound to pre_work_request,
+ *   post_settlement, pre_federation_peer, pre_board_post and post_work_delivery receives its context,
+ *   and a blocking or failing hook refuses the request it guards.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-hooks
+ * @version-history
+ *   v1.0.1 — 2026-10-12 — The hook actions are published with pricing.toll_morsels: node 4.0.0 refuses
+ *     pricing.base_morsels (MORSEL_PRICE_REMOVED), so no hook action was published and every hook
+ *     test after it failed with it. toll_morsels 0 means the same free action on 3.x.
+ */
 // 2026-09-26 (security audit A8-3): a bare id one provider publishes is bound as id#provider, so
 // tests 4, 4b and 6 read the binding and the webhook's action_ref in that form. They asserted the id
 // as typed, which is the form a later publication of the same id by another owner could take over.
@@ -189,7 +202,7 @@ await test('3. Publish action with webhook URL', async () => {
             description: 'Action used for hook testing',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
             webhook_url: hookUrl,
         }),
     });
@@ -336,7 +349,7 @@ await test('10. Hook server unreachable → work request blocked', async () => {
             description: 'Hook action pointing to unreachable URL',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
             webhook_url: 'http://127.0.0.1:1/unreachable',
         }),
     });
@@ -384,7 +397,7 @@ await test('11. Register post_settlement hook action', async () => {
             description: 'Fires after settlement',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
             webhook_url: hookUrl,
         }),
     });
@@ -603,7 +616,7 @@ await test('25. Register second hook action', async () => {
             description: 'Second hook action for multi-hook test',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
             webhook_url: hookUrl,
         }),
     });
@@ -829,7 +842,7 @@ await test('36. Action without webhookUrl → allows by default', async () => {
             description: 'Action without webhookUrl',
             input_schema: { type: 'object' },
             output_schema: { type: 'object' },
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
             // No webhook_url
         }),
     });

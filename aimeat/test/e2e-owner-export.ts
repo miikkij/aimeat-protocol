@@ -27,6 +27,11 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-owner-export.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-owner-export
  * @version-history
+ *   v1.3.1 — 2026-10-12 — The owner's AI key is stored through PUT /v1/ai/providers/:id (the provider)
+ *     and PUT /v1/ai/providers/:id/key, and 3b finds the credential where it now lives,
+ *     `ai.apikey.provider.<id>`: node 4.0.0 answers 410 GONE on PUT /v1/openrouter/settings. The two
+ *     actions are published with pricing.toll_morsels, which 4.0.0 takes and 3.x reads the same, in
+ *     place of the refused pricing.base_morsels (MORSEL_PRICE_REMOVED).
  *   v1.3.0 — 2026-09-26 — 8b: the work the owner did and asked for in person, under their GHII, is
  *     in the export beside the agents' work, and so is the dispute over it.
  *   v1.2.0 — 2026-09-09 — Test 14 asserts that `listings`, `purchases` and `escrow_holds` are absent:
@@ -132,6 +137,8 @@ const OWNER_MEMORY_KEY = `export.owner.note.${stamp}`;
 const AGENT_MEMORY_KEY = `export.agent.note.${stamp}`;
 const OWNER_FILE_KEY = `export-owner-file-${stamp}.txt`;
 const OWNER_PROVIDER_KEY = `sk-or-v1-export-suite-${stamp}`;
+/** The owner's own AI provider; its key is stored as the memory record `ai.apikey.provider.<id>`. */
+const OWNER_PROVIDER_ID = 'export-suite-or';
 const PUSH_ENDPOINT = `https://fcm.googleapis.com/fcm/send/e2e-export-${stamp}`;
 const PERSONAL_PUSH_ENDPOINT = `https://fcm.googleapis.com/fcm/send/e2e-export-personal-${stamp}`;
 
@@ -185,8 +192,13 @@ await test('Memory and a file under the owner\'s own GHII', async () => {
     // A credential, set through its own door, because the memory doors refuse to write one directly.
     // The export used to hand back its ciphertext: useless to the person, a real key to anyone who
     // also has the node's encryption key, in a file that leaves the node by design.
-    const key = await json('/v1/openrouter/settings', {
-        method: 'PUT', headers: authed(subjectToken), body: JSON.stringify({ apiKey: OWNER_PROVIDER_KEY }),
+    const provider = await json(`/v1/ai/providers/${OWNER_PROVIDER_ID}`, {
+        method: 'PUT', headers: authed(subjectToken),
+        body: JSON.stringify({ title: 'Export suite OpenRouter', type: 'openrouter', capabilities: { text: { enabled: true, model: 'google/gemini-2.5-flash' } } }),
+    });
+    assert(provider.status === 200, `owner provider ${provider.status}: ${JSON.stringify(provider.body.error)}`);
+    const key = await json(`/v1/ai/providers/${OWNER_PROVIDER_ID}/key`, {
+        method: 'PUT', headers: authed(subjectToken), body: JSON.stringify({ api_key: OWNER_PROVIDER_KEY }),
     });
     assert(key.status === 200, `owner key ${key.status}: ${JSON.stringify(key.body.error)}`);
 });
@@ -265,7 +277,7 @@ await test('Work delivered by another owner\'s agent, then disputed', async () =
             description: 'action the export suite orders work from',
             input_schema: { type: 'object', properties: { text: { type: 'string' } } },
             output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 10 },
+            pricing: { toll_morsels: 10 },
         }),
     });
     assert(action.status === 201, `action ${action.status}: ${JSON.stringify(action.body.error)}`);
@@ -303,7 +315,7 @@ await test('Work in person: an action the owner published is asked for, and work
     const mine = `export-own-action-${stamp}`;
     const pub = await json('/v1/actions', {
         method: 'POST', headers: authed(subjectToken),
-        body: JSON.stringify({ id: mine, display_name: 'Own action', description: 'an action published in person', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { base_morsels: 10 } }),
+        body: JSON.stringify({ id: mine, display_name: 'Own action', description: 'an action published in person', input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { toll_morsels: 10 } }),
     });
     assert(pub.status === 201, `own action ${pub.status}: ${JSON.stringify(pub.body.error)}`);
     const asked = await json('/v1/work/request', {
@@ -415,7 +427,7 @@ await test('3. The owner\'s own memory and files are in it', async () => {
 await test('3b. A credential is in the export as "configured", never as its stored bytes', async () => {
     const whole = JSON.stringify(exported);
     assert(!whole.includes(OWNER_PROVIDER_KEY), 'the key itself is not in the export');
-    const rec = (exported.memories as any[]).find(m => m.key === 'openrouter.apikey');
+    const rec = (exported.memories as any[]).find(m => m.key === `ai.apikey.provider.${OWNER_PROVIDER_ID}`);
     assert(rec, `the record is listed: ${JSON.stringify((exported.memories as any[]).map(m => m.key))}`);
     assert(JSON.stringify(rec.value) === JSON.stringify({ configured: true }), `redacted, got ${JSON.stringify(rec.value)}`);
     // The ciphertext is what an export could carry out of the node's reach, so it is the thing the
