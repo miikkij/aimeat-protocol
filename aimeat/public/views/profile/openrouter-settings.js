@@ -13,7 +13,8 @@
  *   no server change.
  *
  *   NODE 4.0.0 removes /v1/openrouter/settings, /models and /test. The panel reads the old route
- *   first; its 410 GONE switches the panel onto the owner's provider (js/services/ai-connection.js):
+ *   first (js/services/ai-connection.js legacyOr, the switch the AI page, the calibrator and the inbox
+ *   share, so a 410 one of them met is known to all); its 410 GONE switches the panel onto the owner's provider:
  *   the connection and key through /v1/ai/providers, the default, vision and transcription models,
  *   the language and the fine-tuning into that provider's capabilities, the model lists from the
  *   node's catalogue. A provider keeps no separate reasoning and execution models and no retry
@@ -22,6 +23,8 @@
  *   components/ModelPicker.js · openrouter/pricing.js · openrouter/budget-panel.js
  * @usage import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v3.22.1 -- 2026-10-13 -- The 410 switch is legacyOr in js/services/ai-connection.js, shared with the other screens of
+ *     the connection. On the provider path a removal reads the connection again, since a retired one can stay.
  *   v3.22.0 -- 2026-10-12 -- On node 4.0.0 (the old route answers 410) the panel works on the owner's provider
  *     through js/services/ai-connection.js; the reasoning and execution fold and the retry setting are not shown
  *     there, because a provider keeps neither. On 3.x nothing changes.
@@ -89,7 +92,7 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { useConfirm } from '/components/Modal.js';
 import {
-  readConnection, saveConnection, saveConnectionCapabilities, testConnection, removeConnection, listModels,
+  legacyOr, readConnection, saveConnection, saveConnectionCapabilities, testConnection, removeConnection, listModels,
 } from '/js/services/ai-connection.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { swallowed } from '/js/swallowed.js';
@@ -205,14 +208,13 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
 
   async function loadSettings() {
     try {
-      const resp = await apiGet('/v1/openrouter/settings');
-      if (resp.ok !== false && resp.data) applySettings(resp.data, false);
-    } catch (err) {
-      // 410 GONE: node 4.0.0 removed the route, and the provider routes carry the connection.
-      if (err?.status === 410) {
-        await loadFromProviders().catch((e) => swallowed('openrouter-settings: loadFromProviders', e));
-      } else swallowed('openrouter-settings: loadSettings', err);
-    }
+      // 410 GONE: node 4.0.0 removed the route, and the provider routes carry the connection
+      // (js/services/ai-connection.js legacyOr, which every screen of the connection shares).
+      await legacyOr(async () => {
+        const resp = await apiGet('/v1/openrouter/settings');
+        if (resp.ok !== false && resp.data) applySettings(resp.data, false);
+      }, () => loadFromProviders().catch((e) => swallowed('openrouter-settings: loadFromProviders', e)));
+    } catch (err) { swallowed('openrouter-settings: loadSettings', err); }
     setLoaded(true);
   }
 
@@ -379,7 +381,11 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
   function handleDelete() {
     confirm(t('profile.openrouter.deleteConfirm'), async () => {
       try {
-        if (viaProviders) { await removeConnection(current); setCurrent(null); setProvider('openrouter'); setBaseUrl(''); }
+        if (viaProviders) {
+          await removeConnection(current);
+          // A connection an agent keeps a key for stays, without the owner's key and out of use.
+          setCurrent((await readConnection()).current); setProvider('openrouter'); setBaseUrl('');
+        }
         else await apiDelete('/v1/openrouter/settings');
         setHasApiKey(false); setApiKey('');
         setModel(''); setReasoningModel(''); setExecutionModel('');

@@ -6,14 +6,20 @@
  *   what daily budget. The reads (the owner's connection, the AI budget settings, today's usage,
  *   the 30-day history, and the chat's own word on who pays for it) and the handlers (save the
  *   connection and key, test it, remove the key; the daily budget; per-app caps written on the rows).
- *   The connection is the owner's provider `openrouter`, `lmstudio` or `custom`, read and written
- *   through the provider routes by js/services/ai-connection.js.
+ *   The connection goes through the legacy routes (/v1/openrouter/settings and /test) while the node
+ *   answers them, exactly as before node 4.0.0; when one answers 410 GONE (node 4.0.0, or an operator
+ *   who switched them off), it is the owner's provider `openrouter`, `lmstudio` or `custom`, read and
+ *   written through the provider routes by js/services/ai-connection.js (legacyOr there is the switch).
  *   The providers, the routing and the model policy are ai/use-providers.js; the roles and the app
  *   roles' bindings are ai/use-roles.js. The render is ai/page.js. The older collapsible panel
  *   (openrouter-settings.js) stays for the notebook, which embeds it inline.
- * @structure AiSettingsTab() — state + handlers → renderPage(ctx)
+ * @structure AiSettingsTab() — state + handlers (each a legacy call, and the provider call on a 410) → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'ai' (alias 'generator')
  * @version-history
+ *   v1.5.0 — 2026-10-13 — Legacy route first, provider path on 410 (js/services/ai-connection.js
+ *     legacyOr): on 3.x the connection section calls /v1/openrouter/settings and /test as it did before
+ *     v1.4.0, so the providers table, who pays for the chat, the test and the removal are as they were.
+ *     On the provider path a removal reads the connection again, since a retired one can stay.
  *   v1.4.0 — 2026-10-12 — The connection section reads and writes the owner's provider through
  *     /v1/ai/providers (js/services/ai-connection.js): node 4.0.0 removes /v1/openrouter/settings and
  *     /v1/openrouter/test, which it called. The same section, words and controls on 3.x and 4.0.0.
@@ -36,9 +42,9 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
-import { apiGet, apiPost } from '/js/api.js';
+import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import {
-  readConnection, saveConnection as saveConnectionTo, testConnection as testConnectionOf, removeConnection,
+  legacyOr, legacyGone, readConnection, saveConnection as saveConnectionTo, testConnection as testConnectionOf, removeConnection,
 } from '/js/services/ai-connection.js';
 import { renderPage } from './ai/page.js';
 import { x, rollup } from './ai/frame.js';
@@ -86,13 +92,23 @@ export default function AiSettingsTab({ navigate, showToast }) {
     if (h?.ok !== false && h?.data) setHistory(h.data);
   }, []);
 
+  /** The connection from the provider routes (node 4.0.0): the owner's provider, as settings. */
+  const loadConnection = async () => {
+    const r = await readConnection();
+    setCurrent(r.current);
+    setSettings(r.settings);
+    setConnState({ provider: r.settings.provider, baseUrl: r.settings.baseUrl, apiKey: '' });
+  };
+
   const load = useCallback(async () => {
     try {
-      const r = await readConnection();
-      setCurrent(r.current);
-      setSettings(r.settings);
-      setConnState({ provider: r.settings.provider, baseUrl: r.settings.baseUrl, apiKey: '' });
-    } catch (e) { swallowed('ai: connection', e); setSettings({}); }
+      await legacyOr(async () => {
+        const r = await apiGet('/v1/openrouter/settings');
+        const s = r?.data || {};
+        setSettings(s);
+        setConnState({ provider: s.provider || 'openrouter', baseUrl: s.baseUrl || '', apiKey: '' });
+      }, loadConnection);
+    } catch (e) { swallowed('ai: settings', e); setSettings({}); }
     loadUsage();
     // The chat's own word on who pays for it: best effort, and the node's answer rather than a guess.
     try { const c = await apiGet('/v1/chat/status'); if (c?.ok !== false && c?.data) setChat(c.data); } catch (e) { swallowed('ai: chat status', e); }
@@ -107,15 +123,27 @@ export default function AiSettingsTab({ navigate, showToast }) {
   const setConn = (patch) => setConnState((c) => ({ ...c, ...patch }));
   const setProvider = (p) => setConnState((c) => ({ ...c, provider: p, baseUrl: p === 'lmstudio' ? 'http://localhost:1234/v1' : p === 'openrouter' ? '' : c.baseUrl }));
 
-  /** The connection is the owner's provider `openrouter`, `lmstudio` or `custom` (js/services/ai-connection.js). */
+  /** Every legacy PUT carries the provider and its address, since the route resets them to OpenRouter otherwise. */
+  const put = (fields) => apiPut('/v1/openrouter/settings', { provider: conn.provider, baseUrl: conn.baseUrl, ...fields });
+
   const saveConnection = async () => {
     setBusy('conn');
     const flash = flashFor(setConnMsg);
     try {
-      await saveConnectionTo(current, { provider: conn.provider, baseUrl: conn.baseUrl, apiKey: conn.apiKey });
-      const r = await readConnection();
-      setCurrent(r.current);
-      setSettings(r.settings);
+      await legacyOr(async () => {
+        const body = {};
+        if (conn.apiKey) body.apiKey = conn.apiKey;
+        const r = await put(body);
+        if (r?.ok === false) throw r;
+        const next = { ...settings, provider: conn.provider, baseUrl: conn.baseUrl, hasApiKey: settings.hasApiKey || !!conn.apiKey };
+        setSettings(next);
+      }, async () => {
+        // The owner's provider `openrouter`, `lmstudio` or `custom` (js/services/ai-connection.js).
+        await saveConnectionTo(current, { provider: conn.provider, baseUrl: conn.baseUrl, apiKey: conn.apiKey });
+        const r = await readConnection();
+        setCurrent(r.current);
+        setSettings(r.settings);
+      });
       setConnState((c) => ({ ...c, apiKey: '' }));
       flash(conn.apiKey ? x('keySaved') : x('providerSaved'));
       pv.load();
@@ -128,16 +156,31 @@ export default function AiSettingsTab({ navigate, showToast }) {
     const flash = flashFor(setConnMsg);
     const started = Date.now();
     try {
-      const r = await testConnectionOf(current);
-      flash(x('testOk', { model: r.model, ms: Date.now() - started }));
-      toast(x('testOk', { model: r.model, ms: Date.now() - started }));
-      loadUsage();
-      pv.load();
+      await legacyOr(async () => {
+        const r = await apiPost('/v1/openrouter/test');
+        if (r?.ok === false) {
+          const spent = r.error?.code === 'QUOTA_EXHAUSTED' || r.error?.code === 'APP_QUOTA_EXHAUSTED';
+          flash((spent ? x('testBudgetSpent') : x('testFail')) + (r.error?.message ? ': ' + r.error.message : ''), true);
+        } else {
+          flash(x('testOk', { model: r?.data?.model || '', ms: Date.now() - started }));
+          toast(x('testOk', { model: r?.data?.model || '', ms: Date.now() - started }));
+          loadUsage();
+        }
+      }, async () => {
+        const r = await testConnectionOf(current);
+        flash(x('testOk', { model: r.model, ms: Date.now() - started }));
+        toast(x('testOk', { model: r.model, ms: Date.now() - started }));
+        loadUsage();
+        pv.load();
+      });
     } catch (e) {
-      // A spent budget is not a broken connection, and the head says which it was.
-      const spent = e?.code === 'QUOTA_EXHAUSTED' || e?.code === 'APP_QUOTA_EXHAUSTED';
-      const why = e?.response?.error?.message || e?.message || '';
-      flash((spent ? x('testBudgetSpent') : x('testFail')) + (why ? ': ' + why : ''), true);
+      if (!legacyGone()) flash(`${x('testFail')}: ${errText(e)}`, true);
+      else {
+        // A spent budget is not a broken connection, and the head says which it was.
+        const spent = e?.code === 'QUOTA_EXHAUSTED' || e?.code === 'APP_QUOTA_EXHAUSTED';
+        const why = e?.response?.error?.message || e?.message || '';
+        flash((spent ? x('testBudgetSpent') : x('testFail')) + (why ? ': ' + why : ''), true);
+      }
     }
     setBusy(false);
   };
@@ -145,10 +188,15 @@ export default function AiSettingsTab({ navigate, showToast }) {
   const removeKey = () => {
     confirm(x('confirmRemove'), async () => {
       try {
-        await removeConnection(current);
-        setCurrent(null);
-        setSettings({ hasApiKey: false, provider: 'openrouter', baseUrl: '' });
-        setConnState({ provider: 'openrouter', baseUrl: '', apiKey: '' });
+        await legacyOr(async () => {
+          await apiDelete('/v1/openrouter/settings');
+          setSettings({ hasApiKey: false, provider: 'openrouter', baseUrl: '', autoRetry: true, maxRetries: 3 });
+          setConnState({ provider: 'openrouter', baseUrl: '', apiKey: '' });
+        }, async () => {
+          await removeConnection(current);
+          // A connection an agent keeps a key for stays, without the owner's key and out of use.
+          await loadConnection();
+        });
         toast(x('removedToast'));
         pv.load();
       } catch (e) { toast(errText(e), true); }

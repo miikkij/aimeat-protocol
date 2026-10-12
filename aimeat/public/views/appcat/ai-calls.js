@@ -11,6 +11,9 @@
  *   EDIT_SYSTEM_PROMPT · editPrompt(change, html) · extractHtmlFromAi(content)
  * @usage import { translateText } from '/views/appcat/ai-calls.js'; const fi = await translateText(en, 'en', 'fi');
  * @version-history
+ *   v1.2.0 — 2026-10-13 — Legacy route first, provider path on 410 (js/services/ai-connection.js
+ *     legacyOr): on 3.x hasAiKey() reads the person's own key from GET /v1/openrouter/settings again,
+ *     as before v1.1.0; GET /v1/ai/available answers on node 4.0.0.
  *   v1.1.0 — 2026-10-12 — hasAiKey() asks GET /v1/ai/available: node 4.0.0 removes GET
  *     /v1/openrouter/settings, which it read.
  *   v1.0.0 — 2026-09-27 — Initial: the old catalogue's detailAiRun, detailTranslateDesc and
@@ -18,19 +21,26 @@
  */
 import { api, apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
+import { legacyOr } from '/js/services/ai-connection.js';
 
 /** An edit can take minutes on a slow model with a large app. */
 const AI_TIMEOUT_MS = 10 * 60 * 1000;
 
 /**
- * Whether the node can run an AI call for the signed-in person now (GET /v1/ai/available: their own
- * provider, or the node's when it pays for them). Signed out → false.
+ * Whether the signed-in person has an AI key the node can use for them (GET /v1/openrouter/settings),
+ * or, on a node without that route (410, node 4.0.0), whether the node can run an AI call for them
+ * now (GET /v1/ai/available: their own provider, or the node's when it pays for them). Signed out → false.
  */
 export async function hasAiKey() {
   if (!getSession()) return false;
   try {
-    const j = await apiGet('/v1/ai/available');
-    return !!(j && j.data && j.data.available === true);
+    return await legacyOr(async () => {
+      const j = await apiGet('/v1/openrouter/settings');
+      return !!(j && j.data && (j.data.hasApiKey || j.data.has_api_key));
+    }, async () => {
+      const j = await apiGet('/v1/ai/available');
+      return !!(j && j.data && j.data.available === true);
+    });
   } catch (err) {
     void err;
     // eslint-disable-next-line aimeat/no-silent-catch -- as on the old page, no answer is no key: the panel says how to get one

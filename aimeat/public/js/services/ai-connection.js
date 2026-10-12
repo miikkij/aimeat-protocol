@@ -3,45 +3,104 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The owner's AI connection (OpenRouter, LM Studio or a custom OpenAI-compatible
- *   address, with its key) read and written through the provider routes. Node 4.0.0 removes
- *   GET/PUT/DELETE /v1/openrouter/settings, /v1/openrouter/models and /v1/openrouter/test; the screens
- *   that edited the connection through them (the AI page, the older AI panel, the calibrator) call
- *   this module instead, and keep their own look and words.
+ *   address, with its key), and the one switch between the two ways a screen reaches it.
  *
- *   THE CONNECTION IS A PROVIDER. services/ai/provider-store.ts migrates the old setting into one of
- *   the owner's providers, with the id `openrouter`, `lmstudio` or `custom` and `migrated_from` in the
- *   view. connectionOf() picks it: the migrated one first, then any provider of the owner's own with
- *   one of those three ids. settingsOf() reads it back in the field names the old route answered
- *   (provider, baseUrl, hasApiKey, model, visionModel, sttModel, sttLanguage, temperature, top_p,
- *   max_tokens), so a screen changes its calls and nothing else.
+ *   THE SWITCH. Node 4.0.0 removes GET/PUT/DELETE /v1/openrouter/settings, GET /v1/openrouter/models
+ *   and POST /v1/openrouter/test (they answer 410 GONE), and an operator can switch them off before
+ *   that (AIMEAT_AI_LEGACY_SETTINGS_ROUTES=false). legacyOr(legacyCall, providerCall) runs the legacy
+ *   call; on a 410 it remembers, for this page load, that the node has no legacy routes, and runs the
+ *   provider call, and every later legacyOr goes straight to the provider call. On a node where the
+ *   legacy routes answer (3.x), every screen calls them exactly as it did before 2026-10-12, so the
+ *   screens look and behave as they did. Every screen that calls a legacy route does it through this
+ *   switch (test/unit/no-legacy-ai-settings-callers.test.ts checks that it does).
  *
- *   WRITES. saveConnection() puts the provider (PUT /v1/ai/providers/:id) only when its type or
- *   address changes, then its key (PUT /v1/ai/providers/:id/key); a change of provider removes the
- *   previous one (DELETE /v1/ai/providers/:id), because the old setting held one connection at a
- *   time. A key is never carried over to a new provider: the node never returns a key. Writing takes
- *   the provider over from the migration (provider-store.ts putOwnerAiProvider), which is what the
- *   successor routes mean. removeConnection() removes the owner's key of an OpenRouter connection and
- *   leaves the provider and its agents' keys; a local or custom connection is deleted (for a migrated
- *   one the node also deletes the old key record and sets the old setting back to OpenRouter).
+ *   THE CONNECTION IS A PROVIDER. On the provider path the connection is one of the owner's providers,
+ *   with the id `openrouter`, `lmstudio` or `custom` (services/ai/provider-store.ts migrates the old
+ *   setting into one, with `migrated_from` in the view). connectionOf() picks it: the migrated one
+ *   first, then one in use, then any. settingsOf() reads it back in the field names the old route
+ *   answered (provider, baseUrl, hasApiKey, model, visionModel, sttModel, sttLanguage, temperature,
+ *   top_p, max_tokens), so a screen changes its calls and nothing else.
+ *
+ *   IN USE AS THE OLD SETTING WAS. The node routes a call to an owner's provider only for a capability
+ *   in the owner's pool with a model, and, under the rule "only tested providers", only once that
+ *   capability was tested (services/ai/route-plan.ts inPool, modelOf and 'untested'). The migration
+ *   gives a migrated provider all three. A provider written here gets them the same way: each
+ *   capability with a model joins the pool, as the AI page's providers section does; an OpenRouter
+ *   connection the person gave no model takes the model the node uses for them now (GET
+ *   /v1/ai/capabilities), as the old setting did; and every capability left untested is tested once
+ *   (POST /v1/ai/providers/:id/test), so the person's own key pays at once, as it did after a save on
+ *   the old route. A test is a real call and is recorded like one.
+ *
+ *   WRITES. saveConnection() puts the provider (PUT /v1/ai/providers/:id) when its type or address
+ *   changes, or when it is not in use, then its key (PUT /v1/ai/providers/:id/key). A change of
+ *   provider retires the previous one, because the old setting held one connection at a time. A key
+ *   is never carried over to a new provider: the node never returns a key. Writing takes the provider
+ *   over from the migration (provider-store.ts putOwnerAiProvider), which is what the successor routes
+ *   mean. removeConnection() retires the connection: it is deleted, as the old removal left no
+ *   connection, unless one of the owner's agents keeps its own key for it; then the owner's key goes
+ *   and every capability leaves the pool, so the node's own provider answers and the agents' keys stay
+ *   (DELETE /v1/ai/providers/:id would delete them).
  *
  *   MODELS. listModels() reads the node's model catalogue (GET /v1/ai/models) for an OpenRouter
  *   connection and answers it in the shape of OpenRouter's own listing (id, name, pricing per token,
  *   context_length, input and output modalities), which components/ModelPicker.js and
  *   views/profile/openrouter/pricing.js read. A local or custom server's models are not in the
  *   catalogue, so for those it answers an empty list and the pickers take a typed model id.
- * @structure CONNECTION_IDS · connectionOf · settingsOf · readConnection · saveConnection ·
- *   testConnection · removeConnection · saveConnectionCapabilities · listModels · listingOf
+ * @structure legacyOr · legacyGone · isGone · CONNECTION_IDS · connectionOf · settingsOf ·
+ *   readConnection · saveConnection · testConnection · removeConnection · saveConnectionCapabilities ·
+ *   listModels · listingOf
  * @usage
- *   import { readConnection, saveConnection } from '/js/services/ai-connection.js';
- *   const { current, settings } = await readConnection();
- *   await saveConnection(current, { provider: 'openrouter', baseUrl: '', apiKey });
+ *   import { legacyOr, readConnection } from '/js/services/ai-connection.js';
+ *   const settings = await legacyOr(
+ *     async () => (await apiGet('/v1/openrouter/settings')).data,
+ *     async () => (await readConnection()).settings);
  * @version-history
+ *   v1.1.0 — 2026-10-13 — legacyOr(): the screens call the legacy routes first and take the provider
+ *     path only on a 410, so a 3.x node behaves exactly as before. On the provider path a connection is
+ *     in use as the old setting was: its capabilities with a model join the pool, an OpenRouter one
+ *     without a model takes the node's model for the owner, and what is left untested is tested once.
+ *     Removing a connection deletes it unless an agent keeps a key for it, and a switch of provider
+ *     retires the old one the same way. A switch no longer copies the old provider's models.
  *   v1.0.1 — 2026-10-13 — Removing an OpenRouter connection's key deletes the key only, not the
  *     provider, so the agents' own keys stored for it stay, as they did with the old route.
  *   v1.0.0 — 2026-10-12 — Initial: the AI page, the older AI panel and the calibrator move off the
  *     settings routes node 4.0.0 removes.
  */
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
+
+/* ── The switch ─────────────────────────────────────────────────────────────────────────────── */
+
+/** True once a legacy route answered 410 GONE in this page load: the node has none of them. */
+let legacyRoutesGone = false;
+
+/** Whether a failed request (js/api.js puts the status on the error) was a 410 GONE. */
+export const isGone = (err) => !!err && err.status === 410;
+
+/** Whether this page load found the legacy AI settings routes gone. */
+export const legacyGone = () => legacyRoutesGone;
+
+/**
+ * Run `legacyCall`; when it fails with 410 GONE, remember that the node has no legacy routes and run
+ * `providerCall` instead. Once remembered, `providerCall` runs straight away. Any other failure of
+ * `legacyCall` is thrown as it was, so a screen's own error handling stays as it was.
+ * @template T
+ * @param {() => Promise<T>} legacyCall @param {() => Promise<T>} providerCall
+ * @returns {Promise<T>}
+ */
+export async function legacyOr(legacyCall, providerCall) {
+  if (!legacyRoutesGone) {
+    try {
+      return await legacyCall();
+    } catch (err) {
+      if (!isGone(err)) throw err;
+      legacyRoutesGone = true;
+    }
+  }
+  return providerCall();
+}
+
+/* ── The connection as a provider ───────────────────────────────────────────────────────────── */
 
 /** The ids the old setting's three choices become (services/ai/provider-store.ts legacyRecord). */
 export const CONNECTION_IDS = ['openrouter', 'lmstudio', 'custom'];
@@ -55,6 +114,12 @@ const TYPE_CAPS = {
   local: ['text', 'vision', 'image', 'speech', 'transcription'],
   'openai-compatible': ['text', 'vision', 'image', 'speech', 'transcription'],
 };
+
+/** The capabilities whose test costs no more than one short call (an image test makes a picture). */
+const SELF_TESTED = ['text', 'vision', 'transcription', 'speech', 'embed'];
+
+/** The capabilities whose model the migration takes from the node when the setting names none. */
+const NODE_MODEL_CAPS = ['text', 'vision'];
 
 const isLoopbackHost = (host) => host === 'localhost' || host === '::1' || host === '[::1]' || /^127\./.test(host);
 
@@ -74,23 +139,69 @@ function capConfigOf(v) {
   return cfg;
 }
 
-/** The capabilities a provider of `type` is written with: what `from` had for each one the type serves, else on. */
-function capabilitiesFor(type, from) {
+/** A capability with a model joins the owner's pool, as the AI page's providers section does; the node refuses a pool entry with no model. */
+function pooled(cfg) {
+  return { ...cfg, pool: !!cfg.model && cfg.enabled !== false };
+}
+
+/**
+ * The capabilities a provider of `type` is written with: what `from` (the same provider before) had
+ * for each one the type serves, else on; a missing model from `models`; each with a model in the pool.
+ * @param {string} type @param {any|null} from @param {Record<string, string>} [models]
+ */
+function capabilitiesFor(type, from, models = {}) {
   const out = {};
   for (const c of TYPE_CAPS[type]) {
     const had = from?.capabilities?.[c];
-    out[c] = had ? capConfigOf(had) : { enabled: true, pool: false };
+    const cfg = had ? capConfigOf(had) : { enabled: true, pool: false };
+    if (!cfg.model && models[c]) cfg.model = models[c];
+    out[c] = pooled(cfg);
   }
   return out;
 }
 
+/** The PUT body of provider `p` with `capabilities`. */
+function bodyOf(p, capabilities) {
+  return {
+    title: p.title, type: p.type,
+    ...(p.type === 'openrouter' ? {} : { baseUrl: p.base_url }),
+    auth: { type: p.auth?.type === 'none' ? 'none' : 'key' },
+    capabilities,
+  };
+}
+
 /**
- * The owner's connection among the providers of GET /v1/ai/providers, or null.
+ * The OpenRouter models the node uses for this owner now, for text and vision, as GET
+ * /v1/ai/capabilities resolves them: the node's defaults when the owner has no provider in use. A
+ * capability answered by another type gives nothing. Empty when the read fails.
+ * @returns {Promise<Record<string, string>>}
+ */
+async function nodeModels() {
+  try {
+    const caps = (await apiGet('/v1/ai/capabilities'))?.data?.capabilities || {};
+    /** @type {Record<string, string>} */
+    const out = {};
+    for (const c of NODE_MODEL_CAPS) {
+      const e = caps[c];
+      if (e?.on && e.providerType === 'openrouter' && typeof e.model === 'string' && e.model) out[c] = e.model.replace(/^openrouter:/, '');
+    }
+    return out;
+  } catch (err) { swallowed('ai-connection: node models', err); return {}; }
+}
+
+/** Whether a provider is in use: migrated (the node pools it), or with a capability in the pool. */
+const inUse = (p) => !!p && (!!p.migrated_from || Object.values(p.capabilities || {}).some((c) => c && c.pool));
+
+/**
+ * The owner's connection among the providers of GET /v1/ai/providers, or null: the migrated one, then
+ * one in use or with a key, then a local or custom one that needs no key, then any. A connection
+ * retired for an agent's key (no key, out of the pool) comes last.
  * @param {{ providers?: any[] }|null} view
  */
 export function connectionOf(view) {
   const own = (view?.providers || []).filter((p) => p.source === 'owner' && CONNECTION_IDS.includes(p.id));
-  return own.find((p) => p.migrated_from) || own[0] || null;
+  return own.find((p) => p.migrated_from) || own.find((p) => inUse(p) || p.auth?.has_key)
+    || own.find((p) => p.auth?.type === 'none') || own[0] || null;
 }
 
 /**
@@ -125,6 +236,58 @@ export async function readConnection() {
 }
 
 /**
+ * Test once each capability of provider `id` that is in the pool and untested, so the node routes to
+ * it (route-plan.ts rejects an untested one). Only capabilities whose test is one short call; a
+ * provider that needs a key and has none is not tested. A failed test is not thrown: the providers
+ * table shows it.
+ * @returns {Promise<Array<{ capability: string, ok: boolean, error?: any }>>}
+ */
+async function testUntested(id) {
+  const { view } = await readConnection();
+  const p = (view?.providers || []).find((x) => x.source === 'owner' && x.id === id);
+  if (!p || (p.auth?.type === 'key' && !p.auth?.has_key)) return [];
+  const out = [];
+  for (const [c, cfg] of Object.entries(p.capabilities || {})) {
+    if (!cfg?.enabled || !cfg.pool || !SELF_TESTED.includes(c)) continue;
+    if ((p.health?.[c]?.status || 'untested') !== 'untested') continue;
+    try {
+      await apiPost(`/v1/ai/providers/${id}/test`, { capability: c, accept_cost: false });
+      out.push({ capability: c, ok: true });
+    } catch (error) {
+      swallowed('ai-connection: test after save', error);
+      out.push({ capability: c, ok: false, error });
+    }
+  }
+  return out;
+}
+
+/** Whether one of the owner's agents keeps its own key for provider `id` (GET /v1/agents/:name/ai-keys). */
+async function agentsKeepKeyFor(id) {
+  const agents = (await apiGet('/v1/agents'))?.data?.agents || [];
+  for (const a of agents) {
+    if (!a?.name) continue;
+    const keys = (await apiGet(`/v1/agents/${encodeURIComponent(a.name)}/ai-keys`))?.data?.providers || {};
+    if (Object.prototype.hasOwnProperty.call(keys, id)) return true;
+  }
+  return false;
+}
+
+/**
+ * Retire a connection, as the old removal and the old switch of provider left none: delete it,
+ * unless an agent keeps its own key for it (or that cannot be read); then remove the owner's key and
+ * take every capability out of the pool, so the node's own provider answers and the agents' keys stay.
+ */
+async function retire(p) {
+  let keep;
+  try { keep = await agentsKeepKeyFor(p.id); } catch (err) { swallowed('ai-connection: agents\' keys', err); keep = true; }
+  if (!keep) { await apiDelete(`/v1/ai/providers/${p.id}`); return; }
+  if (p.auth?.has_key) await apiDelete(`/v1/ai/providers/${p.id}/key`);
+  const capabilities = {};
+  for (const [c, v] of Object.entries(p.capabilities || {})) if (v) capabilities[c] = { ...capConfigOf(v), pool: false };
+  await apiPut(`/v1/ai/providers/${p.id}`, bodyOf(p, capabilities));
+}
+
+/**
  * Save the connection: the provider choice, its address and, when typed, its key. Throws the node's
  * refusal as apiPut does (err.code, err.message).
  * @param {any|null} current the connection as readConnection() found it
@@ -140,22 +303,29 @@ export async function saveConnection(current, { provider, baseUrl, apiKey }) {
     && (type === 'openrouter' || String(current.base_url || '').replace(/\/+$/, '') === url);
   // OpenRouter always takes a key; the other two take one when the person gives one or had one.
   const keyed = !!apiKey || id === 'openrouter' || (same && current.auth?.type === 'key');
-  if (!sameAddress || (keyed && current.auth?.type !== 'key')) {
+  // The old setting held one connection: the previous one goes first, so the node's models below are
+  // the node's own and not the previous provider's.
+  if (current && !same) await retire(current);
+  if (!sameAddress || (keyed && current.auth?.type !== 'key') || !inUse(current)) {
+    const models = type === 'openrouter' ? await nodeModels() : {};
     await apiPut(`/v1/ai/providers/${id}`, {
       title: same ? current.title : TITLES[id], type,
       ...(type === 'openrouter' ? {} : { baseUrl: url }),
       auth: { type: keyed ? 'key' : 'none' },
-      capabilities: capabilitiesFor(type, current),
+      capabilities: capabilitiesFor(type, same ? current : null, models),
     });
   }
   if (apiKey) await apiPut(`/v1/ai/providers/${id}/key`, { api_key: apiKey });
-  if (current && current.id !== id) await apiDelete(`/v1/ai/providers/${current.id}`);
+  await testUntested(id);
   return id;
 }
 
 /**
  * Change capabilities of the connection: each entry of `patch` is merged into that capability's
- * config (model, language, params). A capability the type does not serve is left out.
+ * config (model, language, params). A capability the type does not serve is left out. A changed
+ * capability with a model is in the pool; writing a migrated connection takes it over from the
+ * migration, so each of its capabilities with a model stays in the pool. What the change leaves
+ * untested is tested once.
  * @param {any} current @param {Record<string, Record<string, unknown>>} patch
  */
 export async function saveConnectionCapabilities(current, patch) {
@@ -165,15 +335,11 @@ export async function saveConnectionCapabilities(current, patch) {
     if (!(c in capabilities) && !(TYPE_CAPS[current.type] || []).includes(c)) continue;
     const next = { ...(capabilities[c] || { enabled: true, pool: false }), ...changes };
     for (const k of Object.keys(next)) if (next[k] === undefined || next[k] === null || next[k] === '') delete next[k];
-    if (!next.model) next.pool = false;
-    capabilities[c] = next;
+    capabilities[c] = pooled(next);
   }
-  await apiPut(`/v1/ai/providers/${current.id}`, {
-    title: current.title, type: current.type,
-    ...(current.type === 'openrouter' ? {} : { baseUrl: current.base_url }),
-    auth: { type: current.auth?.type === 'none' ? 'none' : 'key' },
-    capabilities,
-  });
+  if (current.migrated_from) for (const c of Object.keys(capabilities)) capabilities[c] = pooled(capabilities[c]);
+  await apiPut(`/v1/ai/providers/${current.id}`, bodyOf(current, capabilities));
+  await testUntested(current.id);
 }
 
 /**
@@ -186,20 +352,12 @@ export async function testConnection(current) {
   return { model: r?.data?.model || '' };
 }
 
-/**
- * Remove the connection's key, as the old "remove key" did. An OpenRouter connection loses the
- * owner's key only (DELETE /v1/ai/providers/:id/key): deleting the provider would also delete every
- * agent's own key stored for it, which the old route never touched. A local or custom connection is
- * deleted, because the old route set the connection back to OpenRouter.
- */
+/** Remove the connection, as the old "remove key" did: retire() says how. */
 export async function removeConnection(current) {
-  if (!current) return;
-  if (current.type === 'openrouter') {
-    if (current.auth?.has_key) await apiDelete(`/v1/ai/providers/${current.id}/key`);
-    return;
-  }
-  await apiDelete(`/v1/ai/providers/${current.id}`);
+  if (current) await retire(current);
 }
+
+/* ── Models ─────────────────────────────────────────────────────────────────────────────────── */
 
 /**
  * A catalogue model in the shape of OpenRouter's own listing. Token prices go back to USD per token;

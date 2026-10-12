@@ -8,6 +8,9 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-10-13 — Legacy route first, provider path on 410: detailCheckAiAvailability reads the owner's
+ *     own key from GET /v1/openrouter/settings again, as before 2026-10-12, and asks GET
+ *     /v1/ai/available only when that route answers 410 GONE (node 4.0.0).
  *   2026-10-12 — detailCheckAiAvailability asks GET /v1/ai/available: node 4.0.0 removes GET
  *     /v1/openrouter/settings, which it read.
  *   2026-09-26 — A checkpoint preview and an AI draft preview open through preview-host.js as the app
@@ -1514,17 +1517,28 @@ function detailAiUnavailableMsg() {
   return getCortexOwnerToken() ? t('detail.aiUnavailable') : t('detail.aiLoginNeeded');
 }
 
-// Probe whether the node can run an AI call for the signed-in owner now (GET /v1/ai/available).
+// Probe whether the signed-in owner has an OpenRouter key configured. Legacy route first, provider
+// path on 410: a node without GET /v1/openrouter/settings (node 4.0.0) answers 410 GONE, and then
+// GET /v1/ai/available says whether the node can run an AI call for the owner now. This bundle does
+// not load public/js, so the switch of js/services/ai-connection.js (legacyOr) is written out here.
 function detailCheckAiAvailability() {
   detailAiAvailable = false;
   var config = loadConfig();
   var token = getCortexOwnerToken();
   if (!config.aimeatUrl || !token) { renderDetailView(); return; }
   var url = config.aimeatUrl.replace(/\/+$/, '');
-  fetch(url + '/v1/ai/available', { headers: { 'Authorization': 'Bearer ' + token } })
-    .then(function(r) { return r.json(); })
-    .then(function(j) {
-      detailAiAvailable = !!(j && j.data && j.data.available === true);
+  var headers = { 'Authorization': 'Bearer ' + token };
+  fetch(url + '/v1/openrouter/settings', { headers: headers })
+    .then(function(r) {
+      if (r.status === 410) {
+        return fetch(url + '/v1/ai/available', { headers: headers })
+          .then(function(a) { return a.json(); })
+          .then(function(j) { return !!(j && j.data && j.data.available === true); });
+      }
+      return r.json().then(function(j) { return !!(j && j.data && (j.data.hasApiKey || j.data.has_api_key)); });
+    })
+    .then(function(available) {
+      detailAiAvailable = available;
       if (detailAppId) renderDetailView();
     })
     .catch(function() { detailAiAvailable = false; if (detailAppId) renderDetailView(); });

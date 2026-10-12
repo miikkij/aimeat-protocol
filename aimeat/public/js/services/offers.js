@@ -9,6 +9,9 @@
  * @structure listOffers / getAgentOffers / publishOffers · ask(agentEntry, offer, inputs) · buildAskPrompt
  * @usage import * as offers from '/js/services/offers.js';
  * @version-history
+ *   v1.2.2 -- 2026-10-13 -- Legacy route first, provider path on 410 (js/services/ai-connection.js legacyOr):
+ *     on 3.x aiAvailable() reads the owner's own key from GET /v1/openrouter/settings again, as before
+ *     v1.2.1; GET /v1/ai/available answers on node 4.0.0.
  *   v1.2.1 -- 2026-10-12 -- aiAvailable() asks GET /v1/ai/available: node 4.0.0 removes GET
  *     /v1/openrouter/settings, which it read.
  *   v1.2.0 -- 2026-10-11 -- An offer's two values (ruling "morseli on tahdistus, ei hinta"): setOfferBilling
@@ -32,6 +35,7 @@ import { api, apiGet, apiPost, apiPut } from '/js/api.js';
 import { copyToClipboard } from '/js/utils.js';
 import { createTask, rateTask } from '/js/services/agent-tasks.js';
 import { swallowed } from '/js/swallowed.js';
+import { legacyOr } from '/js/services/ai-connection.js';
 
 /** The goal-first feed: every agent's offers + mode/availability. */
 export async function listOffers() {
@@ -92,11 +96,20 @@ export async function listOfferRuns({ agent, offerId, limit = 5 }) {
 // /v1/ai/complete endpoint (spend-safe, consent-gated) — runs ONLY on explicit submit, never on every
 // keystroke. When nothing fits, it returns noMatch + a one-line brief for crew-forge (close the loop).
 
-/** True when the node can run an AI call for the owner now (gates the "find by need" button). */
+/**
+ * True when the owner has an OpenRouter key configured (GET /v1/openrouter/settings), or, on a node
+ * without that route (410, node 4.0.0), when the node can run an AI call for the owner now (GET
+ * /v1/ai/available). Gates the "find by need" button.
+ */
 export async function aiAvailable() {
   try {
-    const r = await apiGet('/v1/ai/available');
-    return !!(r?.ok && r.data && r.data.available === true);
+    return await legacyOr(async () => {
+      const r = await apiGet('/v1/openrouter/settings');
+      return !!(r?.ok && r.data && (r.data.hasApiKey || r.data.has_api_key));
+    }, async () => {
+      const r = await apiGet('/v1/ai/available');
+      return !!(r?.ok && r.data && r.data.available === true);
+    });
   } catch (err) { swallowed('offers: aiAvailable', err); return false; }
 }
 

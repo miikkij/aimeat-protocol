@@ -13,6 +13,10 @@
  * @structure CalibratorTab() — state + handlers → renderList(ctx) | renderPage(ctx)
  * @usage registered in profile.js TABS as id 'calibrator'
  * @version-history
+ *   v3.2.0 — 2026-10-13 — Legacy route first, provider path on 410 (js/services/ai-connection.js
+ *     legacyOr): on 3.x the connection and the model list come from /v1/openrouter/settings and
+ *     /v1/openrouter/models as before v3.1.0, so the judge's default is the reasoning model again and
+ *     the list is OpenRouter's own; the provider path of v3.1.0 runs on node 4.0.0.
  *   v3.1.0 — 2026-10-12 — The connection and its model list come through the provider routes and the
  *     model catalogue (js/services/ai-connection.js): node 4.0.0 removes GET /v1/openrouter/settings
  *     and /v1/openrouter/models. The judge's default is the connection's text model, since providers
@@ -28,7 +32,8 @@
  */
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
-import { readConnection, listModels } from '/js/services/ai-connection.js';
+import { apiGet } from '/js/api.js';
+import { legacyOr, readConnection, listModels } from '/js/services/ai-connection.js';
 import { useConfirm } from '/components/Modal.js';
 import { swallowed } from '/js/swallowed.js';
 import {
@@ -95,15 +100,26 @@ export default function CalibratorTab({ showToast }) {
 
   /* ── Reads ─────────────────────────────────────────────────────────────────────────────────── */
 
-  // The owner's connection and its models, through the provider routes (js/services/ai-connection.js).
+  // The owner's connection and its models: the legacy routes while the node answers them, the
+  // provider routes and the model catalogue on a 410 (js/services/ai-connection.js legacyOr).
   const loadSettings = useCallback(async () => {
     try {
-      const { settings: s } = await readConnection();
-      setSettings(s);
-      if (s.hasApiKey || (s.provider && s.provider !== 'openrouter')) {
-        const m = await listModels(s, 'text').catch((e) => { swallowed('calibrator: models', e); return null; });
-        setModels(Array.isArray(m) ? m : []);
-      }
+      await legacyOr(async () => {
+        const r = await apiGet('/v1/openrouter/settings');
+        const s = r?.data || {};
+        setSettings(s);
+        if (s.hasApiKey || (s.provider && s.provider !== 'openrouter')) {
+          const m = await apiGet('/v1/openrouter/models').catch((e) => { swallowed('calibrator: models', e); return null; });
+          setModels(Array.isArray(m?.data?.models) ? m.data.models : []);
+        }
+      }, async () => {
+        const { settings: s } = await readConnection();
+        setSettings(s);
+        if (s.hasApiKey || (s.provider && s.provider !== 'openrouter')) {
+          const m = await listModels(s, 'text').catch((e) => { swallowed('calibrator: models', e); return null; });
+          setModels(Array.isArray(m) ? m : []);
+        }
+      });
     } catch (e) { swallowed('calibrator: settings', e); setSettings({}); }
   }, []);
 
