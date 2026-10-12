@@ -20,6 +20,12 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   v1.6.0 — 2026-10-12 — With owner_scope an agent holding memory:write-as-owner deletes and
+ *     restores a record stored under its owner's own identity (and memory:write-reserved for a
+ *     reserved key), the two words the write under the owner asks. The lookup covered the caller and
+ *     the owner's agents only, so the delete answered NOT_FOUND on a record the same agent had
+ *     written with owner_scope. NOT_FOUND names the permission when the caller asked for owner_scope
+ *     without holding it.
  *   v1.5.0 — 2026-10-11 — Delete and restore tell a private record's change to its owner's streams
  *     only; both were global events.
  *   v1.4.0 — 2026-10-09 — Delete and restore refuse a credential record (secret-records.ts) for every
@@ -40,7 +46,9 @@ import type { Storage } from '../storage/interface.js';
 import { emitRecordChange } from './event-bus.js';
 import { checkDeleteGuard } from './write-guards.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
-import { isServiceOwnedKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { isServiceOwnedKey, isReservedServerKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { isGEAI, localAccountOf } from '../utils/gaii.js';
+import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
 import { isSecretRecordKey, secretRecordBinRefusal } from './secret-records.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
@@ -84,6 +92,39 @@ export interface MemoryBinRequest {
    * is not an operator.
    */
   roles?: string[];
+  /**
+   * The caller's scopes. With `ownerScope`, an agent reaches a record stored under its owner's own
+   * identity only when these carry `memory:write-as-owner` (mayActUnderOwner below). Absent means
+   * none, so a caller that does not pass them keeps the reach it had: its own records and the
+   * owner's agents'.
+   */
+  scopes?: string[];
+}
+
+/**
+ * The account holder's own identity on this node, when the caller is another principal of that
+ * account: an agent of it. Null for the account holder in person and for an app grant (both already
+ * resolve to that identity), for an ecosystem app (it works in its `eco:` namespace) and for a
+ * session of another node (it names no account here).
+ */
+function ownerIdentityBehind(deps: MemoryBinDeps, req: MemoryBinRequest): string | null {
+  if (isGEAI(req.caller)) return null;
+  const account = localAccountOf(req.caller);
+  if (!account) return null;
+  const ownerGhii = `${account}@${deps.config.nodeId}`;
+  return ownerGhii === req.caller ? null : ownerGhii;
+}
+
+/**
+ * Whether these scopes let the caller remove or put back THIS key under the owner's own identity.
+ * The two words are the write's (routes/memory/owner-target.ts resolveMcpWriteTarget), so an agent
+ * removes under its owner exactly what it may write there: `memory:write-as-owner`, and
+ * `memory:write-reserved` as well for a key the server reads and trusts.
+ */
+function mayActUnderOwner(req: MemoryBinRequest): boolean {
+  const scopes = req.scopes ?? [];
+  if (!scopeIsCovered(scopes, WRITE_AS_OWNER_SCOPE)) return false;
+  return !isReservedServerKey(req.key) || scopes.includes(WRITE_RESERVED_SCOPE);
 }
 
 /** Find the record this caller means, across the reach they are entitled to. Null when there is
@@ -95,6 +136,12 @@ async function locate(
   const first = req.ownerOverride || req.caller;
   if (await look(first)) return first;
   if (req.ownerOverride || !req.ownerScope) return null;
+  // The owner's own identity before the agents, the order every owner-scope read uses
+  // (services/owner-memory.ts), so the copy an agent reads with owner_scope is the copy it removes.
+  // This lookup was missing until 2026-10-12: an agent that wrote records under its owner with
+  // owner_scope could list and rewrite them and was answered NOT_FOUND on deleting them.
+  const ownerGhii = ownerIdentityBehind(deps, req);
+  if (ownerGhii && mayActUnderOwner(req) && await look(ownerGhii)) return ownerGhii;
   for (const agent of await deps.storage.getAgentsByOwner(req.ownerName)) {
     if (await look(agent.gaii)) return agent.gaii;
   }
@@ -174,7 +221,17 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
     return !!record;
   });
   if (!found) {
-    return { ok: false, code: 'NOT_FOUND', message: `Memory key not found: ${req.key}` };
+    // The hint depends on the caller and the request alone, never on whether a record exists, so it
+    // answers no question about the owner's keys. Without it an agent reads NOT_FOUND on a key it
+    // has just listed with owner_scope and looks for a platform limit that is not there.
+    const needsGrant = !!req.ownerScope && !req.ownerOverride
+      && !!ownerIdentityBehind(deps, req) && !scopeIsCovered(req.scopes ?? [], WRITE_AS_OWNER_SCOPE);
+    return {
+      ok: false, code: 'NOT_FOUND',
+      message: `Memory key not found: ${req.key}` + (needsGrant
+        ? `. With owner_scope you reach your own records and the other agents' of your owner. A record stored under your owner's own identity also needs the ${WRITE_AS_OWNER_SCOPE} permission, which the owner grants per agent in Profile -> Agents.`
+        : ''),
+    };
   }
   const deleted = await deps.storage.deleteMemory(found, req.key, req.caller);
   if (!deleted) {

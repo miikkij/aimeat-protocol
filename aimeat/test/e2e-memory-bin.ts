@@ -233,5 +233,88 @@ await test('14. The generic restore refuses a credential record the owner remove
   assert(after.body.data?.hasApiKey === false, `the removed key came back: ${JSON.stringify(after.body.data)}`);
 });
 
+console.log('\nAn agent and a record stored under its owner\'s own identity');
+// Found 2026-10-12 on production: an agent holding every permission wrote twelve records under its
+// owner's identity with owner_scope, and its delete of three older records in the same namespace
+// answered 404. The service looked under the caller and under the owner's agents and never under the
+// owner's own identity, while the tool description promised that reach. The reach is the write's:
+// owner_scope asked per request, and memory:write-as-owner held (routes/memory/owner-target.ts).
+const OWNER_HELD = 'bin.ownerheld';
+let delegateTok = '';
+let plainTok = '';
+await test('15. Setup: a record under the owner, an agent that may act under the owner, and one that may not', async () => {
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(tokA), body: JSON.stringify({ key: OWNER_HELD, value: { note: 'owner wrote this' }, visibility: 'private' }) });
+  assert(w.status === 201, `owner write: ${w.status} ${JSON.stringify(w.body)}`);
+  const delegate = await json('/v1/agents', {
+    method: 'POST', headers: auth(tokA),
+    body: JSON.stringify({ name: 'bindelegate', owner: ownerA, capabilities: ['memory'], scopes: ['memory:read', 'memory:write', 'memory:delete', 'memory:write-as-owner'] }),
+  });
+  assert(delegate.status === 201, `delegate agent: ${JSON.stringify(delegate.body)}`);
+  delegateTok = await getAgentToken(delegate.body.data.agent.gaii, delegate.body.data.private_key);
+  const plain = await json('/v1/agents', {
+    method: 'POST', headers: auth(tokA),
+    body: JSON.stringify({ name: 'binplain', owner: ownerA, capabilities: ['memory'], scopes: ['memory:read', 'memory:write', 'memory:delete'] }),
+  });
+  assert(plain.status === 201, `plain agent: ${JSON.stringify(plain.body)}`);
+  plainTok = await getAgentToken(plain.body.data.agent.gaii, plain.body.data.private_key);
+});
+
+await test('16. Without memory:write-as-owner the owner\'s record stays, and the refusal names the permission', async () => {
+  const d = await json(`/v1/memory/${OWNER_HELD}?owner_scope=true`, { method: 'DELETE', headers: auth(plainTok) });
+  assert(d.status === 404, `expected 404, got ${d.status} ${JSON.stringify(d.body)}`);
+  assert(String(d.body.error?.message).includes('memory:write-as-owner'), `the refusal names the permission: ${d.body.error?.message}`);
+  const still = await json(`/v1/memory/${OWNER_HELD}`, { headers: auth(tokA) });
+  assert(still.status === 200, `the owner's record must still read, got ${still.status}`);
+});
+
+await test('17. With the permission and no owner_scope the request reaches the agent\'s own records only', async () => {
+  const d = await json(`/v1/memory/${OWNER_HELD}`, { method: 'DELETE', headers: auth(delegateTok) });
+  assert(d.status === 404, `expected 404 without owner_scope, got ${d.status} ${JSON.stringify(d.body)}`);
+  const still = await json(`/v1/memory/${OWNER_HELD}`, { headers: auth(tokA) });
+  assert(still.status === 200, `the owner's record must still read, got ${still.status}`);
+});
+
+await test('18. With the permission and owner_scope the agent removes the owner\'s record', async () => {
+  const d = await json(`/v1/memory/${OWNER_HELD}?owner_scope=true`, { method: 'DELETE', headers: auth(delegateTok) });
+  assert(d.status === 200, `expected 200, got ${d.status} ${JSON.stringify(d.body)}`);
+  const gone = await json(`/v1/memory/${OWNER_HELD}`, { headers: auth(tokA) });
+  assert(gone.status === 404, `the owner must read it as gone, got ${gone.status}`);
+  // The owner's bin holds it, so the person can take back what their agent removed.
+  const bin = await json('/v1/memory/deleted', { headers: auth(tokA) });
+  assert((bin.body.data.items ?? []).some((i: any) => i.key === OWNER_HELD), `the owner's bin lists it: ${JSON.stringify(bin.body.data)}`);
+});
+
+await test('19. Restore has the same reach: refused without the permission, done with it', async () => {
+  const no = await json(`/v1/memory/${OWNER_HELD}/restore?owner_scope=true`, { method: 'POST', headers: auth(plainTok) });
+  assert(no.status === 404, `expected 404 without the permission, got ${no.status} ${JSON.stringify(no.body)}`);
+  const yes = await json(`/v1/memory/${OWNER_HELD}/restore?owner_scope=true`, { method: 'POST', headers: auth(delegateTok) });
+  assert(yes.status === 200, `expected 200 with the permission, got ${yes.status} ${JSON.stringify(yes.body)}`);
+  const back = await json(`/v1/memory/${OWNER_HELD}`, { headers: auth(tokA) });
+  assert(back.status === 200 && back.body.data.value?.note === 'owner wrote this', `the record came back whole: ${back.status} ${JSON.stringify(back.body.data?.value)}`);
+});
+
+await test('20. A reserved key under the owner needs memory:write-reserved as well', async () => {
+  // `profile.` is one of the prefixes the server reads and trusts (utils/reserved-keys.ts). The write
+  // under the owner refuses it to an agent without memory:write-reserved, so the delete does too.
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(tokA), body: JSON.stringify({ key: 'profile.binprobe', value: { n: 1 }, visibility: 'private' }) });
+  assert(w.status === 201, `owner writes a reserved key: ${w.status} ${JSON.stringify(w.body)}`);
+  const d = await json('/v1/memory/profile.binprobe?owner_scope=true', { method: 'DELETE', headers: auth(delegateTok) });
+  assert(d.status === 404, `expected 404 for a reserved key, got ${d.status} ${JSON.stringify(d.body)}`);
+  const still = await json('/v1/memory/profile.binprobe', { headers: auth(tokA) });
+  assert(still.status === 200, `the reserved record must still read, got ${still.status}`);
+});
+
+await test('21. The permission reaches the agent\'s own owner and nobody else', async () => {
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(tokB), body: JSON.stringify({ key: OWNER_HELD, value: { note: 'owner B wrote this' }, visibility: 'private' }) });
+  assert(w.status === 201, `owner B write: ${w.status} ${JSON.stringify(w.body)}`);
+  // Owner A's copy is removed first, so the only record of this name left is owner B's.
+  const own = await json(`/v1/memory/${OWNER_HELD}?owner_scope=true`, { method: 'DELETE', headers: auth(delegateTok) });
+  assert(own.status === 200, `the agent removes its own owner's copy: ${own.status}`);
+  const other = await json(`/v1/memory/${OWNER_HELD}?owner_scope=true`, { method: 'DELETE', headers: auth(delegateTok) });
+  assert(other.status === 404, `expected 404 for another owner's record, got ${other.status} ${JSON.stringify(other.body)}`);
+  const still = await json(`/v1/memory/${OWNER_HELD}`, { headers: auth(tokB) });
+  assert(still.status === 200 && still.body.data.value?.note === 'owner B wrote this', `owner B's record is untouched: ${still.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 process.exit(failed > 0 ? 1 : 0);

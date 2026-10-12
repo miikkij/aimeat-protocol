@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_memory_delete and aimeat_memory_restore say what owner_scope reaches: the
+ *     sibling agents, and the owner's own namespace with memory:write-as-owner.
  *   2026-10-12 — aimeat_task_request_changes declares connectorOnly: it is on both connector interfaces
  *     and not on the node MCP (V2_EXCLUDED), and it declared the node MCP.
  *   2026-10-11 — aimeat_agent_workplace_set: where an agent's finished work goes.
@@ -511,7 +513,7 @@ export const schedulesTasksMemoryTools = [
         scope: 'memory:delete',
         input: {
             key: { type: 'string', required: true, description: 'Exact memory entry key to delete.' },
-            owner_scope: { type: 'boolean', description: "Also reach the OWNER's namespace and your sibling agents', not only your own.", zod: flexibleBoolean },
+            owner_scope: { type: 'boolean', description: "Also reach your sibling agents' namespaces, and the OWNER's own when you hold the memory:write-as-owner scope, not only your own.", zod: flexibleBoolean },
         },
     },
     {
@@ -526,7 +528,7 @@ export const schedulesTasksMemoryTools = [
         scope: 'memory:write',
         input: {
             key: { type: 'string', required: true, description: 'Exact memory entry key to put back.' },
-            owner_scope: { type: 'boolean', description: "Also reach the OWNER's namespace and your sibling agents'.", zod: flexibleBoolean },
+            owner_scope: { type: 'boolean', description: "Also reach your sibling agents' namespaces, and the OWNER's own when you hold the memory:write-as-owner scope.", zod: flexibleBoolean },
         },
     },
     {
