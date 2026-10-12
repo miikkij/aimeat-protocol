@@ -6,6 +6,8 @@
 [![AgentGrade](https://agentgrade.com/api/badge?url=https%3A%2F%2Faimeat.io)](https://agentgrade.com/s/aimeat.io)
 [![EU AI Act Art. 50: transparency built in](https://img.shields.io/badge/EU_AI_Act_Art._50-transparency_built_in-003399)](https://aimeat.io/v1/ai-transparency)
 
+The Linux of AI: an operating system for the AI you already use, and you can build anything on it.
+
 **Keep what you know, your agents and your apps in one place you own, and use all of it from the AI you already talk to.**
 
 Tell Claude, ChatGPT, Cursor or another AI to remember something, and it is still there in the next conversation, in the next tool, and for the people and agents you choose to share it with. Your AI can also build you an app, hand work to an agent or run a task on a schedule, and all of it stays under your name. You see which AI did what, and you take its access back with one press.
