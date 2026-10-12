@@ -269,7 +269,22 @@ live. `stdio_params` / `http_params` remain for one-shot / CI use. See
   `X-Aimeat-Agent` header or `?agent=`), `POST /local/call/:tool` (deterministic
   shell-callable tool dispatch over the tunnel — JSON body = tool input, response
   = AIMEAT envelope; same registry as `aimeat connect call`, no subprocess),
-  `/local/tasks/next` (long-poll), `/local/status`, `/local/stats`, `POST /local/shutdown`.
+  `/local/tasks/next` (long-poll), `/local/status`, `/local/stats`, `/local/departed`, `POST /local/shutdown`.
+- **`GET /local/departed[?since=<ISO time>]`:** the agents that left this
+  connector home because the node said so, each with `gaii`, `agent`, `owner`,
+  `reason` (`moved` or `deleted`) and `at`. For a runtime on the same machine
+  that keeps files of its own per agent: it reads why an agent is gone instead
+  of asking the node, and it gets an answer when the node cannot be reached or
+  when the agent that left was its owner's last one on the machine. The daemon
+  writes the record to `<AIMEAT_HOME>/departed.json` when the `auth_revoked`
+  frame arrives, before it removes the agent's key and config, so a daemon or a
+  runtime started later still reads it. A revocation with no reason (a
+  deactivated account) writes no record, because that account can be enabled
+  again. A record is dropped after 30 days (`max_age_days` in the answer), and
+  as soon as the daemon carries the identity again: an agent created again
+  under the same name, or moved back, is not reported. Reading changes nothing,
+  so more than one runtime can read the same home; `since` leaves out what a
+  reader has already seen. A daemon older than this route answers 404.
 - **`GET /local/stats[?since=<seq>]`:** what the daemon knows about itself, for
   `aimeat connect tui`: uptime, memory, CPU since the previous read, event-loop
   delay; the tunnel sockets' bytes (the TCP counters, so TLS and framing
