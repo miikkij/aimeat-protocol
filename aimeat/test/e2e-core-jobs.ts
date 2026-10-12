@@ -45,6 +45,8 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   v1.2.2 -- 2026-10-12 -- The capability probe action is published with pricing.toll_morsels; node
+ *     4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the same on 3.x.
  *   v1.2.1 -- 2026-10-09 -- Comment only: core:nonce-cleanup is seeded on every node now.
  *   v1.2.0 -- 2026-09-30 -- core:classification-audit-prune: seeded and fired as its own job.
  *   v1.1.0 -- 2026-09-25 -- core:usage-visit-retention: seeded, fired, and a visit made today keeps
@@ -651,7 +653,7 @@ async function run(): Promise<void> {
                 description: 'Action used to prove the capability aggregation folds it in',
                 input_schema: { type: 'object', properties: { text: { type: 'string' } } },
                 output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-                pricing: { base_morsels: 10 },
+                pricing: { toll_morsels: 10 },
             }),
         });
         assert(publish.status === 201, `publish action: ${publish.status} ${short(publish.body)}`);

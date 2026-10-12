@@ -7,6 +7,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=phase0
  * @version-history
+ *   v1.2.1 — 2026-10-12 — The semantic-annotation action is published with pricing.toll_morsels; node
+ *     4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the same on 3.x.
  *   v1.2.0 — 2026-08-17 — E2E quality, phase0:322. The consent layer was driven by one principal end
  *     to end, so the ownership comparison on the read and the revoke had never been asked about anybody
  *     else. A stranger holding consent:manage — the scope, so the refusal can only be about ownership —
@@ -549,7 +551,7 @@ await test('POST /v1/actions with semantic annotation → 201, preserved in GET'
             description: 'An action with semantic annotation for E2E testing',
             input_schema: { type: 'object', properties: { query: { type: 'string' } } },
             output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 1 },
+            pricing: { toll_morsels: 1 },
             semantic: semanticAnnotation,
         }),
     }));

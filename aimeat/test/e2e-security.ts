@@ -5,6 +5,9 @@
  *   Security tab composite (owner-only) with GHII CORS input validation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-security
  * @version-history
+ *   v1.3.1 — 2026-10-12 — The actions are published with pricing.toll_morsels; node 4.0.0 refuses
+ *            pricing.base_morsels (MORSEL_PRICE_REMOVED), so the same-owner work tests failed at the
+ *            publish instead of at the refusal they assert. toll_morsels 0 means the same on 3.x.
  *   v1.3.0 — 2026-09-26 — 7e: a provider named by a bare account name is refused with INVALID_INPUT on
  *            POST /v1/work/request and in POST /v1/work/batch, and no work is stored under it.
  *   v1.2.0 — 2026-09-26 — 7b-7d: work between a person and their own agent is refused both ways
@@ -239,7 +242,7 @@ await test('Setup — Agent B publishes an action', async () => {
             description: 'An action for security testing',
             input_schema: { type: 'object', properties: { text: { type: 'string' } } },
             output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
         }),
     });
     assert(body.ok === true, `publish action: ${JSON.stringify(body.error)}`);
@@ -356,7 +359,7 @@ await test('4b. Scope enforcement: Agent D (memory:read only) cannot publish act
             description: 'This should be blocked by scope check',
             input_schema: {},
             output_schema: {},
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
         }),
     });
     assert(status === 403, `expected 403 for scope-denied action publish, got ${status}`);
@@ -445,7 +448,7 @@ await test('7. Same-owner work: Agent A cannot request work from Agent C (same o
             description: 'Action for same-owner work test',
             input_schema: { type: 'object', properties: { text: { type: 'string' } } },
             output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
         }),
     });
     assert(pubBody.ok === true, `publish action: ${JSON.stringify(pubBody.error)}`);
@@ -491,7 +494,7 @@ await test('7c. Same-owner work: Agent A cannot request work on an action Owner 
             description: 'Action a person published in person',
             input_schema: { type: 'object', properties: { text: { type: 'string' } } },
             output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 0 },
+            pricing: { toll_morsels: 0 },
         }),
     });
     assert(pub.status === 201, `publish in person: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
