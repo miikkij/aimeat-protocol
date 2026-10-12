@@ -26,6 +26,8 @@
  * @structure PRINCIPALS · GUARD_EFFECTS · principalsFor(guards) · scopesFrom(guards)
  * @usage const { principals, unknown } = principalsFor(['requireAuth()', "requireScope('memory:write')"]);
  * @version-history
+ *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts) joins the authorization gates and
+ *     its word is read as a demand; requireScopeUnlessSelf gets a guard effect instead of reading as unknown.
  *   v1.2.0 — 2026-10-01 — requireScopeOrOwnApp joins the authorization gates (auth/app-own-gate.ts): requireScope,
  *     except the token of the app the route addresses.
  *   v1.1.0 — 2026-09-12 — requireOwnerMailboxRead is an authorization gate: the four owner-mailbox
@@ -84,7 +86,7 @@ export const AUTHORIZATION_GATES = [
     'requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
     'requireOwnerPrincipal', 'requireScimConnection', 'requireOperatorPrincipal',
     'requireExternalPrincipal', 'requireOwnerSession', 'workspaceAccess', 'workspaceAccessMiddleware',
-    'requireOwnerMailboxRead', 'requireScopeOrOwnApp',
+    'requireOwnerMailboxRead', 'requireScopeOrOwnApp', 'requireRestScope',
 ];
 
 /**
@@ -107,6 +109,12 @@ export const GUARD_EFFECTS: Record<string, { admits: Principal[] | null; note?: 
      * (/v1/apps/:owner/:filename/...), which passes without the word (auth/app-own-gate.ts).
      */
     requireScopeOrOwnApp: { admits: AUTHENTICATED, note: 'narrows by scope word; the addressed app\'s own token passes without it' },
+    /**
+     * requireScope for a route that asked no word before 4.0.0 (auth/rest-scope-gate.ts): before that
+     * release a caller without the word passes with the Deprecation headers, from it the caller is refused.
+     */
+    requireRestScope: { admits: AUTHENTICATED, note: 'narrows by scope word from 4.0.0; before it counts the missing word and allows' },
+    requireScopeUnlessSelf: { admits: AUTHENTICATED, note: 'narrows by scope word; an agent acting on its own record passes' },
     /**
      * A scoped external principal: agent OR ecosystem app, with owner and operator also passing
      * because they act for their own. A deliberate superset of requireRole('agent').
@@ -201,7 +209,7 @@ export function principalsFor(guards: GuardCall[]): PrincipalResult {
             unknown.push(guard.name);
             continue;
         }
-        if (guard.name === 'requireScope' || guard.name === 'requireRoleOrScope') scopes.push(...guard.args);
+        if (guard.name === 'requireScope' || guard.name === 'requireRoleOrScope' || guard.name === 'requireRestScope') scopes.push(...guard.args);
         if (guard.name === 'requireOperatorPrincipal') scopes.push(...guard.args.filter(a => a.includes(':')));
 
         let admits = effect.admits;

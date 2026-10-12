@@ -19,6 +19,7 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   v1.8.0 -- 2026-10-12 -- requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/skills. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.7.0 -- 2026-10-09 -- GET /v1/skills/:name and its /zip answer a caller who is not signed in, with
  *     public skills only (Jouni's decision of 2026-10-09: a public skill is readable without sign-in).
  *   v1.6.0 -- 2026-10-09 -- GET /v1/apps/:owner/:filename/skills answers a caller who is not signed in
@@ -60,6 +61,7 @@ import {
   getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills,
   listSkillsByBinding, setSkillVisibility, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -104,7 +106,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   }
 
   /* ── GET /v1/skills — list the library (default) or one scope. Manifests only, no bodies. ── */
-  router.get('/v1/skills', requireAuth(), async (req, res) => {
+  router.get('/v1/skills', requireAuth(), requireRestScope('memory:read'), async (req, res) => {
     try {
       const accessor = await accessorOf(req);
       // 2d: ?binding=app:{owner}/{filename} — skills bound to one app, across scopes.

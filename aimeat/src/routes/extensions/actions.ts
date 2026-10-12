@@ -7,6 +7,7 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): ext:invoke on POST /v1/ext/:extName/:instanceId/:actionId, POST /v1/ext/:extName/:actionId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.15.0 — 2026-10-09 — A failed action's own message and the timeout answer pass the 500 text
  *     filter (middleware/internal-error-text.ts) through keepErrorMessage; the script's message is
  *     redacted of credential-shaped text (secrets audit 2026-10-09, d4).
@@ -83,6 +84,7 @@ import { getEncryptionKey } from '../../services/encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from '../../services/extension-secrets.js';
 import type { EmailService } from '../../services/email.js';
 import { resolveExtensionForCall } from '../../services/component-versions.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 /**
  * Whether a sandbox run ended by running out of time. QuickJS reports its interrupt as
@@ -111,7 +113,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
   });
 
   // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
-  router.post('/v1/ext/:extName/:instanceId/:actionId', requireAuth(), async (req, res) => {
+  router.post('/v1/ext/:extName/:instanceId/:actionId', requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
     // `:extName` may pin a version (`name@1.2.0`): the call then runs that kept version's code.
     const resolved = await resolveExtensionForCall(storage, req.params.extName as string);
     const extName = resolved.name;
@@ -313,7 +315,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
   });
 
   // ── POST /v1/ext/:extName/:actionId — Dynamic action execution ──
-  router.post('/v1/ext/:extName/:actionId', requireAuth(), async (req, res) => {
+  router.post('/v1/ext/:extName/:actionId', requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
     // `:extName` may pin a version (`name@1.2.0`): the call then runs that kept version's code,
     // with the live record's status, settings and instances.
     const resolved = await resolveExtensionForCall(storage, req.params.extName as string);

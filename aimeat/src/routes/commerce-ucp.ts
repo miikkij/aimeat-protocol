@@ -16,6 +16,7 @@
  *   - PATCH /ucp/v1/checkout-sessions/:id        update line_items OR { cancel: true }
  *   - POST  /ucp/v1/checkout-sessions/:id/complete  ({ payment: { handler?, instrument? } })
  * @version-history
+ *   v1.5.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:buy (an app: contract:spend, which completeSession also asks) on POST /ucp/v1/checkout-sessions/:id/complete. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.4.0 — 2026-10-11 — Money only (ruling D4): a session opens in the request's money currency,
  *     else the first one its items are priced in, or is refused MONEY_PRICE_REQUIRED; a morsel
  *     session opened elsewhere is not shown here; completion names its handler; the session's
@@ -48,6 +49,7 @@ import { assertMoneySession, createMoneySession, moneyHandlerFor, moneyPaymentHa
 import { paymentChallenge } from '../commerce/x402.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
 import { ucpCheckoutRouter } from './ucp-checkout.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 export const UCP_VERSION = '2026-04-08';
 const UCP_CAPABILITIES = [{ name: 'dev.ucp.shopping.checkout', version: '1' }];
@@ -231,7 +233,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     } catch (err) { sendUcpError(res, config, err); }
   });
 
-  router.post('/ucp/v1/checkout-sessions/:id/complete', requireAuth(), async (req, res) => {
+  router.post('/ucp/v1/checkout-sessions/:id/complete', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
     const parsed = CompleteSchema.safeParse(req.body ?? {});
     if (!parsed.success) { res.status(400).json(ucpEnvelope(UCP_CAPABILITIES, error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message))); return; }
     try {

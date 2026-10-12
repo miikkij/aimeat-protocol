@@ -75,6 +75,13 @@ export interface AimeatToolDefinition {
      */
     scope?: ToolScope;
     /**
+     * The release from which `scope` decides whether the tool is offered. Before it the tool is offered
+     * without the word and a call without it is counted (GET /v1/stats deprecated_use), as its REST twin
+     * behind requireRestScope is (auth/rest-scope-gate.ts). For the words added on 2026-10-12, which
+     * these tools had never asked: REST_SCOPE_GATES_ENFORCED_IN (utils/rest-scope-release.ts).
+     */
+    scopeEnforcedFrom?: string;
+    /**
      * The v2 surfaces that carry the tool, besides `full` (../surfaces.ts MCP_SURFACES). `full`
      * carries every catalog tool not in V2_EXCLUDED.
      */

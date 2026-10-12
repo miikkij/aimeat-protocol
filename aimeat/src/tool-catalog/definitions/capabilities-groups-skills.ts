@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_skill_list names memory:read, the word GET /v1/skills asks; enforced from 4.0.0.
  *   2026-10-12 — aimeat_consent_grant: `scope` is the reach local, federation or auth (private and dmz
  *     kept as older names for local) and optional, the node picking the default (Core 2026-11 AUTHZ-18).
  *   2026-10-09 — aimeat_secret_set takes an optional `host`; aimeat_secret_list names the host binding
@@ -33,6 +34,7 @@ import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 
 export const capabilitiesGroupsSkillsTools = [
     {
@@ -658,6 +660,9 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Browse Skills Registry', readOnlyHint: true },
+        // The word GET /v1/skills asks from 4.0.0 (auth/rest-scope-gate.ts); view=linked asked it already.
+        scope: 'memory:read',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         surfaces: ['appdev', 'agent', 'service', 'chat'],
         input: {
             view: { type: 'string', enum: ['library', 'linked', 'mine', 'workspace'], description: 'Which listing (default library).' },

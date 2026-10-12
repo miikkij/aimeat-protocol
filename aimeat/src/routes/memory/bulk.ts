@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/memory/discover. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.11.7 — 2026-10-12 — Copy over the memory quota answers 413 QUOTA_EXCEEDED, as every other write does; it answered 429 (Core 2026-11 DATA-26).
  *   v1.11.6 — 2026-10-11 — Copy refuses an `agents.` key that carries an identity where the agent's name belongs (400 AGENT_KEY_NOT_A_NAME); bulk and import refuse it through batchKeyRefusal.
  *   v1.11.5 — 2026-10-11 — The four `memory` changes are scoped to the owner when every record written or deleted is one only its owner reads (event-bus.ts emitRecordChange).
@@ -75,6 +76,7 @@ import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import { discoverMemory } from '../../services/memory-discover.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -536,7 +538,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   });
 
   // GET /v1/memory/discover — browse public memory entries across all users on this node
-  router.get('/v1/memory/discover', requireAuth(), async (req, res) => {
+  router.get('/v1/memory/discover', requireAuth(), requireRestScope('memory:read'), async (req, res) => {
     const prefix = req.query.prefix as string | undefined;
     const owner = req.query.owner as string | undefined;
     const q = req.query.q as string | undefined;

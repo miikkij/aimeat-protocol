@@ -6,6 +6,7 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): packages:write on POST /v1/instances/:id/migration-prompt. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.6.0 — 2026-09-29 — TARGET-082 V4: migration-prompt reads the owner's live component content
  *     through fetchComponentContentForAi with the caller's ContentReader; a memory or translation
  *     record that may not reach a model answers CLASSIFIED (403) and no prompt is composed.
@@ -43,6 +44,7 @@ import { ClassificationError } from '../../services/classification/labels.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { migrateOrRequest, updateOrRequest, requestedBody } from '../../services/packages/install/package-install-requests.js';
 import { actCallerOf as callerOf } from './install-requests.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 // ── Register migration routes ─────────────────────────────────────────
 
@@ -52,7 +54,7 @@ export function registerMigrationRoutes(
   storage: Storage,
 ): void {
   // POST /v1/instances/:id/migration-prompt — Generate AI migration prompts
-  router.post('/v1/instances/:id/migration-prompt', requireAuth(), requireLocalSession(), async (req, res) => {
+  router.post('/v1/instances/:id/migration-prompt', requireAuth(), requireRestScope('packages:write'), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 

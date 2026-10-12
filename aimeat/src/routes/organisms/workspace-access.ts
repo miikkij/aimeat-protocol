@@ -6,6 +6,7 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/organisms/:id/workspaces; organism:invite on POST /v1/organisms/:id/workspace-access, GET /v1/organisms/:id/workspace-access. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.16.1 — 2026-10-06 — The comments say how a key holder confirms the address on a node that
  *     requires one: at first sign-in, through the sign-in window's email completion. They said a
  *     verification code went out at mint, which it does not (audit of the secaudit last items).
@@ -98,6 +99,7 @@ import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/r
 import type { OrganismHelpers } from './shared.js';
 import { eraseOwner } from '../../services/owner-erasure.js';
 import { isValidEmail } from '../../utils/email-validator.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerOrganismWorkspaceAccessRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
@@ -129,7 +131,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
 
   /* ── GET /v1/organisms/:id/workspaces — discover every workspace in the org (membership-gated,
    * names + creator + your access status). Discovery is open to members; content stays gated. ── */
-  router.get('/v1/organisms/:id/workspaces', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspaces', requireAuth(), requireRestScope('organism:read'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
@@ -247,7 +249,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   /* ── POST /v1/organisms/:id/workspace-access — request access to a workspace. Records the request
    * and grants the requester's OWN contributions to the organism, so once approved their additions
    * are visible to the creator + other members. Body: { ws, message? }. ── */
-  router.post('/v1/organisms/:id/workspace-access', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/workspace-access', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const id = req.params.id as string;
     const { ws, message } = req.body ?? {};
     const organism = await storage.getOrganism(id);
@@ -292,7 +294,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
 
   /* ── GET /v1/organisms/:id/workspace-access?ws= — the workspace creator (or org admin) lists the
    * pending/decided access requests for a workspace they own. ── */
-  router.get('/v1/organisms/:id/workspace-access', requireAuth(), async (req, res) => {
+  router.get('/v1/organisms/:id/workspace-access', requireAuth(), requireRestScope('organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : undefined;
     const organism = await storage.getOrganism(id);

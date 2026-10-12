@@ -6,6 +6,7 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:write on POST /v1/knowledge/:id/link, DELETE /v1/knowledge/:id/link; memory:read on GET /v1/knowledge/:id/broken-links. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   2026-10-12 — The organism-share consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — GET /:id public manifest lookup batches owners+agents (was O(owners+agents) scan)
@@ -43,6 +44,7 @@ import { memoryContentBytes } from '../../utils/memory-content.js';
 import { logger } from '../../utils/logger.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { presentMemory, classificationWarningOf } from '../../services/classification/present-memory.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 // The validator is shared with the operator's import, which used to write a manifest nothing
 // checked. → ./manifest-validator.ts
@@ -325,7 +327,7 @@ export function registerPackagesCoreRoutes(
   });
 
   /* ── POST /v1/knowledge/:id/link — Create a link from this package to another memory ── */
-  router.post('/v1/knowledge/:id/link', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/knowledge/:id/link', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const packageId = req.params.id as string;
@@ -393,7 +395,7 @@ export function registerPackagesCoreRoutes(
   });
 
   /* ── DELETE /v1/knowledge/:id/link — Delete a link ── */
-  router.delete('/v1/knowledge/:id/link', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/knowledge/:id/link', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
     const { target } = req.body;
     if (!target) {
@@ -421,7 +423,7 @@ export function registerPackagesCoreRoutes(
   });
 
   /* ── GET /v1/knowledge/:id/broken-links — Find broken links ── */
-  router.get('/v1/knowledge/:id/broken-links', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/knowledge/:id/broken-links', requireAuth(), requireRestScope('memory:read'), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
     const broken = await storage.findBrokenLinks(ownerGaii);
 

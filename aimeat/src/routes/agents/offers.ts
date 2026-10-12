@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent offers routes (publish/read per-agent offers, owner aggregate feed, callable-offer invoke with settlement). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:sell on PUT /v1/agents/:name/offers. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.8.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). PUT stores an old price.morsels as part of tollMorsels; the GETs return
  *     the old field as a deprecated mirror until 4.0.0 (config-pacing.ts). The invoke charges the
@@ -54,6 +55,7 @@ import { listWorkflows } from '../../services/workflow/store.js';
 import { reconcileAfterSourceWrite, exchangeOutcome } from '../../services/exchange-projection.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { logger } from '../../utils/logger.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerOffersRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── Agent OFFERS — the "what can I do with my agents" surface ──
@@ -62,7 +64,7 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
   // record is consumed by the mesh (delegate selection). See docs/plans/2026-06-12-agent-offers-*.md.
 
   // PUT /v1/agents/:name/offers — an agent publishes its own offers, or the owner publishes for one of theirs.
-  router.put('/v1/agents/:name/offers', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.put('/v1/agents/:name/offers', requireAuth(), requireRestScope('commerce:sell', { unlessSelf: config.nodeId }), requireRole('agent'), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
     const owner = req.auth!.owner as string;
     const agentGaii = identifier.includes('#') ? identifier : buildGAII(identifier, owner, config.nodeId);

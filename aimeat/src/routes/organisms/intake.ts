@@ -19,6 +19,7 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   v1.2.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/intake/forms. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.1.0 — 2026-10-01 — The public form read carries a field's options and length limit, and marks a
  *     field required when the form lists it in required_fields, so a renderer draws what the submit enforces.
  *   v1.0.0 — 2026-07-16 — Initial: generic Public Intake capability (forms CRUD + anon submit).
@@ -51,6 +52,7 @@ import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/wor
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 /** Server-trusted intake-form config, stored at organism.{org}.w.{ws}.meta.intake.{formId}. */
 interface IntakeFormConfig {
@@ -218,7 +220,7 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
   });
 
   /* ── GET /v1/intake/forms?ws= — list the owner's forms in a workspace. ── */
-  router.get('/v1/intake/forms', requireAuth(), async (req, res) => {
+  router.get('/v1/intake/forms', requireAuth(), requireRestScope('organism:read'), async (req, res) => {
     const org = typeof req.query.organism_id === 'string' ? req.query.organism_id : (typeof req.query.org === 'string' ? req.query.org : '');
     const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
     if (!org || !ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'organism_id and ws are required')); return; }

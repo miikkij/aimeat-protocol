@@ -7,6 +7,7 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/organisms/:id/join-requests, GET /v1/organisms/:id/invitations, GET /v1/organisms/invitations/mine; organism:invite on POST /v1/organisms/:id/join-requests/:requestId/review, POST /v1/organisms/:id/admins, DELETE /v1/organisms/:id/admins/:ghii, DELETE /v1/organisms/:id/members/:ghii, POST /v1/organisms/:id/members/:ghii/unban, POST /v1/organisms/:id/transfer, POST /v1/organisms/:id/owners, DELETE /v1/organisms/:id/owners/:ghii, POST /v1/organisms/:id/invitations, POST /v1/organisms/:id/members, PATCH /v1/organisms/:id/invitations/:ghii, DELETE /v1/organisms/:id/invitations/:ghii, POST /v1/organisms/:id/agents, DELETE /v1/organisms/:id/agents/:gaii; organism:write on POST /v1/organisms/:id/invitations/accept, POST /v1/organisms/:id/invitations/decline. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   2026-09-28 — The member list names only the agents the organism admits (agentAccess), and says which
  *     setting is in force; an owner or admin can attach any active member's agent, and where only listed
@@ -49,6 +50,7 @@ import {
 } from '../../services/invitations.js';
 import { agentAccessOf, agentBarred } from '../../services/organism-agent-access.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerOrganismMembershipRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/members — List members ── */
@@ -109,7 +111,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* ── GET /v1/organisms/:id/join-requests — List pending join requests ── */
-  router.get('/v1/organisms/:id/join-requests', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/organisms/:id/join-requests', requireAuth(), requireRestScope('organism:read'), requireRole('agent'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
     const { status } = req.query;
@@ -130,7 +132,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* ── POST /v1/organisms/:id/join-requests/:requestId/review — Approve/reject ── */
-  router.post('/v1/organisms/:id/join-requests/:requestId/review', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/join-requests/:requestId/review', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
     const requestId = req.params.requestId as string;
@@ -205,7 +207,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* ── POST /v1/organisms/:id/admins — Add an admin ── */
-  router.post('/v1/organisms/:id/admins', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/admins', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
     const { target_ghii } = req.body ?? {};
@@ -248,7 +250,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* ── DELETE /v1/organisms/:id/admins/:ghii — Remove admin role ── */
-  router.delete('/v1/organisms/:id/admins/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/organisms/:id/admins/:ghii', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const targetGhii = req.params.ghii as string;
@@ -290,7 +292,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
    * membership and drops them from members[] (+ admins[] if applicable). The creator
    * cannot be removed (they must delete the organism); an admin can only be removed by
    * the creator. The removed member is notified. To leave voluntarily, use /leave. */
-  router.delete('/v1/organisms/:id/members/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/organisms/:id/members/:ghii', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const targetGhii = decodeURIComponent(req.params.ghii as string);
@@ -323,7 +325,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   /* ── POST /v1/organisms/:id/members/:ghii/unban — Lift a ban ──
    * Creator/admin removes the block on a previously-banned owner by deleting the banned
    * membership row, so they can request to join (or be invited) again. */
-  router.post('/v1/organisms/:id/members/:ghii/unban', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/members/:ghii/unban', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const targetGhii = decodeURIComponent(req.params.ghii as string);
@@ -351,7 +353,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
    * The creator hands the organism to an existing active member: the target becomes `creator`,
    * the previous creator is demoted to `admin` (kept as a member). Only the current creator may
    * call this. The new creator is notified. */
-  router.post('/v1/organisms/:id/transfer', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/transfer', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const { to } = req.body ?? {};
@@ -401,7 +403,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
    * pair of hands cost the first pair everything, and an organism whose single owner went unreachable
    * could not be recovered by anyone. Adding costs the adder nothing; the handover is this plus the
    * DELETE below, with a look in between. The target must already be an active member. ── */
-  router.post('/v1/organisms/:id/owners', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/owners', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const id = req.params.id as string;
     const callerGhii = req.auth!.owner as string;
     const { ghii } = req.body ?? {};
@@ -431,7 +433,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   /* ── DELETE /v1/organisms/:id/owners/:ghii — step down, or remove a co-owner ──
    * The departing owner stays as an admin. The LAST owner cannot be removed: an organism with no
    * owner is the one state nobody inside it can repair. ── */
-  router.delete('/v1/organisms/:id/owners/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/organisms/:id/owners/:ghii', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const id = req.params.id as string;
     const callerGhii = req.auth!.owner as string;
     const targetGhii = req.params.ghii as string;
@@ -474,7 +476,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   /* POST /v1/organisms/:id/invitations — invite an owner, optionally with an org role and
    * invite-time workspace grants applied when they accept.
    * Body: { invitee, role?: 'member'|'admin', workspaces?: [{ws, role: 'viewer'|'contributor'}] } */
-  router.post('/v1/organisms/:id/invitations', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/invitations', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const { invitee, role, workspaces } = req.body ?? {};
     if (!invitee || typeof invitee !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "invitee" (an owner name) is required'));
@@ -496,7 +498,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   /* POST /v1/organisms/:id/members — DIRECT ADD: creator/admin adds an existing local owner as an
    * ACTIVE member, role + workspace grants applied immediately (no accept round-trip; the invitee is
    * notified and can leave). Body: { ghii, role?, workspaces? } */
-  router.post('/v1/organisms/:id/members', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/members', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const { ghii, role, workspaces } = req.body ?? {};
     if (!ghii || typeof ghii !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "ghii" (an owner name) is required'));
@@ -517,7 +519,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
 
   /* PATCH /v1/organisms/:id/invitations/:ghii — edit a PENDING invitation's role/workspace grants
    * (rights stay editable until the invitee accepts). Body: { role?, workspaces? } */
-  router.patch('/v1/organisms/:id/invitations/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.patch('/v1/organisms/:id/invitations/:ghii', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const organism = await requireInviteAdmin(req, res);
     if (!organism) return;
     const { role, workspaces } = req.body ?? {};
@@ -537,7 +539,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* DELETE /v1/organisms/:id/invitations/:ghii — cancel a PENDING name invitation (creator/admin). */
-  router.delete('/v1/organisms/:id/invitations/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/organisms/:id/invitations/:ghii', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const organism = await requireInviteAdmin(req, res);
     if (!organism) return;
     try {
@@ -552,7 +554,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* GET /v1/organisms/:id/invitations — list outstanding invitations (creator/admin) */
-  router.get('/v1/organisms/:id/invitations', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/organisms/:id/invitations', requireAuth(), requireRestScope('organism:read'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
@@ -569,7 +571,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* GET /v1/organisms/invitations/mine — the caller's own pending invitations (across organisms) */
-  router.get('/v1/organisms/invitations/mine', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/organisms/invitations/mine', requireAuth(), requireRestScope('organism:read'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const memberships = (await storage.listMembershipsByGhii(callerGhii)).filter(m => m.status === 'invited');
     const invitations = [];
@@ -581,7 +583,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* POST /v1/organisms/:id/invitations/accept — the invitee accepts */
-  router.post('/v1/organisms/:id/invitations/accept', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/invitations/accept', requireAuth(), requireRestScope('organism:write'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
@@ -600,7 +602,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* POST /v1/organisms/:id/invitations/decline — the invitee declines */
-  router.post('/v1/organisms/:id/invitations/decline', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/invitations/decline', requireAuth(), requireRestScope('organism:write'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     try {
@@ -621,7 +623,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
    * and only a person signed in makes it: an agent could otherwise list itself and its siblings. */
 
   /* POST /v1/organisms/:id/agents — attach an agent GAII (the agent's owner as a member, or an organism owner/admin) */
-  router.post('/v1/organisms/:id/agents', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/agents', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const { agent_gaii } = req.body ?? {};
@@ -677,7 +679,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   });
 
   /* DELETE /v1/organisms/:id/agents/:gaii — detach an agent (its owner, or creator/admin) */
-  router.delete('/v1/organisms/:id/agents/:gaii', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.delete('/v1/organisms/:id/agents/:gaii', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const agentGaii = decodeURIComponent(req.params.gaii as string);

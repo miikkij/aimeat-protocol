@@ -11,6 +11,7 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): catalogue:read on GET /v1/cortex/:name, GET /v1/cortex/:name/prompts, GET /v1/cortex/:name/prompts/:promptName, GET /v1/cortex/:name/ontology. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   2026-10-05 — POST /v1/cortex with mode presigned answers the upload offer for a cortex ZIP
  *     (services/cortex-upload-offer.ts), as POST /v1/extensions does (secaudit 2026-10, M3).
  *   v1.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -68,6 +69,7 @@ import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { resolveCortexLib, listVersions } from '../services/component-versions.js';
 import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
 // `activateExtension` from '../routes/cortex.js' unchanged after the activation logic moved out.
@@ -243,7 +245,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── GET /v1/cortex/:name — get extension details ──
-  router.get('/v1/cortex/:name', requireAuth(), async (req, res) => {
+  router.get('/v1/cortex/:name', requireAuth(), requireRestScope('catalogue:read'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     // One 404 for "no such cortex" and "not yours to see" (services/cortex-read.ts), which
     // aimeat_cortex_list answers with too.
@@ -367,7 +369,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── GET /v1/cortex/:name/prompts — list prompts from extension ──
-  router.get('/v1/cortex/:name/prompts', requireAuth(), async (req, res) => {
+  router.get('/v1/cortex/:name/prompts', requireAuth(), requireRestScope('catalogue:read'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 
@@ -390,7 +392,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── GET /v1/cortex/:name/prompts/:promptName — get prompt with variable substitution ──
-  router.get('/v1/cortex/:name/prompts/:promptName', requireAuth(), async (req, res) => {
+  router.get('/v1/cortex/:name/prompts/:promptName', requireAuth(), requireRestScope('catalogue:read'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const promptName = decodeURIComponent(req.params.promptName as string);
     const ext = await storage.getCortexExtension(name);
@@ -421,7 +423,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── GET /v1/cortex/:name/ontology — get ontology data ──
-  router.get('/v1/cortex/:name/ontology', requireAuth(), async (req, res) => {
+  router.get('/v1/cortex/:name/ontology', requireAuth(), requireRestScope('catalogue:read'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
 

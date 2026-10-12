@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.17.0 — 2026-10-12 — packages:read, inside the wildcard: seeing the packages installed for the owner,
+ *     the word the install reads ask from 4.0.0 (auth/rest-scope-gate.ts).
  *   v1.16.1 — 2026-10-06 — The standard preset carries organism:read and organism:write, the words the
  *     workspace tools ask (secaudit 2026-10 last items, D4).
  *   v1.16.0 — 2026-10-02 — memory:purge, inside the wildcard: deleting shared workspace records for good.
@@ -268,7 +270,10 @@ export const SCOPE_DOMAINS = [
   // @activate cron the manifest declares, all under the installer's identity, so it is the widest
   // single act in this list and it asked for nothing at all until 2026-08-15. A row here is what
   // lets an owner see it and take it away.
-  { key: 'packages', permissions: ['write'] },
+  // packages:read — see the packages installed for the owner (GET /v1/instances and its two reads,
+  //   aimeat_package_instances). New on 2026-10-12 with the REST scope gates of 4.0.0; every agent that
+  //   existed then was given it once (services/rest-scope-gates-migration.ts).
+  { key: 'packages', permissions: ['read', 'write'] },
   // secrets:manage — set, replace and delete the named credentials in the owner's vault. One word
   //   rather than a read and a write: the list is names and dates, and an agent that could see a
   //   name and not set it has learned nothing it can act on. Without a row here an owner could not

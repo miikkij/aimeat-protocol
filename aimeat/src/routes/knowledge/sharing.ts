@@ -6,6 +6,7 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:write on PATCH /v1/knowledge/:id/sharing, PATCH /v1/knowledge/:id/entries/:entryKey/visibility. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — clone + export manifest lookups batch the per-identity scan (listMemoryForOwners)
  *   v1.2.0 — 2026-09-29 — TARGET-082 V4: clone and export pass the source manifest and entries
@@ -30,6 +31,7 @@ import type { KnowledgeHelpers } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 /** The classification address of a package record (manifest or entry). */
 const targetOfRecord = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
@@ -49,7 +51,7 @@ export function registerSharingRoutes(
   const { resolve, findOwnerScopeMemory } = helpers;
 
   /* ── PATCH /v1/knowledge/:id/sharing — Update package sharing settings ── */
-  router.patch('/v1/knowledge/:id/sharing', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.patch('/v1/knowledge/:id/sharing', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
     const { catalog_listed, allow_clone } = req.body ?? {};
 
@@ -105,7 +107,7 @@ export function registerSharingRoutes(
   });
 
   /* ── PATCH /v1/knowledge/:id/entries/:entryKey/visibility — Change entry visibility ── */
-  router.patch('/v1/knowledge/:id/entries/:entryKey/visibility', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.patch('/v1/knowledge/:id/entries/:entryKey/visibility', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
     const entryKey = req.params.entryKey as string;
     const { visibility, group_id: groupId } = req.body ?? {};

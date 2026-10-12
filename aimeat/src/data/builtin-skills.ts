@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.29.0 -- 2026-10-12 -- use-app-bound-skills: aimeat_skill_list and GET /v1/skills ask memory:read
+ *     (the REST scope gates of 4.0.0, auth/rest-scope-gate.ts).
  *   v1.28.0 -- 2026-10-12 -- Four skills ship with every node (docs audit phase 5a): aimeat-data-ownership,
  *     aimeat-mcp-servers, aimeat-workflow-decisions and aimeat-bookkeeping, each in its own file.
  *     manage-my-profile-data points to aimeat-data-ownership for export, delete and leaving;
@@ -458,6 +460,8 @@ Before driving any app, check for them.
 3. Nothing bound? Proceed with the app's own docs. When the app is your owner's own, consider
    authoring a skill once you have learned it (below) so the next agent starts smarter.
    \`GET /v1/apps/{owner}/{filename}/skills\` needs no sign-in, and lists public skills only.
+   \`aimeat_skill_list\` and \`GET /v1/skills\` read your owner's library and ask \`memory:read\`
+   (node 4.0.0 refuses a call without it; before that the call works and says it is deprecated).
 
 ## Authoring app expertise
 Put the binding in the SKILL.md frontmatter so it travels with the skill:

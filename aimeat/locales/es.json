@@ -14864,6 +14864,7 @@
             "admin": "Administrar esta instalación a través de este agente. Puede, por ejemplo, desactivar cuentas, quitarle a alguien la verificación en dos pasos y cambiar el inicio de sesión de organización, los orígenes permitidos, los hooks y los servidores MCP que se ofrecen a todas las cuentas. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. \"Acceso total\" no lo incluye."
           },
           "packages": {
+            "read": "Ver qué paquetes tienes instalados, qué versión usa cada uno y si sus partes funcionan.",
             "write": "Instalar paquetes por ti. Eso pone en marcha la aplicación del paquete, sus extensiones y las tareas programadas que traiga, a tu nombre.",
             "install-code": "Instalar un paquete que trae código (una aplicación, una extensión, una biblioteca del navegador o instrucciones para tu IA) sin preguntarte antes. Sin este permiso, esa instalación espera tu aprobación, y ves lo que el paquete puede hacer antes de decir que sí."
           },

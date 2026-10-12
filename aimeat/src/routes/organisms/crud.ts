@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/organisms/waiting. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.15.0 — 2026-10-12 — POST /:id/leave no longer calls revokeDepartedMemberAccess itself:
  *     leaveOrganism() does, so aimeat_organism_leave takes the agents and workspace roles away too.
  *   v1.14.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -63,6 +64,7 @@ import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { purgeClassificationAudit } from '../../services/classification/audit.js';
 import { purgeExceptions } from '../../services/classification/exceptions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
@@ -198,7 +200,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
    * (orgs they manage), and incoming invitations. Replaces the home "Waiting for you" widget's per-org
    * 2–3N fan-out (listApprovals + listJoinRequests + listWorkspaces × O orgs). MUST be registered
    * before GET /:id so ':id' doesn't capture 'waiting'. ── */
-  router.get('/v1/organisms/waiting', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/organisms/waiting', requireAuth(), requireRestScope('organism:read'), requireRole('agent'), async (req, res) => {
     const owner = req.auth!.owner as string;
     await expireOverdueApprovals(storage, new Date().toISOString());
     const orgs = await storage.listOrganisms({ member: owner });

@@ -22,6 +22,7 @@
  * @structure aguiRouter(config, storage)
  * @usage app.use(aguiRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:read on GET /v1/agui/:owner/:agent/:taskId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6d).
  */
 import { Router, type Request, type Response } from 'express';
@@ -35,6 +36,7 @@ import { createTask } from '../services/agent-v2-tasks-ops.js';
 import { streamTaskAsAgui } from '../services/agui-run.js';
 import type { Principal } from '../services/agent-v2-messaging-ops.js';
 import { logger } from '../utils/logger.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 /** The message parts of an AG-UI run input, as parts this node stores. */
 function partsFromMessages(messages: unknown): Array<Record<string, unknown>> {
@@ -142,7 +144,7 @@ export function aguiRouter(config: AimeatConfig, storage: Storage): Router {
   //
   // A browser that reloaded, or a second screen. No scope: it is a read, and the task reads beside
   // it on /v1/agents/v2/tasks are ungated for the same reason — the owner is not a parameter.
-  router.get('/v1/agui/:owner/:agent/:taskId', requireAuth(), async (req, res) => {
+  router.get('/v1/agui/:owner/:agent/:taskId', requireAuth(), requireRestScope('task:read'), async (req, res) => {
     const agent = await findAgent(req);
     if (!agent) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No agent of that name on this node.'));

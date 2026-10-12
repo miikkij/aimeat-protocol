@@ -16633,6 +16633,7 @@
             "admin": "Ylläpidä tätä asennusta tämän agentin kautta. Se voi esimerkiksi sulkea tilejä, poistaa jonkun kaksivaiheisen kirjautumisen ja muuttaa organisaatiokirjautumista, sallittuja alkuperiä, koukkuja ja kaikille tileille tarjottuja MCP-palvelimia. Toimii vain sille, joka pyörittää tätä asennusta; millä tahansa muulla tilillä tämä lupa ei tee mitään. \"Täydet oikeudet\" ei sisällä sitä."
           },
           "packages": {
+            "read": "Katso, mitkä paketit sinulle on asennettu, mikä versio kustakin on käytössä ja toimivatko niiden osat.",
             "write": "Asenna puolestasi paketteja. Se ottaa käyttöön paketin sovelluksen, laajennukset ja mahdolliset ajastetut työt sinun nimissäsi.",
             "install-code": "Asenna paketti, jossa on koodia (sovellus, laajennus, selainkirjasto tai ohjeita tekoälyllesi), kysymättä sinulta ensin. Ilman tätä oikeutta asennus odottaa hyväksyntääsi, ja näet ennen hyväksymistä, mitä paketti voi tehdä."
           },

@@ -14,6 +14,8 @@
 
 **Update 2026-10-12 (session cc-joumii-gates-4-0).** 14 of the 31 gaps are closed in code: the 8 planned 4.0.0 changes (AUTH-05, AUTH-24, FED-09, FED-10, HTTP-08, DISC-01, DISC-02, AUTHZ-18) and HTTP-07, FED-13, PROV-07, PACE-21, DISC-05 and DATA-26. Each removal and each 4.0.0 change is a version gate: its own constant, compared with the running version, refused or changed from 4.0.0 whatever the configuration says, and before 4.0.0 answered with the Deprecation headers (`aimeat/src/services/deprecation.ts`). Their rows below say **met (4.0.0)**. The tests run the node as 4.0.0 and as 3.26.1: `aimeat/test/unit/removals-4-0-0.test.ts`, `aimeat/test/unit/core-2026-11-from-4-0-0.test.ts`. MCP-06, MCP-07, AUTH-11 and ID-10 were fixed earlier the same day (commits `a3194232c`, `9c7324cbe`) and are not re-read here, so their rows and the counts above still show the state of `9902b6287`.
 
+**Update 2026-10-12 (session cc-joumii-rest-scopes).** AUTHZ-01 and SEC-03 are closed in code as **met (4.0.0)**: the 70 authenticated REST routes that asked no scope word ask one through `requireRestScope` (`aimeat/src/auth/rest-scope-gate.ts`), refused from 4.0.0 and allowed before it with the Deprecation headers, and every other authenticated route asks a word or carries its reason in `aimeat/security/route-scope-exemptions.json`, held by `pnpm check:route-scopes`. Ruling Q21. The counts above are not recomputed.
+
 Status words: **met** · **met (4.0.0)** (met from the release the requirement is normative in; the code gates it by the running version, and 3.x keeps the old behaviour with the Deprecation headers) · **partial** (met, with a stated shortfall, or not verified on every path) · **gap** (not met) · **n/a** (a rule for readers or editors, no node behaviour to check).
 
 ## What changed since the reviewed draft
@@ -98,7 +100,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 
 | ID | Status | Evidence | What is missing |
 |---|---|---|---|
-| AUTHZ-01 | **gap** | Refusal `aimeat/src/auth/deny.ts:139-165` (403 `SCOPE_DENIED`, `WWW-Authenticate`) | Many REST routes carry no scope gate: `aimeat/src/tool-catalog/scopes.ts:9-12` says tasks, apps, extensions, cortex, organisms, knowledge, instances, groups, capabilities, storage, catalogue and messages "are NOT scope-gated in REST either"; example `aimeat/src/routes/organisms/workspace-access.ts:132`. An agent with any scope reaches them. The ruling of 2026-10-12 (Q21): add the gates in 4.0.0 and grant the new words once to every existing agent that used those routes. |
+| AUTHZ-01 | **met (4.0.0)** | Refusal `aimeat/src/auth/deny.ts:139-165` (403 `SCOPE_DENIED`, `WWW-Authenticate`). The 70 authenticated routes that asked no word carry `requireRestScope` (`aimeat/src/auth/rest-scope-gate.ts`): refused from 4.0.0 (`REST_SCOPE_GATES_ENFORCED_IN`), allowed before it with the Deprecation headers and counted per word in `GET /v1/stats`. Their MCP twins name the same word (catalog `scopeEnforcedFrom`, `aimeat/src/tool-catalog/scopes.ts`). The other authenticated routes either ask a word in the handler or carry a recorded reason why none applies (the caller's own record, the owner in person, no owner data) in `aimeat/security/route-scope-exemptions.json`, and `pnpm check:route-scopes` refuses a new route with neither. The new word `packages:read` was given once to every existing agent (`aimeat/src/services/rest-scope-gates-migration.ts`). Tests: `aimeat/test/unit/rest-scope-gates.test.ts`, `aimeat/test/unit/rest-scope-gates-migration.test.ts`. | The existing words (task:write, organism:invite and the rest) are not granted to agents that lacked them, because each already opens other routes and tools: such an agent sees the Deprecation header in 3.x and its owner ticks the word. |
 | AUTHZ-02 | met | `aimeat/src/auth/middleware.ts:469-479,665-669`; app role `aimeat/src/routes/app-grants.ts:549`; ecosystem role `aimeat/src/routes/ecosystem-apps.ts:405` | `requireAnyScope`'s owner bypass lacks the foreign check (`middleware.ts:714`); a federated token no longer carries `owner`, so it does not open. |
 | AUTHZ-03 | met | `aimeat/src/utils/scope-coverage.ts:317-323` | |
 | AUTHZ-04 | partial | `aimeat/src/utils/scope-coverage.ts:79-304` (19 words, a superset of the minimum in Core) | The list is published in the web app's scope model, not in `openapi.yaml` or discovery. |
@@ -305,7 +307,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 |---|---|---|---|
 | SEC-01 | met | `aimeat/src/utils/gaii.ts:383-414` | |
 | SEC-02 | met | `aimeat/src/utils/reserved-keys.ts:123,333-393`; `aimeat/src/utils/scope-coverage.ts:86` | |
-| SEC-03 | **gap** | | Same cause as AUTHZ-01: routes with authentication and no scope gate. |
+| SEC-03 | **met (4.0.0)** | Same as AUTHZ-01: every authenticated route that changes data asks a scope word (`requireScope`, `requireRestScope`), admits only the person (`requireOwnerPrincipal`, the owner or operator role), or carries a recorded reason in `aimeat/security/route-scope-exemptions.json`; `pnpm check:route-scopes` holds it. | |
 | SEC-04 | met | `aimeat/src/utils/url-validator.ts:53-160,234-320` | DNS rebinding remains possible, as the code notes (`:230-232`). |
 | SEC-05 | met | `aimeat/src/services/signed-node-request.ts:99-136`; `aimeat/src/routes/federation-auth.ts:104-108` | |
 | SEC-06 | met | `aimeat/src/services/owner-session.ts:63-70`; `aimeat/src/middleware/oauth-round-cookie.ts:72-74`; `aimeat/src/services/external-login.ts:159-168` | No check script enforces it. |
@@ -314,7 +316,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 
 ## The 31 gaps in one list, with their wishes
 
-Every gap is work for node 4.0.0. The wish column names the record in the Lifecycle Central wish bucket that carries the fix. Items 1 to 8, 16, 20, 21, 23, 25 and 28 are closed in code since 2026-10-12 (see the update under "Answer first"); they stay in the list so the numbering holds.
+Every gap is work for node 4.0.0. The wish column names the record in the Lifecycle Central wish bucket that carries the fix. Items 1 to 8, 13, 14, 16, 20, 21, 23, 25 and 28 are closed in code since 2026-10-12 (see the updates under "Answer first"); they stay in the list so the numbering holds.
 
 | # | ID | What is missing | Kind | Wish |
 |---|---|---|---|---|

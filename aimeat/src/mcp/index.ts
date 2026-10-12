@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-12 — Every tool is registered through withDeferredScopeNotice: a call made without a word
+ *     the tool names for 4.0.0 (catalog scopeEnforcedFrom) is counted like its REST twin's.
  *   2026-10-12 — The MCP serverInfo.version is the node's software version (getSoftwareVersion), where
  *     it had been a fixed '1.2.0' (Core 2026-11 ruling Q2).
  *   2026-10-12 — authenticate() refuses a token whose audience names another resource, and from 4.0.0
@@ -141,6 +143,7 @@ import { withResourceGate } from './resource-gate.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
 import { withOrganismAgentGate } from './organism-agent-gate.js';
 import { withErrorNextStep } from './error-next-step.js';
+import { withDeferredScopeNotice } from './deferred-scope-notice.js';
 import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
 import { instructionsFor } from './instructions.js';
@@ -320,8 +323,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // measurement, so what is measured is what the tool itself returned.
         // An organism that admits only listed agents refuses the others on every tool that names it
         // (mcp/organism-agent-gate.ts). Innermost, so the refusal is measured and carries a next step.
-        const measuredTool = withOrganismAgentGate(wrapToolHandler(withErrorNextStep(originalTool), () => agentGaii), () => agentGaii, storage);
-        const measuredRegisterTool = withOrganismAgentGate(wrapToolHandler(withErrorNextStep(originalRegisterTool), () => agentGaii), () => agentGaii, storage);
+        // A call without a word the tool names for 4.0.0 is counted, as its REST twin counts it
+        // (mcp/deferred-scope-notice.ts, auth/rest-scope-gate.ts). Innermost, so it sees the call itself.
+        const noticedTool = withDeferredScopeNotice(originalTool, () => scopes);
+        const noticedRegisterTool = withDeferredScopeNotice(originalRegisterTool, () => scopes);
+        const measuredTool = withOrganismAgentGate(wrapToolHandler(withErrorNextStep(noticedTool), () => agentGaii), () => agentGaii, storage);
+        const measuredRegisterTool = withOrganismAgentGate(wrapToolHandler(withErrorNextStep(noticedRegisterTool), () => agentGaii), () => agentGaii, storage);
         // Keep the initial surface ceiling and its memory footprint. The SDK reads enabled at
         // list/call time, so a removed permission affects discovery without rebuilding a session.
         // Newly granted tools outside that initial surface still require re-initialization.

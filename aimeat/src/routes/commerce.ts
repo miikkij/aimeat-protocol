@@ -16,6 +16,7 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   v1.10.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:buy (an app: contract:spend, which completeSession also asks) on POST /v1/commerce/checkout-sessions/:id/complete. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.9.0 — 2026-10-11 — A line item may be `{ kind: 'pacing-pack', quantity }`, pacing capacity the
  *     operator sells for money (commerce/pacing-pack.ts); it needs no offer_id or tool.
  *   v1.8.1 — 2026-10-09 — A typed commerce or payment error keeps its sentence through the 500 text
@@ -66,6 +67,7 @@ import { decodeXPayment, getX402Network, getX402Asset, x402SettlementCurrencies 
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
 import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 const ItemsSchema = z.array(z.object({
   kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'pacing-pack']).optional(),
@@ -470,7 +472,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/commerce/checkout-sessions/:id/complete — charge + fulfill.
-  router.post('/v1/commerce/checkout-sessions/:id/complete', requireAuth(), async (req, res) => {
+  router.post('/v1/commerce/checkout-sessions/:id/complete', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
     const parsed = CompleteSchema.safeParse(req.body ?? {});
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
     let session: CheckoutSessionRecord | undefined;

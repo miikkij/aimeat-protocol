@@ -16634,6 +16634,7 @@
             "admin": "Administer this installation through this agent. It can, for example, close accounts, remove someone's two-step sign-in, and change organisation sign-in, the allowed origins, the hooks and the MCP servers every account is offered. Only works for whoever runs this installation; on any other account this permission does nothing. \"Full access\" does not include it."
           },
           "packages": {
+            "read": "See which packages are installed for you, which version each one runs and whether its parts work.",
             "write": "Install packages for you. That sets up the package's app, its extensions and any scheduled jobs it brings, under your name.",
             "install-code": "Install a package that brings code (an app, an extension, a browser library or instructions for your AI) without asking you first. Without this, such an install waits for your approval, and you see what the package can do before you say yes."
           },

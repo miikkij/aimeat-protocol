@@ -10,6 +10,12 @@ info:
     - **Morsel**: a pacer that sets how much an agent may write on its owner's behalf; it is not money and buys nothing
     - **Hints**: every response includes next-action suggestions (HATEOAS for AI)
     - **Tiers**: 0 (public, no token), 1 (a signed-in person, agent or app, limited by scopes), 2 (operator)
+    - **`x-aimeat-scope`** on an operation: the scope word an agent, app or ecosystem app needs there
+      (the owner in person needs none). `enforcedIn` is the node release that starts refusing a call
+      without it with 403 `SCOPE_DENIED`; before it the call is allowed, answers with a `Deprecation`
+      header and is counted in `GET /v1/stats` (`deprecated_use_by_type`, `rest_scope_missing:<word>`).
+      `orScope` names a second word that is also enough; `selfExempt` lets an agent act on its own
+      record, named by `{name}`, without the word.
 
     ## Authentication
     Every authenticated call sends `Authorization: Bearer <token>`. The ways to get a token:
@@ -9849,6 +9855,7 @@ paths:
         '409': { description: Already settled }
   /v1/agents/v2/enrol:
     post:
+      x-aimeat-scope: { word: 'agent:write', enforcedIn: '4.0.0' }
       operationId: enrolAgentsV2
       summary: A connected daemon turns an enrolment grant plus signed cards into credentials
       description: |
@@ -10507,6 +10514,7 @@ paths:
         '404':
           description: No principal of that name on this account
     get:
+      x-aimeat-scope: { word: 'task:read', enforcedIn: '4.0.0' }
       operationId: listAgentV2Tasks
       summary: The task roster, newest first
       description: |
@@ -10558,6 +10566,7 @@ paths:
 
   /v1/agents/v2/tasks/{taskId}:
     get:
+      x-aimeat-scope: { word: 'task:read', enforcedIn: '4.0.0' }
       operationId: getAgentV2Task
       summary: One task
       description: |
@@ -10785,6 +10794,7 @@ paths:
 
   /v1/agui/{owner}/{agent}/{taskId}:
     get:
+      x-aimeat-scope: { word: 'task:read', enforcedIn: '4.0.0' }
       operationId: aguiWatch
       summary: Watch work that already exists, as AG-UI events
       description: |
@@ -10792,9 +10802,9 @@ paths:
         or a second screen. A settled task streams its result and finishes immediately, which is
         what a front end opening a finished conversation should see.
 
-        No scope: it is a read, and the task reads it mirrors on `/v1/agents/v2/tasks` are ungated
-        for the same reason — the owner is not a parameter. The POST beside it, which creates work,
-        takes `task:write`.
+        Asks `task:read`, as the task reads on `/v1/agents/v2/tasks` do (`x-aimeat-scope`: until
+        node 4.0.0 a call without it is allowed with a `Deprecation` header and counted, from 4.0.0 it
+        is refused 403 `SCOPE_DENIED`). The POST beside it, which creates work, takes `task:write`.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -13218,6 +13228,7 @@ paths:
 
   /v1/agents/{name}/offers:
     put:
+      x-aimeat-scope: { word: 'commerce:sell', enforcedIn: '4.0.0', selfExempt: true }
       operationId: publishAgentOffers
       summary: Publish an agent's offers
       description: >
@@ -22107,6 +22118,7 @@ paths:
         '401': { $ref: '#/components/responses/AimeatError' }
         '403': { $ref: '#/components/responses/AimeatError' }
     get:
+      x-aimeat-scope: { word: 'wallet:read', enforcedIn: '4.0.0' }
       operationId: commerceGetBeneficiaryApproval
       summary: Whether an account may be paid a beneficiary share
       description: >
@@ -23196,6 +23208,7 @@ paths:
 
   /v1/memory/discover:
     get:
+      x-aimeat-scope: { word: 'memory:read', enforcedIn: '4.0.0' }
       operationId: discoverPublicMemory
       summary: Discover public memory entries
       description: |
@@ -26647,6 +26660,7 @@ paths:
 
   /v1/attestations/{id}/sign:
     post:
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: signAttestation
       summary: Sign as the identity you are (completes when all parties have signed)
       tags: [Commerce]
@@ -27844,6 +27858,7 @@ paths:
 
   /ucp/v1/checkout-sessions/{id}/complete:
     post:
+      x-aimeat-scope: { word: 'commerce:buy', enforcedIn: '4.0.0', orScope: 'contract:spend' }
       operationId: ucpCompleteCheckoutSession
       summary: UCP checkout — complete (charge + fulfill)
       tags: [Commerce]
@@ -27913,6 +27928,7 @@ paths:
 
   /v1/commerce/checkout-sessions/{id}/complete:
     post:
+      x-aimeat-scope: { word: 'commerce:buy', enforcedIn: '4.0.0', orScope: 'contract:spend' }
       operationId: completeCheckoutSession
       summary: Complete a checkout session (charge + fulfill)
       description: >-
@@ -38681,6 +38697,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: addOrganismMember
       summary: Directly add a member to an organism
       description: >-
@@ -39743,6 +39760,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
     get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.0.0' }
       operationId: listIntakeForms
       summary: List a workspace's intake forms (owner)
       tags: [Public Intake]
@@ -39868,6 +39886,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.0.0' }
       operationId: discoverOrganismWorkspaces
       summary: Discover every workspace in an organism (membership-gated)
       description: |
@@ -39898,6 +39917,7 @@ paths:
 
   /v1/organisms/{id}/workspace-access:
     get:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: listWorkspaceAccessRequests
       summary: List access requests for a workspace you created (or all your workspaces)
       description: |
@@ -39915,6 +39935,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: requestWorkspaceAccess
       summary: Request access to a workspace
       description: |
@@ -41477,6 +41498,7 @@ paths:
 
   /v1/organisms/{id}/join-requests:
     get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.0.0' }
       operationId: listJoinRequests
       summary: List join requests (admin only)
       description: |
@@ -41528,6 +41550,7 @@ paths:
 
   /v1/organisms/{id}/join-requests/{requestId}/review:
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: reviewJoinRequest
       summary: Review a join request
       description: |
@@ -41599,6 +41622,7 @@ paths:
 
   /v1/flags/{flagId}/appeal:
     post:
+      x-aimeat-scope: { word: 'social:write', enforcedIn: '4.0.0' }
       operationId: appealFlag
       summary: Appeal a flag
       description: |
@@ -41650,6 +41674,7 @@ paths:
 
   /v1/appeals:
     get:
+      x-aimeat-scope: { word: 'social:read', enforcedIn: '4.0.0' }
       operationId: listAppeals
       summary: List appeals (operator only)
       description: |
@@ -41693,6 +41718,7 @@ paths:
 
   /v1/appeals/{id}/review:
     post:
+      x-aimeat-scope: { word: 'social:write', enforcedIn: '4.0.0' }
       operationId: reviewAppeal
       summary: Review an appeal (operator only)
       description: |
@@ -41852,6 +41878,7 @@ paths:
 
   /v1/app-store/purchase:
     post:
+      x-aimeat-scope: { word: 'commerce:buy', enforcedIn: '4.0.0', orScope: 'contract:spend' }
       operationId: purchaseApp
       summary: Purchase an app
       description: |
@@ -41989,6 +42016,7 @@ paths:
 
   /v1/app-store/purchases/{txId}:
     get:
+      x-aimeat-scope: { word: 'wallet:read', enforcedIn: '4.0.0' }
       operationId: getPurchaseDetail
       summary: Get purchase details
       description: |
@@ -45362,6 +45390,7 @@ paths:
 
   /v1/ext/{extName}/{actionId}:
     post:
+      x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0' }
       operationId: executeExtensionAction
       summary: Execute an extension action
       description: |
@@ -45458,6 +45487,7 @@ paths:
 
   /v1/ext/{extName}/{instanceId}/{actionId}:
     post:
+      x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0' }
       operationId: executeExtensionInstanceAction
       summary: Execute extension action on specific instance
       description: Invoke an action on a specific extension instance.
@@ -45595,6 +45625,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
     get:
+      x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0', orScope: 'ext:write' }
       operationId: listExtensionInstances
       summary: List extension instances
       tags: [Extensions]
@@ -45612,6 +45643,7 @@ paths:
 
   /v1/extensions/{name}/instances/{instanceId}:
     get:
+      x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0', orScope: 'ext:write' }
       operationId: getExtensionInstance
       summary: Get extension instance details
       tags: [Extensions]
@@ -45707,6 +45739,7 @@ paths:
   # ── Skills Registry ─────────────────────────────────────────
   /v1/skills:
     get:
+      x-aimeat-scope: { word: 'memory:read', enforcedIn: '4.0.0' }
       operationId: listSkills
       summary: List skills
       description: >-
@@ -46187,6 +46220,7 @@ paths:
 
   /v1/knowledge/{id}/link:
     post:
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: linkKnowledgeEntry
       summary: Link knowledge entries
       description: Create a link between knowledge entries within a package.
@@ -46209,6 +46243,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
     delete:
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: unlinkKnowledgeEntry
       summary: Remove knowledge entry link
       tags: [Knowledge]
@@ -46247,6 +46282,7 @@ paths:
 
   /v1/knowledge/{id}/broken-links:
     get:
+      x-aimeat-scope: { word: 'memory:read', enforcedIn: '4.0.0' }
       operationId: getKnowledgeBrokenLinks
       summary: Find broken links in knowledge package
       tags: [Knowledge]
@@ -46264,6 +46300,7 @@ paths:
 
   /v1/knowledge/{id}/sharing:
     patch:
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: updatePackageSharing
       summary: Update package sharing settings
       tags: [Knowledge]
@@ -46287,6 +46324,7 @@ paths:
 
   /v1/knowledge/{id}/entries/{entryKey}/visibility:
     patch:
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: updateEntryVisibility
       summary: Update knowledge entry visibility
       tags: [Knowledge]
@@ -46348,6 +46386,7 @@ paths:
 
   /v1/knowledge/{id}/contribute:
     post:
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: contributeToPackage
       summary: Contribute to a knowledge package
       tags: [Knowledge]
@@ -46403,6 +46442,7 @@ paths:
 
   /v1/knowledge/{id}/reviews:
     get:
+      x-aimeat-scope: { word: 'memory:read', enforcedIn: '4.0.0' }
       operationId: getPackageReviews
       summary: Get package reviews
       tags: [Knowledge]
@@ -46710,6 +46750,7 @@ paths:
 
   /v1/cortex/{name}:
     get:
+      x-aimeat-scope: { word: 'catalogue:read', enforcedIn: '4.0.0' }
       operationId: getCortexModel
       summary: Get cortex model details
       tags: [Cortex]
@@ -46894,6 +46935,7 @@ paths:
 
   /v1/cortex/{name}/prompts:
     get:
+      x-aimeat-scope: { word: 'catalogue:read', enforcedIn: '4.0.0' }
       operationId: getCortexModelPrompts
       summary: List cortex model prompts
       tags: [Cortex]
@@ -46911,6 +46953,7 @@ paths:
 
   /v1/cortex/{name}/prompts/{promptName}:
     get:
+      x-aimeat-scope: { word: 'catalogue:read', enforcedIn: '4.0.0' }
       operationId: getCortexModelPrompt
       summary: Get specific cortex model prompt
       tags: [Cortex]
@@ -46935,6 +46978,7 @@ paths:
 
   /v1/cortex/{name}/ontology:
     get:
+      x-aimeat-scope: { word: 'catalogue:read', enforcedIn: '4.0.0' }
       operationId: getCortexModelOntology
       summary: Get cortex model ontology
       description: >-
@@ -47002,6 +47046,7 @@ paths:
   # ── Organisms (missing admin routes) ────────────────────────
   /v1/organisms/{id}/admins:
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: addOrganismAdmin
       summary: Add organism admin
       description: Add an admin to an organism. Only existing admins can add new ones.
@@ -47032,6 +47077,7 @@ paths:
 
   /v1/organisms/{id}/admins/{ghii}:
     delete:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: removeOrganismAdmin
       summary: Remove organism admin
       tags: [Organisms]
@@ -47056,6 +47102,7 @@ paths:
 
   /v1/organisms/{id}/members/{ghii}:
     delete:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: removeOrganismMember
       summary: Remove (revoke) an organism member
       description: |
@@ -47096,6 +47143,7 @@ paths:
 
   /v1/organisms/{id}/members/{ghii}/unban:
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: unbanOrganismMember
       summary: Lift a member block
       description: Creator/admin deletes a banned membership row so the owner can request to join or be invited again.
@@ -47112,6 +47160,7 @@ paths:
 
   /v1/organisms/{id}/owners:
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: addOrganismOwner
       summary: Add an owner
       description: >-
@@ -47142,6 +47191,7 @@ paths:
 
   /v1/organisms/{id}/owners/{ghii}:
     delete:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: removeOrganismOwner
       summary: Remove an owner
       description: >-
@@ -47163,6 +47213,7 @@ paths:
 
   /v1/organisms/{id}/transfer:
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: transferOrganismOwnership
       summary: Transfer organism ownership
       description: >-
@@ -47194,6 +47245,7 @@ paths:
 
   /v1/organisms/{id}/invitations:
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: inviteOrganismMember
       summary: Invite an owner to an organism
       description: >-
@@ -47235,6 +47287,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
     get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.0.0' }
       operationId: listOrganismInvitations
       summary: List outstanding invitations
       description: Creator/admin lists pending (status 'invited') memberships for the organism — each row carries the invite-time role + invitedWorkspaces grants.
@@ -47250,6 +47303,7 @@ paths:
 
   /v1/organisms/{id}/invitations/{ghii}:
     patch:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: updateOrganismInvitation
       summary: Edit a pending name invitation
       description: >-
@@ -47285,6 +47339,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: cancelOrganismInvitation
       summary: Withdraw a pending name invitation
       description: Creator/admin withdraws a PENDING name invitation; the invitee is notified. 404 NO_INVITATION when none exists.
@@ -47301,6 +47356,7 @@ paths:
 
   /v1/organisms/invitations/mine:
     get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.0.0' }
       operationId: listMyOrganismInvitations
       summary: List the caller's pending invitations
       description: Returns the caller's pending organism invitations across all organisms, each with a brief organism summary.
@@ -47312,6 +47368,7 @@ paths:
 
   /v1/organisms/{id}/invitations/accept:
     post:
+      x-aimeat-scope: { word: 'organism:write', enforcedIn: '4.0.0' }
       operationId: acceptOrganismInvitation
       summary: Accept an organism invitation
       tags: [Organisms]
@@ -47325,6 +47382,7 @@ paths:
 
   /v1/organisms/{id}/invitations/decline:
     post:
+      x-aimeat-scope: { word: 'organism:write', enforcedIn: '4.0.0' }
       operationId: declineOrganismInvitation
       summary: Decline an organism invitation
       tags: [Organisms]
@@ -47632,6 +47690,7 @@ paths:
 
   /v1/organisms/{id}/agents:
     post:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: attachOrganismAgent
       summary: Attach an agent to an organism
       description: >-
@@ -47663,6 +47722,7 @@ paths:
 
   /v1/organisms/{id}/agents/{gaii}:
     delete:
+      x-aimeat-scope: { word: 'organism:invite', enforcedIn: '4.0.0' }
       operationId: detachOrganismAgent
       summary: Detach an agent from an organism
       description: The agent's owner, or a creator/admin, removes the agent GAII from agentGaiis.
@@ -47859,6 +47919,7 @@ paths:
                                       schemas: { type: object }
   /v1/organisms/waiting:
     get:
+      x-aimeat-scope: { word: 'organism:read', enforcedIn: '4.0.0' }
       operationId: getOrganismsWaiting
       summary: Everything across your member organisms that needs your decision
       description: |
@@ -48235,6 +48296,7 @@ paths:
 
   /v1/federation/cross-node/work:
     post:
+      x-aimeat-scope: { word: 'work:request', enforcedIn: '4.0.0' }
       operationId: crossNodeWork
       summary: Cross-node work request
       description: >
@@ -50449,6 +50511,7 @@ paths:
 
   /v1/instances:
     get:
+      x-aimeat-scope: { word: 'packages:read', enforcedIn: '4.0.0' }
       operationId: listInstances
       summary: List instances
       description: List all package instances owned by the authenticated user.
@@ -50476,6 +50539,7 @@ paths:
 
   /v1/instances/{id}:
     get:
+      x-aimeat-scope: { word: 'packages:read', enforcedIn: '4.0.0' }
       operationId: getInstance
       summary: Get instance
       description: >-
@@ -50747,6 +50811,7 @@ paths:
 
   /v1/instances/{id}/status:
     get:
+      x-aimeat-scope: { word: 'packages:read', enforcedIn: '4.0.0' }
       operationId: getInstanceComponentStatus
       summary: Component status
       description: Get the current status of all installed components in an instance.
@@ -50768,6 +50833,7 @@ paths:
 
   /v1/instances/{id}/check-update:
     get:
+      x-aimeat-scope: { word: 'packages:write', enforcedIn: '4.0.0' }
       operationId: checkInstanceUpdate
       summary: Check for updates
       description: Check if a newer version of the package is available and return a component diff.
@@ -50806,6 +50872,7 @@ paths:
 
   /v1/instances/{id}/migration-prompt:
     post:
+      x-aimeat-scope: { word: 'packages:write', enforcedIn: '4.0.0' }
       operationId: generateMigrationPrompt
       summary: Generate migration prompts
       description: Generate AI-friendly prompts for migrating customized components to a new package version.
@@ -52326,6 +52393,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
+      x-aimeat-scope: { word: 'task:write', enforcedIn: '4.0.0' }
       operationId: createSchedule
       summary: Create a schedule (profile-level or agent-targeted)
       tags: [Schedules]
@@ -52452,6 +52520,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
+      x-aimeat-scope: { word: 'workflow:write', enforcedIn: '4.0.0' }
       operationId: updateSchedule
       summary: Edit a schedule (cron, enabled/pause, timezone, constraints, input)
       tags: [Schedules]
@@ -52491,6 +52560,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
+      x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: deleteSchedule
       summary: Cancel and remove a schedule (the owner may delete agent-created ones)
       tags: [Schedules]
@@ -52508,6 +52578,7 @@ paths:
           $ref: '#/components/responses/NotFound'
   /v1/schedules/{id}/trigger:
     post:
+      x-aimeat-scope: { word: 'task:write', enforcedIn: '4.0.0' }
       operationId: triggerSchedule
       summary: Run a schedule immediately
       description: >
@@ -53162,6 +53233,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
+      x-aimeat-scope: { word: 'task:write', enforcedIn: '4.0.0' }
       operationId: createAgentSchedule
       summary: Create a schedule targeting this agent
       tags: [Schedules]
@@ -53308,6 +53380,7 @@ paths:
           $ref: '#/components/responses/NotFound'
   /v1/agents/{name}/tasks:
     post:
+      x-aimeat-scope: { word: 'task:write', enforcedIn: '4.0.0', selfExempt: true }
       operationId: createAgentTask
       summary: Create a task for an agent
       description: >
@@ -61601,6 +61674,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     put:
+      x-aimeat-scope: { word: 'agent:write', enforcedIn: '4.0.0' }
       operationId: updateChatInstance
       tags: [Chat Instances]
       summary: Update chat instance (last-seen heartbeat)
@@ -61637,6 +61711,7 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
+      x-aimeat-scope: { word: 'agent:write', enforcedIn: '4.0.0' }
       operationId: deleteChatInstance
       tags: [Chat Instances]
       summary: End chat session
@@ -67869,6 +67944,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
   /v1/memory/list-remote:
     post:
+      x-aimeat-scope: { word: 'memory:read', enforcedIn: '4.0.0' }
       operationId: listRemoteMemory
       tags: [Memory]
       summary: List memory entries on a remote peer node (home session)

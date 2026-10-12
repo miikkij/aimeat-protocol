@@ -12,6 +12,7 @@
  *   - GET/other routes: list and touch chat instances for the caller
  *
  * @version-history
+ *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): agent:write on PUT /v1/chat-instances/:id, DELETE /v1/chat-instances/:id. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-10 — August audit step 8: the record build, the GHII check and the lastSeen
@@ -31,6 +32,7 @@ import { emitChange } from '../services/event-bus.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
 import { localAccountName } from '../utils/gaii.js';
 import { operatorOverride } from '../services/operator-override.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -128,7 +130,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   // PUT /v1/chat-instances/:id — Update (e.g. lastSeen heartbeat)
-  router.put('/v1/chat-instances/:id', requireAuth(), async (req, res) => {
+  router.put('/v1/chat-instances/:id', requireAuth(), requireRestScope('agent:write'), async (req, res) => {
     const id = req.params.id as string;
     const record = await storage.getChatInstance(id);
 
@@ -155,7 +157,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   // DELETE /v1/chat-instances/:id — End chat session
-  router.delete('/v1/chat-instances/:id', requireAuth(), async (req, res) => {
+  router.delete('/v1/chat-instances/:id', requireAuth(), requireRestScope('agent:write'), async (req, res) => {
     const id = req.params.id as string;
     const record = await storage.getChatInstance(id);
 
