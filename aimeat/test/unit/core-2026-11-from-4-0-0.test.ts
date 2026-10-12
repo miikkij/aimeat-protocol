@@ -250,9 +250,13 @@ describe('discovery (DISC-01, DISC-05)', () => {
 
     it('names the current ways in, the MCP endpoint and the payment bindings, not /v1/auth/token alone', async () => {
         const wk = (await call('GET', '/.well-known/aimeat')).body.data;
-        expect(wk.endpoints.auth).not.toBe('/v1/auth/token');
-        expect(wk.endpoints.auth.owner_password).toBe('/v1/ghii/login');
-        expect(wk.endpoints.auth.agent_device_authorization).toBe('/v1/agents/device-authorize');
+        // endpoints.auth keeps its type (a string) inside v1, and names the current owner sign-in;
+        // every way in is the new, additive endpoints.sign_in object.
+        expect(typeof wk.endpoints.auth).toBe('string');
+        expect(wk.endpoints.auth).toBe('/v1/ghii/login');
+        expect(wk.endpoints.sign_in.owner_password).toBe('/v1/ghii/login');
+        expect(wk.endpoints.sign_in.agent_device_authorization).toBe('/v1/agents/device-authorize');
+        expect(wk.endpoints.sign_in.agent_token_renewal).toBe('/v1/auth/token');
         expect(wk.endpoints.mcp).toBe('/v1/mcp');
         expect(Array.isArray(wk.payment_bindings)).toBe(true);
     });

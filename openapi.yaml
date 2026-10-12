@@ -26298,9 +26298,11 @@ paths:
         `profiles` (the Core profiles the node claims); before 4.0.0 both are left out, because a
         3.x node does not yet keep the edition's removals. `payment_bindings` lists the payment
         bindings the node accepts (`stripe`, `invoice`, `ucp`, `acp`, `x402`), empty while commerce
-        is off. `endpoints.mcp` is the MCP endpoint and `endpoints.auth` names each way to get a
-        token: `owner_password`, `owner_refresh`, `agent_device_authorization`, `agent_device_token`,
-        `agent_token_renewal` and `mcp_oauth_metadata`. The bootstrap document (`GET /`) carries the
+        is off. `endpoints.mcp` is the MCP endpoint. `endpoints.auth` is a string, as it has been
+        since v1 began: the owner sign-in, `/v1/ghii/login` (until 2026-10-12 it named
+        `/v1/auth/token`, whose owner branch 4.0.0 removes). `endpoints.sign_in` is an object naming
+        each way to get a token: `owner_password`, `owner_refresh`, `agent_device_authorization`,
+        `agent_device_token`, `agent_token_renewal` and `mcp_oauth_metadata`. The bootstrap document (`GET /`) carries the
         same `protocol_version`, `profiles` and `payment_bindings` in `this_node`.
       tags: [Catalogue]
       responses:
