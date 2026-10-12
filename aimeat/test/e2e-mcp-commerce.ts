@@ -7,6 +7,12 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   v1.5.0 — 2026-10-12 — The seller manifest and the test 6 tool carry their morsel amounts as
+ *     tollMorsels, and test 8 sets the offer's pacing with toll_morsels, instead of price.morsels and
+ *     price_morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; tests 7 to 11 had failed in a
+ *     cascade from those writes. Test 8 asserts the deprecated `price` mirror on 3.x and its absence on
+ *     4.0.0. New test 8b keeps the old price_morsels as its subject: read as pacing on 3.x, refused
+ *     with MORSEL_PRICE_REMOVED and nothing written on 4.0.0.
  *   v1.4.0 — 2026-10-11 — 9 and 10 asserted the old model, where the tool's morsel amount was a price: the session is free with 3 morsels of pacing, and the receipt's `pacing` carries the split.
  *   v1.3.0 — 2026-10-01 — psp_set is screen-only (decision D5): test 3 asserts its refusal, and the
  *     tests that need card credentials set them through the owner's Wallet route.
@@ -36,6 +42,8 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -170,7 +178,7 @@ await test('Setup: owners + commerce-scoped and narrow MCP agents + seller manif
     });
     assert(vendor.status === 201, `vendor ${vendor.status}`);
     sellerAppRef = `${sellerOwner.name}/shop.html`;
-    const manifest = { tools: [{ name: 'concierge', description: 'White-glove run (task path)', price: { morsels: 3, unit: 'per-call' }, agent: 'vendor' }] };
+    const manifest = { tools: [{ name: 'concierge', description: 'White-glove run (task path)', tollMorsels: 3, agent: 'vendor' }] };
     const w = await json('/v1/memory', { method: 'POST', headers: auth(sellerOwner.token), body: JSON.stringify({ key: 'apps.shop.html.tools', value: manifest, visibility: 'public' }) });
     assert(w.status === 200 || w.status === 201, `seller manifest ${w.status}`);
 });
@@ -277,7 +285,7 @@ console.log('\nPhase 3 — Selling config');
 await test('6. app_tools_publish declares a priced tool; it lands in the node catalog', async () => {
     const r = await mcp.call('aimeat_app_tools_publish', {
         app_id: 'mcpshop.html',
-        tools: [{ name: 'summarize', description: 'Paid summary (task path)', price: { morsels: 2 }, priceMoney: { amount: 2000, currency: 'EUR' } }],
+        tools: [{ name: 'summarize', description: 'Paid summary (task path)', tollMorsels: 2, priceMoney: { amount: 2000, currency: 'EUR' } }],
     });
     assert(!r.isError, `publish: ${r.text}`);
     assert(r.data.tools[0].sku === `app-tool:${buyerOwner.name}/mcpshop.html:summarize`, `sku: ${r.text}`);
@@ -326,7 +334,7 @@ await test('7b. A missed app id NAMES the manifests this owner does publish', as
     assert(r.text.includes('includes its extension'), `says WHY the id missed, got: ${r.text}`);
 });
 
-await test('8. offer_price_set prices an own offer in morsels + EUR micro-units', async () => {
+await test('8. offer_price_set sets an own offer\'s pacing amount in morsels + a price in EUR micro-units', async () => {
     // Base offer doc via REST (owner token passes requireRole("agent") for own agents).
     const pub = await json('/v1/agents/trader/offers', {
         method: 'PUT', headers: auth(buyerOwner.token),
@@ -335,16 +343,37 @@ await test('8. offer_price_set prices an own offer in morsels + EUR micro-units'
     assert(pub.status === 200, `offers publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
     const r = await mcp.call('aimeat_offer_price_set', {
         agent_name: 'trader', offer_id: 'research',
-        price_morsels: 7, money_amount_micros: 1500000, money_currency: 'EUR', visibility: 'public',
+        toll_morsels: 7, money_amount_micros: 1500000, money_currency: 'EUR', visibility: 'public',
     });
     assert(!r.isError, `price_set: ${r.text}`);
-    assert(r.data.price.morsels === 7 && r.data.priceMoney.amount === 1500000 && r.data.priceMoney.currency === 'EUR', `priced: ${r.text}`);
+    assert(r.data.tollMorsels === 7 && r.data.priceMoney.amount === 1500000 && r.data.priceMoney.currency === 'EUR', `priced: ${r.text}`);
+    // On 3.x the answer also carries the old `price` as a deprecated mirror of the pacing amount; 4.0.0 drops it.
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(r.data.price === undefined, `4.0.0 answers no deprecated price mirror: ${r.text}`);
+    } else {
+        assert(r.data.price?.morsels === 7 && typeof r.data.price?.deprecated === 'string', `deprecated price mirror: ${r.text}`);
+    }
     const back = await json('/v1/agents/trader/offers', { headers: auth(buyerOwner.token) });
     const offer = (back.body.data.offers || []).find((o: any) => o.id === 'research');
-    assert(offer?.priceMoney?.amount === 1500000 && offer?.visibility === 'public', `persisted: ${JSON.stringify(offer)}`);
+    assert(offer?.priceMoney?.amount === 1500000 && offer?.visibility === 'public' && offer?.tollMorsels === 7, `persisted: ${JSON.stringify(offer)}`);
     // Foreign agent names never resolve (GAII is built from the SESSION owner).
-    const foreign = await mcp.call('aimeat_offer_price_set', { agent_name: 'vendor', offer_id: 'x', price_morsels: 1 });
+    const foreign = await mcp.call('aimeat_offer_price_set', { agent_name: 'vendor', offer_id: 'x', toll_morsels: 1 });
     assert(foreign.isError && foreign.text.includes('AGENT_NOT_FOUND'), `foreign agent: ${foreign.text}`);
+});
+
+await test('8b. offer_price_set with the old price_morsels: 3.x reads it as the pacing amount, 4.0.0 refuses it with MORSEL_PRICE_REMOVED and writes nothing', async () => {
+    const r = await mcp.call('aimeat_offer_price_set', { agent_name: 'trader', offer_id: 'research', price_morsels: 4 });
+    const back = async () => ((await json('/v1/agents/trader/offers', { headers: auth(buyerOwner.token) })).body.data.offers || [])
+        .find((o: any) => o.id === 'research');
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(r.isError && r.text.startsWith('MORSEL_PRICE_REMOVED'), `4.0.0 refuses price_morsels: ${r.text}`);
+        const offer = await back();
+        assert(offer?.tollMorsels === 7, `nothing was written: ${JSON.stringify(offer)}`);
+    } else {
+        assert(!r.isError && r.data.tollMorsels === 4, `3.x reads price_morsels as the pacing amount: ${r.text}`);
+        const offer = await back();
+        assert(offer?.tollMorsels === 4, `stored as the pacing amount: ${JSON.stringify(offer)}`);
+    }
 });
 
 // ─── Phase 4: buying over MCP (cross-owner app-tool, task-path fulfillment) ───

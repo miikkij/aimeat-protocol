@@ -18,6 +18,11 @@
  *   - Phase 3: the other doors and the refusals (REST, an id that names no app, another owner)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tools-key
  * @version-history
+ *   v1.0.2 — 2026-10-12 — The tool carries its morsel amount as tollMorsels instead of price.morsels,
+ *     which node 4.0.0 refuses with MORSEL_PRICE_REMOVED on aimeat_app_tools_publish and on POST
+ *     /v1/memory; every test after the first publish had failed only because no manifest landed. The
+ *     seller's agent also holds ext:invoke, which test 5's call of the owner's own extension action asks
+ *     on node 4.0.0.
  *   v1.0.1 — 2026-10-06 — The seller's agent holds memory:write, which aimeat_app_tools_publish asks
  *     since the secaudit 2026-10 follow-up (A4).
  *   v1.0.0 — 2026-09-27 — Initial (wish-tools-for-sale-published-over-mcp-do-not-show-in-the-app-cat).
@@ -159,7 +164,7 @@ const APP = `tkapp${STAMP}`;
 const FILE = `${APP}.html`;
 const IN_SCHEMA = { type: 'object', properties: { q: { type: 'string' } } };
 const OUT_SCHEMA = { type: 'object', properties: { echo: {}, caller: { type: 'string' } } };
-const TOOL = { name: 'audit', description: 'Echoes what it was given', action_id: `ext:${EXT}:echo`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 5 } };
+const TOOL = { name: 'audit', description: 'Echoes what it was given', action_id: `ext:${EXT}:echo`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 5 };
 
 const extManifest = JSON.stringify({
     metadata: { name: EXT, version: '1.0.0', description: 'app tools key e2e', author: 'e2e' },
@@ -174,7 +179,9 @@ const seller = await makeOwner('tksell');
 const other = await makeOwner('tkother');
 // memory:write: aimeat_app_tools_publish asks it beside commerce:sell since the secaudit 2026-10
 // follow-up (A4), the word the route it runs on asks.
-const sellerAgent = await makeAgent(seller, ['commerce:sell', 'exchange:read', 'exchange:write', 'memory:read', 'memory:write']);
+// ext:invoke: test 5 runs the owner's own extension action through aimeat_app_tool_invoke, and node
+// 4.0.0 asks that word on POST /v1/ext/:name/:action (REST_SCOPE_GATES_ENFORCED_IN).
+const sellerAgent = await makeAgent(seller, ['commerce:sell', 'exchange:read', 'exchange:write', 'memory:read', 'memory:write', 'ext:invoke']);
 const session = await openSession(sellerAgent);
 
 console.log('\nPhase 1 — fixtures');
