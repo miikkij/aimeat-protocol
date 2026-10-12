@@ -11,6 +11,9 @@
  *   section headlines compose poster.css, as the profile sections do.
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.26.0 -- 2026-10-12 -- The public library's description line under a package's name is back
+ *     (.kp-lib .kp-nm small). v1.24.0 removed it with the Settings rows' rules, and the description
+ *     ran into the name on the same line in the name's weight.
  *   v1.25.0 -- 2026-09-26 -- On the component kit (page group G7): the Settings page's own rules go,
  *     since the kit draws those parts: the quiet line's margin, the closed entry's count line
  *     (.kp-inline, now the Note), the coral "another author" line (.kp-warn, now Tinted), the name's
@@ -68,6 +71,7 @@
 .kp-lib--head > div { padding: 0 0 .35rem; border-bottom: 0; font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
 .kp-lib .kp-nm { font-weight: 800; font-size: .95rem; color: var(--text); }
 .kp-lib .kp-nm .og-tbl-name { white-space: normal; overflow-wrap: anywhere; }
+.kp-lib .kp-nm small { display: block; font-size: .8rem; font-weight: 400; color: var(--text-dim); margin-top: .1rem; }
 .og.og-kp--public { --poster-page-size: 2.6rem; }
 .og-kp--public { max-width: 1150px; margin: 0 auto; padding: 1.6rem 1.5rem 3rem; background: var(--bg); }
 .og-kp--public .og-sec h2 small { font-family: var(--font-mono); font-size: .8rem; letter-spacing: 0; text-transform: none; color: var(--accent); margin-left: .6rem; }
