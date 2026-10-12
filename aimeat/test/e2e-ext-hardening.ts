@@ -29,6 +29,8 @@
  *   v1.4.0 — 2026-10-12 — 3e on node 4.0.0: `commercial.payMorsels` is refused outright with 400
  *     MORSEL_PRICE_REMOVED (asserted there in place of its ceiling), and the ordinary-price install is a
  *     money price with a toll; on 3.x the morsel-price ceiling and its ordinary install are asserted as before.
+ *     3f setup: ownerA's `paid` tool states `tollMorsels: 3` in place of `price: { morsels: 3 }`, which
+ *     3.x read as the same pacing and 4.0.0 refuses on the memory write.
  *   v1.3.0 — 2026-10-09 — 3b: an encrypted value inside a secret field's descriptor default is not
  *     stored (secrets audit 2026-10-09, finding 1.1).
  *   v1.2.0 — 2026-09-16 — 3a: install, update, activate and deactivate answer with secret config
@@ -584,7 +586,7 @@ async function run() {
     };
     // ownerA sells their own capability, and publishes a free tool onto the same action. Both legitimate.
     await manifest(ownerA.token, appA, [
-      { name: 'paid', action_id: victimCap, price: { morsels: 3 } },
+      { name: 'paid', action_id: victimCap, tollMorsels: 3 },
       { name: 'look', action_id: victimCap },
     ]);
     // ownerB and ownerC each name a capability they do not own.
