@@ -19,7 +19,10 @@
  *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses price.morsels (MORSEL_PRICE_REMOVED), and the setup's PUT
  *     offers carried the old client's offer, so the whole setup was refused there. That offer moved to
  *     the test whose subject it is, on an agent of its own, and the test is version-aware: stored as
- *     pacing with the mirror on 3.x, refused with nothing written on 4.0.0.
+ *     pacing with the mirror on 3.x, refused with nothing written on 4.0.0. (c): on 4.0.0 POST /v1/memory
+ *     refuses the old stored form too, so the seed asserts that refusal with nothing written and then
+ *     seeds the same 39 offers with `tollMorsels`; the read-back, the feed and the two purchases run
+ *     unchanged on both releases.
  *   v1.1.0 — 2026-10-11 — The default node: before any setting changes, a 10-morsel use burns at least
  *     1 (AIMEAT_BURN_RATE, 0.10), and an ordinary buyer's tracking code does not say "granted".
  *   v1.0.0 — 2026-10-11 — Initial (wish-tarjouksella-rahahinta-ja-tahdistus-morselhinnat-tahdistukse).
@@ -205,18 +208,31 @@ await test('an old client writing price.morsels gets it stored as the pacing amo
 const legacy = await setupOwner('leg');
 const LEGACY_PRICES = [20, 1, 1, 1, 1, 3, 1, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 1, 1, 3, 1, 1, 3, 1, 1, 1, 2, 1];   // aimeat.io, 2026-10-11
 let legacyGaii = '';
-await test('(c) 39 offers stored before the change (29 morsel-priced, 10 in EUR) read as free plus paced, and the feed lists only the 10', async () => {
+// On 4.0.0 the memory write refuses the old stored form too, so no request can seed a record "as
+// 3.26.1 stored it". There the test asserts that refusal and that nothing was written, then seeds the
+// same 39 offers in the 4.0.0 form (`tollMorsels` with the same figures) and proves the rest unchanged.
+await test('(c) 39 offers stored before the change (29 morsel-priced, 10 in EUR) read as free plus paced, and the feed lists only the 10 (on 4.0.0 the old form is refused at the write and the same shop is seeded with tollMorsels)', async () => {
   assert(LEGACY_PRICES.length === 29, 'production had 29 morsel-priced products');
   const ag = await json('/v1/agents', { method: 'POST', headers: auth(legacy.token), body: JSON.stringify({ name: 'oldshop', owner: legacy.name, capabilities: ['social'] }) });
   assert(ag.status === 201, `agent ${ag.status}`);
   legacyGaii = `oldshop#${legacy.name}@${NODE_ID}`;
-  const offers = [
-    ...LEGACY_PRICES.map((m, i) => ({ id: `old-${i}`, title: `Old ${i}`, ask: 'x', deliverable, price: { morsels: m, unit: 'per-call' }, visibility: 'public' })),
+  const shop = (pacing: (m: number) => Record<string, unknown>) => [
+    ...LEGACY_PRICES.map((m, i) => ({ id: `old-${i}`, title: `Old ${i}`, ask: 'x', deliverable, ...pacing(m), visibility: 'public' })),
     ...Array.from({ length: 10 }, (_, i) => ({ id: `eur-${i}`, title: `Euro ${i}`, ask: 'x', deliverable, priceMoney: { amount: 500_000 + i, currency: 'EUR' }, visibility: 'public' })),
   ];
+  const rawWrite = (offers: unknown[]) => json('/v1/memory', { method: 'POST', headers: auth(legacy.token), body: JSON.stringify({ key: 'agents.oldshop.offers', agent: legacyGaii, value: { offers }, visibility: 'public' }) });
   // Written straight into the memory record, as a 3.26.1 node stored it: no normalising write path.
-  const w = await json('/v1/memory', { method: 'POST', headers: auth(legacy.token), body: JSON.stringify({ key: 'agents.oldshop.offers', agent: legacyGaii, value: { offers }, visibility: 'public' }) });
-  assert(w.status === 200 || w.status === 201, `raw write ${w.status}: ${JSON.stringify(w.body.error)}`);
+  const w = await rawWrite(shop(m => ({ price: { morsels: m, unit: 'per-call' } })));
+  if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+    assert(w.status === 400 && w.body.error?.code === 'MORSEL_PRICE_REMOVED',
+      `4.0.0 refuses the old stored form at the write with 400 MORSEL_PRICE_REMOVED, got ${w.status}: ${JSON.stringify(w.body.error)}`);
+    const none = await json(`/v1/agents/${encodeURIComponent(legacyGaii)}/offers`, { headers: auth(buyer.token) });
+    assert(none.status === 200 && (none.body.data.offers ?? []).length === 0, `nothing was written: ${JSON.stringify(none.body.data?.offers ?? none.body.error)}`);
+    const seeded = await rawWrite(shop(m => ({ tollMorsels: m })));
+    assert(seeded.status === 200 || seeded.status === 201, `4.0.0-form write ${seeded.status}: ${JSON.stringify(seeded.body.error)}`);
+  } else {
+    assert(w.status === 200 || w.status === 201, `raw write ${w.status}: ${JSON.stringify(w.body.error)}`);
+  }
   const read = await json(`/v1/agents/${encodeURIComponent(legacyGaii)}/offers`, { headers: auth(buyer.token) });
   assert(read.status === 200, `read ${read.status}: ${JSON.stringify(read.body.error)}`);
   const got = (read.body.data.offers ?? []) as any[];
