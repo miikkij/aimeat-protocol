@@ -4,6 +4,8 @@
  * @structure Authenticated fixtures; free calls and caller identity; refusal paths; cleanup.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tool-free-mcp
  * @version-history
+ *   2026-10-13 — From 4.0.0 POST /v1/memory refuses a manifest with price.morsels, so the `priced` tool
+ *     is written with tollMorsels there and keeps its 3.x figure on 3.x; `zero` is tollMorsels 0.
  *   2026-10-12 — Both agents hold ext:invoke, the word node 4.0.0 asks on the extension action route
  *     behind an app tool (REST scope gates). Without it every call there was refused at the route, so
  *     the pacing and the action money price were never reached, and the limited agent's refusal was
@@ -16,6 +18,8 @@
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = randomBytes(5).toString('hex'), EXT = 'freetool' + stamp, FILE = 'free-' + stamp + '.html';
@@ -112,8 +116,11 @@ try {
   assert((await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(seller.token) })).status === 200, 'aggregate');
   const baseTool = { action_id: 'ext:' + EXT + ':echo', lockedInput: { op: 'get' },
     inputSchema: { type: 'object', properties: { op: { type: 'string' }, query: { type: 'string' } }, required: ['query'] } };
-  const tools = [{ ...baseTool, name: 'free' }, { ...baseTool, name: 'zero', price: { morsels: 0 } },
-    { ...baseTool, name: 'priced', price: { morsels: 5 } },
+  // `priced` is the 3.x morsel figure where the node still takes it; from 4.0.0 the memory routes
+  // refuse price.morsels (MORSEL_PRICE_REMOVED), so the same pacing is written as tollMorsels there.
+  const legacyPrice = !(await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN));
+  const tools = [{ ...baseTool, name: 'free' }, { ...baseTool, name: 'zero', tollMorsels: 0 },
+    { ...baseTool, name: 'priced', ...(legacyPrice ? { price: { morsels: 5 } } : { tollMorsels: 5 }) },
     { ...baseTool, name: 'usd', pricesMoney: [{ amount: 1000, currency: 'USD' }] },
     { ...baseTool, name: 'action-paid', action_id: 'ext:' + EXT + ':paid' }];
   for (const [filename, visibility] of [[FILE, 'public'], [PRIVATE_FILE, 'private']]) {

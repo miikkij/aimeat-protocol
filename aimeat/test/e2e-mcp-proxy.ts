@@ -31,6 +31,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   v1.12.1 — 2026-10-13 — The shop's tool manifest carries tollMorsels: from 4.0.0 POST /v1/memory
+ *     refuses price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
  *   v1.12.0 — 2026-10-09 — A sign-in callback from a browser that did not start the round seals
  *     nothing; an agent's sign-in waits for the owner's confirmation; the stored round and the server
  *     row hold no plaintext secret (secrets audit 2026-10-09, chapter 2).
@@ -1489,7 +1491,7 @@ await test('a capability over a remote tool, bought by a second owner, runs at c
       key: 'apps.mcpproxyshop.tools', visibility: 'public',
       value: { tools: [{
         name: 'house-echo', description: 'Says it back through the server this node offers.',
-        action_id: houseCapId, price: { morsels: 1, unit: 'per-call' },
+        action_id: houseCapId, tollMorsels: 1,
       }] },
     }),
   });

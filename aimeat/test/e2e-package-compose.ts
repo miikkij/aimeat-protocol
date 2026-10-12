@@ -14,6 +14,8 @@
  *   - Phase 7: the skills bound to the apps travel, install bound to the installed copy, never
  *     overwrite the installer's own skill, update, and leave with the uninstall
  * @version-history
+ *   v1.1.1 — 2026-10-13 — The shop's priced tool carries tollMorsels: from 4.0.0 POST /v1/memory refuses
+ *     price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
  *   v1.1.0 — 2026-09-30 — Phase 7: a package carries the skills bound to its apps.
  *   v1.0.0 — 2026-09-05 — Initial.
  */
@@ -160,7 +162,7 @@ console.log('\nPhase 2 — Compose');
 
 await test('The shop app has a priced tool list and a data map of its own', async () => {
     const tools = { version: 1, tools: [
-        { name: 'quote', description: 'Price a basket.', inputSchema: { type: 'object' }, price: { morsels: 7 }, priceMoney: { amount: 2_000_000, currency: 'EUR' }, exchange: true },
+        { name: 'quote', description: 'Price a basket.', inputSchema: { type: 'object' }, tollMorsels: 7, priceMoney: { amount: 2_000_000, currency: 'EUR' }, exchange: true },
     ] };
     const w = await json('/v1/memory', { method: 'POST', headers: authed(ownerToken), body: JSON.stringify({ key: `apps.${APP_A}.tools`, value: tools, visibility: 'public' }) });
     assert(w.status === 200 || w.status === 201, `tools ${w.status}: ${JSON.stringify(w.body.error)}`);

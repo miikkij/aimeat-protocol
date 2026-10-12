@@ -6,6 +6,8 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   v1.1.3 — 2026-10-13 — The app tool manifest carries tollMorsels: from 4.0.0 POST /v1/memory refuses
+ *     price.morsels on a tool manifest (MORSEL_PRICE_REMOVED). The discovery entry's cost stays 2.
  *   v1.1.2 — 2026-10-08 — The allowlist node listens on 31000 + lane % 100 (suitePort): the port the
  *     system picked was taken by another suite's stub server while the node booted.
  *   v1.1.1 — 2026-10-02 — The allowlist node listens on a port the operating system picks
@@ -450,7 +452,7 @@ await test('An app tool manifest is written', async () => {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${ownerToken}` },
         body: JSON.stringify({ key: `apps.${CAP_APP}.tools`, visibility: 'public', value: { version: 1, tools: [
-            { name: 'lookup', description: 'Looks a thing up for the caller.', inputSchema: { type: 'object', properties: { q: { type: 'string' } } }, outputSchema: { type: 'object' }, price: { morsels: 2 } },
+            { name: 'lookup', description: 'Looks a thing up for the caller.', inputSchema: { type: 'object', properties: { q: { type: 'string' } } }, outputSchema: { type: 'object' }, tollMorsels: 2 },
         ] } }),
     });
     assert(status === 200 || status === 201, `manifest write ${status}: ${JSON.stringify(body).slice(0, 200)}`);
