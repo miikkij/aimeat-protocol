@@ -29,6 +29,11 @@
  * @structure SETTINGS_TABS · ADMIN_GROUPS · LINES · inLocale · pickApps · clickZig · Projector
  * @usage import { Projector } from './landing-v2-projector.js';
  * @version-history
+ *   v0.7.0 — 2026-10-12 — Three menu pages added since the first show: Visibility in Settings &
+ *     Controls, and the Design group of Admin (aimeat-design-lab, Themes & Styles). The sentences
+ *     for the AI page, the data wallet and Packages say what those pages do today.
+ *   v0.6.0 — 2026-10-12 — The caption reserves the height of the longest caption in the show, so
+ *     the big button keeps its place from slide to slide. Jouni, on the live page.
  *   v0.5.0 — 2026-09-14 — A sound-off button beside the big one; the choice holds for the browser.
  *   v0.4.0 — 2026-09-14 — A sentence for every page of both menus, and the big button jumps to
  *     any other slide while the arrows walk the queue. Jouni, on the second look.
@@ -60,16 +65,16 @@ const SETTINGS_TABS = [
   ['portfolio', 'portfolio.tabLabel'], ['fleet', 'profile.tabs.fleet'], ['agents', 'profile.tabs.agents'],
   ['ecosystem', 'profile.tabs.ecosystem'], ['offers', 'profile.tabs.offers'], ['scheduler', 'profile.tabs.scheduler'],
   ['workflows', 'profile.tabs.workflows'], ['chatsessions', 'profile.tabs.chatSessions'], ['mcp', 'profile.tabs.mcp'],
-  ['wallet', 'profile.tabs.wallet'], ['usage', 'profile.tabs.usage'], ['pnl', 'profile.tabs.pnl'],
-  ['companies', 'profile.tabs.companies'], ['knowledge', 'knowledge.tabLabel'], ['skills', 'skills.tabLabel'],
-  ['organisms', 'profile.tabs.organisms'], ['memory', 'profile.tabs.memory'], ['notebook', 'profile.tabs.notebook'],
-  ['living', 'profile.tabs.living'], ['work', 'profile.tabs.work'], ['actions', 'profile.tabs.services'],
-  ['boards', 'profile.tabs.boards'], ['apps', 'profile.tabs.apps'], ['appdev', 'profile.tabs.appDev'],
-  ['extensions', 'profile.tabs.extensions'], ['capabilities', 'capabilities.tabLabel'], ['federation', 'profile.tabs.federation'],
-  ['nodes', 'profile.tabs.nodes'], ['access', 'profile.tabs.access'], ['dataWallet', 'profile.tabs.dataWallet'],
-  ['nodeStats', 'profile.tabs.nodeStats'], ['security', 'profile.tabs.security'], ['email', 'profile.tabs.email'],
-  ['notifications', 'profile.tabs.notifications'], ['ai', 'profile.generator.openrouter.title'], ['calibrator', 'profile.calibrator.tabLabel'],
-  ['packages', 'profile.tabs.packages'], ['libraries', 'librariesTab.tabLabel'],
+  ['wallet', 'profile.tabs.wallet'], ['usage', 'profile.tabs.usage'], ['visibility', 'profile.tabs.visibility'],
+  ['pnl', 'profile.tabs.pnl'], ['companies', 'profile.tabs.companies'], ['knowledge', 'knowledge.tabLabel'],
+  ['skills', 'skills.tabLabel'], ['organisms', 'profile.tabs.organisms'], ['memory', 'profile.tabs.memory'],
+  ['notebook', 'profile.tabs.notebook'], ['living', 'profile.tabs.living'], ['work', 'profile.tabs.work'],
+  ['actions', 'profile.tabs.services'], ['boards', 'profile.tabs.boards'], ['apps', 'profile.tabs.apps'],
+  ['appdev', 'profile.tabs.appDev'], ['extensions', 'profile.tabs.extensions'], ['capabilities', 'capabilities.tabLabel'],
+  ['federation', 'profile.tabs.federation'], ['nodes', 'profile.tabs.nodes'], ['access', 'profile.tabs.access'],
+  ['dataWallet', 'profile.tabs.dataWallet'], ['nodeStats', 'profile.tabs.nodeStats'], ['security', 'profile.tabs.security'],
+  ['email', 'profile.tabs.email'], ['notifications', 'profile.tabs.notifications'], ['ai', 'profile.generator.openrouter.title'],
+  ['calibrator', 'profile.calibrator.tabLabel'], ['packages', 'profile.tabs.packages'], ['libraries', 'librariesTab.tabLabel'],
 ];
 
 /**
@@ -105,6 +110,7 @@ const ADMIN_GROUPS = [
   ]],
   ['dashboard.navIntegrations', [['msm', 'dashboard.msmManagement']]],
   ['dashboard.navFederation', [['federation', 'dashboard.federation'], ['genesis', 'dashboard.genesis']]],
+  ['dashboard.navDesign', [['design-lab', 'dashboard.designLab'], ['themes', 'dashboard.themes']]],
 ];
 
 /**
@@ -143,6 +149,7 @@ const LINES = {
   'settings:workflows': ['landing2.slideSettingsWorkflows', 'Five steps, three agents, and a pause where it waited for your yes.'],
   'settings:chatsessions': ['landing2.slideSettingsChatSessions', 'Every chat your AI had here is kept, and the one from March still opens.'],
   'settings:wallet': ['landing2.slideSettingsWallet', 'Fifty morsels claimed this morning. Agents hold none, because the pace is yours.'],
+  'settings:visibility': ['landing2.slideSettingsVisibility', 'You see which AIs read your pages last week, where your visitors came from, and the button they pressed where nothing happened.'],
   'settings:knowledge': ['landing2.slideSettingsKnowledge', 'A package of what your team knows, reviewed, cloned twice and cited by name.'],
   'settings:skills': ['landing2.slideSettingsSkills', 'A skill written once and pinned by version, and every agent that reads it works the same way.'],
   'settings:notebook': ['landing2.slideSettingsNotebook', 'A thought typed at the bus stop, found a month later by asking for it in plain words.'],
@@ -153,13 +160,13 @@ const LINES = {
   'settings:capabilities': ['landing2.slideSettingsCapabilities', 'A capability registered, tested, and vouched for by two people who used it.'],
   'settings:federation': ['landing2.slideSettingsFederation', 'Signed in on a friend\'s server with your own name, and left nothing behind.'],
   'settings:nodes': ['landing2.slideSettingsNodes', 'Your own server on your own machine, anchored here, with a mailbox for while it sleeps.'],
-  'settings:dataWallet': ['landing2.slideSettingsDataWallet', 'Everything you hold, exported as one file, with the delete button next to it.'],
+  'settings:dataWallet': ['landing2.slideSettingsDataWallet', 'Everything you hold, exported as one file, and you decide which AI may read what.'],
   'settings:nodeStats': ['landing2.slideSettingsNodeStats', 'What this server holds today, counted live, and how fast it grows.'],
   'settings:email': ['landing2.slideSettingsEmail', 'Gmail connected for reading, Outlook for sending, and your AI writes from both.'],
   'settings:notifications': ['landing2.slideSettingsNotifications', 'The bell says who sent what, pushes at nine rather than three, and stays quiet for the senders you muted.'],
-  'settings:ai': ['landing2.slideSettingsAi', 'Your own model key, encrypted, under a daily budget your apps cannot exceed.'],
+  'settings:ai': ['landing2.slideSettingsAi', 'Your own AI accounts side by side: which one answers what, which models are allowed, and the next one answers when the first does not.'],
   'settings:calibrator': ['landing2.slideSettingsCalibrator', 'A prompt tuned through four rounds, and the version that won is marked.'],
-  'settings:packages': ['landing2.slideSettingsPackages', 'A whole setup installed after a dry run, and rolled back when the update disappointed.'],
+  'settings:packages': ['landing2.slideSettingsPackages', 'A ready-made setup installed as your own in one press: the apps, the agents and the settings, and the updates when you want them.'],
   'settings:libraries': ['landing2.slideSettingsLibraries', 'The libraries every app here shares, one address each, patched once for all of them.'],
   // The rest of Admin, in the sidebar's order.
   'admin:overview': ['landing2.slideAdminOverview', 'The whole server on one screen: who is signed in, what is running, what broke.'],
@@ -204,6 +211,8 @@ const LINES = {
   'admin:packages': ['landing2.slideAdminPackages', 'Packages installed on the server, with a dry run before and a rollback after.'],
   'admin:msm': ['landing2.slideAdminMsm', 'An outside API described once, and every app calling it the same way.'],
   'admin:genesis': ['landing2.slideAdminGenesis', 'Two federations joined, their catalogues shared, and memory read only with consent.'],
+  'admin:design-lab': ['landing2.slideAdminDesignLab', 'Every component of this server\'s own pages on one page, shown working, with the look chosen for each.'],
+  'admin:themes': ['landing2.slideAdminThemes', 'A theme of your own for the whole server: colours, fonts and shapes changed in one place, and every page follows.'],
 };
 
 const AUTO_MS = 1600;
@@ -399,14 +408,20 @@ export function Projector() {
   // is missing; a menu slide has only the one place to look.
   const own = slide.where === 'apps' ? slide.shot : `/img/frontdemo/projector/${slide.where}-${slide.id}.png`;
   const src = (own && !missing[own]) ? own : (slide.where === 'apps' ? slide.fallbackShot : own);
-  const pageName = slide.where === 'apps' ? slide.name : tr(slide.page, slide.id);
-  const whereName = slide.where === 'admin' ? tr('nav.admin', 'Admin')
-    : slide.where === 'apps' ? tr('landing2.cloudApps', 'Apps in the show')
-    : tr('nav.profile', 'Settings & Controls');
-  const line = LINES[`${slide.where}:${slide.id}`];
-  const sentence = line ? tr(...line)
-    : (slide.where === 'apps' && slide.line) ? slide.line
-    : tr('landing2.slideGeneric', '[What this page did for someone: the sentence comes later.]');
+  const pageNameOf = (s) => (s.where === 'apps' ? s.name : tr(s.page, s.id));
+  const whereNameOf = (s) => (s.where === 'admin' ? tr('nav.admin', 'Admin')
+    : s.where === 'apps' ? tr('landing2.cloudApps', 'Apps in the show')
+    : tr('nav.profile', 'Settings & Controls'));
+  const sentenceOf = (s) => {
+    const line = LINES[`${s.where}:${s.id}`];
+    return line ? tr(...line)
+      : (s.where === 'apps' && s.line) ? s.line
+      : tr('landing2.slideGeneric', '[What this page did for someone: the sentence comes later.]');
+  };
+  const pageName = pageNameOf(slide);
+  const captionParts = (s) => html`
+    <span class="ld-v2-slide-where">${whereNameOf(s)} · ${pageNameOf(s)}</span>
+    <span class="ld-v2-slide-text">${sentenceOf(s)}</span>`;
   const isLit = (where, id) => slide.where === where && slide.id === id;
   const word = (where, id, label) => html`
     <button type="button" class=${`ld-v2-word ${isLit(where, id) ? 'is-lit showroom-slab--sun' : ''}`} key=${where + ':' + id}
@@ -438,10 +453,13 @@ export function Projector() {
                 </div>` : html`
                 <img class="ld-v2-slide-img" src=${src} alt=${pageName} onError=${() => setMissing((m) => ({ ...m, [src]: true }))} />`}
             </div>
-            <p class="ld-v2-slide-caption" aria-live="polite">
-              <span class="ld-v2-slide-where">${whereName} · ${pageName}</span>
-              <span class="ld-v2-slide-text">${sentence}</span>
-            </p>
+            ${/* Every slide's caption is laid out in the same grid cell, hidden, so the cell is as tall
+                  as the longest one at this width and in this language. The controls below it then
+                  keep their place from slide to slide. */''}
+            <div class="ld-v2-caption-box">
+              ${slides.map((s) => html`<p class="ld-v2-slide-caption ld-v2-slide-caption--sizer" aria-hidden="true" key=${`${s.where}:${s.id}`}>${captionParts(s)}</p>`)}
+              <p class="ld-v2-slide-caption" aria-live="polite">${captionParts(slide)}</p>
+            </div>
           </div>
           <div class="ld-v2-controls">
             <button type="button" class="ld-v2-arrow poster-frame" aria-label=${tr('landing2.projPrev', 'Previous slide')} onClick=${() => press(-1)}>${Chevron(-1)}</button>
