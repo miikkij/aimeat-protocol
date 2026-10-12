@@ -20,6 +20,8 @@
  * @version-history
  *   v1.6.0 — 2026-10-12 — aimeat_exchange_accept prices an extension action with resolveExtActionPricing,
  *     as REST does, so an action in the 4.0.0 form (its own tollMorsels) is contracted, not NOT_PRICED.
+ *     aimeat_exchange_need_post refuses budget_unit "morsels" from 4.0.0 with MORSEL_PRICE_REMOVED, as
+ *     POST /v1/exchange/needs does; it had stored it.
  *   v1.5.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa): offerings and contracts are presented as REST presents them
  *     (presentOffering, presentContractTerms), with `toll_morsels` and the morsel figures as deprecated
@@ -63,6 +65,7 @@ import {
     offeringStats, offeringConsumers, enrichNeeds, presentOffering, presentContractTerms, budgetFloorText,
 } from '../services/exchange-market.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 function ownerOf(gaii: string): string {
@@ -302,6 +305,11 @@ export function registerExchangeTools(
         zodShapeFor('aimeat_exchange_need_post'),
         annotationsFor('aimeat_exchange_need_post'),
         async ({ description, app_id, ext, action, spec, usage_intent, budget_unit, budget_cap, autonomy }) => {
+            // The refusal POST /v1/exchange/needs answers: a morsel budget is a 3.x unit name, removed in
+            // MORSEL_PRICE_FIELDS_REMOVED_IN. This tool stored it on 4.0.0 while the route refused it.
+            if (budget_unit === 'morsels' && !legacyMorselFieldsLive()) {
+                return fail(`MORSEL_PRICE_REMOVED: a budget in morsels was removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}. Morsels set the pace of use and are not a price: set the budget in money. Each offering states its own pacing amount.`);
+            }
             const now = new Date().toISOString();
             const need: Need = {
                 needId: newNeedId(),
