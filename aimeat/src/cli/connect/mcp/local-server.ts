@@ -34,6 +34,7 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-10-12 -- `GET /local/departed` (./local-departed.ts): who left on the node's word, and why. An identity the node refuses is not counted as carried.
  *   2026-10-11 -- An agent the node says was DELETED is removed from this home too (key, token and
  *     config), on the same word from the node as a moved one. It stayed listed, with its key on disk.
  *   2026-10-11 -- An identity whose credential the node refuses: the others on a socket it opened get a new
@@ -167,6 +168,7 @@ import { logger } from '../../../utils/logger.js';
 import { checkBuildFreshness, announceBuild, buildIdentity } from '../../../utils/build-stamp.js';
 import { installTimestampedOutput } from '../../../utils/log-timestamps.js';
 import { registerLocalCallRoute } from './local-call.js';
+import { registerLocalDepartedRoute } from './local-departed.js';
 
 // The `serve.json` contract -- schema version, its two row shapes, where the file lives and
 // whether the pid in an existing one is still alive -- is its own unit in ./local-discovery.ts:
@@ -325,7 +327,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         if (stopped) void rehome<RegisteredAgent, AgentChannel>(stopped, entry.gaii, registry.list(), g => channels.get(g), attachRegistered, (e, c) => c.tunnel?.subscribe(c.getSubscriptions(), e.gaii)).then(identityChanged);
         // The owner moved it to another connector, or deleted it on the node: either way it is not
         // this home's agent any more, and the node said so itself (../forget-agent.ts).
-        forgetOnNodeWord(reason, entry.agent, entry.owner, () => detachAgent(entry.gaii));
+        forgetOnNodeWord(reason, entry.agent, entry.owner, () => detachAgent(entry.gaii), entry.gaii);
         identityChanged();
       },
     };
@@ -663,6 +665,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
 
   // `POST /local/call/:tool`: the shell-callable tool dispatch over the tunnel (./local-call.ts).
   registerLocalCallRoute(app, resolveAgent);
+  registerLocalDepartedRoute(app, () => registry.list().filter(e => channels.get(e.gaii)?.transportMode !== 'auth_failed').map(e => e.gaii));
 
   app.get('/local/status', (_req: Request, res: Response) => {
     res.json({
