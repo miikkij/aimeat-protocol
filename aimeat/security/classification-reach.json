@@ -53,12 +53,24 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The hold ledger and its state machine, plus the seller's payment settings."
     },
+    "src/commerce/pacing-pack.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-11, the node's own read: the operator's payment settings (commerce.psp), read to sell the pacing pack on the operator's own money handler; nothing is returned to the caller."
+    },
     "src/commerce/payable-book.ts": {
       "reads": {
         "getMemory": 1,
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A node-written payables ledger: read-to-update and owner listing."
+    },
+    "src/commerce/platform-fee.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-11, the node's own read: the existing platform-fee or checkout record, read only to carry its version and creation time into the upsert (moved unchanged from session-service.ts)."
     },
     "src/commerce/psp-secrets.ts": {
       "reads": {
@@ -71,18 +83,6 @@
         "getMemory": 5
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's offers, tool manifests and payment settings, read to work out price and payment rail."
-    },
-    "src/commerce/pacing-pack.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-11, the node's own read: the operator's payment settings (commerce.psp), read to sell the pacing pack on the operator's own money handler; nothing is returned to the caller."
-    },
-    "src/commerce/platform-fee.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-11, the node's own read: the existing platform-fee or checkout record, read only to carry its version and creation time into the upsert (moved unchanged from session-service.ts)."
     },
     "src/commerce/session-service.ts": {
       "reads": {
@@ -140,13 +140,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A tool manifest read to route an invocation, and public manifest app ids for a hint."
-    },
-    "src/mcp/knowledge.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listMemory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Manifests and entries reach the MCP caller through presentMemory/presentMemories next to each read."
     },
     "src/mcp/memory-extended.ts": {
       "reads": {
@@ -727,12 +720,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent proposal approval queue, listed and settled for its owner."
     },
-    "src/services/connector-registry.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-10, the node's own read: the owner's connector record (agents.connectors.registry), which the registry reads to list, rename and forget connectors and holds no content anybody classified."
-    },
     "src/services/agent-refusals.ts": {
       "reads": {
         "getMemory": 5,
@@ -745,6 +732,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The statistics record, read to update it."
+    },
+    "src/services/agent-task-fanout.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads the deliverable only to check whether it is public before logging activity."
     },
     "src/services/agent-ties.ts": {
       "reads": {
@@ -759,12 +752,6 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-10-11, the node's own read: the workplace record (reserved prefix) to update it, and a completed task's result records to change their visibility from private to the workspace the owner named. The value is written back untouched and shown to nobody here; who may read it afterwards is still decided per reader by the record's own classification label at read time."
-    },
-    "src/services/agent-task-fanout.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads the deliverable only to check whether it is public before logging activity."
     },
     "src/services/ai-allowance.ts": {
       "reads": {
@@ -1018,6 +1005,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce attestation records in a system namespace."
     },
+    "src/services/build-app-agent-context.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-11: the latest finished result of the caller's own agent, read to describe its STRUCTURE in the build instructions. The record goes through presentMemory with the caller's classification reader before anything is derived from it, so a result the caller may not read is not described; what is derived is field names and value types only, with no text of the value."
+    },
     "src/services/cache-cleanup.ts": {
       "reads": {
         "listMemory": 1
@@ -1134,6 +1128,12 @@
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The stored file passes reader.leave (external) before a publish attempt opens."
+    },
+    "src/services/connector-registry.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-10, the node's own read: the owner's connector record (agents.connectors.registry), which the registry reads to list, rename and forget connectors and holds no content anybody classified."
     },
     "src/services/contacts-together.ts": {
       "reads": {
@@ -2085,13 +2085,6 @@
         "listMemoryHistory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the node's layout records and their earlier versions."
-    },
-    "src/services/build-app-agent-context.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-10-11: the latest finished result of the caller's own agent, read to describe its STRUCTURE in the build instructions. The record goes through presentMemory with the caller's classification reader before anything is derived from it, so a result the caller may not read is not described; what is derived is field names and value types only, with no text of the value."
     },
     "src/services/task-outcome.ts": {
       "reads": {
