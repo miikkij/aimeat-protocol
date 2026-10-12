@@ -30,13 +30,17 @@
  *   No imports, so a unit test can run it (test/unit/agent-draft-known.test.ts).
  * @structure DEFAULT_TOOL_MENU · clipLine(text, max) · knownBlock(menu, known) · namedIn(crewDef, known) ·
  *   withNeededTools(crewDef, named, offered) · readOnlyTools(crewDef) · extraScopes(crewDef) ·
- *   RECORDS_FEATURE · recordsBlock(known, features) · watchedPlace(when, known) · recordSpacesOf(crewDef) ·
+ *   RECORDS_FEATURE · BACKFILL_FEATURE · recordsBlock(known, features) · watchedPlace(when, known) · recordSpacesOf(crewDef) ·
  *   withRecordSpaces(crewDef, watch)
  * @usage
  *   const prompt = base + knownBlock(menu, { apps, places }) + recordsBlock({ places }, features);
  *   const named = namedIn(draft.crewDef, { apps, places });
  *   const def = withRecordSpaces(draft.crewDef, { organism_id, workspace_id, spaces: ['shared.requests'] });
  * @version-history
+ *   v1.2.0 — 2026-10-12 — `backfill`: a watch can ask for the records that are already in its
+ *     spaces, written per item of `record_spaces` and read back by recordSpacesOf (Jouni,
+ *     2026-10-12: "haluan myös valinnan käsittele myös vanhat"). BACKFILL_FEATURE names the
+ *     runtime feature the page offers it on.
  *   v1.1.0 — 2026-10-12 — An agent that works when a record is published in a workspace: the text
  *     the draft prompt gets for it (only for a runtime whose menu names the feature), the workspace
  *     a draft names, and the definition's `record_spaces` with "records" in `listen_for`. A
@@ -296,6 +300,12 @@ export function extraScopes(crewDef) {
  */
 export const RECORDS_FEATURE = 'record_spaces';
 
+/**
+ * The name a runtime carries when a `record_spaces` item may say `backfill: true`: the agent then
+ * also works on the records that were in the space before it started, ten tasks at a time.
+ */
+export const BACKFILL_FEATURE = 'record_backfill';
+
 /** The most spaces one definition names; the crew runtime refuses a longer list. */
 const RECORD_SPACES_MAX = 20;
 
@@ -338,7 +348,8 @@ export function watchedPlace(when, known) {
 
 /**
  * The spaces a definition watches: the whole items of `record_spaces`, when the definition also
- * listens for records. Each is { organism_id, ws, space }, where `space` is the space's namespace.
+ * listens for records. Each is { organism_id, ws, space }, where `space` is the space's namespace,
+ * with `backfill: true` when the item asks for the records that are already there.
  */
 export function recordSpacesOf(crewDef) {
   const hears = crewDef?.listen_for;
@@ -346,14 +357,18 @@ export function recordSpacesOf(crewDef) {
   const text = (v) => typeof v === 'string' && v.length > 0;
   return crewDef.record_spaces
     .filter((s) => s && typeof s === 'object' && text(s.organism_id) && text(s.ws) && text(s.space))
-    .map((s) => ({ organism_id: s.organism_id, ws: s.ws, space: s.space }));
+    .map((s) => ({ organism_id: s.organism_id, ws: s.ws, space: s.space, ...(s.backfill === true ? { backfill: true } : {}) }));
 }
 
 /**
  * A definition that watches what the person chose, and nothing else.
  *
- * `watch` is { organism_id, workspace_id, spaces }, where `spaces` are namespaces of that
- * workspace's record spaces. With one, the definition names them in `record_spaces` and listens
+ * `watch` is { organism_id, workspace_id, spaces, backfill }, where `spaces` are namespaces of that
+ * workspace's record spaces, and `backfill: true` asks the runtime to work on the records that are
+ * already there as well: each item then carries `backfill: true`, which the runtime reads the
+ * first time it looks at the space and never again. Without it the key is absent, and the agent
+ * works on what is published after it has started.
+ * With a watch, the definition names the spaces in `record_spaces` and listens
  * for "tasks" and "records": the runtime refuses the field without both, because a record reaches
  * the agent as a task it creates for itself. Without one (the person chose another "when", or no
  * space), the field and the "records" kind are taken out: a model may have written them, and the
@@ -367,7 +382,7 @@ export function withRecordSpaces(crewDef, watch) {
     return {
       ...crewDef,
       listen_for: [...new Set([...hears, 'tasks', 'records'])],
-      record_spaces: spaces.map((space) => ({ organism_id: watch.organism_id, ws: watch.workspace_id, space })),
+      record_spaces: spaces.map((space) => ({ organism_id: watch.organism_id, ws: watch.workspace_id, space, ...(watch.backfill === true ? { backfill: true } : {}) })),
     };
   }
   if (!('record_spaces' in crewDef) && !hears.includes('records')) return crewDef;

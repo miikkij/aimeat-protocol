@@ -330,6 +330,23 @@ describe('an agent that works when a record is published in a workspace', () => 
         expect(recordSpacesOf({ listen_for: ['tasks', 'records'] })).toEqual([]);
         expect(recordSpacesOf(null)).toEqual([]);
     });
+    it('the records already there are asked for per space, and only when the person chose it', () => {
+        const out = withRecordSpaces(def('{{ctx.prompt}}'), { ...WATCH, backfill: true });
+        expect(out.record_spaces).toEqual([
+            { organism_id: 'org-1', ws: 'ws-mail', space: 'shared.requests', backfill: true },
+            { organism_id: 'org-1', ws: 'ws-mail', space: 'shared.orders', backfill: true },
+        ]);
+        // Without the choice the key is absent, which the runtime reads as "from now on".
+        for (const item of withRecordSpaces(def('{{ctx.prompt}}'), { ...WATCH, backfill: false }).record_spaces) expect('backfill' in item).toBe(false);
+        for (const item of withRecordSpaces(def('{{ctx.prompt}}'), WATCH).record_spaces) expect('backfill' in item).toBe(false);
+    });
+    it('reads back which spaces ask for the records already there, and takes only a true', () => {
+        const base = { organism_id: 'o', ws: 'w' };
+        const read = recordSpacesOf({ listen_for: ['tasks', 'records'], record_spaces: [
+            { ...base, space: 'a', backfill: true }, { ...base, space: 'b', backfill: 'yes' }, { ...base, space: 'c', backfill: false }, { ...base, space: 'd' },
+        ] });
+        expect(read).toEqual([{ ...base, space: 'a', backfill: true }, { ...base, space: 'b' }, { ...base, space: 'c' }, { ...base, space: 'd' }]);
+    });
     it('watching a workspace asks for the word the node checks before it sends a record', () => {
         expect(extraScopes(withRecordSpaces(def('{{ctx.prompt}}', ['web']), WATCH))).toEqual(['organism:read']);
         expect(extraScopes(withRecordSpaces(def('{{ctx.prompt}}', ['workspace_write']), WATCH))).toEqual(['organism:read']);

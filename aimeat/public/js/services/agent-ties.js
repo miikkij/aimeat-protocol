@@ -74,10 +74,11 @@ export async function readTieChoices({ tools = false } = {}) {
 /**
  * The spaces of one workspace an agent can watch: its record spaces, each { name, namespace,
  * description } (GET /v1/home/agents/choices/spaces). A published record in one of them gives a
- * watching agent a task; rows and document pages do not.
+ * watching agent a task; rows and document pages do not. With `counts`, each space also carries
+ * `records`, how many published records it holds now.
  */
-export async function readWatchableSpaces(organismId, workspaceId) {
-  const resp = await apiGet(`/v1/home/agents/choices/spaces?organism_id=${enc(organismId)}&workspace_id=${enc(workspaceId)}`);
+export async function readWatchableSpaces(organismId, workspaceId, { counts = false } = {}) {
+  const resp = await apiGet(`/v1/home/agents/choices/spaces?organism_id=${enc(organismId)}&workspace_id=${enc(workspaceId)}${counts ? '&include=counts' : ''}`);
   return resp?.data?.spaces ?? [];
 }
 
