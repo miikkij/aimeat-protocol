@@ -24,12 +24,14 @@
  *   - writeWorkspaceDraftsOp() — one draft or a batch, resolved and validated before any write
  *   - publishWorkspaceOp() — the same publishDraft POST /v1/organisms/:id/publish calls
  *   - publishRecordsBatchOp() — publish up to 1000 records of one namespace in one bulk write
- *   - deleteRecordsBatchOp() — remove up to 2000 record families the caller owns, in one batch
+ *   - deleteRecordsBatchOp() — put up to 2000 record families the caller owns in the bin, in one batch
  * @usage
  *   const caller = workspaceCallerOf({ principal: agentGaii, ownerName, roles: ['agent'] }, config);
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.10.0 — 2026-10-12 — deleteRecordsBatchOp puts the rows in the bin (storage.bulkBinMemory); it removed
+ *     them for good (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 9).
  *   v1.9.0 — 2026-10-08 — publishRecordsBatchOp records provenance for every direct value through
  *     services/workspace-direct-provenance.ts: a record's own declaration or id, else the default
  *     stamp for the writer; only the sandbox was stamped (aiprov E3). A document's record describes its
@@ -721,8 +723,10 @@ export interface DeleteRecordsBatchData {
 
 /**
  * Remove many records of one namespace as one operation: each record's family (bare, .draft,
- * .latest, .version.N) that the CALLER's own identity family owns, in one batched delete. A member
- * never removes another member's rows. An append-only (create_only) namespace refuses the whole batch.
+ * .latest, .version.N) that the CALLER's own identity family owns goes into the deleted-memory bin in
+ * one batch, restorable with aimeat_memory_restore for the node's grace period, as the single delete
+ * aimeat_workspace_object_delete does. A member never removes another member's rows. An append-only
+ * (create_only) namespace refuses the whole batch.
  */
 export async function deleteRecordsBatchOp(
     deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, args: DeleteRecordsBatchArgs,
@@ -780,8 +784,8 @@ export async function deleteRecordsBatchOp(
 
     let removed = 0;
     if (refs.length) {
-        if (storage.bulkDeleteMemory) removed = await storage.bulkDeleteMemory(refs);
-        else for (const r of refs) { if (await storage.deleteMemory(r.ownerGaii, r.key)) removed++; }
+        if (storage.bulkBinMemory) removed = await storage.bulkBinMemory(refs, callerId);
+        else for (const r of refs) { if (await storage.deleteMemory(r.ownerGaii, r.key, callerId)) removed++; }
     }
     if (removed > 0) {
         emitChange('organisms');

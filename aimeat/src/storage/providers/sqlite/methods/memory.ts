@@ -8,6 +8,7 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-12 — bulkBinMemory: many rows into the bin in one transaction.
  *   v1.0.0 — 2026-10-05 — 27 methods (setMemory, listMemoryHistory, createMemoryIfAbsent, …) moved here from
  *     owner.ts; getMemoryByKeys, getMemoryByKeysAnyOwner, bulkSetMemory, deleteMemorySubtree,
  *     deleteMemoryByPrefix, bulkDeleteMemory, listMemoryKeysByPrefix moved here from owner-memory-bulk.ts;
@@ -593,6 +594,26 @@ export const memoryMethods = {
       throw err;
     }
     return removed;
+  },
+
+  // BULK PRIMITIVE — deleteMemory's soft delete for many (ownerGaii, key) rows in ONE transaction:
+  // each row goes to the bin (deletedAt, deletedBy) and stays restorable until the sweeper's grace ends.
+  // Same nesting rule as bulkDeleteMemory above.
+  async bulkBinMemory(this: SqliteStorage, refs: { ownerGaii: string; key: string }[], deletedBy?: string): Promise<number> {
+    if (refs.length === 0) return 0;
+    const stmt = this.db.prepare('UPDATE memory SET deletedAt = ?, deletedBy = ? WHERE ownerGaii = ? AND key = ? AND deletedAt IS NULL');
+    const at = new Date().toISOString();
+    const run = (): number => refs.reduce((n, r) => n + stmt.run(at, deletedBy ?? null, r.ownerGaii, r.key).changes, 0);
+    if (this.insideTransaction) return run();
+    this.db.exec('BEGIN');
+    try {
+      const binned = run();
+      this.db.exec('COMMIT');
+      return binned;
+    } catch (err) {
+      this.db.exec('ROLLBACK');
+      throw err;
+    }
   },
 
   // BULK PRIMITIVE (Phase 2) — value-free (ownerGaii, key) enumeration under a prefix (SELECT projects

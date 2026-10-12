@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The batch delete of workspace records goes to the bin and needs memory:delete,
+ *     as aimeat_workspace_object_delete does; it is no longer in the list of deletes with no bin.
  *   v1.1.0 — 2026-10-12 — Leaving through aimeat_organism_leave removes the agents and workspace roles
  *     too, and the two tool texts now match their code, so the skill stops naming the differences.
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5a).
@@ -113,7 +115,8 @@ What an export leaves out, and why:
 
 ## 4. Delete, and take it back
 
-- \`aimeat_memory_delete\` moves a record to the bin. The answer says until when it can come back
+- \`aimeat_memory_delete\` moves a record to the bin, and so do \`aimeat_workspace_object_delete\` and
+  the batch delete of workspace records (all three need \`memory:delete\`). The answer says until when it can come back
   (\`restorable_until\`): tell the person that date. The operator sets the window; zero means a delete
   is final at once.
 - \`aimeat_memory_restore\` with the same \`key\` puts it back, while the window is open. It needs
@@ -124,8 +127,8 @@ What an export leaves out, and why:
 
 **Deleted at once, with no bin.** Say this before you do it, and ask the person to confirm in words:
 
-- workspace rows (\`aimeat_workspace_rows_delete\`), a whole workspace, and the batch delete of
-  workspace records: these need \`memory:purge\`;
+- workspace rows (\`aimeat_workspace_rows_delete\`) and a whole workspace: these need
+  \`memory:purge\`;
 - a stored file (\`aimeat_storage_delete\`);
 - an app (\`aimeat_app_delete\`: the app and its versions are removed; only an apps backup taken
   earlier brings it back);

@@ -14,6 +14,7 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   v1.3.0 — 2026-10-12 — bulkBinMemory: the batched workspace record delete puts rows in the bin.
  *   v1.2.0 — 2026-09-08 — countMemoryWithOrigins: how many records carry a CORS list of their own,
  *     for the operator's CORS page.
  *   v1.1.0 — 2026-08-17 — listAllMemoryMeta: the cross-owner enumeration gains the same value-free
@@ -159,6 +160,14 @@ export interface MemoryRepository {
    * the number of rows removed. Optional.
    */
   bulkDeleteMemory?(refs: { ownerGaii: string; key: string }[]): Promise<number>;
+  /**
+   * BULK PRIMITIVE — put MANY rows addressed by (ownerGaii, key) into the deleted-memory bin in ONE unit:
+   * the per-row semantics of {@link deleteMemory} (deletedAt and deletedBy set, a row already in the bin
+   * left alone), so each key is restorable with restoreMemory until the sweeper's grace period ends.
+   * Backs the batched workspace record delete (POST /v1/organisms/:id/workspace/records/delete).
+   * Returns the number of rows binned. Optional; a backend without it falls back to deleteMemory per key.
+   */
+  bulkBinMemory?(refs: { ownerGaii: string; key: string }[], deletedBy?: string): Promise<number>;
   /**
    * BULK PRIMITIVE — enumerate the (ownerGaii, key) ADDRESSES of every row under a key prefix, across ALL
    * owners, WITHOUT loading any value (Phase 2). Backs the batched record delete: it needs only the

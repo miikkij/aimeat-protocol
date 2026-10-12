@@ -61,13 +61,14 @@ deleted it, and answers with `restorable_until`. `POST /v1/memory/{key}/restore`
 once shortly after start. `AIMEAT_MEMORY_DELETE_GRACE_DAYS` sets the window; zero makes a delete final
 at once.
 
-**What skips the window, by design:** workspace rows, a whole workspace and the batch delete of
-workspace records (all need the `memory:purge` permission, and an agent that holds it never starts a
-task without the person's OK); stored files; apps; deleting an agent (every record and file under its identity goes with
+**What skips the window, by design:** workspace rows and a whole workspace (both need the
+`memory:purge` permission, and an agent that holds it never starts a task without the person's OK);
+stored files; apps; deleting an agent (every record and file under its identity goes with
 it); deleting an organism; erasing an account.
 
-**Limits today.** `aimeat_workspace_object_delete` puts a workspace record in the bin, while its REST
-twin, `POST /v1/organisms/{id}/workspace/records/delete`, deletes at once.
+Workspace records go through the window on both interfaces: `aimeat_workspace_object_delete` and its
+REST twin, `POST /v1/organisms/{id}/workspace/records/delete`, put them in the bin and ask
+`memory:delete` (Jouni's ruling of 2026-10-12).
 
 ## 4. Every record can say who wrote it
 

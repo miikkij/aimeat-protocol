@@ -15,6 +15,8 @@
  *   The wake on Start is held by e2e-connect-tunnel-delivery (test 8).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=task-start
  * @version-history
+ *   v1.0.2 — 2026-10-12 — 6a: the workspace records delete asks memory:delete (into the bin), and
+ *     memory:purge alone no longer passes it.
  *   v1.0.1 — 2026-10-06 — 6d: an agent holding memory:purge alone is not offered rows_delete, since
  *     the catalog asks organism:write beside it (secaudit 2026-10 follow-up, A4).
  *   v1.0.0 — 2026-10-02 — Initial.
@@ -350,15 +352,18 @@ await test('5c. Over MCP the propose answer says go on or wait', async () => {
 console.log('\n6. Deleting shared records for good is its own permission (ruling B)');
 let purgerAgent!: Agent;
 let wsPurger!: Agent;
-await test('6a. memory:delete alone no longer deletes workspace records for good; memory:purge passes that check', async () => {
+// Since 2026-10-12 the batch delete of workspace records puts them in the bin and asks memory:delete
+// (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 9); 6c below holds the
+// two removals that stay final on memory:purge.
+await test('6a. memory:delete passes the workspace records delete (into the bin); memory:purge alone does not', async () => {
   const deleter = await newAgent(owner, 'deleter', ['memory:read', 'memory:delete']);
   const purger = purgerAgent = await newAgent(owner, 'purger', ['memory:read', 'memory:purge']);
   const body = JSON.stringify({ namespace: 'shared.notes', ids: ['x'] });
-  const refused = await json('/v1/organisms/no-such-organism/workspace/records/delete', { method: 'POST', headers: auth(deleter.token), body });
-  assert(refused.status === 403, `memory:delete alone ${refused.status}`);
+  const refused = await json('/v1/organisms/no-such-organism/workspace/records/delete', { method: 'POST', headers: auth(purger.token), body });
+  assert(refused.status === 403, `memory:purge alone ${refused.status}`);
   // Past the permission check, the request meets the next one: the organism does not exist.
-  const passed = await json('/v1/organisms/no-such-organism/workspace/records/delete', { method: 'POST', headers: auth(purger.token), body });
-  assert(passed.status === 404, `memory:purge ${passed.status}: ${JSON.stringify(passed.body?.error)}`);
+  const passed = await json('/v1/organisms/no-such-organism/workspace/records/delete', { method: 'POST', headers: auth(deleter.token), body });
+  assert(passed.status === 404, `memory:delete ${passed.status}: ${JSON.stringify(passed.body?.error)}`);
 });
 
 await test('6b. An agent holding memory:purge has every task wait, whatever its setting', async () => {
