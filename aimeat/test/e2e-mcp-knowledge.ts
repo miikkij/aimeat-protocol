@@ -583,6 +583,47 @@ await test('9. A second owner\'s agent lists NO packages and cannot read A\'s', 
     assert(mine.body.result?.isError !== true, `A must still read A's own package: ${JSON.stringify(mine.body.result?.content?.[0]?.text ?? '').slice(0, 160)}`);
 });
 
+// ─── Phase 6: a package stored under the owner's own identity ───
+// Found 2026-10-12 on production: aimeat_knowledge_list named a package the owner had imported in
+// person, and aimeat_knowledge_get answered "Package not found" for the id the list had just given.
+// The list read the owner's identities and the get read the agent's own namespace only.
+console.log('\nPhase 6 — A package the owner imported in person');
+
+await test('17. The agent lists and opens a package stored under its owner\'s identity', async () => {
+    const imp = await json('/v1/knowledge/import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            package: {
+                type: 'knowledge-package', name: 'Owner Held Package', version: '1.0.0', author: ownerName,
+                content_type: 'document', tags: ['mcp-test'], language: 'en', maturity: 'draft',
+                synthesis: { level: 'original', description: 'Imported by the owner in person' },
+                references: [], links: [],
+                entries: [{ key: 'intro', title: 'Introduction', visibility: 'owner' }],
+                sharing: { catalog_listed: false, allow_clone: false, morsel_price: 0 },
+            },
+            entry_data: { intro: { title: 'Introduction', body: 'Stored under the owner' } },
+        }),
+    });
+    assert(imp.status === 201, `owner import ${imp.status}: ${JSON.stringify(imp.body)}`);
+    const ownerPackageId = imp.body.data.package_id;
+
+    const list = await mcpRpc('tools/call', { name: 'aimeat_knowledge_list', arguments: {} }, 500);
+    const packages = JSON.parse(list.body.result.content[0].text);
+    assert(packages.some((p: any) => p.package_id === ownerPackageId), `the list names the owner's package: ${JSON.stringify(packages.map((p: any) => p.package_id))}`);
+
+    const get = await mcpRpc('tools/call', { name: 'aimeat_knowledge_get', arguments: { package_id: ownerPackageId } }, 501);
+    assert(get.body.result?.isError !== true, `the get opens what the list named: ${get.body.result?.content?.[0]?.text}`);
+    const result = JSON.parse(get.body.result.content[0].text);
+    assert(result.manifest?.name === 'Owner Held Package', `manifest name: ${result.manifest?.name}`);
+    const intro = (result.entries ?? []).find((e: any) => String(e.key).endsWith('/intro'));
+    assert(intro?.value?.body === 'Stored under the owner', `the entry carries its value: ${JSON.stringify(result.entries)}`);
+
+    const res = await mcpRpc('resources/read', { uri: `aimeat://knowledge/${encodeURIComponent(ownerPackageId)}` }, 502);
+    const text = res.body.result?.contents?.[0]?.text ?? '';
+    assert(text.includes('Owner Held Package'), `the resource reads the same package: ${String(text).slice(0, 160)}`);
+});
+
 await test('Delete owner (cascade)', async () => {
     const { status } = await json(`/v1/owners/${ownerName}`, {
         method: 'DELETE',

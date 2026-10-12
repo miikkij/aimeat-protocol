@@ -263,6 +263,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       ownerScope: isOwnerSession || req.query.owner_scope === 'true',
       ownerOverride: (ownerOverride && roles.includes('operator')) ? ownerOverride : null,
       roles,
+      // An agent's reach to a record under its owner's own identity is decided from these in the
+      // service (memory:write-as-owner), as the write under the owner is.
+      scopes: req.auth!.scopes ?? [],
     };
 
     // Who to ask, if somebody later wonders where it went. The principal, not the owner name:
@@ -328,6 +331,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       ownerScope: isOwnerInPerson(req.auth) || req.query.owner_scope === 'true',
       // The organism namespace rule inside the service reads the roles, as the delete's does.
       roles: req.auth!.roles,
+      scopes: req.auth!.scopes ?? [],
     });
     if (!out.ok) {
       // A refusal about the key and the caller (the organism rule, the append-only guard) is said

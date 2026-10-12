@@ -17350,6 +17350,16 @@ paths:
           required: true
           schema:
             type: string
+        - name: owner_scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: >
+            The reach `DELETE /v1/memory/{key}` has with the same parameter: the
+            owner's other agents, and, holding `memory:write-as-owner`, the
+            owner's own identity. Whoever could remove a record can put it back.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -17496,6 +17506,20 @@ paths:
           description: >
             Operator-only override — target identity (GHII/GAII) whose memory
             entry should be deleted. Ignored for non-operator sessions.
+        - name: owner_scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: >
+            When true, a caller that is not the owner in person also reaches the
+            same key under the owner's other agents, and, holding
+            `memory:write-as-owner`, under the owner's own identity (a reserved
+            key there needs `memory:write-reserved` as well). These are the
+            permissions a write with `owner_scope` asks. An owner session has
+            this reach without the parameter. Without the permission the answer
+            is 404 NOT_FOUND, and the message names the permission.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

@@ -14,6 +14,8 @@
  * @structure registerMemoryBinTools(mcp, deps, caller)
  * @usage registerMemoryBinTools(mcp, { storage, config }, caller);
  * @version-history
+ *   2026-10-12 — Both tools hand the service the session's scopes, which decide whether owner_scope
+ *     reaches a record under the owner's own identity (memory:write-as-owner).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -40,7 +42,7 @@ export function registerMemoryBinTools(
 /** The service's caller fields, from the session caller. */
 const binCaller = () => {
     const session = caller();
-    return { caller: session.principal, ownerName: session.owner, roles: [...session.roles] };
+    return { caller: session.principal, ownerName: session.owner, roles: [...session.roles], scopes: [...session.scopes] };
 };
 // ── The bin: delete, and take it back ──
 //

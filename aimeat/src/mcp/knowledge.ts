@@ -36,12 +36,16 @@
  *     read, aimeat_knowledge_list (appdev-kb.ts listOwnerScopeShown) and aimeat_knowledge_get. A
  *     manifest the agent may not see reads as not found; an entry it may not see is left out; a
  *     warning-labelled one carries `classificationWarning`.
+ *   v1.8.0 — 2026-10-12 — aimeat_knowledge_get and the knowledge resource read one package across
+ *     the owner's identities (readPackage, over listOwnerScopeShown), as aimeat_knowledge_list does.
+ *     Both read the agent's own namespace only, so a package the owner imported in person was
+ *     listed and then answered "Package not found".
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { listOwnerScopeShown } from '../services/appdev-kb.js';
 import { readerForAgent } from '../services/classification/reader.js';
-import { presentMemory, presentMemories, classificationWarningOf } from '../services/classification/present-memory.js';
+import { classificationWarningOf } from '../services/classification/present-memory.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -83,6 +87,18 @@ export function registerKnowledgeTools(
         const w = classificationWarningOf(record);
         return w ? { classificationWarning: w } : {};
     };
+    // ONE PACKAGE, FOUND THE WAY THE LIST FINDS IT. aimeat_knowledge_list reads the owner's identities
+    // and the read of one package read the agent's own namespace only, so the list named a package
+    // the owner had imported in person and the get answered "Package not found" for that id (found
+    // 2026-10-12 on production). Same listing, same classification reader, narrowed to one package:
+    // null when this reader may see no manifest, which is also the answer for a package that does
+    // not exist.
+    const readPackage = async (packageId: string) => {
+        const manifestKey = `packages/${packageId}/manifest`;
+        const records = await listOwnerScopeShown(storage, config, reader(), { prefix: `packages/${packageId}/` });
+        const manifest = records.find(e => e.key === manifestKey);
+        return manifest ? { manifest, entries: records.filter(e => e.key !== manifestKey) } : null;
+    };
 
     // ── Resource: knowledge package ──
     mcp.registerResource(
@@ -108,15 +124,12 @@ export function registerKnowledgeTools(
         { mimeType: 'application/json', description: 'Knowledge package manifest and entries' },
         async (uri, variables) => {
             const packageId = decodeURIComponent(variables.packageId as string);
-            const manifestKey = `packages/${packageId}/manifest`;
-            const r = reader();
-            const stored = await storage.getMemory(agentGaii, manifestKey);
-            const manifest = stored ? await presentMemory(r, stored) : null;
-            if (!manifest) {
+            const found = await readPackage(packageId);
+            if (!found) {
                 return { contents: [{ uri: uri.toString(), text: 'Package not found' }] };
             }
-            const entries = await presentMemories(r, await storage.listMemory(agentGaii, { prefix: `packages/${packageId}/` }));
-            const entryList = entries.filter(e => !e.key.endsWith('/manifest')).map(e => ({
+            const { manifest, entries } = found;
+            const entryList = entries.map(e => ({
                 key: e.key,
                 visibility: e.visibility,
                 tags: e.tags,
@@ -178,28 +191,24 @@ export function registerKnowledgeTools(
         zodShapeFor('aimeat_knowledge_get'),
         annotationsFor('aimeat_knowledge_get'),
         async ({ package_id }) => {
-            const manifestKey = `packages/${package_id}/manifest`;
-            const r = reader();
             // A manifest the agent may not see answers the same as one that does not exist.
-            const stored = await storage.getMemory(agentGaii, manifestKey);
-            const manifest = stored ? await presentMemory(r, stored) : null;
-            if (!manifest) {
+            const found = await readPackage(package_id);
+            if (!found) {
                 return {
                     content: [{ type: 'text' as const, text: `Package not found: ${package_id}` }],
                     isError: true,
                 };
             }
-            // listMemory returns FULL records (SELECT *), so each entry already carries its value —
+            // The listing returns FULL records (SELECT *), so each entry already carries its value —
             // no getMemory per entry needed (was a redundant re-fetch of data already in hand). Each
             // entry passes the reader on its own label: a package can hold entries of mixed labels.
-            const entries = await presentMemories(r, await storage.listMemory(agentGaii, { prefix: `packages/${package_id}/` }));
+            const { manifest, entries } = found;
             // TARGET-058: how each entry was made, in ONE query for the whole package. A knowledge
             // package is exactly the material an agent later quotes back to a person as if it were
             // established fact, so per-entry origin is the difference between citing a source and
             // laundering a model's output through a package name.
             const provFor = await readProvenanceMany(storage, config, entries.map(e => e.aiProvenanceId));
             const entryDetails = entries
-                .filter(e => !e.key.endsWith('/manifest'))
                 .map(e => ({
                     key: e.key,
                     visibility: e.visibility,
