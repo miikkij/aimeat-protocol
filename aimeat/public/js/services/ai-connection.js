@@ -20,8 +20,9 @@
  *   previous one (DELETE /v1/ai/providers/:id), because the old setting held one connection at a
  *   time. A key is never carried over to a new provider: the node never returns a key. Writing takes
  *   the provider over from the migration (provider-store.ts putOwnerAiProvider), which is what the
- *   successor routes mean. removeConnection() deletes the provider; for a migrated one the node also
- *   deletes the old key record and sets the old setting back to OpenRouter.
+ *   successor routes mean. removeConnection() removes the owner's key of an OpenRouter connection and
+ *   leaves the provider and its agents' keys; a local or custom connection is deleted (for a migrated
+ *   one the node also deletes the old key record and sets the old setting back to OpenRouter).
  *
  *   MODELS. listModels() reads the node's model catalogue (GET /v1/ai/models) for an OpenRouter
  *   connection and answers it in the shape of OpenRouter's own listing (id, name, pricing per token,
@@ -35,6 +36,8 @@
  *   const { current, settings } = await readConnection();
  *   await saveConnection(current, { provider: 'openrouter', baseUrl: '', apiKey });
  * @version-history
+ *   v1.0.1 — 2026-10-13 — Removing an OpenRouter connection's key deletes the key only, not the
+ *     provider, so the agents' own keys stored for it stay, as they did with the old route.
  *   v1.0.0 — 2026-10-12 — Initial: the AI page, the older AI panel and the calibrator move off the
  *     settings routes node 4.0.0 removes.
  */
@@ -183,9 +186,19 @@ export async function testConnection(current) {
   return { model: r?.data?.model || '' };
 }
 
-/** Remove the connection and its key. */
+/**
+ * Remove the connection's key, as the old "remove key" did. An OpenRouter connection loses the
+ * owner's key only (DELETE /v1/ai/providers/:id/key): deleting the provider would also delete every
+ * agent's own key stored for it, which the old route never touched. A local or custom connection is
+ * deleted, because the old route set the connection back to OpenRouter.
+ */
 export async function removeConnection(current) {
-  if (current) await apiDelete(`/v1/ai/providers/${current.id}`);
+  if (!current) return;
+  if (current.type === 'openrouter') {
+    if (current.auth?.has_key) await apiDelete(`/v1/ai/providers/${current.id}/key`);
+    return;
+  }
+  await apiDelete(`/v1/ai/providers/${current.id}`);
 }
 
 /**
