@@ -30,13 +30,17 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   v1.2.0 -- 2026-10-12 -- More than 40 changed suites go to the runner in a file (--tests-file):
+ *     404 of them made a command line Windows refused, and the gate stopped there in 0 s.
  *   v1.1.0 -- 2026-09-07 -- Preserve changed suites under --full, honor --postgres for them,
  *     and select guards when shared identity, commerce, configuration or bootstrap code changes.
  *   v1.0.0 — 2026-09-05 — Initial. "Full tests rarely; only what changed, and the security tier
  *     only when platform code that concerns it changed, not for every little thing."
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 const args = process.argv.slice(2);
 const FULL = args.includes('--full');
@@ -108,9 +112,19 @@ function plan(files: string[], mergeBase: string): Step[] {
     }
 
     if (ownSuites.length > 0) {
+        // Past a few dozen suites the names go in a file: one `--test=` each made a command line of
+        // about 13000 characters for 404 suites, and Windows refused it ("The command line is too
+        // long", 2026-10-12). The runner reads the file as if each line were a `--test=`.
+        let selection = ownSuites.map(s => `--test=${s}`);
+        if (ownSuites.length > 40) {
+            const list = join(mkdtempSync(join(tmpdir(), 'aimeat-gate-')), 'suites.txt');
+            writeFileSync(list, ownSuites.join('\n') + '\n');
+            selection = [`--tests-file=${list}`];
+        }
+        const shown = ownSuites.length > 40 ? `${ownSuites.length} suites` : ownSuites.join(', ');
         for (const backend of POSTGRES ? ['sqlite', 'postgres-kysely'] : ['sqlite']) {
             const label = backend === 'sqlite' ? 'SQLite' : 'Postgres';
-            steps.push({ name: `own E2E suite(s), ${label}: ${ownSuites.join(', ')}`, cmd: ['node', `--env-file=.env.test.${backend}`, '--import', 'tsx', 'test/run-e2e-ci.ts', ...ownSuites.map(s => `--test=${s}`)], why: 'a suite that changed is run' });
+            steps.push({ name: `own E2E suite(s), ${label}: ${shown}`, cmd: ['node', `--env-file=.env.test.${backend}`, '--import', 'tsx', 'test/run-e2e-ci.ts', ...selection], why: 'a suite that changed is run' });
         }
     }
 
