@@ -34,6 +34,8 @@
  *   const prompt = base + knownBlock(menu, { apps, places });
  *   const named = namedIn(draft.crewDef, { apps, places });
  * @version-history
+ *   v1.0.1 — 2026-10-12 — extraScopes: a definition that calls an app tool asks ext:invoke, the
+ *     word the extension action route checks and refuses without from node 4.0.0.
  *   v1.0.0 — 2026-10-12 — Initial (wish-kodin-agenttiluonnos-tuntee-ty-kalujen-kuvaukset-omistajan-s).
  */
 
@@ -261,10 +263,20 @@ export function readOnlyTools(crewDef) {
 }
 
 /**
- * The permissions a definition's tools ask beyond the reach the person chose. Reading a workspace
- * asks organism:read (the node's workspace tools check it since 2026-10-06), and the read-only
- * preset does not carry it.
+ * The permissions a definition's tools ask beyond the reach the person chose. Neither preset
+ * carries them, and the page shows the result before the person approves.
+ *
+ * - Reading a workspace asks organism:read (the node's workspace tools check it since 2026-10-06).
+ * - Calling an app tool asks ext:invoke. The tool runs an extension action, and the node calls
+ *   that action with the caller's own token (services/capability-invoke.ts), so the agent is the
+ *   one POST /v1/ext/:extName/:actionId checks. That route lets a caller without the word through
+ *   with a Deprecation header before node 4.0.0 and refuses it from 4.0.0
+ *   (auth/rest-scope-gate.ts). Without the word here, an agent that calls its owner's app tool
+ *   stops working on the day the node becomes 4.0.0.
  */
 export function extraScopes(crewDef) {
-  return anyMemberHas(crewDef, ['workspace', 'workspace_write']) ? ['organism:read'] : [];
+  return [
+    ...(anyMemberHas(crewDef, ['workspace', 'workspace_write']) ? ['organism:read'] : []),
+    ...(anyMemberHas(crewDef, ['app_tools']) ? ['ext:invoke'] : []),
+  ];
 }

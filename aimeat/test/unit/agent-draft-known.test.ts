@@ -248,4 +248,15 @@ describe('reach', () => {
         expect(extraScopes(def('{{ctx.prompt}}', ['web']))).toEqual([]);
         expect(extraScopes(null)).toEqual([]);
     });
+    // FAILED FIRST, on 2026-10-12, after the rebase onto the REST scope gates (0f8f52b35). An app
+    // tool runs an extension action, and the node calls that action with the CALLER's own token
+    // (services/capability-invoke.ts). POST /v1/ext/:extName/:actionId asks ext:invoke: allowed with
+    // a Deprecation header before node 4.0.0, refused from it (auth/rest-scope-gate.ts). Neither
+    // preset carries the word, so an agent made here that calls its owner's app tool would have
+    // stopped working at 4.0.0.
+    it('calling an app tool asks for the word the extension action route checks', () => {
+        expect(extraScopes(def('{{ctx.prompt}}', ['app_tools']))).toEqual(['ext:invoke']);
+        expect(extraScopes(def('{{ctx.prompt}}', ['workspace', 'app_tools']))).toEqual(['organism:read', 'ext:invoke']);
+        expect(extraScopes(def('{{ctx.prompt}}', ['web', 'memory']))).toEqual([]);
+    });
 });
