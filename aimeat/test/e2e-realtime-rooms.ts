@@ -201,12 +201,27 @@ async function mintTicket(socket: string, headers: Record<string, string>) {
     return json('/v1/ws/ticket', { method: 'POST', headers, body: JSON.stringify({ socket }) });
 }
 
-/** How many upgrades this node has accepted with ?token= on a socket kind (GET /v1/stats). */
+/**
+ * How many upgrades this node has accepted with ?token= on a socket kind (GET /v1/stats). The
+ * counter family appears with its first use, so before any use it reads 0; a caller that asserts a
+ * use asserts the count went up, which needs the family to be there.
+ */
 async function queryTokenUses(kind: string): Promise<number> {
     const { body } = await json('/v1/stats', { headers: authA() });
     const byType = body?.data?.ws_query_token_by_type;
-    if (!byType || typeof byType !== 'object') throw new Error(`GET /v1/stats carries no ws_query_token_by_type: ${JSON.stringify(Object.keys(body?.data ?? {}))}`);
+    if (!byType || typeof byType !== 'object') return 0;
     return Number(byType[kind] ?? 0);
+}
+
+/**
+ * Whether the node runs 4.0.0 or later (GET /v1/build), where ?token= on an upgrade is gone whatever
+ * security.ws_query_token says (WS_QUERY_TOKEN_REMOVED_IN). Before it the setting decides, and a
+ * sweep may start the node with it off (AIMEAT_WS_QUERY_TOKEN=false).
+ */
+async function queryTokenRemoved(): Promise<boolean> {
+    const { body } = await json('/v1/build');
+    const [major] = String(body?.version ?? '0').split('.').map(n => parseInt(n, 10));
+    return (major ?? 0) >= 4;
 }
 
 // ─── State ───
@@ -418,7 +433,10 @@ await test('ws upgrade — a valid owner token is accepted, in a room of its own
     // deletes it. Asserting that is the other half of this test.
     const { body } = await createRoom({ app_type: 'whiteboard', name: 'rt-probe' });
     const probeRoom = body.data.id;
-    const probe = await Sock.open(`room=${probeRoom}&token=${encodeURIComponent(ownerA.token)}&nick=probe`);
+    // The owner token reaches the upgrade through a ticket minted with it (POST /v1/ws/ticket), the
+    // current way: ?token= is deprecated and refused on a node with security.ws_query_token off.
+    const ticket = (await mintTicket('realtime', authA())).body.data.ticket as string;
+    const probe = await Sock.open(`room=${probeRoom}&ticket=${encodeURIComponent(ticket)}&nick=probe`);
     const joined = await probe.waitFor('joined');
     assert(joined.roomId === probeRoom, `roomId: ${joined.roomId}`);
     probe.close();
@@ -490,7 +508,15 @@ await test('ws upgrade — a ticket that was never minted is 401, not the anonym
     assert(answer.status === 401 && answer.code === 'INVALID_TICKET', `forged ticket: ${answer.status} "${answer.code}"`);
 });
 
-await test('ws upgrade — ?token= still opens the socket while security.ws_query_token is on, and is counted', async () => {
+await test('ws upgrade — ?token= still opens the socket while security.ws_query_token is on, and is counted (from 4.0.0 it is refused)', async () => {
+    if (await queryTokenRemoved()) {
+        const { body } = await createRoom({ app_type: 'whiteboard', name: 'rt-query-token' });
+        const refused = await upgradeAnswer(`room=${body.data.id}&token=${encodeURIComponent(ownerA.token)}&nick=legacy`);
+        assert(refused.status === 401 && refused.code === 'WS_QUERY_TOKEN_DISABLED', `from 4.0.0 a query token is refused: ${refused.status} "${refused.code}"`);
+        return;
+    }
+    // The 3.x half: the setting decides, and a sweep may have started the node with it off.
+    await setConfig('security.ws_query_token', true);
     const before = await queryTokenUses('realtime');
     const { body } = await createRoom({ app_type: 'whiteboard', name: 'rt-query-token' });
     const s = await Sock.open(`room=${body.data.id}&token=${encodeURIComponent(ownerA.token)}&nick=legacy`);
@@ -505,7 +531,9 @@ await test('ws upgrade — with security.ws_query_token off, ?token= is refused 
     const room = body.data.id;
     const keeper = await Sock.open(`room=${room}&nick=keeper`);
     await keeper.waitFor('joined');
-    await setConfig('security.ws_query_token', false);
+    const removed = await queryTokenRemoved();
+    // From 4.0.0 there is no setting to turn off: the refusal below holds on its own.
+    if (!removed) await setConfig('security.ws_query_token', false);
     try {
         const before = await queryTokenUses('realtime');
         const refused = await upgradeAnswer(`room=${room}&token=${encodeURIComponent(ownerA.token)}&nick=legacy`);
@@ -518,7 +546,7 @@ await test('ws upgrade — with security.ws_query_token off, ?token= is refused 
         const viaTicket = await upgradeAnswer(`room=${room}&ticket=${encodeURIComponent(ticket)}&nick=ticketed`);
         assert(viaTicket.status === 101, `a ticket must still open the socket, got ${viaTicket.status}`);
     } finally {
-        await setConfig('security.ws_query_token', true);
+        if (!removed) await setConfig('security.ws_query_token', true);
         keeper.close();
     }
 });
