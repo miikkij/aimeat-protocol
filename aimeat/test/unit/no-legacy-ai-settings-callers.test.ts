@@ -20,8 +20,15 @@
  *   (`"http://localhost:40050/v1/..."`). A sentence that names the route after a method word
  *   (`'DELETE /v1/openrouter/settings (the AI settings page)'`) is not a call. The routes' own file
  *   (src/routes/openrouter.ts) is not read. ALLOWED names a file that calls one with the reason.
+ *
+ *   A screen may call a removed route FIRST, so a node where the routes still answer (3.x) behaves
+ *   exactly as before, and take the provider path when it answers 410 GONE. Its ALLOWED reason is
+ *   LEGACY_FIRST, and the file must show it handles the 410 (handlesLegacyGone).
  * @usage cd aimeat && pnpm exec vitest run test/unit/no-legacy-ai-settings-callers.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-13 — LEGACY_FIRST: the AI page, the calibrator, the inbox voice hook, the app
+ *     catalogue checks and the offers search call the legacy route first again, through legacyOr()
+ *     (public/js/services/ai-connection.js); a file listed with that reason must handle the 410.
  *   v1.0.0 — 2026-10-12 — Initial (the 4.0.0 sweep: the first-party callers of the removed AI settings routes).
  */
 import { describe, it, expect } from 'vitest';
@@ -39,10 +46,28 @@ const ROOTS = ['aimeat/public', 'aimeat/src', 'aimeat-desktop/src-tauri/src'];
 /** The routes' own declarations: not a caller. */
 const NOT_CALLERS = new Set(['aimeat/src/routes/openrouter.ts']);
 
+/**
+ * The reason of a screen that calls the legacy route first and takes the provider path when it
+ * answers 410 GONE, so a node where the routes still answer (3.x) sees exactly the calls it saw
+ * before 2026-10-12 (ruled for the 4.0.0 sweep on 2026-10-13). Such a file must show that it handles
+ * the 410: it calls legacyOr() from public/js/services/ai-connection.js, or, in a bundle that does
+ * not load public/js (the old app catalogue), it tests a response's status against 410 itself.
+ */
+const LEGACY_FIRST = 'legacy route first, provider path on 410 (3.x unchanged)';
+
 /** Files that call a removed route, with the reason. Paths from the repository root. */
 const ALLOWED: Record<string, string> = {
-    'aimeat/public/views/profile/openrouter-settings.js':
-        'The older AI panel the notebook card and the workspace generator embed. It reads GET /v1/openrouter/settings first and keeps its five model roles and retry setting on a node before 4.0.0; a 410 GONE (node 4.0.0) moves the whole panel onto the provider routes through js/services/ai-connection.js.',
+    // The older AI panel the notebook card and the workspace generator embed; on 3.x it also keeps
+    // its five model roles and its retry setting, which a provider has no place for.
+    'aimeat/public/views/profile/openrouter-settings.js': LEGACY_FIRST,
+    'aimeat/public/views/profile/ai-tab.js': LEGACY_FIRST,
+    'aimeat/public/views/profile/calibrator-tab.js': LEGACY_FIRST,
+    'aimeat/public/views/profile/inbox-tab/use-voice.js': LEGACY_FIRST,
+    'aimeat/public/views/appcat/ai-calls.js': LEGACY_FIRST,
+    'aimeat/public/js/services/offers.js': LEGACY_FIRST,
+    'aimeat/src/static/app-catalog/js/detail.js': LEGACY_FIRST,
+    // The old catalogue's built page: detail.js above, bundled by scripts/build-app-catalog.ts.
+    'aimeat/src/static/app-catalog.html': LEGACY_FIRST,
     // NOT a reason to keep it: a move left undone on 2026-10-12 because `cargo check` cannot link on
     // the machine that made the sweep (no MSVC build tools), and an unchecked Rust edit is not shipped.
     // get_ai_settings becomes GET /v1/ai/providers (the owner's provider openrouter, lmstudio or
@@ -97,6 +122,14 @@ export function callsLegacyAiSettings(src: string): boolean {
     return LEGACY_CALL.test(codeOf(src));
 }
 
+/** A call of the shared switch, or a response status compared with 410 (`r.status === 410`). */
+const HANDLES_GONE = /\blegacyOr\s*\(|\.status\s*===\s*410\b/;
+
+/** Whether a file's code handles the 410 GONE of a removed route: the shared switch, or its own status test. */
+export function handlesLegacyGone(src: string): boolean {
+    return HANDLES_GONE.test(codeOf(src));
+}
+
 describe('no first-party code calls the AI settings routes node 4.0.0 removes', () => {
     it('the pattern finds a call in each of its shapes, and not a sentence or a comment', () => {
         const calls = [
@@ -144,5 +177,28 @@ describe('no first-party code calls the AI settings routes node 4.0.0 removes', 
             const src = readFileSync(join(REPO, rel), 'utf8');
             expect(callsLegacyAiSettings(src), rel).toBe(true);
         }
+    });
+
+    it('the 410 test finds the shared switch and a status test, and not a plain call or a comment', () => {
+        const handles = [
+            `await legacyOr(async () => apiGet('/v1/openrouter/settings'), loadConnection);`,
+            `.then(function(r) { if (r.status === 410) return fetch(url + '/v1/ai/available'); })`,
+        ];
+        for (const shape of handles) expect(handlesLegacyGone(shape), shape).toBe(true);
+        const plain = [
+            `const r = await apiGet('/v1/openrouter/settings');`,
+            `// legacyOr(...) would switch on a 410\nconst r = await apiGet('/v1/openrouter/settings');`,
+            ` * r.status === 410 is what node 4.0.0 answers`,
+            `if (err?.status === 4100) retry();`,
+        ];
+        for (const shape of plain) expect(handlesLegacyGone(shape), shape).toBe(false);
+    });
+
+    it(`every file ALLOWED as "${LEGACY_FIRST}" handles the 410, so a plain legacy call cannot come in under that reason`, () => {
+        const unhandled = Object.entries(ALLOWED)
+            .filter(([rel, reason]) => reason === LEGACY_FIRST && !handlesLegacyGone(readFileSync(join(REPO, rel), 'utf8')))
+            .map(([rel]) => rel);
+        expect(unhandled, 'These files call a removed route without the 410 switch: call it through legacyOr() '
+            + 'from public/js/services/ai-connection.js, so node 4.0.0 takes the provider path.').toEqual([]);
     });
 });

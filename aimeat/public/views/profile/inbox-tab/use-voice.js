@@ -8,6 +8,9 @@
  * @structure useVoiceMessages(loadThread, activeConvRef) → { canTranscribe, voiceMaxSeconds, transcribeVoice }
  * @usage const { canTranscribe, voiceMaxSeconds, transcribeVoice } = useVoiceMessages(loadThread, activeConvRef);
  * @version-history
+ *   v1.2.0 — 2026-10-13 — Legacy route first, provider path on 410 (js/services/ai-connection.js
+ *     legacyOr): on 3.x the Transcribe control follows the owner's transcription model in GET
+ *     /v1/openrouter/settings again, as before v1.1.0; the reads of v1.1.0 run on node 4.0.0.
  *   v1.1.0 — 2026-10-12 — Whether this owner can transcribe comes from GET /v1/ai/capabilities
  *     (transcription.on), and the recorder's limit from GET /v1/ai/settings (limits): node 4.0.0
  *     removes GET /v1/openrouter/settings, which answered both.
@@ -16,6 +19,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
+import { legacyOr } from '/js/services/ai-connection.js';
 import * as messages from '/js/services/messages.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -32,17 +36,27 @@ export function useVoiceMessages(loadThread, activeConvRef) {
   const [voiceMaxSeconds, setVoiceMaxSeconds] = useState(300);
 
   useEffect(() => {
-    // Whether a transcription would find a provider and a model now: the same gate the call runs.
-    apiGet('/v1/ai/capabilities')
-      .then((r) => setCanTranscribe(!!(r?.data?.capabilities?.transcription?.on)))
-      .catch((err) => { swallowed('inbox-tab: transcription capability', err); setCanTranscribe(false); });
-    // The node's ceiling comes with the owner's AI budget settings.
-    apiGet('/v1/ai/settings')
+    // The legacy route while the node answers it; on a 410 (node 4.0.0) the provider path
+    // (js/services/ai-connection.js legacyOr).
+    legacyOr(() => apiGet('/v1/openrouter/settings')
       .then((r) => {
+        setCanTranscribe(!!(r?.data?.sttModel));
         const n = Number(r?.data?.limits?.voice_msg_max_seconds);
         if (n > 0) setVoiceMaxSeconds(n);
-      })
-      .catch((err) => swallowed('inbox-tab: voice limit', err));
+      }), async () => {
+      // Whether a transcription would find a provider and a model now: the same gate the call runs.
+      apiGet('/v1/ai/capabilities')
+        .then((r) => setCanTranscribe(!!(r?.data?.capabilities?.transcription?.on)))
+        .catch((err) => { swallowed('inbox-tab: transcription capability', err); setCanTranscribe(false); });
+      // The node's ceiling comes with the owner's AI budget settings.
+      apiGet('/v1/ai/settings')
+        .then((r) => {
+          const n = Number(r?.data?.limits?.voice_msg_max_seconds);
+          if (n > 0) setVoiceMaxSeconds(n);
+        })
+        .catch((err) => swallowed('inbox-tab: voice limit', err));
+    })
+      .catch((err) => { swallowed('inbox-tab: stt settings', err); setCanTranscribe(false); });
   }, []);
 
   /** Transcribe one voice attachment on the caller's OWN copy, then reload the thread so the text

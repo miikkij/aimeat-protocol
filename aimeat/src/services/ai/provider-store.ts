@@ -29,6 +29,9 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   v1.2.2 — 2026-10-13 — deleteOwnerAiProvider removes the legacy records also for a provider the
+ *     owner took over from the migration, when they still describe it: until now the next read
+ *     migrated them into it again, so the deleted provider came back with the old key paying.
  *   v1.2.1 — 2026-10-12 — aiProvidersView reads which providers have a key AFTER the migration, so the
  *     first read after the legacy setting gained a key says has_key (the AI page reads the connection
  *     from this view since node 4.0.0 removed GET /v1/openrouter/settings).
@@ -331,10 +334,17 @@ export async function putOwnerAiProvider(
   return { ...p.provider, health: { byCapability } };
 }
 
+/** The id of the provider the legacy settings record describes (legacyRecord's name), whether or not it has a key. */
+function legacyIdOf(settings: MemoryRecord | null): LegacyName {
+  const p = isObj(settings?.value) ? settings.value.provider : undefined;
+  return p === 'lmstudio' || p === 'custom' ? p : 'openrouter';
+}
+
 /**
  * Remove an owner's provider, its key and its agents' keys for it. A migrated provider is removed at
  * its source as well (the legacy key, and the legacy address set back to the default), or the next
- * read would migrate it again.
+ * read would migrate it again. So is a provider the owner took over from the migration: the write
+ * took the migration's mark off it, and the legacy records still describe it.
  */
 export async function deleteOwnerAiProvider(storage: Storage, config: AimeatConfig, ownerGhii: string, rawId: string): Promise<boolean> {
   const id = providerIdOf(rawId);
@@ -345,9 +355,11 @@ export async function deleteOwnerAiProvider(storage: Storage, config: AimeatConf
   for (const m of await storage.listMemoryMeta(ownerGhii, { prefix: AGENT_KEY_PREFIX })) {
     if (m.key.endsWith(`.${id}`)) await storage.deleteMemory(ownerGhii, m.key);
   }
-  if (wasLegacy) {
+  const s = await storage.getMemory(ownerGhii, LEGACY_SETTINGS);
+  // Until 2026-10-13 only a provider with the mark was removed at its source, so deleting one the
+  // owner had changed brought it back on the next read, with the legacy key paying again.
+  if (wasLegacy || legacyIdOf(s) === id) {
     if (await storage.getMemory(ownerGhii, LEGACY_KEY)) await storage.deleteMemory(ownerGhii, LEGACY_KEY);
-    const s = await storage.getMemory(ownerGhii, LEGACY_SETTINGS);
     if (s && isObj(s.value)) {
       await upsertPrivateRecord(storage, ownerGhii, LEGACY_SETTINGS, { ...s.value, provider: 'openrouter', baseUrl: '' }, s.tags ?? ['openrouter', 'settings']);
     }
