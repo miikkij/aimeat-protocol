@@ -15,6 +15,9 @@
  *       split against someone else's revenue, and cannot release someone else's obligation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=beneficiary-split
  * @version-history
+ *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED): the
+ *     paced action states `tollMorsels` instead of `commercial.payMorsels`, and the chain tool drops its
+ *     `price: { morsels: 0 }`, which said nothing. Both forms are accepted by 3.x too.
  *   v1.1.0 — 2026-09-16 — The payout address is set through PUT /v1/commerce/payout/x402.
  *   v1.0.0 — 2026-07-30 — Initial.
  */
@@ -101,7 +104,7 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'fails', method: 'POST', path: '/fails', script: 'boom', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } },
     // Priced in the PACING meter. It exists so the suite can prove a morsel call shares nothing.
     { id: 'chain', method: 'POST', path: '/chain', script: 'rolefiller', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } },
-    { id: 'paced', method: 'POST', path: '/paced', script: 'designating', commercial: { payMorsels: MORSEL_PRICE } },
+    { id: 'paced', method: 'POST', path: '/paced', script: 'designating', tollMorsels: MORSEL_PRICE },
     { id: 'paid', method: 'POST', path: '/paid', script: 'echo', commercial: { payMoney: { amount: 500_000, currency: 'EUR' } } },
     // Money price AND a per-call destination: the exact combination kumppani sells (0.50 EUR a
     // lookup, the share going to whichever company was looked up). Each rail and each source had
@@ -636,7 +639,7 @@ await test('APP-TOOL: a sale through the outer door accrues the share the capabi
     method: 'POST', headers: auth(provider.token),
     body: JSON.stringify({ key: `apps.${APP_ID}.tools`, visibility: 'public', value: { version: 1, tools: [
       { name: 'lookup', description: 'chain proof', action_id: capId, inputSchema: IN, outputSchema: OUT,
-        price: { morsels: 0 }, priceMoney: { amount: PRICE, currency: 'EUR' } },
+        priceMoney: { amount: PRICE, currency: 'EUR' } },
     ] } }),
   });
   assert(w.status === 200 || w.status === 201, `write manifest ${w.status}: ${JSON.stringify(w.body?.error)}`);

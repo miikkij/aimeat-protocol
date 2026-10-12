@@ -16,11 +16,17 @@
  *   (f) ACP, UCP and the feed show money only
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=pacing-two-values
  * @version-history
+ *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses price.morsels (MORSEL_PRICE_REMOVED), and the setup's PUT
+ *     offers carried the old client's offer, so the whole setup was refused there. That offer moved to
+ *     the test whose subject it is, on an agent of its own, and the test is version-aware: stored as
+ *     pacing with the mirror on 3.x, refused with nothing written on 4.0.0.
  *   v1.1.0 — 2026-10-11 — The default node: before any setting changes, a 10-morsel use burns at least
  *     1 (AIMEAT_BURN_RATE, 0.10), and an ordinary buyer's tracking code does not say "granted".
  *   v1.0.0 — 2026-10-11 — Initial (wish-tarjouksella-rahahinta-ja-tahdistus-morselhinnat-tahdistukse).
  */
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -119,7 +125,6 @@ await test('setup: the operator sets the burn rate, the fee and a pacing pack (5
     { id: 'paced', title: 'Free and paced', ask: 'Send text.', deliverable, tollMorsels: 10, visibility: 'public' },
     { id: 'priced', title: 'Money and paced', ask: 'Send text.', deliverable, tollMorsels: 5, priceMoney: { amount: 1_000_000, currency: 'EUR' }, visibility: 'public' },
     { id: 'heavy', title: 'Heavily paced', ask: 'Send text.', deliverable, tollMorsels: 100, visibility: 'public' },
-    { id: 'legacy-write', title: 'Old client', ask: 'Send text.', deliverable, price: { morsels: 7, unit: 'per-call' }, visibility: 'public' },
   ] }) });
   assert(pub.status === 200, `offers ${pub.status}: ${JSON.stringify(pub.body.error)}`);
 });
@@ -170,10 +175,26 @@ await test('(b) a money price and a pacing amount: 1 EUR through a money handler
   assert(await balance(seller.token) === before.seller + 3, 'the provider gets the pacing rest in morsels');
 });
 
-await test('an old client writing price.morsels gets it stored as the pacing amount, with the old field mirrored and marked deprecated', async () => {
-  const r = await json(`/v1/agents/${encodeURIComponent(vendorGaii)}/offers`, { headers: auth(buyer.token) });
+// The old client's write is this test's subject, so it has an agent of its own (PUT offers replaces
+// the whole list, and the vendor's offers are read by the tests below). On 3.x the write is stored as
+// the pacing amount with the old field mirrored; on 4.0.0 it is refused and nothing is written.
+await test('an old client writing price.morsels gets it stored as the pacing amount, with the old field mirrored and marked deprecated, on 3.x; 4.0.0 refuses it with MORSEL_PRICE_REMOVED and writes nothing', async () => {
+  const ag = await json('/v1/agents', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ name: 'oldclient', owner: seller.name, capabilities: ['social'] }) });
+  assert(ag.status === 201, `agent ${ag.status}`);
+  const oldClientGaii = `oldclient#${seller.name}@${NODE_ID}`;
+  const pub = await json('/v1/agents/oldclient/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ offers: [
+    { id: 'legacy-write', title: 'Old client', ask: 'Send text.', deliverable, price: { morsels: 7, unit: 'per-call' }, visibility: 'public' },
+  ] }) });
+  const r = await json(`/v1/agents/${encodeURIComponent(oldClientGaii)}/offers`, { headers: auth(buyer.token) });
   assert(r.status === 200, `offers ${r.status}`);
   const offers = (r.body.data.offers ?? []) as any[];
+  if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+    assert(pub.status === 400 && pub.body.error?.code === 'MORSEL_PRICE_REMOVED',
+      `4.0.0 refuses price.morsels with 400 MORSEL_PRICE_REMOVED, got ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    assert(offers.length === 0, `nothing was written: ${JSON.stringify(offers)}`);
+    return;
+  }
+  assert(pub.status === 200, `offers ${pub.status}: ${JSON.stringify(pub.body.error)}`);
   const o = offers.find(x => x.id === 'legacy-write');
   assert(o?.tollMorsels === 7, `stored as pacing: ${JSON.stringify(o)}`);
   assert(o.price?.morsels === 7 && typeof o.price?.deprecated === 'string', `old field mirrored, deprecated: ${JSON.stringify(o.price)}`);

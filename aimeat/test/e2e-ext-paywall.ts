@@ -8,6 +8,10 @@
  *   free (non-commercial) public call; refund-on-throw; and install-time C1/no-mint validation.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-paywall.ts
  * @version-history
+ *   v1.4.0 — 2026-10-12 — Node 4.0.0 refuses `commercial.payMorsels` (MORSEL_PRICE_REMOVED), so the shared
+ *     extension states `tollMorsels` (the unaffordable action at the per-call ceiling of 100, which the
+ *     old 9 999 was clamped to). The case whose subject is the 3.x figure installs its own extension and
+ *     is version-aware: one pacing charge on 3.x, the install refused and nothing installed on 4.0.0.
  *   v1.3.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa): `payMorsels` and `tollMorsels` are one pacing charge, part burned and
  *     the rest credited to the owner. The two economics assertions read that; every refusal stays.
@@ -37,6 +41,8 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
   return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -67,18 +73,18 @@ const manifest = (name: string) => JSON.stringify({
   metadata: { name, version: '1.0.0', description: 'paywall e2e', author: 'e2e' },
   actions: [
     { id: 'freecall', method: 'POST', path: '/freecall', script: 'echo' },
-    { id: 'paidcall', method: 'POST', path: '/paidcall', script: 'echo', commercial: { payMorsels: 5 } },
+    { id: 'paidcall', method: 'POST', path: '/paidcall', script: 'echo', tollMorsels: 5 },
     { id: 'tollcall', method: 'POST', path: '/tollcall', script: 'echo', tollMorsels: 2 },
     { id: 'moneycall', method: 'POST', path: '/moneycall', script: 'echo', commercial: { payMoney: { amount: 500000, currency: 'EUR' } } },
     // A SECOND money-priced action, identical in price, so a token bought for one can be offered to
     // the other. Without it the suite can only ever spend a token on the action it was bought for,
     // which is the half of the binding it already proved.
     { id: 'moneycall2', method: 'POST', path: '/moneycall2', script: 'echo', commercial: { payMoney: { amount: 500000, currency: 'EUR' } } },
-    // Priced far above a welcome bonus (100) to prove the insufficient-balance 402, but under
-    // the node's manifest price ceiling — the point is that the caller cannot afford it, not that
-    // the number is astronomical.
-    { id: 'expensivecall', method: 'POST', path: '/expensivecall', script: 'echo', commercial: { payMorsels: 9_999 } },
-    { id: 'paidthrow', method: 'POST', path: '/paidthrow', script: 'boom', commercial: { payMorsels: 3 } },
+    // Paced at the node's per-call ceiling (AIMEAT_EXT_MAX_DEBIT, 100 here), which is the welcome
+    // bonus (100), and the caller has spent some of it by then: the point is that the caller cannot
+    // afford it. (The 3.x `payMorsels: 9 999` this replaced was clamped to the same 100 per call.)
+    { id: 'expensivecall', method: 'POST', path: '/expensivecall', script: 'echo', tollMorsels: 100 },
+    { id: 'paidthrow', method: 'POST', path: '/paidthrow', script: 'boom', tollMorsels: 3 },
   ],
   config: { public_access: { default: true } },
   limits: { timeout_ms: 5000, max_api_calls: 1 },
@@ -117,11 +123,32 @@ async function burnOf(amount: number): Promise<number> {
   return Math.min(amount, Math.ceil(amount * (Math.round(rate * 10_000) / 100) / 100));
 }
 
-await test('Cross-owner call with a 3.x morsel figure = pacing: caller debited 5, owner credited 5 less the burn', async () => {
+// The 3.x figure (`commercial.payMorsels`) is this test's subject, so it has an extension of its own:
+// on 3.x it installs and one call is one pacing charge; on 4.0.0 the install is refused with 400
+// MORSEL_PRICE_REMOVED and nothing is installed.
+await test('Cross-owner call with a 3.x morsel figure = pacing on 3.x (caller debited 5, owner credited 5 less the burn); 4.0.0 refuses the install', async () => {
+  const LEGACY = `${EXT}legacy`;
+  const legacyManifest = JSON.stringify({
+    metadata: { name: LEGACY, version: '1.0.0', description: 'paywall e2e, 3.x morsel figure', author: 'e2e' },
+    actions: [{ id: 'paidcall', method: 'POST', path: '/paidcall', script: 'echo', commercial: { payMorsels: 5 } }],
+    config: { public_access: { default: true } },
+    limits: { timeout_ms: 5000, max_api_calls: 1 },
+  }, null, 2);
+  const inst = await json('/v1/extensions', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ manifest: legacyManifest, scripts: { echo: SCRIPTS.echo } }) });
+  if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+    assert(inst.status === 400 && inst.body?.error?.code === 'MORSEL_PRICE_REMOVED',
+      `4.0.0 refuses commercial.payMorsels with 400 MORSEL_PRICE_REMOVED, got ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    const got = await json(`/v1/extensions/${LEGACY}`, { headers: auth(owner.token) });
+    assert(got.status === 404, `nothing was installed: ${got.status}`);
+    return;
+  }
+  assert(inst.status === 201 || inst.status === 200, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+  const act = await json(`/v1/extensions/${LEGACY}/activate`, { method: 'POST', headers: auth(owner.token) });
+  assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
   const burn = await burnOf(5);
   const cb = await balance(caller.token);
   const ob = await balance(owner.token);
-  const r = await invoke(caller.token, 'paidcall');
+  const r = await json(`/v1/ext/${LEGACY}/paidcall`, { method: 'POST', headers: auth(caller.token), body: JSON.stringify({ hi: 1 }) });
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(await balance(caller.token) === cb - 5, 'caller debited the 5 morsels of pacing');
   assert(await balance(owner.token) === ob + 5 - burn, `owner credited 5 less the burn of ${burn}`);

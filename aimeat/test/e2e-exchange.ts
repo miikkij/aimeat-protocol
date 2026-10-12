@@ -2,13 +2,18 @@
  * @file test/e2e-exchange.ts
  * @description E2E for the EXCHANGE loop (TARGET-045): the metered entitlement (G1) + the metered-call
  *   gateway (G2) + the per-app cost surface (G3) + the contract-acceptance mint surface. Proves the full
- *   slice-1 path end-to-end against a real server: a provider publishes a morsel-priced extension action;
+ *   slice-1 path end-to-end against a real server: a provider publishes a paced extension action;
  *   a consumer ACCEPTS a contract (price read authoritatively from the action, consumer picks only the
  *   budget); each call flows through the gateway — caller debited, provider credited its cut, the platform
  *   rake routed, the budget decremented; the budget CAP hard-stops the call; the cost surface reflects the
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   v1.9.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
+ *     fixtures use the 4.0.0 form, which 3.x accepts too: the extension actions state `tollMorsels`, the
+ *     app tools `tollMorsels`, the agent-work listing `toll_morsels`, and a need's budget is money. The
+ *     morsel-rail offering and contract views are read through assertPacingRail: `toll_morsels` on both
+ *     releases, the deprecated `unit`/`basePrice`/`price_per_call` mirrors on 3.x only.
  *   v1.8.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). Assertions that read the old morsel-price model now read pacing: the
  *     provider is credited the amount less the burn and the rake, an offering states `toll_morsels`,
@@ -60,6 +65,8 @@ import { readFileSync } from 'node:fs';
 const odpsSchema = JSON.parse(readFileSync(new URL('./fixtures/odps-v4.1.schema.json', import.meta.url), 'utf8'));
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
   return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -81,6 +88,23 @@ async function balance(token: string): Promise<number> {
 
 console.log('\n=== AIMEAT EXCHANGE E2E (TARGET-045 — G1 entitlement + G2 gateway + G3 cost) ===\n');
 
+// Node 4.0.0 drops the deprecated mirrors of a morsel-rail offering or contract (`unit`, `basePrice`,
+// `price_per_call`, `currency`) and keeps `toll_morsels` as the only figure (services/exchange-market.ts
+// presentOffering, presentContractTerms). A 3.x node still answers with the mirrors, marked deprecated.
+const MIRRORS_GONE = await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
+/**
+ * A morsel-rail offering or contract states `amount` morsels of pacing per use. On 3.x the mirror
+ * `priceKey` and `unit: 'morsels'` carry the same amount and are named in `deprecated`; on 4.0.0 they are absent.
+ */
+function assertPacingRail(x: any, amount: number, priceKey: 'basePrice' | 'price_per_call', label: string) {
+  assert(x?.toll_morsels === amount, `${label}: toll_morsels ${amount}: ${JSON.stringify(x)}`);
+  if (MIRRORS_GONE) {
+    assert(!('unit' in x) && !(priceKey in x) && !('deprecated' in x), `${label}: no 3.x mirrors on 4.0.0: ${JSON.stringify(x)}`);
+  } else {
+    assert(x.unit === 'morsels' && x[priceKey] === amount && !!x.deprecated?.[priceKey], `${label}: the 3.x mirrors: ${JSON.stringify(x)}`);
+  }
+}
+
 const EXT = `xchg${Date.now()}`;
 const SCRIPTS = { echo: 'export default async function(ctx, input){ return { echo: input, caller: ctx.caller.owner }; }' };
 const manifest = (name: string) => JSON.stringify({
@@ -89,14 +113,14 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'validate', method: 'POST', path: '/validate', script: 'echo',
       input: { type: 'object', properties: { q: { type: 'string' } } },
       output: { type: 'object', properties: { echo: {}, caller: { type: 'string' } } },
-      commercial: { payMorsels: 10 } },
+      tollMorsels: 10 },
     { id: 'cheap', method: 'POST', path: '/cheap', script: 'echo',
       input: { type: 'object', properties: { q: { type: 'string' } } },
       output: { type: 'object', properties: { echo: {} } },
-      commercial: { payMorsels: 4 } },
+      tollMorsels: 4 },
     { id: 'money', method: 'POST', path: '/money', script: 'echo', commercial: { payMoney: { amount: 100000, currency: 'EUR' } } },
-    { id: 'bundled', method: 'POST', path: '/bundled', script: 'echo', commercial: { payMorsels: 5, plans: [{ id: 'pack3', model: 'bundle', blockSize: 3, blockPrice: 12 }] } },
-    { id: 'subbed', method: 'POST', path: '/subbed', script: 'echo', commercial: { payMorsels: 5, plans: [{ id: 'basic', model: 'subscription', periodSeconds: 3600, periodPrice: 30, callsPerWindow: 2, windowSeconds: 60 }] } },
+    { id: 'bundled', method: 'POST', path: '/bundled', script: 'echo', tollMorsels: 5, commercial: { plans: [{ id: 'pack3', model: 'bundle', blockSize: 3, blockPrice: 12 }] } },
+    { id: 'subbed', method: 'POST', path: '/subbed', script: 'echo', tollMorsels: 5, commercial: { plans: [{ id: 'basic', model: 'subscription', periodSeconds: 3600, periodPrice: 30, callsPerWindow: 2, windowSeconds: 60 }] } },
     { id: 'free', method: 'POST', path: '/free', script: 'echo' },
   ],
   config: { public_access: { default: true } },
@@ -109,7 +133,7 @@ let operator: Awaited<ReturnType<typeof setupOwner>>;
 let appId = '';
 let rakePerCall = 0;
 
-await test('Setup: provider installs a morsel-priced extension; consumer registered', async () => {
+await test('Setup: provider installs a paced extension (tollMorsels); consumer registered', async () => {
   operator = await setupOwner('neutral'); // the FIRST owner on a fresh DB auto-becomes operator
   provider = await setupOwner('prov');
   consumer = await setupOwner('cons');
@@ -140,15 +164,15 @@ await test('Consumer accepts a contract → price is authoritative (10), budget 
   const r = await accept(consumer.token, 'validate', { cap_units: 25, app_id: appId, price_per_call: 1 /* must be IGNORED */ });
   assert(r.status === 201, `accept ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const e = r.body.data.entitlement;
-  assert(e.price_per_call === 10, `price must come from the provider action (10), got ${e.price_per_call}`);
-  assert(e.unit === 'morsels' && e.state === 'active', `unit/state: ${JSON.stringify(e)}`);
+  assertPacingRail(e, 10, 'price_per_call', 'pacing must come from the provider action (10)');
+  assert(e.state === 'active', `state: ${JSON.stringify(e)}`);
   assert(e.budget.cap_units === 25 && e.budget.spent_units === 0, `budget: ${JSON.stringify(e.budget)}`);
   rakePerCall = e.rake_per_call;
   assert(rakePerCall >= 1, `a positive price must carry a rake, got ${rakePerCall}`);
 });
 
 // A morsel is pacing, never a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
-// arvoa, 2026-10-11). A 3.x `payMorsels: 10` is 10 morsels of pacing per call, charged through
+// arvoa, 2026-10-11). `tollMorsels: 10` is 10 morsels of pacing per call, charged through
 // chargePacing: the burn rate's share burns, the contract's rake goes to the operator, and the provider
 // is credited the rest. This assertion was `provider +(10−rake)`, the old morsel-price model.
 await test('Metered call #1: caller −10 of pacing, provider +(10−burn−rake), budget spent=10', async () => {
@@ -286,9 +310,8 @@ await test('Provider lists an OFFERING for its priced action (authoritative pric
     body: JSON.stringify({ ext: EXT, action: 'validate', title: 'Y-tunnus validation', description: 'PRH company lookup', tags: ['prh', 'finland'], usage_terms: validTerms }) });
   assert(r.status === 201, `list offering ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const o = r.body.data.offering;
-  // The action's 3.x morsel figure is the pacing amount; `unit`/`basePrice` are its deprecated mirrors.
-  assert(o.toll_morsels === 10 && o.unit === 'morsels' && o.basePrice === 10 && !!o.deprecated?.basePrice,
-    `offering pacing authoritative: ${JSON.stringify(o)}`);
+  // The action's pacing amount is authoritative; `unit`/`basePrice` are its deprecated mirrors on 3.x.
+  assertPacingRail(o, 10, 'basePrice', 'offering pacing authoritative');
   offeringId = o.offeringId;
 });
 
@@ -312,7 +335,7 @@ await test('One capability, one listing: the same call offered as BOTH kinds -> 
   // Re-listing the same SURFACE is legitimate (that is how a listing is changed), so this offers
   // the same underlying action through the OTHER kind: an app-tool bound to `ext:<EXT>:validate`.
   const manifest = { tools: [{ name: 'dup-tool', description: 'the same call, sold twice',
-    action_id: `ext:${EXT}:validate`, price: { morsels: 10 },
+    action_id: `ext:${EXT}:validate`, tollMorsels: 10,
     inputSchema: { type: 'object', properties: { y: { type: 'string' } } },
     outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } } }] };
   const dupApp = `${provider.name}/dup-app`;
@@ -343,7 +366,7 @@ await test('A non-owner cannot list someone else’s extension as an offering �
 await test('Consumer posts a NEED → open, and matches surface the offering', async () => {
   buyer = await setupOwner('buy');
   const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
-    body: JSON.stringify({ ext: EXT, action: 'validate', description: 'Need Finnish company lookups', app_id: `${buyer.name}/lookup-app`, budget_unit: 'morsels', budget_cap: 50 }) });
+    body: JSON.stringify({ ext: EXT, action: 'validate', description: 'Need Finnish company lookups', app_id: `${buyer.name}/lookup-app`, budget_unit: 'money', budget_cap: 500000 }) });
   assert(r.status === 201, `post need ${r.status}: ${JSON.stringify(r.body?.error)}`);
   needId = r.body.data.need.needId;
   assert(r.body.data.matches.some((o: any) => o.offeringId === offeringId), 'offering should match the need');
@@ -392,7 +415,7 @@ await test('Offering carries provider USAGE TERMS (derivatives/resale/attributio
 
 await test('Need carries a MIN-SPEC (required fields + format) so a provider can judge fit', async () => {
   const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
-    body: JSON.stringify({ description: 'Company registry with VAT status', app_id: `${buyer.name}/vat-app`, spec: { requiredFields: ['name', 'vatValid'], format: 'JSON { name, vatValid }', inputSchema: { type: 'object', properties: { businessId: { type: 'string' } } }, outputSchema: { type: 'object', properties: { name: {}, vatValid: { type: 'boolean' } } } }, budget_unit: 'morsels', budget_cap: 40 }) });
+    body: JSON.stringify({ description: 'Company registry with VAT status', app_id: `${buyer.name}/vat-app`, spec: { requiredFields: ['name', 'vatValid'], format: 'JSON { name, vatValid }', inputSchema: { type: 'object', properties: { businessId: { type: 'string' } } }, outputSchema: { type: 'object', properties: { name: {}, vatValid: { type: 'boolean' } } } }, budget_unit: 'money', budget_cap: 400000 }) });
   assert(r.status === 201, `need w/ spec ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const s = r.body.data.need.spec;
   assert(s && Array.isArray(s.requiredFields) && s.requiredFields.includes('vatValid') && s.format, `need spec roundtrip: ${JSON.stringify(s)}`);
@@ -401,7 +424,7 @@ await test('Need carries a MIN-SPEC (required fields + format) so a provider can
 
 await test('A need REQUIRES a requesting app → 400 NEED_APP_REQUIRED without app_id', async () => {
   const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
-    body: JSON.stringify({ description: 'orphan need with no app', budget_unit: 'morsels', budget_cap: 10 }) });
+    body: JSON.stringify({ description: 'orphan need with no app', budget_unit: 'money', budget_cap: 100000 }) });
   assert(r.status === 400 && r.body?.error?.code === 'NEED_APP_REQUIRED', `expected NEED_APP_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
 });
 
@@ -533,9 +556,9 @@ await test('Setup: aggregate the backing capability + provider publishes an app-
   // A well-formed sellable tool + a couple of gate-probe tools.
   const w = await writeManifest(provider.token, [
     { name: 'getbrief', description: 'Company brief', action_id: capId, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA,
-      price: { morsels: 8 }, plans: [{ id: 'pack5', model: 'bundle', blockSize: 5, blockPrice: 30 }] },
-    { name: 'noout', description: 'missing output schema', action_id: capId, inputSchema: IN_SCHEMA, price: { morsels: 3 } },
-    { name: 'unbound', description: 'no binding', inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 3 } },
+      tollMorsels: 8, plans: [{ id: 'pack5', model: 'bundle', blockSize: 5, blockPrice: 30 }] },
+    { name: 'noout', description: 'missing output schema', action_id: capId, inputSchema: IN_SCHEMA, tollMorsels: 3 },
+    { name: 'unbound', description: 'no binding', inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 3 },
   ]);
   assert(w.status === 200 || w.status === 201, `write manifest ${w.status}: ${JSON.stringify(w.body?.error)}`);
 });
@@ -545,7 +568,7 @@ await test('List an app-tool offering → kind=app-tool, pinned interface v1, au
   assert(r.status === 201, `list app-tool ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const o = r.body.data.offering;
   assert(o.kind === 'app-tool' && o.surface?.ifaceVersion === 1, `kind/surface: ${JSON.stringify(o.surface)}`);
-  assert(o.unit === 'morsels' && o.basePrice === 8, `authoritative price: ${JSON.stringify({ unit: o.unit, basePrice: o.basePrice })}`);
+  assertPacingRail(o, 8, 'basePrice', 'authoritative pacing');
   assert(o.ext === `apptool:${provider.name}/${APP_ID}` && o.action === 'getbrief', `coordinate: ${o.ext}/${o.action}`);
   appToolOfferingId = o.offeringId;
 });
@@ -592,7 +615,8 @@ await test('Consumer contracts the app-tool offering (by offering_id) → entitl
     body: JSON.stringify({ offering_id: appToolOfferingId, cap_units: 20, app_id: appId }) });
   assert(r.status === 201, `contract ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const e = r.body.data.entitlement;
-  assert(e.price_per_call === 8 && e.unit === 'morsels' && e.state === 'active', `entitlement: ${JSON.stringify(e)}`);
+  assertPacingRail(e, 8, 'price_per_call', 'entitlement');
+  assert(e.state === 'active', `entitlement: ${JSON.stringify(e)}`);
   assert(e.surface?.kind === 'app-tool' && e.surface.ifaceVersion === 1, `pinned surface: ${JSON.stringify(e.surface)}`);
 });
 
@@ -666,7 +690,7 @@ await test('FREEZE: a schema change mints interface v2; the consumer’s contrac
   const w = await writeManifest(provider.token, [
     { name: 'getbrief', description: 'Company brief v2', action_id: capId, inputSchema: IN_SCHEMA,
       outputSchema: { type: 'object', properties: { echo: {}, caller: { type: 'string' }, score: { type: 'number' } } },
-      price: { morsels: 8 }, plans: [{ id: 'pack5', model: 'bundle', blockSize: 5, blockPrice: 30 }] },
+      tollMorsels: 8, plans: [{ id: 'pack5', model: 'bundle', blockSize: 5, blockPrice: 30 }] },
   ]);
   assert(w.status === 200 || w.status === 201, `rewrite manifest ${w.status}`);
   const r = await listAppTool(provider.token, { tool: 'getbrief', usage_terms: validTerms });
@@ -714,16 +738,18 @@ await test('Consumer sees the incoming proposal in their list', async () => {
 await test('Consumer ACCEPTS → contract supersedes at the new price (6); the old one is archived to history', async () => {
   const r = await json(`/v1/exchange/proposals/${propId}/accept`, { method: 'POST', headers: auth(consumer.token), body: '{}' });
   assert(r.status === 200, `accept ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(r.body.data.entitlement.price_per_call === 6, `new price should be 6, got ${r.body.data.entitlement.price_per_call}`);
+  assertPacingRail(r.body.data.entitlement, 6, 'price_per_call', 'new pacing should be 6');
   assert(r.body.data.entitlement.budget.spent_units === 0, 'renegotiated contract starts a fresh meter');
-  // The live contract now prices at 6.
+  // The live contract now paces at 6.
   const list = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
   const e = list.body.data.entitlements.find((x: any) => x.action === 'cheap');
-  assert(e.price_per_call === 6, `live contract must be 6, got ${e.price_per_call}`);
-  // The old contract (price 4) is in history.
+  assertPacingRail(e, 6, 'price_per_call', 'live contract must be 6');
+  // The old contract (4) is in history.
   const hist = await json('/v1/exchange/entitlements/history', { headers: auth(consumer.token) });
   assert(hist.status === 200, `history ${hist.status}`);
-  assert(hist.body.data.history.some((h: any) => h.action === 'cheap' && h.price_per_call === 4 && h.archive_reason === 'superseded'), `superseded old contract not in history: ${JSON.stringify(hist.body.data.history)}`);
+  const old = hist.body.data.history.find((h: any) => h.action === 'cheap' && h.archive_reason === 'superseded');
+  assert(!!old, `superseded old contract not in history: ${JSON.stringify(hist.body.data.history)}`);
+  assertPacingRail(old, 4, 'price_per_call', 'the superseded contract');
 });
 
 await test('A metered call after renegotiation is priced at the NEW rate (6)', async () => {
@@ -741,7 +767,10 @@ await test('A metered call after renegotiation is priced at the NEW rate (6)', a
 
 await test('Provider’s history view also shows the superseded contract', async () => {
   const r = await json('/v1/exchange/provider/history', { headers: auth(provider.token) });
-  assert(r.status === 200 && r.body.data.history.some((h: any) => h.action === 'cheap' && h.price_per_call === 4), `provider history: ${JSON.stringify(r.body.data.history)}`);
+  assert(r.status === 200, `provider history ${r.status}`);
+  const old = r.body.data.history.find((h: any) => h.action === 'cheap');
+  assert(!!old, `provider history: ${JSON.stringify(r.body.data.history)}`);
+  assertPacingRail(old, 4, 'price_per_call', 'provider history');
 });
 
 await test('DECLINE: a new proposal declined by the consumer leaves the contract unchanged', async () => {
@@ -751,7 +780,7 @@ await test('DECLINE: a new proposal declined by the consumer leaves the contract
   assert(dec.status === 200 && dec.body.data.proposal.status === 'declined', `decline ${dec.status}`);
   const list = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
   const e = list.body.data.entitlements.find((x: any) => x.action === 'cheap');
-  assert(e.price_per_call === 6, 'declined proposal must not change the price (still 6)');
+  assertPacingRail(e, 6, 'price_per_call', 'declined proposal must not change the pacing (still 6)');
 });
 
 await test('WITHDRAW: the proposer can withdraw their own pending proposal', async () => {
@@ -765,7 +794,7 @@ await test('WITHDRAW: the proposer can withdraw their own pending proposal', asy
 
 await test('Needs carry usage-intent + an appContext field (provider can judge who they’d serve)', async () => {
   const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
-    body: JSON.stringify({ description: 'Company registry lookups for a CRM enrichment app', app_id: `${buyer.name}/crm-enrich`, usage_intent: 'Enrich CRM contacts nightly; internal use only, no resale', budget_unit: 'morsels', budget_cap: 40 }) });
+    body: JSON.stringify({ description: 'Company registry lookups for a CRM enrichment app', app_id: `${buyer.name}/crm-enrich`, usage_intent: 'Enrich CRM contacts nightly; internal use only, no resale', budget_unit: 'money', budget_cap: 400000 }) });
   assert(r.status === 201, `need w/ intent ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.need.usageIntent && r.body.data.need.usageIntent.includes('CRM'), `usageIntent roundtrip: ${r.body.data.need.usageIntent}`);
   const list = await json('/v1/exchange/needs?open=1');
@@ -782,20 +811,21 @@ await test('Provider registers a worker agent + lists an AGENT-WORK offering (ta
   awRake = ((await json('/v1/exchange/info')).body.data.rake_percent) || 5;
   const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
     body: JSON.stringify({ kind: 'agent-work', agent_name: 'worker', task_type: 'summarize', title: 'Doc summarization',
-      price_morsels: 12, usage_terms: validTerms,
+      toll_morsels: 12, usage_terms: validTerms,
       input_schema: { type: 'object', required: ['text'], properties: { text: { type: 'string' } } },
       output_schema: { type: 'object', properties: { summary: { type: 'string' } } } }) });
   assert(r.status === 201, `list agent-work ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const o = r.body.data.offering;
   assert(o.kind === 'agent-work' && o.surface?.kind === 'agent-work' && o.surface.taskType === 'summarize', `surface: ${JSON.stringify(o.surface)}`);
-  assert(o.basePrice === 12 && o.ext === `agentwork:${provider.name}/worker` && o.action === 'summarize', `price/coordinate: ${JSON.stringify({ p: o.basePrice, ext: o.ext, action: o.action })}`);
+  assertPacingRail(o, 12, 'basePrice', 'agent-work pacing');
+  assert(o.ext === `agentwork:${provider.name}/worker` && o.action === 'summarize', `coordinate: ${JSON.stringify({ ext: o.ext, action: o.action })}`);
   assert(o.taskSpec && o.taskSpec.inputSchema && o.taskSpec.outputSchema, `task spec stored: ${JSON.stringify(o.taskSpec)}`);
   awOfferingId = o.offeringId;
 });
 
 await test('Agent-work legibility gate: no output schema → 400 SCHEMA_REQUIRED', async () => {
   const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
-    body: JSON.stringify({ kind: 'agent-work', agent_name: 'worker', task_type: 'noout', price_morsels: 5, usage_terms: validTerms, input_schema: { type: 'object', properties: { x: {} } } }) });
+    body: JSON.stringify({ kind: 'agent-work', agent_name: 'worker', task_type: 'noout', toll_morsels: 5, usage_terms: validTerms, input_schema: { type: 'object', properties: { x: {} } } }) });
   assert(r.status === 400 && r.body?.error?.code === 'SCHEMA_REQUIRED', `expected SCHEMA_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
 });
 
@@ -806,7 +836,8 @@ await test('Starting work without a contract → 402 NO_CONTRACT', async () => {
 
 await test('Consumer contracts the agent-work offering, then STARTS a task (nothing charged yet)', async () => {
   const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: awOfferingId, cap_units: 50 }) });
-  assert(acc.status === 201 && acc.body.data.entitlement.price_per_call === 12, `contract ${acc.status}: ${JSON.stringify(acc.body?.error || acc.body.data.entitlement)}`);
+  assert(acc.status === 201, `contract ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+  assertPacingRail(acc.body.data.entitlement, 12, 'price_per_call', 'agent-work contract');
   const cb = await balance(buyer.token);
   const st = await json('/v1/exchange/work', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: awOfferingId, input: { text: 'a long document to summarize' } }) });
   assert(st.status === 201 && st.body.data.work.state === 'open' && st.body.data.work.charged_units === 0, `start work ${st.status}: ${JSON.stringify(st.body?.error || st.body.data.work)}`);
@@ -819,7 +850,7 @@ await test('A non-provider cannot deliver the work → 404', async () => {
   assert(r.status === 404, `a non-provider must not deliver, got ${r.status}`);
 });
 
-// `price_morsels: 12` is 12 morsels of pacing per task (ruling decision-morseli-on-tahdistus-ei-hinta-
+// `toll_morsels: 12` is 12 morsels of pacing per task (ruling decision-morseli-on-tahdistus-ei-hinta-
 // tarjouksen-kaksi-arvoa). The provider's credit was `12 − rake`, the old morsel-price model; the burn
 // rate's share now burns as well (chargePacing).
 await test('Provider DELIVERS → consumer charged 12 of pacing ON DELIVERY, provider +(12−burn−rake), output stored', async () => {
@@ -1085,7 +1116,7 @@ await test('A usage note past the ODPS restrictions cap is refused on write, and
   const write = (exchange: boolean) => json('/v1/memory', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
     key: `apps.${LONG_APP}.tools`, visibility: 'public',
     value: { version: 1, tools: [{ name: 'brief', action_id: capId, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA,
-      price: { morsels: 6 }, exchange, usageTerms: { derivatives: true, resale: false, attribution: true, note } }] },
+      tollMorsels: 6, exchange, usageTerms: { derivatives: true, resale: false, attribution: true, note } }] },
   }) });
   // Nothing is stored under the key yet, so the text is new and refused, with the room the note has (255 - 99).
   const refused = await write(true);

@@ -10,6 +10,13 @@
  *   projection-aware delist guard.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange-projection.ts
  * @version-history
+ *   v1.5.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
+ *     fixtures use the 4.0.0 form, which 3.x accepts too: tools and offers state `tollMorsels`, extension
+ *     actions `tollMorsels` beside a `commercial` block that keeps only the listing fields. Morsel-rail
+ *     listings and contracts are read through onPacingRail/assertPacingRail (`toll_morsels` on both
+ *     releases, the deprecated `unit`/`basePrice`/`price_per_call` mirrors on 3.x only). The case whose
+ *     subject is the 3.x figure is version-aware: it adds up to 14 on 3.x, and on 4.0.0 the same write is
+ *     400 MORSEL_PRICE_REMOVED with the manifest and the listing unchanged.
  *   v1.4.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa): a declared toll and a 3.x morsel figure on a money-priced tool add up
  *     to the listing's toll (3 + 11 = 14). The case asserted the old "declared toll wins" model.
@@ -50,6 +57,8 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
   return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -119,6 +128,25 @@ async function mcpSession(gaii: string, priv: string) {
 
 console.log('\n=== AIMEAT EXCHANGE PROJECTION E2E (TARGET-050 — the source owns the listing) ===\n');
 
+// Node 4.0.0 refuses the 3.x morsel price fields and drops the deprecated mirrors of a morsel-rail
+// offering or contract (`unit`, `basePrice`, `price_per_call`, `currency`), keeping `toll_morsels` as
+// the only figure (services/exchange-market.ts presentOffering, presentContractTerms).
+const MIRRORS_GONE = await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
+/** Whether an offering or contract row is on the morsel rail: `unit: 'morsels'` on 3.x, no `unit` on 4.0.0. */
+const onPacingRail = (x: any): boolean => (MIRRORS_GONE ? x?.unit === undefined : x?.unit === 'morsels') && typeof x?.toll_morsels === 'number';
+/**
+ * A morsel-rail offering or contract states `amount` morsels of pacing per use. On 3.x the mirror
+ * `priceKey` and `unit: 'morsels'` carry the same amount and are named in `deprecated`; on 4.0.0 they are absent.
+ */
+function assertPacingRail(x: any, amount: number, priceKey: 'basePrice' | 'price_per_call', label: string) {
+  assert(x?.toll_morsels === amount, `${label}: toll_morsels ${amount}: ${JSON.stringify(x)}`);
+  if (MIRRORS_GONE) {
+    assert(!('unit' in x) && !(priceKey in x) && !('deprecated' in x), `${label}: no 3.x mirrors on 4.0.0: ${JSON.stringify(x)}`);
+  } else {
+    assert(x.unit === 'morsels' && x[priceKey] === amount && !!x.deprecated?.[priceKey], `${label}: the 3.x mirrors: ${JSON.stringify(x)}`);
+  }
+}
+
 const operator = await setupOwner('op');
 const provider = operator;                       // the first owner on a fresh DB is operator (capability aggregation)
 const consumer = await setupOwner('cn');
@@ -145,7 +173,7 @@ const forTool = (list: any[], tool: string) => list.filter(o => o.action === too
 const tool = (over: Record<string, unknown> = {}) => ({
   name: 'brief', description: 'Company brief', action_id: capId,
   inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, usageTerms: TERMS,
-  price: { morsels: 8 }, exchange: true, ...over,
+  tollMorsels: 8, exchange: true, ...over,
 });
 
 await test('Setup: aggregate the backing capability + install the provider extension', async () => {
@@ -176,22 +204,22 @@ await test('Flagging a tool `exchange: true` in the manifest lists it — with N
   assert(mine.length === 1, `exactly one listing appeared, got ${mine.length}`);
   const o = mine[0];
   assert(o.kind === 'app-tool' && o.auto === true, `projected listing: ${JSON.stringify({ kind: o.kind, auto: o.auto })}`);
-  assert(o.unit === 'morsels' && o.basePrice === 8, `price from the manifest: ${o.unit}/${o.basePrice}`);
+  assertPacingRail(o, 8, 'basePrice', 'pacing from the manifest');
   assert(o.surface?.ifaceVersion === 1, `pinned interface v1: ${JSON.stringify(o.surface)}`);
   offeringId = o.offeringId;
 });
 
 await test('Repricing in the manifest updates the SAME listing — no rival card', async () => {
-  const w = await writeManifest(provider.token, [tool({ price: { morsels: 11 } })]);
+  const w = await writeManifest(provider.token, [tool({ tollMorsels: 11 })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
   const mine = forTool(await myOfferings(provider.token), 'brief');
   assert(mine.length === 1, `still exactly one listing, got ${mine.length}`);
   assert(mine[0].offeringId === offeringId, `same offeringId (${offeringId}), got ${mine[0].offeringId}`);
-  assert(mine[0].basePrice === 11, `new price shown, got ${mine[0].basePrice}`);
+  assertPacingRail(mine[0], 11, 'basePrice', 'new pacing shown');
 });
 
 await test('Editing the description/title flows to the listing (labels never go stale)', async () => {
-  const w = await writeManifest(provider.token, [tool({ price: { morsels: 11 }, description: 'Full Finnish company brief' })]);
+  const w = await writeManifest(provider.token, [tool({ tollMorsels: 11, description: 'Full Finnish company brief' })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
   const mine = forTool(await myOfferings(provider.token), 'brief');
   assert(mine[0].description === 'Full Finnish company brief', `description followed: ${mine[0].description}`);
@@ -201,14 +229,14 @@ await test('Editing the description/title flows to the listing (labels never go 
 // plain case. `paid` is what a real priced tool looks like: money AND a morsel figure, together.
 const paidTool = (over: Record<string, unknown> = {}) => tool({
   name: 'paid', description: 'Paid brief',
-  price: { morsels: 11 }, priceMoney: { amount: 20_000, currency: 'EUR' }, ...over,
+  tollMorsels: 11, priceMoney: { amount: 20_000, currency: 'EUR' }, ...over,
 });
 
 await test('COMBINED PRICE: money + morsels declared together = ONE listing, morsels as its pacing toll', async () => {
   // The authoring UI shows one price, "11 morsels · 0.02 EUR", and the marketplace card shows one
   // product. This used to project TWO purchasable listings, so a buyer could take the morsel side
   // and pay the provider nothing at all — for a second product nobody ever declared.
-  const w = await writeManifest(provider.token, [tool({ price: { morsels: 11 } }), paidTool()]);
+  const w = await writeManifest(provider.token, [tool({ tollMorsels: 11 }), paidTool()]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
   const mine = forTool(await myOfferings(provider.token), 'paid');
   assert(mine.length === 1, `one listing, not one per unit, got ${mine.length}: ${JSON.stringify(mine.map(o => `${o.unit}/${o.currency}`))}`);
@@ -217,23 +245,39 @@ await test('COMBINED PRICE: money + morsels declared together = ONE listing, mor
   assert(mine[0].tollMorsels === 11, `the morsel figure became the pacing toll, got ${mine[0].tollMorsels}`);
   // And the morsel-only tool beside it is untouched: no money declared means morsels ARE the price.
   const plain = forTool(await myOfferings(provider.token), 'brief');
-  assert(plain.length === 1 && plain[0].unit === 'morsels',
-    `a morsels-only tool still lists in morsels: ${JSON.stringify(plain.map(o => `${o.unit}/${o.currency}`))}`);
+  assert(plain.length === 1 && onPacingRail(plain[0]),
+    `a morsels-only tool still lists on the morsel rail: ${JSON.stringify(plain.map(o => `${o.unit}/${o.currency}/${o.toll_morsels}`))}`);
 });
 
 // A 3.x morsel figure is pacing and ADDS to the declared toll (ruling decision-morseli-on-tahdistus-ei-
 // hinta-tarjouksen-kaksi-arvoa: toll = declared + legacy). This asserted "the explicit 3 wins and the
 // 11 is dropped", the old combined-price model; a use now carries the same morsels it did, 3 + 11.
-await test('An explicit tollMorsels and the 3.x morsel figure add up to the pacing toll', async () => {
-  const w = await writeManifest(provider.token, [tool({ price: { morsels: 11 } }), paidTool({ tollMorsels: 3 })]);
-  assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+// The 3.x figure is this test's subject, so on 4.0.0 it asserts the refusal of the same write: 400
+// MORSEL_PRICE_REMOVED, the manifest record unchanged, and the listing still at its toll of 11.
+await test('An explicit tollMorsels and the 3.x morsel figure add up to the pacing toll on 3.x; 4.0.0 refuses the 3.x figure and writes nothing', async () => {
+  const key = encodeURIComponent(`apps.${APP_ID}.tools`);
+  const stored = await json(`/v1/memory/${key}`, { headers: auth(provider.token) });
+  assert(stored.status === 200, `read the manifest ${stored.status}`);
+  const w = await writeManifest(provider.token, [tool({ tollMorsels: 11 }), paidTool({ price: { morsels: 11 }, tollMorsels: 3 })]);
+  if (!MIRRORS_GONE) {
+    assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+    const mine = forTool(await myOfferings(provider.token), 'paid');
+    assert(mine.length === 1 && mine[0].tollMorsels === 14 && mine[0].toll_morsels === 14,
+      `declared toll plus the legacy figure, got ${JSON.stringify(mine.map(o => [o.tollMorsels, o.toll_morsels]))}`);
+    return;
+  }
+  assert(w.status === 400 && w.body?.error?.code === 'MORSEL_PRICE_REMOVED',
+    `4.0.0 refuses price.morsels with 400 MORSEL_PRICE_REMOVED, got ${w.status}: ${JSON.stringify(w.body?.error)}`);
+  const after = await json(`/v1/memory/${key}`, { headers: auth(provider.token) });
+  assert(after.body.data.version === stored.body.data.version && !JSON.stringify(after.body.data.value).includes('"morsels"'),
+    `nothing was written: v${stored.body.data.version} -> v${after.body.data.version}`);
   const mine = forTool(await myOfferings(provider.token), 'paid');
-  assert(mine.length === 1 && mine[0].tollMorsels === 14 && mine[0].toll_morsels === 14,
-    `declared toll plus the legacy figure, got ${JSON.stringify(mine.map(o => [o.tollMorsels, o.toll_morsels]))}`);
+  assert(mine.length === 1 && mine[0].tollMorsels === 11 && mine[0].toll_morsels === 11,
+    `the listing keeps its toll of 11, got ${JSON.stringify(mine.map(o => [o.tollMorsels, o.toll_morsels]))}`);
 });
 
 await test('EUR + USD on one tool → one listing per currency, all sharing the tool coordinate', async () => {
-  const w = await writeManifest(provider.token, [tool({ price: { morsels: 11 } }), paidTool({
+  const w = await writeManifest(provider.token, [tool({ tollMorsels: 11 }), paidTool({
     pricesMoney: [{ amount: 20_000, currency: 'EUR' }, { amount: 25_000, currency: 'USD' }],
   })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
@@ -250,15 +294,15 @@ let contractedPrice = 0;
 
 await test('Consumer contracts the morsel listing at the CURRENT price', async () => {
   const mine = forTool(await myOfferings(provider.token), 'brief');
-  const morselOffering = mine.find(o => o.unit === 'morsels');
+  const morselOffering = mine.find(onPacingRail);
   assert(!!morselOffering, 'a morsel listing exists to contract');
   const acc = await json('/v1/exchange/entitlements', {
     method: 'POST', headers: auth(consumer.token),
     body: JSON.stringify({ offering_id: morselOffering!.offeringId, cap_units: 100 }),
   });
   assert(acc.status === 201, `contract ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
-  contractedPrice = acc.body.data.entitlement.price_per_call;
-  assert(contractedPrice === 11, `contracted at the listed 11, got ${contractedPrice}`);
+  contractedPrice = acc.body.data.entitlement.toll_morsels;
+  assertPacingRail(acc.body.data.entitlement, 11, 'price_per_call', 'contracted at the listed 11');
   assert(acc.body.data.entitlement.surface?.ifaceVersion === 1, 'contract pinned to interface v1');
 });
 
@@ -400,8 +444,9 @@ await test('BYPASS: holding two products on one capability, the raw route settle
   const afterBrief = await entOf('brief'), afterPaid = await entOf('paid');
   assert(afterBrief.budget.calls === beforeBrief.budget.calls + 1,
     `exactly one call on the cheaper contract, ${beforeBrief.budget.calls} → ${afterBrief.budget.calls}`);
-  assert(afterBrief.budget.spent_units === beforeBrief.budget.spent_units + afterBrief.price_per_call,
-    `charged its own agreed price once: ${beforeBrief.budget.spent_units} → ${afterBrief.budget.spent_units} at ${afterBrief.price_per_call}`);
+  assertPacingRail(afterBrief, 11, 'price_per_call', 'the cheaper contract keeps its agreed 11');
+  assert(afterBrief.budget.spent_units === beforeBrief.budget.spent_units + afterBrief.toll_morsels,
+    `charged its own agreed amount once: ${beforeBrief.budget.spent_units} → ${afterBrief.budget.spent_units} at ${afterBrief.toll_morsels}`);
   assert(afterPaid.budget.calls === beforePaid.budget.calls,
     `the money contract is untouched — one call is one charge: ${JSON.stringify(afterPaid.budget)}`);
 });
@@ -450,25 +495,25 @@ await test('NO DOUBLE CHARGE: the app-tool endpoint charges once, not once per d
 });
 
 await test('INVARIANT: repricing the source does NOT change an existing contract', async () => {
-  const w = await writeManifest(provider.token, [tool({ price: { morsels: 99 } })]);
+  const w = await writeManifest(provider.token, [tool({ tollMorsels: 99 })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
-  const listed = forTool(await myOfferings(provider.token), 'brief').find(o => o.unit === 'morsels');
-  assert(listed!.basePrice === 99, `the market shows the new price, got ${listed!.basePrice}`);
+  const listed = forTool(await myOfferings(provider.token), 'brief').find(onPacingRail);
+  assertPacingRail(listed, 99, 'basePrice', 'the market shows the new pacing');
   const mine = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
   assert(mine.status === 200, `entitlements ${mine.status}`);
   const ent = (mine.body.data.entitlements as any[]).find(e => e.ext === `apptool:${provider.name}/${APP_ID}` && e.action === 'brief');
   assert(!!ent, 'the consumer still holds the contract');
-  assert(ent.price_per_call === 11, `contract keeps its agreed 11, got ${ent.price_per_call}`);
+  assertPacingRail(ent, 11, 'price_per_call', 'contract keeps its agreed 11');
   assert(ent.surface?.ifaceVersion === 1, `contract keeps its pinned interface v1, got ${JSON.stringify(ent.surface)}`);
 });
 
 await test('INVARIANT: a schema change mints a new interface version but keeps the SAME listing', async () => {
   const w = await writeManifest(provider.token, [tool({
-    price: { morsels: 99 },
+    tollMorsels: 99,
     outputSchema: { type: 'object', properties: { echo: {}, caller: { type: 'string' }, extra: { type: 'string' } } },
   })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
-  const listed = forTool(await myOfferings(provider.token), 'brief').filter(o => o.unit === 'morsels');
+  const listed = forTool(await myOfferings(provider.token), 'brief').filter(onPacingRail);
   assert(listed.length === 1, `still one morsel listing after a schema change, got ${listed.length}`);
   assert(listed[0].offeringId === offeringId, 'the listing is re-pointed, not replaced');
   assert(listed[0].surface.ifaceVersion === 2, `listing now offers v2, got ${listed[0].surface.ifaceVersion}`);
@@ -484,7 +529,7 @@ await test('A projected listing cannot be hand-delisted → 409 SOURCE_MANAGED (
 });
 
 await test('Turning `exchange` off in the manifest removes every listing for that tool', async () => {
-  const w = await writeManifest(provider.token, [tool({ price: { morsels: 99 }, exchange: false })]);
+  const w = await writeManifest(provider.token, [tool({ tollMorsels: 99, exchange: false })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
   const mine = forTool(await myOfferings(provider.token), 'brief');
   assert(mine.length === 0, `no listings remain, got ${mine.length}`);
@@ -494,13 +539,13 @@ await test('…and the consumer\'s contract SURVIVES the delisting (a listing is
   const mine = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
   const ent = (mine.body.data.entitlements as any[]).find(e => e.action === 'brief');
   assert(!!ent && ent.state === 'active', `contract still active after delisting: ${JSON.stringify(ent?.state)}`);
-  assert(ent.price_per_call === 11, 'and still at its agreed price');
+  assertPacingRail(ent, 11, 'price_per_call', 'and still at its agreed amount');
 });
 
 await test('Re-flagging revives the SAME listing id rather than minting a duplicate', async () => {
-  const w = await writeManifest(provider.token, [tool({ price: { morsels: 99 } })]);
+  const w = await writeManifest(provider.token, [tool({ tollMorsels: 99 })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
-  const mine = forTool(await myOfferings(provider.token), 'brief').filter(o => o.unit === 'morsels');
+  const mine = forTool(await myOfferings(provider.token), 'brief').filter(onPacingRail);
   assert(mine.length === 1 && mine[0].offeringId === offeringId, `revived ${offeringId}, got ${JSON.stringify(mine.map(o => o.offeringId))}`);
 });
 
@@ -508,8 +553,8 @@ await test('Re-flagging revives the SAME listing id rather than minting a duplic
 await test('Migration: a hand-authored listing is adopted (flag set at the source, offeringId kept)', async () => {
   // A second tool, priced but NOT flagged, listed the old way.
   const w = await writeManifest(provider.token, [
-    tool({ price: { morsels: 99 } }),
-    { name: 'legacy', description: 'listed by hand', action_id: capId, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 5 } },
+    tool({ tollMorsels: 99 }),
+    { name: 'legacy', description: 'listed by hand', action_id: capId, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 5 },
   ]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
   const listed = await json('/v1/exchange/offerings', {
@@ -542,8 +587,8 @@ await test('Reconcile is idempotent: a second run reports no creations or delist
 
 await test('A tool flagged but missing its schemas is skipped with a reason, never half-listed', async () => {
   const w = await writeManifest(provider.token, [
-    tool({ price: { morsels: 99 } }),
-    { name: 'noschema', action_id: capId, price: { morsels: 4 }, exchange: true },
+    tool({ tollMorsels: 99 }),
+    { name: 'noschema', action_id: capId, tollMorsels: 4, exchange: true },
   ]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
   const r = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true }) });
@@ -602,7 +647,8 @@ await test('Editing the ODPS descriptor changes the listing without touching the
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
   const after = forTool(await myOfferings(provider.token), 'brief')[0];
   assert(after.offeringId === before.offeringId, 'the same listing is updated, not a rival one');
-  assert(after.basePrice === before.basePrice, 'the price is untouched by a description edit');
+  assert(after.toll_morsels === before.toll_morsels && after.toll_morsels > 0 && after.basePrice === before.basePrice,
+    `the pacing is untouched by a description edit: ${before.toll_morsels} -> ${after.toll_morsels}`);
   assert(after.odps.valueProposition.startsWith('Company identity'), 'the new description is live');
 });
 
@@ -614,9 +660,9 @@ await test('An EXTENSION ACTION carries its own ODPS descriptor from the manifes
     metadata: { name: EXT2, version: '1.0.0', description: 'ODPS ext source', author: 'e2e' },
     actions: [{
       id: 'search', method: 'POST', path: '/search', script: 'echo',
-      input: IN_SCHEMA, output: OUT_SCHEMA,
+      input: IN_SCHEMA, output: OUT_SCHEMA, tollMorsels: 3,
       commercial: {
-        payMorsels: 3, exchange: true, usageTerms: TERMS,
+        exchange: true, usageTerms: TERMS,
         provenance: { source: 'PRH open register', legalBasis: 'CC BY 4.0 open data' },
         odps: { productType: 'derived data', valueProposition: 'Company identity from the register.',
           dataHolder: { legalName: 'Overscale Solutions Oy' } },
@@ -649,9 +695,9 @@ await test('An EXTENSION ACTION carries its own ODPS descriptor from the manifes
 const XDUP = `xdup${Date.now()}`;
 const DUP_APP = `dup-${Date.now()}.html`;
 const DUP_TOOLS = (over: Record<string, unknown> = {}) => [
-  { name: 'find', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 5 }, exchange: true,
+  { name: 'find', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 5, exchange: true,
     usageTerms: TERMS, ...over },
-  { name: 'noout', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, price: { morsels: 5 }, exchange: true },
+  { name: 'noout', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, tollMorsels: 5, exchange: true },
 ];
 let sellerMcp: Awaited<ReturnType<typeof mcpSession>>;
 let dupActionId = '';
@@ -663,7 +709,7 @@ await test('MCP app_tools_publish lists a tool and the extension action it calls
       manifest: JSON.stringify({
         metadata: { name: XDUP, version: '1.0.0', description: 'flagged twice', author: 'e2e' },
         actions: [{ id: 'search', method: 'POST', path: '/search', script: 'echo', input: IN_SCHEMA, output: OUT_SCHEMA,
-          commercial: { payMorsels: 3, exchange: true, usageTerms: TERMS } }],
+          tollMorsels: 3, commercial: { exchange: true, usageTerms: TERMS } }],
       }),
       scripts: { echo: 'export default async function(ctx, input){ return { echo: input }; }' },
     }),
@@ -678,7 +724,8 @@ await test('MCP app_tools_publish lists a tool and the extension action it calls
   const acc = await json('/v1/exchange/entitlements', {
     method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ offering_id: dupActionId, cap_units: 100 }),
   });
-  assert(acc.status === 201 && acc.body.data.entitlement.price_per_call === 3, `contract on the action at 3: ${acc.status} ${JSON.stringify(acc.body?.error ?? acc.body.data.entitlement)}`);
+  assert(acc.status === 201, `contract on the action: ${acc.status} ${JSON.stringify(acc.body?.error)}`);
+  assertPacingRail(acc.body.data.entitlement, 3, 'price_per_call', 'contract on the action at 3');
 
   const reg = await json('/v1/agents', {
     method: 'POST', headers: auth(provider.token),
@@ -716,7 +763,8 @@ await test('…and the contract signed on the withdrawn action keeps settling at
   const ent = async () => ((await json('/v1/exchange/entitlements', { headers: auth(consumer.token) })).body.data.entitlements as any[])
     .find(e => e.ext === XDUP && e.action === 'search');
   const was = await ent();
-  assert(was?.state === 'active' && was.price_per_call === 3 && was.contract_ref === `offering:${dupActionId}`, `the contract is intact: ${JSON.stringify(was)}`);
+  assert(was?.state === 'active' && was.contract_ref === `offering:${dupActionId}`, `the contract is intact: ${JSON.stringify(was)}`);
+  assertPacingRail(was, 3, 'price_per_call', 'the contract keeps its agreed 3');
   const call = await json(`/v1/ext/${XDUP}/search`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'x' }) });
   assert(call.status === 200, `the holder still gets through on the raw route, got ${call.status}: ${JSON.stringify(call.body?.error)}`);
   const now = await ent();
@@ -743,7 +791,7 @@ await test("Another owner's tool naming this owner's extension action takes noth
   const w = await json('/v1/memory', {
     method: 'POST', headers: auth(other.token),
     body: JSON.stringify({ key: `apps.theirs-${Date.now()}.html.tools`, visibility: 'public', value: { version: 1, tools: [
-      { name: 'grab', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 1 }, exchange: true, usageTerms: TERMS },
+      { name: 'grab', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 1, exchange: true, usageTerms: TERMS },
     ] } }),
   });
   assert(w.status === 201, `their manifest ${w.status}: ${JSON.stringify(w.body?.error)}`);
@@ -797,7 +845,7 @@ await test('ODPS_FIELD_TOO_LONG: a changed text past the cap is refused on every
       manifest: JSON.stringify({
         metadata: { name: XLONG, version: '1.0.0', description: 'long note', author: 'e2e' },
         actions: [{ id: 'search', method: 'POST', path: '/search', script: 'echo', input: IN_SCHEMA, output: OUT_SCHEMA,
-          commercial: { payMorsels: 3, exchange: true, usageTerms: { ...TERMS, note } } }],
+          tollMorsels: 3, commercial: { exchange: true, usageTerms: { ...TERMS, note } } }],
       }),
       scripts: { echo: 'export default async function(ctx, input){ return { echo: input }; }' },
     }),
@@ -822,7 +870,7 @@ await test('ODPS_FIELD_TOO_LONG: text a stored record already carries keeps publ
   assert(on.status === 200, `flagging it leaves the stored text as it was, so it is not refused: ${on.status} ${JSON.stringify(on.body?.error)}`);
   const warn = (on.body.data.exchange?.warnings as any[] ?? []).find(w => w.reason === 'ODPS_FIELD_TOO_LONG product.license.scope.restrictions');
   assert(!!warn && warn.odpsField?.length === 299, `it lists with the warning: ${JSON.stringify(on.body.data.exchange)}`);
-  const repriced = await write({ price: { morsels: 6 } });
+  const repriced = await write({ tollMorsels: 6 });
   assert(repriced.status === 200, `republishing for a price change still passes: ${repriced.status} ${JSON.stringify(repriced.body?.error)}`);
   const doc = await json(`/v1/exchange/offerings/${(on.body.data.exchange.listed as any[])[0].offeringId}/odps`);
   assert(String(doc.body.data?.odps?.product?.license?.scope?.restrictions ?? '').endsWith(note), 'and the text is published whole, never cut');
@@ -837,7 +885,7 @@ await test('Adopting a hand-authored listing never erases an attestation its sou
   const EXT3 = `xhand${Date.now()}`;
   const m3 = JSON.stringify({
     metadata: { name: EXT3, version: '1.0.0', description: 'hand-listed source', author: 'e2e' },
-    actions: [{ id: 'lookup', method: 'POST', path: '/lookup', script: 'echo', input: IN_SCHEMA, output: OUT_SCHEMA, commercial: { payMorsels: 4 } }],
+    actions: [{ id: 'lookup', method: 'POST', path: '/lookup', script: 'echo', input: IN_SCHEMA, output: OUT_SCHEMA, tollMorsels: 4 }],
   });
   const i3 = await json('/v1/extensions', {
     method: 'POST', headers: auth(provider.token),
@@ -882,7 +930,7 @@ const taskListings = async (token: string, taskType: string) =>
 const unbound = (over: Record<string, unknown> = {}) => ({
   name: 'digest', description: 'A written digest, delivered by an agent',
   inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, usageTerms: TERMS,
-  price: { morsels: 5 }, exchange: true, agent: AGENT, ...over,
+  tollMorsels: 5, exchange: true, agent: AGENT, ...over,
 });
 
 await test('Setup: the provider has an agent that can receive fulfillment tasks', async () => {
@@ -896,7 +944,7 @@ await test('Setup: the provider has an agent that can receive fulfillment tasks'
 await test('PUT offers answers which offers listed, and names the skipped ones with their reason', async () => {
   const offer = (id: string, over: Record<string, unknown> = {}) => ({
     id, title: `Offer ${id}`, ask: 'Send a business id; I write the brief.', deliverable: { format: 'document', sample: 'untested' },
-    inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 4 }, exchange: true, visibility: 'public', ...over,
+    inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 4, exchange: true, visibility: 'public', ...over,
   });
   const r = await json(`/v1/agents/${encodeURIComponent(AGENT)}/offers`, {
     method: 'PUT', headers: auth(provider.token),
@@ -929,7 +977,7 @@ await test('PUT offers answers which offers listed, and names the skipped ones w
 await test('PUT offers refuses ODPS_FIELD_TOO_LONG before the write, and another owner hears 403 before the length is read', async () => {
   const note = 'n'.repeat(200);
   const offer = { id: 'longnote', title: 'Long note', ask: 'Send an id.', deliverable: { format: 'document', sample: 'untested' },
-    inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 4 }, exchange: true, visibility: 'public', usageTerms: { ...TERMS, note } };
+    inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 4, exchange: true, visibility: 'public', usageTerms: { ...TERMS, note } };
   const r = await json(`/v1/agents/${encodeURIComponent(AGENT)}/offers`, { method: 'PUT', headers: auth(provider.token), body: JSON.stringify({ offers: [offer] }) });
   const f = r.body.error?.details?.fields?.[0];
   assert(r.status === 422 && r.body.error?.code === 'ODPS_FIELD_TOO_LONG'
@@ -951,7 +999,7 @@ await test('An unbound tool with a named agent lists as AGENT-WORK carrying its 
   assert(mine.length === 1, `exactly one agent-work listing, got ${mine.length}`);
   const o = mine[0];
   assert(o.kind === 'agent-work' && o.auto === true, `kind/auto: ${JSON.stringify({ kind: o.kind, auto: o.auto })}`);
-  assert(o.unit === 'morsels' && o.basePrice === 5, `price from the manifest: ${o.unit}/${o.basePrice}`);
+  assertPacingRail(o, 5, 'basePrice', 'pacing from the manifest');
   assert(o.surface?.agentName === AGENT && o.surface?.taskType === 'digest',
     `the surface names the assignee the work path builds its GAII from: ${JSON.stringify(o.surface)}`);
   assert(hasKeys(o.taskSpec?.inputSchema) && hasKeys(o.taskSpec?.outputSchema),
