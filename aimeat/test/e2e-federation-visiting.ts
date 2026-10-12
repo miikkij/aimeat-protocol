@@ -10,6 +10,10 @@
  *   Nodes: A 40273 aimeat-test-001-fedvisa (open join on); C 40274 aimeat-test-001-fedvisc (off).
  *   Virtual joiner B: aimeat-peer-001-visitb (keypair only; not a running server).
  * @version-history
+ *   v1.2.0 -- 2026-10-12 -- The introduces of tests 1, 5 and 8 carry the audience proof for the node
+ *     they knock on (introduceProof). Node 4.0.0 refuses an introduce without it (401
+ *     AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), and the proof is not this suite's subject. The
+ *     three refusals of 1b are checked before the audience and keep their codes.
  *   v1.1.0 — 2026-08-17 — E2E quality, federation-visiting:106. The introduce door is unauthenticated by
  *     design — a node that has never met this one has no credential — so the Ed25519 signature IS the
  *     authentication, and on a node with open-join ON, passing it means self-admission as an active
@@ -27,6 +31,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -91,6 +96,11 @@ async function signIntroduce(privKey: string, node_id: string, node_url: string,
   return sign(privKey, `${node_id}${node_url}${timestamp}`);
 }
 
+/** The audience proof an introduce carries for the node it knocks on (required from 4.0.0). */
+async function introduceProof(privKey: string, node_id: string, node_url: string, timestamp: string, audience: string) {
+  return audienceProof(privKey, `${node_id}${node_url}${timestamp}`, audience);
+}
+
 console.log('\n=== AIMEAT Federation Visiting-Tier E2E ===\n');
 
 let A: NodeState;
@@ -113,9 +123,10 @@ console.log('\nPhase 1 — Auto-join as visiting');
 await test('1. signed introduce self-admits as active visiting peer on A', async () => {
   const timestamp = new Date().toISOString();
   const signature = await signIntroduce(bKeys.privateKey, B_NODE, B_URL, timestamp);
+  const proof = await introduceProof(bKeys.privateKey, B_NODE, B_URL, timestamp, A.nodeId);
   const r = await A.json('/v1/federation/peer/introduce', {
     method: 'POST',
-    body: JSON.stringify({ node_id: B_NODE, node_url: B_URL, public_key: bKeys.publicKey, role: 'contributor', signature, timestamp }),
+    body: JSON.stringify({ node_id: B_NODE, node_url: B_URL, public_key: bKeys.publicKey, role: 'contributor', signature, timestamp, ...proof }),
   });
   assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
   assert(r.body.data.status === 'active' && r.body.data.tier === 'visiting', `expected active/visiting, got ${JSON.stringify(r.body.data)}`);
@@ -209,9 +220,10 @@ await test('4. directory shows B with tier visiting', async () => {
 await test('5. open-join OFF (node C) → introduce stays pending, no peer created', async () => {
   const timestamp = new Date().toISOString();
   const signature = await signIntroduce(bKeys.privateKey, B_NODE, B_URL, timestamp);
+  const proof = await introduceProof(bKeys.privateKey, B_NODE, B_URL, timestamp, C.nodeId);
   const r = await C.json('/v1/federation/peer/introduce', {
     method: 'POST',
-    body: JSON.stringify({ node_id: B_NODE, node_url: B_URL, public_key: bKeys.publicKey, role: 'contributor', signature, timestamp }),
+    body: JSON.stringify({ node_id: B_NODE, node_url: B_URL, public_key: bKeys.publicKey, role: 'contributor', signature, timestamp, ...proof }),
   });
   assert(r.status === 202 && r.body.data.status === 'pending', `expected 202 pending, got ${r.status}: ${JSON.stringify(r.body)}`);
   const peers = await C.json('/v1/federation/peers', { headers: auth(C.ownerToken) });
@@ -239,7 +251,8 @@ await test('8. visiting peer cannot be silently granted routing without promotio
   const k = await generateKeyPair();
   const vNode = 'aimeat-peer-001-visitd';
   const signature = await signIntroduce(k.privateKey, vNode, 'http://localhost:49996', timestamp);
-  await A.json('/v1/federation/peer/introduce', { method: 'POST', body: JSON.stringify({ node_id: vNode, node_url: 'http://localhost:49996', public_key: k.publicKey, role: 'contributor', signature, timestamp }) });
+  const proof = await introduceProof(k.privateKey, vNode, 'http://localhost:49996', timestamp, A.nodeId);
+  await A.json('/v1/federation/peer/introduce', { method: 'POST', body: JSON.stringify({ node_id: vNode, node_url: 'http://localhost:49996', public_key: k.publicKey, role: 'contributor', signature, timestamp, ...proof }) });
   const r = await A.json(`/v1/federation/peers/${vNode}`, { method: 'PUT', headers: auth(A.ownerToken), body: JSON.stringify({ allow_routing: true }) });
   assert(r.body.data.allow_routing === false, `routing must stay false for visiting, got ${r.body.data.allow_routing}`);
 });

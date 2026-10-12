@@ -21,6 +21,11 @@
  *   made appeared under "asking to join" with Approve and Refuse beside it, naming this node as the
  *   asker. Found by driving the browser on 2026-09-12.
  * @version-history
+ *   v1.6.0 -- 2026-10-12 -- Node 4.0.0 removes the relay-claim setting `optional`
+ *     (RELAY_CLAIM_OPTIONAL_REMOVED_IN). The three relay-claim tests that keep a peer on optional ask
+ *     the node its release: before 4.0.0 they assert what they asserted; from 4.0.0 the REST door
+ *     answers 400 INVALID_INPUT and writes nothing (the row follows the node, kept_optional is empty),
+ *     and the unclaimed relay is refused 403 RELAY_CLAIM_REQUIRED and still written down on the peer.
  *   v1.5.0 — 2026-10-01 — aimeat_admin_federation_peer_remove: the operator's agent removes a peer in
  *     chat, the page stops listing it, and a second call answers NOT_FOUND.
  *   v1.4.0 — 2026-09-25 — Relay claims peer by peer: a peer kept on its own setting through the REST
@@ -58,6 +63,8 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../src/config-federation.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
@@ -315,14 +322,22 @@ await test("The operator's agent reads the same federation over MCP", async () =
  */
 const rosterRow = (d: any, nodeId: string) => d.roster.find((r: any) => r.node_id === nodeId);
 
-await test('A peer can be kept on its own relay-claim setting on the REST door, and the answer shows it', async () => {
+await test('A peer can be kept on its own relay-claim setting optional on the REST door before 4.0.0, and the answer shows it; from 4.0.0 the door refuses optional and writes nothing', async () => {
     const kept = await json('/v1/federation/peers/peer-waiting-001/relay-claim', {
         method: 'PUT', headers: { Authorization: `Bearer ${opToken}` }, body: JSON.stringify({ relay_claim: 'optional' }),
     });
-    assert(kept.status === 200, `keep on optional: ${kept.status} ${JSON.stringify(kept.body.error ?? '')}`);
+    const optionalGone = await removedOn(BASE, RELAY_CLAIM_OPTIONAL_REMOVED_IN);
+    if (optionalGone) {
+        assert(kept.status === 400 && kept.body.error?.code === 'INVALID_INPUT'
+            && String(kept.body.error?.message).includes(`removed in ${RELAY_CLAIM_OPTIONAL_REMOVED_IN}`),
+            `from ${RELAY_CLAIM_OPTIONAL_REMOVED_IN} optional is refused: expected 400 INVALID_INPUT, got ${kept.status} ${JSON.stringify(kept.body.error ?? '')}`);
+    } else {
+        assert(kept.status === 200, `keep on optional: ${kept.status} ${JSON.stringify(kept.body.error ?? '')}`);
+    }
     const d = (await overview()).body.data;
-    assert(rosterRow(d, 'peer-waiting-001').relay_claim.setting === 'optional', `the row says so: ${JSON.stringify(rosterRow(d, 'peer-waiting-001'))}`);
-    assert(d.relay_claims.kept_optional.includes('peer-waiting-001'), `and the summary: ${JSON.stringify(d.relay_claims)}`);
+    const setting = optionalGone ? null : 'optional';
+    assert(rosterRow(d, 'peer-waiting-001').relay_claim.setting === setting, `the row says ${setting}: ${JSON.stringify(rosterRow(d, 'peer-waiting-001'))}`);
+    assert(d.relay_claims.kept_optional.includes('peer-waiting-001') === !optionalGone, `and the summary: ${JSON.stringify(d.relay_claims)}`);
     assert(d.relay_claims.default_becomes_required_in === '3.20.0' && d.relay_claims.optional_removed_in === '4.0.0',
         `the two versions are named: ${JSON.stringify(d.relay_claims)}`);
 });
@@ -344,9 +359,14 @@ await test('...and in chat: the operator\'s agent sets another peer, and both do
     assert(rosterRow((await overview()).body.data, 'peer-old-001').relay_claim.setting === null, 'following the node again');
 });
 
-await test('A relay that names a peer and carries no claim is written down on that peer', async () => {
+await test('A relay that names a peer and carries no claim is written down on that peer (let through on optional before 4.0.0, refused from it)', async () => {
     const relayed = await fetch(`${BASE}/v1/health`, { headers: { 'X-Forwarded-From': 'peer-waiting-001' } });
-    assert(relayed.status === 200, `kept on optional, it relays: ${relayed.status}`);
+    if (await removedOn(BASE, RELAY_CLAIM_OPTIONAL_REMOVED_IN)) {
+        assert(relayed.status === 403, `from ${RELAY_CLAIM_OPTIONAL_REMOVED_IN} an unclaimed relay is refused: ${relayed.status}`);
+        assert(((await relayed.json()) as any).error.code === 'RELAY_CLAIM_REQUIRED', 'refused for the missing claim');
+    } else {
+        assert(relayed.status === 200, `kept on optional, it relays: ${relayed.status}`);
+    }
     const d = (await overview()).body.data;
     const row = rosterRow(d, 'peer-waiting-001');
     assert(row.relay_claim.state === 'sends_none' && typeof row.relay_claim.last_unclaimed_at === 'string',
@@ -363,7 +383,9 @@ await test('The relay-claim door is operator-only, and refuses a word it does no
         method: 'PUT', headers: { Authorization: `Bearer ${opToken}` }, body: JSON.stringify({ relay_claim: 'always' }),
     });
     assert(bad.status === 400, `an unknown word: expected 400, got ${bad.status}`);
-    assert(rosterRow((await overview()).body.data, 'peer-waiting-001').relay_claim.setting === 'optional', 'and nothing changed');
+    // What the first relay-claim test left: optional before 4.0.0, the node's answer (null) from it.
+    const left = await removedOn(BASE, RELAY_CLAIM_OPTIONAL_REMOVED_IN) ? null : 'optional';
+    assert(rosterRow((await overview()).body.data, 'peer-waiting-001').relay_claim.setting === left, `and nothing changed: still ${left}`);
 });
 
 await test("In chat, the operator's agent removes a peer and frees its node id; a second call finds nothing", async () => {

@@ -25,6 +25,10 @@
  *   routes the sweep found · cleanup
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-peer-registration-proof
  * @version-history
+ *   v1.2.1 -- 2026-10-12 -- The introductions of Phase 7 and the peer message carry the audience proof
+ *     for this node. Node 4.0.0 refuses either without it (401 AUDIENCE_REQUIRED,
+ *     UNPROVEN_FORMAT_REMOVED_IN), so the refusals these tests name (a held id, a pending request, an
+ *     open join, a sender of another node) were never reached there.
  *   v1.2.0 — 2026-10-10 — Phase 4: an unsigned request, or one signed with another key, naming a waiting
  *     node writes nothing to its pending record or the peer registry (secaudit 2026-10-10 I7).
  *   v1.1.0 — 2026-10-01 — Phase 6: the Security page entries for a failed card check and a held node
@@ -41,6 +45,7 @@ import type { AddressInfo } from 'node:net';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { sign, generateKeyPair } from '../src/auth/keypair.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 
@@ -381,10 +386,13 @@ const incidents = async () => {
 };
 const introduce = async (nodeId: string, url: string, keys: { publicKey: string; privateKey: string }) => {
     const timestamp = new Date().toISOString();
+    const signed = `${nodeId}${url}${timestamp}`;
+    // The audience proof a node of this version sends (required from 4.0.0), so the refusal comes
+    // from the held id or the pending request and not from a missing proof.
     return R.json('/v1/federation/peer/introduce', {
         method: 'POST',
         body: JSON.stringify({ node_id: nodeId, node_url: url, public_key: keys.publicKey, role: 'contributor', timestamp,
-            signature: await sign(keys.privateKey, `${nodeId}${url}${timestamp}`) }),
+            signature: await sign(keys.privateKey, signed), ...await audienceProof(keys.privateKey, signed, R.nodeId) }),
     });
 };
 
@@ -457,8 +465,10 @@ await test('A peer may deliver a message only from its own people', async () => 
     const deliver = async (senderGhii: string) => {
         const message = { id: randomUUID(), senderGhii, recipientGhii: `ops${ts}@${R.nodeId}`, body: 'hello', createdAt: new Date().toISOString() };
         const timestamp = new Date().toISOString();
-        const signature = await sign(member.keys.privateKey, JSON.stringify({ source_node: member.nodeId, message, timestamp }));
-        return R.json('/v1/federation/message', { method: 'POST', body: JSON.stringify({ source_node: member.nodeId, message, timestamp, signature }) });
+        const signed = JSON.stringify({ source_node: member.nodeId, message, timestamp });
+        const signature = await sign(member.keys.privateKey, signed);
+        const proof = await audienceProof(member.keys.privateKey, signed, R.nodeId);
+        return R.json('/v1/federation/message', { method: 'POST', body: JSON.stringify({ source_node: member.nodeId, message, timestamp, signature, ...proof }) });
     };
     const forged = await deliver(`bob@aimeat-test-001-elsewhere${ts}`);
     assert(forged.status === 403 && forged.body.error?.code === 'SENDER_NOT_OF_PEER', `another node's sender: ${forged.status} ${JSON.stringify(forged.body)}`);

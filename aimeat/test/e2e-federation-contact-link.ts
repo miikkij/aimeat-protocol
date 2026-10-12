@@ -17,6 +17,15 @@
  *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
+ *   v1.6.0 -- 2026-10-12 -- Node 4.0.0 refuses a federation message without the audience or delivery
+ *     proof (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN). asPeer and the introduces of node I
+ *     add the proof a node of this version sends (delivery proof for receipt, replicate and catalogue
+ *     sync; audience proof for the rest), so P1 to P4 and I3 to I9 prove their own subject again.
+ *     P8b and P12b send without it through asPeerWithoutProof, which is their subject. P8 and P12,
+ *     whose subject is the setting, ask the node its release: before 4.0.0 the older node is heard
+ *     with the setting off, as before; from 4.0.0 it is refused 401 AUDIENCE_REQUIRED either way, and
+ *     P8 reads the inbox total to show the refused message did not land (and, before 4.0.0, that the
+ *     heard one did).
  *   v1.5.0 — 2026-10-10 — P8b, P12b: a peer that has sent an audience or delivery proof is refused a
  *     message or receipt without one while AIMEAT_FEDERATION_AUDIENCE_REQUIRED is off; peer D, which
  *     never sent one, is the older node P8 and P12 hear. R9 signs the grant's audience (secaudit
@@ -38,6 +47,8 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
+import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config-federation.js';
+import { removedOn } from './helpers/node-release.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -108,13 +119,28 @@ const C_NODE = 'aimeat-peer-001-contactc';
 const C_URL = 'http://localhost:49997';   // a keypair, not a server: nothing here needs it to answer
 let cKeys: { publicKey: string; privateKey: string };
 
-/** Sign a body the way the route will canonicalise it, and post it as peer C. */
+/**
+ * The four messages that sign no send time of their own carry the delivery proof; every other signed
+ * message carries the audience proof (signed-node-request.ts). Node 4.0.0 refuses either without it.
+ */
+const DELIVERY_PATHS = new Set(['/v1/federation/message/receipt', '/v1/federation/replicate', '/v1/federation/catalogue-sync']);
+
+/** Sign a body the way the route will canonicalise it, and post it as peer C, with the proof a node of this version adds. */
 async function asPeer(path: string, payload: Record<string, unknown>, signOver?: string) {
+    const signed = signOver ?? JSON.stringify(payload);
+    const proof = DELIVERY_PATHS.has(path)
+        ? await deliveryProof(cKeys.privateKey, signed, V.nodeId)
+        : await audienceProof(cKeys.privateKey, signed, V.nodeId);
+    return asPeerWithoutProof(path, payload, signOver, proof);
+}
+
+/** Post as peer C with its own signature only: a message whose audience or delivery proof was stripped. */
+async function asPeerWithoutProof(path: string, payload: Record<string, unknown>, signOver?: string, proof: Record<string, string> = {}) {
     const signature = await sign(cKeys.privateKey, signOver ?? JSON.stringify(payload));
     return V.json(path, {
         method: 'POST',
         headers: { 'x-source-node': C_NODE },
-        body: JSON.stringify({ ...payload, signature }),
+        body: JSON.stringify({ ...payload, signature, ...proof }),
     });
 }
 
@@ -261,7 +287,7 @@ await test('P7. An audience the sending node did not sign is refused (401)', asy
 const olderMessage = () => ({
     source_node: D_NODE, message: { ...freshMessage(), senderGhii: `someone@${D_NODE}` }, timestamp: new Date().toISOString(),
 });
-await test('P8. With the audience required, a message from an older node that names none is refused; off, it is heard', async () => {
+await test('P8. With the audience required, a message from an older node that names none is refused; off, it is heard before 4.0.0 and refused from 4.0.0', async () => {
     const legacy = olderMessage();
     V.config.federationAudienceRequired = true;
     try {
@@ -270,15 +296,27 @@ await test('P8. With the audience required, a message from an older node that na
     } finally {
         V.config.federationAudienceRequired = false;
     }
+    // The inbox total counts every message delivered to the owner, so it shows whether this one landed.
+    const inboxTotal = async () => (await V.json('/v1/messages/inbox', { headers: auth(V.ownerToken) })).body.data?.total as number;
+    const totalBefore = await inboxTotal();
     const heard = await asOlderPeer('/v1/federation/message', { ...legacy, timestamp: new Date(Date.now() + 1).toISOString() });
-    assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
+    if (await removedOn(V.baseUrl, UNPROVEN_FORMAT_REMOVED_IN)) {
+        // From 4.0.0 a message without the proof is no format at all, whatever the setting says.
+        assert(heard.status === 401 && heard.body.error?.code === 'AUDIENCE_REQUIRED',
+            `from ${UNPROVEN_FORMAT_REMOVED_IN} an older node is refused with the setting off: expected 401 AUDIENCE_REQUIRED, got ${heard.status} ${JSON.stringify(heard.body)}`);
+        assert(await inboxTotal() === totalBefore, 'the refused message must not land in the inbox');
+    } else {
+        assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
+        // The positive half of the count above: a heard message is counted, so an unchanged count means something.
+        assert(await inboxTotal() === totalBefore + 1, `the heard message lands in the inbox: ${totalBefore} before`);
+    }
 });
 // Secaudit 2026-10-10 I21. C signed an audience in P5, so it runs a version that always does: a
 // message from it without one is a captured message with the proof stripped, and is refused with the
 // setting off. Failed on the old code (200, delivered).
 await test('P8b. A peer that has sent an audience proof is refused a message without one, with the setting off', async () => {
     assert(V.config.federationAudienceRequired === false, 'the setting is off');
-    const r = await asPeer('/v1/federation/message', { source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() });
+    const r = await asPeerWithoutProof('/v1/federation/message', { source_node: C_NODE, message: freshMessage(), timestamp: new Date().toISOString() });
     assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
@@ -314,7 +352,7 @@ await test('P11. A read receipt signed for another node is refused here (401 WRO
     const r = await withDelivery(receipt(), 'aimeat-test-001-elsewhere');
     assert(r.status === 401 && r.body.error?.code === 'WRONG_AUDIENCE', `expected 401 WRONG_AUDIENCE, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
-await test('P12. With the audience required, a read receipt from an older node is refused; off, it is heard', async () => {
+await test('P12. With the audience required, a read receipt from an older node is refused; off, it is heard before 4.0.0 and refused from 4.0.0', async () => {
     const olderReceipt = () => ({ ...receipt(), source_node: D_NODE });
     V.config.federationAudienceRequired = true;
     try {
@@ -324,14 +362,20 @@ await test('P12. With the audience required, a read receipt from an older node i
         V.config.federationAudienceRequired = false;
     }
     const heard = await asOlderPeer('/v1/federation/message/receipt', olderReceipt());
-    assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
+    if (await removedOn(V.baseUrl, UNPROVEN_FORMAT_REMOVED_IN)) {
+        // From 4.0.0 a receipt without the proof is no format at all, whatever the setting says.
+        assert(heard.status === 401 && heard.body.error?.code === 'AUDIENCE_REQUIRED',
+            `from ${UNPROVEN_FORMAT_REMOVED_IN} an older node's receipt is refused with the setting off: expected 401 AUDIENCE_REQUIRED, got ${heard.status} ${JSON.stringify(heard.body)}`);
+    } else {
+        assert(heard.status === 200, `with the setting off an older node is heard: ${heard.status} ${JSON.stringify(heard.body)}`);
+    }
 });
 // Secaudit 2026-10-10 I21. C sent a delivery proof in P9: a receipt from it with the three proof
 // fields stripped (its own signature still verifies) is refused with the setting off. Failed on the
 // old code (200).
 await test('P12b. A peer that has sent a delivery proof is refused a read receipt without one, with the setting off', async () => {
     assert(V.config.federationAudienceRequired === false, 'the setting is off');
-    const r = await asPeer('/v1/federation/message/receipt', receipt());
+    const r = await asPeerWithoutProof('/v1/federation/message/receipt', receipt());
     assert(r.status === 401 && r.body.error?.code === 'AUDIENCE_REQUIRED', `expected 401 AUDIENCE_REQUIRED, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
@@ -571,15 +615,20 @@ const I_NODE = 'aimeat-peer-001-invited';
 const I_URL = 'http://localhost:49994';
 let iKeys: { publicKey: string; privateKey: string };
 
+/** The signature and audience proof node I puts on an introduce to V for `url` (the proof is required from 4.0.0). */
+async function introduceSigned(url: string) {
+    const timestamp = new Date().toISOString();
+    const signed = `${I_NODE}${url}${timestamp}`;
+    return { timestamp, signature: await sign(iKeys.privateKey, signed), ...await audienceProof(iKeys.privateKey, signed, V.nodeId) };
+}
+
 /** Introduce as node I, signed the way the door requires. */
 async function introduce(token?: string) {
-    const timestamp = new Date().toISOString();
-    const signature = await sign(iKeys.privateKey, `${I_NODE}${I_URL}${timestamp}`);
     return V.json('/v1/federation/peer/introduce', {
         method: 'POST',
         body: JSON.stringify({
             node_id: I_NODE, node_url: I_URL, public_key: iKeys.publicKey,
-            role: 'contributor', signature, timestamp,
+            role: 'contributor', ...await introduceSigned(I_URL),
             ...(token ? { invite_token: token } : {}),
         }),
     });
@@ -643,13 +692,11 @@ await test('I5. A body that ASKS for a tier gets the invite\'s tier, not the one
     });
     const token = mint.body.data.token;
 
-    const timestamp = new Date().toISOString();
-    const signature = await sign(iKeys.privateKey, `${I_NODE}${I_URL}${timestamp}`);
     const r = await V.json('/v1/federation/peer/introduce', {
         method: 'POST',
         body: JSON.stringify({
             node_id: I_NODE, node_url: I_URL, public_key: iKeys.publicKey, role: 'operator',
-            signature, timestamp, invite_token: token,
+            ...await introduceSigned(I_URL), invite_token: token,
             tier: 'member', tier_request: 'genesis',   // ignored: not where the tier comes from
         }),
     });
@@ -683,13 +730,11 @@ await test('I7. A refused URL does not burn the invite (refuse before you write)
     const token = mint.body.data.token;
 
     const badUrl = 'http://169.254.169.254:49994'; // link-local: refused whatever the egress profile
-    const timestamp = new Date().toISOString();
-    const signature = await sign(iKeys.privateKey, `${I_NODE}${badUrl}${timestamp}`);
     const bad = await V.json('/v1/federation/peer/introduce', {
         method: 'POST',
         body: JSON.stringify({
             node_id: I_NODE, node_url: badUrl, public_key: iKeys.publicKey,
-            role: 'contributor', signature, timestamp, invite_token: token,
+            role: 'contributor', ...await introduceSigned(badUrl), invite_token: token,
         }),
     });
     assert(bad.status === 400, `expected 400 INVALID_URL, got ${bad.status}: ${JSON.stringify(bad.body)}`);
@@ -718,11 +763,9 @@ await test('I8. A refused re-introduction does not destroy the existing (depeeri
 
     // Re-introduce with a bad URL: refused 400, and the depeering row must survive.
     const badUrl = 'http://169.254.169.254:49994';
-    const timestamp = new Date().toISOString();
-    const signature = await sign(iKeys.privateKey, `${I_NODE}${badUrl}${timestamp}`);
     const bad = await V.json('/v1/federation/peer/introduce', {
         method: 'POST',
-        body: JSON.stringify({ node_id: I_NODE, node_url: badUrl, public_key: iKeys.publicKey, role: 'contributor', signature, timestamp }),
+        body: JSON.stringify({ node_id: I_NODE, node_url: badUrl, public_key: iKeys.publicKey, role: 'contributor', ...await introduceSigned(badUrl) }),
     });
     assert(bad.status === 400, `expected 400 INVALID_URL, got ${bad.status}: ${JSON.stringify(bad.body)}`);
     assert(!!(await iRow()), 'the refused re-introduction must not have deleted the existing peer row');

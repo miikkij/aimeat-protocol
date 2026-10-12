@@ -10,6 +10,10 @@
  *   Node: port 40272, aimeat-test-001-presence (memory storage, in-process — same pattern as the
  *   federation-* suites, so the test shares the server's PresenceTracker instance).
  * @version-history
+ *   v1.2.0 -- 2026-10-12 -- pushPresence adds the audience proof (audienceProof) to every push. Node
+ *     4.0.0 refuses a push without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), and the
+ *     proof is not this suite's subject. Test 14 still fails on the signature (wrong key), test 15
+ *     on the unknown peer.
  *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit (e2e-presence:160): test 10 proved an
  *     everyone owner IS in the federation snapshot and nothing proved the other two settings stay
  *     out of it. 10b drives bob through everyone → contacts → nobody and reads the tracker after
@@ -27,6 +31,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../src/services/presence.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -209,7 +214,10 @@ let peerKeys: { publicKey: string; privateKey: string };
 async function pushPresence(updates: PresenceUpdate[], signWith: string, fromNode = REMOTE_NODE) {
   const timestamp = new Date().toISOString();
   const signature = await sign(signWith, presenceSignString(fromNode, timestamp, updates));
-  return json('/v1/federation/presence', { method: 'POST', body: JSON.stringify({ from_node_id: fromNode, timestamp, updates, signature }) });
+  // The audience proof names this node, as the presence flush sends it (required from 4.0.0). It is
+  // signed with the same key as the message, so test 14's wrong key still fails the signature first.
+  const proof = await audienceProof(signWith, presenceSignString(fromNode, timestamp, updates), NODE_ID);
+  return json('/v1/federation/presence', { method: 'POST', body: JSON.stringify({ from_node_id: fromNode, timestamp, updates, signature, ...proof }) });
 }
 
 await test('11. add + activate a peer with a known key', async () => {

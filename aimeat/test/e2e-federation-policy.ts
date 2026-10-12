@@ -7,6 +7,9 @@
  *
  *   Nodes: A 40275 aimeat-test-001-pola; P 40276 aimeat-test-001-polp.
  * @version-history
+ *   v1.2.0 -- 2026-10-12 -- introduce() adds the audience proof for the node it knocks on. Node 4.0.0
+ *     refuses an introduce without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), which left
+ *     no visiting peer for tests 2 to 5; the proof is not this suite's subject.
  *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit (e2e-federation-policy:168): test 7 pulls A's
  *     GENUINE policy, so the signature check had never refused anything. A policy decides what a
  *     visiting node may do here, so an unverified one is a stranger writing our permissions. Test 8
@@ -24,6 +27,7 @@ import * as http from 'node:http';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 import { recordHeartbeatOutcome } from '../src/services/federation-availability.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import type { Server } from 'node:http';
@@ -90,7 +94,9 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 async function introduce(node: NodeState, nodeId: string, url: string, keys: { publicKey: string; privateKey: string }) {
   const timestamp = new Date().toISOString();
   const signature = await sign(keys.privateKey, `${nodeId}${url}${timestamp}`);
-  return node.json('/v1/federation/peer/introduce', { method: 'POST', body: JSON.stringify({ node_id: nodeId, node_url: url, public_key: keys.publicKey, role: 'contributor', signature, timestamp }) });
+  // The audience proof names the node knocked on (required from 4.0.0; not this suite's subject).
+  const proof = await audienceProof(keys.privateKey, `${nodeId}${url}${timestamp}`, node.nodeId);
+  return node.json('/v1/federation/peer/introduce', { method: 'POST', body: JSON.stringify({ node_id: nodeId, node_url: url, public_key: keys.publicKey, role: 'contributor', signature, timestamp, ...proof }) });
 }
 
 console.log('\n=== AIMEAT Federation Policy / Phase B E2E ===\n');

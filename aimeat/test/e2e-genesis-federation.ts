@@ -31,6 +31,12 @@
  *   the 404s and the denials
  * @usage cd aimeat && node --import tsx test/e2e-genesis-federation.ts
  * @version-history
+ *   v1.3.0 -- 2026-10-12 -- Two fixtures move to the 4.0.0 form, neither of them this suite's subject:
+ *     the federated-tagged action is published with pricing.toll_morsels (4.0.0 refuses
+ *     pricing.base_morsels, 400 MORSEL_PRICE_REMOVED), and the cross-catalogue reads the pacing amount
+ *     back under the same name; the positive genesis-catalogue-ingest carries the delivery proof
+ *     genesis-sync.ts sends (4.0.0 refuses one without it, 401 AUDIENCE_REQUIRED). The other eleven
+ *     failures at 4.0.0 were cascades of those two.
  *   v1.2.0 — 2026-10-06 — The subscribed push is verified as the replicate receiver verifies it, with
  *     its delivery proof, and a refused push is not counted (wish-genesis-subscribed-memory-sync-never-lands).
  *   v1.1.0 — 2026-09-08 — The prune, the cross-catalogue id and stop() tests assert the fixes made
@@ -86,7 +92,7 @@ const { loadConfig } = await import('../src/config.js');
 const { createGenesisSyncService } = await import('../src/services/genesis-sync.js');
 const { startFakeGenesisPeer } = await import('./helpers/fake-genesis-peer.js');
 const { verify } = await import('../src/auth/keypair.js');
-const { deliveryRefusal } = await import('../src/services/signed-node-request.js');
+const { deliveryRefusal, deliveryProof } = await import('../src/services/signed-node-request.js');
 type GenesisSyncService = import('../src/services/genesis-sync.js').GenesisSyncService;
 type FakeGenesisPeer = import('./helpers/fake-genesis-peer.js').FakeGenesisPeer;
 
@@ -237,7 +243,7 @@ async function run(): Promise<void> {
                 category: 'data',
                 input_schema: { type: 'object', properties: { url: { type: 'string' } } },
                 output_schema: { type: 'object', properties: { content: { type: 'string' } } },
-                pricing: { base_morsels: 0 },
+                pricing: { toll_morsels: 0 },
                 tags: [`federated:${FEDERATED_SOURCE}`, 'kelp'],
             }),
         });
@@ -353,8 +359,10 @@ async function run(): Promise<void> {
         // {source_node, entries, csms, catalogue_hash} and verifies that exact string.
         const payload = { source_node: REMOTE_NODE, entries: INGEST_ENTRIES, csms: INGEST_CSMS, catalogue_hash: INGEST_HASH };
         const signature = await peer!.sign(JSON.stringify(payload));
+        // The delivery proof names this node and the send time, as genesis-sync.ts sends it (required from 4.0.0).
+        const proof = await deliveryProof(peer!.privateKey, JSON.stringify(payload), NODE_ID);
         const { status, body } = await json('/v1/federation/genesis-catalogue-ingest', {
-            method: 'POST', body: JSON.stringify({ ...payload, signature }),
+            method: 'POST', body: JSON.stringify({ ...payload, signature, ...proof }),
         });
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
         assert(body.data.stored === 3, `two entries and one CSM were stored, got ${body.data.stored}`);
@@ -452,7 +460,7 @@ async function run(): Promise<void> {
         const mine = body.data.entries.find((e: any) => e.display_name === 'Genesis Remote Scraper');
         assert(!!mine, `the tagged action is listed: ${JSON.stringify(body.data.entries)}`);
         assert(mine.source_node === FEDERATED_SOURCE, `the source node comes from the tag, got ${mine.source_node}`);
-        assert(mine.source_type === 'federated' && mine.pricing.base_morsels === 0, `shape: ${JSON.stringify(mine)}`);
+        assert(mine.source_type === 'federated' && mine.pricing.toll_morsels === 0, `shape: ${JSON.stringify(mine)}`);
     });
 
     await test('?source=network answers with the network directory, which is empty on a lone node', async () => {
