@@ -13,6 +13,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-draft
  * @version-history
+ *   v1.3.1 — 2026-10-12 — Phase 6 publishes the paid app with toll_morsels instead of price_morsels,
+ *     which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; the three tests after it had failed only
+ *     because that publish never landed. The deprecated priceMorsels mirror is asserted on 3.x and its
+ *     absence on 4.0.0, which drops it.
  *   v1.2.1 — 2026-10-11 — The paywall read is signed in as owner B: an anonymous read of a paid
  *     app answers 401 since secaudit 2026-10-10 C1, and the 402 that names the price needs a caller.
  *   v1.3.0 — 2026-10-11 — Phase 6 reads the app's pacing amount `tollMorsels` (a morsel is pacing, not
@@ -33,6 +37,8 @@
  */
 
 import { registerOwner } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ownerAName = `draftowna${Date.now() % 100000}`;
@@ -306,15 +312,21 @@ await test('A paid app with per-locale descriptions is published inline', async 
             content: b64('<!DOCTYPE html><html><body><h1>paid v1</h1></body></html>'),
             description: 'A paid app used to prove the draft door keeps its price.',
             descriptions: { en: 'Paid app', fi: 'Maksullinen sovellus' },
-            price_morsels: 5,
+            toll_morsels: 5,
             license_type: 'lifetime',
             category: 'utility',
         }),
     }));
     assert(status === 201, `publish status ${status}: ${JSON.stringify(body)}`);
-    // The 3.x price_morsels is read as the app's pacing amount (2026-10-11); priceMorsels is its mirror.
+    // toll_morsels is the app's pacing amount (2026-10-11). On 3.x the manifest also carries
+    // priceMorsels as its deprecated mirror; 4.0.0 drops the mirror.
     assert(body.data?.manifest?.tollMorsels === 5, `tollMorsels=5, got ${body.data?.manifest?.tollMorsels}`);
-    assert(body.data?.manifest?.priceMorsels === 5, `the deprecated priceMorsels mirror=5, got ${body.data?.manifest?.priceMorsels}`);
+    if (await removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN)) {
+        assert(body.data?.manifest?.priceMorsels === undefined && body.data?.manifest?.deprecated === undefined,
+            `4.0.0 answers no priceMorsels mirror, got ${JSON.stringify({ p: body.data?.manifest?.priceMorsels, dep: body.data?.manifest?.deprecated })}`);
+    } else {
+        assert(body.data?.manifest?.priceMorsels === 5, `the deprecated priceMorsels mirror=5, got ${body.data?.manifest?.priceMorsels}`);
+    }
     assert(body.data?.manifest?.licenseType === 'lifetime', 'licenseType=lifetime');
     assert(body.data?.manifest?.descriptions?.fi === 'Maksullinen sovellus', 'fi description stored');
 });

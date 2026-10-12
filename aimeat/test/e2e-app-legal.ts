@@ -24,6 +24,10 @@
  *
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @version-history
+ *   v1.4.1 — 2026-10-12 — The republish sets the app's morsel amount as toll_morsels: 100 instead of
+ *     price_morsels: 500, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED (3.x read the old field
+ *     as the same pacing amount and capped it at 100). The test still proves a morsel amount makes
+ *     no shop.
  *   v1.4.0 — 2026-10-08 — Phase 4 (aiprov D3): the record behind an AI-drafted legal page resolves
  *     anonymously and by hash while the page is served, access code or not, and answers 404 once
  *     the page is removed.
@@ -246,12 +250,13 @@ await test('`me` in the owner slot resolves to the caller', async () => {
     assert(s2 === 401, `anonymous me: ${s2}`);
 });
 
-await test('A republish carries the pages forward, and a MORSEL price makes no shop', async () => {
-    const { status } = await json('/v1/apps', aAuthed({
+await test('A republish carries the pages forward, and a MORSEL pacing amount makes no shop', async () => {
+    const { status, body: pub } = await json('/v1/apps', aAuthed({
         method: 'POST',
-        body: JSON.stringify({ filename: FILE, content: b64(HTML_V2), name: 'Legal Shop', description: 'a shop, v2', category: 'utility', tags: ['demo'], price_morsels: 500 }),
+        body: JSON.stringify({ filename: FILE, content: b64(HTML_V2), name: 'Legal Shop', description: 'a shop, v2', category: 'utility', tags: ['demo'], toll_morsels: 100 }),
     }));
     assert(status === 201 || status === 200, `republish status ${status}`);
+    assert(pub.data?.manifest?.tollMorsels === 100, `the app carries the morsel amount: ${JSON.stringify(pub.data?.manifest?.tollMorsels)}`);
     const { body } = await json(`${appPath}/legal`, aAuthed());
     assert(body.data.legal.terms?.format === 'markdown' && body.data.legal.privacy?.format === 'html', 'pages survived the republish');
     // Morsels pace what agents push into the store and buy nothing. A morsel price is not money,
