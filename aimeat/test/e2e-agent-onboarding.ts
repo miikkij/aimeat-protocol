@@ -7,6 +7,8 @@
  *   progress tracking, DELETE cancellation, role enforcement, full 11-step
  *   completion flow, readiness score verification, and auto-check on GET.
  * @version-history
+ *   v1.3.1 -- 2026-10-13 -- The offer written through POST /v1/memory carries tollMorsels: from 4.0.0
+ *                            that route refuses price.morsels on an offers document.
  *   v1.3.0 -- 2026-09-16 -- 47b: two starts at once. The nightly sweep on Postgres answered
  *                            INTERNAL_ERROR when a row appeared between the route's read and its
  *                            create; createOnboarding replaces on conflict now, on both providers.
@@ -372,7 +374,7 @@ await test('7b. Offers ladder auto-passes after the agent publishes an offer', a
             deliverable: { format: 'document', location: { key: 'research.out', visibility: 'workspace' } },
             success_signal: { kind: 'deterministic', key_glob: 'research.*', op: 'count_nonempty', min: 1 },
             required_to_function: 'none',
-            price: { morsels: 10, unit: 'per-call' },
+            tollMorsels: 10,
             visibility: 'public',
             callable: { action_id: 'research-run' },
         }],

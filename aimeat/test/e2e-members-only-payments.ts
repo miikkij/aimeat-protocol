@@ -9,6 +9,8 @@
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-members-only-payments
  * @version-history
  *   v1.0.0 — 2026-10-01 — Initial (wish-members-only-refuses-a-non-member-before-checkout-or-a-contr).
+ *   v1.1.1 — 2026-10-13 — The tool manifest carries its pacing as tollMorsels: from 4.0.0 POST /v1/memory
+ *     refuses price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
  *   v1.1.0 — 2026-10-12 — The MCP test's two agents hold ext:invoke beside exchange:write: node 4.0.0
  *     asks that word on the extension action route behind an app tool (REST scope gates), and the
  *     member was refused there.
@@ -122,7 +124,7 @@ await test('setup: an app, its extension naming it, a priced tool, a member, and
     const schema = { type: 'object', properties: { q: { type: 'string' } } };
     const put = await json('/v1/memory', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({
         key: `apps.${APP}.tools`, visibility: 'public',
-        value: { version: 1, tools: [{ name: TOOL, description: 'look it up', action_id: `ext:${ext}:${TOOL}`, inputSchema: schema, outputSchema: schema, price: { morsels: 3 }, exchange: true }] } }) });
+        value: { version: 1, tools: [{ name: TOOL, description: 'look it up', action_id: `ext:${ext}:${TOOL}`, inputSchema: schema, outputSchema: schema, tollMorsels: 3, exchange: true }] } }) });
     assert(put.status === 200 || put.status === 201, `tool manifest ${put.status}: ${JSON.stringify(put.body?.error)}`);
     const listed = await json('/v1/exchange/offerings', { headers: auth(owner.token) });
     offering = ((listed.body.data.offerings as any[]).find(o => o.providerOwner === owner.name && o.action === TOOL)?.offeringId) ?? '';

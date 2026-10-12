@@ -7,6 +7,8 @@
  *   behind. A 200 proved none of them.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-members
  * @version-history
+ *   v1.2.3 — 2026-10-13 — The priced capabilities' manifests carry tollMorsels: from 4.0.0 POST
+ *     /v1/memory refuses price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
  *   v1.2.2 — 2026-10-12 — The member's agent is approved with ext:invoke beside memory:read: it calls an
  *     extension action, which node 4.0.0 gates on that word (REST_SCOPE_GATES_ENFORCED_IN).
  *   v1.2.1 — 2026-10-06 — provisionWithEmail marks the code key's address verified with
@@ -248,8 +250,8 @@ await test('setup: the owner lists two priced capabilities', async () => {
 
     const schema = { type: 'object', properties: { q: { type: 'string' } } };
     const tools = [
-        { name: OFFER_A, description: 'first', action_id: `ext:${ext}:${OFFER_A}`, inputSchema: schema, outputSchema: schema, price: { morsels: 5 }, exchange: true },
-        { name: OFFER_B, description: 'second', action_id: `ext:${ext}:${OFFER_B}`, inputSchema: schema, outputSchema: schema, price: { morsels: 7 }, exchange: true },
+        { name: OFFER_A, description: 'first', action_id: `ext:${ext}:${OFFER_A}`, inputSchema: schema, outputSchema: schema, tollMorsels: 5, exchange: true },
+        { name: OFFER_B, description: 'second', action_id: `ext:${ext}:${OFFER_B}`, inputSchema: schema, outputSchema: schema, tollMorsels: 7, exchange: true },
     ];
     const put = await json('/v1/memory', {
         method: 'POST', headers: auth(owner.token),
@@ -335,7 +337,7 @@ async function providerWithOffering(label: string): Promise<{ owner: Awaited<Ret
         method: 'POST', headers: auth(them.token),
         body: JSON.stringify({
             key: `apps.${theirApp}.tools`, visibility: 'public',
-            value: { version: 1, tools: [{ name: action, description: 'theirs', action_id: `ext:${theirExt}:${action}`, inputSchema: schema, outputSchema: schema, price: { morsels: 9 }, exchange: true }] },
+            value: { version: 1, tools: [{ name: action, description: 'theirs', action_id: `ext:${theirExt}:${action}`, inputSchema: schema, outputSchema: schema, tollMorsels: 9, exchange: true }] },
         }),
     });
     assert(put.status === 200 || put.status === 201, `their manifest ${put.status}: ${JSON.stringify(put.body?.error)}`);
