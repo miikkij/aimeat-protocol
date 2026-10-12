@@ -588,6 +588,7 @@ await test('9. A second owner\'s agent lists NO packages and cannot read A\'s', 
 // person, and aimeat_knowledge_get answered "Package not found" for the id the list had just given.
 // The list read the owner's identities and the get read the agent's own namespace only.
 console.log('\nPhase 6 — A package the owner imported in person');
+let ownerPackageId = '';
 
 await test('17. The agent lists and opens a package stored under its owner\'s identity', async () => {
     const imp = await json('/v1/knowledge/import', {
@@ -606,7 +607,7 @@ await test('17. The agent lists and opens a package stored under its owner\'s id
         }),
     });
     assert(imp.status === 201, `owner import ${imp.status}: ${JSON.stringify(imp.body)}`);
-    const ownerPackageId = imp.body.data.package_id;
+    ownerPackageId = imp.body.data.package_id;
 
     const list = await mcpRpc('tools/call', { name: 'aimeat_knowledge_list', arguments: {} }, 500);
     const packages = JSON.parse(list.body.result.content[0].text);
@@ -622,6 +623,34 @@ await test('17. The agent lists and opens a package stored under its owner\'s id
     const res = await mcpRpc('resources/read', { uri: `aimeat://knowledge/${encodeURIComponent(ownerPackageId)}` }, 502);
     const text = res.body.result?.contents?.[0]?.text ?? '';
     assert(text.includes('Owner Held Package'), `the resource reads the same package: ${String(text).slice(0, 160)}`);
+});
+
+// The same day's second defect, on the tool that met it: aimeat_memory_delete with owner_scope
+// answered NOT_FOUND for an entry of this kind of package. e2e-memory-bin.ts 15 to 21 hold the rule
+// on the REST route; this holds that the MCP tool hands the session's scopes to the same service.
+await test('18. aimeat_memory_delete with owner_scope removes an entry of the owner\'s package only with memory:write-as-owner', async () => {
+    const entryKey = `packages/${ownerPackageId}/intro`;
+    const mk = async (name: string, scopes: string[]) => {
+        const made = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name, owner: ownerName, capabilities: ['memory'], scopes }),
+        });
+        assert(made.status === 201, `agent ${name} ${made.status}: ${JSON.stringify(made.body)}`);
+        return sessionFor(made.body.data.agent.gaii, made.body.data.private_key);
+    };
+    const plain = await mk('mcpkwlplain', ['memory:read', 'memory:write', 'memory:delete']);
+    const refused = await plain.call('aimeat_memory_delete', { key: entryKey, owner_scope: true }, 510);
+    assert(refused.result?.isError === true, `without the scope the delete is refused: ${JSON.stringify(refused.result?.content?.[0]?.text ?? refused).slice(0, 200)}`);
+    assert(String(refused.result?.content?.[0]?.text).includes('memory:write-as-owner'), `the refusal names the scope: ${refused.result?.content?.[0]?.text}`);
+    const still = await json(`/v1/memory/${encodeURIComponent(entryKey)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(still.status === 200, `the owner's entry still reads after the refusal, got ${still.status}`);
+
+    const delegate = await mk('mcpkwldelegate', ['memory:read', 'memory:write', 'memory:delete', 'memory:write-as-owner']);
+    const done = await delegate.call('aimeat_memory_delete', { key: entryKey, owner_scope: true }, 511);
+    assert(done.result?.isError !== true, `with the scope the delete is done: ${JSON.stringify(done.result?.content?.[0]?.text ?? done).slice(0, 200)}`);
+    assert(JSON.parse(done.result.content[0].text).deleted === true, `deleted flag: ${done.result.content[0].text}`);
+    const gone = await json(`/v1/memory/${encodeURIComponent(entryKey)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(gone.status === 404, `the owner reads the entry as gone, got ${gone.status}`);
 });
 
 await test('Delete owner (cascade)', async () => {
