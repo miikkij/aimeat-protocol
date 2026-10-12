@@ -18,6 +18,8 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.6.0 — 2026-10-12 — aimeat_exchange_accept prices an extension action with resolveExtActionPricing,
+ *     as REST does, so an action in the 4.0.0 form (its own tollMorsels) is contracted, not NOT_PRICED.
  *   v1.5.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa): offerings and contracts are presented as REST presents them
  *     (presentOffering, presentContractTerms), with `toll_morsels` and the morsel figures as deprecated
@@ -54,8 +56,8 @@ import {
     pauseEntitlement, revokeEntitlement, type MeteredEntitlement,
 } from '../services/metered-entitlements.js';
 import {
-    type Offering, type Need, type Bid, type ActionCommercial,
-    resolveActionPricing, resolveOfferingPricing, newNeedId, newBidId,
+    type Offering, type Need, type Bid,
+    resolveExtActionPricing, resolveOfferingPricing, newNeedId, newBidId,
     getOffering, getOfferingWithMeta, listOfferings, matchOfferings, filterOfferings,
     putNeed, getNeed, parseNeedSpec, listNeeds, putBid, getBid, acceptBid,
     offeringStats, offeringConsumers, enrichNeeds, presentOffering, presentContractTerms, budgetFloorText,
@@ -230,7 +232,7 @@ export function registerExchangeTools(
 
             // AUTHORITATIVE price + unit + (optional plan) pricing — shared resolver, so a consumer can
             // never undercut the provider. `plan_id` picks a provider-declared plan; none → per_call.
-            const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, plan_id ?? null);
+            const priced = resolveExtActionPricing(act, plan_id ?? null);
             if (!priced.ok) return fail(`${priced.code}: action "${ext}/${action}": ${priced.message}`);
             const { unit, pricePerCall, currency, pricing } = priced;
             const minCharge = pricing?.model === 'bundle' ? pricing.blockPrice : pricing?.model === 'subscription' ? pricing.periodPrice : pricePerCall;
@@ -243,7 +245,7 @@ export function registerExchangeTools(
             const existing = await readContractForCall(storage, consumerGaii, ext, action);
             const ent = await createEntitlement(storage, {
                 consumerGaii, appId: app_id ?? null, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
-                unit, pricePerCall, currency, pricing, capUnits, contractRef, tollMorsels: act.tollMorsels ?? null,
+                unit, pricePerCall, currency, pricing, capUnits, contractRef, tollMorsels: priced.tollMorsels,
                 createdBy: owner, carrySpend: existing,
             });
             return ok({ entitlement: entitlementView(config, ent) });

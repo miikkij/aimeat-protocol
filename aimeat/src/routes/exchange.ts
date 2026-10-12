@@ -23,6 +23,8 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.10.0 — 2026-10-12 — Accepting an extension action prices it with resolveExtActionPricing, so an
+ *     action in the 4.0.0 form (its own tollMorsels, no payMorsels) is contracted instead of NOT_PRICED.
  *   v1.9.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). A contract's `toll_morsels` is the pacing every call is charged (on the
  *     morsel rail the per-call amount plus the toll); on a morsel-rail contract `unit`, `currency` and
@@ -75,7 +77,7 @@ import {
 import { mergeOwnerEntitlements, listAllEntitlementsForMerge } from '../services/entitlement-merge.js';
 import { listPayables } from '../commerce/payable-book.js';
 import {
-  resolveActionPricing, resolveOfferingPricing, getOffering, budgetFloorText, presentContractTerms, type ActionCommercial,
+  resolveExtActionPricing, resolveOfferingPricing, getOffering, budgetFloorText, presentContractTerms,
 } from '../services/exchange-market.js';
 import {
   type ContractProposal, newProposalId, putProposal, getProposal, listProposalsForOwner,
@@ -203,7 +205,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
 
     // AUTHORITATIVE price + unit + (optional plan) pricing — shared resolver, so a consumer can never
     // undercut the provider. `plan_id` picks a provider-declared bundle/subscription plan; none → per_call.
-    const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, planId);
+    const priced = resolveExtActionPricing(act, planId);
     if (!priced.ok) return res.status(priced.code === 'NOT_PRICED' ? 400 : 404).json(error(config.nodeId, priced.code, `Action "${ext}/${action}": ${priced.message}`));
     const { unit, pricePerCall, currency, pricing } = priced;
     // Budget floor: the cap must cover a single charge (per-call price, or a bundle block / subscription period).
@@ -218,7 +220,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const ent = await createEntitlement(storage, {
       consumerGaii, appId, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
       unit, pricePerCall, currency, pricing, capUnits, contractRef, escrowParty, createdBy: owner,
-      tollMorsels: act.tollMorsels ?? null, carrySpend: existing,
+      tollMorsels: priced.tollMorsels, carrySpend: existing,
     });
     return res.status(201).json(success(config.nodeId, { entitlement: view(config, ent) }, [
       { description: 'This app’s cost & contracts', method: 'GET', url: appId ? `/v1/apps/cost?app_id=${encodeURIComponent(appId)}` : '/v1/exchange/entitlements' },
