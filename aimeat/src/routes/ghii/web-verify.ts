@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-10-12 — The "app" agent both mailbox proofs create holds the node's default agent scopes
+ *     (appAgentWithFreshKey), so its token can act; it had none and every scope gate refused it
+ *     (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 10).
  *   v1.14.0 — 2026-10-12 — Both agent mints (verify-email, magic-link/verify) carry a session id and
  *     write its session row (mintVerifiedAgentToken), so deleting the agent revokes the token
  *     (Core 2026-11 ID-10).
@@ -97,6 +100,46 @@ async function mintVerifiedAgentToken(
         expiresAt: new Date(issuedAt.getTime() + config.jwtTtlSeconds * 1000).toISOString(),
     });
     return token;
+}
+
+/**
+ * The account's "app" agent, found or created, with a fresh key pair. Both mailbox proofs call this.
+ *
+ * The agent holds the node's default agent scopes (config.defaultAgentScopes) from the moment it is
+ * created. Without a recorded list the route layer narrows its token to nothing (auth/effective-scopes.ts
+ * reads a missing list as []), so every scope-gated route refused it: SCOPE_DENIED, "Agent scopes: []"
+ * (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 10). An app agent that an
+ * earlier verification created without a list gets the same default list here; a list the owner has
+ * set is kept as it is.
+ */
+async function appAgentWithFreshKey(
+    storage: Storage,
+    config: AimeatConfig,
+    ownerName: string,
+    now: string,
+): Promise<{ agent: { gaii: string; defaultScopes?: string[] }; privateKey: string }> {
+    const keys = await generateKeyPair();
+    const existing = (await storage.getAgentsByOwner(ownerName)).find(a => a.name === 'app');
+    if (existing) {
+        const defaultScopes = Array.isArray(existing.defaultScopes) ? existing.defaultScopes : [...config.defaultAgentScopes];
+        await storage.updateAgent(existing.gaii, { publicKey: keys.publicKey, defaultScopes });
+        return { agent: { ...existing, defaultScopes }, privateKey: keys.privateKey };
+    }
+    const agent = await storage.createAgent({
+        name: 'app',
+        owner: ownerName,
+        gaii: buildGAII('app', ownerName, config.nodeId),
+        displayName: `${ownerName}'s App Agent`,
+        description: 'Default agent for AIMEAT apps',
+        capabilities: [],
+        publicKey: keys.publicKey,
+        trustScore: 50,
+        morselBalance: 0,
+        defaultScopes: [...config.defaultAgentScopes],
+        createdAt: now,
+        lastSeen: now,
+    });
+    return { agent, privateKey: keys.privateKey };
 }
 
 export function registerWebVerifyRoutes(
@@ -406,32 +449,7 @@ export function registerWebVerifyRoutes(
             .catch(err => { logger.warn('verify-email: app invitations are best-effort', { error: String(err) }); });
 
         // Create an agent if not exists, then issue JWT
-        const agents = await storage.getAgentsByOwner(record.ownerName);
-        let agent = agents.find(a => a.name === 'app');
-        let agentPrivKey: string;
-
-        if (!agent) {
-            const agentKeyPair = await generateKeyPair();
-            const gaii = buildGAII('app', record.ownerName, config.nodeId);
-            agent = await storage.createAgent({
-                name: 'app',
-                owner: record.ownerName,
-                gaii,
-                displayName: `${record.ownerName}'s App Agent`,
-                description: 'Default agent for AIMEAT apps',
-                capabilities: [],
-                publicKey: agentKeyPair.publicKey,
-                trustScore: 50,
-                morselBalance: 0,
-                createdAt: now,
-                lastSeen: now,
-            });
-            agentPrivKey = agentKeyPair.privateKey;
-        } else {
-            const agentKeyPair = await generateKeyPair();
-            await storage.updateAgent(agent.gaii, { publicKey: agentKeyPair.publicKey });
-            agentPrivKey = agentKeyPair.privateKey;
-        }
+        const { agent, privateKey: agentPrivKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);
 
         // Issue JWT
         //
@@ -544,32 +562,7 @@ export function registerWebVerifyRoutes(
         // credential below; a person signs in through GET /v1/ghii/magic-link/open.
 
         // Find or create a default agent
-        const agents = await storage.getAgentsByOwner(record.ownerName);
-        let agent = agents.find(a => a.name === 'app');
-        let agentPrivKey: string;
-
-        if (agent) {
-            const agentKeyPair = await generateKeyPair();
-            await storage.updateAgent(agent.gaii, { publicKey: agentKeyPair.publicKey });
-            agentPrivKey = agentKeyPair.privateKey;
-        } else {
-            const agentKeyPair = await generateKeyPair();
-            const gaii = buildGAII('app', record.ownerName, config.nodeId);
-            agent = await storage.createAgent({
-                name: 'app',
-                owner: record.ownerName,
-                gaii,
-                displayName: `${record.ownerName}'s App Agent`,
-                description: 'Default agent for AIMEAT apps',
-                capabilities: [],
-                publicKey: agentKeyPair.publicKey,
-                trustScore: 50,
-                morselBalance: 0,
-                createdAt: now,
-                lastSeen: now,
-            });
-            agentPrivKey = agentKeyPair.privateKey;
-        }
+        const { agent, privateKey: agentPrivKey } = await appAgentWithFreshKey(storage, config, record.ownerName, now);
 
         // Issue JWT
         //
