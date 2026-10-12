@@ -24,6 +24,11 @@
  *   cd aimeat && pnpm check:route-scopes --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:route-scopes --seed     # rewrite the exemption file from today's state
  * @version-history
+ *   v1.4.0 — 2026-10-12 — The gate asks whether a chain stops a scoped principal that lacks the word
+ *     (stopsUnscopedPrincipal, Core 2026-11 AUTHZ-01): requireRole('agent'), requireExternalPrincipal,
+ *     requireRoleOrScope('agent', …) and workspaceAccess no longer count, and requireRestScope does. A
+ *     router-level gate counts only when it is one of those. The routes this found got a word
+ *     (auth/rest-scope-gate.ts) or an exemption with its reason.
  *   v1.3.0 — 2026-08-24 — requireScimConnection counts as a gate (BR-04): it is an explicit
  *     authorization decision (SCIM bearer hash → connection record → the record's id must equal
  *     the path's), a credential family of its own beside JWT/PAT.
@@ -50,6 +55,29 @@ const EXEMPTIONS = join(ROOT, 'security', 'route-scope-exemptions.json');
  *  their own and they disagreed about four names. Re-exported so the other gates that ask this
  *  question keep one import. */
 export const GATES = AUTHORIZATION_GATES;
+
+/**
+ * The narrower question THIS gate asks since 2026-10-12: does the chain stop an agent, an app grant
+ * or an ecosystem app that lacks a scope word (Core 2026-11 AUTHZ-01, SEC-03)? A middleware that
+ * names a principal CLASS does not: requireRole('agent') admits every agent whatever its owner
+ * granted, requireExternalPrincipal admits every agent and ecosystem app, requireRoleOrScope('agent',
+ * …) admits every agent on the role before it reads the scope, and workspaceAccess decides per row.
+ * Those stay authorization for the other gates that import GATES; here they are not enough.
+ *
+ * Counted: a gate that demands a word (the first group), and a gate that admits no principal but
+ * the person (the owner or operator role, the owner in person, the owner's browser session).
+ */
+const SCOPE_GATE_CALLS = [
+    'requireScope(', 'requireAnyScope(', 'requireRestScope(', 'requireScopeOrOwnApp(', 'requireScopeUnlessSelf(',
+    'requireOwnerMailboxRead(', 'requireOperatorPrincipal(', 'requireOperator(', 'requireScimConnection',
+    'requireOwnerPrincipal(', 'requireOwnerSession(', 'requireOwnerPrincipalOrVerifiedRelay(',
+];
+const PERSON_ROLE = /requireRole\(\s*['"](owner|operator)['"]\s*\)|requireRoleOrScope\(\s*['"]owner['"]/;
+
+/** Does this middleware text stop a scoped principal that lacks the word? */
+export function stopsUnscopedPrincipal(chain: string): boolean {
+    return SCOPE_GATE_CALLS.some(g => chain.includes(g)) || PERSON_ROLE.test(chain);
+}
 
 export interface Finding {
     file: string;
@@ -96,7 +124,7 @@ function gatedArrayNames(source: string): Set<string> {
     const re = /const\s+(\w+)\s*(?::[^=]+)?=\s*\[([^\]]*)\]/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(source))) {
-        if (GATES.some(g => m![2].includes(g))) names.add(m[1]);
+        if (stopsUnscopedPrincipal(m[2])) names.add(m[1]);
     }
     return names;
 }
@@ -119,7 +147,8 @@ export function collectRoutes(files: string[]): Finding[] {
         const arrays = gatedArrayNames(source);
 
         // A router-level gate applies to every route in the file: `router.use(requireAuth(), requireRole(...))`
-        const routerLevelGate = /router\.use\(([^)]*(?:requireScope|requireRole|requireAnyScope)[^)]*)\)/.test(source);
+        const routerUse = [...source.matchAll(/router\.use\(([^\n]*)/g)].map(u => u[1]);
+        const routerLevelGate = routerUse.some(u => stopsUnscopedPrincipal(u));
         if (routerLevelGate) continue;
 
         const re = /router\.(post|put|patch|delete|get)\(\s*(['"`])([^'"`]+)\2\s*,?/g;
@@ -128,7 +157,7 @@ export function collectRoutes(files: string[]): Finding[] {
             const [, method, , path] = m;
             if (isFederationRoute(rel, path)) continue;
             const chain = middlewareSection(source, m.index + m[0].length);
-            const hasGate = GATES.some(g => chain.includes(g))
+            const hasGate = stopsUnscopedPrincipal(chain)
                 || [...arrays].some(name => new RegExp(`\\b${name}\\b`).test(chain));
             if (hasGate) continue;
 

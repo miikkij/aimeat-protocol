@@ -6,6 +6,7 @@
  *   system knowledge, delete a package, submit an operator review, plus the per-package reviews
  *   list. Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/knowledge/:id/reviews. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — review-list / delete / find batch the per-agent scans (listMemoryForOwners)
@@ -41,6 +42,7 @@ import { validateManifest } from './manifest-validator.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge-overview.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerAdminRoutes(
   router: Router,
@@ -345,7 +347,7 @@ export function registerAdminRoutes(
   // moderator and wrong on a read anyone can make. Two indexed reads: the owner's agents, then one
   // keyed lookup across that owner's identities. A package imported by the person's agent is read by
   // the person's browser session and by that agent alike, because both resolve to the same owner.
-  router.get('/v1/knowledge/:id/reviews', requireAuth(), async (req, res) => {
+  router.get('/v1/knowledge/:id/reviews', requireAuth(), requireRestScope('memory:read'), async (req, res) => {
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 

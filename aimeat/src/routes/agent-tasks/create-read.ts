@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:write on POST /v1/agents/:name/tasks, except for an agent queueing work for itself (the self rule, auth/self-or-scope.ts; the permission text says it creates its own tasks without the word). Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.7.1 — 2026-10-11 — The list reads storage with the resolved agent identity on both branches; an
  *     agent must be that identity (Semgrep owner-data-must-resolve-identity, code scanning 1728-1729).
  *   v1.7.0 — 2026-10-11 — A stopped agent's own task list carries no queued task and says `agent_stopped`,
@@ -46,6 +47,7 @@ import { taskOutcome } from '../../services/task-outcome.js';
 import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
 import { respondDeduplicated } from './dedupe.js';
 import { agentIsStopped } from '../../services/agent-stop.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerTaskCreateReadRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
@@ -69,7 +71,7 @@ export function registerTaskCreateReadRoutes(
    * calling agent's GAII. So the task appears in the owner's profile
    * dashboard exactly as if the owner had queued it themselves.
    */
-  router.post('/v1/agents/:name/tasks', requireAuth(), async (req, res) => {
+  router.post('/v1/agents/:name/tasks', requireAuth(), requireRestScope('task:write', { unlessSelf: config.nodeId }), async (req, res) => {
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
 

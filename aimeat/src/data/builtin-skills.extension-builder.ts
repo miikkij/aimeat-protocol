@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   v2.1.0 — 2026-10-12 — Instances: calling an action asks ext:invoke, reading the instances ext:invoke or
+ *     ext:write (the REST scope gates of 4.0.0, auth/rest-scope-gate.ts).
  *   v2.0.0 — 2026-10-11 — Built in, extended with the AI half of the service-extensions manual,
  *     and selling rewritten to a money price plus a pacing amount (docs audit phase 2).
  */
@@ -147,7 +149,10 @@ may already do it.
 
 With \`instances: { supported: true, config_per_instance: { ... } }\`, one installation serves several
 independent copies. Create one with \`POST /v1/extensions/{name}/instances\` \`{ id, config }\` (the
-installer or the operator). Call it at \`POST /v1/ext/{name}/{instanceId}/{action}\`. Each instance
+installer or the operator). Call it at \`POST /v1/ext/{name}/{instanceId}/{action}\`. Calling an
+action asks \`ext:invoke\` of an agent or an app, and reading the instances asks \`ext:invoke\` or
+\`ext:write\` (node 4.0.0 refuses a call without the word; before that it works and says it is
+deprecated), so an app that calls an extension through its cortex declares \`ext:invoke\`. Each instance
 has its own namespace, \`ext:{name}.{instanceId}\`, and the script reads \`ctx.instance.config\`. A
 \`type: secret\` field in the instance config is encrypted per instance: bring-your-own-key per tenant.
 

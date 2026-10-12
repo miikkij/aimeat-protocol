@@ -5,6 +5,9 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_workspace_list and aimeat_organism_invitations name organism:read, and
+ *     aimeat_organism_invitation_respond organism:write, the words their REST twins ask; enforced from
+ *     4.0.0 (scopeEnforcedFrom), counted before it.
  *   2026-10-12 — aimeat_organism_owner_add, _owner_remove and the three email-invitation tools declare all
  *     three interfaces (agentEverywhere): each has a CLI dispatch definition
  *     (tool-dispatch/tool-call-defs-organism-owners.ts) and the connector MCP registers it.
@@ -68,6 +71,7 @@ import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 // Documents and rows: the two surfaces that edit PART of a workspace object rather than replace
 // one. Spread in place below, so the catalog order is exactly what it was before the extraction.
 import { workspaceSpaceTools } from './workspace-spaces.js';
@@ -250,6 +254,9 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List My Invitations', readOnlyHint: true },
+        // The word GET /v1/organisms/invitations/mine asks from 4.0.0 (auth/rest-scope-gate.ts).
+        scope: 'organism:read',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         surfaces: ['appdev', 'agent', 'service'],
         input: {},
     },
@@ -259,6 +266,10 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Respond to Invitation', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // Accepting puts the owner's account into an organism, as POST /v1/organisms/:id/invitations/accept
+        // does: the same word from 4.0.0 (auth/rest-scope-gate.ts). It left scope-exempt-tools.ts.
+        scope: 'organism:write',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier you were invited to.' },
@@ -386,6 +397,9 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Workspaces', readOnlyHint: true },
+        // The word GET /v1/organisms/:id/workspaces asks from 4.0.0 (auth/rest-scope-gate.ts).
+        scope: 'organism:read',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         surfaces: ['appdev', 'agent', 'service', 'chat'],
         input: { organism_id: { type: 'string', required: true, description: 'Organism identifier.' } },
     },

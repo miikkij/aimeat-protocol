@@ -11,6 +11,9 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   v1.20.0 — 2026-10-12 — migrateRestScopeGatesOnce(), chained after migrateToolScopeWordsOnce: once per
+ *     node, the new word of the REST scope gates (packages:read) goes to every existing agent and
+ *     approved ecosystem app (services/rest-scope-gates-migration.ts).
  *   v1.19.0 — 2026-10-09 — sealPlaintextTotpSecrets() and sealPlaintextConfigSecrets() at boot: TOTP
  *     secrets and secret Config rows stored in plain text are encrypted when the node has a key
  *     (secrets audit 2026-10-09, S4).
@@ -107,6 +110,7 @@ import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { migrateToolScopeWordsOnce } from '../services/tool-scope-words-migration.js';
+import { migrateRestScopeGatesOnce } from '../services/rest-scope-gates-migration.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -349,7 +353,12 @@ export async function initializeServices(
   // The MCP tool scope words of 2026-10-06 (services/tool-scope-words-migration.ts), once per node:
   // an agent approved before them keeps its workspace read tools and its send-as-owner tool.
   migrateToolScopeWordsOnce(storage, config.nodeId)
-    .catch(err => logger.error('Failed to carry existing agents onto the 2026-10-06 tool scope words; the next boot tries again', { error: String(err) }));
+    .catch(err => logger.error('Failed to carry existing agents onto the 2026-10-06 tool scope words; the next boot tries again', { error: String(err) }))
+    // The REST scope gates of 4.0.0 (services/rest-scope-gates-migration.ts), once per node: the one new
+    // word goes to every agent and approved ecosystem app that could reach its routes. Chained after
+    // the line above because both rewrite an agent's whole scope list.
+    .then(() => migrateRestScopeGatesOnce(storage, config.nodeId))
+    .catch(err => logger.error('Failed to give the REST scope gate words to existing principals; the next boot tries again', { error: String(err) }));
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.
   // Until this runs, a plain Stripe key is readable through the generic memory doors

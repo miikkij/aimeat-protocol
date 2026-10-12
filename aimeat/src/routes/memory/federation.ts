@@ -8,6 +8,7 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.11.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:read on POST /v1/memory/list-remote. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.10.0 — 2026-10-06 — A push-home replicate carries a delivery proof: the home node and the send time (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.9.0 — 2026-10-06 — A memory-list request names the node it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.8.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -47,6 +48,7 @@ import { audienceProof, deliveryProof } from '../../services/signed-node-request
 import type { MemoryRouteCtx } from './shared.js';
 import { systemReader } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, peers, resolve, stats, onDirectoryChange } = ctx;
@@ -400,7 +402,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
   });
 
   // ── /v1/memory/list-remote — List memories on a remote peer node (home users) ──
-  router.post('/v1/memory/list-remote', requireAuth(), async (req, res) => {
+  router.post('/v1/memory/list-remote', requireAuth(), requireRestScope('memory:read'), async (req, res) => {
     if (isForeignPrincipal(req.auth)) {
       res.status(400).json(error(config.nodeId, 'NOT_HOME', 'This endpoint is only available for home sessions'));
       return;

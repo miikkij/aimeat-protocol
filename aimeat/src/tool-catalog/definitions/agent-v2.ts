@@ -8,11 +8,14 @@
  *   so the catalog order is what it was.
  * @usage imported by ./agent-messaging.ts
  * @version-history
+ *   v1.1.0 — 2026-10-12 — aimeat_v2_task_list and aimeat_v2_task_get name task:read, the word their REST
+ *     twins ask; enforced from 4.0.0 (scopeEnforcedFrom), counted before it.
  *   v1.0.0 — 2026-10-05 — Extracted from agent-messaging.ts (pure extraction; no behavior change).
  */
 import { partsSchema } from '../input-schemas.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 
 export const agentV2Tools = [
     // -- Agent v2 messaging: a turn between two principals of one account --
@@ -147,6 +150,9 @@ export const agentV2Tools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Tasks', readOnlyHint: true },
+        // The word GET /v1/agents/v2/tasks asks from 4.0.0 (auth/rest-scope-gate.ts).
+        scope: 'task:read',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         surfaces: ['agent'],
         supportsResponseFormat: true,
         conciseFields: ['taskId', 'status', 'assignedTo', 'createdBy', 'lastUpdatedAt'],
@@ -165,6 +171,9 @@ export const agentV2Tools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read One Task', readOnlyHint: true },
+        // The word GET /v1/agents/v2/tasks/:taskId asks from 4.0.0 (auth/rest-scope-gate.ts).
+        scope: 'task:read',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         surfaces: ['agent'],
         input: {
             task_id: { type: 'string', required: true, description: 'The task id.' },

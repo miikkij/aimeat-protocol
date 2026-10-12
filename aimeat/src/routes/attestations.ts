@@ -11,6 +11,7 @@
  *   - GET  /v1/attestations/:id       public read + server-side signature verification
  *   - POST /v1/attestations/:id/sign  add the caller's signature (completes when all have signed)
  * @version-history
+ *   v1.2.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:write on POST /v1/attestations/:id/sign. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.1.0 — 2026-10-09 — Mounts docsignRouter (routes/docsign.ts): document signing and validation.
  *   v1.0.0 — 2026-08-06 — Initial attestation routes (TINKI phase 1)
  */
@@ -25,6 +26,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { createAttestation, getAttestation, signAttestation, verifyAttestation } from '../services/attestation.js';
 import { CommerceError } from '../commerce/errors.js';
 import { docsignRouter } from './docsign.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 const CreateSchema = z.object({
   payload: z.unknown(),
@@ -74,7 +76,7 @@ export function attestationsRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // POST /v1/attestations/:id/sign — the caller signs as the identity they are.
-  router.post('/v1/attestations/:id/sign', requireAuth(), async (req, res) => {
+  router.post('/v1/attestations/:id/sign', requireAuth(), requireRestScope('memory:write'), async (req, res) => {
     const parsed = SignSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_ATTESTATION', parsed.error.message)); return; }
     try {

@@ -21,6 +21,7 @@
  * @structure registerAgentV2TaskRoutes(router, config, storage)
  * @usage registerAgentV2TaskRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:read on GET /v1/agents/v2/tasks, GET /v1/agents/v2/tasks/:taskId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V5).
  */
 import type { Router, Response } from 'express';
@@ -31,6 +32,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { publicTask } from '../../models/agent-v2-task.js';
 import { createTask, listTasks, getTask, setTaskStatus, cancelTask } from '../../services/agent-v2-tasks-ops.js';
 import type { OpResult } from '../../services/agent-v2-messaging-ops.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 function refuse(res: Response, nodeId: string, out: Extract<OpResult<unknown>, { ok: false }>): void {
   res.status(out.status).json(error(nodeId, out.code, out.message, undefined, out.details));
@@ -47,7 +49,7 @@ export function registerAgentV2TaskRoutes(router: Router, config: AimeatConfig, 
     ]));
   });
 
-  router.get('/v1/agents/v2/tasks', requireAuth(), async (req, res) => {
+  router.get('/v1/agents/v2/tasks', requireAuth(), requireRestScope('task:read'), async (req, res) => {
     const out = await listTasks(storage, req.auth!, {
       context_id: req.query.context_id as string | undefined,
       assigned_to: req.query.assigned_to as string | undefined,
@@ -59,7 +61,7 @@ export function registerAgentV2TaskRoutes(router: Router, config: AimeatConfig, 
     res.json(success(config.nodeId, { tasks: out.value.map(publicTask), count: out.value.length }));
   });
 
-  router.get('/v1/agents/v2/tasks/:taskId', requireAuth(), async (req, res) => {
+  router.get('/v1/agents/v2/tasks/:taskId', requireAuth(), requireRestScope('task:read'), async (req, res) => {
     const out = await getTask(storage, req.auth!, req.params.taskId as string);
     if (!out.ok) { refuse(res, config.nodeId, out); return; }
     res.json(success(config.nodeId, { task: publicTask(out.value) }));

@@ -1973,6 +1973,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The refinery config record, read for its connection id."
     },
+    "src/services/rest-scope-gates-migration.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-12, the node's own read: the run-once marker under the node's system identity that says the REST scope gate grant has run. No content is shown to anyone."
+    },
     "src/services/schedule-write.ts": {
       "reads": {
         "getStorageFile": 1

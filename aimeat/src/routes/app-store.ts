@@ -19,6 +19,7 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   v1.5.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:buy (an app: contract:spend) on POST /v1/app-store/purchase; wallet:read on GET /v1/app-store/purchases/:txId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.4.0 — 2026-10-11 — Ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa: an
  *     app's morsel price is its pacing amount. POST /purchase is ONE chargePacing (burn share, the
  *     existing operator share as feePercent, the rest to the app owner; pacing_* ledger rows) in place
@@ -63,6 +64,7 @@ import { paymentChallenge } from '../commerce/x402.js';
 import { publicAppManifest } from '../services/app-public-manifest.js';
 import { appToll, presentAppManifest } from '../services/app-pacing.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 /**
  * The 3.x receipt fields, while legacyMorselFieldsLive(): `price_morsels` (and, with `withShare`,
@@ -93,7 +95,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
         ownerCoordinate(req.auth!, config.nodeId);
 
     // POST /v1/app-store/purchase — Purchase an app
-    router.post('/v1/app-store/purchase', requireAuth(), async (req, res) => {
+    router.post('/v1/app-store/purchase', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
         if (!config.marketplaceEnabled) {
             res.status(403).json(error(config.nodeId, 'APP_STORE_DISABLED', 'App store payments are not enabled on this node'));
             return;
@@ -283,7 +285,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // GET /v1/app-store/purchases/:txId — Get specific purchase (includes full content)
-    router.get('/v1/app-store/purchases/:txId', requireAuth(), async (req, res) => {
+    router.get('/v1/app-store/purchases/:txId', requireAuth(), requireRestScope('wallet:read'), async (req, res) => {
         const gaii = coordinateOf(req);
         const txId = req.params.txId as string;
 

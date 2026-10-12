@@ -5,6 +5,7 @@
  * @description Extension instance REST routes — create, list, get, update (PATCH), delete, and
  *   public per-instance translations. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): ext:invoke on GET /v1/extensions/:name/instances, GET /v1/extensions/:name/instances/:instanceId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.1.0 — 2026-10-09 — Instance secrets are encrypted bound to their extension, instance and field
  *     (SecretBinding; secrets audit 2026-10-09, 1.1).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
@@ -25,6 +26,7 @@ import {
 } from '../../services/extension-secrets.js';
 import { mayManageInstalledExt, canSeeExtensionInstanceAs } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerExtensionInstanceRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── POST /v1/extensions/:name/instances — Create instance ──────────
@@ -118,7 +120,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   });
 
   // ── GET /v1/extensions/:name/instances — List instances ───────────
-  router.get('/v1/extensions/:name/instances', requireAuth(), async (req, res) => {
+  router.get('/v1/extensions/:name/instances', requireAuth(), requireRestScope('ext:invoke', { orScope: 'ext:write' }), async (req, res) => {
     try {
       const name = req.params.name as string;
       const ext = await storage.getExtension(name);
@@ -150,7 +152,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   });
 
   // ── GET /v1/extensions/:name/instances/:instanceId — Get instance detail ──
-  router.get('/v1/extensions/:name/instances/:instanceId', requireAuth(), async (req, res) => {
+  router.get('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRestScope('ext:invoke', { orScope: 'ext:write' }), async (req, res) => {
     try {
       const name = req.params.name as string;
       const instanceId = req.params.instanceId as string;

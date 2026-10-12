@@ -12,6 +12,7 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.0.3 -- 2026-10-12 -- Scopes: the words the REST scope gates of 4.0.0 ask (auth/rest-scope-gate.ts).
  *   v1.0.2 -- 2026-10-11 -- Step 4: the first run's task text is the first offer's example, and
  *     the purpose only when there is none.
  *   v1.0.1 -- 2026-10-11 -- The agent guide is named by its GitHub address; a bare repository path does not open from a node.
@@ -115,7 +116,12 @@ It needs no \`agent:write\` to report its own tags or its own runtime; that word
 change other agents' settings, so give it only to an agent whose job is that. An agent
 that reads and writes the owner's memory needs \`memory:read\` and \`memory:write\`; one that takes
 queued work also needs \`work:read\` and \`work:accept\`; one that uses the owner's AI (text, pictures,
-transcription, embeddings, or the node's \`/v1/llm\` through \`node_llm()\`) needs \`ai:use\`. \`mode: "task-runner"\` lets a queued task
+transcription, embeddings, or the node's \`/v1/llm\` through \`node_llm()\`) needs \`ai:use\`. From node
+4.0.0 the calls that asked no word before ask one too, except on the agent's own record (its own
+tasks, messages, offers and reports): \`task:write\` to queue work for another agent or make a
+schedule, \`task:read\` for the task roster, \`ext:invoke\` to run an extension, \`organism:read\` and
+\`organism:invite\` for organism membership, \`packages:read\` to list installs. Until then such a
+call works and its answer carries a \`Deprecation\` header. \`mode: "task-runner"\` lets a queued task
 start without asking the owner each time, so say that in the purpose. \`run_mode: "spawn"\` starts
 a worker per piece of work and suits bursty jobs; \`"resident"\` stays up and suits a front door.
 Ask for \`"resident"\` only when the owner's connector can keep an agent up: \`aimeat connect serve\`

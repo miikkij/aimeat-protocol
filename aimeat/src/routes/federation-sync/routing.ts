@@ -5,6 +5,7 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): work:request on POST /v1/federation/cross-node/work. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.7.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.6.0 — 2026-10-05 — POST /v1/federation/cross-node/work goes only to a peer with routing on
  *     (gatePeer 'allowRouting'); a packages-only or contact peer is refused (secaudit 2026-10, PKG-8).
@@ -48,6 +49,7 @@ import { buildRelayClaim } from '../../services/relay-claim.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { routingFee } from '../../services/morsel.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 /**
  * Who may drive POST /v1/federation/route: this node's own account holder, or a peer relaying a hop.
@@ -395,7 +397,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
     });
 
     // POST /v1/federation/cross-node/work — Submit cross-node work request
-    router.post('/v1/federation/cross-node/work', requireAuth(), requireRole('agent'), async (req, res) => {
+    router.post('/v1/federation/cross-node/work', requireAuth(), requireRestScope('work:request'), requireRole('agent'), async (req, res) => {
         const { target_node, action_id, provider_gaii, input, ttl_hours } = req.body ?? {};
 
         if (!target_node || !action_id || !provider_gaii || input === undefined) {

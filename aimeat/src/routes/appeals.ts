@@ -11,6 +11,7 @@
  *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
  *
  * @version-history
+ *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): social:write on POST /v1/flags/:flagId/appeal, POST /v1/appeals/:id/review; social:read on GET /v1/appeals. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.2.1 — 2026-10-10 — POST /v1/flags/:flagId/appeal decides operator admission with isOperatorCaller and writes the operator trail only after the ALREADY_APPEALED check, so a refused second appeal leaves no operator_acted event (secaudit 2026-10-10 I5).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   2026-09-08 — Two identities read in the wrong alphabet: the organism-admin arms compared
@@ -30,6 +31,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -94,7 +96,7 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
     // ── POST /v1/flags/:flagId/appeal — Content owner appeals a flag ──
-    router.post('/v1/flags/:flagId/appeal', requireAuth(), async (req, res) => {
+    router.post('/v1/flags/:flagId/appeal', requireAuth(), requireRestScope('social:write'), async (req, res) => {
         const flagId = param(req.params.flagId);
         const { reason } = req.body ?? {};
 
@@ -179,7 +181,7 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // ── GET /v1/appeals — List appeals (operator sees all; organism admin sees their organism's) ──
-    router.get('/v1/appeals', requireAuth(), async (req, res) => {
+    router.get('/v1/appeals', requireAuth(), requireRestScope('social:read'), async (req, res) => {
         const status = req.query.status as string | undefined;
         const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
         const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string, 10) || 20));
@@ -249,7 +251,7 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
     // ── POST /v1/appeals/:id/review — Review an appeal (operator or organism admin) ──
-    router.post('/v1/appeals/:id/review', requireAuth(), async (req, res) => {
+    router.post('/v1/appeals/:id/review', requireAuth(), requireRestScope('social:write'), async (req, res) => {
         const id = param(req.params.id);
         const { decision, note } = req.body ?? {};
 

@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-10-12 — aimeat_package_instances names packages:read, the word GET /v1/instances asks; enforced from 4.0.0.
  *   2026-10-12 — aimeat_package_versions, _delete and _publish declare connectorOnly: they are on both
  *     connector interfaces and not on the node MCP (V2_EXCLUDED), and they declared the node MCP.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -52,6 +53,7 @@
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere, connectorOnly } from './types.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 
 /** What `config` on aimeat_package_install is, on every interface. */
 /** The `grant_apps` input of aimeat_package_install, shared by its three surfaces. */
@@ -303,6 +305,10 @@ export const packagesTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Installed Packages', readOnlyHint: true },
+        // The word GET /v1/instances asks from 4.0.0 (auth/rest-scope-gate.ts). New on 2026-10-12, and
+        // given once to every existing agent (services/rest-scope-gates-migration.ts).
+        scope: 'packages:read',
+        scopeEnforcedFrom: REST_SCOPE_GATES_ENFORCED_IN,
         surfaces: ['appdev', 'agent'],
         input: {
             group_id: { type: 'string', description: 'Only the copies of this package.' },

@@ -6,6 +6,7 @@
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): packages:read on GET /v1/instances, GET /v1/instances/:id/status, GET /v1/instances/:id; packages:write on GET /v1/instances/:id/check-update. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.8.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.7.0 — 2026-10-05 — PATCH turns automatic updates on only for the owner in person or an agent
  *     holding packages:install-code (secaudit 2026-10, PKG-12).
@@ -51,6 +52,7 @@ import { approvalOf, forgetApproval, INSTALL_CODE_SCOPE } from '../../services/p
 import { isOwnerInPerson } from '../../auth/effective-scopes.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { operatorOverride } from '../../services/operator-override.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 // ── Register instance management routes ───────────────────────────────
 
@@ -61,7 +63,7 @@ export function registerManageRoutes(
   peers: Map<string, PeerInfo> = new Map(),
 ): void {
   // GET /v1/instances — List my instances
-  router.get('/v1/instances', requireAuth(), requireLocalSession(), async (req, res) => {
+  router.get('/v1/instances', requireAuth(), requireRestScope('packages:read'), requireLocalSession(), async (req, res) => {
     const owner = req.auth!.owner;
     const status = req.query.status as string | undefined;
     const packageGroupId = req.query.packageGroupId as string | undefined;
@@ -75,7 +77,7 @@ export function registerManageRoutes(
 
   // GET /v1/instances/:id/status — Component status with live hash comparison
   // (Must be before the generic GET /v1/instances/:id)
-  router.get('/v1/instances/:id/status', requireAuth(), requireLocalSession(), async (req, res) => {
+  router.get('/v1/instances/:id/status', requireAuth(), requireRestScope('packages:read'), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 
@@ -142,7 +144,7 @@ export function registerManageRoutes(
 
   // GET /v1/instances/:id/check-update — Check for available updates
   // (Must be before the generic GET /v1/instances/:id)
-  router.get('/v1/instances/:id/check-update', requireAuth(), requireLocalSession(), async (req, res) => {
+  router.get('/v1/instances/:id/check-update', requireAuth(), requireRestScope('packages:write'), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 
@@ -157,7 +159,7 @@ export function registerManageRoutes(
   });
 
   // GET /v1/instances/:id — Get instance details
-  router.get('/v1/instances/:id', requireAuth(), requireLocalSession(), async (req, res) => {
+  router.get('/v1/instances/:id', requireAuth(), requireRestScope('packages:read'), requireLocalSession(), async (req, res) => {
     const id = req.params.id as string;
     const owner = req.auth!.owner;
 

@@ -599,10 +599,10 @@
      "slug": "g-4-scopes-and-roles",
      "cells": [
       "<strong>Scopes and roles</strong>",
-      "Every agent, app and token carries named permissions (<code>memory:read</code>, <code>ai:use</code>, <code>workflow:write</code> and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited.",
-      "<code>/v1/permissions/*</code>"
+      "Every agent, app and token carries named permissions (<code>memory:read</code>, <code>ai:use</code>, <code>workflow:write</code> and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited. Every signed-in route asks a word of an agent or an app, unless the caller acts on its own record; the 70 routes that asked none before (organism membership, tasks for another agent, schedules, extension actions, cortex reads, installs and more) ask theirs from 4.0.0, and until then answer a call without it with a Deprecation header and count it.",
+      "<code>/v1/permissions/*</code>, <code>x-aimeat-scope</code> in <code>openapi.yaml</code>"
      ],
-     "plain": "Scopes and roles Every agent, app and token carries named permissions (memory:read, ai:use, workflow:write and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited. /v1/permissions/*"
+     "plain": "Scopes and roles Every agent, app and token carries named permissions (memory:read, ai:use, workflow:write and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited. Every signed-in route asks a word of an agent or an app, unless the caller acts on its own record; the 70 routes that asked none before (organism membership, tasks for another agent, schedules, extension actions, cortex reads, installs and more) ask theirs from 4.0.0, and until then answer a call without it with a Deprecation header and count it. /v1/permissions/*, x-aimeat-scope in openapi.yaml"
     },
     {
      "slug": "g-4-consent",

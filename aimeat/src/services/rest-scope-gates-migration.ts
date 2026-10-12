@@ -1,0 +1,120 @@
+/**
+ * @file src/services/rest-scope-gates-migration.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The one-time grant that goes with the REST scope gates of 4.0.0 (auth/rest-scope-gate.ts;
+ *   ruling decision-core-2026-11-avoimet-kysymykset-ja-agenttien-automaattinen-l Q21: "grant the new
+ *   scope words once to every existing agent that used those routes").
+ *
+ *   WHICH WORDS. Only the words that did not exist before the gates: one, `packages:read`. Every other
+ *   word the gates ask (task:write, organism:invite, memory:read and the rest) already existed and
+ *   already opens other routes and MCP tools. Writing one of those onto a principal that did not hold
+ *   it would hand it those other routes and tools too, which its owner never granted, so they are not
+ *   written: a principal that used a newly gated route without the word sees the Deprecation header
+ *   and the count in GET /v1/stats until 4.0.0, and its owner ticks the word in the agent editor.
+ *   `packages:read` opens nothing but the three install reads (GET /v1/instances, /v1/instances/:id,
+ *   /v1/instances/:id/status) and aimeat_package_instances, all of which asked no word before.
+ *
+ *   TO WHOM. Usage cannot be known: the node never recorded a REST call per principal before the gates
+ *   (services/scope-use.ts records from 2026-10-02 and only what a `*` agent was admitted for). So the
+ *   rule is the fallback the brief names: every existing principal that could reach those routes
+ *   before, which is every agent and every approved ecosystem app with a recorded scope list, because
+ *   the three routes asked nothing but a session. A principal whose words already cover it (`*`,
+ *   `packages:*`) is left alone, and nothing is ever removed.
+ *
+ *   NOT APP GRANTS. A grant follows its app's own declaration (`<meta name="aimeat-scopes">`): every
+ *   refresh and silent sign-in trims a word the app does not declare (services/app-grant-scopes.ts), so
+ *   a word written here would be gone at the app's next refresh. An app that reads installs declares
+ *   packages:read (routes/app-grant-vocabulary.ts lists it), and its owner sees it on the consent screen;
+ *   until 4.0.0 the call still works and carries the Deprecation header that says so.
+ *
+ *   ONCE PER NODE, recorded under `system@<nodeId>` (REST_SCOPE_GATES_KEY) after the principals, so a
+ *   boot that stops half way runs it again, and an owner who later takes the word away keeps it away.
+ *   A principal made after the run chose from a screen that lists the word.
+ * @structure REST_SCOPE_GATES_KEY · REST_SCOPE_NEW_WORDS · missingNewWords(held) ·
+ *   migrateRestScopeGatesOnce(storage, nodeId)
+ * @usage migrateRestScopeGatesOnce(storage, config.nodeId).catch(err => logger.error(…));
+ * @version-history
+ *   v1.0.0 — 2026-10-12 — Initial (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
+ */
+import type { Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+
+/** The record under `system@<nodeId>` that says this node has run the grant. */
+export const REST_SCOPE_GATES_KEY = 'migrations.rest-scope-gates-4-0-0';
+
+/** The words the REST scope gates introduced, and what each opens. */
+export const REST_SCOPE_NEW_WORDS: ReadonlyArray<{ word: string; opens: string }> = [
+  {
+    word: 'packages:read',
+    opens: 'GET /v1/instances, GET /v1/instances/:id, GET /v1/instances/:id/status and aimeat_package_instances',
+  },
+];
+
+/** The new words a principal holding `held` lacks; none for a wildcard or a domain wildcard that covers them. */
+export function missingNewWords(held: readonly string[]): string[] {
+  return REST_SCOPE_NEW_WORDS.map(w => w.word).filter(w => !scopeIsCovered(held, w));
+}
+
+export interface RestScopeGatesMigrationResult {
+  ran: boolean;
+  agents: string[];
+  ecosystemApps: string[];
+}
+
+/** Give the new words to every existing principal that could reach their routes, unless this node has run it. */
+export async function migrateRestScopeGatesOnce(storage: Storage, nodeId: string): Promise<RestScopeGatesMigrationResult> {
+  const system = `system@${nodeId}`;
+  const result: RestScopeGatesMigrationResult = { ran: false, agents: [], ecosystemApps: [] };
+  if (await storage.getMemory(system, REST_SCOPE_GATES_KEY)) return result;
+
+  for (const agent of await storage.listAgents()) {
+    const held = agent.defaultScopes;
+    // No recorded list: the agent is minted from config.defaultAgentScopes, and writing a list here
+    // would replace that fallback rather than extend it (services/scope-vocabulary-migration.ts).
+    if (!Array.isArray(held)) continue;
+    const missing = missingNewWords(held);
+    if (!missing.length) continue;
+    await storage.updateAgent(agent.gaii, { defaultScopes: [...held, ...missing] });
+    result.agents.push(agent.gaii);
+  }
+
+  for (const owner of await storage.listOwners()) {
+    for (const app of await storage.getEcosystemAppsByOwner(owner.name)) {
+      if (app.status !== 'approved' && app.status !== 'active') continue;
+      const held = app.scopes;
+      if (!Array.isArray(held)) continue;
+      const missing = missingNewWords(held);
+      if (!missing.length) continue;
+      await storage.updateEcosystemApp(app.geai, { scopes: [...held, ...missing] });
+      result.ecosystemApps.push(app.geai);
+    }
+  }
+
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: REST_SCOPE_GATES_KEY,
+    ownerGaii: system,
+    value: {
+      at: now,
+      words: REST_SCOPE_NEW_WORDS.map(w => w.word),
+      agents: result.agents,
+      ecosystemApps: result.ecosystemApps,
+    },
+    visibility: 'private',
+    tags: ['migration'],
+    // Never swept: a record that expired would run the grant again at the next boot.
+    ttlHours: null,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+  });
+  result.ran = true;
+  if (result.agents.length + result.ecosystemApps.length > 0) {
+    logger.info(`REST scope gates: gave ${REST_SCOPE_NEW_WORDS.map(w => w.word).join(', ')} to ${result.agents.length} agent(s) `
+      + `and ${result.ecosystemApps.length} ecosystem app(s) that could already reach `
+      + `${REST_SCOPE_NEW_WORDS.map(w => w.opens).join('; ')}`, { agents: result.agents, ecosystemApps: result.ecosystemApps });
+  }
+  return result;
+}

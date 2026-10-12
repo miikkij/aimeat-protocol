@@ -7,12 +7,15 @@
  *   public /v1/mcp surface enforces the SAME least-privilege rules as REST — closing the hole where
  *   /v1/mcp registered every tool for every agent regardless of granted scopes.
  *
- *   Only tools whose REST route is genuinely scope-gated appear in TOOL_SCOPES. Tools omitted here
- *   (tasks, apps, extensions, cortex, organisms, knowledge, instances, groups, capabilities, flags,
- *   storage, catalogue, board reads, onboarding, handbook, agent self-report, messages) are NOT
- *   scope-gated in REST either, so leaving them ungated keeps MCP consistent with REST. The operator's
- *   tools ride words no wildcard carries (operator:admin and its siblings), because every tool
- *   session is an agent and the account role alone armed every agent an operator connected.
+ *   A tool appears in TOOL_SCOPES when its REST route asks a word. Since 2026-10-12 every authenticated
+ *   REST route asks one or carries a recorded reason why none applies (security/route-scope-exemptions.json,
+ *   held by check:route-scopes): the routes that asked none before ask theirs through requireRestScope
+ *   (auth/rest-scope-gate.ts), and their MCP twins name the same word with scopeEnforcedFrom, so both
+ *   surfaces allow a call without it and count it until 4.0.0 and refuse it from then. Tools still
+ *   without a word act on the caller's own record (its tasks, messages, onboarding, self-report), read
+ *   what anyone may read (public catalogue, boards, apps, extensions), or ask the word in the handler.
+ *   The operator's tools ride words no wildcard carries (operator:admin and its siblings), because
+ *   every tool session is an agent and the account role alone armed every agent an operator connected.
  * @structure
  *   - TOOL_SCOPES — tool name -> required scope (mirrors REST requireScope gates)
  *   - scopeAllowsTool() — wildcard-aware check (exact / domain:* / global *), mirroring middleware
@@ -22,6 +25,10 @@
  *   import { scopeAllowsTool } from './scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.51.0 -- 2026-10-12 -- TOOL_SCOPE_ENFORCED_FROM, deferredScopesForTool, enforcedScopesForTool: a
+ *     catalog entry's `scopeEnforcedFrom` names the release from which its word decides whether the tool
+ *     is offered (the REST scope gates of 4.0.0, auth/rest-scope-gate.ts). scopeAllowsTool asks the
+ *     enforced words; the header no longer says tasks, organisms and the rest are ungated in REST.
  *   v1.50.0 -- 2026-10-05 -- TOOL_SCOPES is each catalog entry's `scope` plus the list here, which
  *     only shrinks as each catalog group carries its own (secaudit 2026-10, M3). ToolScope moved to
  *     definitions/types.ts and is re-exported.
@@ -153,6 +160,7 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1): tool->scope map + wildcard check + scope profiles
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 import type { ToolScope } from './definitions/types.js';
 
@@ -197,6 +205,27 @@ export function requiredScopesForTool(toolName: string): string[] {
     return toolScopeWords(TOOL_SCOPES[toolName]);
 }
 
+/** Tool -> the release from which its words decide whether it is offered (catalog `scopeEnforcedFrom`). */
+export const TOOL_SCOPE_ENFORCED_FROM: Record<string, string> = Object.fromEntries(
+    CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.scope !== undefined && d.scopeEnforcedFrom !== undefined)
+        .map(d => [d.name, d.scopeEnforcedFrom!]),
+);
+
+/**
+ * The words a tool names but does not yet enforce on the running version: before its
+ * `scopeEnforcedFrom` release, all of them; from it, none. The MCP surface counts a call made without
+ * one of these (mcp/deferred-scope-notice.ts), the way its REST twin counts it (auth/rest-scope-gate.ts).
+ */
+export function deferredScopesForTool(toolName: string, version: string = getSoftwareVersion()): string[] {
+    const from = TOOL_SCOPE_ENFORCED_FROM[toolName];
+    return from !== undefined && !versionAtLeast(version, from) ? requiredScopesForTool(toolName) : [];
+}
+
+/** The words that decide whether the tool is offered on the running version. */
+export function enforcedScopesForTool(toolName: string, version: string = getSoftwareVersion()): string[] {
+    return deferredScopesForTool(toolName, version).length > 0 ? [] : requiredScopesForTool(toolName);
+}
+
 /**
  * Whether an agent holding `scopes` may use `toolName`. The wildcard rule is NOT written out here:
  * it is scopeIsCovered() in utils/scope-coverage.ts, the same function requireScope and the agent
@@ -209,8 +238,8 @@ export function requiredScopesForTool(toolName: string): string[] {
  * raise the owner's daily AI budget, while the same agent posting the same key to /v1/memory was
  * refused RESERVED_KEY. One rule, one place, so the exception cannot be lost again.
  */
-export function scopeAllowsTool(scopes: string[], toolName: string): boolean {
-    return requiredScopesForTool(toolName).every((word) => scopeIsCovered(scopes, word));
+export function scopeAllowsTool(scopes: string[], toolName: string, version?: string): boolean {
+    return enforcedScopesForTool(toolName, version).every((word) => scopeIsCovered(scopes, word));
 }
 
 // The role-based scope bundles for provisioning agents live in ./scope-profiles.ts.

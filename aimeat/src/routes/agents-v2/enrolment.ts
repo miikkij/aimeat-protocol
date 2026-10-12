@@ -34,6 +34,7 @@
  * @structure registerAgentV2EnrolRoute(router, config, storage)
  * @usage registerAgentV2EnrolRoute(router, config, storage);
  * @version-history
+ *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): agent:write on POST /v1/agents/v2/enrol. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.2.0 — 2026-10-10 — A move grant: an agent that holds a key gets a new one from the connector
  *     the owner moved it to. Its sessions end before the new key is pinned, and the old connector's
  *     socket identity is detached after.
@@ -54,6 +55,7 @@ import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js'
 import { emitChange } from '../../services/event-bus.js';
 import { cardUri, jwksUri } from './card.js';
 import { logger } from '../../utils/logger.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 /**
  * More cards than any grant can legitimately carry. A bound, not a policy.
@@ -80,7 +82,7 @@ export function registerAgentV2EnrolRoute(router: Router, config: AimeatConfig, 
   // requireRole('agent') at the door, and the handler's own first check immediately after it. The
   // middleware's role hierarchy admits owner and operator sessions as well, which is precisely what
   // the handler then refuses: this is the daemon's door, and a person in a browser is not a daemon.
-  router.post('/v1/agents/v2/enrol', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/agents/v2/enrol', requireAuth(), requireRestScope('agent:write'), requireRole('agent'), async (req, res) => {
     const auth = req.auth!;
     const roles = auth.roles ?? [];
     // An app grant is consent to USE this account; an ecosystem app is a different principal class

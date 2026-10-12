@@ -7,6 +7,8 @@
  *   reading it from there.
  * @structure SCOPE_EXEMPT_TOOLS
  * @version-history
+ *   v1.4.0 — 2026-10-12 — aimeat_organism_invitation_respond leaves: accepting puts the owner's account into
+ *     an organism, and from 4.0.0 it asks organism:write like POST /v1/organisms/:id/invitations/accept.
  *   v1.3.0 — 2026-10-04 — aimeat_task_decline: its own task only (isOwnTask), like aimeat_task_fail.
  *   v1.2.0 — 2026-10-02 — aimeat_agent_runtime_report: its own report without a word, a sibling's with agent:write.
  *   v1.1.0 — 2026-10-02 — aimeat_agent_tags_set: own tags without a word, a sibling's with agent:write.
@@ -60,7 +62,6 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_onboarding_confirm_skill_installed',     // Same identity path as the rest of the onboarding set — agentGaii from the session closure (agent-onboarding
     'aimeat_onboarding_declare_services',            // agentGaii from the session closure (agent-onboarding
     'aimeat_onboarding_identify_platform',           // Every onboarding tool passes the session closure `agentGaii` (agent-onboarding
-    'aimeat_organism_invitation_respond',            // It acts only on the caller's own pending invitation — membership is looked up by getOwnerName() at organisms-n
     'aimeat_task_complete',                          // isOwnTask() at agent-tasks
     'aimeat_task_event',                             // isOwnTask() at agent-tasks
     'aimeat_task_fail',                              // isOwnTask() at agent-tasks

@@ -16,6 +16,7 @@
  *   const vocabulary = readVocabulary(aimeatDir);
  *   const demanded = demandedScopes(sourceFiles);
  * @version-history
+ *   v1.1.0 — 2026-10-12 — demandedScopes() reads requireRestScope('word', { orScope }) as a demand too.
  *   v1.0.0 — 2026-09-04 — Extracted from build-inventory.ts (pure move) and joined by
  *     demandedScopes(), for the scope-parity gate.
  */
@@ -81,10 +82,20 @@ export function demandedScopes(files: readonly ts.SourceFile[]): ScopeDemand[] {
         const visit = (node: ts.Node): void => {
             if (ts.isCallExpression(node)
                 && ts.isIdentifier(node.expression)
-                && node.expression.text === 'requireScope'
+                && (node.expression.text === 'requireScope' || node.expression.text === 'requireRestScope')
                 && node.arguments.length > 0) {
+                // requireRestScope takes one word and an options object; its `orScope` is read too.
+                const literals: ts.StringLiteral[] = [];
                 for (const arg of node.arguments) {
-                    if (!ts.isStringLiteral(arg)) continue;
+                    if (ts.isStringLiteral(arg)) literals.push(arg);
+                    if (ts.isObjectLiteralExpression(arg)) {
+                        for (const p of arg.properties) {
+                            if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === 'orScope'
+                                && ts.isStringLiteral(p.initializer)) literals.push(p.initializer);
+                        }
+                    }
+                }
+                for (const arg of literals) {
                     const { line } = sf.getLineAndCharacterOfPosition(arg.getStart(sf));
                     out.push({ word: arg.text, file: sf.fileName, line: line + 1 });
                 }

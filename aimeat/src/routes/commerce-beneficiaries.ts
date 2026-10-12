@@ -21,6 +21,7 @@
  *   POST /v1/commerce/beneficiary/release · GET+POST /v1/commerce/beneficiary/approvals
  * @usage app.use(commerceBeneficiariesRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): wallet:read on GET /v1/commerce/beneficiary/approvals. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-30 — Initial: declare / read / release / approve for the second rake.
  */
@@ -44,6 +45,7 @@ import {
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { operatorOverride } from '../services/operator-override.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 /** What a split looks like on the wire. Snake-case, like every other commerce surface. */
 function splitView(s: BeneficiarySplit): Record<string, unknown> {
@@ -365,7 +367,7 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
   });
 
   /** GET /v1/commerce/beneficiary/approvals — the caller's own approval state, or one named by an operator. */
-  router.get('/v1/commerce/beneficiary/approvals', requireAuth(), async (req: Request, res: Response) => {
+  router.get('/v1/commerce/beneficiary/approvals', requireAuth(), requireRestScope('wallet:read'), async (req: Request, res: Response) => {
     const self = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const asked = typeof req.query.ghii === 'string' ? req.query.ghii : '';
     // Anyone may read their own; reading someone else's verification state is an operator question,

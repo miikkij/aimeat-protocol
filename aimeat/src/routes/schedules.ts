@@ -31,6 +31,7 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:write on POST /v1/schedules, POST /v1/schedules/:id/trigger, POST /v1/agents/:name/schedules; workflow:write on PATCH /v1/schedules/:id; memory:write on DELETE /v1/schedules/:id. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   2026-10-05 — A schedule an app makes records the app's grant (secaudit 2026-10, AI-2).
  *   2026-09-27 — GET /v1/schedules?detail=true names each schedule's prompt; PATCH takes `prompt` (services/schedule-prompt.ts).
@@ -90,6 +91,7 @@ import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { isManifestDeclaredJob } from '../services/extension-schedules.js';
 import { nodeTimeZone } from '../services/display-prefs.js';
 import { schedulePromptOf } from '../services/schedule-prompt.js';
+import { requireRestScope } from '../auth/rest-scope-gate.js';
 
 // The record build, the per-kind input checks and the write moved to services/schedule-write.ts on
 // 2026-08-11, so the MCP tools that create, edit and cancel schedules produce the same record this
@@ -226,7 +228,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── POST /v1/schedules — create (profile-level or agent-targeted) ──
-  router.post('/v1/schedules', requireAuth(), async (req, res) => {
+  router.post('/v1/schedules', requireAuth(), requireRestScope('task:write'), async (req, res) => {
     try { await createSchedule(req, res); }
     catch (err) {
       logger.error('Failed to create schedule', { error: (err as Error).message });
@@ -353,7 +355,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── PATCH /v1/schedules/:id — edit ──
-  router.patch('/v1/schedules/:id', requireAuth(), async (req, res) => {
+  router.patch('/v1/schedules/:id', requireAuth(), requireRestScope('workflow:write'), async (req, res) => {
     const id = req.params.id as string;
     const out = await updateScheduleRecord(
       { storage, config, scheduler }, writeCaller(req), id, (req.body ?? {}) as Record<string, unknown>,
@@ -363,7 +365,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── DELETE /v1/schedules/:id — cancel ──
-  router.delete('/v1/schedules/:id', requireAuth(), async (req, res) => {
+  router.delete('/v1/schedules/:id', requireAuth(), requireRestScope('memory:write'), async (req, res) => {
     const id = req.params.id as string;
     const out = await deleteScheduleRecord({ storage, config, scheduler }, writeCaller(req), id);
     if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
@@ -371,7 +373,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── POST /v1/schedules/:id/trigger — run now ──
-  router.post('/v1/schedules/:id/trigger', requireAuth(), async (req, res) => {
+  router.post('/v1/schedules/:id/trigger', requireAuth(), requireRestScope('task:write'), async (req, res) => {
     const id = req.params.id as string;
     const out = await triggerScheduleRecord({ storage, config, scheduler }, writeCaller(req), id);
     if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
@@ -403,7 +405,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   });
 
   // ── POST /v1/agents/:name/schedules — create targeting this agent ──
-  router.post('/v1/agents/:name/schedules', requireAuth(), async (req, res) => {
+  router.post('/v1/agents/:name/schedules', requireAuth(), requireRestScope('task:write'), async (req, res) => {
     try { await createSchedule(req, res, req.params.name as string); }
     catch (err) {
       logger.error('Failed to create agent schedule', { error: (err as Error).message });

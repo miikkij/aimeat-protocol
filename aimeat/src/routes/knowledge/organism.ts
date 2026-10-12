@@ -6,6 +6,7 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:write on POST /v1/knowledge/:id/contribute. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   2026-10-12 — The contribution consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   2026-09-29 — TARGET-082 V4: GET /v1/knowledge/organism/:id passes the contributed manifests
  *     through the caller's classification reader (readerFor, reader.show) before they are listed.
@@ -26,6 +27,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { memoryTarget } from '../../services/classification/labels.js';
+import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 export function registerOrganismRoutes(
   router: Router,
@@ -36,7 +38,7 @@ export function registerOrganismRoutes(
   const { resolve } = helpers;
 
   /* ── POST /v1/knowledge/:id/contribute — Contribute a package to an organism ── */
-  router.post('/v1/knowledge/:id/contribute', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/knowledge/:id/contribute', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const packageId = req.params.id as string;
