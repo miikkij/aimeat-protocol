@@ -1407,17 +1407,27 @@ def _default_propose_crew(task: dict[str, Any], liaison: Any) -> Any:
 
 
 # Curated subset of AIMEAT MCP tools that a daemon-mode liaison actually
-# needs. Loading all ~95 AIMEAT tools into a CrewAI agent overflows some LLM
-# adapters (litellm / smaller models choke on the schema package) and slows
-# down even the ones that don't. This list covers the canonical liaison flow:
-# Hello Integration, capability self-reporting, task lifecycle (read + take a
-# task, propose+update TODOs, complete/fail), deliverable persistence
-# (memory + knowledge), telemetry, and handbook self-reference. Wallet,
-# admin, consent, cortex, extension, organism, board, app, and group tools
-# are excluded because a default liaison doesn't need them.
+# needs. A node offers more than 400 tools (430 in its catalog on 2026-10-12;
+# this comment said "~95" from the day it was written until then). Loading all
+# of them into a CrewAI agent overflows some LLM adapters (litellm / smaller
+# models choke on the schema package) and slows down even the ones that
+# don't. This list covers the canonical liaison flow: Hello Integration,
+# capability self-reporting, task lifecycle (read + take a task,
+# propose+update TODOs, complete/fail), deliverable persistence (memory +
+# knowledge), telemetry, and handbook self-reference. Wallet, admin, consent,
+# cortex, extension, organism, board, app, and group tools are not listed one
+# by one, because a default liaison rarely needs them.
+#
+# It is not cut off from them either. `aimeat_discover` finds what the node
+# can do and `aimeat_invoke` runs any capability by its id, so the liaison
+# reaches every tool the agent is permitted to use without loading every
+# description. The three `aimeat_mcp_*` tools do the same for the remote MCP
+# servers the owner attached to the node. These five are the node's own way
+# to keep a tool list small (its chat interface lists about twenty tools and
+# reaches the rest this way).
 #
 # Override by passing `tool_filter=[...]` explicitly to run_crew_daemon, or
-# `tool_filter=None` for the unfiltered ~95-tool set.
+# `tool_filter=None` for every tool the connector offers.
 DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
     # Onboarding (Hello Integration)
     "aimeat_handbook_get",
@@ -1461,6 +1471,37 @@ DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
     # Messages (so the daemon can listen for owner messages too)
     "aimeat_message_inbox",
     "aimeat_message_send",
+    # Everything else the node can do, without loading its description: find a
+    # capability, then run it by id (0.35.0). See DAEMON_TOOLS_IF_OFFERED.
+    "aimeat_discover",
+    "aimeat_invoke",
+    # The remote MCP servers the owner attached to the node: list them, read
+    # one server's tools, call one. The agent needs `mcp:read` for the first
+    # two and `mcp:use` for the call; without them the node refuses the call
+    # with SCOPE_DENIED and the daemon runs on.
+    "aimeat_mcp_list",
+    "aimeat_mcp_tools",
+    "aimeat_mcp_call",
+)
+
+# The names in the default list that the liaison loads when the MCP server
+# offers them and runs without when it does not. A filter normally refuses to
+# start on a tool the server did not expose (liaison.select_liaison_tools), and
+# these five can be missing for a reason that is not an error:
+#   - a connector started with `--surface agent` offers `aimeat_discover` and
+#     not `aimeat_invoke` or the three `aimeat_mcp_*` tools (they are on the
+#     `primitives`, `chat` and `full` surfaces);
+#   - a node's own MCP lists `aimeat_mcp_*` only to a session that holds
+#     `mcp:read` / `mcp:use`, which an agent with default permissions does not;
+#   - a connector older than a tool does not have it.
+# The 25 names above them stay required: without one of those the daemon's
+# own loop cannot work, so a missing one still stops the start with its name.
+DAEMON_TOOLS_IF_OFFERED: tuple[str, ...] = (
+    "aimeat_discover",
+    "aimeat_invoke",
+    "aimeat_mcp_list",
+    "aimeat_mcp_tools",
+    "aimeat_mcp_call",
 )
 
 
@@ -1546,11 +1587,17 @@ def run_crew_daemon(
             (e.g. crewai.LLM(model="openrouter/...", api_key=...)) for any
             non-OpenAI runtime.
         tool_filter: Which AIMEAT MCP tools the liaison should load.
-            Defaults to `DAEMON_DEFAULT_TOOL_FILTER` (a curated ~25-tool
+            Defaults to `DAEMON_DEFAULT_TOOL_FILTER` (a curated 30-tool
             set covering Hello Integration, task lifecycle, memory,
-            knowledge, telemetry, and messages). Pass `None` for the
-            unfiltered ~95-tool set (some LLM adapters choke on it). Pass
-            a list of tool names to use that exact subset.
+            knowledge, telemetry and messages, plus `aimeat_discover`,
+            `aimeat_invoke` and the three `aimeat_mcp_*` tools, through
+            which the liaison reaches every other capability). The last
+            five are loaded when the MCP server offers them
+            (`DAEMON_TOOLS_IF_OFFERED`). Pass `None` for every tool the
+            connector offers, more than 400 (some LLM adapters choke on
+            it). Pass a list of tool names to use that exact subset; a
+            name in your own list that the server does not offer stops
+            the start.
         poll_interval_seconds: How often to check AIMEAT for new work
             when idle. Default 30s; raise for low-priority crews, lower
             for snappy interactive feel (but mind rate limits).
@@ -1721,11 +1768,15 @@ def run_crew_daemon(
     )
 
     # Resolve tool_filter:
-    #   sentinel (default) -> DAEMON_DEFAULT_TOOL_FILTER (curated ~25 tools)
+    #   sentinel (default) -> DAEMON_DEFAULT_TOOL_FILTER (curated 30 tools, of
+    #                         which DAEMON_TOOLS_IF_OFFERED are loaded only when
+    #                         the server offers them)
     #   None               -> no filter, every MCP tool the connector exposes
-    #   iterable           -> use as-is
+    #   iterable           -> use as-is; every name in it is required
+    resolved_if_offered: tuple[str, ...] = ()
     if tool_filter is _USE_DAEMON_DEFAULT_FILTER:
         resolved_tool_filter: Iterable[str] | None = DAEMON_DEFAULT_TOOL_FILTER
+        resolved_if_offered = DAEMON_TOOLS_IF_OFFERED
     else:
         resolved_tool_filter = tool_filter
 
@@ -1844,6 +1895,7 @@ def run_crew_daemon(
                 mcp_server_params=serve_params(agent_name=identity.gaii, **serve_opts),
                 agent_name=agent_name,
                 tool_filter=resolved_tool_filter,
+                tool_filter_if_offered=resolved_if_offered,
                 llm=llm,
             ) as worker_liaison:
                 if _is_cancelled(api, task_id):
@@ -1907,6 +1959,7 @@ def run_crew_daemon(
         mcp_server_params=serve_params(agent_name=identity.gaii, **serve_opts),
         agent_name=agent_name,
         tool_filter=resolved_tool_filter,
+        tool_filter_if_offered=resolved_if_offered,
         llm=llm,
     ) as liaison:
         print(f"[daemon:{agent_name}] liaison ready, entering poll loop")

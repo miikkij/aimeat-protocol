@@ -108,10 +108,12 @@ def build_crew_for_task(task: dict[str, Any], liaison: Agent) -> Crew:
 
 
 if __name__ == "__main__":
-    # tool_filter defaults to DAEMON_DEFAULT_TOOL_FILTER (~25 curated tools).
-    # That keeps the LLM's schema package small enough that adapters like
-    # litellm + smaller models don't choke. Pass tool_filter=None to get
-    # the full ~95-tool set, or pass an explicit list to override.
+    # tool_filter defaults to DAEMON_DEFAULT_TOOL_FILTER (30 curated tools; the
+    # liaison reaches every other capability through aimeat_discover and
+    # aimeat_invoke). That keeps the LLM's schema package small enough that
+    # adapters like litellm + smaller models don't choke. Pass
+    # tool_filter=None to get every tool the connector offers (more than
+    # 400), or pass an explicit list to override.
     run_crew_daemon(
         agent_name=AGENT_NAME,
         build_crew=build_crew_for_task,
