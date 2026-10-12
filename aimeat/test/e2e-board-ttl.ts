@@ -1003,7 +1003,9 @@ await test('41. The keeper sets the rules: who posts, the categories, the lifeti
     });
     assert(okStatus === 201, `post under a listed category: ${okStatus} ${JSON.stringify(okBody)}`);
     const hoursLeft = (new Date(okBody.data.ttl_expires_at).getTime() - Date.now()) / 3600_000;
-    assert(hoursLeft > 719 && hoursLeft <= 720, `default lifetime 720 h, got ${hoursLeft.toFixed(1)} h`);
+    // One second of slack above 720 h: the node and this process read the clock separately, and on
+    // origin/main the bare `<= 720` failed 3 runs of 5 on Windows with "got 720.0 h" (2026-10-12).
+    assert(hoursLeft > 719 && hoursLeft <= 720 + 1 / 3600, `default lifetime 720 h, got ${hoursLeft.toFixed(4)} h`);
     const { body: after } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${nonOpAgentToken}` } });
     assert(after.data.balance === before.data.balance, `a board priced at 0 charged ${before.data.balance - after.data.balance}`);
 

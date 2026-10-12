@@ -8,7 +8,10 @@
  *   node --import tsx test/run-e2e-ci.ts
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
+ *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-12 -- --tests-file=<path> takes the suite names from a file, one a line, for a list too long
+ *     for a Windows command line (pnpm gate after a change to 404 suites).
  *   2026-10-12 -- e2e-mcp-token-rest.ts joins the list (not the guard tier): an MCP OAuth token on a
  *     REST route of a 3.x node is counted with the Deprecation headers, and the three MCP tools that
  *     reach REST over loopback count nothing.
@@ -1478,9 +1481,20 @@ function parseArgs(): string[] {
     const args = process.argv.slice(2);
     if (args.includes('--guards')) return guardSuites();
     const tests: string[] = [];
+    // `--tests-file=<path>`: one suite name a line, read as if each were a `--test=`. pnpm gate passes
+    // the suites a change touched this way when there are too many for one command line: Windows
+    // refuses a command line past 32767 characters, and 404 `--test=` arguments are about 13000
+    // more ("The command line is too long", 2026-10-12).
+    const names: string[] = [];
     for (const arg of args) {
-        if (arg.startsWith('--test=')) {
-            const name = arg.slice(7);
+        if (arg.startsWith('--test=')) names.push(arg.slice(7));
+        else if (arg.startsWith('--tests-file=')) {
+            names.push(...readFileSync(arg.slice('--tests-file='.length), 'utf-8').split(/\r?\n/).map(s => s.trim()).filter(Boolean));
+        }
+    }
+    // --all is default behavior (run everything)
+    for (const name of names) {
+        {
             // Exact match wins over substring. Without this ordering `--test=security`
             // matched `e2e-zip-security` (first in ALL_SUITES) and `e2e-security` never
             // ran — silently, exit code 0. An ambiguous substring is an error, not a
@@ -1502,7 +1516,6 @@ function parseArgs(): string[] {
             }
             tests.push(match);
         }
-        // --all is default behavior (run everything)
     }
     return tests.length > 0 ? tests : ALL_SUITES;
 }
