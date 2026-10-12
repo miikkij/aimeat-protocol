@@ -19,6 +19,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -62,20 +63,7 @@ const CALL = { messages: [{ role: 'user', content: 'hello' }] };
 console.log('\n=== LLM proxy E2E ===\n');
 
 await test('Setup: an owner', async () => {
-    const reg = await json('/v1/owners', {
-        method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({
-            owner: ownerName, timestamp: ts,
-            signature: await signMsg(reg.body.data.private_key, ownerName + NODE_ID + ts),
-        }),
-    });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    ownerToken = tok.body.data.token;
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
 });
 
 await test('An unauthenticated caller cannot spend anyone\'s budget', async () => {

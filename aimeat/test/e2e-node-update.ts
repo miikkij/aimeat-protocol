@@ -17,18 +17,14 @@
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=node-update
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 let passed = 0, failed = 0;
@@ -48,16 +44,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 async function ownerToken(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${short(reg.body)}`);
-    const ts = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + ts), Buffer.from(reg.body.data.private_key, 'base64'));
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${short(tok.body.error)}`);
-    return tok.body.data.token as string;
+    return (await registerOwner(BASE, name)).token;
 }
 
 // ── The stub registry ──

@@ -24,6 +24,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TunnelClient } from './helpers/tunnel-harness.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -61,11 +62,10 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function getToken(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
-  const signature = await signMsg(priv, message);
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const signature = await signMsg(priv, gaii + ts);
+  const payload = { gaii, timestamp: ts, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -112,12 +112,8 @@ console.log('\n=== AIMEAT Connector Forward Tunnel: one socket, many identities 
 
 console.log('Setup — two owners, three agents each');
 await test('Register both owners', async () => {
-  const a = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerA, public_key: 'placeholder' }) });
-  assert(a.status === 201, `owner A: ${JSON.stringify(a.body)}`);
-  ownerATok = await getToken(ownerA, a.body.data.private_key, false);
-  const b = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerB, public_key: 'placeholder' }) });
-  assert(b.status === 201, `owner B: ${JSON.stringify(b.body)}`);
-  ownerBTok = await getToken(ownerB, b.body.data.private_key, false);
+  ownerATok = (await registerOwner(BASE, ownerA)).token;
+  ownerBTok = (await registerOwner(BASE, ownerB)).token;
 });
 
 await test('Register six agents — three per owner, two of them sharing a name across owners', async () => {
@@ -132,7 +128,7 @@ await test('Register six agents — three per owner, two of them sharing a name 
       assert(status === 201, `${name}@${ownerName}: ${status} ${JSON.stringify(body)}`);
       const gaii = body.data.agent.gaii;
       (into as string[]).push(gaii);
-      agents.set(gaii, await getToken(gaii, body.data.private_key, true));
+      agents.set(gaii, await getToken(gaii, body.data.private_key));
     }
   }
   assert(agents.size === 6, `six agents, got ${agents.size}`);
@@ -271,7 +267,7 @@ await test('8c. A scope-limited identity is refused exactly as it would be over 
     body: JSON.stringify({ name: 'readonly', owner: ownerA, capabilities: ['memory'], scopes: ['memory:read'] }),
   });
   const gaii = body.data.agent.gaii;
-  const reply = await hub!.attach(gaii, await getToken(gaii, body.data.private_key, true));
+  const reply = await hub!.attach(gaii, await getToken(gaii, body.data.private_key));
   assert(reply.type === 'attached', `attach: ${reply.type} ${reply.message ?? ''}`);
   const denied = await hub!.request('POST', '/v1/memory', { agent: gaii, body: { key: 'nope', value: 1 } });
   assert(denied.status === 403, `a memory:read agent must be refused a write, got ${denied.status}`);
@@ -363,7 +359,7 @@ await test('13. One owner, one agent, no attach — behaves exactly as before', 
     method: 'POST', headers: { Authorization: `Bearer ${ownerBTok}` },
     body: JSON.stringify({ name: 'solo', owner: ownerB, capabilities: ['memory'], scopes: ['*'] }),
   });
-  const solo = await TunnelClient.connect(BASE, await getToken(body.data.agent.gaii, body.data.private_key, true));
+  const solo = await TunnelClient.connect(BASE, await getToken(body.data.agent.gaii, body.data.private_key));
   assert(solo.welcome !== null, 'welcomed');
   // No `agent` field on anything, exactly as a client older than this change sends.
   const w = await solo.request('POST', '/v1/memory', { body: { key: 'solo.probe', value: { ok: true } } });

@@ -21,11 +21,11 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const stamp = Date.now() % 100000;
 const ownerApp = `fnla${stamp}`;
 const ownerAgent = `fnlg${stamp}`;
@@ -56,15 +56,8 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 }
 
 async function registerOwner(name: string): Promise<{ token: string }> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { token: tok.body.data.token as string };
+    const { token } = await registerWithPassword(BASE, name);
+    return { token };
 }
 
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
@@ -209,7 +202,7 @@ await test('An operator reads cohorts + rows, and this account appears activated
     assert(mine.activationKind === 'app', `expected activationKind=app, got ${mine.activationKind}`);
     assert(typeof mine.ttfvMinutes === 'number', 'an activated row must carry a TTFV');
     // Cohorts are grouped by week × track (remake phase 0), so pick the group by its track rather
-    // than by position: both accounts here were created through /v1/owners, hence `remake`.
+    // than by position: both accounts here were created through /v1/ghii, hence `remake`.
     const week = cohorts.find((c: any) => c.track === 'remake');
     assert(week && week.created >= 2 && week.activated >= 2,
         `this week's remake cohort must count both accounts: ${JSON.stringify(cohorts)}`);

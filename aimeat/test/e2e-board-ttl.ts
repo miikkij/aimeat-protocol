@@ -24,12 +24,12 @@ import * as http from 'node:http';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -82,11 +82,10 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 
 async function getToken(identity: string, privKey: string, isAgent: boolean): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? identity + timestamp : identity + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: identity, timestamp, signature }
-        : { owner: identity, timestamp, signature };
+    // Agents only: an owner signs in with the password (helpers/owner-login.ts).
+    assert(isAgent, 'an owner signs in with the password, not here');
+    const signature = await signMsg(privKey, identity + timestamp);
+    const payload = { gaii: identity, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -125,13 +124,9 @@ console.log('\n=== AIMEAT Board TTL E2E Test ===\n');
 console.log('Setup — Owner & Agents');
 
 await test('Register owner (gets operator role)', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    const reg = await registerOwner(BASE, ownerName);
+    ownerPrivKey = reg.privateKey;
+    ownerToken = reg.token;
 });
 
 await test('Register agent-A', async () => {
@@ -636,11 +631,7 @@ let nonOpAgentGaii = '';
 
 await test('31-pre. Create non-operator owner+agent', async () => {
     nonOpOwnerName = `bd-noop-${Date.now()}`;
-    const { body: oBody } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: nonOpOwnerName, public_key: 'placeholder' }),
-    });
-    nonOpOwnerToken = await getToken(nonOpOwnerName, oBody.data.private_key, false);
+    nonOpOwnerToken = (await registerOwner(BASE, nonOpOwnerName)).token;
     const { body: aBody } = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
@@ -720,8 +711,7 @@ await test('35. Any account opens a public board; a system board stays the opera
 await test('35b. The eleventh public board of one account is refused', async () => {
     // A fresh owner, so the count starts at zero and the two boards of test 35 do not skew it.
     const name = `bd-quota-${Date.now()}`;
-    const { body: oBody } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    const token = await getToken(name, oBody.data.private_key, false);
+    const token = (await registerOwner(BASE, name)).token;
     for (let i = 1; i <= 10; i++) {
         const { status } = await json('/v1/boards', {
             method: 'POST',
@@ -750,8 +740,7 @@ await test('35c. …and the eleventh cannot be reached by making it private and 
     // createBoard() and PATCH /v1/boards/:id/visibility wrote straight to storage, so ten private
     // boards flipped to public got past a maximum of ten. Review item 3.3, 2026-09-06.
     const name = `bd-flip-${Date.now()}`;
-    const { body: oBody } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    const token = await getToken(name, oBody.data.private_key, false);
+    const token = (await registerOwner(BASE, name)).token;
     const mk = async (n: string, visibility: string) => {
         const { status, body } = await json('/v1/boards', {
             method: 'POST', headers: { Authorization: `Bearer ${token}` },
@@ -791,8 +780,7 @@ await test('35c. …and the eleventh cannot be reached by making it private and 
 // as zero. Both halves are needed for the assertion below. Found by the AI triage of 2026-09-13.
 await test('35d. A cortex refused by the board ceiling writes none of the components before it', async () => {
     const name = `bd-cortexq-${Date.now()}`;
-    const { body: oBody } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    const token = await getToken(name, oBody.data.private_key, false);
+    const token = (await registerOwner(BASE, name)).token;
     for (let i = 1; i <= 10; i++) {
         const { status } = await json('/v1/boards', {
             method: 'POST', headers: { Authorization: `Bearer ${token}` },

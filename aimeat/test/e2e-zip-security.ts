@@ -9,7 +9,6 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=zip-security
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -23,11 +22,8 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
 }
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(privB64: string, msg: string) { return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64'); }
+import { ownerSignIn } from './helpers/owner-login.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 function makeZip(entries: { name: string; data: Buffer | string }[]): Promise<Buffer> {
@@ -52,8 +48,7 @@ await test('Setup owner (operator) + org', async () => {
     ownerName = `zipsec${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'ZipSec', password: 'ZipSec1234' }) });
     assert(reg.status === 201, `ghii ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await sign(reg.body.data.private_key, ownerName + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, ownerName, 'ZipSec1234');
     token = tk.body.data.token;
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'ZipSec Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
     orgId = o.body.data.organism.id;
@@ -155,8 +150,7 @@ await test('4b. a plain owner cannot read, resolve or delete the incident list',
     const other = `zipsec2${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: other, display_name: 'ZipSec2', password: 'ZipSec1234' }) });
     assert(reg.status === 201, `second owner ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: other, timestamp: ts, signature: await sign(reg.body.data.private_key, other + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, other, 'ZipSec1234');
     const otherToken = tk.body.data.token as string;
 
     const list = await json('/v1/admin/security/incidents', { headers: auth(otherToken) });

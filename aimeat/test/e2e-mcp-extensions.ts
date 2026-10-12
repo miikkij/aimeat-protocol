@@ -57,6 +57,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -117,7 +118,6 @@ async function mcpRpc(method: string, params: Record<string, any> = {}, id: numb
 
 // ─── State ───
 let ownerToken = '';
-let ownerPrivKey = '';
 let agentPrivKey = '';
 let agentGaii = '';
 const ownerName = `mcpext${Date.now()}`;
@@ -207,17 +207,10 @@ await test('Register GHII identity', async () => {
         body: JSON.stringify({ username: ownerName, display_name: 'MCP Ext Test', password: 'McpExt1234' }),
     });
     assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
 });
 
 await test('Owner auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName, 'McpExt1234');
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });
@@ -444,7 +437,6 @@ await test('9b. aimeat_extension_invoke gives the action ctx.files (write + read
 
 const targetName = `mcpexttarget${Date.now()}`;
 let targetToken = '';
-let targetPriv = '';
 
 await test('9c. Cross-owner notify is REFUSED without the target\'s consent', async () => {
   // A second owner who has granted nothing.
@@ -453,10 +445,7 @@ await test('9c. Cross-owner notify is REFUSED without the target\'s consent', as
     body: JSON.stringify({ username: targetName, display_name: 'Notify Target', password: 'NotifyT1234' }),
   });
   assert(reg.status === 201, `register target: ${reg.status}`);
-  targetPriv = reg.body.data.private_key;
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(targetPriv, targetName + NODE_ID + timestamp);
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: targetName, timestamp, signature }) });
+  const tok = await ownerSignIn(BASE, targetName, 'NotifyT1234');
   assert(tok.body.ok === true, 'target token');
   targetToken = tok.body.data.token;
 

@@ -44,7 +44,6 @@ import requests
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 AIMEAT_DIR = REPO_ROOT / "aimeat"
-NODE_ID = "aimeat-local-001-dev"
 AGENT = "decidecrew"
 # A second agent of the same owner. The node refuses a review by the agent that asked for the
 # decision (OWN_DECISION): the owner records the verdict in person or through another of their
@@ -84,15 +83,27 @@ def _node_sign(priv: str, message: str) -> str:
 
 
 def _auth_token(base: str, ident: str, priv: str, *, is_agent: bool) -> str:
+    """An agent's token, from its own key (the agent sign-in). An owner signs in with _owner_token."""
+    assert is_agent, "an owner signs in with the password: _owner_token"
     ts = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
-    msg = (ident + ts) if is_agent else (ident + NODE_ID + ts)
-    key = "gaii" if is_agent else "owner"
     body = requests.post(
         f"{base}/v1/auth/token",
-        json={key: ident, "timestamp": ts, "signature": _node_sign(priv, msg)},
+        json={"gaii": ident, "timestamp": ts, "signature": _node_sign(priv, ident + ts)},
         timeout=20,
     ).json()
     assert body.get("ok") is True, f"auth token failed: {body}"
+    return body["data"]["token"]
+
+
+OWNER_PASSWORD = "DecideLive-2026"
+
+
+def _owner_token(base: str, owner: str) -> str:
+    """The owner's token from the password sign-in, POST /v1/ghii/login."""
+    body = requests.post(
+        f"{base}/v1/ghii/login", json={"username": owner, "password": OWNER_PASSWORD}, timeout=20,
+    ).json()
+    assert body.get("ok") is True, f"owner sign-in failed: {body}"
     return body["data"]["token"]
 
 
@@ -255,9 +266,11 @@ def live(tmp_path_factory: pytest.TempPathFactory):
         else:
             pytest.fail("node did not become ready within 120 s")
 
-        r = requests.post(f"{e.base}/v1/owners", json={"name": e.owner, "public_key": "placeholder"}, timeout=20)
+        # The owner registers with a password and signs in with it: the owner-key sign-in is removed
+        # in node 4.0.0.
+        r = requests.post(f"{e.base}/v1/ghii", json={"username": e.owner, "display_name": e.owner, "password": OWNER_PASSWORD}, timeout=20)
         assert r.status_code == 201, f"owner register: {r.status_code} {r.text}"
-        owner_token = _auth_token(e.base, e.owner, r.json()["data"]["private_key"], is_agent=False)
+        owner_token = _owner_token(e.base, e.owner)
         e.owner_headers = {"Authorization": f"Bearer {owner_token}"}
 
         e.gaii, e.agent_token = _agent(e, AGENT)

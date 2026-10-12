@@ -23,6 +23,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ZipArchive } from 'archiver';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -92,17 +93,7 @@ async function parseSSE(text: string, id: number): Promise<any> {
 
 async function setupParty(prefix: string): Promise<Party> {
     const owner = `${prefix}${Date.now()}${Math.floor(process.hrtime()[1] / 1000)}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${owner}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ownerPriv = reg.body.data.private_key;
-
-    let ts = new Date().toISOString();
-    const ownerTok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await signMsg(ownerPriv, owner + NODE_ID + ts) }),
-    });
-    assert(ownerTok.body.ok === true, `owner token: ${JSON.stringify(ownerTok.body.error)}`);
-    const ownerToken = ownerTok.body.data.token;
+    const ownerToken = (await registerOwner(BASE, owner)).token;
 
     const ag = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -117,7 +108,7 @@ async function setupParty(prefix: string): Promise<Party> {
     });
     assert(client.status === 201, `mcp register: ${client.status}`);
 
-    ts = new Date().toISOString();
+    const ts = new Date().toISOString();
     const pkce = mcpPkce(BASE);
     const q = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii: agentGaii,

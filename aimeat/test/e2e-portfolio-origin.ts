@@ -22,16 +22,13 @@
  *     had been describing an attacker's request as the production one. `fetch` cannot set Host at
  *     all, hence the node:http helper.
  */
-import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hostRequest, type HostResponse } from './helpers/host-request.js';
 import { waitForServer } from './helpers/wait-for-server.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const PORT = process.env.E2E_PORTFOLIO_ORIGIN_PORT ?? '40263';
 const BASE = `http://localhost:${PORT}`;
@@ -52,10 +49,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body, headers: res.headers };
-}
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
 }
 
 /**
@@ -108,14 +101,7 @@ async function main() {
         console.log('Setup (server flag ON, portfolio host ' + PORTFOLIO_HOST + ')');
 
         await test('register owner + token + agent', async () => {
-            const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-            assert(status === 201, `owner status ${status}: ${JSON.stringify(body)}`);
-            const priv = body.data.private_key;
-            const ts = new Date().toISOString();
-            const sig = await signMsg(priv, owner + NODE_ID + ts);
-            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp: ts, signature: sig }) });
-            assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-            token = tok.body.data.token;
+            token = (await registerOwner(BASE, owner)).token;
             const ag = await json('/v1/agents', {
                 method: 'POST', headers: { Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ name: 'pfagent', owner, capabilities: ['memory'] }),

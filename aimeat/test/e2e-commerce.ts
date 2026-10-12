@@ -52,17 +52,14 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(privB64: string, msg: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 async function setupOwner(label: string) {
     const name = `com${label}${Date.now()}`;
     let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Commerce', password: 'Commerce1234' }) });
     for (let i = 0; reg.status === 429 && i < 8; i++) { await new Promise(r => setTimeout(r, 1500)); reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Commerce', password: 'Commerce1234' }) }); }
     assert(reg.status === 201, `ghii ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'Commerce1234');
     const token = tok.body.data.token as string;
     const roles: string[] = (JSON.parse(Buffer.from(token.split('.')[1] as string, 'base64url').toString('utf8')).roles) ?? [];
     return { name, token, roles };

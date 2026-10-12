@@ -15,13 +15,9 @@
  *   v1.0.0 — 2026-08-16 — initial: auth, validation, the unset-model refusal, and the key refusal.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerName = `img${Date.now() % 100000}`;
 
 let passed = 0;
@@ -52,11 +48,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-async function signMsg(priv: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(priv, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
 let token = '';
 const authed = (o: RequestInit = {}): RequestInit =>
     ({ ...o, headers: { ...((o.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${token}` } });
@@ -66,15 +57,7 @@ const generate = (body: unknown) => json('/v1/ai/image', authed({ method: 'POST'
 console.log('\n=== AI Image Generation E2E Tests ===\n');
 
 await test('Setup: register an owner', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data.private_key;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(priv, ownerName + NODE_ID + ts) }),
-    });
-    token = tok.body.data?.token as string;
+    token = (await registerOwner(BASE, ownerName)).token;
     assert(!!token, 'token issued');
 });
 

@@ -14,12 +14,10 @@
  *     workflow with an agent step, and without it the save is refused naming the word.
  *   v1.0.0 — 2026-07-07 — Initial (TARGET-006 AGENCY: task and workflow app-grant scopes).
  */
-import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner as registerPasswordOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const owner = `taskgrant${Date.now() % 100000}`;
 const owner2 = `taskgrant${(Date.now() + 7) % 100000}b`;
 const FILENAME = 'agency-demo.html';
@@ -39,10 +37,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body, headers: res.headers };
 }
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
 // PKCE (reused across grants — each authorize→consent mints its own single-use code)
@@ -53,13 +47,7 @@ let ownerToken = '';
 
 /** Register an owner and return its owner JWT. */
 async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, name + NODE_ID + ts);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token;
+    return (await registerPasswordOwner(BASE, name)).token;
 }
 
 /** Run the full app-grant flow for `scopes` and return the app access token. */

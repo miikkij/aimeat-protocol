@@ -19,12 +19,9 @@
  * @version-history
  *   v1.0.0 — 2026-10-02 — Initial.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const stamp = Date.now() % 100000;
 
 let passed = 0, failed = 0;
@@ -41,15 +38,11 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
     ({ ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${token}` } });
-async function sign(privB64: string, message: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 async function owner(tag: string) {
     const name = `fmd${tag}${stamp}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Format Md', password: 'FormatMd12345' }) });
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'FormatMd12345');
     assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
     return { name, token: tok.body.data.token as string };
 }

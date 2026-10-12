@@ -31,12 +31,10 @@
  *   v1.0.0 — 2026-09-08 — Initial. First suite in the repo to open a realtime socket.
  */
 import { WebSocket } from 'ws';
-import * as ed from '@noble/ed25519';
-import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const WS_BASE = BASE.replace(/^http/, 'ws').replace(/\/+$/, '');
@@ -78,22 +76,7 @@ function sleep(ms: number) {
 
 async function setupOwner(label: string): Promise<{ name: string; token: string }> {
     const name = `rt${label}${Date.now().toString(36)}`;
-    const reg = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name, public_key: 'placeholder' }),
-    });
-    if (reg.status !== 201) throw new Error(`register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const timestamp = new Date().toISOString();
-    const sig = Buffer.from(await ed.signAsync(
-        new TextEncoder().encode(name + NODE_ID + timestamp),
-        Buffer.from(reg.body.data.private_key, 'base64'),
-    )).toString('base64');
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: sig }),
-    });
-    if (tok.body?.ok !== true) throw new Error(`token ${name}: ${JSON.stringify(tok.body?.error)}`);
-    return { name, token: tok.body.data.token };
+    return { name, token: (await registerOwner(BASE, name)).token };
 }
 
 function rolesOf(token: string): string[] {

@@ -43,6 +43,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -103,7 +104,6 @@ async function mcpRpc(method: string, params: Record<string, any> = {}, id: numb
 
 // ─── State ───
 let ownerToken = '';
-let ownerPrivKey = '';
 let agentPrivKey = '';
 let agentGaii = '';
 const ownerName = `mcpcnt${Date.now()}`;
@@ -127,17 +127,10 @@ await test('Register GHII identity', async () => {
         body: JSON.stringify({ username: ownerName, display_name: 'MCP Consent Test', password: 'McpCnt1234' }),
     });
     assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
 });
 
 await test('Owner auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName, 'McpCnt1234');
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });
@@ -321,11 +314,7 @@ await test('6b. A consent OPENS a private read, and revoking it CLOSES the read'
         body: JSON.stringify({ username: readerName, display_name: 'Consent Reader', password: 'McpCnt1234' }),
     });
     assert(reg.status === 201, `reader ghii ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: readerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, readerName + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, readerName, 'McpCnt1234');
     const readerToken = tok.body.data.token as string;
     const readerGhii = `${readerName}@${NODE_ID}`;
     const ownerGhii = `${ownerName}@${NODE_ID}`;

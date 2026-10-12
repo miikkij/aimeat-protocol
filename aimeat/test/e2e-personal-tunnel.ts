@@ -54,11 +54,11 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const HB_PORT = Number(process.env.E2E_TUNNEL_HB_PORT ?? 40299);
 const HB_BASE = `http://127.0.0.1:${HB_PORT}`;
 const HB_NODE_ID = 'aimeat-tunnel-heartbeat-test';
@@ -102,20 +102,8 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 }
 
 /** Register an owner and return its token. The first owner on a fresh node is also the operator. */
-async function registerOwner(call: ReturnType<typeof api>, name: string, nodeId: string): Promise<string> {
-    const reg = await call('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(reg.body.data.private_key, name + nodeId + timestamp);
-    const tok = await call('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
+async function registerOwner(base: string, name: string): Promise<string> {
+    return (await registerWithPassword(base, name)).token;
 }
 
 // ─── The home node's end of the tunnel ────────────────────────────────────────
@@ -279,8 +267,8 @@ async function sharedNodePhases() {
     console.log('Phase 1 — Setup');
 
     await test('an owner, an agent of that owner, and a second owner with no personal node', async () => {
-        ownerToken = await registerOwner(json, ownerName, NODE_ID);
-        strangerToken = await registerOwner(json, strangerName, NODE_ID);
+        ownerToken = await registerOwner(BASE, ownerName);
+        strangerToken = await registerOwner(BASE, strangerName);
         const agent = await json('/v1/agents', {
             method: 'POST',
             headers: { Authorization: `Bearer ${ownerToken}` },
@@ -652,9 +640,8 @@ async function startHeartbeatNode(): Promise<void> {
             AIMEAT_PORT: String(HB_PORT),
             AIMEAT_BASE_URL: HB_BASE,
             AIMEAT_NODE_TYPE: 'full',
-            // Pinned rather than read back off the running node: the owner-auth message is signed
-            // over the node id, and asking a booting node for its own id through the bootstrap route
-            // answered with the SPA's HTML once in four runs.
+            // Pinned rather than read back off the running node: asking a booting node for its own id
+            // through the bootstrap route answered with the SPA's HTML once in four runs.
             AIMEAT_NODE_ID: HB_NODE_ID,
             AIMEAT_NODE_KEY_PATH: join(hbDir, 'node-key.json'),
             AIMEAT_SQLITE_PATH: join(hbDir, 'tunnel.db'),
@@ -706,7 +693,7 @@ async function heartbeatMonitorPhase() {
     await test('a node with a twelve-second offline threshold is up, anchored and connected', async () => {
         await startHeartbeatNode();
         // Its own node id, not the shared runner's: the owner-auth message is signed over it.
-        hbToken = await registerOwner(hbJson, hbOwner, HB_NODE_ID);
+        hbToken = await registerOwner(HB_BASE, hbOwner);
         const anchor = await hbJson('/v1/personal/anchor', {
             method: 'POST',
             headers: { Authorization: `Bearer ${hbToken}` },

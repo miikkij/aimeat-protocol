@@ -19,12 +19,12 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -77,11 +77,10 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 
 async function getToken(identity: string, privKey: string, isAgent: boolean): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? identity + timestamp : identity + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: identity, timestamp, signature }
-        : { owner: identity, timestamp, signature };
+    // Agents only: an owner signs in with the password (helpers/owner-login.ts).
+    assert(isAgent, 'an owner signs in with the password, not here');
+    const signature = await signMsg(privKey, identity + timestamp);
+    const payload = { gaii: identity, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -127,13 +126,9 @@ console.log('\n=== AIMEAT Board Access Control E2E Test ===\n');
 console.log('Setup — Owners & Agents');
 
 await test('Register owner1 (gets operator role as first owner)', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: owner1Name, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    owner1PrivKey = body.data.private_key;
-    owner1Token = await getToken(owner1Name, owner1PrivKey, false);
+    const reg = await registerOwner(BASE, owner1Name);
+    owner1PrivKey = reg.privateKey;
+    owner1Token = reg.token;
 });
 
 await test('Register agent-A (under owner1)', async () => {
@@ -159,13 +154,9 @@ await test('Register agent-B (under owner1, same owner as agent-A)', async () =>
 });
 
 await test('Register owner2 (external, non-operator)', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    owner2PrivKey = body.data.private_key;
-    owner2Token = await getToken(owner2Name, owner2PrivKey, false);
+    const reg = await registerOwner(BASE, owner2Name);
+    owner2PrivKey = reg.privateKey;
+    owner2Token = reg.token;
 });
 
 await test('Register agent-C (under owner2, external agent)', async () => {

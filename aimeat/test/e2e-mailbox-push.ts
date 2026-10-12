@@ -58,14 +58,13 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
-import { createHash, generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
-import * as ed from '@noble/ed25519';
+import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
 import { startFakeSmtp, type FakeSmtp, type ParsedMail } from './helpers/fake-smtp.js';
 import { startFakePushReceiver, type FakePushReceiver } from './helpers/fake-push.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { createStorage } from '../src/storage/storage-factory.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerToken as passwordToken, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { seedPassword } from './helpers/seed-password.js';
 
 const require = createRequire(import.meta.url);
 const webPush = require('web-push') as typeof import('web-push');
@@ -111,15 +110,14 @@ async function json(path: string, opts: RequestInit = {}): Promise<Res> {
     return { status: res.status, body };
 }
 
-async function ownerToken(owner: string, privB64: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(owner + NODE_ID + timestamp), Buffer.from(privB64, 'base64'));
-    const r = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(r.status === 200 && r.body?.data?.token, `owner token for ${owner}: ${r.status} ${short(r.body)}`);
-    return r.body.data.token as string;
+/**
+ * A session for an account the web door made, which has no password. The owner-key sign-in that
+ * used to open it is removed in 4.0.0, so the account gets a password in this node's database and
+ * signs in with it (helpers/seed-password.ts).
+ */
+async function ownerToken(owner: string): Promise<string> {
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'mailbox-push.db'), nodeId: NODE_ID });
+    return passwordToken(BASE, owner);
 }
 
 /** Register through the plain door and sign in. */
@@ -129,7 +127,7 @@ async function registerOwner(username: string): Promise<string> {
         body: JSON.stringify({ username, display_name: `Mailbox Push ${username}`, password: 'MbxPush1234' }),
     });
     assert(reg.status === 201, `register ${username}: ${reg.status} ${short(reg.body)}`);
-    return ownerToken(username, reg.body.data.private_key);
+    return passwordToken(BASE, username, 'MbxPush1234');
 }
 
 /**
@@ -295,7 +293,7 @@ async function run(): Promise<void> {
             body: JSON.stringify({ username: sweepOwner, display_name: 'Sweep Owner', email: sweepEmail }),
         });
         assert(reg.status === 201, `register-web ${reg.status}: ${short(reg.body)}`);
-        sweepToken = await ownerToken(sweepOwner, reg.body.data.private_key);
+        sweepToken = await ownerToken(sweepOwner);
         const mail: ParsedMail = await smtp!.waitForMail(sweepEmail, /\b\d{6}\b/);
         const code = /\b(\d{6})\b/.exec(mail.text)?.[1];
         assert(typeof code === 'string' && code.length === 6, `no six-digit code in the message: ${mail.text.slice(0, 300)}`);

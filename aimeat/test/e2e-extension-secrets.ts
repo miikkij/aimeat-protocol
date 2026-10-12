@@ -15,11 +15,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { serverSqlitePath } from './helpers/server-db.js';
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
 
 const MASK = '••••••••';
@@ -54,12 +52,6 @@ async function json(path: string, opts: RequestInit = {}) {
   return { status: res.status, body, headers: res.headers };
 }
 
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-  const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-  return Buffer.from(sig).toString('base64');
-}
-
 // ─── State ───
 let ownerToken = '';
 let ownerPrivKey = '';
@@ -79,7 +71,7 @@ await test('register owner (operator)', async () => {
   const { status, body } = await json('/v1/admin/setup/register', {
     method: 'POST',
     headers: { 'X-Admin-Password': ADMIN_PW },
-    body: JSON.stringify({ name: ownerName }),
+    body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   ownerPrivKey = body.private_key;
@@ -87,12 +79,7 @@ await test('register owner (operator)', async () => {
 });
 
 await test('owner auth token', async () => {
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(ownerPrivKey, ownerName + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-  });
+  const { body } = await ownerSignIn(BASE, ownerName);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   ownerToken = body.data?.token;
   assert(typeof ownerToken === 'string', 'owner token');
@@ -269,24 +256,14 @@ const strangerName = `secstranger${Date.now()}`;
 let strangerToken = '';
 
 await test('register a second owner — a PLAIN one, not another operator', async () => {
-  // POST /v1/owners, NOT /v1/admin/setup/register. The setup route is how the owner at the top of
+  // POST /v1/ghii, NOT /v1/admin/setup/register. The setup route is how the owner at the top of
   // this file was made, and its test name says "(operator)" for a reason: it grants the operator
   // role. canManageInstalledExt allows an operator to manage anyone's extension BY DESIGN, so a
   // second principal made the same way passes every gate below and reads like a cross-owner hole.
   // The first draft of this block did exactly that and reported a 200 where it expected a refusal.
-  const reg = await json('/v1/owners', {
-    method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }),
-  });
-  assert(reg.status === 201, `status ${reg.status}: ${JSON.stringify(reg.body)}`);
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(reg.body.data.private_key, strangerName + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: strangerName, timestamp, signature }),
-  });
-  assert(body.ok === true, `stranger token: ${JSON.stringify(body.error)}`);
-  strangerToken = body.data?.token;
-  assert(!(body.data?.roles ?? []).includes('operator'), 'the second owner must not be an operator');
+  const stranger = await registerOwner(BASE, strangerName);
+  strangerToken = stranger.token;
+  assert(!stranger.roles.includes('operator'), 'the second owner must not be an operator');
 });
 
 await test('an unauthenticated caller cannot read the instance', async () => {

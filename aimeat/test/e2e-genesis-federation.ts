@@ -43,6 +43,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
 import * as ed from '@noble/ed25519';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -128,13 +129,7 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 
 /** Register an owner and return a token for it. The FIRST owner on a fresh node is the operator. */
 async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(reg.body.data.private_key, name + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body?.error)}`);
-    return tok.body.data.token as string;
+    return (await registerWithPassword(BASE, name)).token;
 }
 
 /** An agent of `ownerName` holding exactly these scopes, with its GAII and a token. */

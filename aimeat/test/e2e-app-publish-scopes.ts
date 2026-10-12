@@ -8,10 +8,9 @@
  * @version-history
  *   v1.0.0 -- 2026-09-07 -- Review finding: inline, presigned and draft promotion lacked app:write.
  */
-import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const owner = `pubscope${Date.now()}`;
 const filename = 'scope-target.html';
@@ -85,13 +84,9 @@ async function rawLive(): Promise<string> {
     return r.text();
 }
 async function main() {
-    const reg = await json('/v1/owners', '', { name: owner, public_key: 'placeholder' });
-    assert(reg.status === 201, `register ${reg.status}`);
-    const timestamp = new Date().toISOString();
-    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(owner + reg.body.node + timestamp), Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
-    const login = await json('/v1/auth/token', '', { owner, timestamp, signature: sig });
-    assert(login.status === 200, `owner token ${login.status}`);
-    ownerToken = login.body.data.token;
+    const registered = await registerOwner(BASE, owner);
+    const reg = registered.registration;
+    ownerToken = registered.token;
     try {
         const p = await publish(ownerToken, grantApp, 'grant-client');
         assert(p.status === 201, `publish grant client ${p.status}: ${JSON.stringify(p.body.error)}`);
@@ -129,14 +124,7 @@ async function main() {
             }
         }
         const other = `${owner}b`;
-        const otherReg = await json('/v1/owners', '', { name: other, public_key: 'placeholder' });
-        assert(otherReg.status === 201, `second owner ${otherReg.status}`);
-        const otherTime = new Date().toISOString();
-        const otherSig = Buffer.from(await ed.signAsync(new TextEncoder().encode(other + otherReg.body.node + otherTime),
-            Buffer.from(otherReg.body.data.private_key, 'base64'))).toString('base64');
-        const otherLogin = await json('/v1/auth/token', '', { owner: other, timestamp: otherTime, signature: otherSig });
-        assert(otherLogin.status === 200, `second owner token ${otherLogin.status}`);
-        const otherToken = otherLogin.body.data.token;
+        const otherToken = (await registerOwner(BASE, other)).token;
         try {
             for (const door of doors) {
                 await test(`another owner: ${door} cannot overwrite the first owner's app`, async () => {

@@ -90,10 +90,9 @@
  *     an unknown address as 404.
  *   v1.0.0 — 2026-08-28 — initial.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -115,10 +114,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(privB64: string, msg: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
@@ -130,10 +125,9 @@ async function setupOwner(label: string) {
         reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Db', password: 'DesignBook1234' }) });
     }
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'DesignBook1234');
     assert(tok.status === 200 && tok.body?.data?.token, `auth/token ${tok.status}`);
-    return { name, token: tok.body.data.token as string, roles: (tok.body.data.roles ?? []) as string[] };
+    return { name, token: tok.body.data.token as string, roles: (reg.body.data.owner?.roles ?? []) as string[] };
 }
 
 /** An agent of `owner`, approved by the owner through device authorization, with these scopes. */

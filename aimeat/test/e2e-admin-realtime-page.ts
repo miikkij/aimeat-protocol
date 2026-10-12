@@ -17,15 +17,11 @@
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=admin-realtime-page
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -45,21 +41,8 @@ async function call(base: string, path: string, opts: RequestInit = {}) {
 }
 const json = (path: string, opts: RequestInit = {}) => call(BASE, path, opts);
 
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
-async function ownerToken(base: string, nodeId: string, name: string): Promise<string> {
-    const reg = await call(base, '/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${short(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await call(base, '/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + nodeId + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${short(tok.body.error)}`);
-    return tok.body.data.token as string;
+async function ownerToken(base: string, name: string): Promise<string> {
+    return (await registerOwner(base, name)).token;
 }
 
 console.log('\n=== AIMEAT Admin Realtime Page E2E ===\n');
@@ -74,8 +57,8 @@ let otherToken = '';
 let roomId = '';
 
 await test('Setup: an operator, a second owner who is not one, and a room', async () => {
-    opToken = await ownerToken(BASE, NODE_ID, opName);
-    otherToken = await ownerToken(BASE, NODE_ID, otherName);
+    opToken = await ownerToken(BASE, opName);
+    otherToken = await ownerToken(BASE, otherName);
 
     const made = await json('/v1/realtime/rooms', {
         method: 'POST', headers: auth(opToken),
@@ -159,7 +142,7 @@ await test('With realtime switched off the overview answers 200 and says so', as
     const offBase = `http://localhost:${(server.address() as AddressInfo).port}`;
 
     try {
-        const token = await ownerToken(offBase, config.nodeId, `rtoff${stamp}`);
+        const token = await ownerToken(offBase, `rtoff${stamp}`);
         const r = await call(offBase, '/v1/admin/realtime', { headers: auth(token) });
         assert(r.status === 200, `a read of a switched-off feature is still an answer: got ${r.status}`);
         assert(r.body.data.enabled === false, `enabled: ${r.body.data.enabled}`);

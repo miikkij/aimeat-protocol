@@ -5,6 +5,9 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 
+import { tokenRoles } from './helpers/owner-login.js';
+import { signInByLink } from './helpers/seed-password.js';
+
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -50,6 +53,9 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 // ─── State ───
 const username = `authtest${Date.now()}`;
 const displayName = 'Auth Test User';
+// auth.register() registers with a password and signs in with it, always (session.js v1.7.0): the
+// owner-key sign-in it used without one is removed in node 4.0.0.
+const ownerPassword = 'AuthLibOwner-2026';
 let ownerName = '';
 let ownerPrivKey = '';
 let ownerJwt = '';
@@ -68,7 +74,7 @@ console.log('Phase 1 — GHII Registration (what auth.register() does)');
 await test('POST /v1/ghii — register human identity', async () => {
     const data = await api('/v1/ghii', {
         method: 'POST',
-        body: JSON.stringify({ username, display_name: displayName }),
+        body: JSON.stringify({ username, display_name: displayName, password: ownerPassword }),
     });
     assert(data.ok === true, `GHII registration failed: ${data.error?.message}`);
     assert(data._status === 201, `expected 201, got ${data._status}`);
@@ -87,19 +93,18 @@ await test('POST /v1/ghii — register human identity', async () => {
 // ─── Phase 2: Owner JWT ───
 console.log('\nPhase 2 — Owner Authentication');
 
-await test('POST /v1/auth/token — get owner JWT', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-
-    const data = await api('/v1/auth/token', {
+// The owner-key sign-in (POST /v1/auth/token with an owner signature) is removed in 4.0.0; what
+// auth.register() does after the registration is the password sign-in.
+await test('POST /v1/ghii/login — get owner JWT', async () => {
+    const data = await api('/v1/ghii/login', {
         method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
+        body: JSON.stringify({ username: ownerName, password: ownerPassword }),
     });
     assert(data.ok === true, `Owner auth failed: ${data.error?.message}`);
     ownerJwt = data.data.token;
     assert(typeof ownerJwt === 'string' && ownerJwt.length > 0, 'missing owner JWT');
-    assert(data.data.roles.includes('owner'), `owner JWT should have owner role, got: ${data.data.roles}`);
+    const roles = tokenRoles(ownerJwt);
+    assert(roles.includes('owner'), `owner JWT should have owner role, got: ${roles}`);
 });
 
 // ─── Phase 3: Agent Registration ───
@@ -398,10 +403,13 @@ await test('POST /v1/ghii/login — nonexistent user rejected', async () => {
 });
 
 await test('POST /v1/ghii/login — no-password account rejected', async () => {
-    // The 'username' account (from Phase 1) was registered without password
+    // An account registered without a password (Phase 1's now has one, as auth.register() gives it).
+    const noPwName = `${username}np`;
+    const reg = await api('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: noPwName, display_name: 'No Password' }) });
+    assert(reg.ok === true && reg.data.has_password === false, `password-less registration: ${reg.error?.message}`);
     const data = await api('/v1/ghii/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password: 'trylogin' }),
+        body: JSON.stringify({ username: noPwName, password: 'trylogin' }),
     });
     assert(data.ok === false, 'no-password account should reject login');
     assert(data.error?.code === 'NO_PASSWORD', `expected NO_PASSWORD, got: ${data.error?.code}`);
@@ -462,16 +470,11 @@ await test('POST /v1/ghii — register WITHOUT a password (OAuth-style)', async 
     assert(data.ok === true, `Registration failed: ${data.error?.message}`);
     assert(data.data.has_password === false, 'newly registered passwordless account should report has_password=false');
 
-    // Obtain an owner JWT via signature (the OAuth flow yields a session the same way).
-    const timestamp = new Date().toISOString();
-    const message = noPwUsername + NODE_ID + timestamp;
-    const signature = await signMsg(data.data.private_key, message);
-    const tok = await api('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: noPwUsername, timestamp, signature }),
-    });
-    assert(tok.ok === true, `Owner auth failed: ${tok.error?.message}`);
-    noPwOwnerJwt = tok.data.token;
+    // A session without a password, the way such an account gets one from 4.0.0: an emailed sign-in
+    // link, opened and refreshed (helpers/seed-password.ts signInByLink). An OAuth sign-in ends in
+    // the same kind of session. The account still has no password afterwards.
+    noPwOwnerJwt = await signInByLink(BASE, noPwUsername, `${noPwUsername}@example.test`);
+    assert(noPwOwnerJwt.length > 0, 'Owner auth failed: no session from the sign-in link');
 });
 
 await test('GET /v1/ghii/me — reports has_password=false before setting one', async () => {

@@ -58,6 +58,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner as registerPasswordOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function sign(privB64: string, message: string): Promise<string> {
@@ -70,16 +71,8 @@ interface Owner { name: string; token: string; priv: string }
 
 async function registerOwner(label: string): Promise<Owner> {
     const name = `cmp${label}${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
-    const priv = reg.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(priv, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body?.error)}`);
-    return { name, token: tok.body.data.token as string, priv };
+    const owner = await registerPasswordOwner(BASE, name);
+    return { name, token: owner.token, priv: owner.privateKey };
 }
 
 /** An agent of `owner` holding exactly `scopes`, and a bearer token for it. */

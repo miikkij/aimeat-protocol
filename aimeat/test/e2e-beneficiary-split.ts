@@ -36,6 +36,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
   return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -46,8 +47,7 @@ async function setupOwner(label: string) {
   let reg = await reg0();
   for (let i = 0; reg.status === 429 && i < 8; i++) { await new Promise(r => setTimeout(r, 1500)); reg = await reg0(); }
   assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-  const ts = new Date().toISOString();
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
+  const tok = await ownerSignIn(BASE, name, 'Beneficiary1234');
   return { name, token: tok.body.data.token as string, ghii: `${name}@${NODE_ID}` };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });

@@ -23,13 +23,10 @@
  *     malformed-manifest, non-ZIP and cross-owner cases.
  *   v1.0.0 — 2026-07-26 — Initial.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { deflateRawSync, crc32 } from 'node:zlib';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-let NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const owner = `pmowner${Date.now() % 1000000}`;
 const EXT = `pmext${Date.now() % 100000}`;
 
@@ -45,16 +42,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
-}
-async function getOwnerToken(name: string, priv: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + timestamp), Buffer.from(priv, 'base64'));
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(body.ok === true, `owner token: ${JSON.stringify(body.error)}`);
-    return body.data.token;
 }
 
 /** Minimal stored+deflated ZIP writer — avoids adding a dev dependency just to build a fixture. */
@@ -166,10 +153,7 @@ async function main() {
     console.log('Setup');
 
     await test('register owner', async () => {
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register: ${reg.status}`);
-        if (typeof reg.body.node === 'string' && reg.body.node) NODE_ID = reg.body.node;
-        ownerToken = await getOwnerToken(owner, reg.body.data.private_key);
+        ownerToken = (await registerOwner(BASE, owner)).token;
     });
 
     console.log('\nPhase 1: sandbox primitives (ctx.hash / ctx.now)');
@@ -339,9 +323,7 @@ async function main() {
 
     await test('a DIFFERENT owner cannot overwrite an installed extension through a presigned ZIP', async () => {
         const other = `pmother${Date.now() % 1000000}`;
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register other owner: ${reg.status}`);
-        const otherToken = await getOwnerToken(other, reg.body.data.private_key);
+        const otherToken = (await registerOwner(BASE, other)).token;
 
         const url = await presignedExtensionUrl({ update: true, as: otherToken });
         const r = await putZip(url, makeZip({ 'manifest.yaml': manifest('9.9.9'), 'scripts/ping.js': PING_JS }));

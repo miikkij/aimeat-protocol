@@ -46,32 +46,21 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
     return { status: res.status, body };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerToken as passwordToken } from './helpers/owner-login.js';
+import { seedPassword } from './helpers/seed-password.js';
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
-async function ownerToken(name: string, privKey: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }),
-    });
-    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-    return body.data.token;
-}
-
-/** POST /v1/owners — the programmatic door. */
+/**
+ * POST /v1/owners — the programmatic door. It makes an account with no password, and the owner-key
+ * sign-in that opened its session is removed in 4.0.0, so the account gets a password in the
+ * server's database (helpers/seed-password.ts) and signs in with it to read its inbox.
+ */
 async function registerViaOwners(name: string): Promise<{ token: string; ghii: string }> {
     const { status, body } = await json('/v1/owners', {
         method: 'POST', body: JSON.stringify({ name, display_name: name, public_key: 'placeholder' }),
     });
     assert(status === 201, `register ${name}: ${status} ${JSON.stringify(body)}`);
-    return { token: await ownerToken(name, body.data.private_key), ghii: `${name}@${NODE_ID}` };
+    await seedPassword(name);
+    return { token: await passwordToken(BASE, name), ghii: `${name}@${NODE_ID}` };
 }
 
 /** POST /v1/ghii — the account door with a password. */
@@ -81,7 +70,7 @@ async function registerViaGhii(name: string): Promise<{ token: string; ghii: str
         body: JSON.stringify({ username: name, display_name: name, password: 'Correct-Horse-9!' }),
     });
     assert(status === 201, `ghii register ${name}: ${status} ${JSON.stringify(body)}`);
-    return { token: await ownerToken(name, body.data.private_key), ghii: `${name}@${NODE_ID}` };
+    return { token: await passwordToken(BASE, name, 'Correct-Horse-9!'), ghii: `${name}@${NODE_ID}` };
 }
 
 async function inboxOf(token: string): Promise<any[]> {

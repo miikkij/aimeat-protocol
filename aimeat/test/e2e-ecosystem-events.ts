@@ -46,17 +46,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
   throw new Error('unreachable');
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-
-async function getOwnerToken(owner: string, privKey: string): Promise<string> {
-  const timestamp = new Date().toISOString();
-  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(owner + NODE_ID + timestamp), Buffer.from(privKey, 'base64'))).toString('base64');
-  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp, signature: sig }) });
-  assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-  return body.data.token;
-}
+import { registerOwner } from './helpers/owner-login.js';
 
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 const ownerName = `ecoevowner${Date.now()}`;
@@ -101,9 +91,7 @@ async function run() {
   // ── Setup ──
   console.log('Setup — Owner + agent + offer');
   await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerToken = await getOwnerToken(ownerName, body.data.private_key);
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
     auth = { Authorization: `Bearer ${ownerToken}` };
   });
   await test('Register agent + publish offer', async () => {
@@ -145,9 +133,7 @@ async function run() {
   // morsels on a payload they never saw.
   await test('A SECOND owner\'s identically-triggered workflow does NOT fire on A\'s event', async () => {
     const otherName = `ecoevother${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register second owner: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const otherAuth = { Authorization: `Bearer ${await getOwnerToken(otherName, reg.body.data.private_key)}` };
+    const otherAuth = { Authorization: `Bearer ${(await registerOwner(BASE, otherName)).token}` };
 
     // B needs their own agent + offer, because the workflow step names one.
     const ag = await json('/v1/agents', { method: 'POST', headers: otherAuth, body: JSON.stringify({ name: agentName, owner: otherName, capabilities: ['memory'] }) });

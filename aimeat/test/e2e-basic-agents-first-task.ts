@@ -59,6 +59,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node
 import { join, resolve } from 'node:path';
 import { stringify as yamlStringify } from 'yaml';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -94,10 +95,11 @@ async function json(base: string, path: string, opts: RequestInit = {}): Promise
 
 async function tokenFor(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
-  const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(priv, 'base64'));
+  // Agents only: an owner signs in with the password (helpers/owner-login.ts).
+  assert(isAgent, 'an owner signs in with the password, not here');
+  const sig = await ed.signAsync(new TextEncoder().encode(idOrOwner + ts), Buffer.from(priv, 'base64'));
   const signature = Buffer.from(sig).toString('base64');
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const payload = { gaii: idOrOwner, timestamp: ts, signature };
   const { body } = await json(BASE, '/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -154,9 +156,7 @@ async function refusalsSince(agent: string, since: string): Promise<any[]> {
 console.log('\n=== An agent the basic-agents button made finishes its first task ===\n');
 
 await test('setup: an owner, one connected agent, and the connector daemon', async () => {
-  const reg = await json(BASE, '/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `owner ${reg.status}: ${JSON.stringify(reg.body)}`);
-  ownerToken = await tokenFor(ownerName, reg.body.data.private_key, false);
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
   const ag = await json(BASE, '/v1/agents', {
     method: 'POST', headers: authOwner(),
     body: JSON.stringify({ name: firstAgent, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*'] }),

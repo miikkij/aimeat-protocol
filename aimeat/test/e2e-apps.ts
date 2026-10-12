@@ -53,6 +53,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -118,22 +119,13 @@ console.log('\n=== App Catalog Versions/Restore/Fork E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register test owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
+    const reg = await registerOwner(BASE, ownerName);
+    ownerPrivKey = reg.privateKey;
     assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got private key');
 });
 
 await test('Get owner token', async () => {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(ownerPrivKey, ownerName + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data?.token;
     assert(typeof ownerToken === 'string', 'got owner token');
@@ -275,20 +267,8 @@ const ownerBName = `appsother${Date.now() % 100000}`;
 let ownerBToken = '';
 
 await test('Register a second owner and get a token', async () => {
-    const reg = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerBName, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `register status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const bPriv = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(bPriv, ownerBName + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerBName, timestamp, signature }),
-    });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    ownerBToken = tok.body.data?.token;
+    const reg = await registerOwner(BASE, ownerBName);
+    ownerBToken = reg.token;
     assert(typeof ownerBToken === 'string', 'got owner B token');
 });
 

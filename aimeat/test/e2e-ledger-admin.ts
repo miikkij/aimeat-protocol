@@ -55,32 +55,13 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
     throw new Error('unreachable');
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature } : { owner: ownerOrGaii, timestamp, signature };
-    const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
-    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-    return body.data.token;
-}
+import { registerOwner } from './helpers/owner-login.js';
 
 async function registerOwnerAndAgent(prefix: string): Promise<{
     ownerName: string; ownerToken: string; agentName: string; agentGaii: string;
 }> {
     const ownerName = `${prefix}${Date.now()}${Math.floor(performance.now())}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register owner: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ownerToken = await getToken(ownerName, reg.body.data.private_key, false);
+    const ownerToken = (await registerOwner(BASE, ownerName)).token;
 
     const agentName = 'ledgerbot';
     const ar = await json('/v1/agents', {

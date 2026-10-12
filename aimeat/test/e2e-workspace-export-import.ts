@@ -16,7 +16,6 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-export-import
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -30,10 +29,7 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
 }
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(privB64: string, msg: string) { return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64'); }
+import { ownerSignIn } from './helpers/owner-login.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 // 1x1 transparent PNG
@@ -52,7 +48,7 @@ await test('Setup owner + org + workspace (manifest, schema, record, document w/
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'WS Exp', password: 'WsExp1234' }) });
     assert(reg.status === 201, `ghii ${reg.status}`);
     const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await sign(reg.body.data.private_key, ownerName + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, ownerName, 'WsExp1234');
     token = tk.body.data.token;
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'Exp Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
     orgId = o.body.data.organism.id;
@@ -197,8 +193,7 @@ await test('9. an active MEMBER (not the creator) exports the organism — reada
         reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: memberName, display_name: 'WS Member', password: 'WsExp1234' }) });
     }
     assert(reg.status === 201, `ghii ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: memberName, timestamp: ts, signature: await sign(reg.body.data.private_key, memberName + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, memberName, 'WsExp1234');
     memberToken = tk.body.data.token;
     const jr = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(memberToken), body: '{}' });
     assert(jr.status < 300, `join ${jr.status}: ${JSON.stringify(jr.body.error)}`);

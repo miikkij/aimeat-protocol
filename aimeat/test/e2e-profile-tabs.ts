@@ -31,12 +31,12 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -104,12 +104,7 @@ await test('Register owner (via GHII)', async () => {
 });
 
 await test('Owner auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(ownerPrivKey, ownerName + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName, 'E2eTest123!');
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });
@@ -328,12 +323,7 @@ await test('Register 2nd owner for work lifecycle', async () => {
 });
 
 await test('Owner2 auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(owner2PrivKey, owner2Name + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: owner2Name, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, owner2Name, 'Provider123!');
     assert(body.ok === true, `owner2 token: ${JSON.stringify(body.error)}`);
     owner2Token = body.data.token;
 });
@@ -1547,12 +1537,7 @@ await test('Re-auth after session revocation', async () => {
     assert(body.ok === true, `re-auth: ${JSON.stringify(body.error)}`);
     agentToken = body.data.token;
 
-    const ownerTs = new Date().toISOString();
-    const ownerSig = await signMsg(ownerPrivKey, ownerName + NODE_ID + ownerTs);
-    const owner = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp: ownerTs, signature: ownerSig }),
-    });
+    const owner = await ownerSignIn(BASE, ownerName, 'E2eTest123!');
     assert(owner.body.ok === true, `owner re-auth: ${JSON.stringify(owner.body.error)}`);
     ownerToken = owner.body.data.token;
 });

@@ -28,8 +28,7 @@
  *     the owner's feed and not in the usage stream the sibling admin doors write to.
  *   v1.0.0 — 2026-09-12 — Written with the page rebuilt around the question.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { registerOwner, ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -61,21 +60,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
     return { status: res.status, body };
-}
-
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
-
-async function ownerTokenFor(name: string, privateKeyB64: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const priv = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + timestamp), priv);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(body.ok === true, `token for ${name}: ${JSON.stringify(body.error)}`);
-    return body.data.token as string;
 }
 
 // ─── State ───
@@ -114,23 +98,19 @@ await test('An operator, through the admin-password door', async () => {
     const { status, body } = await json('/v1/admin/setup/register', {
         method: 'POST',
         headers: { 'X-Admin-Password': ADMIN_PW },
-        body: JSON.stringify({ name: opName }),
+        body: JSON.stringify({ name: opName, password: OWNER_PASSWORD }),
     });
     assert(status === 200, `register ${opName}: ${status} ${JSON.stringify(body)}`);
     assert(body.owner?.roles?.includes('operator'), 'the first registration is not an operator');
-    opToken = await ownerTokenFor(opName, body.private_key);
+    opToken = await ownerToken(BASE, opName);
     opGhii = `${opName}@${NODE_ID}`;
 });
 
 await test('A plain owner, who must be refused every door below', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: plainName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `register ${plainName}: ${status} ${JSON.stringify(body)}`);
-    assert(!(body.data.owner?.roles ?? []).includes('operator'),
-        `the second owner came out an operator, so the refusals below prove nothing: ${JSON.stringify(body.data.owner?.roles)}`);
-    plainToken = await ownerTokenFor(plainName, body.data.private_key);
+    const plainOwner = await registerOwner(BASE, plainName);
+    assert(!plainOwner.roles.includes('operator'),
+        `the second owner came out an operator, so the refusals below prove nothing: ${JSON.stringify(plainOwner.roles)}`);
+    plainToken = plainOwner.token;
     plainGhii = `${plainName}@${NODE_ID}`;
 });
 

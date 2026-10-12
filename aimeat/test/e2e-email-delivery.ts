@@ -56,17 +56,14 @@ import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
-import * as ed from '@noble/ed25519';
 import { startFakeSmtp, decodeWords, type FakeSmtp, type ParsedMail } from './helpers/fake-smtp.js';
 import { waitForServer } from './helpers/wait-for-server.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { seedPassword } from './helpers/seed-password.js';
 
 const PORT = Number(process.env.E2E_EMAIL_PORT ?? 40294);
 const SMTP_PORT = PORT + 1;
 const BASE = `http://127.0.0.1:${PORT}`;
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const STAMP = Date.now().toString(36).slice(-6);
 
 let passed = 0;
@@ -104,14 +101,14 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
 const bearer = (t: string): Record<string, string> => ({ Authorization: `Bearer ${t}` });
 const short = (v: unknown): string => JSON.stringify(v).slice(0, 300);
 
-/** Sign the owner-auth message with the key a registration handed back once. */
-async function ownerToken(owner: string, privB64: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(owner + NODE_ID + timestamp), Buffer.from(privB64, 'base64'));
-    const r = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
+/**
+ * A session for an account the web door made, which has no password. The owner-key sign-in that
+ * used to open it is removed in 4.0.0, so the account gets a password in this node's database and
+ * signs in with it (helpers/seed-password.ts).
+ */
+async function ownerToken(owner: string): Promise<string> {
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'email.db') });
+    const r = await ownerSignIn(BASE, owner);
     assert(r.status === 200 && r.body?.data?.token, `owner token for ${owner}: ${r.status} ${short(r.body)}`);
     return r.body.data.token as string;
 }
@@ -124,7 +121,7 @@ async function registerWeb(username: string, email: string, displayName: string)
     });
     assert(reg.status === 201, `register-web ${username}: ${reg.status} ${short(reg.body)}`);
     return {
-        token: await ownerToken(username, reg.body.data.private_key),
+        token: await ownerToken(username),
         verificationId: reg.body.data.verification_id as string,
         privateKey: reg.body.data.private_key as string,
     };
@@ -288,7 +285,9 @@ async function run(): Promise<void> {
             body: JSON.stringify({ username: recName, display_name: 'Recovery Reader', password: recPassword }),
         });
         assert(reg.status === 201, `register ${reg.status}: ${short(reg.body)}`);
-        recToken = await ownerToken(recName, reg.body.data.private_key);
+        const signIn = await ownerSignIn(BASE, recName, recPassword);
+        assert(signIn.status === 200 && signIn.body?.data?.token, `sign-in ${recName}: ${signIn.status} ${short(signIn.body)}`);
+        recToken = signIn.body.data.token as string;
 
         const ask = await json('/v1/ghii/email/verify', {
             method: 'POST', headers: bearer(recToken), body: JSON.stringify({ email: recEmail }),

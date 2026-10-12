@@ -22,13 +22,9 @@
  * @version-history
  *   v1.0.0 -- 2026-10-09 -- Initial.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerAName = `aiusea${Date.now() % 100000}`;
 const ownerBName = `aiuseb${Date.now() % 100000}`;
 const FILE = 'ai-use-app.html';
@@ -62,22 +58,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
     return { status: res.status, body, headers: res.headers };
-}
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
-
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name} status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(reg.body.data.private_key, name + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data?.token as string;
 }
 
 const b64 = (html: string) => Buffer.from(html, 'utf8').toString('base64');
@@ -126,8 +106,8 @@ Type a word, press Look up.
 console.log('\n=== Use with your AI mark + guide page E2E ===\n');
 
 await test('Setup: two owners, three apps', async () => {
-    aToken = await registerOwner(ownerAName);
-    bToken = await registerOwner(ownerBName);
+    aToken = (await registerOwner(BASE, ownerAName)).token;
+    bToken = (await registerOwner(BASE, ownerBName)).token;
     await publish(FILE);
     await publish(PRIVATE_FILE);
     await publish(GATED_FILE, { access_code: 'open-sesame-42' });

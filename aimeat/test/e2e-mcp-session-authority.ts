@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -73,10 +74,7 @@ async function owner(label: string) {
     username: name, display_name: label, password: 'SessionAuthority1234',
   });
   assert.equal(registration.status, 201, 'owner registration');
-  const time = new Date().toISOString();
-  const login = await rest('/v1/auth/token', 'POST', undefined, {
-    owner: name, timestamp: time, signature: await sign(registration.body.data.private_key, name + NODE + time),
-  });
+  const login = await ownerSignIn(BASE, name, 'SessionAuthority1234');
   assert.equal(login.status, 200, 'owner credential');
   return { name, token: login.body.data.token as string };
 }

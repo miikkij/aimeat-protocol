@@ -30,10 +30,11 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-// Read from the node's own registration response rather than guessing: the owner signature is over
-// `owner + nodeId + timestamp`, so a wrong id fails as an opaque 'Invalid signature'.
+// Read from the node's own registration response rather than guessing: a member identifier is
+// `name@nodeId`, so a wrong id names nobody.
 let NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
@@ -55,12 +56,13 @@ async function signMsg(privB64: string, message: string): Promise<string> {
     return Buffer.from(sig).toString('base64');
 }
 async function getToken(subject: string, priv: string, isAgent: boolean): Promise<string> {
+    assert(isAgent, 'an owner signs in with registerOwner() from helpers/owner-login.js');
     const timestamp = new Date().toISOString();
-    // Agents sign `gaii + timestamp`; owners sign `owner + nodeId + timestamp`. Different messages.
-    const signature = await signMsg(priv, isAgent ? subject + timestamp : subject + NODE_ID + timestamp);
+    // Agents sign `gaii + timestamp`.
+    const signature = await signMsg(priv, subject + timestamp);
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
-        body: JSON.stringify(isAgent ? { gaii: subject, timestamp, signature } : { owner: subject, timestamp, signature }),
+        body: JSON.stringify({ gaii: subject, timestamp, signature }),
     });
     assert(body.ok === true, `token for ${subject}: ${JSON.stringify(body.error)}`);
     return body.data.token;
@@ -78,10 +80,10 @@ interface Party {
 }
 
 async function makeParty(name: string): Promise<Party> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const owner = await registerOwner(BASE, name);
+    const reg = owner.registration;
     if (typeof reg.body.node === 'string' && reg.body.node) NODE_ID = reg.body.node;
-    const ownerToken = await getToken(name, reg.body.data.private_key, false);
+    const ownerToken = owner.token;
 
     const ag = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },

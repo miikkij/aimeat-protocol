@@ -26,9 +26,7 @@
  *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
  *   v1.0.0 — 2026-08-14 — Initial (August 2026 audit NEW-2).
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner as registerWithPassword, ownerSignIn, tokenRoles } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -51,20 +49,12 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
 /** Register a plain owner and sign in. Not an operator: this is the principal the fix is about. */
 async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, name + NODE_ID + ts);
-    const auth = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
+    await registerWithPassword(BASE, name);
+    const auth = await ownerSignIn(BASE, name);
     assert(auth.body.ok === true, `auth ${name}: ${JSON.stringify(auth.body.error)}`);
-    assert(!(auth.body.data.roles ?? []).includes('operator'), `${name} must NOT be an operator`);
+    assert(!tokenRoles(auth.body.data.token).includes('operator'), `${name} must NOT be an operator`);
     return auth.body.data.token;
 }
 

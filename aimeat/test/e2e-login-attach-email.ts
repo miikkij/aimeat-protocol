@@ -28,14 +28,9 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
-import * as ed from '@noble/ed25519';
 import { markEmailVerified } from './helpers/verified-email.js';
-import { createHash } from 'node:crypto';
 import { waitForServer } from './helpers/wait-for-server.js';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(privB64: string, msg: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const PORT = process.env.E2E_ATTACH_EMAIL_PORT ?? '40402';
 const BASE = `http://localhost:${PORT}`;
@@ -117,8 +112,7 @@ async function main() {
             const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `inviter${Date.now() % 1000000}`, display_name: 'Inviter', password: 'InviteP123' }) });
             assert(reg.status === 201, `inviter reg ${reg.status}`);
             const inv = reg.body.data.owner.name as string;
-            const ts = new Date().toISOString();
-            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: inv, timestamp: ts, signature: await sign(reg.body.data.private_key, inv + NODE_ID + ts) }) });
+            const tok = await ownerSignIn(BASE, inv, 'InviteP123');
             const token = tok.body.data.token as string;
             const org = await json('/v1/organisms', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: 'Attach Org', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
             assert(org.status === 201, `org ${org.status}`);

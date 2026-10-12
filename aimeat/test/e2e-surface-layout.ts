@@ -19,14 +19,9 @@
  *     redirects to the store.
  *   v1.0.0 — 2026-08-26 — Initial suite.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -56,22 +51,8 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
 async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(priv, name + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }),
-    });
-    assert(body.ok === true, `token ${name}: ${JSON.stringify(body.error)}`);
-    return body.data.token;
+    return (await registerWithPassword(BASE, name)).token;
 }
 
 // ─── State ───

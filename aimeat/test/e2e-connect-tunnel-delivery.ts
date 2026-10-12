@@ -12,12 +12,12 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TunnelClient } from './helpers/tunnel-harness.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const PUSH_LATENCY_BUDGET_MS = 250;
 
 let passed = 0;
@@ -40,11 +40,10 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function getToken(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
-  const signature = await signMsg(priv, message);
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const signature = await signMsg(priv, gaii + ts);
+  const payload = { gaii, timestamp: ts, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -73,9 +72,7 @@ console.log('\n=== AIMEAT Connector Forward Tunnel — Reverse Delivery E2E (Pha
 
 console.log('Setup — Owner & Agent');
 await test('Register owner', async () => {
-  const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  ownerToken = await getToken(ownerName, body.data.private_key, false);
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
 });
 await test('Register agent (interactive)', async () => {
   const { status, body } = await json('/v1/agents', {
@@ -83,7 +80,7 @@ await test('Register agent (interactive)', async () => {
     body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*'] }),
   });
   assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  agentToken = await getToken(body.data.agent.gaii, body.data.private_key, true);
+  agentToken = await getToken(body.data.agent.gaii, body.data.private_key);
 });
 
 // ─── Phase 1: realtime push to a connected agent ───
@@ -241,9 +238,7 @@ await test('9. Another owner cannot start this agent\'s task, and nothing is pus
   // The fence beside the wake: a second account's session is refused, and the agent's socket hears
   // nothing, so a refused Start can never wake somebody else's agent.
   const strangerName = `delstranger${Date.now()}`;
-  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `stranger ${reg.status}`);
-  const strangerToken = await getToken(strangerName, reg.body.data.private_key, false);
+  const strangerToken = (await registerOwner(BASE, strangerName)).token;
   const taskId = await createQueuedTask('Not the stranger\'s to start');
   const t = await TunnelClient.connect(BASE, agentToken);
   await t.waitForBacklog(1500);

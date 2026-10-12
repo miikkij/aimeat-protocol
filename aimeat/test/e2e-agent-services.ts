@@ -10,7 +10,6 @@
 //     a broken gate makes the later provider accept answer 409 and the second failure says nothing.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -52,6 +51,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -61,13 +61,11 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
+    const message = gaii + timestamp;
     const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: ownerOrGaii, timestamp, signature }
-        : { owner: ownerOrGaii, timestamp, signature };
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -112,13 +110,9 @@ console.log('\n=== AIMEAT Agent Services (Work-to-Task Bridge) E2E Test ===\n');
 console.log('Setup -- Provider Owner & Agent');
 
 await test('Register provider owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: providerOwnerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    providerOwnerPrivKey = body.data.private_key;
-    providerOwnerToken = await getToken(providerOwnerName, providerOwnerPrivKey, false);
+    const owner = await registerOwner(BASE, providerOwnerName);
+    providerOwnerPrivKey = owner.privateKey;
+    providerOwnerToken = owner.token;
 });
 
 await test('Register provider agent', async () => {
@@ -137,20 +131,16 @@ await test('Register provider agent', async () => {
 });
 
 await test('Provider agent auth token', async () => {
-    providerToken = await getToken(providerGaii, providerPrivKey, true);
+    providerToken = await getToken(providerGaii, providerPrivKey);
     assert(typeof providerToken === 'string' && providerToken.length > 0, 'got provider token');
 });
 
 console.log('Setup -- Requester Owner & Agent');
 
 await test('Register requester owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: requesterOwnerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    requesterOwnerPrivKey = body.data.private_key;
-    requesterOwnerToken = await getToken(requesterOwnerName, requesterOwnerPrivKey, false);
+    const owner = await registerOwner(BASE, requesterOwnerName);
+    requesterOwnerPrivKey = owner.privateKey;
+    requesterOwnerToken = owner.token;
 });
 
 await test('Register requester agent', async () => {
@@ -169,20 +159,16 @@ await test('Register requester agent', async () => {
 });
 
 await test('Requester agent auth token', async () => {
-    requesterToken = await getToken(requesterGaii, requesterPrivKey, true);
+    requesterToken = await getToken(requesterGaii, requesterPrivKey);
     assert(typeof requesterToken === 'string' && requesterToken.length > 0, 'got requester token');
 });
 
 console.log('Setup -- No-directives Owner & Agent');
 
 await test('Register no-directives owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: noDirectivesOwnerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    noDirectivesOwnerPrivKey = body.data.private_key;
-    noDirectivesOwnerToken = await getToken(noDirectivesOwnerName, noDirectivesOwnerPrivKey, false);
+    const owner = await registerOwner(BASE, noDirectivesOwnerName);
+    noDirectivesOwnerPrivKey = owner.privateKey;
+    noDirectivesOwnerToken = owner.token;
 });
 
 await test('Register no-directives agent', async () => {
@@ -201,7 +187,7 @@ await test('Register no-directives agent', async () => {
 });
 
 await test('No-directives agent auth token', async () => {
-    noDirectivesToken = await getToken(noDirectivesGaii, noDirectivesPrivKey, true);
+    noDirectivesToken = await getToken(noDirectivesGaii, noDirectivesPrivKey);
     assert(typeof noDirectivesToken === 'string' && noDirectivesToken.length > 0, 'got no-directives token');
 });
 

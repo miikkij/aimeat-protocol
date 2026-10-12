@@ -46,6 +46,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, msg: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -175,11 +176,7 @@ await test('Setup: an owner, an agent, and an MCP session', async () => {
     for (let i = 0; reg.status === 429 && i < 8; i++) { await new Promise(r => setTimeout(r, 1500)); reg = await mk(); }
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body)}`);
 
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await sign(reg.body.data.private_key, ownerName + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, ownerName, 'IamGen12345');
     ownerToken = tok.body.data.token;
 
     const ag = await json('/v1/agents', {

@@ -15,10 +15,10 @@
  *     collapse into creditWelcomeBonus().
  *   v1.0.0 — 2026-09-04 — Initial.
  */
-import * as ed from '@noble/ed25519';
+import { ownerSignIn } from './helpers/owner-login.js';
+import { seedPassword } from './helpers/seed-password.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -74,17 +74,11 @@ await test('The web registration door credits the same welcome bonus', async () 
   });
   assert(reg.status === 201, `register-web ${reg.status}: ${JSON.stringify(reg.body.error)}`);
 
-  // No password on this door, so the session comes from the owner key it just handed back.
-  const timestamp = new Date().toISOString();
-  const message = webName + NODE_ID + timestamp;
-  const sig = await ed.signAsync(
-    new TextEncoder().encode(message),
-    Buffer.from(reg.body.data.private_key as string, 'base64'),
-  );
-  const tok = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: webName, timestamp, signature: Buffer.from(sig).toString('base64') }),
-  });
+  // No password on this door, and the owner-key sign-in that used to open its session is removed in
+  // 4.0.0, so the account gets a password behind the server's back and signs in with it. The
+  // password write adds no ledger row, so the wallet below is still exactly what the door made.
+  await seedPassword(webName);
+  const tok = await ownerSignIn(BASE, webName);
   assert(tok.status === 200, `owner token ${tok.status}: ${JSON.stringify(tok.body.error)}`);
 
   const { status, body } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${tok.body.data.token}` } });

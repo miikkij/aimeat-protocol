@@ -16,6 +16,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -41,10 +42,10 @@ async function signMsg(priv: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(priv, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function getToken(id: string, priv: string, isAgent: boolean): Promise<string> {
+async function getToken(id: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const signature = await signMsg(priv, isAgent ? id + ts : id + NODE_ID + ts);
-  const payload = isAgent ? { gaii: id, timestamp: ts, signature } : { owner: id, timestamp: ts, signature };
+  const signature = await signMsg(priv, id + ts);
+  const payload = { gaii: id, timestamp: ts, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -62,11 +63,8 @@ console.log('\n=== AIMEAT: /v1/agents/me, the bulk press, and A2A discovery ===\
 
 console.log('Setup');
 await test('Two owners, one agent each', async () => {
-  const a = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerA, public_key: 'placeholder' }) });
-  assert(a.status === 201, `owner A: ${JSON.stringify(a.body)}`);
-  tokA = await getToken(ownerA, a.body.data.private_key, false);
-  const b = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerB, public_key: 'placeholder' }) });
-  tokB = await getToken(ownerB, b.body.data.private_key, false);
+  tokA = (await registerOwner(BASE, ownerA)).token;
+  tokB = (await registerOwner(BASE, ownerB)).token;
 
   const mk = await json('/v1/agents', {
     method: 'POST', headers: { Authorization: `Bearer ${tokA}` },
@@ -74,7 +72,7 @@ await test('Two owners, one agent each', async () => {
   });
   assert(mk.status === 201, `agent: ${JSON.stringify(mk.body)}`);
   gaiiA = mk.body.data.agent.gaii;
-  agentTokA = await getToken(gaiiA, mk.body.data.private_key, true);
+  agentTokA = await getToken(gaiiA, mk.body.data.private_key);
 });
 
 console.log('\nWho am I');

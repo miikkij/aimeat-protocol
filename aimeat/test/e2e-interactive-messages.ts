@@ -50,6 +50,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner as registerPasswordOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -57,20 +58,17 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature } : { owner: ownerOrGaii, timestamp, signature };
+    const signature = await signMsg(privKey, gaii + timestamp);
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     return body.data.token;
 }
 
 async function registerOwner(name: string): Promise<{ token: string; ghii: string }> {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(status === 201, `register owner ${name}: ${status} ${JSON.stringify(body)}`);
-    const token = await getToken(name, body.data.private_key, false);
+    const { token } = await registerPasswordOwner(BASE, name);
     return { token, ghii: `${name}@${NODE_ID}` };
 }
 
@@ -82,7 +80,7 @@ async function createAgent(ownerName: string, ownerToken: string, agentName: str
     });
     assert(status === 201, `create agent ${agentName}: ${status} ${JSON.stringify(body)}`);
     const gaii = body.data.agent.gaii;
-    const token = await getToken(gaii, body.data.private_key, true);
+    const token = await getToken(gaii, body.data.private_key);
     return { gaii, token };
 }
 

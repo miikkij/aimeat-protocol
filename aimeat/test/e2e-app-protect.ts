@@ -16,13 +16,9 @@
  *   v1.0.0 — 2026-07-07 — initial: obfuscate, watermark + operator decode, noRawDownload.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerAName = `prota${Date.now() % 100000}`;   // first owner → operator
 const ownerBName = `protb${Date.now() % 100000}`;
 const FILE = 'protect-demo.html';
@@ -43,24 +39,12 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
 }
-async function signMsg(priv: string, message: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(priv, 'base64'))).toString('base64');
-}
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
 let aToken = '';
 let bToken = '';
 const aAuth = (o: RequestInit = {}): RequestInit => ({ ...o, headers: { ...((o.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${aToken}` } });
 const bAuth = (o: RequestInit = {}): RequestInit => ({ ...o, headers: { ...((o.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${bToken}` } });
-
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
-}
 
 /** Fetch the inline (runnable) HTML of the app as text. */
 async function inline(): Promise<string> {
@@ -72,8 +56,8 @@ console.log('\n=== App copy-protection E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register owner A (operator) + owner B, publish the demo app', async () => {
-    aToken = await registerOwner(ownerAName);
-    bToken = await registerOwner(ownerBName);
+    aToken = (await registerOwner(BASE, ownerAName)).token;
+    bToken = (await registerOwner(BASE, ownerBName)).token;
     const pub = await json('/v1/apps', aAuth({ method: 'POST', body: JSON.stringify({ filename: FILE, content: b64(APP_HTML), name: 'Protect Demo', description: 'copy-protection demo', category: 'utility', tags: [] }) }));
     assert(pub.status === 201, `publish status ${pub.status}`);
 });

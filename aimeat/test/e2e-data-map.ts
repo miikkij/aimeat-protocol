@@ -19,9 +19,9 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -65,14 +65,7 @@ async function registerOwner(label: string): Promise<Owner> {
         body: JSON.stringify({ username: name, display_name: 'Data map', password: 'Provenance1234' }),
     });
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({
-            owner: name, timestamp: ts,
-            signature: await sign(reg.body.data.private_key, name + NODE_ID + ts),
-        }),
-    });
+    const tok = await ownerSignIn(BASE, name, 'Provenance1234');
     assert(tok.status === 200 && tok.body?.data?.token, `auth/token ${tok.status}`);
     return { name, token: tok.body.data.token as string };
 }

@@ -23,7 +23,6 @@
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -38,12 +37,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(p: string, m: string) {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(m), Buffer.from(p, 'base64'))).toString('base64');
-}
+import { ownerSignIn } from './helpers/owner-login.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 console.log('\n=== AIMEAT Ontology E2E ===\n');
@@ -55,8 +49,7 @@ await test('Setup owner', async () => {
     ownerName = `onto${stamp}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'Onto', password: 'Onto12345' }) });
     assert(reg.status === 200 || reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await sign(reg.body.data.private_key, ownerName + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, ownerName, 'Onto12345');
     token = tk.body.data.token;
     assert(!!token, 'no token');
 });
@@ -233,8 +226,7 @@ await test('13. Setup a second owner', async () => {
     const other = `onto2${stamp}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: other, display_name: 'Onto2', password: 'Onto12345' }) });
     assert(reg.status === 200 || reg.status === 201, `register ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: other, timestamp: ts, signature: await sign(reg.body.data.private_key, other + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, other, 'Onto12345');
     otherToken = tk.body.data.token;
     assert(!!otherToken, 'no token for the second owner');
 });

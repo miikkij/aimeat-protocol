@@ -29,11 +29,12 @@
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-// Read from the node's own response envelope during setup rather than guessing: the owner
-// signature is over `owner + nodeId + timestamp`, so a wrong id is an opaque 'Invalid signature'.
+// Read from the node's own response envelope during setup rather than guessing: the MCP authorize
+// signature is over `gaii + nodeId + timestamp`, so a wrong id is an opaque 'Invalid signature'.
 let NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 const owner = `nsowner${Date.now() % 1000000}`;
@@ -60,12 +61,13 @@ async function signMsg(privB64: string, message: string): Promise<string> {
     return Buffer.from(sig).toString('base64');
 }
 async function getToken(subject: string, priv: string, isAgent: boolean): Promise<string> {
+    assert(isAgent, 'an owner signs in with registerOwner() from helpers/owner-login.js');
     const timestamp = new Date().toISOString();
-    // Agents sign `gaii + timestamp`; owners sign `owner + nodeId + timestamp`. Different messages.
-    const signature = await signMsg(priv, isAgent ? subject + timestamp : subject + NODE_ID + timestamp);
+    // Agents sign `gaii + timestamp`.
+    const signature = await signMsg(priv, subject + timestamp);
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
-        body: JSON.stringify(isAgent ? { gaii: subject, timestamp, signature } : { owner: subject, timestamp, signature }),
+        body: JSON.stringify({ gaii: subject, timestamp, signature }),
     });
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     return body.data.token;
@@ -142,11 +144,11 @@ async function main() {
     console.log('Setup');
 
     await test('register owner + agent + publish an app', async () => {
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register owner: ${reg.status}`);
+        const registered = await registerOwner(BASE, owner);
+        const reg = registered.registration;
         if (typeof reg.body.node === 'string' && reg.body.node) NODE_ID = reg.body.node;
-        ownerPriv = reg.body.data.private_key;
-        ownerToken = await getToken(owner, ownerPriv, false);
+        ownerPriv = registered.privateKey;
+        ownerToken = registered.token;
 
         const ag = await json('/v1/agents', {
             method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -301,9 +303,7 @@ async function main() {
         // The check looks under THIS agent's owner only. A different person holding the same key
         // name is a different namespace entirely and must not appear in the answer.
         const other = `nsother${Date.now() % 1000000}`;
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register second owner: ${reg.status}`);
-        const otherToken = await getToken(other, reg.body.data.private_key, false);
+        const otherToken = (await registerOwner(BASE, other)).token;
         const own = await json('/v1/memory', {
             method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
             body: JSON.stringify({ key: 'nstest.crossowner.only', value: { by: 'other' } }),

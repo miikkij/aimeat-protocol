@@ -9,9 +9,10 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 
+import { ownerToken as passwordToken } from './helpers/owner-login.js';
+
 ed.hashes.sha512 = m => new Uint8Array(createHash('sha512').update(m).digest());
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 let passed = 0;
 let failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -26,22 +27,22 @@ async function json(path: string, token?: string, body?: unknown, method = body 
   // Runtime assertions below validate the HTTP contract at this untyped JSON boundary.
   return { status: response.status, body: await response.json() as Record<string, any> };
 }
-async function login(identity: string, privateKey: string, isAgent = false): Promise<string> {
+/** An agent's token from its own key. The owner signs in with the password (helpers/owner-login.ts). */
+async function login(gaii: string, privateKey: string): Promise<string> {
   const timestamp = new Date().toISOString();
-  const message = identity + (isAgent ? '' : NODE) + timestamp;
-  const signature = Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKey, 'base64'))).toString('base64');
-  const result = await json('/v1/auth/token', undefined, { ...(isAgent ? { gaii: identity } : { owner: identity }), timestamp, signature });
+  const signature = Buffer.from(await ed.signAsync(new TextEncoder().encode(gaii + timestamp), Buffer.from(privateKey, 'base64'))).toString('base64');
+  const result = await json('/v1/auth/token', undefined, { gaii, timestamp, signature });
   assert.equal(result.status, 200);
   return result.body.data.token;
 }
 const owner = `batchprov${Date.now()}`;
 const registered = await json('/v1/ghii', undefined, { username: owner, display_name: owner, password: 'BatchProvenance1234' });
 assert.equal(registered.status, 201);
-const ownerToken = await login(owner, registered.body.data.private_key);
+const ownerToken = await passwordToken(BASE, owner, 'BatchProvenance1234');
 const agent = await json('/v1/agents', ownerToken, { owner, name: 'writer', capabilities: ['memory'], scopes: ['memory:read', 'memory:write', 'memory:delete'] });
 assert.equal(agent.status, 201);
 const gaii = agent.body.data.agent.gaii as string;
-const token = await login(gaii, agent.body.data.private_key, true);
+const token = await login(gaii, agent.body.data.private_key);
 const read = (key: string) => json(`/v1/memory/${encodeURIComponent(key)}`, token);
 const value = { text: 'The original content' };
 let provenanceId = '';
@@ -52,7 +53,7 @@ try {
       owner, name: 'reader', capabilities: ['memory'], scopes: ['memory:read'],
     });
     assert.equal(reader.status, 201);
-    const readerToken = await login(reader.body.data.agent.gaii, reader.body.data.private_key, true);
+    const readerToken = await login(reader.body.data.agent.gaii, reader.body.data.private_key);
     for (const path of ['/v1/memory/bulk', '/v1/memory/import']) {
       const refused = await json(path, readerToken, { entries: [{ key: 'batch.denied', value }] });
       assert(refused.status === 403, 'memory:read cannot authorize a batch write');
@@ -116,7 +117,7 @@ try {
     const name = `batchother${Date.now()}`;
     const registration = await json('/v1/ghii', undefined, { username: name, display_name: name, password: 'BatchProvenance1234' });
     assert.equal(registration.status, 201);
-    const otherToken = await login(name, registration.body.data.private_key);
+    const otherToken = await passwordToken(BASE, name, 'BatchProvenance1234');
     try {
       const result = await json('/v1/memory/import', otherToken, { entries: [
         { key: 'batch.foreign', value, visibility: 'public', ai_provenance_id: provenanceId },

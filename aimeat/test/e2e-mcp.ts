@@ -69,6 +69,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams, type McpPkce } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -158,13 +159,7 @@ await test('Register GHII identity (creates owner)', async () => {
 });
 
 await test('Owner auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName, 'McpTest1234');
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });

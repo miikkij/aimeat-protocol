@@ -19,6 +19,7 @@
  *   seedEmailVerification() writes a pending verification with a code the suite knows, for a suite
  *   whose subject is what POST /v1/ghii/verify-email hands out (e2e-agent-token-revocation).
  * @version-history
+ *   v1.2.0 — 2026-10-12 — storageFor() is exported, for seed-password.ts.
  *   v1.1.0 — 2026-10-12 — seedEmailVerification() (Core 2026-11 ID-10).
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 follow-up, A1).
  */
@@ -33,7 +34,7 @@ import { pinnedSqlitePath, serverDbUrl } from './server-db.js';
 const handles = new Map<string, Promise<Storage>>();
 
 /** One storage handle per database, opened on first use: the runner's server's, or a suite's own. */
-function storageFor(sqlitePath?: string): Promise<Storage> {
+export function storageFor(sqlitePath?: string): Promise<Storage> {
     const key = sqlitePath ?? '(runner)';
     let h = handles.get(key);
     if (!h) {

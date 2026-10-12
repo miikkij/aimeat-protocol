@@ -18,8 +18,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-12 — Initial, with the Portal page in the poster face.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -53,27 +52,9 @@ async function json(path: string, opts: RequestInit = {}) {
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
 /** Register an owner and come back with a token. The first owner of a fresh node is the operator. */
 async function owner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const priv = reg.body.data.private_key;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(priv, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
+    return (await registerOwner(BASE, name)).token;
 }
 
 console.log('\n🧪 Admin Portal page — the reads behind the answer\n');

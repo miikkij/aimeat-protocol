@@ -10,11 +10,11 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerName = `uploadtest${Date.now() % 100000}`;
 const agentName = 'uploadagent';
 
@@ -72,23 +72,13 @@ console.log('\n=== Presigned Upload E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register test owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
+    const owner = await registerOwner(BASE, ownerName);
+    ownerPrivKey = owner.privateKey;
     assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got private key');
 });
 
 await test('Get owner token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data?.token;
     assert(typeof ownerToken === 'string', 'got owner token');

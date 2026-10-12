@@ -50,12 +50,9 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createHash } from 'node:crypto';
-import * as ed from '@noble/ed25519';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, type FakeAiProvider } from './helpers/fake-ai-provider.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
 const PORT = Number(process.env.E2E_CHAT_AGENT_PORT ?? 40300);
 const BROKEN_PORT = PORT + 1;
@@ -185,17 +182,7 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
 }
 
 async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body).slice(0, 200)}`);
-    const priv = reg.body.data.private_key as string;
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + timestamp), Buffer.from(priv, 'base64'));
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(tok.body?.ok === true, `token ${name}: ${JSON.stringify(tok.body?.error)}`);
-    return tok.body.data.token as string;
+    return (await registerWithPassword(BASE, name)).token;
 }
 
 async function upload(key: string, bytes: Buffer, mimeType: string): Promise<void> {

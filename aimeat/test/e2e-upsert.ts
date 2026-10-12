@@ -20,12 +20,12 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -139,22 +139,13 @@ console.log('\n=== Upsert (PUT) E2E Test ===\n');
 console.log('Setup — Auth');
 
 await test('Register owner (first owner ⇒ operator)', async () => {
-  const { status, body } = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-  });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  ownerPrivKey = body.data.private_key;
+  const owner = await registerOwner(BASE, ownerName);
+  ownerPrivKey = owner.privateKey;
   assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
 await test('Owner auth token', async () => {
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(ownerPrivKey, ownerName + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-  });
+  const { body } = await ownerSignIn(BASE, ownerName);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   ownerToken = body.data?.token;
   assert(typeof ownerToken === 'string', 'got owner token');
@@ -327,11 +318,8 @@ await test('PUT with manifest name ≠ URL name → 400 NAME_MISMATCH', async ()
 // bytes served, the old schemas and boards gone, and a record still saying "active".
 await test('A redeploy the board ceiling refuses changes nothing: bytes, manifest and the live activation stay', async () => {
   const name = `upsertq${Date.now()}`;
-  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `owner ${reg.status}`);
-  const ts = new Date().toISOString();
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
-  const hdr = { Authorization: `Bearer ${tok.body.data.token}` };
+  const owner = await registerOwner(BASE, name);
+  const hdr = { Authorization: `Bearer ${owner.token}` };
   // Nine public boards of its own, so the cortex's one public board is the tenth and last allowed.
   for (let i = 1; i <= 9; i++) {
     const b = await json('/v1/boards', { method: 'POST', headers: hdr, body: JSON.stringify({ name: `Upsert quota board ${i}`, visibility: 'public' }) });
@@ -469,11 +457,7 @@ await test('another owner cannot PUT over this cortex, or this extension', async
     body: JSON.stringify({ username: strangerName, display_name: 'Upsert Stranger', password: 'Upsert1234' }),
   });
   assert(reg.status === 201, `stranger ghii ${reg.status}`);
-  const ts = new Date().toISOString();
-  const tok = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts) }),
-  });
+  const tok = await ownerSignIn(BASE, strangerName, 'Upsert1234');
   const strangerHdr = { Authorization: `Bearer ${tok.body.data.token}` };
 
   const EVIL = 'export function hello() { return "owned by the stranger"; }';

@@ -27,6 +27,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { registerOwner as registerWithPassword, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -52,12 +53,7 @@ async function signMsg(privB64: string, msg: string): Promise<string> {
 const auth = (t: string): RequestInit => ({ headers: { Authorization: `Bearer ${t}` } });
 
 async function registerOwner(name: string): Promise<{ token: string; ghii: string }> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { token: tok.body.data.token, ghii: `${name}@${NODE_ID}` };
+    return { token: (await registerWithPassword(BASE, name)).token, ghii: `${name}@${NODE_ID}` };
 }
 
 console.log('\n=== Catalogue provider identity E2E ===\n');
@@ -295,13 +291,10 @@ await test("An agent activates its person's cortex and the person deactivates it
 await test("An operator deactivates another owner's cortex: none of its actions stays published", async () => {
     opName = `catop${ts}`;
     const reg = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: opName }),
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: opName, password: OWNER_PASSWORD }),
     });
     assert(reg.status === 200 && reg.body.ok === true, `setup/register: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const at = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: opName, timestamp: at, signature: await signMsg(reg.body.private_key, opName + NODE_ID + at) }),
-    });
+    const tok = await ownerSignIn(BASE, opName);
     assert(tok.body.ok === true, `operator token: ${JSON.stringify(tok.body?.error)}`);
     opTok = tok.body.data.token as string;
 

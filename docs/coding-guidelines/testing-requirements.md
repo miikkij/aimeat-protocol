@@ -106,7 +106,7 @@ Copy **`test/e2e-model-suite.ts`**. It exists to be copied, and it shows every p
 - **clean up**: each owner deletes itself with `DELETE /v1/owners/:name` and its own Bearer token (the route needs the account holder's local session);
 - an exit code the runner reads: `process.exit(failed > 0 ? 1 : 0)`.
 
-Most older suites sign in differently: they sign `name + NODE_ID + timestamp` with the owner's private key and exchange it for a token. That owner-key sign-in is deprecated (`AIMEAT_OWNER_KEY_LOGIN`) and removed in 4.0.0, so a new suite does not copy it from them. A suite that needs helpers beyond the model's takes them from `test/helpers/` (for example `wait-for-server.ts`, `node-entry.ts`, `fake-ai-provider.ts`, `fake-smtp.ts`).
+A suite that makes many owners uses **`test/helpers/owner-login.ts`** instead of writing the two calls again: `registerOwner(BASE, name)` registers with a password and signs in (it returns the token, the GHII and the key pair), `ownerSignIn(BASE, name, password)` answers `{ status, body }` like the suite's own `json()`, and `ownerToken(BASE, name, password)` returns the token. Until 2026-10-12 most suites signed an owner in with the owner key (a signature over `name + NODE_ID + timestamp` sent to `POST /v1/auth/token`). That sign-in is removed in 4.0.0, every suite now signs in with the password, and `test/unit/no-owner-key-sign-in.test.ts` refuses a file that brings it back. An agent still signs in with its own key on the same route. A suite that needs other helpers takes them from `test/helpers/` (for example `wait-for-server.ts`, `node-entry.ts`, `fake-ai-provider.ts`, `fake-smtp.ts`).
 
 ### Conventions
 

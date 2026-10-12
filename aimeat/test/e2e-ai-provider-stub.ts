@@ -66,7 +66,6 @@
  *     retries (502 EMPTY_COMPLETION naming finish_reason=length, three attempts).
  *   v1.0.0 — 2026-09-08 — Initial.
  */
-import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -80,8 +79,7 @@ import {
     startFakeAiProvider, chatJson, chatErrorBody, sseChat, modelsJson, transcriptionJson,
     imageJson, providerStatus, type FakeAiProvider, type RecordedRequest,
 } from './helpers/fake-ai-provider.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 // 40314/40315 are this suite's own pair. E2E_AI_STUB_PORT is already e2e-ai-provenance's variable,
 // so these carry their own names rather than quietly moving that suite's stub.
@@ -107,9 +105,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
-async function sign(privB64: string, msg: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 
 // ── the node under test ───────────────────────────────────────────────────────
 
@@ -174,11 +169,7 @@ async function setupOwner(label: string): Promise<Owner> {
         body: JSON.stringify({ username: name, display_name: 'AI Stub', password: 'AiStubTest1234' }),
     });
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, name, 'AiStubTest1234');
     assert(tok.status === 200 && tok.body?.data?.token, `auth/token ${tok.status}: ${JSON.stringify(tok.body)}`);
     return { name, gaii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }

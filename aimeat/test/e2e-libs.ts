@@ -70,12 +70,12 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -123,7 +123,6 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 // ─── Setup: Register owner + agent ───
 
 const username = `libtest${Date.now()}`;
-let ownerPrivKey = '';
 let ownerJwt = '';
 let agentGaii = '';
 let agentPrivKey = '';
@@ -131,7 +130,6 @@ let agentJwt = '';
 
 // Second owner for cross-owner work tests
 const username2 = `libtest2${Date.now()}`;
-let ownerPrivKey2 = '';
 let ownerJwt2 = '';
 
 console.log(`\n=== AIMEAT Helper Libraries E2E Test ===\n`);
@@ -144,20 +142,13 @@ console.log('Setup — Register owner & agent');
 await test('Register owner via GHII', async () => {
     const data = await api('/v1/ghii', {
         method: 'POST',
-        body: JSON.stringify({ username, display_name: 'Lib Test User' }),
+        body: JSON.stringify({ username, display_name: 'Lib Test User', password: OWNER_PASSWORD }),
     });
     assert(data.ok === true, `Registration failed: ${data.error?.message}`);
-    ownerPrivKey = data.data.private_key;
 });
 
 await test('Get owner JWT', async () => {
-    const timestamp = new Date().toISOString();
-    const message = username + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const data = await api('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: username, timestamp, signature }),
-    });
+    const { body: data } = await ownerSignIn(BASE, username);
     assert(data.ok === true, `Owner auth failed: ${data.error?.message}`);
     ownerJwt = data.data.token;
 });
@@ -553,20 +544,13 @@ let agent2Jwt = '';
 await test('Register second owner via GHII', async () => {
     const data = await api('/v1/ghii', {
         method: 'POST',
-        body: JSON.stringify({ username: username2, display_name: 'Lib Test Provider Owner' }),
+        body: JSON.stringify({ username: username2, display_name: 'Lib Test Provider Owner', password: OWNER_PASSWORD }),
     });
     assert(data.ok === true, `Second owner registration failed: ${data.error?.message}`);
-    ownerPrivKey2 = data.data.private_key;
 });
 
 await test('Get second owner JWT', async () => {
-    const timestamp = new Date().toISOString();
-    const message = username2 + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey2, message);
-    const data = await api('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: username2, timestamp, signature }),
-    });
+    const { body: data } = await ownerSignIn(BASE, username2);
     assert(data.ok === true, `Second owner auth failed: ${data.error?.message}`);
     ownerJwt2 = data.data.token;
 });

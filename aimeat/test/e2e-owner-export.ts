@@ -41,6 +41,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -75,20 +76,14 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function tokenFor(name: string, privateKey: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: await signMsg(privateKey, name + NODE_ID + timestamp) }),
-    });
+async function tokenFor(name: string): Promise<string> {
+    const tok = await ownerSignIn(BASE, name);
     assert(tok.body.ok === true, `token for ${name}: ${JSON.stringify(tok.body.error)}`);
     return tok.body.data.token as string;
 }
 
 async function makeOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body.error)}`);
-    return tokenFor(name, reg.body.data.private_key);
+    return (await registerOwner(BASE, name)).token;
 }
 
 /** An agent of `owner`, and a token for it. */
@@ -150,10 +145,10 @@ console.log('Setup');
 
 await test('An operator, the owner being exported, and a second owner', async () => {
     const op = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: OP }),
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: OP, password: OWNER_PASSWORD }),
     });
     assert(op.status === 200, `operator register ${op.status}: ${JSON.stringify(op.body)}`);
-    opToken = await tokenFor(OP, op.body.private_key);
+    opToken = await tokenFor(OP);
     subjectToken = await makeOwner(SUBJECT);
     otherToken = await makeOwner(OTHER);
 });

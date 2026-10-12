@@ -20,13 +20,9 @@
  *   v1.0.0 — 2026-08-08 — Initial, with the fix.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const owner = `rap${Date.now() % 100000}`;
 const AGENT = 'returning-agent';
 
@@ -56,11 +52,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
     return { status: res.status, body };
-}
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
 }
 
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
@@ -128,15 +119,7 @@ console.log('\n=== Agent Re-approval E2E Tests ===\n');
 console.log('Phase 0: an agent that already exists, with full access');
 
 await test('Register the owner', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await signMsg(reg.body.data.private_key, owner + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    ownerToken = tok.body.data.token;
+    ownerToken = (await registerOwner(BASE, owner)).token;
 });
 
 await test('The agent connects and the owner grants full access', async () => {
@@ -281,15 +264,7 @@ let strangerToken = '';
 let pendingUserCode = '';
 
 await test('a second owner exists', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: stranger, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: stranger, timestamp: ts, signature: await signMsg(reg.body.data.private_key, stranger + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    strangerToken = tok.body.data.token;
+    strangerToken = (await registerOwner(BASE, stranger)).token;
 });
 
 await test('a stranger cannot approve this owner\'s pending request', async () => {

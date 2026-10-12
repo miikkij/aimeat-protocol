@@ -32,11 +32,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 // ─── Boot embedded server ───
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40253', 10);
 const BASE = process.env.E2E_BASE ?? `http://localhost:${TEST_PORT}`;
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let server: Server | null = null;
 
@@ -132,22 +132,14 @@ await test('Register owner', async () => {
         ownerPrivKey = body.private_key;
         isOperator = true;
     } else {
-        const { status, body } = await json('/v1/owners', {
-            method: 'POST',
-            body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-        });
-        assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-        assert(body.ok === true, 'ok');
-        ownerPrivKey = body.data.private_key;
+        const owner = await registerOwner(BASE, ownerName);
+        ownerPrivKey = owner.privateKey;
+        if (owner.roles.includes('operator')) isOperator = true;
     }
     assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
 await test('Owner auth', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-
     if (ADMIN_PW && isOperator) {
         const { body } = await json('/v1/admin/setup/token', {
             method: 'POST',
@@ -157,13 +149,9 @@ await test('Owner auth', async () => {
         assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
         ownerToken = body.token;
     } else {
-        const { body } = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-        });
+        const { body } = await ownerSignIn(BASE, ownerName);
         assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
         ownerToken = body.data?.token;
-        if (body.data?.roles?.includes('operator')) isOperator = true;
     }
     assert(typeof ownerToken === 'string', 'got owner token');
 });
@@ -297,16 +285,11 @@ let outsiderToken = '';
 
 await test('Setup: a second owner, minted WITHOUT the operator role', async () => {
     const outsiderName = `meshoutsider${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: outsiderName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts2 = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, outsiderName + NODE_ID + ts2);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: outsiderName, timestamp: ts2, signature: sig }) });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    outsiderToken = tok.body.data.token;
-    // The premise every assertion below rests on, read from the mint rather than from a door.
-    assert(Array.isArray(tok.body.data.roles) && !tok.body.data.roles.includes('operator'),
-        `the second owner must not be an operator: ${JSON.stringify(tok.body.data.roles)}`);
+    const outsider = await registerOwner(BASE, outsiderName);
+    outsiderToken = outsider.token;
+    // The premise every assertion below rests on, read from the registration rather than from a door.
+    assert(Array.isArray(outsider.roles) && !outsider.roles.includes('operator'),
+        `the second owner must not be an operator: ${JSON.stringify(outsider.roles)}`);
 });
 
 await test('A non-operator owner cannot register, read, retune or de-peer a peer → 403', async () => {
@@ -706,10 +689,6 @@ await test('Register GHII with password for federation auth tests', async () => 
 });
 
 await test('Authenticate federation login user', async () => {
-    const timestamp = new Date().toISOString();
-    const message = fedLoginUser + NODE_ID + timestamp;
-    const signature = await signMsg(fedLoginPrivKey, message);
-
     // Use admin token endpoint if available, otherwise standard auth
     if (ADMIN_PW) {
         const { body } = await json('/v1/admin/setup/token', {
@@ -720,10 +699,7 @@ await test('Authenticate federation login user', async () => {
         assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
         fedLoginToken = body.token;
     } else {
-        const { body } = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: fedLoginUser, timestamp, signature }),
-        });
+        const { body } = await ownerSignIn(BASE, fedLoginUser, fedLoginPassword);
         assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
         fedLoginToken = body.data?.token;
     }

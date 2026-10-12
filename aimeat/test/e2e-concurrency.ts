@@ -4,12 +4,12 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -74,12 +74,10 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 }
 
 async function getToken(identity: string, privKey: string, isAgent: boolean): Promise<string> {
+    assert(isAgent, 'an owner signs in with registerOwner() from helpers/owner-login.js');
     const timestamp = new Date().toISOString();
-    const message = isAgent ? identity + timestamp : identity + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: identity, timestamp, signature }
-        : { owner: identity, timestamp, signature };
+    const signature = await signMsg(privKey, identity + timestamp);
+    const payload = { gaii: identity, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -123,22 +121,14 @@ console.log('Phase 0 — Setup');
 
 await test('0a. Register owners + agents', async () => {
     // First owner (for requester agents)
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `owner: ${status}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    const o1 = await registerOwner(BASE, ownerName);
+    ownerPrivKey = o1.privateKey;
+    ownerToken = o1.token;
 
     // Second owner (for provider agent — work requires different owners)
-    const { status: s2, body: o2Body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
-    });
-    assert(s2 === 201, `owner2: ${s2}`);
-    owner2PrivKey = o2Body.data.private_key;
-    owner2Token = await getToken(owner2Name, owner2PrivKey, false);
+    const o2 = await registerOwner(BASE, owner2Name);
+    owner2PrivKey = o2.privateKey;
+    owner2Token = o2.token;
 
     // Requester agent (under owner 1)
     const { body: rBody } = await json('/v1/agents', {

@@ -41,12 +41,9 @@
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=living-hooks
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { LIVING_HOOKS } from '../src/data/builtin-extensions/living-hooks.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -70,17 +67,11 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
 async function setupOwner(label: string) {
     const name = `lh${label}${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Living Hooks', password: 'LivHook12345' }) });
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'LivHook12345');
     assert(tok.body?.ok === true, `token: ${JSON.stringify(tok.body?.error)}`);
     return { name, ghii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }

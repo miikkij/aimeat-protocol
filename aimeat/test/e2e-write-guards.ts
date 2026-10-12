@@ -20,12 +20,12 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -46,19 +46,12 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function ownerToken(name: string, priv: string): Promise<string> {
-  const ts = new Date().toISOString();
-  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(priv, name + NODE_ID + ts) }) });
-  assert(body.ok === true, `owner token: ${JSON.stringify(body.error)}`);
-  return body.data.token;
-}
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 async function setupOwner(prefix: string) {
   const name = `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `register owner ${reg.status}: ${JSON.stringify(reg.body)}`);
-  return { name, token: await ownerToken(name, reg.body.data.private_key) };
+  const owner = await registerOwner(BASE, name);
+  return { name, token: owner.token };
 }
 
 // ─── State ───

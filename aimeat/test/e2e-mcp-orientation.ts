@@ -36,6 +36,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn, registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -164,15 +165,10 @@ async function main() {
         console.log(`Phase 0: Setup (app origin ON, app host ${APP_HOST})`);
 
         await test('register the operator (first real owner)', async () => {
-            const { status, body } = await json('/v1/owners', {
-                method: 'POST', body: JSON.stringify({ name: operatorName, public_key: 'placeholder' }),
-            });
+            const operator = await registerOwner(BASE, operatorName);
+            const { status, body } = operator.registration;
             assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-            const ts = new Date().toISOString();
-            const sig = await signMsg(body.data.private_key, operatorName + NODE_ID + ts);
-            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: operatorName, timestamp: ts, signature: sig }) });
-            assert(tok.body.ok === true, `operator token: ${JSON.stringify(tok.body.error)}`);
-            operatorToken = tok.body.data.token;
+            operatorToken = operator.token;
         });
 
         await test('register the GHII owner MCP will connect as', async () => {
@@ -181,9 +177,7 @@ async function main() {
                 body: JSON.stringify({ username: ownerName, display_name: 'MCP Orientation Test', password: 'McpOrient1234' }),
             });
             assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
-            const ts = new Date().toISOString();
-            const sig = await signMsg(body.data.private_key, ownerName + NODE_ID + ts);
-            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: sig }) });
+            const tok = await ownerSignIn(BASE, ownerName, 'McpOrient1234');
             assert(tok.body.ok === true, `owner token: ${JSON.stringify(tok.body.error)}`);
             ownerToken = tok.body.data.token;
         });

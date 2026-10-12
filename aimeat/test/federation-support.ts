@@ -24,6 +24,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -91,28 +92,20 @@ async function signMsg(privKeyB64: string, message: string): Promise<string> {
 
 /** A second owner on a node, granted the operator role, so "every operator sees it" has two people. */
 async function addOperator(node: NodeState, name: string): Promise<{ ghii: string; token: string }> {
-    const reg = await node.json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    await registerOwner(node.baseUrl, name);
     const grant = await node.json('/v1/admin/roles/grant', {
         method: 'POST', headers: auth(node.ownerToken), body: JSON.stringify({ owner: name, role: 'operator' }),
     });
     assert(grant.status === 200 || grant.status === 201, `grant operator to ${name}: ${grant.status} ${JSON.stringify(grant.body)}`);
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(reg.body.data.private_key, name + node.nodeId + timestamp);
-    const tok = await node.json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
+    const tok = await ownerSignIn(node.baseUrl, name);
     assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
     return { ghii: `${name}@${node.nodeId}`, token: tok.body.data.token };
 }
 
 /** An ordinary owner on a node: no operator role, so a support thread is none of their business. */
 async function addNonOperator(node: NodeState, name: string): Promise<{ ghii: string; token: string }> {
-    const reg = await node.json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(reg.body.data.private_key, name + node.nodeId + timestamp);
-    const tok = await node.json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { ghii: `${name}@${node.nodeId}`, token: tok.body.data.token };
+    const owner = await registerOwner(node.baseUrl, name);
+    return { ghii: `${name}@${node.nodeId}`, token: owner.token };
 }
 
 async function createAgent(node: NodeState, agentName: string, scopes: string[] = ['messages:send', 'messages:read']): Promise<{ gaii: string; token: string }> {

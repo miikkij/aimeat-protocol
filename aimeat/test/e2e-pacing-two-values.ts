@@ -20,9 +20,7 @@
  *     1 (AIMEAT_BURN_RATE, 0.10), and an ordinary buyer's tracking code does not say "granted".
  *   v1.0.0 — 2026-10-11 — Initial (wish-tarjouksella-rahahinta-ja-tahdistus-morselhinnat-tahdistukse).
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -45,9 +43,7 @@ async function setupOwner(label: string) {
   let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Pacing', password: 'Pacing12345' }) });
   for (let i = 0; reg.status === 429 && i < 8; i++) { await new Promise(r => setTimeout(r, 1500)); reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Pacing', password: 'Pacing12345' }) }); }
   assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body.error)}`);
-  const ts = new Date().toISOString();
-  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(name + NODE_ID + ts), Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
+  const tok = await ownerSignIn(BASE, name, 'Pacing12345');
   const token = tok.body.data.token as string;
   const roles: string[] = JSON.parse(Buffer.from(token.split('.')[1] as string, 'base64url').toString('utf8')).roles ?? [];
   return { name, token, ghii: `${name}@${NODE_ID}`, roles };

@@ -31,9 +31,9 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -89,17 +89,7 @@ console.log('\n=== AIMEAT Prompt Arms E2E ===\n');
 console.log('Phase 0 — Principals');
 
 await test('register owner + token', async () => {
-  const reg = await json('/v1/owners', {
-    method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-  });
-  assert(reg.status === 201, `status ${reg.status}: ${JSON.stringify(reg.body)}`);
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(reg.body.data.private_key, ownerName + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-  });
-  assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-  ownerToken = body.data.token;
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
 });
 
 await test('register an agent + token', async () => {

@@ -14,6 +14,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TunnelClient } from './helpers/tunnel-harness.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -48,11 +49,10 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function getToken(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
-  const signature = await signMsg(priv, message);
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const signature = await signMsg(priv, gaii + ts);
+  const payload = { gaii, timestamp: ts, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -70,9 +70,7 @@ console.log('\n=== AIMEAT Connector Forward Tunnel E2E (Phase 1) ===\n');
 // ─── Setup ───
 console.log('Setup — Owner & Agents');
 await test('Register owner (operator)', async () => {
-  const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  ownerToken = await getToken(ownerName, body.data.private_key, false);
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
 });
 
 await test('Register full-scope agent', async () => {
@@ -81,7 +79,7 @@ await test('Register full-scope agent', async () => {
     body: JSON.stringify({ name: 'fullbot', owner: ownerName, capabilities: ['memory'], scopes: ['*'] }),
   });
   assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  fullAgentToken = await getToken(body.data.agent.gaii, body.data.private_key, true);
+  fullAgentToken = await getToken(body.data.agent.gaii, body.data.private_key);
 });
 
 await test('Register read-only agent', async () => {
@@ -91,7 +89,7 @@ await test('Register read-only agent', async () => {
   });
   assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
   litePrivKey = body.data.private_key;
-  liteAgentToken = await getToken(body.data.agent.gaii, litePrivKey, true);
+  liteAgentToken = await getToken(body.data.agent.gaii, litePrivKey);
 });
 
 // ─── Phase 1: Connect & handshake ───
@@ -434,7 +432,7 @@ await test('19. A granted scope does NOT take effect on the pinned credential, a
 
     // And this is what the connector does now: mint a fresh token and RE-ATTACH, which is what
     // replaces the node's pinned copy (handleAttach overwrites conn.rawToken).
-    const fresh = await getToken(gaii, litePrivKey, true);
+    const fresh = await getToken(gaii, litePrivKey);
     const reattached = await t.attach(gaii, fresh);
     assert(reattached.type === 'attached', `re-attach refused: ${JSON.stringify(reattached)}`);
 
@@ -447,7 +445,7 @@ await test('20. A REMOVED scope is told the same way, and stops applying once re
     // The gap is two-way and this is the serious half: a permission taken away went on being
     // honoured for the rest of the pinned token's life, and nobody reported it.
     const gaii = `litebot#${ownerName}@${NODE_ID}`;
-    const granted = await getToken(gaii, litePrivKey, true);   // minted while it still holds messages:read
+    const granted = await getToken(gaii, litePrivKey);   // minted while it still holds messages:read
     const t = await TunnelClient.connect(BASE, fullAgentToken);
     const joined = await t.attach(gaii, granted);
     assert(joined.type === 'attached', `attach: ${joined.type} ${joined.message ?? ''}`);
@@ -465,7 +463,7 @@ await test('20. A REMOVED scope is told the same way, and stops applying once re
 
     // The pinned token still carries the removed word until the identity re-attaches. That window is
     // what this frame exists to close, and the re-attach is what closes it.
-    const fresh = await getToken(gaii, litePrivKey, true);
+    const fresh = await getToken(gaii, litePrivKey);
     const reattached = await t.attach(gaii, fresh);
     assert(reattached.type === 'attached', `re-attach refused: ${JSON.stringify(reattached)}`);
     const refused = await t.request('GET', '/v1/messages/agent-inbox', { agent: gaii });

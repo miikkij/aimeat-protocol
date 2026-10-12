@@ -71,18 +71,12 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
   return Buffer.from(sig).toString('base64');
-}
-async function getOwnerToken(owner: string, privKey: string): Promise<string> {
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(privKey, owner + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp, signature }) });
-  assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-  return body.data.token;
 }
 
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
@@ -102,11 +96,7 @@ console.log(`Node: ${NODE_ID}\n`);
 console.log('Setup — Owner, agent, connected app');
 
 await test('Register owner', async () => {
-  const { status, body } = await json('/v1/owners', {
-    method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-  });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  ownerToken = await getOwnerToken(ownerName, body.data.private_key);
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
   assert(ownerToken.length > 0, 'got owner token');
 });
 
@@ -662,9 +652,7 @@ let otherToken = '';
 let agentToken = '';
 
 await test('Setup — a second owner and an agent of the first owner', async () => {
-  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: `${ownerName}b`, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `register second owner: ${reg.status} ${JSON.stringify(reg.body)}`);
-  otherToken = await getOwnerToken(`${ownerName}b`, reg.body.data.private_key);
+  otherToken = (await registerOwner(BASE, `${ownerName}b`)).token;
 
   const ag = await json('/v1/agents', {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },

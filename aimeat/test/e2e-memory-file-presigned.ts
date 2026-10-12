@@ -28,10 +28,10 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -45,17 +45,6 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
-}
-
-async function getOwnerToken(name: string, priv: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + timestamp), Buffer.from(priv, 'base64'));
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(body.ok === true, `owner token: ${JSON.stringify(body.error)}`);
-    return body.data.token;
 }
 
 /** An agent of `ownerName` holding exactly these scopes, and a token for it. */
@@ -84,11 +73,7 @@ let maxBytes = 0;
 console.log('\n=== Memory file presigned upload E2E ===\n');
 
 await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerToken = await getOwnerToken(ownerName, body.data.private_key);
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
     authHeaders = { Authorization: `Bearer ${ownerToken}` };
 });
 
@@ -198,11 +183,7 @@ const otherName = `mfpother${Date.now() % 1000000}`;
 let otherHeaders: Record<string, string> = {};
 
 await test('Register a second owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    otherHeaders = { Authorization: `Bearer ${await getOwnerToken(otherName, body.data.private_key)}` };
+    otherHeaders = { Authorization: `Bearer ${(await registerOwner(BASE, otherName)).token}` };
 });
 
 await test('An unauthenticated caller cannot download the file', async () => {

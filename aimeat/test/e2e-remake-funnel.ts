@@ -25,13 +25,10 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 0).
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner as registerWithPassword, ownerSignIn } from './helpers/owner-login.js';
+import { seedPassword } from './helpers/seed-password.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const stamp = Date.now() % 100000;
 const TRACK_KEY = 'onboarding.track';
 
@@ -60,23 +57,19 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
     ({ ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${token}` } });
 
-/** The programmatic creation door. */
+/**
+ * The programmatic creation door. It makes an account with no password, and the owner-key sign-in
+ * that opened its session is removed in 4.0.0, so the account gets a password in the server's
+ * database (helpers/seed-password.ts) and signs in with it.
+ */
 async function registerOwner(name: string): Promise<string> {
     const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
     assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
+    await seedPassword(name);
+    const tok = await ownerSignIn(BASE, name);
     assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
     return tok.body.data.token as string;
 }
@@ -88,11 +81,7 @@ async function registerHuman(name: string): Promise<string> {
         body: JSON.stringify({ username: name, display_name: name, password: 'Correct-Horse-9!' }),
     });
     assert(reg.status === 201, `ghii register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, name, 'Correct-Horse-9!');
     assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
     return tok.body.data.token as string;
 }
@@ -147,7 +136,7 @@ await test('POST /v1/ghii writes the same marker (one door must not be invisible
 console.log('\nPhase 1: an account on the old path, and one from before the feature');
 
 await test('An account can be marked legacy (what an existing account looks like)', async () => {
-    tokenLegacy = await registerOwner(ownerLegacy);
+    tokenLegacy = (await registerWithPassword(BASE, ownerLegacy)).token;
     assert(!!(await waitForTrack(tokenLegacy)), 'setup: the account must have a marker to overwrite');
     const w = await json('/v1/memory', auth(tokenLegacy, {
         method: 'POST',
@@ -165,7 +154,7 @@ await test('An account can be marked legacy (what an existing account looks like
 await test('FAILURE MODE: an account with NO marker is legacy, never remake', async () => {
     // An account created before the feature existed has no marker at all. Counting it as `remake`
     // would pad the cohort the remake is judged by with people who never saw it.
-    tokenPre = await registerOwner(ownerPre);
+    tokenPre = (await registerWithPassword(BASE, ownerPre)).token;
     assert(!!(await waitForTrack(tokenPre)), 'setup: the marker must exist before we remove it');
     const d = await json(`/v1/memory/${encodeURIComponent(TRACK_KEY)}`, auth(tokenPre, { method: 'DELETE' }));
     assert(d.status === 200, `delete marker: ${d.status} ${JSON.stringify(d.body)}`);
@@ -319,7 +308,7 @@ await test('A brand-new account lands on the home whether or not this node has a
     // A new account used to be sent into the chat when the node had one. The onboarding home carries
     // the chat door now, so the steps and the chat are side by side and the default is the same
     // everywhere. This suite runs on a node with no chat agent; the assertion holds either way.
-    const tokenFresh = await registerOwner(`rmkfr${stamp}`);
+    const tokenFresh = (await registerWithPassword(BASE, `rmkfr${stamp}`)).token;
     const fresh = await json('/v1/home/ui-track', auth(tokenFresh));
     assert(fresh.body.data.defaulted === true, 'setup: this account has chosen nothing');
     assert(fresh.body.data.ui === 'home', `a new account lands on the home, got ${fresh.body.data.ui}`);

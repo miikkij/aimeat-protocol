@@ -42,6 +42,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn, registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -102,7 +103,6 @@ async function mcpRpc(method: string, params: Record<string, any> = {}, id: numb
 
 // ─── State ───
 let ownerToken = '';
-let ownerPrivKey = '';
 let agentPrivKey = '';
 let agentGaii = '';
 const ownerName = `mcpcat${Date.now()}`;
@@ -126,17 +126,10 @@ await test('Register GHII identity', async () => {
         body: JSON.stringify({ username: ownerName, display_name: 'MCP Catalogue Test', password: 'McpCat1234' }),
     });
     assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
 });
 
 await test('Owner auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName, 'McpCat1234');
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });
@@ -302,17 +295,10 @@ await test('6. Create a public board for testing', async () => {
 // registered on a node that already has one is an ordinary account with no operator role.
 await test('6b. A later owner\'s agent cannot create a public board (the operator gate)', async () => {
     const otherOwner = `cat2${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherOwner, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `second owner ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
-    const ts = new Date().toISOString();
-    const otherTok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: otherOwner, timestamp: ts, signature: await signMsg(reg.body.data.private_key, otherOwner + NODE_ID + ts) }),
-    });
-    assert(otherTok.body.ok === true, `second owner token: ${JSON.stringify(otherTok.body.error)}`);
+    const other = await registerOwner(BASE, otherOwner);
 
     const ag = await json('/v1/agents', {
-        method: 'POST', headers: { Authorization: `Bearer ${otherTok.body.data.token}` },
+        method: 'POST', headers: { Authorization: `Bearer ${other.token}` },
         body: JSON.stringify({ name: 'cat2-bot', owner: otherOwner, capabilities: ['catalogue'], scopes: ['social:write', 'social:read'] }),
     });
     assert(ag.status === 201, `second agent ${ag.status}: ${JSON.stringify(ag.body).slice(0, 200)}`);
@@ -344,7 +330,7 @@ await test('6b. A later owner\'s agent cannot create a public board (the operato
     });
     assert(priv.status === 201, `the same agent must still create a private board, got ${priv.status}: ${JSON.stringify(priv.body).slice(0, 200)}`);
 
-    await json(`/v1/owners/${otherOwner}`, { method: 'DELETE', headers: { Authorization: `Bearer ${otherTok.body.data.token}` } });
+    await json(`/v1/owners/${otherOwner}`, { method: 'DELETE', headers: { Authorization: `Bearer ${other.token}` } });
 });
 
 await test('7. aimeat_catalogue_boards returns array including public board', async () => {
@@ -429,15 +415,8 @@ await test('12. Setup: A keeps a PRIVATE profile, B publishes one', async () => 
     assert(priv.status === 200 || priv.status === 201, `A private profile: ${priv.status}`);
 
     dirOwnerB = `catdir${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: dirOwnerB, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `owner B: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: dirOwnerB, timestamp: ts, signature: await signMsg(reg.body.data.private_key, dirOwnerB + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `owner B token: ${JSON.stringify(tok.body.error)}`);
-    const bAuth = { Authorization: `Bearer ${tok.body.data.token}` };
+    const ownerB = await registerOwner(BASE, dirOwnerB);
+    const bAuth = { Authorization: `Bearer ${ownerB.token}` };
     for (const [key, value] of [['profile.location', { city: 'Helsinki' }], ['profile.interests', ['music', 'sailing']]] as const) {
         const w = await json('/v1/memory', { method: 'POST', headers: bAuth, body: JSON.stringify({ key, value, visibility: 'public' }) });
         assert(w.status === 200 || w.status === 201, `B ${key}: ${w.status}`);

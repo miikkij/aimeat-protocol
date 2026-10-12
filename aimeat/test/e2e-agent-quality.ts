@@ -12,7 +12,6 @@
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -54,6 +53,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -63,13 +63,11 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
+    const message = gaii + timestamp;
     const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: ownerOrGaii, timestamp, signature }
-        : { owner: ownerOrGaii, timestamp, signature };
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     return body.data.token;
@@ -94,12 +92,7 @@ console.log('\n=== AIMEAT Agent Quality E2E Test ===\n');
 console.log('Setup -- Owner & two agents');
 
 await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerToken = await getToken(ownerName, body.data.private_key, false);
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
 });
 
 await test('Register agent (ratee) + orchestrator (rater)', async () => {
@@ -110,7 +103,7 @@ await test('Register agent (ratee) + orchestrator (rater)', async () => {
     });
     assert(a.status === 201, `agent: ${JSON.stringify(a.body)}`);
     agentGaii = a.body.data.agent.gaii;
-    agentToken = await getToken(agentGaii, a.body.data.private_key, true);
+    agentToken = await getToken(agentGaii, a.body.data.private_key);
 
     const p = await json('/v1/agents', {
         method: 'POST',
@@ -118,7 +111,7 @@ await test('Register agent (ratee) + orchestrator (rater)', async () => {
         body: JSON.stringify({ name: parentName, owner: ownerName, capabilities: ['memory'] }),
     });
     assert(p.status === 201, `orchestrator: ${JSON.stringify(p.body)}`);
-    parentToken = await getToken(p.body.data.agent.gaii, p.body.data.private_key, true);
+    parentToken = await getToken(p.body.data.agent.gaii, p.body.data.private_key);
 });
 
 // Helper: create a task, start it (owner), complete it (agent) -> returns task id in 'done'.
@@ -345,11 +338,7 @@ await test('A FOREIGN account cannot rate this agent\'s task, or read its statis
         body: JSON.stringify({ username: strangerName, display_name: 'Quality Stranger', password: 'Quality1234' }),
     });
     assert(reg.status === 201, `stranger ghii ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, strangerName, 'Quality1234');
     const strangerAuth = { Authorization: `Bearer ${tok.body.data.token}` };
 
 

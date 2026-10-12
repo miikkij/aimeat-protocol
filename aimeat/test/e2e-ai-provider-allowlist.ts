@@ -22,9 +22,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-13 — Initial, with the two doors it covers.
  */
-import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -32,15 +30,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 // 40420 is this suite's own port and 40421 is the closed one it points the allowed host at;
 // check:suite-ports holds both. 40322/40323 were the first choice and belong to
 // e2e-federation-settlements-sync, which that gate said out loud before this suite ever ran.
 const PORT = process.env.E2E_AI_PROVIDER_ALLOWLIST_PORT ?? '40420';
 const BASE = `http://localhost:${PORT}`;
-const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const PASSWORD = 'AllowlistTest1234';
 
 /** The one host this node's operator permits. Everything else must be refused at both doors. */
@@ -64,9 +60,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
-async function sign(privB64: string, msg: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 
 const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-ai-allowlist-'));
 const DB_PATH = join(dbDir, 'ai-allowlist.db');
@@ -126,12 +119,7 @@ async function main() {
                 body: JSON.stringify({ username: name, display_name: name, password: PASSWORD }),
             });
             assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
-            const priv = reg.body.data.private_key as string;
-            const ts = new Date().toISOString();
-            const tok = await json('/v1/auth/token', {
-                method: 'POST',
-                body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(priv, name + NODE_ID + ts) }),
-            });
+            const tok = await ownerSignIn(BASE, name, PASSWORD);
             assert(tok.body.ok === true, `owner token: ${JSON.stringify(tok.body.error)}`);
             token = tok.body.data.token as string;
         });

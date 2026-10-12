@@ -24,6 +24,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,16 +75,7 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 }
 
 async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(priv, name + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }),
-    });
-    assert(body.ok === true, `token ${name}: ${JSON.stringify(body.error)}`);
-    return body.data.token;
+    return (await registerWithPassword(BASE, name)).token;
 }
 
 /** An MCP session on /v1/mcp for one agent of `owner`, holding `scopes`. */

@@ -19,7 +19,6 @@
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -52,6 +51,7 @@ async function json(path: string, opts: RequestInit = {}) {
 // Helper: sign a message with a base64 private key
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -84,23 +84,13 @@ console.log('\n=== AIMEAT Phase 0 E2E Test ===\n');
 console.log('Setup \u2014 registering test owner & agent');
 
 await test('Register test owner (auto-operator)', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
+    const owner = await registerOwner(BASE, ownerName);
+    ownerPrivKey = owner.privateKey;
     assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got private key');
 });
 
 await test('Get owner token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data?.token;
     assert(typeof ownerToken === 'string', 'got owner token');
@@ -344,16 +334,7 @@ await test('GET /v1/consent/:id \u2192 200, get single consent', async () => {
  */
 await test('A stranger cannot read or revoke somebody else\'s consent grant', async () => {
     const strangerName = `phase0stranger-${Date.now()}`;
-    const reg = await json('/v1/owners', {
-        method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `register the stranger: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const ownerSig = await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts);
-    const strangerOwner = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: ownerSig }),
-    });
-    const strangerOwnerToken = strangerOwner.body.data?.token;
+    const strangerOwnerToken = (await registerOwner(BASE, strangerName)).token;
     assert(typeof strangerOwnerToken === 'string', 'stranger owner token');
 
     const strangerAgent = await json('/v1/agents', {

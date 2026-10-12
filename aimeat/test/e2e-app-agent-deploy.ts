@@ -23,6 +23,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -50,16 +51,6 @@ async function signMsg(privB64: string, message: string): Promise<string> {
     return Buffer.from(sig).toString('base64');
 }
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
-
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, name + NODE_ID + ts);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token;
-}
 
 /** Register an agent under `ownerToken`'s owner and return { gaii, token }. */
 async function registerAgent(ownerToken: string, ownerName: string, name: string, mode: string, scopes: string[]) {
@@ -113,8 +104,8 @@ async function main() {
 
     console.log('Phase 0: Setup — two owners, owner1 has a crew-forge (task-runner mode)');
     await test('register owners + owner1 crew-forge', async () => {
-        owner1Token = await registerOwner(owner1);
-        owner2Token = await registerOwner(owner2);
+        owner1Token = (await registerOwner(BASE, owner1)).token;
+        owner2Token = (await registerOwner(BASE, owner2)).token;
         const r = await registerAgent(owner1Token, owner1, RUNNER, 'task-runner', ['memory:read', 'memory:write', 'task:read', 'task:write']);
         runner1Gaii = r.gaii; runner1Token = r.token;
     });

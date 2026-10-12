@@ -25,8 +25,8 @@
  *   v1.0.0 — 2026-08-13 — Initial, with the fix.
  */
 import { seedEmailVerification } from './helpers/verified-email.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -65,11 +65,7 @@ async function setupOwner(label: string) {
         r = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: owner, display_name: 'T', password: 'RevokeMe123456' }) });
     }
     assert(r.status === 201, `ghii ${r.status}: ${JSON.stringify(r.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await sign(r.body.data.private_key, owner + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, owner, 'RevokeMe123456');
     return { owner, ownerToken: tok.body.data.token as string };
 }
 

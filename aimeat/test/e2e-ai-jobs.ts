@@ -43,17 +43,14 @@
  *     spend the owner's provider key through the new door and not the old one.
  *   v1.0.0 — 2026-08-31 — Initial.
  */
-import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { createHash } from 'node:crypto';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, imageJson, transcriptionJson, providerStatus, type FakeAiProvider } from './helpers/fake-ai-provider.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const PORT = process.env.E2E_AI_JOBS_PORT ?? '40297';
 const BASE = `http://localhost:${PORT}`;
@@ -93,9 +90,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
-async function sign(privB64: string, msg: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 
 // ── the stub provider ─────────────────────────────────────────────────────────
 // It answers the OpenAI-compatible completions shape, and it can hold a request open so a job stays
@@ -200,11 +194,7 @@ async function setupOwner(label: string): Promise<Owner> {
         body: JSON.stringify({ username: name, display_name: 'AI Jobs', password: 'AiJobsTest1234' }),
     });
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, name, 'AiJobsTest1234');
     assert(tok.status === 200 && tok.body?.data?.token, `auth/token ${tok.status}: ${JSON.stringify(tok.body)}`);
     return { name, gaii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }

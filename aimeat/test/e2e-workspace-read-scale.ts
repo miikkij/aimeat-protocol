@@ -34,14 +34,13 @@
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial.
  */
-import * as ed from '@noble/ed25519';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 import type { Storage } from '../src/storage/interface.js';
 import type { AppRecord } from '../src/storage/types/apps.js';
 import type { AiProvenance } from '../src/models/ai-provenance-schemas.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -68,10 +67,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
 }
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
 
 console.log('\n=== AIMEAT Workspace Read at Production Size E2E Test ===\n');
 
@@ -96,7 +91,7 @@ await test('Setup: owner, organism and a workspace with one record space', async
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Scale', password: 'Scale12345' }) });
     assert(reg.status === 201, `ghii ${reg.status}`);
     const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'Scale12345');
     assert(tok.status === 200, `token ${tok.status}`);
     token = tok.body.data.token;
     const auth = { Authorization: `Bearer ${token}` };
@@ -183,8 +178,7 @@ await test('Refused: another owner who is not a member reads nothing of the work
     const other = `scaleo${Date.now() % 1_000_000}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: other, display_name: 'Other', password: 'Scale12345' }) });
     assert(reg.status === 201, `ghii ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: other, timestamp: ts, signature: await signMsg(reg.body.data.private_key, other + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, other, 'Scale12345');
     const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: { Authorization: `Bearer ${tok.body.data.token}` } });
     assert(r.status === 403, `a non-member's read: expected 403, got ${r.status}`);
 });

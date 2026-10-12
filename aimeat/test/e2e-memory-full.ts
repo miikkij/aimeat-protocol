@@ -31,6 +31,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 // ─── Boot embedded server ───
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40251', 10);
@@ -124,12 +125,7 @@ await test('Register owner', async () => {
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
         ownerPrivKey = body.private_key;
     } else {
-        const { status, body } = await json('/v1/owners', {
-            method: 'POST',
-            body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-        });
-        assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-        ownerPrivKey = body.data.private_key;
+        ownerPrivKey = (await registerOwner(BASE, ownerName)).privateKey;
     }
 });
 
@@ -143,13 +139,7 @@ await test('Owner auth token', async () => {
         assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
         ownerToken = body.token;
     } else {
-        const timestamp = new Date().toISOString();
-        const message = ownerName + NODE_ID + timestamp;
-        const signature = await signMsg(ownerPrivKey, message);
-        const { body } = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-        });
+        const { body } = await ownerSignIn(BASE, ownerName);
         assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
         ownerToken = body.data?.token;
     }
@@ -947,19 +937,7 @@ await test('register second owner + token (different account)', async () => {
         assert(tok.body.ok === true, `owner2 token: ${JSON.stringify(tok.body.error)}`);
         owner2Token = tok.body.token;
     } else {
-        const { status, body } = await json('/v1/owners', {
-            method: 'POST',
-            body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
-        });
-        assert(status === 201, `owner2 register ${status}: ${JSON.stringify(body)}`);
-        const timestamp = new Date().toISOString();
-        const signature = await signMsg(body.data.private_key, owner2Name + NODE_ID + timestamp);
-        const tok = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: owner2Name, timestamp, signature }),
-        });
-        assert(tok.body.ok === true, `owner2 token: ${JSON.stringify(tok.body.error)}`);
-        owner2Token = tok.body.data?.token;
+        owner2Token = (await registerOwner(BASE, owner2Name)).token;
     }
 });
 
@@ -1144,11 +1122,7 @@ await test('Bulk and import refuse a foreign agent target, the same way the sing
         body: JSON.stringify({ username: strangerName, display_name: 'Memory Stranger', password: 'MemFull1234' }),
     });
     assert(reg.status === 201, `stranger ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const stok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts) }),
-    });
+    const stok = await ownerSignIn(BASE, strangerName, 'MemFull1234');
     const theirAgent = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${stok.body.data.token}` },
         body: JSON.stringify({ name: 'memstrangeragent', owner: strangerName, capabilities: ['memory'], model: 'gpt-4o' }),

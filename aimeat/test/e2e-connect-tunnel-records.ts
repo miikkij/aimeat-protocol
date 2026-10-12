@@ -10,6 +10,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TunnelClient } from './helpers/tunnel-harness.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -36,12 +37,6 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function ownerToken(name: string, priv: string): Promise<string> {
-  const ts = new Date().toISOString();
-  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(priv, name + NODE_ID + ts) }) });
-  assert(body.ok === true, `owner token: ${JSON.stringify(body.error)}`);
-  return body.data.token;
-}
 async function agentToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(priv, gaii + ts) }) });
@@ -52,9 +47,8 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 async function setupOwner(prefix: string) {
   const name = `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `register owner ${reg.status}: ${JSON.stringify(reg.body)}`);
-  return { name, token: await ownerToken(name, reg.body.data.private_key) };
+  const owner = await registerOwner(BASE, name);
+  return { name, token: owner.token };
 }
 async function setupAgent(ownerName: string, ownerTok: string, agentName: string) {
   const reg = await json('/v1/agents', {

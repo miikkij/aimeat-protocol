@@ -23,9 +23,8 @@
  *     write server-trusted owner keys (openrouter.*, ai-usage.*, profile.*) on POST/PUT/import; the
  *     owner is unaffected (guard is app-scoped). Closes the C-2 app-grant key-exfil class.
  */
-import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -45,10 +44,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body, headers: res.headers };
-}
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
 }
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
@@ -93,13 +88,7 @@ async function main() {
     console.log('Phase 0: Setup');
 
     await test('register owner + token + publish app', async () => {
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
-        const ts = new Date().toISOString();
-        const sig = await signMsg(reg.body.data.private_key, owner + NODE_ID + ts);
-        const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp: ts, signature: sig }) });
-        assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-        ownerToken = tok.body.data.token;
+        ownerToken = (await registerOwner(BASE, owner)).token;
         const pub = await json('/v1/apps', {
             method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
             body: JSON.stringify({ filename: FILENAME, content: b64('<!DOCTYPE html><html><body>grant</body></html>'), name: 'Grant Demo', description: 'grant demo app', category: 'utility' }),
@@ -596,12 +585,7 @@ async function main() {
 
     await test('a plain owner is refused both operator listings, and so is a caller with none', async () => {
         const plain = `grantplain${Date.now() % 100000}`;
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: plain, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register: ${reg.status}`);
-        const ts = new Date().toISOString();
-        const sig = await signMsg(reg.body.data.private_key, plain + NODE_ID + ts);
-        const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: plain, timestamp: ts, signature: sig }) });
-        const plainToken = tok.body.data.token;
+        const plainToken = (await registerOwner(BASE, plain)).token;
 
         const g = await json('/v1/admin/app-grants', { headers: { Authorization: `Bearer ${plainToken}` } });
         assert(g.status === 403, `app-grants expected 403, got ${g.status}`);

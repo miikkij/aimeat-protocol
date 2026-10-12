@@ -22,6 +22,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -81,15 +82,14 @@ async function provision(tag: string) {
     const ownerName = `shape${tag}${stamp}`;
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'Shape Test', password: 'Shape1234567' }) });
     assert(ghii.status === 201, `ghii ${ghii.status}: ${JSON.stringify(ghii.body)}`);
-    let ts = new Date().toISOString();
-    const ownerTok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ghii.body.data.private_key, ownerName + NODE_ID + ts) }) });
+    const ownerTok = await ownerSignIn(BASE, ownerName, 'Shape1234567');
     assert(ownerTok.body.ok === true, `owner token: ${JSON.stringify(ownerTok.body.error)}`);
     const ownerToken = ownerTok.body.data.token as string;
     const agent = await json('/v1/agents', auth(ownerToken, { method: 'POST', body: JSON.stringify({ name: 'shapeai', owner: ownerName, capabilities: ['memory'], model: 'claude-opus-5-5' }) }));
     assert(agent.status === 201, `agent ${agent.status}: ${JSON.stringify(agent.body)}`);
     const agentGaii = agent.body.data.agent.gaii;
     const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'Shape E2E', redirect_uris: [] }) });
-    ts = new Date().toISOString();
+    const ts = new Date().toISOString();
     const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({ response_type: 'code', client_id: reg.body.client_id, gaii: agentGaii, signature: await signMsg(agent.body.data.private_key, agentGaii + NODE_ID + ts), timestamp: ts, ...authorizeParams(pkce) });
     const authz = await json(`/v1/mcp/authorize?${params}`);

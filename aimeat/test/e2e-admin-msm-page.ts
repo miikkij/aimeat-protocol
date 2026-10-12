@@ -17,13 +17,9 @@
  * @version-history
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 let passed = 0;
 let failed = 0;
@@ -55,22 +51,8 @@ async function json(path: string, opts: RequestInit = {}) {
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
 async function owner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const priv = reg.body.data.private_key;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(priv, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
+    return (await registerOwner(BASE, name)).token;
 }
 
 console.log('\n🧪 Admin MSM page — the listing the page is arranged by\n');

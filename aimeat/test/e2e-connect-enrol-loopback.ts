@@ -37,6 +37,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node
 import { join, resolve } from 'node:path';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -69,12 +70,11 @@ async function json(base: string, path: string, opts: RequestInit = {}): Promise
   return { status: res.status, body };
 }
 
-async function tokenFor(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
+async function tokenFor(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
-  const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(priv, 'base64'));
+  const sig = await ed.signAsync(new TextEncoder().encode(gaii + ts), Buffer.from(priv, 'base64'));
   const signature = Buffer.from(sig).toString('base64');
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const payload = { gaii, timestamp: ts, signature };
   const { body } = await json(BASE, '/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -146,15 +146,13 @@ console.log(`  node base URL ${BASE}, connector node URL ${LOOPBACK}`);
 
 await test('setup: an owner, one agent connected the way the sale connects one, and its daemon on loopback', async () => {
   assert(LOOPBACK !== new URL(BASE).origin, 'the connector address must differ from the node base URL');
-  const reg = await json(BASE, '/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `owner ${reg.status}: ${JSON.stringify(reg.body)}`);
-  ownerToken = await tokenFor(ownerName, reg.body.data.private_key, false);
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
   const ag = await json(BASE, '/v1/agents', {
     method: 'POST', headers: authOwner(),
     body: JSON.stringify({ name: firstAgent, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*'] }),
   });
   assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body)}`);
-  agentToken = await tokenFor(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+  agentToken = await tokenFor(ag.body.data.agent.gaii, ag.body.data.private_key);
 
   mkdirSync(join(home, 'tokens'), { recursive: true });
   mkdirSync(join(home, 'agents', firstAgent), { recursive: true });

@@ -48,6 +48,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -110,11 +111,7 @@ async function setupOwnerAgentSession(ownerName: string, agentName: string): Pro
         body: JSON.stringify({ username: ownerName, display_name: ownerName, password: 'ProofKb1!' }),
     });
     assert(gs === 201, `ghii ${gs}`);
-    const ts1 = new Date().toISOString();
-    const { body: tb } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp: ts1, signature: await signMsg(gb.data.private_key, ownerName + NODE_ID + ts1) }),
-    });
+    const { body: tb } = await ownerSignIn(BASE, ownerName, 'ProofKb1!');
     const ownerToken = tb.data.token;
     const { status: as, body: ab } = await json('/v1/agents', {
         method: 'POST',

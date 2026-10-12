@@ -7,7 +7,6 @@
 //   prompt_answer correlation via thread history (the path aimeat_message_history reads).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -49,6 +48,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -58,13 +58,11 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
+    const message = gaii + timestamp;
     const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: ownerOrGaii, timestamp, signature }
-        : { owner: ownerOrGaii, timestamp, signature };
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -91,13 +89,9 @@ console.log('\n=== AIMEAT Agent Messages E2E Test ===\n');
 console.log('Setup -- Owner & Agent');
 
 await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    const owner = await registerOwner(BASE, ownerName);
+    ownerPrivKey = owner.privateKey;
+    ownerToken = owner.token;
 });
 
 await test('Register agent', async () => {
@@ -117,7 +111,7 @@ await test('Register agent', async () => {
 });
 
 await test('Agent auth token', async () => {
-    agentToken = await getToken(agentGaii, agentPrivKey, true);
+    agentToken = await getToken(agentGaii, agentPrivKey);
     assert(typeof agentToken === 'string' && agentToken.length > 0, 'got agent token');
 });
 
@@ -280,9 +274,7 @@ await test('6. Update message status to delivered', async () => {
 // message content in the response.
 await test('6b. An agent cannot touch another owner\'s message by id', async () => {
     const strangerName = `agmsgstranger${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `stranger owner ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
-    const strangerToken = await getToken(strangerName, reg.body.data.private_key, false);
+    const strangerToken = (await registerOwner(BASE, strangerName)).token;
 
     const strangerAgent = 'stranger-bot';
     const ar = await json('/v1/agents', {
@@ -290,7 +282,7 @@ await test('6b. An agent cannot touch another owner\'s message by id', async () 
         body: JSON.stringify({ name: strangerAgent, owner: strangerName, capabilities: ['memory'] }),
     });
     assert(ar.status === 201, `stranger agent ${ar.status}: ${JSON.stringify(ar.body).slice(0, 200)}`);
-    const strangerAgentToken = await getToken(ar.body.data.agent.gaii, ar.body.data.private_key, true);
+    const strangerAgentToken = await getToken(ar.body.data.agent.gaii, ar.body.data.private_key);
 
     // A message that belongs to the STRANGER's agent, with content only they should ever see.
     const secret = 'the stranger\'s private instruction';
@@ -387,7 +379,7 @@ await test('9c. messages/overview owner-or-self: a sibling agent gets 403', asyn
         body: JSON.stringify({ name: 'msgbot2', owner: ownerName, capabilities: ['memory'] }),
     });
     assert(r.status === 201, `register agent2 ${r.status}: ${JSON.stringify(r.body)}`);
-    const a2 = await getToken(r.body.data.agent.gaii, r.body.data.private_key, true);
+    const a2 = await getToken(r.body.data.agent.gaii, r.body.data.private_key);
     const { status } = await json(`/v1/agents/${agentName}/messages/overview`, { headers: { Authorization: `Bearer ${a2}` } });
     assert(status === 403, `sibling agent should get 403, got ${status}`);
 });

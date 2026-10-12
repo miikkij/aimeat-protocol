@@ -31,6 +31,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { hostRequest } from './helpers/host-request.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -130,13 +131,8 @@ async function connectAgent(label: string, scopes: string[]): Promise<{ session:
         body: JSON.stringify({ username: owner, display_name: owner, password: 'McpCompany1234' }),
     });
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ownerPriv = reg.body.data.private_key as string;
 
-    let ts = new Date().toISOString();
-    const ownerTok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await signMsg(ownerPriv, owner + NODE_ID + ts) }),
-    });
+    const ownerTok = await ownerSignIn(BASE, owner, 'McpCompany1234');
     const ownerToken = ownerTok.body.data.token as string;
 
     const agent = await json('/v1/agents', {
@@ -152,7 +148,7 @@ async function connectAgent(label: string, scopes: string[]): Promise<{ session:
         method: 'POST',
         body: JSON.stringify({ client_name: `MCP Company E2E ${label}`, redirect_uris: [] }),
     });
-    ts = new Date().toISOString();
+    const ts = new Date().toISOString();
     const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code', client_id: client.body.client_id, gaii,

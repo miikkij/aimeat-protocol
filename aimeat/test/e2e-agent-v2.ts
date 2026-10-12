@@ -36,6 +36,7 @@ import { WebSocket } from 'ws';
 import { CompactSign, importJWK, exportJWK, generateKeyPair, calculateJwkThumbprint, compactVerify } from 'jose';
 import * as ed from '@noble/ed25519';
 import { createHash, randomUUID } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -71,11 +72,7 @@ async function setupOwner(label: string) {
         r = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: owner, display_name: 'T', password: 'AgentV2Pass12345' }) });
     }
     assert(r.status === 201, `ghii ${r.status}: ${JSON.stringify(r.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await signOwner(r.body.data.private_key, owner + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, owner, 'AgentV2Pass12345');
     return { owner, ownerToken: tok.body.data.token as string };
 }
 

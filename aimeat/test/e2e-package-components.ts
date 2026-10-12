@@ -45,6 +45,7 @@
  */
 
 import { deepStrictEqual } from 'node:assert';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -76,11 +77,7 @@ async function setupOwner(label: string) {
     let reg = await mk();
     for (let i = 0; reg.status === 429 && i < 8; i++) { await new Promise(r => setTimeout(r, 1500)); reg = await mk(); }
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, name, 'PkgComp1234');
     assert(tok.status === 200, `token ${tok.status}`);
     return { name, token: tok.body.data.token as string };
 }

@@ -16,6 +16,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 // ─── Boot embedded server ───
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40251', 10);
@@ -334,22 +335,17 @@ await test('POST /v1/owners — register owner', async () => {
         ownerPrivKey = body.private_key;
         isOperator = true;
     } else {
-        const { status, body } = await json('/v1/owners', {
-            method: 'POST',
-            body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-        });
-        assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+        const owner = await registerOwner(BASE, ownerName);
+        const { body } = owner.registration;
         assert(body.ok === true, 'ok');
-        ownerPrivKey = body.data.private_key;
+        ownerPrivKey = owner.privateKey;
+        // Detect operator from the registration answer (first registered owner is auto-operator)
+        if (owner.roles.includes('operator')) isOperator = true;
     }
     assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
 await test('Owner auth — sign + token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-
     if (ADMIN_PW && isOperator) {
         // Use admin setup token endpoint for admin-registered owners
         const { body } = await json('/v1/admin/setup/token', {
@@ -360,14 +356,9 @@ await test('Owner auth — sign + token', async () => {
         assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
         ownerToken = body.token;
     } else {
-        const { body } = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-        });
+        const { body } = await ownerSignIn(BASE, ownerName);
         assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
         ownerToken = body.data?.token;
-        // Detect operator from actual auth response (first registered owner is auto-operator)
-        if (body.data?.roles?.includes('operator')) isOperator = true;
     }
     assert(typeof ownerToken === 'string', 'got owner token');
 });
@@ -461,21 +452,12 @@ await test('Catalogue — list actions', async () => {
 await test('Work lifecycle — submit→accept→deliver→rate', async () => {
     // Register a second owner + agent for cross-owner work
     const workOwnerName = `workowner${Date.now()}`;
-    const { body: owReg } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: workOwnerName, public_key: 'placeholder' }),
-    });
+    const workOwner = await registerOwner(BASE, workOwnerName);
+    const owReg = workOwner.registration.body;
     assert(owReg.ok === true, `register work owner: ${JSON.stringify(owReg.error)}`);
-    const workOwnerPrivKey = owReg.data.private_key;
 
     // Get work owner token
-    const owTs = new Date().toISOString();
-    const owSig = await signMsg(workOwnerPrivKey, workOwnerName + NODE_ID + owTs);
-    const { body: owTk } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: workOwnerName, timestamp: owTs, signature: owSig }),
-    });
-    const workOwnerToken = owTk.data?.token;
+    const workOwnerToken = workOwner.token;
 
     // Register agent under second owner
     const agent2Name = 'requester';
@@ -1378,14 +1360,7 @@ await test('Setup — create GHII user for chat instances', async () => {
     assert(typeof chatOwnerPrivKey === 'string' && chatOwnerPrivKey.length > 0, 'got private key');
 
     // Authenticate to get a JWT token
-    const timestamp = new Date().toISOString();
-    const message = chatOwnerName + NODE_ID + timestamp;
-    const signature = await signMsg(chatOwnerPrivKey, message);
-
-    const { body: tokenBody } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: chatOwnerName, timestamp, signature }),
-    });
+    const { body: tokenBody } = await ownerSignIn(BASE, chatOwnerName, 'TestPass1234!');
     assert(tokenBody.ok === true, `token ok: ${JSON.stringify(tokenBody.error)}`);
     chatOwnerToken = tokenBody.data?.token;
     assert(typeof chatOwnerToken === 'string', 'got chat owner token');
@@ -1886,21 +1861,12 @@ const scopedAgentName = 'scoped-test-' + Date.now();
 
 await test('Register agent with limited scopes', async () => {
     // Create a non-operator owner (via regular registration, not admin setup)
-    const { body: owReg } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: scopedOwnerName, public_key: 'placeholder' }),
-    });
+    const scopedOwner = await registerOwner(BASE, scopedOwnerName);
+    const owReg = scopedOwner.registration.body;
     assert(owReg.ok === true, `register scope owner: ${JSON.stringify(owReg.error)}`);
-    const scopedOwnerPrivKey = owReg.data.private_key;
 
     // Get owner token
-    const ts = new Date().toISOString();
-    const sig = await signMsg(scopedOwnerPrivKey, scopedOwnerName + NODE_ID + ts);
-    const { body: tkBody } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: scopedOwnerName, timestamp: ts, signature: sig }),
-    });
-    scopedOwnerToken = tkBody.data?.token;
+    scopedOwnerToken = scopedOwner.token;
 
     const { status, body } = await json('/v1/agents', {
         method: 'POST',
@@ -2154,21 +2120,12 @@ let agent2bToken = '';
 let agent2bGaii = '';
 
 await test('Setup — register second owner for consent tests', async () => {
-    const { body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
-    });
+    const owner2 = await registerOwner(BASE, owner2Name);
+    const { body } = owner2.registration;
     assert(body.ok === true, `register owner2: ${JSON.stringify(body.error)}`);
-    const privKey = body.data?.private_key;
 
     // Get owner token
-    const ts = new Date().toISOString();
-    const sig = await signMsg(privKey, owner2Name + NODE_ID + ts);
-    const { body: tkBody } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: owner2Name, timestamp: ts, signature: sig }),
-    });
-    owner2Token = tkBody.data?.token;
+    owner2Token = owner2.token;
     assert(typeof owner2Token === 'string', 'got owner2 token');
 
     // Register agent under owner2
@@ -2540,17 +2497,9 @@ await test('Re-register an owner for the config tests (the previous one was just
         assert(tk.body.ok === true, `admin re-token: ${JSON.stringify(tk.body.error)}`);
         ownerToken = tk.body.token;
     } else {
-        const { status, body } = await json('/v1/owners', {
-            method: 'POST',
-            body: JSON.stringify({ name: configOwnerName, public_key: 'placeholder' }),
-        });
-        assert(status === 201, `re-register ${status}: ${JSON.stringify(body)}`);
-        privKey = body.data.private_key;
-        const timestamp = new Date().toISOString();
-        const tk = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: configOwnerName, timestamp, signature: await signMsg(privKey, configOwnerName + NODE_ID + timestamp) }),
-        });
+        const owner = await registerOwner(BASE, configOwnerName);
+        privKey = owner.privateKey;
+        const tk = await ownerSignIn(BASE, configOwnerName);
         assert(tk.body.ok === true, `re-token: ${JSON.stringify(tk.body.error)}`);
         ownerToken = tk.body.data?.token;
     }

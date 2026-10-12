@@ -40,6 +40,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import YAML from 'yaml';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -151,24 +152,13 @@ console.log('\n=== Packages, Templates & Instances E2E Tests ===\n');
 console.log('Setup — Register owner + agent');
 
 await test('Register test owner (first = operator)', async () => {
-  const { status, body } = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-  });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  ownerPrivKey = body.data.private_key;
+  const owner = await registerOwner(BASE, ownerName);
+  ownerPrivKey = owner.privateKey;
   assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
 await test('Owner auth — sign + token', async () => {
-  const timestamp = new Date().toISOString();
-  const message = ownerName + NODE_ID + timestamp;
-  const signature = await signMsg(ownerPrivKey, message);
-
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-  });
+  const { body } = await ownerSignIn(BASE, ownerName);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   ownerToken = body.data?.token;
   assert(typeof ownerToken === 'string', 'got owner token');
@@ -1276,23 +1266,12 @@ console.log('\nPhase 7 — Auth & Validation');
 
 // Register second owner
 await test('Register second owner', async () => {
-  const { status, body } = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
-  });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  owner2PrivKey = body.data.private_key;
+  const owner2 = await registerOwner(BASE, owner2Name);
+  owner2PrivKey = owner2.privateKey;
 });
 
 await test('Second owner auth', async () => {
-  const timestamp = new Date().toISOString();
-  const message = owner2Name + NODE_ID + timestamp;
-  const signature = await signMsg(owner2PrivKey, message);
-
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: owner2Name, timestamp, signature }),
-  });
+  const { body } = await ownerSignIn(BASE, owner2Name);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   owner2Token = body.data?.token;
 });

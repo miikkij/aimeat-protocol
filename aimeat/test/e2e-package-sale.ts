@@ -40,6 +40,7 @@ import type { PeerInfo } from '../src/services/federation.js';
 import { runAutoRenewals } from '../src/services/packages/sale/package-renewals.js';
 import { runAsNode } from '../src/utils/gaii.js';
 import { cleanupPackagePeers } from '../src/services/packages/peer/package-peer-limits.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 let passed = 0;
 let failed = 0;
@@ -103,8 +104,7 @@ async function signUp(node: NodeState, name: string): Promise<string> {
     let reg = await node.json('/v1/ghii', { method: 'POST', body });
     for (let i = 0; reg.status === 429 && i < 8; i++) { await new Promise(r => setTimeout(r, 1500)); reg = await node.json('/v1/ghii', { method: 'POST', body }); }
     assert(reg.status === 201, `sign up ${name}: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
-    const at = new Date().toISOString();
-    const tok = await node.json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: at, signature: await sign(reg.body.data.private_key, name + node.nodeId + at) }) });
+    const tok = await ownerSignIn(node.baseUrl, name, 'PackageSale1234');
     assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
     return tok.body.data.token as string;
 }

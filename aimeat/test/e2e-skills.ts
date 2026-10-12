@@ -66,6 +66,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -75,13 +76,10 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: ownerOrGaii, timestamp, signature }
-        : { owner: ownerOrGaii, timestamp, signature };
+    const signature = await signMsg(privKey, gaii + timestamp);
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -202,23 +200,15 @@ console.log('\n=== AIMEAT Skills Registry E2E Test ===\n');
 console.log('Setup -- Owners & Agent');
 
 await test('Register owner A', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    const owner = await registerOwner(BASE, ownerName);
+    ownerPrivKey = owner.privateKey;
+    ownerToken = owner.token;
 });
 
 await test('Register owner B', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: otherOwnerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}`);
-    otherOwnerPrivKey = body.data.private_key;
-    otherOwnerToken = await getToken(otherOwnerName, otherOwnerPrivKey, false);
+    const owner = await registerOwner(BASE, otherOwnerName);
+    otherOwnerPrivKey = owner.privateKey;
+    otherOwnerToken = owner.token;
 });
 
 await test('Register agent under owner A', async () => {
@@ -236,7 +226,7 @@ await test('Register agent under owner A', async () => {
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentGaii = body.data.agent.gaii;
     agentPrivKey = body.data.private_key;
-    agentToken = await getToken(agentGaii, agentPrivKey, true);
+    agentToken = await getToken(agentGaii, agentPrivKey);
 });
 
 // ─── Phase 1: Publish + contract validation ───

@@ -16,13 +16,9 @@
  *   v1.0.0 — 2026-07-20 — initial (Phase 2a multilingual descriptions).
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerName = `desc${Date.now() % 100000}`;
 const FILE = 'descriptions-demo.html';
 const APP_HTML = '<!DOCTYPE html><html><body><h1>descriptions demo</h1></body></html>';
@@ -41,22 +37,10 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
 }
-async function signMsg(priv: string, message: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(priv, 'base64'))).toString('base64');
-}
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
 let token = '';
 const auth = (o: RequestInit = {}): RequestInit => ({ ...o, headers: { ...((o.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${token}` } });
-
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
-}
 
 /** Fetch this owner's app manifest from the listing (descriptions live on manifest). */
 async function manifest(): Promise<any> {
@@ -72,7 +56,7 @@ console.log('\n=== App per-locale descriptions E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register owner', async () => {
-    token = await registerOwner(ownerName);
+    token = (await registerOwner(BASE, ownerName)).token;
 });
 
 // ── Phase 1: publish with a descriptions map ──
@@ -147,7 +131,7 @@ await test('PATCH with a non-string locale value → 400', async () => {
 // by filename alone, and nothing here had ever called it as anyone but the owner.
 
 await test('A second owner cannot rewrite this app\'s descriptions', async () => {
-    const strangerToken = await registerOwner(`descother${Date.now() % 100000}`);
+    const strangerToken = (await registerOwner(BASE, `descother${Date.now() % 100000}`)).token;
     const r = await json(`/v1/apps/${FILE}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${strangerToken}` },

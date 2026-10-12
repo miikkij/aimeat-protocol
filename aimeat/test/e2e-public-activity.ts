@@ -22,10 +22,10 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerName = `pactest${Date.now() % 100000}`;
 const agentName = 'pacagent';
 const stamp = Date.now();
@@ -81,13 +81,7 @@ console.log('\n=== Public Activity Feed E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register owner', async () => {
-  const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  const priv = body.data.private_key;
-  const ts = new Date().toISOString();
-  const sig = await signMsg(priv, ownerName + NODE_ID + ts);
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: sig }) });
-  ownerToken = tok.body.data?.token;
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
   assert(typeof ownerToken === 'string', 'got owner token');
 });
 

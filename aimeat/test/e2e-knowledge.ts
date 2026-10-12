@@ -4,12 +4,12 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -56,24 +56,13 @@ console.log('\n=== Knowledge System E2E Tests ===\n');
 console.log('Setup — Register owner + agent');
 
 await test('Register test owner', async () => {
-  const { status, body } = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-  });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  ownerPrivKey = body.data.private_key;
+  const owner = await registerOwner(BASE, ownerName);
+  ownerPrivKey = owner.privateKey;
   assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
 await test('Owner auth — sign + token', async () => {
-  const timestamp = new Date().toISOString();
-  const message = ownerName + NODE_ID + timestamp;
-  const signature = await signMsg(ownerPrivKey, message);
-
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-  });
+  const { body } = await ownerSignIn(BASE, ownerName);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   ownerToken = body.data?.token;
   assert(typeof ownerToken === 'string', 'got owner token');
@@ -432,11 +421,7 @@ await test('An ORDINARY owner cannot list or review packages node-wide', async (
     body: JSON.stringify({ username: plainName, display_name: 'Plain Owner', password: 'Knowledge1234' }),
   });
   assert(reg.status === 201, `plain ghii ${reg.status}`);
-  const ts = new Date().toISOString();
-  const tok = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: plainName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, plainName + NODE_ID + ts) }),
-  });
+  const tok = await ownerSignIn(BASE, plainName, 'Knowledge1234');
   plainToken = tok.body.data.token as string;
 
   const list = await json('/v1/admin/knowledge', { headers: { Authorization: `Bearer ${plainToken}` } });
@@ -488,25 +473,23 @@ await test('Package owner can see operator reviews', async () => {
 // canonical consent pattern form that findMatchingConsents/consentMatchPattern supports.
 console.log('\nPhase 5: Organism-Member Consent Resolution');
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
   const timestamp = new Date().toISOString();
-  const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-  const signature = await signMsg(privKey, message);
-  const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature } : { owner: ownerOrGaii, timestamp, signature };
+  const signature = await signMsg(privKey, gaii + timestamp);
+  const payload = { gaii, timestamp, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   return body.data?.token;
 }
 
 async function makeOwnerAgent(name: string): Promise<{ owner: string; ownerToken: string; agentGaii: string; agentToken: string }> {
-  const { body: oBody } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-  const oToken = await getToken(name, oBody.data.private_key, false);
+  const oToken = (await registerOwner(BASE, name)).token;
   const { body: aBody } = await json('/v1/agents', {
     method: 'POST',
     headers: { Authorization: `Bearer ${oToken}` },
     body: JSON.stringify({ name: 'orgagent', owner: name, capabilities: ['memory'], model: 'test-model' }),
   });
   const gaii = aBody.data.agent.gaii;
-  const aToken = await getToken(gaii, aBody.data.private_key, true);
+  const aToken = await getToken(gaii, aBody.data.private_key);
   return { owner: name, ownerToken: oToken, agentGaii: gaii, agentToken: aToken };
 }
 

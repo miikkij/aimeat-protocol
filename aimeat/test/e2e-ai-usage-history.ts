@@ -11,9 +11,9 @@
  */
 // Run: cd aimeat && pnpm exec tsx test/e2e-ai-usage-history.ts
 
-import * as ed from '@noble/ed25519';
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
+import { registerOwner } from './helpers/owner-login.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 
@@ -46,24 +46,6 @@ async function json(path: string, opts: RequestInit = {}) {
   const ct = res.headers.get('content-type') ?? '';
   const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
   return { status: res.status, body };
-}
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-  const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-  return Buffer.from(sig).toString('base64');
-}
-
-async function registerOwner(name: string): Promise<string> {
-  const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-  assert(status === 201, `register ${name} status ${status}: ${JSON.stringify(body)}`);
-  return body.data.private_key as string;
-}
-async function ownerToken(name: string, privKey: string): Promise<string> {
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-  assert(body.ok === true, `token ${name}: ${JSON.stringify(body.error)}`);
-  return body.data.token as string;
 }
 const dayStr = (offset: number) => new Date(Date.now() - offset * 86_400_000).toISOString().slice(0, 10);
 async function seed(token: string, gaii: string, rec: any) {
@@ -117,10 +99,10 @@ const today = dayStr(0), yesterday = dayStr(1), tenDaysAgo = dayStr(10);
 console.log('\n=== AI Usage History E2E Tests ===\n');
 
 await test('Register operator owner + token', async () => {
-  opToken = await ownerToken(opName, await registerOwner(opName));
+  opToken = (await registerOwner(BASE, opName)).token;
 });
 await test('Register non-operator owner + token', async () => {
-  userToken = await ownerToken(userName, await registerOwner(userName));
+  userToken = (await registerOwner(BASE, userName)).token;
 });
 
 await test('Seed operator per-day usage records (today, yesterday, 10 days ago)', async () => {

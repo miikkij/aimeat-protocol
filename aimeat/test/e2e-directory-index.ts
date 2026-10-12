@@ -41,6 +41,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -74,8 +75,7 @@ interface Account { name: string; ghii: string; token: string; agentGaii: string
 /**
  * One account with one agent, and the agent's own bearer token.
  *
- * The owner signs `owner + nodeId + timestamp`; an agent signs `gaii + timestamp`. Two different
- * messages, which is why the two branches are spelled out rather than shared.
+ * The owner signs in with the password; an agent signs `gaii + timestamp`.
  */
 async function setupAccount(label: string): Promise<Account> {
     const name = `dir${label}${STAMP}`;
@@ -84,11 +84,7 @@ async function setupAccount(label: string): Promise<Account> {
         body: JSON.stringify({ username: name, display_name: `Directory ${label.toUpperCase()}`, password: 'DirIndex1234' }),
     });
     assert(reg.status === 201, `register ${name}: ${reg.status} ${short(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, name, 'DirIndex1234');
     assert(tok.status === 200 && tok.body.data?.token, `owner token ${name}: ${tok.status} ${short(tok.body)}`);
     const token = tok.body.data.token as string;
 

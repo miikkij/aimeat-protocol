@@ -28,7 +28,6 @@
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -84,6 +83,7 @@ async function rawFetch(path: string, opts: RequestInit = {}, retries = 5): Prom
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -93,13 +93,10 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: ownerOrGaii, timestamp, signature }
-        : { owner: ownerOrGaii, timestamp, signature };
+    const signature = await signMsg(privKey, gaii + timestamp);
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -145,13 +142,9 @@ console.log('\n=== AIMEAT Storage Visibility E2E Test ===\n');
 console.log('Setup — Owners & Agents');
 
 await test('Register owner 1', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    const owner = await registerOwner(BASE, ownerName);
+    ownerPrivKey = owner.privateKey;
+    ownerToken = owner.token;
 });
 
 await test('Register agent-A (owner 1)', async () => {
@@ -163,7 +156,7 @@ await test('Register agent-A (owner 1)', async () => {
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentAGaii = body.data.agent.gaii;
     agentAPrivKey = body.data.private_key;
-    agentAToken = await getToken(agentAGaii, agentAPrivKey, true);
+    agentAToken = await getToken(agentAGaii, agentAPrivKey);
 });
 
 await test('Register agent-B (owner 1)', async () => {
@@ -175,17 +168,13 @@ await test('Register agent-B (owner 1)', async () => {
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentBGaii = body.data.agent.gaii;
     agentBPrivKey = body.data.private_key;
-    agentBToken = await getToken(agentBGaii, agentBPrivKey, true);
+    agentBToken = await getToken(agentBGaii, agentBPrivKey);
 });
 
 await test('Register owner 2 + agent-C', async () => {
-    const { status: os, body: oBody } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
-    });
-    assert(os === 201, `owner2 status ${os}: ${JSON.stringify(oBody)}`);
-    owner2PrivKey = oBody.data.private_key;
-    owner2Token = await getToken(owner2Name, owner2PrivKey, false);
+    const owner2 = await registerOwner(BASE, owner2Name);
+    owner2PrivKey = owner2.privateKey;
+    owner2Token = owner2.token;
 
     const { status: as2, body: aBody } = await json('/v1/agents', {
         method: 'POST',
@@ -195,7 +184,7 @@ await test('Register owner 2 + agent-C', async () => {
     assert(as2 === 201, `agentC status ${as2}: ${JSON.stringify(aBody)}`);
     agentCGaii = aBody.data.agent.gaii;
     agentCPrivKey = aBody.data.private_key;
-    agentCToken = await getToken(agentCGaii, agentCPrivKey, true);
+    agentCToken = await getToken(agentCGaii, agentCPrivKey);
 });
 
 // ─── Phase 1: Private Visibility (default) ───
@@ -806,7 +795,7 @@ await test('36. Register agent-D (owner 2, non-member)', async () => {
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentDGaii = body.data.agent.gaii;
-    agentDToken = await getToken(agentDGaii, body.data.private_key, true);
+    agentDToken = await getToken(agentDGaii, body.data.private_key);
 });
 
 await test('37. Owner-1 creates a sharing group with agent-C as a read member', async () => {

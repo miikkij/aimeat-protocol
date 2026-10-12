@@ -66,6 +66,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -287,19 +288,7 @@ async function run() {
     console.log('Phase 1 — Setup');
 
     await test('POST /v1/owners — register the operator who runs this node', async () => {
-        const { status, body } = await json('/v1/owners', {
-            method: 'POST',
-            body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-        });
-        assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-        const timestamp = new Date().toISOString();
-        const signature = await signMsg(body.data.private_key, ownerName + NODE_ID + timestamp);
-        const tok = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-        });
-        assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-        ownerToken = tok.body.data.token;
+        ownerToken = (await registerOwner(BASE, ownerName)).token;
         const roles = claims(ownerToken).roles ?? [];
         assert(roles.includes('operator'),
             `the peer routes are operator-only and this owner is not one (${JSON.stringify(roles)}); `

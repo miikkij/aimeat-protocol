@@ -29,6 +29,7 @@ import { USAGE_FOLDED_VISITOR, type Storage } from '../src/storage/interface.js'
 import { rebuildUsageRollup } from '../src/services/usage/rollup-engine.js';
 import { readAppVisitors, type AppVisitorsReport } from '../src/services/app-visitors.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -85,10 +86,7 @@ async function makeOwner(name: string): Promise<{ token: string; ghii: string; o
     });
     if (reg.status === 429 && attempt < 8) { await new Promise((r) => setTimeout(r, 1500)); continue; }
     assert(reg.status === 201, `registration failed: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const privKey = reg.body.data.private_key as string;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey, owner + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp, signature }) });
+    const tok = await ownerSignIn(BASE, owner, 'VisitorsTest1234');
     assert(tok.status === 200, `token failed: ${tok.status}`);
     return { token: tok.body.data.token as string, ghii: `${owner}@${NODE_ID}`, owner };
   }

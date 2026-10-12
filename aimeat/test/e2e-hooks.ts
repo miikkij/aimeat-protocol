@@ -14,6 +14,7 @@ import * as http from 'node:http';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
@@ -70,13 +71,10 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(identity: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(identity: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? identity + timestamp : identity + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: identity, timestamp, signature }
-        : { owner: identity, timestamp, signature };
+    const signature = await signMsg(privKey, identity + timestamp);
+    const payload = { gaii: identity, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -87,7 +85,6 @@ async function getToken(identity: string, privKey: string, isAgent: boolean): Pr
 
 // ─── State ───
 const ownerName = `hkowner${Date.now()}`;
-let ownerPrivKey = '';
 let ownerToken = '';
 let agentGaii = '';
 let agentPrivKey = '';
@@ -95,7 +92,6 @@ let agentToken = '';
 
 // Second owner (for provider agent — avoids SAME_OWNER_WORK)
 const providerOwnerName = `hkprovowner${Date.now()}`;
-let providerOwnerPrivKey = '';
 let providerOwnerToken = '';
 
 // Provider agent (under second owner)
@@ -154,22 +150,10 @@ await test('1. Mock webhook server started', async () => {
 
 await test('2. Register owners (operator + provider) and agents', async () => {
     // First owner (operator) — owns the requester agent
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `owner: ${status}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
 
     // Second owner — owns the provider agent (avoids SAME_OWNER_WORK)
-    const { status: status2, body: body2 } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: providerOwnerName, public_key: 'placeholder' }),
-    });
-    assert(status2 === 201, `provider owner: ${status2}`);
-    providerOwnerPrivKey = body2.data.private_key;
-    providerOwnerToken = await getToken(providerOwnerName, providerOwnerPrivKey, false);
+    providerOwnerToken = (await registerOwner(BASE, providerOwnerName)).token;
 
     // Agent-A (requester) under first owner
     const { body: aBody } = await json('/v1/agents', {
@@ -180,7 +164,7 @@ await test('2. Register owners (operator + provider) and agents', async () => {
     assert(aBody.ok, `agent-A: ${JSON.stringify(aBody.error)}`);
     agentGaii = aBody.data.agent.gaii;
     agentPrivKey = aBody.data.private_key;
-    agentToken = await getToken(agentGaii, agentPrivKey, true);
+    agentToken = await getToken(agentGaii, agentPrivKey);
 
     // Agent-B (provider) under second owner
     const { body: bBody } = await json('/v1/agents', {
@@ -191,7 +175,7 @@ await test('2. Register owners (operator + provider) and agents', async () => {
     assert(bBody.ok, `agent-B: ${JSON.stringify(bBody.error)}`);
     providerGaii = bBody.data.agent.gaii;
     providerPrivKey = bBody.data.private_key;
-    providerToken = await getToken(providerGaii, providerPrivKey, true);
+    providerToken = await getToken(providerGaii, providerPrivKey);
 });
 
 await test('3. Publish action with webhook URL', async () => {
@@ -228,7 +212,7 @@ await test('4. Configure pre_work_request hook', async () => {
 // A hook runs on every work request on the node, so who may set one is an operator decision. Every
 // call to these three doors in this file is the suite's own operator, and no other suite touches
 // them, so the role gate was covered by nothing. providerOwnerToken is the honest second principal:
-// it is registered through POST /v1/owners AFTER the operator exists, so routes/owners.ts gives it
+// it is registered through POST /v1/ghii AFTER the operator exists, so routes/ghii gives it
 // roles ['owner'] and never 'operator', whatever state the database was in.
 await test('4b. A non-operator owner is refused every hook door, and the list does not move', async () => {
     const asProvider = { Authorization: `Bearer ${providerOwnerToken}` };
