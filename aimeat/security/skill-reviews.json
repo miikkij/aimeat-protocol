@@ -280,7 +280,7 @@
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:ee6ddf9e2f6ea7dae56485dd"
+      "digest": "sha256:0d826ef620d853e2a7c3b596"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-10-05",
@@ -609,7 +609,7 @@
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
     },
     "node:configure-routing": {
-      "aimeat/src/routes/ai.ts": "71e8bca97955ccd0",
+      "aimeat/src/routes/ai.ts": "a8c423af8fcf617e",
       "aimeat/src/routes/ai-providers.ts": "7bcbba098542ad10",
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
