@@ -29,6 +29,8 @@
  * @structure SETTINGS_TABS · ADMIN_GROUPS · LINES · inLocale · pickApps · clickZig · Projector
  * @usage import { Projector } from './landing-v2-projector.js';
  * @version-history
+ *   v0.6.0 — 2026-10-12 — The caption reserves the height of the longest caption in the show, so
+ *     the big button keeps its place from slide to slide. Jouni, on the live page.
  *   v0.5.0 — 2026-09-14 — A sound-off button beside the big one; the choice holds for the browser.
  *   v0.4.0 — 2026-09-14 — A sentence for every page of both menus, and the big button jumps to
  *     any other slide while the arrows walk the queue. Jouni, on the second look.
@@ -399,14 +401,20 @@ export function Projector() {
   // is missing; a menu slide has only the one place to look.
   const own = slide.where === 'apps' ? slide.shot : `/img/frontdemo/projector/${slide.where}-${slide.id}.png`;
   const src = (own && !missing[own]) ? own : (slide.where === 'apps' ? slide.fallbackShot : own);
-  const pageName = slide.where === 'apps' ? slide.name : tr(slide.page, slide.id);
-  const whereName = slide.where === 'admin' ? tr('nav.admin', 'Admin')
-    : slide.where === 'apps' ? tr('landing2.cloudApps', 'Apps in the show')
-    : tr('nav.profile', 'Settings & Controls');
-  const line = LINES[`${slide.where}:${slide.id}`];
-  const sentence = line ? tr(...line)
-    : (slide.where === 'apps' && slide.line) ? slide.line
-    : tr('landing2.slideGeneric', '[What this page did for someone: the sentence comes later.]');
+  const pageNameOf = (s) => (s.where === 'apps' ? s.name : tr(s.page, s.id));
+  const whereNameOf = (s) => (s.where === 'admin' ? tr('nav.admin', 'Admin')
+    : s.where === 'apps' ? tr('landing2.cloudApps', 'Apps in the show')
+    : tr('nav.profile', 'Settings & Controls'));
+  const sentenceOf = (s) => {
+    const line = LINES[`${s.where}:${s.id}`];
+    return line ? tr(...line)
+      : (s.where === 'apps' && s.line) ? s.line
+      : tr('landing2.slideGeneric', '[What this page did for someone: the sentence comes later.]');
+  };
+  const pageName = pageNameOf(slide);
+  const captionParts = (s) => html`
+    <span class="ld-v2-slide-where">${whereNameOf(s)} · ${pageNameOf(s)}</span>
+    <span class="ld-v2-slide-text">${sentenceOf(s)}</span>`;
   const isLit = (where, id) => slide.where === where && slide.id === id;
   const word = (where, id, label) => html`
     <button type="button" class=${`ld-v2-word ${isLit(where, id) ? 'is-lit showroom-slab--sun' : ''}`} key=${where + ':' + id}
@@ -438,10 +446,13 @@ export function Projector() {
                 </div>` : html`
                 <img class="ld-v2-slide-img" src=${src} alt=${pageName} onError=${() => setMissing((m) => ({ ...m, [src]: true }))} />`}
             </div>
-            <p class="ld-v2-slide-caption" aria-live="polite">
-              <span class="ld-v2-slide-where">${whereName} · ${pageName}</span>
-              <span class="ld-v2-slide-text">${sentence}</span>
-            </p>
+            ${/* Every slide's caption is laid out in the same grid cell, hidden, so the cell is as tall
+                  as the longest one at this width and in this language. The controls below it then
+                  keep their place from slide to slide. */''}
+            <div class="ld-v2-caption-box">
+              ${slides.map((s) => html`<p class="ld-v2-slide-caption ld-v2-slide-caption--sizer" aria-hidden="true" key=${`${s.where}:${s.id}`}>${captionParts(s)}</p>`)}
+              <p class="ld-v2-slide-caption" aria-live="polite">${captionParts(slide)}</p>
+            </div>
           </div>
           <div class="ld-v2-controls">
             <button type="button" class="ld-v2-arrow poster-frame" aria-label=${tr('landing2.projPrev', 'Previous slide')} onClick=${() => press(-1)}>${Chevron(-1)}</button>

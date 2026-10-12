@@ -8,6 +8,8 @@
  *   offset shadows in ink, sun and coral, and every colour a theme token so the dark theme inverts.
  *   Mobile first: the base rules are the phone, and the wider screens add columns.
  * @version-history
+ *   2026-10-12 - The projector's caption cell has the height of the longest caption, and the bar
+ *     under the big button stands further from it.
  *   2026-09-19 - TARGET-080: the three steps and what opens after them, inside the hero.
  *   2026-09-17 - TARGET-078: readable heading and paragraphs for the ownership block.
  *   v0.2.0 — 2026-09-14 — The cloud's words are buttons, and the apps in the show are a third group.
@@ -121,6 +123,11 @@
 }
 .ld-v2-slide-page { font-family: var(--font-showroom); text-transform: uppercase; font-size: clamp(1.4rem, 4vw, 2.4rem); color: var(--text); }
 .ld-v2-slide-note { font-family: var(--font-showroom-body); font-size: .85rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+/* The visible caption and a hidden copy of every other slide's caption share one grid cell, so the
+   cell has the height of the longest caption and the controls under it do not move. */
+.ld-v2-caption-box { display: grid; }
+.ld-v2-caption-box > .ld-v2-slide-caption { grid-area: 1 / 1; }
+.ld-v2-slide-caption--sizer { visibility: hidden; pointer-events: none; }
 .ld-v2-slide-caption { margin: 0; display: flex; flex-direction: column; gap: .25rem; font-family: var(--font-showroom-body); }
 .ld-v2-slide-where { font-family: var(--font-showroom); text-transform: uppercase; font-size: .8rem; letter-spacing: .04em; color: var(--accent); }
 .ld-v2-slide-text { font-size: 1.15rem; font-weight: 800; line-height: 1.4; color: var(--text); }
@@ -142,7 +149,8 @@
   transition: transform 80ms ease, box-shadow 80ms ease;
 }
 .ld-v2-arrow:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--text); }
-.ld-v2-proj-bar { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+/* The counter and the two small buttons stand clear of the big button and its shadow. */
+.ld-v2-proj-bar { display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; }
 .ld-v2-counter { font-family: var(--font-showroom); text-transform: uppercase; font-size: .85rem; letter-spacing: .04em; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .ld-v2-autobtn { font-family: var(--font-showroom-body); font-weight: 800; min-width: 6rem; }
 .ld-v2-autobtn.is-on { background: var(--text); color: var(--bg); border-color: var(--text); }
