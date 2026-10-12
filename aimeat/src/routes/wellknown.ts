@@ -16,6 +16,8 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.11.1 — 2026-10-12 — endpoints.auth stays a string (the owner sign-in, /v1/ghii/login) and the
+ *     object with every way in is the new endpoints.sign_in: a change inside v1 is additive.
  *   v1.11.0 — 2026-10-12 — /.well-known/aimeat states protocol_version "2026-11" and the claimed
  *     profiles from node 4.0.0, and the accepted payment bindings and the MCP endpoint in every release
  *     (services/core-discovery.ts, Core 2026-11 DISC-01, DISC-05). endpoints.auth names each current
@@ -138,7 +140,10 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         spec: '/v1/spec',
         docs: '/v1/docs',
         mcp: '/v1/mcp',
-        auth: SIGN_IN_ENDPOINTS,
+        // A string, as it has been since v1 began: a change inside v1 is additive. It names the
+        // owner sign-in now, not /v1/auth/token; every way in is the object below.
+        auth: SIGN_IN_ENDPOINTS.owner_password,
+        sign_in: SIGN_IN_ENDPOINTS,
         catalogue: '/v1/catalogue',
       },
     }, [
