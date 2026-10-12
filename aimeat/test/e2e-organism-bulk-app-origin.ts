@@ -10,6 +10,7 @@
  *   deleteRecords step fail here — the guard-parity net (pitfalls §6).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-bulk-app-origin
  * @version-history
+ *   v1.3.0 — 2026-10-12 — The read-only refusal names memory:delete: the batch delete puts records in the bin.
  *   v1.2.0 — 2026-10-02 — The read-only refusal names memory:purge, the word the batch delete asks now.
  *     The setup no longer matched production: the word changed by ruling (task-start ruling B).
  *   v1.1.0 — 2026-09-30 — DELETE /comments under an app-origin token: the app deletes its own comment
@@ -116,9 +117,9 @@ await test('A READ-ONLY app grant cannot batch-delete records → 403, and the r
     });
     assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(r.body?.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${r.body?.error?.code}`);
-    // memory:purge since 2026-10-02: deleting records for good is its own word (an app granted
-    // memory:delete is granted it too, services/app-grant-scopes.ts withAppPurge).
-    assert(JSON.stringify(r.body?.error ?? '').includes('memory:purge'), `the refusal must name the missing word: ${JSON.stringify(r.body?.error)}`);
+    // memory:delete since 2026-10-12: the batch delete puts the records in the bin (ruling
+    // decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 9); memory:purge before.
+    assert(JSON.stringify(r.body?.error ?? '').includes('memory:delete'), `the refusal must name the missing word: ${JSON.stringify(r.body?.error)}`);
 
     // The refusal is about the WORD, not about the door: the same token still reads.
     const read = await json(`/v1/memory/${encodeURIComponent(`${root()}.${NS}.a1.latest`)}?owner_scope=true`, {

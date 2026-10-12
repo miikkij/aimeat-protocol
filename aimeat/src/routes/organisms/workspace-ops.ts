@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 -- 2026-10-12 -- POST .../workspace/records/delete puts the records in the bin and asks
+ *     memory:delete, as aimeat_workspace_object_delete does (ruling
+ *     decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 9).
  *   v1.15.0 -- 2026-10-09 -- The share unlock mints a token bound to the current password's version, so
  *     a password change ends it (secrets audit 2026-10-09, S-6).
  *   v1.14.0 -- 2026-10-08 -- The share reads (public documents, document, records) and the member read
@@ -657,12 +660,12 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * Body: { ws?, namespace, ids: [] }. Mirrors aimeat_workspace_object_delete's own/same-owner + role
    * + append-only semantics.
    *
-   * `memory:purge`, not `memory:delete`, since 2026-10-02 (Jouni's ruling): this removes records for
-   * good, with no grace window, so it is its own word, and an agent holding it has every task wait
-   * for the owner (services/agent-task-rules.ts). `memory:delete` stays the undoable delete of
-   * DELETE /v1/memory/:key. App grants that held memory:delete were given the word once
-   * (services/task-start-migrations.ts). ── */
-  router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireExternalPrincipal(), requireScope('memory:purge'), async (req, res) => {
+   * `memory:delete` since 2026-10-12: the records go to the deleted-memory bin and come back with
+   * aimeat_memory_restore for the node's grace period, the undoable delete DELETE /v1/memory/:key and
+   * aimeat_workspace_object_delete make (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-
+   * mukaan, item 9). From 2026-10-02 it asked memory:purge, because it removed the rows for good.
+   * `memory:purge` stays the word for what cannot come back: a whole workspace (above) and rows. ── */
+  router.post('/v1/organisms/:id/workspace/records/delete', requireAuth(), requireExternalPrincipal(), requireScope('memory:delete'), async (req, res) => {
     // The body is deleteRecordsBatchOp (services/workspace-tool-ops.ts), which
     // ctx.workspace.deleteRecords runs too: membership, the append-only guard, the caller-owned family.
     const who = callerOf(req, config.nodeId, storage);

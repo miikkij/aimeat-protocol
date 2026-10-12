@@ -32,7 +32,7 @@
  *   caller of the action is not consulted, so an extension whose action is public decides itself
  *   (from ctx.caller) whose calls may append.
  *     3. The caller's own authority. An owner session may. An agent, app-grant or ecosystem token
- *        holds `memory:write` to write or publish, `memory:purge` to remove records for good
+ *        holds `memory:write` to write or publish, `memory:delete` to put records in the bin
  *        (deleteRecords) and `organism:read` to read — the words the
  *        REST routes and aimeat_workspace_write enforce for the same acts — and the test is the
  *        same scopeIsCovered() requireScope asks, so a wildcard is read the same way on this door.
@@ -52,6 +52,9 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.5.0 — 2026-10-12 — deleteRecords puts the records in the bin and asks memory:delete of a token,
+ *     as the batch route does now (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan,
+ *     item 9); it asked memory:purge.
  *   v1.4.0 — 2026-10-09 — archiveRecords: up to 500 records of one space archived in one host call,
  *     through services/archive.ts archiveRecordsBatchOp, under the archive route's rule (organism:write
  *     of a token, creator or admin of the organism). For Lifecycle Central's closed claims.
@@ -96,9 +99,9 @@ export { WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf, type WorkspaceDeclar
 export const WORKSPACE_WRITE_SCOPE = 'memory:write';
 /** The scope such a token needs to READ a workspace: what GET /v1/organisms/:id/workspace asks. */
 export const WORKSPACE_READ_SCOPE = 'organism:read';
-/** The scope such a token needs to REMOVE records for good (deleteRecords): what
- *  POST /v1/organisms/:id/workspace/records/delete asks since 2026-10-02. */
-export const WORKSPACE_PURGE_SCOPE = 'memory:purge';
+/** The scope such a token needs to DELETE records (deleteRecords puts them in the bin): what
+ *  POST /v1/organisms/:id/workspace/records/delete asks since 2026-10-12 (memory:purge before). */
+export const WORKSPACE_DELETE_SCOPE = 'memory:delete';
 /** The scope such a token needs to ARCHIVE records (archiveRecords): what
  *  POST /v1/organisms/:id/archive asks. */
 export const WORKSPACE_ARCHIVE_SCOPE = 'organism:write';
@@ -149,8 +152,8 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         return refuse(r.status, r.code, r.message);
     };
 
-    /** Guard 1 and 3 for a call of the given kind. A purge or an archive is a write the manifest declares as write. */
-    const allow = (kind: 'read' | 'write' | 'purge' | 'archive'): void => {
+    /** Guard 1 and 3 for a call of the given kind. A delete or an archive is a write the manifest declares as write. */
+    const allow = (kind: 'read' | 'write' | 'delete' | 'archive'): void => {
         if (kind === 'read' && !declaration.read) {
             refuse(403, 'PERMISSION', `Extension "${extName}" does not declare workspace read access (manifest workspace.read).`);
         }
@@ -160,10 +163,10 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         // The test requireScope makes before it asks for a word: an owner in person bypasses scopes;
         // an agent, an app grant or an ecosystem app does not.
         if (isOwnerInPerson(caller)) return;
-        const scope = kind === 'write' ? WORKSPACE_WRITE_SCOPE : kind === 'purge' ? WORKSPACE_PURGE_SCOPE
+        const scope = kind === 'write' ? WORKSPACE_WRITE_SCOPE : kind === 'delete' ? WORKSPACE_DELETE_SCOPE
             : kind === 'archive' ? WORKSPACE_ARCHIVE_SCOPE : WORKSPACE_READ_SCOPE;
         if (!scopeIsCovered(caller.scopes, scope)) {
-            const act = kind === 'purge' ? 'remove records from' : kind === 'archive' ? 'archive records in' : kind;
+            const act = kind === 'delete' ? 'remove records from' : kind === 'archive' ? 'archive records in' : kind;
             refuse(403, 'SCOPE_DENIED', `Scope "${scope}" required to ${act} a workspace through extension "${extName}". Caller scopes: [${caller.scopes.join(', ')}]`);
         }
     };
@@ -221,9 +224,9 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
                 nodeStamp: { pipeline, level: provenance.level, method: provenance.method },
             }));
         },
-        // Removing records for good asks memory:purge of a token, as POST .../workspace/records/delete does.
+        // Deleting records (into the bin) asks memory:delete of a token, as POST .../workspace/records/delete does.
         deleteRecords: async (organismId, ws, namespace, ids) => {
-            allow('purge');
+            allow('delete');
             if (!Array.isArray(ids) || ids.length === 0) refuse(400, 'INVALID_INPUT', 'deleteRecords() needs a non-empty array of instance ids');
             return settle(await deleteRecordsBatchOp(ops, opsCaller, { organismId, ws, namespace, ids }));
         },

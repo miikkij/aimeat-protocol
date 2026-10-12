@@ -18,6 +18,7 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.6.1 — 2026-10-12 — deleteRecords puts records in the bin and needs memory:delete (it said for good, memory:purge).
  *   v1.6.0 — 2026-10-11 — Selling section: an action has a money price and a pacing amount
  *     (`tollMorsels`); `commercial.payMorsels` is the deprecated 3.x name of the pacing amount until
  *     4.0.0, and ctx.wallet.consume debits pacing (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
@@ -253,8 +254,9 @@ function sandboxSection(): string {
     'fails with its `violations` and the others are published. Call it with `dryRun: true` first to',
     'show the person what would happen (new, already there, invalid) before anything is written, then',
     'again without it. Keep the ids of what you published (under a batch id in your `ext:` memory) and',
-    'an undo is one `deleteRecords` call. `deleteRecords` removes for good: an agent or app token needs',
-    '`memory:purge` for it, `memory:write` for the rest. When the organism reviews every publish (its',
+    'an undo is one `deleteRecords` call. `deleteRecords` puts the records in the bin, where each can be',
+    'restored for the node\'s grace period: an agent or app token needs `memory:delete` for it,',
+    '`memory:write` for the rest. When the organism reviews every publish (its',
     'publish gate is on), `publishRecords` is refused with `GATE_ENABLED`: write drafts for a reviewer.',
     '',
     '**An extension as an AI provider.** Declare `provides: { ai_provider: { ops: [text, embed], models:',

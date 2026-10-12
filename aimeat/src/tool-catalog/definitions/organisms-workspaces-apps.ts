@@ -12,6 +12,8 @@
  *     three interfaces (agentEverywhere): each has a CLI dispatch definition
  *     (tool-dispatch/tool-call-defs-organism-owners.ts) and the connector MCP registers it.
  *     aimeat_organism_invitations_email asks organism:invite, the word its REST route asks.
+ *   2026-10-12 — aimeat_workspace_object_delete asks memory:delete, the undoable delete, as its REST twin
+ *     now does (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 9).
  *   2026-10-12 — aimeat_workspace_object_delete says what it does: the keys go to the 7-day bin, where
  *     aimeat_memory_restore brings each back (it said permanent and irreversible). aimeat_organism_leave
  *     says the leaver's agents and workspace roles in the organism end too
@@ -507,10 +509,11 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Delete Workspace Object', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-        // Removes a stored record.
-        // Removes a record for good, no grace window: its own word since 2026-10-02, held on the
-        // task-start floor (services/agent-task-rules.ts). memory:delete stays the undoable delete.
-        scope: 'memory:purge',
+        // Puts the record in the bin, restorable with aimeat_memory_restore: the undoable delete, the
+        // word its REST twin POST /v1/organisms/{id}/workspace/records/delete asks too (ruling
+        // decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 9). It asked memory:purge
+        // from 2026-10-02, whose text said permanent; memory:purge stays for what cannot come back.
+        scope: 'memory:delete',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },

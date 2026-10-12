@@ -9,6 +9,7 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   v1.6.0 -- 2026-10-12 -- bulkBinMemory: many rows into the bin, chunked like bulkDeleteMemory.
  *   v1.5.0 -- 2026-09-08 -- countMemoryWithOrigins, for the operator's CORS page.
  *   v1.4.0 -- 2026-09-06 -- Review item 5.1: countArchivedByKeyPrefix returns { active, archived },
  *     the shape the interface declares. It returned a number, so structure-overview read
@@ -341,6 +342,23 @@ export const memoryMethods = {
       removed += Number(r.numDeletedRows ?? 0);
     }
     return removed;
+  },
+
+  // deleteMemory's soft delete for many (ownerGaii, key) rows: each goes to the bin (deletedAt,
+  // deletedBy) and stays restorable until the sweeper's grace ends. Chunked like bulkDeleteMemory.
+  async bulkBinMemory(this: PostgresKyselyStorage, refs: { ownerGaii: string; key: string }[], deletedBy?: string): Promise<number> {
+    if (refs.length === 0) return 0;
+    const at = new Date();
+    let binned = 0;
+    for (let i = 0; i < refs.length; i += 500) {
+      const chunk = refs.slice(i, i + 500);
+      const r = await this.db.updateTable('Memory')
+        .set({ deletedAt: at, deletedBy: deletedBy ?? null })
+        .where('deletedAt', 'is', null)
+        .where(eb => eb.or(chunk.map(x => eb.and([eb('ownerGaii', '=', x.ownerGaii), eb('key', '=', x.key)])))).executeTakeFirst();
+      binned += Number(r.numUpdatedRows ?? 0);
+    }
+    return binned;
   },
 
   // Through applyArchive, which is where the bin is hidden. It used to write `archived = false` by

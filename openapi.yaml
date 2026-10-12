@@ -40284,16 +40284,17 @@ paths:
       description: |
         Batched record-family delete: removes MANY workspace records at once instead of one
         object-delete call per record (a 549-record teardown was 549 round-trips). Resolves the
-        organism, membership and the append-only guard ONCE, then removes each record's whole family
-        (bare / `.draft` / `.latest` / `.version.N`) that is owned by the CALLER'S OWN identity family —
-        cross-owner rows are never touched (a member can only delete their own records) — and commits the
-        deletions together. An append-only (create_only) namespace refuses the whole batch (409).
-        Active member of the organism.
+        organism, membership and the append-only guard ONCE, then puts each record's whole family
+        (bare / `.draft` / `.latest` / `.version.N`) that is owned by the CALLER'S OWN identity family
+        into the deleted-memory bin, in one batch — cross-owner rows are never touched (a member can
+        only delete their own records). An append-only (create_only) namespace refuses the whole batch
+        (409). Active member of the organism.
 
-        Needs `memory:purge` since 2026-10-02: the records go for good, with no grace window, so
-        this is its own permission, and an agent holding it has every task wait for the owner's OK.
-        `memory:delete` stays the undoable delete of DELETE /v1/memory/{key}. An app grant that held
-        `memory:delete` was given `memory:purge` once.
+        Needs `memory:delete` since 2026-10-12: each key stays restorable with POST
+        /v1/memory/{key}/restore (`aimeat_memory_restore`) for the node's grace period, the undoable
+        delete `aimeat_workspace_object_delete` and DELETE /v1/memory/{key} make. From 2026-10-02 to
+        2026-10-12 it asked `memory:purge` and removed the rows for good; `memory:purge` stays the word
+        for removing rows or a whole workspace.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:

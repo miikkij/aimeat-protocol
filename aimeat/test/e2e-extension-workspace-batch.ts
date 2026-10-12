@@ -13,7 +13,7 @@
  *       carries the node's provenance naming `ext.<name>.<action>`
  *     - a second run with createOnly finds every id already there (EXISTS) and writes nothing
  *     - one deleteRecords removes the same 500
- *     - an agent without `memory:purge` is refused deleteRecords (SCOPE_DENIED), as the batch delete
+ *     - an agent without `memory:delete` is refused deleteRecords (SCOPE_DENIED), as the batch delete
  *       route refuses it; an agent of a member without a contributor grant is refused the publish
  *       (CONSENT_REQUIRED), as a draft write refuses it
  *
@@ -21,6 +21,8 @@
  *   script throws a TypeError and the route answers 500 EXTENSION_ERROR. Each assertion that asserts
  *   the new capability is marked `// HOLE:`.
  * @version-history
+ *   v1.2.0 — 2026-10-12 — deleteRecords asks memory:delete (the records go to the bin), so the importer
+ *     agent holds memory:delete instead of memory:purge.
  *   v1.1.0 — 2026-10-09 — ctx.workspace.archiveRecords: the creator's agent with organism:write
  *     archives 10 in one call and they leave the workspace read until restored; a member in person is
  *     refused ACCESS_DENIED and the creator's agent without organism:write SCOPE_DENIED.
@@ -120,7 +122,7 @@ let A!: Awaited<ReturnType<typeof setupOwner>>;   // installs the extension, cre
 let B!: Awaited<ReturnType<typeof setupOwner>>;   // a member with a contributor grant
 let C!: Awaited<ReturnType<typeof setupOwner>>;   // a member WITHOUT a contributor grant
 const B_AGENT = 'importer';
-let bAgentToken = '';      // memory:write + memory:purge + organism:read
+let bAgentToken = '';      // memory:write + memory:delete + organism:read
 let bNoPurgeToken = '';    // memory:write + organism:read
 let cAgentToken = '';      // memory:write + organism:read, but C holds no grant
 let aArchiveToken = '';    // A (the creator): organism:read + organism:write
@@ -141,7 +143,7 @@ async function publishedCount(): Promise<number> {
 
 await test('Setup: three owners and their agents', async () => {
     A = await setupOwner('a'); B = await setupOwner('b'); C = await setupOwner('c');
-    bAgentToken = await mintAgentToken(B, B_AGENT, ['memory:read', 'memory:write', 'memory:purge', 'organism:read']);
+    bAgentToken = await mintAgentToken(B, B_AGENT, ['memory:read', 'memory:write', 'memory:delete', 'organism:read']);
     bNoPurgeToken = await mintAgentToken(B, 'nopurge', ['memory:read', 'memory:write', 'organism:read']);
     cAgentToken = await mintAgentToken(C, 'outsider', ['memory:read', 'memory:write', 'organism:read']);
     aArchiveToken = await mintAgentToken(A, 'keeper', ['memory:read', 'organism:read', 'organism:write']);
@@ -221,7 +223,7 @@ await test('createOnly: a second import finds all 500 already there and writes n
     assert((r.body.data.results as Array<{ code?: string }>).every(x => x.code === 'EXISTS'), 'every refusal is EXISTS');
 });
 
-await test('Refused: deleteRecords from an agent without memory:purge (SCOPE_DENIED), nothing removed', async () => {
+await test('Refused: deleteRecords from an agent without memory:delete (SCOPE_DENIED), nothing removed', async () => {
     const r = await invoke('undo_import', bNoPurgeToken);
     assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED', `no purge ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(await publishedCount() === N, 'records were removed');
