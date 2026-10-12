@@ -16,6 +16,10 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-12 — optionalAuth and requireAuth ask ./mcp-token-on-rest.ts of every verified JWT: a
+ *     token bound to the MCP endpoint is refused on a REST route from 4.0.0 (401 invalid_token) and
+ *     counted with the Deprecation headers before it; the MCP surface and the node's own loopback
+ *     call (./loopback-pass.ts) take it in every release.
  *   2026-10-05 — requireOperator(storage): the operator's routes ask askOperator with operator:admin,
  *     in place of requireRole('operator') (secaudit 2026-10, C2). It and requireOperatorPrincipal move
  *     to ./operator-gate.ts, re-exported here (max-file-lines).
@@ -115,7 +119,8 @@ import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { deny401, deny403, denyScope403 } from './deny.js';
+import { deny401, deny403, denyScope403, denyInvalidToken } from './deny.js';
+import { mcpTokenOnRestVerdict, MCP_TOKEN_ON_REST_MESSAGE } from './mcp-token-on-rest.js';
 import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { noteScopeUse } from '../services/scope-use.js';
@@ -348,6 +353,13 @@ export function optionalAuth() {
         // revoking caller writes its own entry; here the revocation happens in storage, and an owner
         // pressing Delete means now. One keyed read per authenticated request that carries a jti.
         if (verified && !(await credentialRevoked(token, verified))) {
+          // A token issued for the MCP endpoint is refused on REST routes from 4.0.0 and counted
+          // before it (./mcp-token-on-rest.ts). Refused here, where the token is read, so a public
+          // route does not quietly treat it as no credential.
+          if (mcpTokenOnRestVerdict(req, token, verified, sessionConfig()) === 'refuse') {
+            denyInvalidToken(req, res, MCP_TOKEN_ON_REST_MESSAGE);
+            return;
+          }
           // The scope list on the token is what the agent held when it was minted; the record is
           // what it holds now. Narrowed here, once, so every door downstream — routes, the MCP
           // surface, the tunnel's forwarded calls — reads the same answer without asking again.
@@ -429,6 +441,12 @@ export function requireAuth() {
     // optionalAuth() ahead of it (a unit test, a router mounted on its own).
     if (await credentialRevoked(token, verified)) {
       deny401(req, res, 'The credential is no longer valid');
+      return;
+    }
+
+    // The same audience question optionalAuth asks (./mcp-token-on-rest.ts).
+    if (mcpTokenOnRestVerdict(req, token, verified, sessionConfig()) === 'refuse') {
+      denyInvalidToken(req, res, MCP_TOKEN_ON_REST_MESSAGE);
       return;
     }
 

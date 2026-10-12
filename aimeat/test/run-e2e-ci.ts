@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   2026-10-12 -- e2e-mcp-token-rest.ts joins the list (not the guard tier): an MCP OAuth token on a
+ *     REST route of a 3.x node is counted with the Deprecation headers, and the three MCP tools that
+ *     reach REST over loopback count nothing.
  *   2026-10-12 -- e2e-rest-scope-gates.ts joins the list (not the guard tier): the REST routes that asked
  *     no scope word, on a 3.x node, are allowed with the Deprecation headers and counted per word.
  *   2026-10-12 -- e2e-app-community.ts joins the list (not the guard tier): an app listed to the
@@ -946,6 +949,9 @@ const ALL_SUITES = [
     // A tool published over MCP lands under the app filename, so both catalogues show it.
     'test/e2e-app-tools-key.ts',
     'test/e2e-app-tool-free-mcp.ts',
+    // An MCP OAuth token on REST routes: counted with Deprecation on 3.x, and the three MCP tools
+    // that reach REST over loopback carry the node's pass, so they count nothing.
+    'test/e2e-mcp-token-rest.ts',
     // One tool for an app's settings and reads, each action on its own permission word.
     'test/e2e-app-manage.ts',
     // The same sweep, three files further: the core doors nobody had called (the work lifecycle,

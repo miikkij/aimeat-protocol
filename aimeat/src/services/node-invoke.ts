@@ -29,6 +29,10 @@
  * @usage
  *   const out = await invokeNodeCapability(config, { id, input, bearer, agentName });
  * @version-history
+ *   2026-10-12 — The loopback request carries the node's loopback pass for the caller's bearer
+ *     (auth/loopback-pass.ts), so a session bound to the MCP endpoint (RFC 8707) keeps reaching the
+ *     REST routes from 4.0.0, when a REST route refuses that token from outside. The caller's
+ *     identity, scopes and every gate are unchanged: the request still carries the caller's token.
  *   2026-09-27 — A capability that moved into aimeat_app_manage answers 410 TOOL_MOVED with the replacing call.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
@@ -38,6 +42,7 @@ import { AimeatClient } from '../tool-dispatch/api-client.js';
 import { findNodeCapability, NON_INVOKABLE, listNodeCapabilities } from './node-capabilities.js';
 import { logger } from '../utils/logger.js';
 import { movedToolMessage } from '../tool-catalog/moved-tools.js';
+import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../auth/loopback-pass.js';
 
 export interface InvokeRefusal { ok: false; status: number; code: string; message: string; details?: unknown }
 export interface InvokeSuccess { ok: true; capability: string; result: unknown; duration_ms: number }
@@ -101,6 +106,12 @@ export async function invokeNodeCapability(
   // Loopback, so the request runs through the real Express stack. NOT config.baseUrl, which would
   // add a public-internet hop for a call that never leaves this process's host.
   const client = new AimeatClient(`http://127.0.0.1:${config.port}`, args.bearer);
+  // The node's own pass for this bearer (auth/loopback-pass.ts). A session that signed in over MCP
+  // OAuth holds a token bound to the MCP endpoint, which a REST route refuses from 4.0.0; the pass
+  // says this request is the node calling itself for that session. Identity and scopes are still
+  // the bearer's, read by the route as before. Ended when this call ends.
+  const pass = mintLoopbackPass(args.bearer);
+  client.setNodeHeaders({ [LOOPBACK_PASS_HEADER]: pass });
   const started = Date.now();
   try {
     const response = await tool.handler({
@@ -133,5 +144,7 @@ export async function invokeNodeCapability(
     // A thrown handler is usually a contract problem the caller can fix (an undeclared parameter,
     // a missing required one), so it comes back as 400 with the message rather than as a 500.
     return { ok: false, status: 400, code: 'CAPABILITY_ERROR', message };
+  } finally {
+    revokeLoopbackPass(pass);
   }
 }

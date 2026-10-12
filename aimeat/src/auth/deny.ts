@@ -18,9 +18,12 @@
  * @structure
  *   - auditContext(req) — the request, as the refusal log needs it
  *   - deny401 / deny403 — the two refusals
+ *   - denyInvalidToken — 401 `invalid_token` for a token that verified but is not for this route
  * @usage
  *   import { deny401, deny403 } from './deny.js';
  * @version-history
+ *   v1.4.0 — 2026-10-12 — denyInvalidToken: 401 INVALID_TOKEN with `Bearer error="invalid_token"`,
+ *     for an MCP-bound token on a REST route from 4.0.0 (./mcp-token-on-rest.ts).
  *   v1.3.0 — 2026-09-30 — denyScope403 notes an agent's refusal (services/agent-refusals.ts), so it
  *     shows on the agent card and its open tasks instead of only in the node log. `anyOf` added.
  *   v1.2.0 — 2026-09-26 — deny401 reads the config of the node the code runs as (./node-auth.ts), so a
@@ -90,6 +93,25 @@ export function deny401(req: Request, res: Response, message: string): void {
     res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req, config)}"`);
   }
   res.status(401).json(errorEnvelope('AUTH_REQUIRED', message));
+}
+
+/**
+ * Refuse a token that verified but is not a credential for this route (RFC 6750 §3.1
+ * `invalid_token`): 401 `INVALID_TOKEN`, with `error="invalid_token"` and the discovery hint in the
+ * challenge. The first caller is an MCP-bound token on a REST route from 4.0.0
+ * (./mcp-token-on-rest.ts). Counted and logged as deny401 is.
+ */
+export function denyInvalidToken(req: Request, res: Response, message: string): void {
+  const stats = getStats();
+  if (stats) stats.increment('auth_failures_total');
+  const prom = getPromMetrics();
+  if (prom) prom.authFailuresTotal.inc();
+  recordAuthFailure(auditContext(req), { status: 401, code: 'INVALID_TOKEN', reason: message });
+  const config = sessionConfig();
+  const parts = ['Bearer error="invalid_token"', `error_description="${message.replace(/"/g, '\'')}"`];
+  if (config) parts.push(`resource_metadata="${resourceMetadataUrl(req, config)}"`);
+  if (!res.headersSent) res.setHeader('WWW-Authenticate', parts.join(', '));
+  res.status(401).json(errorEnvelope('INVALID_TOKEN', message));
 }
 
 /**

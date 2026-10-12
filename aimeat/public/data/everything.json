@@ -3521,10 +3521,10 @@
      "slug": "g-21-oauth-2-0-with-pkce-rfc-8707-resource-indicators-rfc-8414-and-rfc-9728-metadata-client-id-metadata-documents",
      "cells": [
       "<strong>OAuth 2.0 with PKCE, RFC 8707 resource indicators, RFC 8414 and RFC 9728 metadata, client ID metadata documents</strong>",
-      "How an MCP client and an app get a token. An MCP client's token names the node's MCP endpoint as its audience, and the endpoint refuses a token made for another resource. PKCE and the resource are required from node 4.0.0; until then a client without them still connects and is counted.",
+      "How an MCP client and an app get a token. An MCP client's token names the node's MCP endpoint as its audience, and the endpoint refuses a token made for another resource. PKCE and the resource are required from node 4.0.0; until then a client without them still connects and is counted. From node 4.0.0 the REST routes refuse that token too; the MCP tools that reach REST routes for the session keep working.",
       "<code>/.well-known/oauth-*</code>"
      ],
-     "plain": "OAuth 2.0 with PKCE, RFC 8707 resource indicators, RFC 8414 and RFC 9728 metadata, client ID metadata documents How an MCP client and an app get a token. An MCP client's token names the node's MCP endpoint as its audience, and the endpoint refuses a token made for another resource. PKCE and the resource are required from node 4.0.0; until then a client without them still connects and is counted. /.well-known/oauth-*"
+     "plain": "OAuth 2.0 with PKCE, RFC 8707 resource indicators, RFC 8414 and RFC 9728 metadata, client ID metadata documents How an MCP client and an app get a token. An MCP client's token names the node's MCP endpoint as its audience, and the endpoint refuses a token made for another resource. PKCE and the resource are required from node 4.0.0; until then a client without them still connects and is counted. From node 4.0.0 the REST routes refuse that token too; the MCP tools that reach REST routes for the session keep working. /.well-known/oauth-*"
     },
     {
      "slug": "g-21-rfc-8628-device-authorization",
