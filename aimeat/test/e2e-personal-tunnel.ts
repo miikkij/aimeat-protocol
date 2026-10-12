@@ -576,7 +576,20 @@ async function sharedNodePhases() {
         await second.close();
     });
 
-    await test('the deprecated ?token= still opens the tunnel while AIMEAT_WS_QUERY_TOKEN is on (the 3.x default)', async () => {
+    await test('the deprecated ?token= still opens the tunnel while AIMEAT_WS_QUERY_TOKEN is on (the 3.x default); off, or from 4.0.0, it is refused', async () => {
+        // The runner's node takes the setting from the environment this suite runs in, and from
+        // 4.0.0 (WS_QUERY_TOKEN_REMOVED_IN) the form is gone whatever it says.
+        const build = await (await fetch(`${BASE}/v1/build`)).json() as { version?: string };
+        const gone = process.env.AIMEAT_WS_QUERY_TOKEN === 'false' || parseInt(String(build.version ?? '0'), 10) >= 4;
+        if (gone) {
+            let refusal = 'opened';
+            try {
+                const s = await HomeNodeSocket.connectWith(BASE, { queryToken: ownerToken });
+                openSockets.push(s);
+            } catch (err) { refusal = (err as Error).message; }
+            assert(refusal === 'HTTP 401 WS_QUERY_TOKEN_DISABLED', `a query token on a node with it off or removed: "${refusal}"`);
+            return;
+        }
         const s = await HomeNodeSocket.connectWith(BASE, { queryToken: ownerToken });
         openSockets.push(s);
         await s.waitFor('mailbox_sync');

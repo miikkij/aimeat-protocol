@@ -316,8 +316,12 @@ await test('9. Login with no username, and with no password, is refused', async 
 });
 
 await test('10. An account with no password set cannot use the password door (NO_PASSWORD)', async () => {
-    // A owns no password: it was created through POST /v1/owners, which stores a key and no hash.
-    const r = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: A.name, password: 'AcctDoor1234' }) });
+    // An account made through POST /v1/owners owns no password: that route stores a key and no hash.
+    // (A has a password now: it signs in with it, because the owner-key sign-in goes in 4.0.0.)
+    const name = `acctdoornopw${Date.now().toString(36)}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `POST /v1/owners ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const r = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: name, password: 'AcctDoor1234' }) });
     assert(r.status === 400 && r.body.error?.code === 'NO_PASSWORD', `expected NO_PASSWORD, got ${r.status} ${r.body.error?.code}`);
 });
 
