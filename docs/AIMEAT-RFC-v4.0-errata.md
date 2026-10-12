@@ -7,9 +7,9 @@ The two v4.0 documents no longer match the reference implementation in the place
 
 ## What comes next
 
-- **AIMEAT Core 2026-11** is the next version of the Core specification. It is released together with node 4.0.0, because that release removes the deprecated formats listed in the first table. It is named by its date, so that its name does not collide with the node's version number or with the API path version `v1`.
-- **The Platform RFC will be replaced by a Platform reference** that is versioned with the node. It is made from the feature list (`docs/AIMEAT-Feature-List.md`), `openapi.yaml`, the MCP tool catalog and a short architecture note.
-- Until then, the v4.0 documents stay as published, and this file records where they are wrong.
+- **[AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md)** is the next version of the Core specification. It is a draft today and normative from node 4.0.0, because that release removes the deprecated formats listed in the first table; from then on discovery reports `protocol_version` `2026-11`. It is named by its date, so that its name does not collide with the node's version number or with the API path version `v1`. The [conformance evidence](AIMEAT-Core-2026-11-evidence.md) says which of its requirements the reference node meets and which gaps are scheduled for 4.0.0.
+- **The [Platform reference](AIMEAT-Platform-reference.md)** replaces the Platform RFC. It is versioned with the node, and is made of the feature list ([AIMEAT-Feature-List.md](AIMEAT-Feature-List.md)), `openapi.yaml`, the MCP tool catalog and a short architecture note.
+- Until node 4.0.0, the v4.0 documents stay as published, and this file records where they are wrong.
 
 ## Breaking changes pending in Core
 

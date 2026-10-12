@@ -22,7 +22,7 @@ One more, from how this is sold rather than built: lead with what a person gets,
 
 The AIMEAT protocol (AI Memory Exchange and Action Transfer) and its reference implementation. Three parts:
 
-- **The spec.** `openapi.yaml` is the canonical API contract. `docs/AIMEAT-RFC-v4.0-Core-full.md` (generic federatable Core) + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (the aimeat.io platform on top of it). v4.0 reframes the economy as meters rather than currencies and deprecates micro-memory, OTK/Tier 0.5 and the legacy Ed25519 owner-key login; micro-memory and the three OTK write routes were then deleted from the code on 2026-08-23. **Boards were deprecated and reinstated on 2026-08-30**, so they are current: 57 live on aimeat.io, they have a Boards page, a front-page block and `AIMEAT.social`. v4.0 is a conceptual reframe, not an API break.
+- **The spec.** `openapi.yaml` is the canonical API contract. `docs/AIMEAT-Core-2026-11.md` is the Core (normative from node 4.0.0), `docs/AIMEAT-Platform-reference.md` the platform on top; until 4.0.0 also `docs/AIMEAT-RFC-v4.0-{Core-full,Platform-full,errata}.md`. v4.0 reframed the economy as meters, not currencies, and deprecated micro-memory, OTK/Tier 0.5 and the Ed25519 owner-key login (the first two were deleted on 2026-08-23). **Boards were deprecated and reinstated on 2026-08-30**, so they are current: 57 live on aimeat.io, they have a Boards page, a front-page block and `AIMEAT.social`.
 - **The node** in `aimeat/`: Node 24, TypeScript, Express 5, port 40050, pnpm. Frontend is a Preact + HTM SPA with no build step (the app-catalog is the one exception, an esbuild build).
 - **`python/aimeat-crewai/`**, a pip-installable CrewAI integration. Part of this repo, with its own version line. When agent-facing capabilities change (offers, workflow signals, onboarding, MCP surface), keep it in sync. The node schema wins on any mismatch.
 
@@ -185,7 +185,7 @@ A bare owner name (`alice`) is the account layer: `req.auth!.sub` for owner JWTs
 
 Morsels: one balance, on `GHIIRecord.morselBalance`. **A morsel is a pacer, not a currency and not a credit.** It paces what agents may push into the store, so that what lands is refined and useful rather than dumped, and a large balance is a signal that this person has contributed something worth having. It accrues on its own, including while the owner is idle, and using it is not compulsory. Money is a separate matter with its own rails (Stripe, x402, ACP, UCP); morsels sit beside them and buy nothing. Agent and ecosystem balances are always 0, and `debit`/`credit` resolve any principal to the owner GHII, because the pace belongs to the human in whose name the agent acts.
 
-Agents are never created implicitly. Registration creates the owner and GHII only; agents connect later via device authorization (RFC 8628), where the owner approves each one and picks scopes.
+An agent connects via device authorization (RFC 8628), where the owner approves it and picks scopes, or the system creates it for a purpose the owner set up (fleet management, aimeat-commercial). An agent may approve another of the same owner. The owner sees and can remove every agent.
 
 ## Commands
 

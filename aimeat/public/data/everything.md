@@ -6,8 +6,8 @@ AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps 
 
 This list covers two layers:
 
-- **Core** is the protocol any node can implement: identity, memory, consent, organisms and workspaces, the economy, federation. Specified in [AIMEAT-RFC-v4.0-Core-full.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md).
-- **Platform** is what the aimeat.io reference implementation builds on it: apps, the agent fleet, extensions, AI, commerce, the web surfaces. Specified in [AIMEAT-RFC-v4.0-Platform-full.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Platform-full.md).
+- **Core** is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in [AIMEAT-Core-2026-11.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md), normative from node 4.0.0; until then [AIMEAT-RFC-v4.0-Core-full.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md) with its errata.
+- **Platform** is what the aimeat.io reference implementation builds on it: apps, the agent fleet, extensions, AI, commerce, the web surfaces. This list is its inventory, and the [Platform reference](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Platform-reference.md) says how it is put together; it replaces [AIMEAT-RFC-v4.0-Platform-full.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Platform-full.md) from node 4.0.0.
 
 The API contract is [openapi.yaml](https://github.com/miikkij/aimeat-protocol/blob/main/openapi.yaml). Where this list and the contract disagree, the contract wins. Individual apps built on the node (Lifecycle Central, the Design Book's apps, games) are not listed here; they are users of these features.
 
@@ -699,4 +699,4 @@ Every piece of content you keep can carry a classification: how sensitive it is.
 
 ---
 
-*AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is `openapi.yaml`; the specifications are RFC v4.0 Core and Platform; later changes are at [the change log](/v1/changelog).*
+*AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is `openapi.yaml`; the specification is AIMEAT Core 2026-11 (normative from node 4.0.0; RFC v4.0 Core and Platform until then), and the Platform reference describes what the node builds on it; later changes are at [the change log](/v1/changelog).*

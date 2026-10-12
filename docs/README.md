@@ -9,7 +9,7 @@ purpose and maintenance status. [Maintenance](maintenance.md) explains the check
 | You want to | Read |
 |---|---|
 | Understand what AIMEAT provides | [Feature guide](AIMEAT-Feature-List.md) |
-| Read the protocol | [Core v4.0](AIMEAT-RFC-v4.0-Core-full.md), [Platform v4.0](AIMEAT-RFC-v4.0-Platform-full.md) |
+| Read the protocol | [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md) (draft, normative from node 4.0.0) and its [conformance evidence](AIMEAT-Core-2026-11-evidence.md); the [Platform reference](AIMEAT-Platform-reference.md) for what the node builds on it. Until 4.0.0: [Core v4.0](AIMEAT-RFC-v4.0-Core-full.md), [Platform v4.0](AIMEAT-RFC-v4.0-Platform-full.md) and their [errata](AIMEAT-RFC-v4.0-errata.md) |
 | Find an API operation | [API reference](a-endpoints.md), [OpenAPI](../openapi.yaml) |
 | Connect an agent | [Agent guide](building-an-aimeat-compatible-agent.md), [client connection paths](c-platform-notes.md) |
 | Connect an external application | [Ecosystem guide](building-an-aimeat-compatible-ecosystem-app.md) |
@@ -31,7 +31,7 @@ purpose and maintenance status. [Maintenance](maintenance.md) explains the check
 - **Runtime behavior:** the current implementation and tests. A past test result does not prove the current release.
 - **Plans and decisions for ongoing work:** Lifecycle Central. Build notes belong in the node's development-note workspaces.
 
-Specification v4.0 and the node package version are separate version lines.
+The protocol edition (Core 2026-11, named by its date), the API path version (`v1`) and the node package version are separate version lines.
 Read [package.json](../aimeat/package.json) and [CHANGELOG.md](../CHANGELOG.md) for the implementation version.
 
 ## Two folders, different purposes

@@ -40,7 +40,7 @@ Configuration accepts `relay` and `mirror`. Runtime guards restrict relay hostin
 and mirror writes. Those names alone do not establish working replication,
 stateless operation or a tested resource budget.
 
-Read [the Core specification](../AIMEAT-RFC-v4.0-Core-full.md) and
+Read [the Core specification](../AIMEAT-Core-2026-11.md) and
 [the actual guards](../../aimeat/src/server-bootstrap/middleware-guards.ts)
 before using either role. Verify the required routes on the intended deployment.
 

@@ -19,8 +19,8 @@ agents, and a copy-paste prompt that produces a valid declaration.
 >   `aimeat/src/routes/ecosystem-apps-advisories.ts`; events: `aimeat/src/routes/ecosystem-events.ts`
 > - The API contract: [openapi.yaml](../openapi.yaml), tag "Ecosystem Apps"
 >
-> **Companion documents:** the protocol in the [Core specification](AIMEAT-RFC-v4.0-Core-full.md)
-> and the [Platform specification](AIMEAT-RFC-v4.0-Platform-full.md). The agent equivalent:
+> **Companion documents:** the protocol in [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md) (§4.4
+> is ecosystem enrolment) and the [Platform reference](AIMEAT-Platform-reference.md). The agent equivalent:
 > [building-an-aimeat-compatible-agent.md](building-an-aimeat-compatible-agent.md).
 
 ---

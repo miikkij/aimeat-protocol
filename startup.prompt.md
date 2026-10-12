@@ -20,8 +20,10 @@ already hold `aimeat_*` tools against a running node, skip to Step 6 and Step 7.
 
 ## What this repository is (read first, then act)
 
-**aimeat-protocol** holds the **AIMEAT protocol** (`docs/AIMEAT-RFC-v4.0-Core-full.md`,
-`docs/AIMEAT-RFC-v4.0-Platform-full.md`, the errata in `docs/AIMEAT-RFC-v4.0-errata.md`, and the API
+**aimeat-protocol** holds the **AIMEAT protocol** (`docs/AIMEAT-Core-2026-11.md`, normative from node
+4.0.0, with its conformance evidence `docs/AIMEAT-Core-2026-11-evidence.md`; the
+`docs/AIMEAT-Platform-reference.md`; until 4.0.0 the v4.0 documents `docs/AIMEAT-RFC-v4.0-Core-full.md`
+and `docs/AIMEAT-RFC-v4.0-Platform-full.md` with `docs/AIMEAT-RFC-v4.0-errata.md`; and the API
 contract `openapi.yaml`) and its **reference node** in `aimeat/`, a Node.js 24, TypeScript and
 Express 5 server. AIMEAT (AI Memory Exchange and Action Transfer) keeps a person's knowledge, agents
 and apps on a node they own and lets them work with it from the AI they already use. It carries
