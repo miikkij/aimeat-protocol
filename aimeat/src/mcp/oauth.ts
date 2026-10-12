@@ -12,6 +12,11 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.7.0 — 2026-10-12 — PKCE (S256) and the resource indicator (RFC 8707) are read on authorize,
+ *     authorize-consent and token, and refused when missing from 4.0.0 (MCP_OAUTH_LAX_REMOVED_IN);
+ *     before 4.0.0 a request without them is accepted and counted (mcp_oauth_legacy). Every access
+ *     token names this node's MCP endpoint as its audience, and the authorization server metadata
+ *     says resource_indicators_supported (mcp/oauth-binding.ts, Core 2026-11 MCP-06, MCP-07).
  *   v1.6.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-06 — Review items 2.3 and 2.4. The signed GET is bounded in time and spent on
@@ -47,6 +52,9 @@ import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
 import { buildProtectedResourceMetadata, mcpResourceMetadata, MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
 import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client-metadata.js';
+import {
+    hasUnknownResource, mcpOAuthLaxLive, mcpResourceOf, noteLaxUse, pkceRefusal, resourceRefusal, resourceValues,
+} from './oauth-binding.js';
 
 // OAuth 2.1 — authorization codes stay in-memory (short-lived, single-use).
 // Clients, refresh tokens, and approvals are persisted to storage.
@@ -60,7 +68,19 @@ interface AuthorizationCode {
     redirectUri: string;
     codeChallenge?: string;
     codeChallengeMethod?: string;
+    /** The `resource` values the authorization request named (RFC 8707), already checked. */
+    resources: string[];
     expiresAt: number;
+}
+
+/**
+ * Count what a 3.x client left out at the moment a code is issued, once per code. A missing resource
+ * is counted at the token step instead, because RFC 8707 lets the client send it there.
+ */
+function noteIssuedCode(config: AimeatConfig, codeChallenge: string | undefined, resources: string[]): void {
+    if (!mcpOAuthLaxLive()) return;
+    if (!codeChallenge) noteLaxUse('no_pkce');
+    if (hasUnknownResource(config, resources)) noteLaxUse('unknown_resource');
 }
 
 /** SHA-256 hash a raw token for storage lookup */
@@ -119,15 +139,20 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         const gaii = q('gaii');
         const signature = q('signature');
         const timestamp = q('timestamp');
+        const resources = resourceValues(req.query.resource);
 
         if (responseType !== 'code') {
             res.status(400).json({ error: 'unsupported_response_type', error_description: 'Only "code" is supported' });
             return;
         }
 
-        // PKCE validation (OAuth 2.1 requires S256)
-        if (codeChallengeMethod && codeChallengeMethod !== 'S256') {
-            res.status(400).json({ error: 'invalid_request', error_description: 'Only S256 code_challenge_method is supported' });
+        // PKCE (OAuth 2.1 requires S256) and the resource indicator (RFC 8707): a method other than
+        // S256 is refused in every release; a missing challenge or resource, or a resource that is not
+        // this node's MCP endpoint, from 4.0.0 (mcp/oauth-binding.ts). Before any lookup, so a refused
+        // request learns nothing about which clients exist.
+        const refusal = pkceRefusal(codeChallenge, codeChallengeMethod) ?? resourceRefusal(config, resources, true);
+        if (refusal) {
+            res.status(400).json(refusal);
             return;
         }
 
@@ -233,9 +258,11 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 redirectUri: redirectUri ?? allowedRedirects[0] ?? '',
                 codeChallenge,
                 codeChallengeMethod: codeChallenge ? 'S256' : undefined,
+                resources,
                 expiresAt: Date.now() + 600_000,
             };
             authCodes.set(code, authCode);
+            noteIssuedCode(config, codeChallenge, resources);
 
             if (redirectUri) {
                 const url = new URL(redirectUri);
@@ -259,16 +286,30 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         if (state) consentUrl.searchParams.set('state', state);
         if (scope) consentUrl.searchParams.set('scope', scope);
         if (codeChallenge) consentUrl.searchParams.set('code_challenge', codeChallenge);
+        if (codeChallengeMethod) consentUrl.searchParams.set('code_challenge_method', codeChallengeMethod);
+        // The consent page posts these back to /v1/mcp/authorize-consent, which issues the code.
+        for (const r of resources) consentUrl.searchParams.append('resource', r);
         res.redirect(302, consentUrl.toString());
     });
 
     // POST /v1/mcp/authorize-consent — Browser consent form submission
     // Called by the consent page after user logs in, selects an agent, and clicks "Approve"
     router.post('/v1/mcp/authorize-consent', async (req: Request, res: Response) => {
-        const { client_id, client_name: clientNameBody, redirect_uri, state, gaii, owner_token, code_challenge } = req.body ?? {};
+        const { client_id, client_name: clientNameBody, redirect_uri, state, gaii, owner_token, code_challenge, code_challenge_method } = req.body ?? {};
+        const consentResources = resourceValues(req.body?.resource);
 
         if (!client_id || !gaii || !owner_token) {
             res.status(400).json({ error: 'invalid_request', error_description: 'Missing required fields (client_id, gaii, owner_token)' });
+            return;
+        }
+
+        // The same PKCE and resource rules as the authorize step, because this route issues the code
+        // and can be called without passing through that step. The consent page relays both from the
+        // authorize redirect; a page from before 2026-10-12 sends no method, read as S256 as before.
+        const consentRefusal = pkceRefusal(code_challenge, code_challenge_method ?? (code_challenge ? 'S256' : undefined))
+            ?? resourceRefusal(config, consentResources, true);
+        if (consentRefusal) {
+            res.status(400).json(consentRefusal);
             return;
         }
 
@@ -390,8 +431,10 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             redirectUri: finalRedirect ?? '',
             codeChallenge: code_challenge,
             codeChallengeMethod: code_challenge ? 'S256' : undefined,
+            resources: consentResources,
             expiresAt: Date.now() + 600_000,
         });
+        noteIssuedCode(config, code_challenge, consentResources);
 
         // Remember this approval so future authorizations skip the consent screen
         await storage.createOAuthApproval({
@@ -438,6 +481,17 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
     // POST /v1/mcp/token — Token exchange endpoint
     router.post('/v1/mcp/token', async (req: Request, res: Response) => {
         const { grant_type, code, client_id, client_secret, redirect_uri, refresh_token, code_verifier } = req.body ?? {};
+        // RFC 8707 §2.2: the token request may name the resource too. Each value must name this node's
+        // MCP endpoint (refused from 4.0.0, counted before it), and every token issued here names that
+        // endpoint as its audience.
+        const tokenResources = resourceValues(req.body?.resource);
+        const tokenRefusal = resourceRefusal(config, tokenResources, false);
+        if (tokenRefusal) {
+            res.status(400).json(tokenRefusal);
+            return;
+        }
+        if (mcpOAuthLaxLive() && hasUnknownResource(config, tokenResources)) noteLaxUse('unknown_resource');
+        const audience = mcpResourceOf(config);
 
         if (grant_type === 'authorization_code') {
             if (!code || !client_id) {
@@ -477,7 +531,12 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
 
-            // PKCE validation (OAuth 2.1 §4.4.3)
+            // PKCE validation (OAuth 2.1 §4.4.3). From 4.0.0 a code issued without a challenge is not
+            // redeemed either; the authorize step already refuses to issue one, so this is the backstop.
+            if (!authCode.codeChallenge && !mcpOAuthLaxLive()) {
+                res.status(400).json({ error: 'invalid_grant', error_description: 'This code was issued without PKCE. Authorize again with code_challenge (S256).' });
+                return;
+            }
             if (authCode.codeChallenge) {
                 if (!code_verifier) {
                     res.status(400).json({ error: 'invalid_request', error_description: 'code_verifier is required (PKCE)' });
@@ -496,6 +555,10 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
 
+            // Neither the authorization request nor this one named a resource: only a 3.x client
+            // gets here (resourceRefusal requires one at the authorize step from 4.0.0).
+            if (authCode.resources.length === 0 && tokenResources.length === 0) noteLaxUse('no_resource');
+
             // Issue access + refresh tokens (JWT-based access token)
             // The agent's OWN scopes, stamped explicitly. Omitting them used to mean
             // issueJWT's `?? ['*']` default, so every MCP OAuth session was a wildcard — which
@@ -509,6 +572,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 roles: authCode.roles,
                 scopes: codeAgent?.defaultScopes ?? config.defaultAgentScopes,
                 mcp_client: authCode.clientName || client_id,
+                aud: audience,
             }, config.jwtTtlSeconds);
 
             const refreshTok = randomBytes(32).toString('hex');
@@ -561,6 +625,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 node: config.nodeId,
                 roles: existing.roles,
                 scopes: refreshAgent?.defaultScopes ?? config.defaultAgentScopes,
+                aud: audience,
             }, config.jwtTtlSeconds);
 
             const newRefreshTok = randomBytes(32).toString('hex');
@@ -667,7 +732,13 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             response_types_supported: ['code'],
             grant_types_supported: ['authorization_code', 'refresh_token'],
             token_endpoint_auth_methods_supported: ['client_secret_post'],
+            // PKCE with S256, which the MCP authorization spec has a client check for before it starts.
+            // Required from 4.0.0, accepted without until then (mcp/oauth-binding.ts).
             code_challenge_methods_supported: ['S256'],
+            // RFC 8707: a client names the resource it wants a token for, and the token names it back
+            // as its audience. Not a registered RFC 8414 field; read by clients that look for it, and
+            // harmless to the rest. The protected resource document names the identifier to send.
+            resource_indicators_supported: true,
             scopes_supported: ['aimeat:full'],
             skill: `${baseUrl}/auth.md`,
             agent_auth: buildAgentAuthMetadata(config),

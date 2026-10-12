@@ -5,6 +5,10 @@
  *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
  *   /.well-known/oauth-authorization-server).
  * @version-history
+ *   v1.4.0 -- 2026-10-12 -- Phase 13: PKCE and the resource indicator on this 3.x node. A PKCE +
+ *     resource flow gives a token whose audience is the MCP endpoint and the endpoint takes it; a
+ *     wrong verifier is refused; a code without PKCE or with a foreign resource is still issued and
+ *     counted in GET /v1/stats (mcp_oauth_legacy). Core 2026-11 MCP-06, MCP-07.
  *   v1.3.0 -- 2026-09-27 -- Authenticate session close after K01 bound every request to its caller.
  *     The old lifecycle test's setup changes; its close and closed-session assertions stay intact.
  *   v1.2.0 -- 2026-09-26 -- Test 13: a re-spelled copy of the revoked access token (the signature's
@@ -1213,6 +1217,98 @@ await test('An unknown client_id cannot reach the consent door either', async ()
         `expected invalid_client, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
 });
 
+// ─── Phase 13: PKCE and the resource indicator (Core 2026-11 MCP-06, MCP-07) ───
+// This node runs 3.x, so a client without PKCE or a resource still gets a code, and each such code
+// is counted. Every access token names the MCP endpoint as its audience. The 4.0.0 refusals are
+// proved by test/unit/mcp-oauth-binding.test.ts, which runs the same routes with the version at 4.0.0.
+console.log('\nPhase 13 — PKCE and the resource indicator');
+
+function pkce(): { verifier: string; challenge: string } {
+    const verifier = createHash('sha256').update(`v-${Date.now()}-${Math.random()}`).digest('base64url');
+    return { verifier, challenge: createHash('sha256').update(verifier).digest('base64url') };
+}
+
+function audOf(jwt: string): unknown {
+    return JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString('utf-8')).aud;
+}
+
+async function legacyUses(kind: string): Promise<number> {
+    const { body } = await json('/v1/stats', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    return Number(body?.data?.mcp_oauth_legacy_by_type?.[kind] ?? 0);
+}
+
+async function signedAuthorize(extra: Record<string, string>) {
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(agentPrivKey, agentGaii + NODE_ID + timestamp);
+    const params = new URLSearchParams({ response_type: 'code', client_id: clientId, gaii: agentGaii, signature, timestamp, ...extra });
+    return json(`/v1/mcp/authorize?${params}`);
+}
+
+let mcpResource = '';
+
+await test('MCP-07: the MCP resource document names the identifier a client sends as resource', async () => {
+    const { status, body } = await json('/.well-known/oauth-protected-resource/v1/mcp');
+    assert(status === 200 && typeof body.resource === 'string' && body.resource.endsWith('/v1/mcp'), `resource: ${JSON.stringify(body)}`);
+    mcpResource = body.resource;
+    const meta = await json('/.well-known/oauth-authorization-server');
+    assert(JSON.stringify(meta.body.code_challenge_methods_supported) === '["S256"]', `methods: ${JSON.stringify(meta.body.code_challenge_methods_supported)}`);
+    assert(meta.body.resource_indicators_supported === true, `resource_indicators_supported: ${meta.body.resource_indicators_supported}`);
+});
+
+await test('MCP-06/07: a PKCE + resource flow gives a token bound to the MCP endpoint, and the endpoint takes it', async () => {
+    const { verifier, challenge } = pkce();
+    const a = await signedAuthorize({ code_challenge: challenge, code_challenge_method: 'S256', resource: mcpResource });
+    assert(a.status === 200 && typeof a.body.code === 'string', `authorize: ${a.status} ${JSON.stringify(a.body)}`);
+    const t = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
+        grant_type: 'authorization_code', code: a.body.code, client_id: clientId, client_secret: clientSecret,
+        code_verifier: verifier, resource: mcpResource,
+    }) });
+    assert(t.status === 200, `token: ${t.status} ${JSON.stringify(t.body)}`);
+    assert(audOf(t.body.access_token) === mcpResource, `aud: ${audOf(t.body.access_token)}`);
+    const init = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${t.body.access_token}` },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1300, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'pkce', version: '1' } } }),
+    });
+    await init.text();
+    assert(init.status === 200, `initialize: ${init.status}`);
+});
+
+await test('MCP-06: a token request with the wrong verifier is refused', async () => {
+    const { challenge } = pkce();
+    const a = await signedAuthorize({ code_challenge: challenge, code_challenge_method: 'S256', resource: mcpResource });
+    const t = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
+        grant_type: 'authorization_code', code: a.body.code, client_id: clientId, client_secret: clientSecret,
+        code_verifier: pkce().verifier,
+    }) });
+    assert(t.status === 400 && t.body.error === 'invalid_grant', `expected invalid_grant, got ${t.status} ${JSON.stringify(t.body)}`);
+});
+
+await test('MCP-06: on 3.x a code without PKCE is still issued, counted, and its token is still bound', async () => {
+    const before = await legacyUses('no_pkce');
+    const noResource = await legacyUses('no_resource');
+    const a = await signedAuthorize({});
+    assert(a.status === 200, `authorize: ${a.status} ${JSON.stringify(a.body)}`);
+    const t = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
+        grant_type: 'authorization_code', code: a.body.code, client_id: clientId, client_secret: clientSecret,
+    }) });
+    assert(t.status === 200, `token: ${t.status} ${JSON.stringify(t.body)}`);
+    assert(audOf(t.body.access_token) === mcpResource, `aud: ${audOf(t.body.access_token)}`);
+    assert(await legacyUses('no_pkce') === before + 1, `no_pkce counter did not move from ${before}`);
+    assert(await legacyUses('no_resource') === noResource + 1, `no_resource counter did not move from ${noResource}`);
+});
+
+await test('MCP-07: on 3.x a resource that is not this node\'s MCP endpoint is counted, and the token names the MCP endpoint', async () => {
+    const before = await legacyUses('unknown_resource');
+    const { verifier, challenge } = pkce();
+    const a = await signedAuthorize({ code_challenge: challenge, code_challenge_method: 'S256', resource: 'https://other.example/v1/mcp' });
+    assert(a.status === 200, `authorize: ${a.status} ${JSON.stringify(a.body)}`);
+    const t = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
+        grant_type: 'authorization_code', code: a.body.code, client_id: clientId, client_secret: clientSecret, code_verifier: verifier,
+    }) });
+    assert(t.status === 200 && audOf(t.body.access_token) === mcpResource, `token: ${t.status} aud ${t.body.access_token ? audOf(t.body.access_token) : '-'}`);
+    assert(await legacyUses('unknown_resource') === before + 1, `unknown_resource counter did not move from ${before}`);
+});
 
 // ─── Cleanup ───
 console.log('\nCleanup');

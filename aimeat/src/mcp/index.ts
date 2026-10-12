@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-12 — authenticate() refuses a token whose audience names another resource, and from 4.0.0
+ *     an MCP OAuth token that names none (mcp/oauth-binding.ts, Core 2026-11 MCP-07).
  *   2026-10-05 — Resources are registered through withResourceGate (mcp/resource-gate.ts): the scope
  *     of the tool that reads the same thing, from the request's token, and the organism agent gate
  *     (secaudit 2026-10, AUTH-2).
@@ -143,6 +145,7 @@ import { instructionsFor } from './instructions.js';
 import { proactiveGuidance } from '../services/proactive-mode.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
+import { mcpAudienceRefusal } from './oauth-binding.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
 import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
 import { MCP_VIA_HEADER, parseVia, viaRefusal, runWithVia } from '../services/mcp-client/hops.js';
@@ -180,6 +183,16 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             res.status(401).json({ jsonrpc: '2.0', error: { code: -32001,
                 message: 'Token is invalid or has been revoked. Obtain a new access token via /v1/mcp/token.' },
                 id: req.body?.id ?? null });
+            return null;
+        }
+        // The resource server's half of RFC 8707: a token issued for another resource is not a
+        // credential here, and from 4.0.0 an MCP OAuth token must name this endpoint at all.
+        const audienceRefusal = mcpAudienceRefusal(verified, config);
+        if (audienceRefusal) {
+            const resourceMetadataUrl = `${config.baseUrl.replace(/\/+$/, '')}${MCP_RESOURCE_METADATA_PATH}`;
+            res.status(401)
+                .setHeader('WWW-Authenticate', `Bearer error="invalid_token", resource_metadata="${resourceMetadataUrl}"`)
+                .json({ jsonrpc: '2.0', error: { code: -32001, message: audienceRefusal }, id: req.body?.id ?? null });
             return null;
         }
         return withCurrentScopes(storage, verified);

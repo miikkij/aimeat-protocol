@@ -610,7 +610,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | Standard | What it is used for | Reach |
 |---|---|---|
 | <a id="g-21-mcp"></a> **MCP** | The main road for AIs. Handshake versions up to 2025-11-25. | `/v1/mcp`, `/v2/mcp/*` |
-| <a id="g-21-oauth-2-0-with-pkce-rfc-8414-and-rfc-9728-metadata-client-id-metadata-documents"></a> **OAuth 2.0 with PKCE, RFC 8414 and RFC 9728 metadata, client ID metadata documents** | How an MCP client and an app get a token. | `/.well-known/oauth-*` |
+| <a id="g-21-oauth-2-0-with-pkce-rfc-8707-resource-indicators-rfc-8414-and-rfc-9728-metadata-client-id-metadata-documents"></a> **OAuth 2.0 with PKCE, RFC 8707 resource indicators, RFC 8414 and RFC 9728 metadata, client ID metadata documents** | How an MCP client and an app get a token. An MCP client's token names the node's MCP endpoint as its audience, and the endpoint refuses a token made for another resource. PKCE and the resource are required from node 4.0.0; until then a client without them still connects and is counted. | `/.well-known/oauth-*` |
 | <a id="g-21-rfc-8628-device-authorization"></a> **RFC 8628 device authorization** | How an agent gets its identity. | agent registration |
 | <a id="g-21-a2a"></a> **A2A** | Another A2A client reaches a node agent through its card and JSON-RPC. | `/v1/a2a/:owner/:agent` |
 | <a id="g-21-ag-ui"></a> **AG-UI** | A web front end streams an agent's work. | `/v1/agui/:owner/:agent` |

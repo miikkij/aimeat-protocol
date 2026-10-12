@@ -8,6 +8,9 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.6.0 — 2026-10-12 — The approval relays code_challenge_method and every `resource` from the
+        authorize redirect to /v1/mcp/authorize-consent, which requires PKCE and the resource from
+        4.0.0 (src/mcp/oauth-binding.ts). Nothing on the page changes.
     v1.5.0 — 2026-09-27 — The page says what is happening in words a first-time person has. The
         title names the connecting service by the client_name it registered with ("Connect Claude to
         AIMEAT", "Connect Goose to AIMEAT"), or "your AI" when it gave none; the "platform" badge and
@@ -230,6 +233,9 @@
     const redirectUri = params.get('redirect_uri') || '';
     const state = params.get('state') || '';
     const codeChallenge = params.get('code_challenge') || '';
+    const codeChallengeMethod = params.get('code_challenge_method') || '';
+    // RFC 8707 lets a client name more than one resource; every one is relayed.
+    const resources = params.getAll('resource');
 
     // Shared i18n runtime: stored-locale preference, en fallback, dot-notation keys. Page-local
     // shorthand: a bare key is oauthConsent.*; a dotted key (consent.*, common.*, appGrant.*)
@@ -780,6 +786,8 @@
               gaii: selectedAgent.gaii,
               owner_token: jwt,
               code_challenge: codeChallenge || undefined,
+              code_challenge_method: codeChallengeMethod || undefined,
+              resource: resources.length ? resources : undefined,
             }),
           });
           const d = await r.json();
