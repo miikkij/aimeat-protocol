@@ -6,9 +6,11 @@
  *   cached. Used to advertise the node's version to the federation (well-known, heartbeat, node-card)
  *   so peers can see which AIMEAT each other runs and infer feature gaps. Tries the candidate paths
  *   that work in both dev (src/utils → aimeat/) and the built dist layout (dist/src/utils → aimeat/).
- * @structure getSoftwareVersion(): string
- * @usage import { getSoftwareVersion } from '../utils/version.js';
+ * @structure getSoftwareVersion(): string · versionAtLeast(version, floor): boolean
+ * @usage import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
  * @version-history
+ *   v1.1.0 — 2026-10-12 — versionAtLeast(), the comparison a *_REMOVED_IN gate makes, for the MCP
+ *     OAuth gate (mcp/oauth-binding.ts). config-pacing.ts and config-federation.ts keep their own copy.
  *   v1.0.0 — 2026-06-19 — Initial runtime version resolver (federation version visibility).
  */
 import { readFileSync } from 'node:fs';
@@ -33,4 +35,16 @@ export function getSoftwareVersion(): string {
   }
   cached = 'unknown';
   return cached;
+}
+
+/** True when `version` is at or past `floor`, compared part by part as numbers. An unparseable version is below every floor. */
+export function versionAtLeast(version: string, floor: string): boolean {
+  const a = version.split('.').map(n => parseInt(n, 10));
+  const b = floor.split('.').map(n => parseInt(n, 10));
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = Number.isFinite(a[i]) ? a[i] as number : -1;
+    const y = Number.isFinite(b[i]) ? b[i] as number : 0;
+    if (x !== y) return x > y;
+  }
+  return true;
 }

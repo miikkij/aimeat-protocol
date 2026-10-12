@@ -34879,7 +34879,14 @@ paths:
     get:
       operationId: mcpAuthorize
       summary: MCP OAuth authorization endpoint
-      description: Initiates OAuth 2.1 authorization code flow for MCP clients.
+      description: >-
+        Initiates the OAuth 2.1 authorization code flow for MCP clients. PKCE (S256) and the
+        resource indicator (RFC 8707) are required from 4.0.0: a request without `code_challenge`
+        and `code_challenge_method=S256`, or without a `resource` naming this node's MCP endpoint,
+        is refused with 400. Before 4.0.0 such a request is accepted, and each issued code that
+        lacked PKCE or named a foreign resource is counted in GET /v1/stats (`mcp_oauth_legacy`).
+        Every access token issued for the code names this node's MCP endpoint as its audience.
+        Errors are bare OAuth error objects, not the AIMEAT envelope.
       tags: [MCP]
       parameters:
         - name: client_id
@@ -34894,17 +34901,49 @@ paths:
             type: string
         - name: code_challenge
           in: query
+          description: PKCE challenge, base64url SHA-256 of the verifier. Required from 4.0.0.
+          schema:
+            type: string
+        - name: code_challenge_method
+          in: query
+          description: Only S256. Required with code_challenge from 4.0.0.
+          schema:
+            type: string
+            enum: [S256]
+        - name: resource
+          in: query
+          description: >-
+            The resource the token is for (RFC 8707): this node's MCP endpoint (`<base>/v1/mcp`, its
+            `/mcp` alias, a `/v2/mcp/<role>` surface, or the origin). May repeat. Required from 4.0.0.
           schema:
             type: string
       responses:
         '302':
           description: Redirect to callback with authorization code
+        '400':
+          description: >-
+            invalid_request (unsupported code_challenge_method, or from 4.0.0 no code_challenge),
+            invalid_target (from 4.0.0: no resource, or one that is not this node's MCP endpoint),
+            unsupported_response_type or invalid_client.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, example: invalid_target }
+                  error_description: { type: string }
 
   /v1/mcp/token:
     post:
       operationId: mcpToken
       summary: MCP OAuth token exchange
-      description: Exchange authorization code for access token (MCP OAuth 2.1).
+      description: >-
+        Exchange an authorization code or a refresh token for an access token (MCP OAuth 2.1). The
+        access token names this node's MCP endpoint as its audience (`aud`), and the MCP endpoint
+        refuses a token whose audience is another resource. From 4.0.0 a code issued without PKCE is
+        not redeemed and the MCP endpoint refuses an MCP OAuth token without an audience; before
+        4.0.0 the latter is accepted and counted in GET /v1/stats (`mcp_oauth_legacy`). Errors are
+        bare OAuth error objects, not the AIMEAT envelope.
       tags: [MCP]
       requestBody:
         required: true
@@ -34915,15 +34954,37 @@ paths:
               properties:
                 grant_type:
                   type: string
+                  enum: [authorization_code, refresh_token]
                 code:
                   type: string
                 client_id:
                   type: string
+                client_secret:
+                  type: string
+                refresh_token:
+                  type: string
                 code_verifier:
                   type: string
+                  description: PKCE verifier. Required when the code was issued with a challenge, and from 4.0.0 always.
+                resource:
+                  description: >-
+                    RFC 8707. Optional here; when present it must name this node's MCP endpoint (from
+                    4.0.0 another value is refused with invalid_target). One value or a list.
+                  oneOf:
+                    - { type: string }
+                    - { type: array, items: { type: string } }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: invalid_request, invalid_grant (wrong or missing verifier, expired or used code) or invalid_target.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, example: invalid_grant }
+                  error_description: { type: string }
 
   /v1/mcp/token/revoke:
     post:
@@ -34954,7 +35015,9 @@ paths:
         (device-token), verification_uri, token_uri (Ed25519 re-auth), revocation_uri,
         device_code grant, credential types (ed25519_keypair, bearer_jwt), the owner-approval
         requirement, the node's default agent scopes, and the three identity types
-        (GHII / GAII / GEAI) with their registration + claim entry points.
+        (GHII / GAII / GEAI) with their registration + claim entry points. It says
+        `code_challenge_methods_supported: [S256]` and `resource_indicators_supported: true`: PKCE and
+        the RFC 8707 resource are required from 4.0.0.
       tags: [MCP]
       responses:
         '200':
@@ -73209,7 +73272,16 @@ paths:
                 state: { type: string }
                 gaii: { type: string, description: The agent the client will act as. }
                 owner_token: { type: string, description: The account holder's own session token. }
-                code_challenge: { type: string, description: PKCE challenge. When present the method is S256. }
+                code_challenge: { type: string, description: 'PKCE challenge (S256). Required from 4.0.0; before 4.0.0 a code without one is issued and counted in GET /v1/stats (mcp_oauth_legacy).' }
+                code_challenge_method: { type: string, enum: [S256], description: Required with code_challenge from 4.0.0. Read as S256 when absent before 4.0.0. }
+                resource:
+                  description: >-
+                    The resource the token is for (RFC 8707), relayed from the authorization request:
+                    this node's MCP endpoint. One value or a list. Required from 4.0.0, when a value
+                    that is not this node's MCP endpoint is refused with invalid_target.
+                  oneOf:
+                    - { type: string }
+                    - { type: array, items: { type: string } }
       responses:
         '200':
           description: The authorization code, as a redirect URL or on its own
@@ -73229,8 +73301,10 @@ paths:
         '400':
           description: >-
             invalid_request (a required field is missing, the redirect URI is not registered or is
-            not a parseable URL, or the agent does not exist) or invalid_client (the client_id is
-            neither registered nor a usable metadata document URL).
+            not a parseable URL, the agent does not exist, or from 4.0.0 the PKCE challenge is
+            missing), invalid_target (from 4.0.0: no resource, or one that is not this node's MCP
+            endpoint) or invalid_client (the client_id is neither registered nor a usable metadata
+            document URL).
           content:
             application/json:
               schema:

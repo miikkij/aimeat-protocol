@@ -9,6 +9,9 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.11.0 — 2026-10-12 — The optional `aud` claim: issueJWT writes it when asked, verifyJWT carries it.
+ *     An MCP OAuth access token names this node's MCP endpoint, and the MCP endpoint refuses a token
+ *     whose audience is another resource (mcp/oauth-binding.ts, Core 2026-11 MCP-07).
  *   v1.10.0 — 2026-10-09 — verifyJWT refuses as a session any token that carries a purpose claim
  *     (`typ`, `purpose`, `vc`), a header type other than JWT, or lacks the session claims (sub, owner,
  *     node as strings, roles as a list of strings). A download, upload, share or app-access token, a
@@ -110,6 +113,10 @@ export interface JWTPayload {
    *  OIDC `auth_time` claim). Written on an ecosystem app's token at approval and carried across
    *  each refresh, so the chain ends a fixed time after the owner said yes (routes/eco-refresh.ts). */
   auth_time?: number;
+  /** The resource this token is for (RFC 8707 / RFC 7519 `aud`). Written on an MCP OAuth access
+   *  token as this node's MCP endpoint (mcp/oauth-binding.ts); the MCP endpoint refuses a token whose
+   *  audience is another resource. */
+  aud?: string;
 }
 
 /** Generate a unique session ID for JWT tracking. */
@@ -175,6 +182,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
   if (sessionId) {
     builder.setJti(sessionId);
   }
+  if (payload.aud) builder.setAudience(payload.aud);
 
   return builder.sign(nodePrivateKey);
 }
@@ -200,6 +208,7 @@ export interface VerifiedToken {
   via?: 'pat';          // made from a personal access token: set by the auth middleware on a raw PAT
                         //   and read from the `via` claim of a JWT minted from one
   authTime?: number;    // `auth_time`: when the owner approved this token's chain (ecosystem apps)
+  aud?: string | string[]; // `aud`: the resource the token is for (MCP OAuth tokens name the MCP endpoint)
 }
 
 /**
@@ -277,6 +286,8 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       // Only the one known value is carried; anything else in the claim is not ours.
       ...(payload.via === 'pat' ? { via: 'pat' as const } : {}),
       ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}),
+      // Carried as written; the MCP endpoint judges it (mcp/oauth-binding.ts mcpAudienceRefusal).
+      ...(typeof payload.aud === 'string' || Array.isArray(payload.aud) ? { aud: payload.aud } : {}),
     });
   } catch {
     // Fail-closed by design: any verification error (bad signature, expiry, malformed claims) means
