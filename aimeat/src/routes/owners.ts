@@ -11,6 +11,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.8.0 — 2026-10-12 — The POST /v1/owners answer's next action is the password sign-in (POST /v1/ghii/login), not the owner-key sign-in that node 4.0.0 removes. What the route stores is unchanged.
  *   v1.7.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.6.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.6.0 — 2026-09-14 — DELETE /v1/owners/:name is behind requireLocalSession as well.
@@ -175,13 +176,12 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       note: 'SECURITY: Store the private key securely. It cannot be retrieved again. Consider client-side key generation for enhanced security.',
     }, [
       {
-        description: 'Authenticate with your owner key to get a JWT',
+        description: 'Sign in with your user name and password to get a session token',
         method: 'POST',
-        url: '/v1/auth/token',
+        url: '/v1/ghii/login',
         example_body: {
-          owner: name,
-          timestamp: new Date().toISOString(),
-          signature: 'base64(Ed25519_sign(private_key, owner + node + timestamp))',
+          username: name,
+          password: '<your password>',
         },
       },
       {

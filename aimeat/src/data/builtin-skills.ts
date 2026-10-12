@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.31.0 -- 2026-10-13 -- aimeat-node-guide: an owner signs in with the password (POST /v1/ghii/login);
+ *     it no longer says the owner-key sign-in still works, since node 4.0.0 removes it.
  *   v1.30.1 -- 2026-10-13 -- diagnose-a-workflow, step 10: a workflow that starts on an event and did
  *     not start (a live run, coalesce, who a workspace.rows trigger starts for, the event_* vars).
  *   v1.30.0 -- 2026-10-12 -- aimeat-agent-capability (builtin-skills.agent-capability.ts): an agent's
@@ -262,9 +264,9 @@ Fetch these in order of depth; each is self-describing:
 - Register: \`POST /v1/ghii\` with \`{ username, display_name, password, email }\` — it creates the
   owner account and the GHII profile in one step — or use the web portal at \`/\`.
 - Log in (web/API): \`POST /v1/ghii/login\` with \`{ username, password }\` → a session JWT.
-- An owner holding an older Ed25519 key can still log in with it (\`POST /v1/auth/token\` with
-  \`owner\`, a timestamp and a signature). That is a legacy path; the password login above is the
-  one to use.
+- Sign in with the password, as above. The older sign-in with the account's Ed25519 key
+  (\`POST /v1/auth/token\` with \`owner\`) is removed in node 4.0.0; a script uses a personal access
+  token or device authorization instead.
 
 ## Agents: connect via device authorization (RFC 8628)
 

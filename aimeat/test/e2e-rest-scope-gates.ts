@@ -2,25 +2,30 @@
  * @file e2e-rest-scope-gates.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The REST routes that asked no scope word until node 4.0.0, on a running 3.x node
- *   (auth/rest-scope-gate.ts; Core 2026-11 AUTHZ-01, ruling Q21).
+ * @description The REST routes that asked no scope word until node 4.0.0, on a running node of
+ *   either release (auth/rest-scope-gate.ts; Core 2026-11 AUTHZ-01, ruling Q21).
  *
  *   On 3.x a call without the word still works, so this suite asserts what 3.x promises: the call
  *   answers with `Deprecation: true` and `X-AIMEAT-Removed-In: 4.0.0`, it is counted per word in
  *   GET /v1/stats, an agent holding the word and the owner in person get no such header, and an agent
- *   acting on its own record (queueing work for itself) needs no word at all. The 4.0.0 refusal is
- *   proved in test/unit/rest-scope-gates.test.ts, which runs the same code as 4.0.0; a running node
- *   cannot be made to report another version.
+ *   acting on its own record (queueing work for itself) needs no word at all. On a node at 4.0.0
+ *   (a loopback test node run with AIMEAT_TEST_SOFTWARE_VERSION, helpers/node-release.ts) the same
+ *   call without the word is refused with 403 SCOPE_DENIED and counted nowhere, and the other
+ *   assertions hold as on 3.x. test/unit/rest-scope-gates.test.ts proves both halves in code.
  *
  *   Failure modes asserted: an agent without the word is marked on every family tried (skills,
  *   installs, the v2 task roster, organism invitations, another agent's task queue); an agent made
  *   after the node's one-time grant does not get packages:read by itself.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-rest-scope-gates
  * @version-history
+ *   v1.1.0 — 2026-10-12 — Asks the node which release it runs: the 3.x acceptance on 3.x, the 403
+ *     SCOPE_DENIED on 4.0.0 (the 4.0.0 sweep).
  *   v1.0.0 — 2026-10-12 — Initial (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { removedOn } from './helpers/node-release.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../src/utils/rest-scope-release.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -86,8 +91,27 @@ async function missingCount(word: string): Promise<number> {
     return Number(r.body?.data?.deprecated_use_by_type?.[`rest_scope_missing:${word}`] ?? r.body?.deprecated_use_by_type?.[`rest_scope_missing:${word}`] ?? 0);
 }
 
+/**
+ * A call without the word: on 3.x allowed, marked deprecated and counted once; from 4.0.0 refused with
+ * 403 SCOPE_DENIED and not counted as a deprecated use.
+ */
+async function assertMissingWord(r: Reply, word: string, before: number, enforced: boolean): Promise<void> {
+    const after = await missingCount(word);
+    if (enforced) {
+        assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED', `on 4.0.0 expected 403 SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+        assert(after === before, `a refused call is not a deprecated use: rest_scope_missing:${word} went from ${before} to ${after}`);
+        return;
+    }
+    assert(r.status !== 403, `refused on 3.x: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(deprecated(r), `no Deprecation headers: ${r.headers.get('deprecation')} ${r.headers.get('x-aimeat-removed-in')}`);
+    assert(after === before + 1, `rest_scope_missing:${word} went from ${before} to ${after}`);
+}
+
 async function main(): Promise<void> {
-    console.log('\n=== REST scope gates on a 3.x node: allowed, marked deprecated, counted ===\n');
+    const enforced = await removedOn(BASE, REST_SCOPE_GATES_ENFORCED_IN);
+    console.log(enforced
+        ? '\n=== REST scope gates on a 4.0.0 node: refused without the word ===\n'
+        : '\n=== REST scope gates on a 3.x node: allowed, marked deprecated, counted ===\n');
 
     const ownerToken = await signUpOwner();
     // `narrow` holds nothing any of the routes below ask; `wide` holds every word they ask.
@@ -102,13 +126,12 @@ async function main(): Promise<void> {
     ];
 
     for (const [path, word] of reads) {
-        await test(`GET ${path}: an agent without ${word} is let through, marked deprecated and counted`, async () => {
+        await test(enforced
+            ? `GET ${path}: an agent without ${word} is refused with 403 SCOPE_DENIED (4.0.0)`
+            : `GET ${path}: an agent without ${word} is let through, marked deprecated and counted`, async () => {
             const before = await missingCount(word);
             const r = await call(path, { headers: auth(narrow.token) });
-            assert(r.status !== 403, `refused on 3.x: ${r.status} ${JSON.stringify(r.body?.error)}`);
-            assert(deprecated(r), `no Deprecation headers: ${r.headers.get('deprecation')} ${r.headers.get('x-aimeat-removed-in')}`);
-            const after = await missingCount(word);
-            assert(after === before + 1, `rest_scope_missing:${word} went from ${before} to ${after}`);
+            await assertMissingWord(r, word, before, enforced);
         });
 
         await test(`GET ${path}: an agent with ${word} and the owner get no Deprecation header`, async () => {
@@ -127,10 +150,12 @@ async function main(): Promise<void> {
         assert(!deprecated(r), 'its own queue is not a deprecated call');
     });
 
-    await test('an agent queueing work for another agent without task:write is marked deprecated', async () => {
+    await test(enforced
+        ? 'an agent queueing work for another agent without task:write is refused with 403 SCOPE_DENIED (4.0.0)'
+        : 'an agent queueing work for another agent without task:write is marked deprecated', async () => {
+        const before = await missingCount('task:write');
         const r = await call('/v1/agents/wide/tasks', { method: 'POST', headers: auth(narrow.token), body: taskBody });
-        assert(r.status !== 403, `refused on 3.x: ${r.status} ${JSON.stringify(r.body?.error)}`);
-        assert(deprecated(r), 'queueing for a sibling without task:write carries the Deprecation headers');
+        await assertMissingWord(r, 'task:write', before, enforced);
     });
 
     await test('with task:write the same call carries no Deprecation header', async () => {

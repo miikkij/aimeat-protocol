@@ -7,6 +7,8 @@
  *   behind. A 200 proved none of them.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-members
  * @version-history
+ *   v1.2.2 — 2026-10-12 — The member's agent is approved with ext:invoke beside memory:read: it calls an
+ *     extension action, which node 4.0.0 gates on that word (REST_SCOPE_GATES_ENFORCED_IN).
  *   v1.2.1 — 2026-10-06 — provisionWithEmail marks the code key's address verified with
  *     helpers/verified-email.ts: a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.2.0 — 2026-10-01 — IAM round 2: display names on every row and on /me, approve by email
@@ -441,7 +443,7 @@ await test('an approved member is seen by the gate, with the role the OWNER set'
 
 await test('the member\'s AGENT is that member inside the sandbox too', async () => {
     const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: 'gatebot', owner: stranger.name }) });
-    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: stranger.token }) });
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read', 'ext:invoke'], owner_token: stranger.token }) });
     assert(v.status === 200, `verify ${v.status}`);
     const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
 
