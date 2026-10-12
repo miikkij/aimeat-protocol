@@ -12,6 +12,9 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-12 -- Step 0: before a new tool is proposed, look at the tools the person's
+ *     apps publish; the rule is in skill aimeat-agent-capability
+ *     (wish-noden-skilli-agentin-kyvykkyys-suunnitellaan-sovelluksena-ja).
  *   v1.0.3 -- 2026-10-12 -- Scopes: the words the REST scope gates of 4.0.0 ask (auth/rest-scope-gate.ts).
  *   v1.0.2 -- 2026-10-11 -- Step 4: the first run's task text is the first offer's example, and
  *     the purpose only when there is none.
@@ -60,6 +63,17 @@ their CRM, their notes, their customers. Read the workspace the agent will use
 (\`aimeat_workspace_read\` without ids gives its spaces and record shapes), so the definition reads
 the records they actually have. "Gather my open deals" means the deals in their sales workspace,
 not a product they do not use.
+
+Then look at what their apps already give. Before you propose a tool the agent's runtime does not
+have, check whether one of the person's apps publishes it: \`aimeat_app_list\`, then
+\`aimeat_app_tools_get\` for an app that looks right (\`GET /v1/commerce/tools?include=own\` lists
+their free callable tools in one read). An agent calls such a tool with the tool id \`app_tools\`,
+by its sku \`app-tool:<owner>/<app>:<tool>\`, and its own owner's tools cost it nothing. Write the
+sku into the task description, and a workspace's id beside its name, so the runtime finds exactly
+that one. When no app gives the capability, it is built as an app that publishes the tool; the
+runtime gets a new tool only for work that needs the computer itself (a browser, a local file).
+Skill \`aimeat-agent-capability\` has the rule, the questions to answer before building, and three
+examples: email, a calendar, meeting notes from a recording.
 
 ## 1. The usual way: propose it, with its definition
 

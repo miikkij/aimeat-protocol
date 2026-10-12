@@ -316,6 +316,19 @@
       ],
       "digest": "sha256:22f751b7d0eefa8cab836ecb"
     },
+    "node:aimeat-agent-capability": {
+      "reviewedOn": "2026-10-12",
+      "watches": [
+        "aimeat/src/models/app-tool-schemas.ts",
+        "aimeat/src/commerce/app-tool-catalog.ts",
+        "aimeat/src/services/extension-ctx-contract.ts",
+        "aimeat/src/services/connect-tunnel-push.ts",
+        "aimeat/src/services/workspace-rows/row-service.ts",
+        "aimeat/src/services/refinery/pipeline.ts",
+        "aimeat/src/routes/outbound.ts"
+      ],
+      "digest": "sha256:cb117dac46fb6c0cbffe544f"
+    },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-12",
       "watches": [
@@ -731,6 +744,15 @@
       "aimeat/src/routes/finance-ledger.ts": "c059bfae0e2db40e",
       "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
       "aimeat/src/routes/odata.ts": "58546d25a53d197a"
+    },
+    "node:aimeat-agent-capability": {
+      "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
+      "aimeat/src/commerce/app-tool-catalog.ts": "c6cd3abb7698d83a",
+      "aimeat/src/services/extension-ctx-contract.ts": "f98490dfeca8202c",
+      "aimeat/src/services/connect-tunnel-push.ts": "1b1865b5effedeb4",
+      "aimeat/src/services/workspace-rows/row-service.ts": "e4bab00bc0194222",
+      "aimeat/src/services/refinery/pipeline.ts": "3d0c7d06c76b0e3d",
+      "aimeat/src/routes/outbound.ts": "c778ece9fe93e8d1"
     }
   }
 }
