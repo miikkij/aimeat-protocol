@@ -22,6 +22,12 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.5.0 — 2026-10-12 — Under the watched spaces, the tick "Also work on the records that are
+ *     already there" (Jouni, 2026-10-12: "haluan myös valinnan käsittele myös vanhat"), offered
+ *     when the computer's agent program names `record_backfill`. What a computer's agent program
+ *     can do is read from the computer's own row first (`features` of GET /v1/home/agents, which
+ *     the connector presents when it connects), so a computer with no agent on it can be chosen
+ *     for such an agent; a computer that never said is answered by one of its agents, as before.
  *   v1.4.0 — 2026-10-12 — A fifth answer to "When it works": when something new arrives in a
  *     workspace. The person chooses the workspace and the spaces in it (agent-watch-parts.js); the
  *     definition then names them in `record_spaces` and listens for records, and the agent is
@@ -71,7 +77,7 @@ import { timeOfCron } from '/views/profile/scheduler/cron-words.js';
 import {
   draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeMenu, readHomeAgents, offerShown, scopesFor,
 } from '/js/services/agent-draft.js';
-import { namedIn, recordSpacesOf, RECORDS_FEATURE } from '/js/services/agent-draft-known.js';
+import { namedIn, recordSpacesOf, RECORDS_FEATURE, BACKFILL_FEATURE } from '/js/services/agent-draft-known.js';
 import { decodeEntities } from '/js/utils.js';
 import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
 import { activateEngagement } from '/js/services/organisms.js';
@@ -131,6 +137,8 @@ export default function AgentNewView({ navigate }) {
   // ('<organism id>/<workspace id>') and the namespaces of the spaces the person ticked.
   const [watchPlace, setWatchPlace] = useState('');
   const [watched, setWatched] = useState([]);
+  // Whether it also works on the records that are already in those spaces. Off unless the person ticks it.
+  const [backfill, setBackfill] = useState(false);
 
   const goHome = useCallback((e) => { e?.preventDefault?.(); navigate(HOME); }, [navigate]);
 
@@ -168,14 +176,20 @@ export default function AgentNewView({ navigate }) {
   // chosen computer answers first, because that computer's agent program is the one that will run
   // the new agent. With no connected agent there, any connected agent of the person gives the tool
   // list, and no feature is taken from it.
+  //
+  // WHAT THE COMPUTER SAID ITSELF COMES FIRST. A computer whose agent program names its features
+  // when it connects carries them on its own row (`features` of GET /v1/home/agents), also while it
+  // is away and when it has no agent yet. Only a computer that never said is answered by one of
+  // its agents.
   useEffect(() => {
     if (!home) return;
     const online = (home.workers ?? []).filter((x) => x.has_key && x.connector?.online);
     const here = online.filter((x) => x.connector?.id === machine).map((x) => x.name);
     const names = here.length ? here : online.map((x) => x.name);
+    const said = (home.connectors ?? []).find((c) => c.id === machine)?.features;
     let live = true;
     menuRead.current = runtimeMenu(names).then((menu) => {
-      const offered = here.length ? menu.features : [];
+      const offered = Array.isArray(said) ? said : here.length ? menu.features : [];
       if (live) setFeatures(offered);
       return { tools: menu.tools, features: offered };
     });
@@ -231,6 +245,7 @@ export default function AgentNewView({ navigate }) {
   // the spaces, and the page cannot add them to it.
   const proposalWatches = recordSpacesOf(proposal?.crew_def);
   const canWatch = proposal ? proposalWatches.length > 0 : features.includes(RECORDS_FEATURE) && places.length > 0;
+  const canBackfill = !proposal && canWatch && features.includes(BACKFILL_FEATURE);
   const set = (key) => (value) => setDraft((d) => ({ ...d, [key]: value }));
 
   const start = async () => {
@@ -244,9 +259,9 @@ export default function AgentNewView({ navigate }) {
     // definition; for a draft it is the workspace and the spaces the person chose here.
     const slashAt = watchPlace.indexOf('/');
     const watch = when === 'records' && !proposal
-      ? { organism_id: watchPlace.slice(0, Math.max(slashAt, 0)), workspace_id: watchPlace.slice(slashAt + 1), spaces: watched }
+      ? { organism_id: watchPlace.slice(0, Math.max(slashAt, 0)), workspace_id: watchPlace.slice(slashAt + 1), spaces: watched, backfill: backfill && canBackfill }
       : null;
-    if (watch && !canWatch) { setProblem(n('badWatchComputer', 'The computer you chose cannot start an agent from a workspace. Choose another computer, or another time for it to work.')); return; }
+    if (watch && !canWatch) { setProblem(n('badWatchComputer', 'The computer you chose cannot start an agent from a workspace. Choose another computer, or another answer to "When it works".')); return; }
     if (watch && (!watch.organism_id || !watch.workspace_id)) { setProblem(n('badWatchPlace', 'Choose the workspace the agent watches.')); return; }
     if (watch && watch.spaces.length === 0) { setProblem(n('badWatchSpaces', 'Choose at least one space of the workspace for the agent to watch.')); return; }
     setProblem('');
@@ -432,7 +447,8 @@ export default function AgentNewView({ navigate }) {
             options=${[['weekdays', n('weekdays', 'Weekdays')], ['daily', n('daily', 'Every day')]]} />
           <${TextField} type="time" label=${n('time', 'At what time')} value=${clock} onInput=${setClock} />`}
         ${when === 'records' && !proposal && canWatch && html`
-          <${WatchChoice} places=${places} place=${watchPlace} onPlace=${setWatchPlace} watched=${watched} onWatched=${setWatched} />`}
+          <${WatchChoice} places=${places} place=${watchPlace} onPlace=${setWatchPlace} watched=${watched} onWatched=${setWatched}
+            canBackfill=${canBackfill} backfill=${backfill} onBackfill=${setBackfill} />`}
         ${when === 'records' && proposal && proposalWatches.length > 0 && html`
           <${WatchedFacts} spaces=${proposalWatches} places=${places} />`}
 
