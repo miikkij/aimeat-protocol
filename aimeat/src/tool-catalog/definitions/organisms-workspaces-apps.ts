@@ -5,6 +5,10 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-12 — aimeat_workspace_object_delete says what it does: the keys go to the 7-day bin, where
+ *     aimeat_memory_restore brings each back (it said permanent and irreversible). aimeat_organism_leave
+ *     says the leaver's agents and workspace roles in the organism end too
+ *     (wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app-).
  *   2026-10-11 — aimeat_workspace_update's manifest names the skill aimeat-workspace-contracts instead
  *     of docs/agent-workspace-contracts.md, which no route serves.
  *   2026-10-06 — aimeat_organism_overview takes include_archived, aimeat_workspace_publish
@@ -115,7 +119,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_organism_leave',
-        description: 'Leave an organism you belong to. The creator cannot leave — they must delete the organism instead.',
+        description: 'Leave an organism you belong to. Your agents are taken off the organism and the workspace roles you were granted there end. The creator cannot leave — they must delete the organism instead.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Leave Organism', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
@@ -477,7 +481,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_object_delete',
-        description: 'Permanently remove ONE object (record or document) from a workspace — its draft, its published .latest, and all .version.N history — and unfile it from any document section. Use this to retract a mistake or clean up a duplicate. Irreversible; member-only. To replace content instead, overwrite with aimeat_workspace_write.',
+        description: 'Remove ONE object (record or document) from a workspace — its draft, its published .latest, and all .version.N history — and unfile it from any document section. The keys go to the deleted-memory bin for the node\'s grace period (7 days unless the operator changed it); until then aimeat_memory_restore puts each key back, and after it they are gone for good. Only your own copies and your agents\' are removed; another member\'s stay. Use this to retract a mistake or clean up a duplicate. Member-only. To replace content instead, overwrite with aimeat_workspace_write.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Delete Workspace Object', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },

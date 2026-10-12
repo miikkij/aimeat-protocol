@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-10-12 — POST /:id/leave no longer calls revokeDepartedMemberAccess itself:
+ *     leaveOrganism() does, so aimeat_organism_leave takes the agents and workspace roles away too.
  *   v1.14.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.13.0 -- 2026-10-01 -- POST takes `shape` and `lang` and answers the workspaces the shape made;
  *     GET /v1/organisms/shapes lists the starting shapes (guided journey P5).
@@ -54,7 +56,6 @@ import { showOrganismReadme } from '../../services/organism-readme.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../../services/organism-lifecycle.js';
 import { publicShapes } from '../../data/organism-shapes.js';
-import { revokeDepartedMemberAccess } from '../../services/invitations.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 import { localAccountName } from '../../utils/gaii.js';
@@ -389,19 +390,14 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    // Membership removal + the roster/admin sync live in services/organism-lifecycle.ts, shared
-    // with aimeat_organism_leave.
+    // Membership removal, the roster/admin sync and the departed member's agents and workspace roles
+    // (revokeDepartedMemberAccess) live in services/organism-lifecycle.ts, shared with
+    // aimeat_organism_leave.
     const result = await leaveOrganism({ storage, config }, organism, ghii);
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
-    // Two grants outlive the membership row and both behave like membership: the leaver's agents stay
-    // listed on the organism, where every membership gate reads them as members in their own right,
-    // and the workspace-role consents granted to them are owned by each workspace's creator. Someone
-    // who walked out keeps neither. This call belongs inside leaveOrganism(), which is also the leave
-    // door aimeat_organism_leave uses; that tool leaves both behind until the call moves there.
-    await revokeDepartedMemberAccess(storage, config, { organism, departing: ghii });
     res.json(success(config.nodeId, { left: true }));
   });
 }

@@ -15,9 +15,7 @@
  *   WHAT IS TRUE TODAY, AND SAID SO. Most of these acts have a REST route and a page and no MCP tool
  *   (memory export and import, the bundle, the deleted list, the full account export, erasure, agent
  *   export). The skill tells an AI over MCP to send the person to the page rather than pretend, and
- *   wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app- asks for the tools. Two tool
- *   texts disagree with their code (aimeat_app_delete says archive and deletes;
- *   aimeat_workspace_object_delete says permanent and uses the bin); the skill describes the code.
+ *   wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app- asks for the tools.
  *
  *   WHAT IT MUST AGREE WITH. routes/memory/bulk.ts (export, import, bulk, bulk-delete, bundle, copy),
  *   routes/memory/key.ts (delete, restore, the deleted list, TTL on read), services/memory-bin.ts and
@@ -29,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   v1.1.0 — 2026-10-12 — Leaving through aimeat_organism_leave removes the agents and workspace roles
+ *     too, and the two tool texts now match their code, so the skill stops naming the differences.
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5a).
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -127,8 +127,8 @@ What an export leaves out, and why:
 - workspace rows (\`aimeat_workspace_rows_delete\`), a whole workspace, and the batch delete of
   workspace records: these need \`memory:purge\`;
 - a stored file (\`aimeat_storage_delete\`);
-- an app (\`aimeat_app_delete\`: its description says archive, but the app and its versions are
-  removed; only an apps backup taken earlier brings it back);
+- an app (\`aimeat_app_delete\`: the app and its versions are removed; only an apps backup taken
+  earlier brings it back);
 - an agent: deleting it removes every record and file under its identity at once;
 - an organism (its creator deletes it);
 - the whole account (section 6).
@@ -159,9 +159,9 @@ let knowledge age, and you should offer them, not wait to be asked:
 ## 6. Leave
 
 - **A group:** \`aimeat_organism_leave\`. Their records in it stay with the group, and the creator
-  cannot leave (they hand ownership over first, \`POST /v1/organisms/{id}/transfer\`). Leaving from
-  the organism page also removes the person's agents from the group and the workspace roles given to
-  them; leaving through the MCP tool does not do that yet, so for now send the person to the page.
+  cannot leave (they hand ownership over first, \`POST /v1/organisms/{id}/transfer\`). Leaving also
+  removes the person's agents from the group and the workspace roles given to them, from the tool
+  and from the organism page alike.
 - **The node.** First the account export (section 1), the apps backup, and an export of each organism
   they want to keep. Then erasure: \`DELETE /v1/owners/{name}\` from their own signed-in session,
   which no MCP tool and no page offers today. **It is immediate and has no window.** It removes the
