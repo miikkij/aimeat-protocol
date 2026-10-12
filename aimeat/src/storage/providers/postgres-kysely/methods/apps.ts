@@ -25,13 +25,16 @@
  *   v1.5.0 — 2026-10-02 — updateAppMeta replaces or takes off `designSpec`, the design spec's stamp.
  *   v1.6.0 — 2026-10-11 — Every manifest read (app, listing row, draft) goes through
  *     normalizeAppManifestPacing: a stored `priceMorsels` is the app's pacing amount `tollMorsels`.
+ *   v1.7.0 — 2026-10-12 — setAppParked becomes setAppListing (the `parked` and `community` pair in
+ *     one write); the readers carry `community`, and includeCommunity lets a signed-in viewer's
+ *     listing return other owners' community apps (migration 0102).
  */
 import { sql } from 'kysely';
 import { mergeLegal } from '../../../types/apps.js';
 import type { Selectable } from 'kysely';
 import type {
   AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection, AppSeo,
-  AppMarks, AppAuthorship, AppAuthorshipLogEntry, AppLegalKind, AppLegalDoc,
+  AppMarks, AppAuthorship, AppAuthorshipLogEntry, AppLegalKind, AppLegalDoc, AppListing,
 } from '../../../interface.js';
 import type { App, AppDraft, AppFork } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -54,6 +57,7 @@ function toApp(r: Selectable<App>): AppRecord {
     data: Buffer.from(r.data),
     accessCode: r.accessCode ?? undefined,
     parked: r.parked ? true : undefined,
+    community: r.parked && r.community ? true : undefined,
     forkable: r.forkable ? true : undefined,
     operatorHidden: r.operatorHidden ? true : undefined,
     operatorHiddenBy: r.operatorHiddenBy ?? undefined,
@@ -77,7 +81,7 @@ function toApp(r: Selectable<App>): AppRecord {
  */
 const SUMMARY_COLUMNS = [
   'ownerGaii', 'ownerName', 'filename', 'versionNumber', 'manifest', 'mimeType', 'size',
-  'accessCode', 'parked', 'forkable', 'operatorHidden', 'operatorHiddenBy', 'operatorHiddenAt',
+  'accessCode', 'parked', 'community', 'forkable', 'operatorHidden', 'operatorHiddenBy', 'operatorHiddenAt',
   'operatorHideReason', 'operatorSeoBlocked', 'operatorSeoBlockedBy', 'operatorSeoBlockedAt',
   'operatorSeoBlockReason', 'aiProvenanceId', 'createdAt',
 ] as const;
@@ -95,6 +99,7 @@ function toAppSummary(r: AppSummaryRow): AppSummaryRecord {
     size: r.size,
     accessCode: r.accessCode ?? undefined,
     parked: r.parked ? true : undefined,
+    community: r.parked && r.community ? true : undefined,
     forkable: r.forkable ? true : undefined,
     operatorHidden: r.operatorHidden ? true : undefined,
     operatorHiddenBy: r.operatorHiddenBy ?? undefined,
@@ -160,8 +165,10 @@ async function finishAppListing<T extends AppSummaryRecord>(
   if (opts?.freeOnly) apps = apps.filter(a => !a.manifest.tollMorsels);
   // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner (viewerGhii). A scoped
   // ownerGaii query already returns only that owner's apps, so skip the filters there. adminView sees all.
+  // A community app is parked, so every public listing skips it; the signed-in member listing
+  // (includeCommunity) lets it through as well.
   if (!opts?.ownerGaii && !opts?.adminView) {
-    apps = apps.filter(a => !a.parked || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
+    apps = apps.filter(a => !a.parked || (opts?.viewerGhii && (a.ownerGaii === opts.viewerGhii || (opts.includeCommunity && a.community))));
     apps = apps.filter(a => !a.operatorHidden || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
   }
   const total = apps.length;
@@ -192,7 +199,7 @@ export const appMethods = {
       ownerGaii: record.ownerGaii, ownerName: record.ownerName, filename: record.filename,
       versionNumber: record.versionNumber, manifest: jsonb(record.manifest), mimeType: record.mimeType,
       size: record.size, data: record.data, accessCode: record.accessCode ?? null,
-      parked: record.parked ?? false, forkable: record.forkable ?? false,
+      parked: record.parked ?? false, community: !!(record.parked && record.community), forkable: record.forkable ?? false,
       operatorHidden: record.operatorHidden ?? false, operatorHiddenBy: record.operatorHiddenBy ?? null,
       operatorHiddenAt: record.operatorHiddenAt ? new Date(record.operatorHiddenAt) : null,
       operatorHideReason: record.operatorHideReason ?? null, createdAt: new Date(record.createdAt),
@@ -368,9 +375,9 @@ export const appMethods = {
     return true;
   },
 
-  async setAppParked(this: PostgresKyselyStorage, ownerGaii: string, filename: string, parked: boolean): Promise<boolean> {
-    // Park/unpark applies to the whole app — flag every version row.
-    const r = await this.db.updateTable('App').set({ parked }).where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).executeTakeFirst();
+  async setAppListing(this: PostgresKyselyStorage, ownerGaii: string, filename: string, listing: AppListing): Promise<boolean> {
+    // The listing applies to the whole app — flag every version row, both columns in one write.
+    const r = await this.db.updateTable('App').set({ parked: listing !== 'listed', community: listing === 'community' }).where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0) > 0;
   },
 

@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-12 -- settings forwards `listing` to PATCH /v1/apps/:filename.
  *   2026-10-05 -- MEMBER_ACTIONS removed: the node MCP server calls the member, plan, audit-keeping,
  *     builder and spec services directly; aimeat_app_manage calls the service in place of the route
  *     over loopback HTTP (secaudit 2026-10, M6). The connector and the CLI still send every action here.
@@ -67,7 +68,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
 
     switch (checked.action) {
         case 'settings':
-            return client.patch(`/v1/apps/${file}`, pick(input, ['owner', 'name', 'description', 'descriptions', 'parked', 'forkable', 'access_code', 'protection']));
+            return client.patch(`/v1/apps/${file}`, pick(input, ['owner', 'name', 'description', 'descriptions', 'listing', 'parked', 'forkable', 'access_code', 'protection']));
         case 'seo':
             return client.patch(`/v1/apps/${file}`, { seo: pick(input, ['index', 'title', 'description', 'keywords', 'image', 'lang']) });
         case 'marks':

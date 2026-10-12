@@ -3,17 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The detail section "Manage on server" (features F321–F322, F126, routes F192–F194): the
- *   switches on the person's own published app. Unlist / List publicly (its tooltip says it does not
- *   publish a new version), Allow forking / Forking: on, the access code (🔒 while one is set) with its
+ *   switches on the person's own published app. Where it is listed (Listed, Community, Unlisted; a
+ *   change publishes no new version), Allow forking / Forking: on, the access code (🔒 while one is set) with its
  *   editor inline under the row, Protection (🛡✓ while a flag is on), Versions, App access (the grants
  *   the person gave this app) and, for an operator, Subdomain. The four last open appcat's dialogs by
  *   name (`protect`, `versions`, `consents`, `subdomain`) with { app, owner, filename, name,
- *   manifest, protection, onDone }. A park or fork change redraws only this section, so the page keeps its
+ *   manifest, protection, onDone }. A listing or fork change redraws only this section, so the page keeps its
  *   scroll, and then reads the listing again. Delete stays under Actions, the one door out, as on the
  *   old page. The shell draws the chapter line and the headline from `meta`; this is the body.
  * @structure meta · ManageSection({ d }) · AccessCode({ d, onSaved, onCancel })
  * @usage const mod = await import('./sections/manage.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.2.0 — 2026-10-12 — The Unlist / List publicly button becomes a three-way choice: Listed,
+ *     Community (only people signed in to this node see it in the community list) and Unlisted, with
+ *     a line under it that says who sees the app.
  *   v1.1.0 — 2026-09-27 — Parity pass (sections-b): the doors as the chapter's row (.dtl-btn-row), not
  *     dimmed while a switch is on its way; the access code editor as the old .dtl-ac-editor (the
  *     chapter's plain form, its grey line, its doors, the status line in the old colours), opened
@@ -29,6 +32,8 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { TextField } from '/components/TextField.js';
 import { Fields } from '/components/Field.js';
+import { Choice } from '/components/Choice.js';
+import { LISTINGS, stateOf } from '/views/appcat/model.js';
 import { getSession } from '/js/services/auth.js';
 import { x } from '/views/appcat/i18n.js';
 import { patchApp, errorText, isOperator, noticeKind } from '/views/appcat/sections/app-write.js';
@@ -86,17 +91,17 @@ export default function ManageSection({ d }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => { setLocal({}); setEditing(0); }, [d.ref]);
   // A fresh listing row is the truth again once it has come.
-  useEffect(() => { setLocal({}); }, [app.parked, app.forkable, app.protected]);
+  useEffect(() => { setLocal({}); }, [app.listing, app.parked, app.forkable, app.protected]);
 
-  const parked = 'parked' in local ? local.parked : !!app.parked;
+  const listing = 'listing' in local ? local.listing : stateOf(app);
   const forkable = 'forkable' in local ? local.forkable : !!app.forkable;
   const hasCode = 'protected' in local ? local.protected : !!app.protected;
   const prot = (app.manifest && app.manifest.protection) || {};
   const anyProt = !!(prot.obfuscate || prot.domainLock || prot.watermark || prot.noRawDownload);
 
-  /** Flip one switch on the record (parked or forkable). */
+  /** Set one switch on the record (listing or forkable). */
   const flip = async (key, value) => {
-    if (busy) return;
+    if (busy || (key === 'listing' && value === listing)) return;
     if (!getSession()?.jwt) { const t = x('common.loginRequired'); d.notice(t, noticeKind(t)); return; }
     setBusy(true);
     try {
@@ -113,10 +118,12 @@ export default function ManageSection({ d }) {
 
   // The switches do not dim while a change is on its way, as on the old page; a second press waits.
   return html`
+    <${Fields} plain chapter>
+      <${Choice} label=${x('manage.listing')} value=${listing}
+        onChange=${(v) => flip('listing', v)} options=${LISTINGS.map((v) => [v, x('state.' + v)])} />
+    <//>
+    <${Note} kind="quiet" chapter>${x('manage.listingHint.' + listing)}<//>
     <${Actions} chapter>
-      ${parked
-        ? html`<${Action} small title=${x('card.unparkHint')} onClick=${() => flip('parked', false)}>${x('card.unpark')}<//>`
-        : html`<${Action} small title=${x('card.parkHint')} onClick=${() => flip('parked', true)}>${x('card.park')}<//>`}
       <${Action} small title=${x(forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')}
         onClick=${() => flip('forkable', !forkable)}>${x(forkable ? 'card.forkableOn' : 'card.forkableOff')}<//>
       <${Action} small title=${x('detail.accessCodeHint')} expanded=${editing > 0} onClick=${() => setEditing((n) => n + 1)}>${hasCode ? '🔒 ' : ''}${x('detail.editAccess')}<//>

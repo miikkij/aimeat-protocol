@@ -23,9 +23,12 @@
  * @version-history
  *   v1.0.0 — 2026-09-27 — Extracted from routes/apps/fork-manage.ts (PATCH /v1/apps/:filename), so
  *     the MCP tool aimeat_app_manage (action "settings") calls the same code as the route.
+ *   v1.1.0 — 2026-10-12 — `listing` (listed, community, unlisted) sets where the app is listed;
+ *     the older `parked` boolean maps onto it, and the answer carries `listing`.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppProtection, AppRecord } from '../storage/interface.js';
+import type { Storage, AppProtection, AppRecord, AppListing } from '../storage/interface.js';
+import { appListingOf } from '../storage/interface.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../utils/app-protect.js';
 import { recordAppAudit, type AppAuditAction } from './app-audit.js';
 import { emitChange } from './event-bus.js';
@@ -34,7 +37,10 @@ import { emitChange } from './event-bus.js';
 export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions'] as const;
 
 /** How an app is offered: needs the `operate` rung on a delegated app. */
-export const SETTINGS_OFFERING_FIELDS = ['access_code', 'parked', 'forkable', 'protection'] as const;
+export const SETTINGS_OFFERING_FIELDS = ['access_code', 'listing', 'parked', 'forkable', 'protection'] as const;
+
+/** The three `listing` values, in the order the catalogue offers them. */
+export const APP_LISTINGS: readonly AppListing[] = ['listed', 'community', 'unlisted'];
 
 /** Every field this service writes, in the order it writes them. */
 export const SETTINGS_FIELDS = [...SETTINGS_PRESENTATION_FIELDS, ...SETTINGS_OFFERING_FIELDS] as const;
@@ -68,7 +74,8 @@ export interface ParsedAppSettings {
     meta: { name?: string; description?: string; descriptions?: Record<string, string> };
     /** Present when `access_code` was in the body; `code` undefined clears it. */
     accessCode?: { code: string | undefined };
-    parked?: boolean;
+    /** From `listing`, or from the older `parked` boolean (true = unlisted, false = listed). */
+    listing?: AppListing;
     forkable?: boolean;
     protection?: AppProtection;
 }
@@ -79,6 +86,9 @@ export interface AppSettingsState {
     name: string | undefined;
     description: string | undefined;
     protected: boolean;
+    /** Where the app is listed: listed, community (signed-in members only) or unlisted. */
+    listing: AppListing;
+    /** True for community and unlisted: the app is off every public surface. */
     parked: boolean;
     forkable: boolean;
     protection: AppProtection | null;
@@ -86,6 +96,13 @@ export interface AppSettingsState {
 
 const bad = (message: string): { refusal: AppSettingsRefusal } =>
     ({ refusal: { status: 400, code: 'INVALID_INPUT', message } });
+
+/** What the answer says after the listing changed. */
+const LISTING_NOTES: Record<AppListing, string> = {
+    listed: 'App listed. It is in the public catalogue again.',
+    community: 'App listed to members. Everyone signed in to this node sees it in the community list; it is hidden from the public catalogue, search engines and other nodes. The link still opens it.',
+    unlisted: 'App unlisted. It is hidden from every list but yours, and stays usable by you. The link still opens it.',
+};
 
 /**
  * Validate the settings fields present in `body`, in the route's order; the first refusal wins.
@@ -131,9 +148,20 @@ export function parseOwnerSettingsInput(
         if (newCode && (newCode.length < 4 || newCode.length > 64)) return bad('access_code must be 4-64 characters');
         settings.accessCode = { code: newCode };
     }
+    if ('listing' in body) {
+        if (typeof body.listing !== 'string' || !APP_LISTINGS.includes(body.listing as AppListing)) {
+            return bad(`listing must be one of ${APP_LISTINGS.join(', ')}`);
+        }
+        settings.listing = body.listing as AppListing;
+    }
     if ('parked' in body) {
         if (typeof body.parked !== 'boolean') return bad('parked must be a boolean');
-        settings.parked = body.parked;
+        // `parked` is the older two-state switch. Next to `listing` it must say the same thing,
+        // so a body cannot ask for two different states at once.
+        if (settings.listing && (settings.listing !== 'listed') !== body.parked) {
+            return bad(`parked: ${body.parked} contradicts listing: ${settings.listing}; send listing alone`);
+        }
+        settings.listing ??= body.parked ? 'unlisted' : 'listed';
     }
     if ('forkable' in body) {
         if (typeof body.forkable !== 'boolean') return bad('forkable must be a boolean');
@@ -210,12 +238,10 @@ export async function applyOwnerSettingsUpdate(
             : 'Access code removed. The app is now publicly downloadable.');
     }
 
-    if (settings.parked !== undefined) {
-        await storage.setAppParked(ownerGaii, filename, settings.parked);
-        await audit(settings.parked ? 'parked' : 'unparked');
-        notes.push(settings.parked
-            ? 'App parked. It is now hidden from the public catalogue but stays usable by you.'
-            : 'App unparked. It is published in the public catalogue again.');
+    if (settings.listing !== undefined) {
+        await storage.setAppListing(ownerGaii, filename, settings.listing);
+        await audit(settings.listing === 'listed' ? 'unparked' : settings.listing === 'community' ? 'community' : 'parked');
+        notes.push(LISTING_NOTES[settings.listing]);
     }
 
     if (settings.forkable !== undefined) {
@@ -255,6 +281,7 @@ export function appSettingsState(app: AppRecord | null | undefined, filename: st
         name: app?.manifest?.name,
         description: app?.manifest?.description,
         protected: !!app?.accessCode,
+        listing: appListingOf(app ?? {}),
         parked: !!app?.parked,
         forkable: !!app?.forkable,
         protection: app?.manifest?.protection ?? null,

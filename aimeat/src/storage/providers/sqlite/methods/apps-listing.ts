@@ -12,6 +12,8 @@
  *     apps' bytes, which is what made the production catalogue a flat 3.5 s request.
  *   v1.1.0 — 2026-10-11 — A morsel is pacing, never a price: every listed manifest goes through
  *     normalizeAppManifestPacing, and `freeOnly` means no pacing amount under either key.
+ *   v1.2.0 — 2026-10-12 — Selects `community`; with includeCommunity a signed-in viewer's listing
+ *     also returns other owners' parked apps marked community.
  */
 import type { AppListOptions, AppManifest } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -25,7 +27,7 @@ import { normalizeAppManifestPacing } from '../../../app-manifest-pacing.js';
  */
 export const SUMMARY_COLUMNS = [
   'a.ownerGaii', 'a.ownerName', 'a.filename', 'a.versionNumber', 'a.manifest', 'a.mimeType',
-  'a.size', 'a.accessCode', 'a.parked', 'a.forkable', 'a.operatorHidden', 'a.operatorHiddenBy',
+  'a.size', 'a.accessCode', 'a.parked', 'a.community', 'a.forkable', 'a.operatorHidden', 'a.operatorHiddenBy',
   'a.operatorHiddenAt', 'a.operatorHideReason',
   'a.operatorSeoBlocked', 'a.operatorSeoBlockedBy', 'a.operatorSeoBlockedAt', 'a.operatorSeoBlockReason',
   'a.aiProvenanceId', 'a.createdAt',
@@ -77,9 +79,13 @@ export async function runAppListing<T extends { manifest: AppManifest }>(
   // own (operator-hidden ones carry operator_hidden=true so the client can badge
   // them); everyone else does not. An explicit ownerGaii filter already scopes to
   // one owner, so skip the clause there. adminView sees EVERYTHING.
+  // A community app is parked, so every public listing skips it; the signed-in member listing
+  // (includeCommunity) lets it through as well.
   if (!opts?.ownerGaii && !opts?.adminView) {
     if (opts?.viewerGhii) {
-      conditions.push(`(a.parked = 0 OR a.ownerGaii = ?)`);
+      conditions.push(opts.includeCommunity
+        ? `(a.parked = 0 OR a.community = 1 OR a.ownerGaii = ?)`
+        : `(a.parked = 0 OR a.ownerGaii = ?)`);
       params.push(opts.viewerGhii);
       conditions.push(`(a.operatorHidden = 0 OR a.ownerGaii = ?)`);
       params.push(opts.viewerGhii);

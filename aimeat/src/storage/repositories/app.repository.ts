@@ -8,7 +8,7 @@
  *   SQLite and MongoDB providers.
  * @structure AppRepository interface — createApp, getApp, getAppByOwnerName,
  *   listApps, listAppVersions, getLatestVersionNumber, deleteApp,
- *   updateAppAccessCode, setAppParked/setAppForkable, download counters,
+ *   updateAppAccessCode, setAppListing/setAppForkable, download counters,
  *   fork-lineage events (recordAppFork/countAppForks/listAppForks),
  *   normalizeAppOwnerNames.
  * @usage Implemented by SqliteStorage / MongoStorage; consumed by routes/apps.ts
@@ -42,8 +42,10 @@
  *     visitor's app keeps its owner's home name (secaudit 2026-09, A6-4).
  *   v1.10.0 — 2026-10-02 — updateAppMeta takes `designSpec` (whole-value, null takes it off): the
  *     design spec's stamp follows every write of the spec (services/app-design-spec.ts).
+ *   v1.11.0 — 2026-10-12 — setAppParked becomes setAppListing(listing): one write sets the `parked`
+ *     and `community` pair, so an app is listed, listed to signed-in members only, or unlisted.
  */
-import type { AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord } from '../interface.js';
+import type { AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord, AppListing } from '../interface.js';
 
 export interface AppRepository {
     createApp(record: AppRecord): Promise<AppRecord>;
@@ -153,24 +155,25 @@ export interface AppRepository {
         },
     ): Promise<boolean>;
     /**
-     * Park or unpark an app: set the `parked` flag on EVERY version row of
-     * (ownerGaii, filename). Parked apps drop out of the public catalogue,
-     * gallery, and search but remain fully usable by the owner. Returns true if
-     * any row was updated.
+     * Set where an app is listed, on EVERY version row of (ownerGaii, filename), by writing the
+     * `parked` and `community` pair together: listed = (false, false), community = (true, true),
+     * unlisted = (true, false). A parked app drops out of the public catalogue, gallery and search
+     * but remains fully usable by the owner; a community one is also listed to signed-in members.
+     * Returns true if any row was updated.
      */
-    setAppParked(ownerGaii: string, filename: string, parked: boolean): Promise<boolean>;
+    setAppListing(ownerGaii: string, filename: string, listing: AppListing): Promise<boolean>;
     /**
      * Set the fork-permission flag on EVERY version row of (ownerGaii, filename).
      * When true, outsiders (users other than the owner and the owner's own agents)
      * may fork the app; when false (default), only the owner/their agents/operators
-     * may. Mirrors setAppParked. Returns true if any row was updated.
+     * may. Mirrors setAppListing. Returns true if any row was updated.
      */
     setAppForkable(ownerGaii: string, filename: string, forkable: boolean): Promise<boolean>;
     /**
      * Operator moderation: hide or un-hide an app from EVERY public surface
      * (catalogue/gallery/search/discovery + public download). Sets the
      * `operatorHidden` flag (and audit fields) on EVERY version row of
-     * (ownerGaii, filename). Unlike setAppParked, only an operator may call this
+     * (ownerGaii, filename). Unlike setAppListing, only an operator may call this
      * — the owner cannot lift it; they only see a "moderated by operator: hidden"
      * badge on their own copy. Pass meta on hide; cleared on un-hide. Returns
      * true if any row was updated.

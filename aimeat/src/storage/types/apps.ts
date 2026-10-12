@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 — 2026-10-12 — AppRecord gains `community` and AppListOptions `includeCommunity`: a
+ *     parked app can be listed to the node's signed-in members only. AppListing names the three
+ *     states (listed, community, unlisted) and appListingOf reads them from a record.
  *   v1.16.0 — 2026-10-11 — A morsel is pacing, never a price: AppManifest.priceMorsels is
  *     `tollMorsels`, and AppPurchaseRecord's priceMorsels / transactionFeeMorsels are `tollMorsels` /
  *     `operatorShareMorsels` (the SQL columns keep their names).
@@ -349,6 +352,12 @@ export interface AppRecord {
   // usable by their owner (and the owner's agents). A property of the app
   // (owner+filename), mirrored onto every version row. Default false = published.
   parked?: boolean;
+  // Community listing: when true on a PARKED app, the app is listed to every signed-in member of
+  // this node (the catalogue's community list) while every public surface keeps treating it as
+  // parked. Meaningless without `parked`; the pair is written together by setAppListing, so
+  // listed = !parked, community = parked && community, unlisted = parked && !community.
+  // A property of the app (owner+filename), mirrored onto every version row. Default false.
+  community?: boolean;
   // Fork permission: when true, ANY authenticated user may fork this app into their
   // own catalogue via POST /v1/apps/:owner/:filename/fork. When false (default), only
   // the owner and the owner's own agents (same owner component) — and operators — may
@@ -408,6 +417,20 @@ export interface AppRecord {
 export type AppSummaryRecord = Omit<AppRecord, 'data'>;
 
 /**
+ * Where an app is listed, as one word: `listed` (everywhere, the default), `community` (only in
+ * the catalogue listing for signed-in members of this node, nowhere public) or `unlisted` (only
+ * its owner sees it in a list). A link opens the app in all three; the access code is the gate
+ * for opening. Stored as the `parked` + `community` pair.
+ */
+export type AppListing = 'listed' | 'community' | 'unlisted';
+
+/** The listing word for a stored app. */
+export function appListingOf(app: { parked?: boolean; community?: boolean }): AppListing {
+  if (!app.parked) return 'listed';
+  return app.community ? 'community' : 'unlisted';
+}
+
+/**
  * One published version WEIGHED rather than read: the three columns a size trend needs.
  *
  * `listAppVersions` returns whole records, so asking "how fast is this app growing" through it
@@ -456,6 +479,11 @@ export interface AppListOptions {
   // everyone else does not. Decided purely from who is authenticated — no client
   // flag. Omitted = anonymous/public view: exclude every parked / hidden app.
   viewerGhii?: string;
+  // The signed-in member listing: when true together with viewerGhii, parked apps marked
+  // `community` are included as well. Only the catalogue listing for a signed-in member sets it
+  // (GET /v1/apps and aimeat_app_list); every other caller, and every public surface, leaves it
+  // off, so a community app stays out of the sitemap, search, stats and federation by default.
+  includeCommunity?: boolean;
   // Operator-only listing: when true, return EVERY app regardless of parked or
   // operator-hidden state (the admin moderation view). Bypasses both filters.
   adminView?: boolean;

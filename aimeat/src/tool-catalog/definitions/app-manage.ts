@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-12 — settings takes `listing` (listed, community, unlisted); `parked` stays as its older
+ *     two-state form.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   2026-10-02 — The design spec beside the app: spec, spec_set and spec_clear over the design-spec
@@ -98,7 +100,8 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // settings
     name: { type: 'string', description: 'For settings: the app\'s display name. Changes it without a new version.' },
     descriptions: { type: 'object', description: 'For settings: the description per language, { "fi": "…", "es": "…" }.', zod: z.record(z.string(), z.string()) },
-    parked: { type: 'boolean', description: 'For settings: true hides the app from the public catalogue (it still works by link and for you); false lists it again.' },
+    listing: { type: 'string', enum: ['listed', 'community', 'unlisted'], description: 'For settings: where the app is listed. listed: everywhere, including search and other nodes. community: only in the community list of people signed in to this node, nowhere public. unlisted: only in your own list. A link opens the app in all three.' },
+    parked: { type: 'boolean', description: 'For settings: the older two-state switch. true is listing "unlisted", false is listing "listed". Prefer listing.' },
     forkable: { type: 'boolean', description: 'For settings: true lets anyone signed in fork the app into their own catalogue.' },
     access_code: { type: 'string', description: 'For settings: a code visitors must type to open the app. An empty string removes it. Never read back.' },
     protection: { type: 'object', description: 'For settings: copy protection { obfuscate, domainLock, watermark, noRawDownload }, each true or false.', zod: z.record(z.string(), z.boolean()) },
@@ -156,7 +159,7 @@ export interface AppManageAction {
 const F = (required: string[], optional: string[] = []): Record<string, boolean> =>
     Object.fromEntries([...required.map(f => [f, true] as const), ...optional.map(f => [f, false] as const)]);
 
-const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'parked', 'forkable', 'access_code', 'protection'];
+const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'listing', 'parked', 'forkable', 'access_code', 'protection'];
 
 /**
  * The member roster. Each action is one route of routes/app-members.ts and names the word that route
@@ -222,7 +225,7 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
 
 export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     settings: { fields: F(['filename'], ['owner', ...SETTINGS_FIELDS]), oneOf: SETTINGS_FIELDS, scope: 'app:write',
-        summary: 'change name, description, per-language descriptions, parked (hidden from the public catalogue), forkable, access code or copy protection, without a new version' },
+        summary: 'change name, description, per-language descriptions, listing (listed, community for signed-in members only, or unlisted), forkable, access code or copy protection, without a new version' },
     seo: { fields: F(['filename'], ['index', 'title', 'description', 'keywords', 'image', 'lang']), scope: 'app:write',
         summary: 'decide whether the app can be found in search engines (off until you ask) and what it says there; naming nothing reports where it stands' },
     marks: { fields: F(['filename'], ['badge', 'install', 'aiUse']), scope: 'app:write',

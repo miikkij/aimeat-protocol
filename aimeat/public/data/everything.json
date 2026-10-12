@@ -1934,13 +1934,13 @@
      "plain": "Copy protection options Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy. aimeat_app_manage action settings (protection), App Catalog > Protection"
     },
     {
-     "slug": "g-10-parking-and-access-codes",
+     "slug": "g-10-listing-and-access-codes",
      "cells": [
-      "<strong>Parking and access codes</strong>",
-      "Park an app to remove it from normal public discovery and unpark it later. Set, change or remove an access code for opening the app.",
-      "<code>PATCH /v1/apps/:filename</code>, <code>aimeat_app_manage</code> action <code>settings</code>, App Catalog &gt; Manage on server"
+      "<strong>Listing and access codes</strong>",
+      "Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. The link opens the app in all three. Set, change or remove an access code for opening the app.",
+      "<code>PATCH /v1/apps/:filename</code> (<code>listing</code>), <code>aimeat_app_manage</code> action <code>settings</code>, App Catalog &gt; Manage on server"
      ],
-     "plain": "Parking and access codes Park an app to remove it from normal public discovery and unpark it later. Set, change or remove an access code for opening the app. PATCH /v1/apps/:filename, aimeat_app_manage action settings, App Catalog > Manage on server"
+     "plain": "Listing and access codes Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. The link opens the app in all three. Set, change or remove an access code for opening the app. PATCH /v1/apps/:filename (listing), aimeat_app_manage action settings, App Catalog > Manage on server"
     },
     {
      "slug": "g-10-screenshots-icons-and-promotion",

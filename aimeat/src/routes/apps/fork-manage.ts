@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-12 — PATCH takes `listing` (listed, community, unlisted) beside `parked`, and
+ *     answers with it (services/app-settings.ts).
  *   v1.9.2 — 2026-10-11 — The fork gate reads the app's pacing amount (`tollMorsels`, services/app-pacing.ts):
  *     a morsel is pacing, not a price, and the 402 says so.
  *   v1.9.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -453,7 +455,7 @@ export function registerForkManageRoutes(
         }
 
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked, forkable, protection, seo, marks, author or legal).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, listing, parked, forkable, protection, seo, marks, author or legal).'));
             return;
         }
 
@@ -461,7 +463,7 @@ export function registerForkManageRoutes(
         const updated = await storage.getApp(effectiveGaii, filename);
 
         res.json(success(config.nodeId, {
-            // filename, name, description, protected, parked, forkable, protection: in this order.
+            // filename, name, description, protected, listing, parked, forkable, protection: in this order.
             ...appSettingsState(updated, filename),
             // The STATE, not the switch. An owner who turned the switch on in review mode, or on a
             // blocked app, has to be able to see that the answer is still not "findable".

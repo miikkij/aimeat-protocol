@@ -12,6 +12,8 @@
  * @structure AppRow({ sa, i, own, open, onToggle, starred }) · openApp(sa) · openDraft(sa)
  * @usage html`<${AppRow} key=${ref} sa=${sa} i=${i} own open=${ref === openRef} onToggle=${…} starred=${favs.has(ref)} />`
  * @version-history
+ *   v1.1.0 — 2026-10-12 — The state column and the line say Community for an app listed to signed-in
+ *     members only, on the owner's row and on another person's; only an unlisted row is faded.
  *   v1.0.0 — 2026-09-27 — Initial (appcat, the shell).
  */
 import { h, Fragment } from 'preact';
@@ -26,9 +28,12 @@ import { x } from '/views/appcat/i18n.js';
 import { notice, openDetail, toggleFavourite, appRef } from '/views/appcat/store.js';
 import { openDialog } from '/views/appcat/dialogs/host.js';
 import { openPublished, openDraftPreview, appUrl } from '/views/appcat/dialogs/app-io.js';
-import { appName, appIcon, appDesc, shipsAgents, fmtKb, fmtDate } from '/views/appcat/model.js';
+import { appName, appIcon, appDesc, shipsAgents, fmtKb, fmtDate, stateOf } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
+
+/** The state column's word for each listing. */
+const STATUS_KEY = { listed: 'status.published', community: 'status.community', unlisted: 'status.parked' };
 
 /**
  * Open a published app in a new tab, top level, never framed (F113, F118, F294): the node serves it
@@ -73,13 +78,15 @@ export function AppRow({ sa, i, own, open, onToggle, starred }) {
   const author = m.authorDisplay || sa.owner || '';
   const meta = own ? [v, when, fmtKb(sa.size)].filter(Boolean).join(' · ') : [author, v, when].filter(Boolean).join(' · ');
   const draft = own && !!sa.has_draft;
-  const state = (sa.parked ? x('status.parked') : x('status.published')) + (draft ? ' · ' + x('state.draftShort') : '');
+  const listing = stateOf(sa);
+  const state = x(STATUS_KEY[listing]) + (draft ? ' · ' + x('state.draftShort') : '');
   const opens = own ? (sa.downloads || 0) : (typeof sa.downloads === 'number' ? sa.downloads : '');
   const n = String(i + 1).padStart(2, '0');
   const star = sa.filename ? html`<${StarToggle} bright on=${starred} title=${starred ? x('fav.remove') : x('fav.add')}
     onClick=${(e) => { e.stopPropagation(); toggleFavourite(ref); }} />` : null;
   const line = own
-    ? (draft ? x('row.lineDraft') : sa.parked ? x('row.lineUnlisted') : x('row.linePublished', { v, date: when }))
+    ? (draft ? x('row.lineDraft') : listing === 'unlisted' ? x('row.lineUnlisted')
+      : listing === 'community' ? x('row.lineCommunity') : x('row.linePublished', { v, date: when }))
     : x('row.lineBy', { owner: author, date: when });
   const doors = own
     ? html`
@@ -91,7 +98,7 @@ export function AppRow({ sa, i, own, open, onToggle, starred }) {
       ${sa.forkable ? html`<${Action} title=${x('card.forkHint')} onClick=${() => openDialog('fork', { owner: sa.owner, filename: sa.filename, version: sa.version_number || 0 })}>${x('card.fork')}<//>` : null}
       ${shipsAgents(sa) ? html`<${Action} title=${x('card.agentHint')} onClick=${() => openDialog('agents', { owner: sa.owner, filename: sa.filename })}>${x('card.agent')}<//>` : null}
       <${Action} title=${x('ctx.details')} onClick=${() => openDetail(sa)}>${x('card.details')}<//>`;
-  return html`<${Row} order=${i} open=${open} onToggle=${onToggle} faded=${!!sa.parked}>
+  return html`<${Row} order=${i} open=${open} onToggle=${onToggle} faded=${listing === 'unlisted'}>
     <${Cell} sign>${n}<//>
     <${Lead} text=${appIcon(sa)} />
     <${Name} before=${star} after=${markers(sa, own)} meta=${meta}>${appName(sa)}<//>

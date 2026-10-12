@@ -38,6 +38,7 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.6.0 — 2026-10-12 — `community`: the owner listed the app to signed-in members only.
  *   v1.5.0 — 2026-10-02 — design_spec.set and design_spec.cleared: the design spec beside the app.
  *   v1.4.0 — 2026-10-01 — Nothing falls off any more: the log was cut at 500 entries across every
  *     kind, so a busy roster pushed out legal, settings and development-right entries. The oldest
@@ -77,7 +78,7 @@ export type AppAuditAction =
   | 'marks.badge' | 'marks.install' | 'marks.aiUse'
   | 'authorship.declared' | 'authorship.cleared'
   | 'seo'
-  | 'parked' | 'unparked'
+  | 'parked' | 'unparked' | 'community'
   | 'forkable'
   | 'access_code.set' | 'access_code.cleared'
   | 'protection'

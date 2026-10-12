@@ -73,6 +73,8 @@
  *   v1.3.0 — 2026-07-25 — One-live-grant-per-(owner, app): dedupe app_grants (revoke every
  *     stale duplicate) then enforce it with a partial unique index. Mirrors Postgres
  *     migration 0012. Dedupe must precede the index or boot crashes on existing data.
+ *   v1.5.0 — 2026-10-12 — apps.community: a parked app listed to signed-in members only. Mirrors
+ *     Postgres migration 0102.
  */
 import type Database from 'better-sqlite3';
 import { applySchemaTables1 } from './schema-tables-1.js';
@@ -488,6 +490,9 @@ export function initializeSchema(db: Database.Database): void {
   // owner/their agents/operators may. Additive/nullable-default; pre-existing apps are
   // NOT forkable by outsiders (0), matching the new default.
   safeAddColumn('apps', 'forkable', 'INTEGER NOT NULL DEFAULT 0');
+  // Community listing: a parked app listed to signed-in members only. Pre-existing apps are 0, so
+  // a parked app stays owner-only. Mirrors Postgres 0102.
+  safeAddColumn('apps', 'community', 'INTEGER NOT NULL DEFAULT 0');
 
   // Provisioned-code invitations — a second invitation type whose account is created at MINT time
   // and whose emailed code IS the account password. `type` discriminates it from the existing
