@@ -31,6 +31,10 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.0.1 — 2026-10-12 — "When you propose the agent" names the scopes the tools use: ext:invoke
+ *     for an app tool (services/capability-invoke.ts calls the extension action with the caller's
+ *     token, and auth/rest-scope-gate.ts refuses that call without the word from node 4.0.0),
+ *     organism:read and organism:write for a workspace.
  *   v1.0.0 — 2026-10-12 — Initial (wish-noden-skilli-agentin-kyvykkyys-suunnitellaan-sovelluksena-ja).
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -225,5 +229,11 @@ definition is not that approval.
 Skill \`add-a-crew-agent\` has the steps. Give each member only the tool ids its role needs, name
 the workspace by its id and each app tool by its sku in the task description, and say in the
 purpose which of the person's workspaces and apps the agent works on, in the names they use.
+
+Ask for the scopes those tools use. An agent that calls an app tool needs \`ext:invoke\`: the tool
+runs an extension action, and the node calls it with the agent's own token. From node 4.0.0 that
+call is refused without the word; before it, the call works and its answer carries a
+\`Deprecation\` header. An agent that reads a workspace needs \`organism:read\`, and one that writes
+into it \`organism:write\` as well.
 `,
 };
