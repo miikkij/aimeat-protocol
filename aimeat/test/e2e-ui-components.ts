@@ -21,6 +21,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -52,16 +53,9 @@ let ownerToken = '';
 let ownerKey = '';
 
 await test('Setup: one owner', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register: ${reg.status}`);
-    ownerKey = reg.body.data.private_key;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ownerKey, ownerName + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    ownerToken = tok.body.data.token;
+    const owner = await registerOwner(BASE, ownerName);
+    ownerKey = owner.privateKey;
+    ownerToken = owner.token;
 });
 
 let listed: any[] = [];

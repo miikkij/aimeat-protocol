@@ -26,7 +26,6 @@
  *     5c: a cached turn's ledger cost is what OpenRouter reports for it, which it reports only when asked.
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
-import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -40,8 +39,7 @@ import {
   startFakeAiProvider, chatJson, sseChat, providerStatus, anthropicJson, anthropicToolCallStream,
   type FakeAiProvider, type RecordedRequest,
 } from './helpers/fake-ai-provider.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 // Its own port, outside the 40251-up range sessions claim; the stub takes an ephemeral one.
 const PORT = process.env.E2E_AI_PROVIDERS_PORT ?? '40439';
@@ -120,10 +118,7 @@ async function setupOwner(label: string): Promise<Owner> {
     method: 'POST', body: JSON.stringify({ username: name, display_name: 'AI Providers', password: 'AiProviders1234' }),
   });
   assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-  const ts = new Date().toISOString();
-  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(name + NODE_ID + ts),
-    Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
+  const tok = await ownerSignIn(BASE, name, 'AiProviders1234');
   assert(tok.status === 200, `auth/token ${tok.status}`);
   return { name, gaii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }

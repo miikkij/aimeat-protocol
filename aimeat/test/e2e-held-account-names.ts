@@ -52,6 +52,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { createStorage } from '../src/storage/storage-factory.js';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -149,23 +150,17 @@ async function sql(s: AnyStorage, sqlite: string, postgres: string, params: unkn
 
 // ── people ──
 
-interface Owner { name: string; key: string; token: string }
+interface Owner { name: string; token: string }
 
-async function ownerToken(name: string, key: string): Promise<string> {
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(key, name + NODE_ID + ts) }),
-    });
+async function ownerToken(name: string): Promise<string> {
+    const tok = await ownerSignIn(BASE, name);
     assert(tok.body.ok === true, `owner token ${name}: ${JSON.stringify(tok.body.error)}`);
     return tok.body.data.token as string;
 }
 
 async function register(name: string): Promise<Owner> {
-    const r = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(r.status === 201, `register ${name}: ${r.status} ${JSON.stringify(r.body.error)}`);
-    const o = { name, key: r.body.data.private_key as string, token: '' };
-    o.token = await ownerToken(name, o.key);
-    return o;
+    const r = await registerOwner(BASE, name);
+    return { name: r.name, token: r.token };
 }
 
 interface App { geai: string; token: string }
@@ -250,11 +245,11 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
 
     await test('1a. an operator, their agent with operator:admin, a second person, and carol, dora and erin', async () => {
         const reg = await json('/v1/admin/setup/register', {
-            method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: `hnop${stamp}` }),
+            method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: `hnop${stamp}`, password: OWNER_PASSWORD }),
         });
         assert(reg.status === 200 && reg.body.owner?.roles?.includes('operator'), `operator ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
-        op = { name: `hnop${stamp}`, key: reg.body.private_key, token: '' };
-        op.token = await ownerToken(op.name, op.key);
+        op = { name: `hnop${stamp}`, token: '' };
+        op.token = await ownerToken(op.name);
         other = await register(`hnx${stamp}`);
         const agent = await json('/v1/agents', {
             method: 'POST', headers: auth(op.token),
@@ -339,8 +334,8 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
 
     console.log('\nPhase 2: the start that carries the move and the start step');
     server = await startServer();
-    op.token = await ownerToken(op.name, op.key);
-    other.token = await ownerToken(other.name, other.key);
+    op.token = await ownerToken(op.name);
+    other.token = await ownerToken(other.name);
     let incidentId = '';
 
     await test('2a. the node starts, and erin\'s app, a deleted account\'s, is gone: its token is refused', async () => {
@@ -479,7 +474,7 @@ async function heldIncidents(token: string, name: string): Promise<any[]> {
     });
 
     server = await startServer();
-    op.token = await ownerToken(op.name, op.key);
+    op.token = await ownerToken(op.name);
     await test('3c. the next start opens no second incident', async () => {
         const found = await heldIncidents(op.token, carolName);
         assert(found.length === 1 && found[0].status === 'resolved', `incidents naming carol: ${found.length}`);

@@ -33,6 +33,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerExchangeRunTools } from '../src/mcp/exchange-run.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -108,8 +109,7 @@ async function setupOwner(label: string) {
     let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'MoneyAudit', password: 'Exchange1234' }) });
     for (let i = 0; reg.status === 429 && i < 8; i++) { await new Promise(r => setTimeout(r, 1500)); reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'MoneyAudit', password: 'Exchange1234' }) }); }
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'Exchange1234');
     return { name, token: tok.body.data.token as string, gaii: `${name}@${NODE_ID}` };
 }
 /** Register an agent under an owner and return a signed agent session token (a GAII principal). */

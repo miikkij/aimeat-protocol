@@ -38,6 +38,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner, ownerToken } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -206,29 +207,13 @@ async function stopServer(child: ChildProcess): Promise<void> {
 
 /** Register the first owner (which takes the operator role) and return its name, key and token. */
 async function registerOperator(name: string): Promise<{ name: string; token: string; privateKey: string }> {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `register operator: status ${status}: ${JSON.stringify(body)}`);
-    const privateKey = body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const sig = await signMsg(privateKey, name + NODE_ID + ts);
-    const tok = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }),
-    });
-    assert(tok.body.ok === true, `operator token: ${JSON.stringify(tok.body.error)}`);
-    return { name, token: tok.body.data.token as string, privateKey };
+    const op = await registerOwner(BASE, name);
+    return { name: op.name, token: op.token, privateKey: op.privateKey };
 }
 
-/** Sign in again as an owner whose key we already hold (used across a restart). */
-async function signIn(name: string, privateKey: string): Promise<string> {
-    const ts = new Date().toISOString();
-    const sig = await signMsg(privateKey, name + NODE_ID + ts);
-    const tok = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }),
-    });
-    assert(tok.body.ok === true, `token for ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
+/** Sign in again as an owner whose password we hold (used across a restart). */
+async function signIn(name: string): Promise<string> {
+    return ownerToken(BASE, name);
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -331,7 +316,7 @@ async function main() {
         // Same database, same operator: the ONLY difference between the two boots is the seal.
         let opToken = '';
         await test('3. the operator still signs in after the restart', async () => {
-            opToken = await signIn(unsealedOp.name, unsealedOp.privateKey);
+            opToken = await signIn(unsealedOp.name);
             assert(opToken.length > 0, 'the restart must not have cost the operator their account');
         });
 

@@ -53,6 +53,7 @@ import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, type FakeAiProvider, type RecordedRequest } from './helpers/fake-ai-provider.js';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -165,15 +166,7 @@ async function json(path: string, token: string, opts: RequestInit = {}): Promis
 }
 
 async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', '', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body).slice(0, 200)}`);
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + timestamp), Buffer.from(reg.body.data.private_key, 'base64'));
-    const tok = await json('/v1/auth/token', '', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(tok.body?.ok === true, `token ${name}: ${JSON.stringify(tok.body?.error)}`);
-    return tok.body.data.token as string;
+    return (await registerWithPassword(BASE, name)).token;
 }
 
 async function mintAgent(ownerToken: string, ownerName: string, name: string, scopes: string[]): Promise<string> {

@@ -13,7 +13,6 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-signage-agent-faced
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -29,21 +28,13 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
+import { ownerSignIn } from './helpers/owner-login.js';
 
 async function setupOwner(label: string) {
     const ownerName = `sig${label}${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'Signage', password: 'Signage1234' }) });
     assert(reg.status === 201, `ghii ${reg.status}`);
-    const ownerPriv = reg.body.data.private_key;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ownerPriv, ownerName + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, ownerName, 'Signage1234');
     return { ownerName, ownerToken: tok.body.data.token as string };
 }
 

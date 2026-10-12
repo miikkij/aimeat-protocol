@@ -54,20 +54,13 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
+import { ownerSignIn } from './helpers/owner-login.js';
 
 async function setupOwner(label: string) {
     const name = `ews${label}${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Ext WS', password: 'ExtWs12345' }) });
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'ExtWs12345');
     assert(tok.body?.ok === true, `token: ${JSON.stringify(tok.body?.error)}`);
     return { name, ghii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }

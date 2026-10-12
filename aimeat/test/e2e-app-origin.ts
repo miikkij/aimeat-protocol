@@ -40,16 +40,13 @@
  *     with no tool manifest instead of 404ing.
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phases 1–2).
  */
-import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hostRequest, type HostResponse } from './helpers/host-request.js';
 import { waitForServer } from './helpers/wait-for-server.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const PORT = process.env.E2E_APP_ORIGIN_PORT ?? '40262';
 const BASE = `http://localhost:${PORT}`;
@@ -69,10 +66,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body, headers: res.headers };
-}
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
 }
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
@@ -140,14 +133,7 @@ async function main() {
         console.log('Phase 0: Setup (server flag ON, app host ' + APP_HOST + ')');
 
         await test('register owner', async () => {
-            const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-            assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-            const priv = body.data.private_key;
-            const ts = new Date().toISOString();
-            const sig = await signMsg(priv, owner + NODE_ID + ts);
-            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp: ts, signature: sig }) });
-            assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-            token = tok.body.data.token;
+            token = (await registerOwner(BASE, owner)).token;
         });
 
         await test('publish an app', async () => {
@@ -553,13 +539,9 @@ async function main() {
 
         await test('another owner cannot mint a grant for someone else\'s app', async () => {
             const nm = `outsider${Date.now() % 100000}`;
-            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: nm, public_key: 'placeholder' }) });
-            assert(reg.status === 201, `outsider register: ${reg.status} ${JSON.stringify(reg.body.error ?? '')}`);
-            const ts = new Date().toISOString();
-            const sig = await signMsg(reg.body.data.private_key, nm + NODE_ID + ts);
-            const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: nm, timestamp: ts, signature: sig }) });
+            const tk = await registerOwner(BASE, nm);
             const r = await json(`/v1/apps/${owner}/${filename}/frame-token`, {
-                method: 'POST', headers: { Authorization: `Bearer ${tk.body.data.token}`, Origin: FRAMER }, body: '{}',
+                method: 'POST', headers: { Authorization: `Bearer ${tk.token}`, Origin: FRAMER }, body: '{}',
             });
             // 403 since 2026-09-08, and the change is a decision rather than a drift. The `:owner`
             // segment used to be read and ignored on this door, so an outsider naming somebody
@@ -576,12 +558,7 @@ async function main() {
         // the app's frame-ancestors would open to it. Who may frame the app is the owner's call.
         await test('a builder holding a development right cannot mint a grant either', async () => {
             const nm = `framebuilder${Date.now() % 100000}`;
-            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: nm, public_key: 'placeholder' }) });
-            assert(reg.status === 201, `builder register: ${reg.status} ${JSON.stringify(reg.body.error ?? '')}`);
-            const ts = new Date().toISOString();
-            const sig = await signMsg(reg.body.data.private_key, nm + NODE_ID + ts);
-            const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: nm, timestamp: ts, signature: sig }) });
-            assert(tk.body.ok === true, `builder token: ${JSON.stringify(tk.body.error)}`);
+            const tk = await registerOwner(BASE, nm);
             const EVIL = 'http://evil.example';
             for (const level of ['drafter', 'full']) {
                 const grant = await json(`/v1/apps/${owner}/${filename}/dev-grants/${nm}`, {
@@ -589,7 +566,7 @@ async function main() {
                 });
                 assert(grant.status === 200, `grant ${level}: ${grant.status} ${JSON.stringify(grant.body.error ?? '')}`);
                 const r = await json(`/v1/apps/${owner}/${filename}/frame-token`, {
-                    method: 'POST', headers: { Authorization: `Bearer ${tk.body.data.token}`, Origin: EVIL }, body: '{}',
+                    method: 'POST', headers: { Authorization: `Bearer ${tk.token}`, Origin: EVIL }, body: '{}',
                 });
                 assert(r.status === 403,
                     `a ${level} builder must not mint (expected 403, got ${r.status}: ${JSON.stringify(r.body.data ?? r.body.error)})`);
@@ -862,14 +839,7 @@ async function main() {
 
         await test('a grant does not open the SAME filename owned by someone else', async () => {
             const other = `gatedout${Date.now() % 100000}`;
-            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
-            assert(reg.status === 201, `register: ${reg.status}`);
-            const ts = new Date().toISOString();
-            const tk = await json('/v1/auth/token', {
-                method: 'POST',
-                body: JSON.stringify({ owner: other, timestamp: ts, signature: await signMsg(reg.body.data.private_key, other + NODE_ID + ts) }),
-            });
-            const otherToken = tk.body.data.token;
+            const otherToken = (await registerOwner(BASE, other)).token;
             const pub = await json('/v1/apps', {
                 method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
                 body: JSON.stringify({
@@ -1116,12 +1086,7 @@ async function main() {
 
         await test('a second owner cannot touch this app\'s search visibility, and no operator door opens for them', async () => {
             const other = `seostranger${Date.now() % 100000}`;
-            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
-            assert(reg.status === 201, `register → ${reg.status}`);
-            const ts = new Date().toISOString();
-            const sig = await signMsg(reg.body.data.private_key, other + NODE_ID + ts);
-            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: other, timestamp: ts, signature: sig }) });
-            const otherToken = tok.body.data.token;
+            const otherToken = (await registerOwner(BASE, other)).token;
 
             // The owner door is scoped to the caller's own bucket, so a stranger's PATCH finds
             // nothing to patch rather than patching somebody else's app.

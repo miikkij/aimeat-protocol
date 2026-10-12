@@ -17,12 +17,10 @@
  *     and, acting for the creator, the creator's; a read-only grant is refused.
  *   v1.0.0 — 2026-07-15 — Initial: publishRecords + deleteRecords work under an H-2 app-origin token.
  */
-import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const owner = `bao${Date.now() % 1000000}`;
 const FILENAME = 'cadence-like.html';
 const REDIRECT = 'http://localhost:9911/callback';
@@ -38,10 +36,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
-}
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
 }
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
@@ -69,11 +63,7 @@ async function grantAppToken(scope: string): Promise<string> {
 console.log('\n=== Batched workspace endpoints under an app-origin (H-2) token ===\n');
 
 await test('Setup: owner + org + workspace + records namespace + published app', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp: ts, signature: await signMsg(reg.body.data.private_key, owner + NODE_ID + ts) }) });
-    ownerToken = tok.body.data.token;
+    ownerToken = (await registerOwner(BASE, owner)).token;
     // Publish a CADENCE-like app (the grant needs a real app to bind to) with the same scopes.
     const pub = await json('/v1/apps', { method: 'POST', headers: ownerAuth(), body: JSON.stringify({ filename: FILENAME, content: b64('<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="memory:read memory:write memory:delete organism:write"></head><body>cadence-like</body></html>'), name: 'Cadence-like', description: 'app-origin bulk test', category: 'utility' }) });
     assert(pub.status === 201, `publish app ${pub.status}`);

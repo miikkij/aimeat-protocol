@@ -104,6 +104,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -115,21 +116,11 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 interface Owner { name: string; token: string; privateKey: string }
 
-/** An owner through POST /v1/owners: no rate limit on that door, unlike POST /v1/ghii. */
+/** An owner through POST /v1/ghii with a password, signed in with that password. */
 async function setupOwner(label: string): Promise<Owner> {
     const name = `acctdoor${label}${Date.now().toString(36)}`;
-    const reg = await json('/v1/owners', {
-        method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `owner ${label} ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const privateKey = reg.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(privateKey, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `owner ${label} token: ${JSON.stringify(tok.body?.error)}`);
-    return { name, token: tok.body.data.token as string, privateKey };
+    const owner = await registerOwner(BASE, name);
+    return { name, token: owner.token, privateKey: owner.privateKey };
 }
 
 /** An agent of `owner`, through the owner-authed door. Returns its GAII, private key and token. */
@@ -162,16 +153,12 @@ let agentA: Awaited<ReturnType<typeof setupAgent>>;
 await test('Setup: an operator through the admin setup door', async () => {
     const name = `acctdoorop${Date.now().toString(36)}`;
     const reg = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name }),
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name, password: OWNER_PASSWORD }),
     });
     assert(reg.status === 200 && reg.body.ok === true, `setup/register ${reg.status}: ${JSON.stringify(reg.body)}`);
     assert(reg.body.owner?.roles?.includes('operator'), `operator role: ${JSON.stringify(reg.body.owner?.roles)}`);
     const privateKey = reg.body.private_key as string;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(privateKey, name + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, name);
     assert(tok.body.ok === true, `operator token: ${JSON.stringify(tok.body?.error)}`);
     OP = { name, token: tok.body.data.token as string, privateKey };
 });
@@ -208,9 +195,7 @@ await test('0a. The owner names the node writes under cannot be registered, on e
         // An unfixed node creates the account. Remove it again, so one failing run leaves nothing.
         for (const made of [owners, ghii]) {
             if (made.status !== 201) continue;
-            const key = made.body.data?.private_key as string;
-            const ts = new Date().toISOString();
-            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(key, name + NODE_ID + ts) }) });
+            const tok = await ownerSignIn(BASE, name, 'AcctDoor1234');
             if (tok.body.ok) await json(`/v1/owners/${name}`, { method: 'DELETE', headers: auth(tok.body.data.token) });
         }
         assert(owners.status === 400 && owners.body.error?.code === 'INVALID_INPUT', `POST /v1/owners ${name}: ${owners.status} ${JSON.stringify(owners.body.error)}`);
@@ -993,13 +978,8 @@ await test('55. A name registered again after its owner deleted the account hold
     const listed = await json(`/v1/actions?q=${encodeURIComponent(actionId)}`);
     const survivors = (listed.body.data?.actions ?? []).filter((a: any) => a.id === actionId);
 
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: first.name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register the freed name again: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: first.name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, first.name + NODE_ID + ts) }),
-    });
+    await registerOwner(BASE, first.name);
+    const tok = await ownerSignIn(BASE, first.name);
     assert(tok.body.ok === true, `token for the new account: ${JSON.stringify(tok.body?.error)}`);
     // On an unfixed node this call is the new account deleting the previous person's action.
     const reach = await json(`/v1/actions/${encodeURIComponent(actionId)}`, { method: 'DELETE', headers: auth(tok.body.data.token) });
@@ -1011,16 +991,8 @@ await test('55. A name registered again after its owner deleted the account hold
 
 /** Register `name` again, as the next person to pick a freed name does, and sign in. */
 async function registerAgain(name: string): Promise<Owner> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register the freed name again: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
-    const privateKey = reg.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(privateKey, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token for the new account: ${JSON.stringify(tok.body?.error)}`);
-    return { name, token: tok.body.data.token as string, privateKey };
+    const owner = await registerOwner(BASE, name);
+    return { name, token: owner.token, privateKey: owner.privateKey };
 }
 
 // Work has two sides, so erasing one account must neither take the other side's records away nor
@@ -1530,10 +1502,7 @@ await test('63. The device approval endpoint refuses a signed-out owner token an
     assert(out.status === 200, `sign out ${out.status}: ${JSON.stringify(out.body?.error)}`);
     const signedOut = await approve(await ask('aftersignout'), owner.token);
 
-    const ts = new Date().toISOString();
-    const signedIn = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: owner.name, timestamp: ts, signature: await signMsg(owner.privateKey, owner.name + NODE_ID + ts) }),
-    });
+    const signedIn = await ownerSignIn(BASE, owner.name);
     assert(signedIn.body.ok === true, `sign in again: ${JSON.stringify(signedIn.body?.error)}`);
     const current = await approve(await ask('current'), signedIn.body.data.token as string);
     await json(`/v1/owners/${owner.name}`, { method: 'DELETE', headers: auth(signedIn.body.data.token as string) });

@@ -46,6 +46,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -106,7 +107,6 @@ async function mcpRpc(method: string, params: Record<string, any> = {}, id: numb
 
 // ─── State ───
 let ownerToken = '';
-let ownerPrivKey = '';
 let agentPrivKey = '';
 let agentGaii = '';
 const ownerName = `mcporg${Date.now()}`;
@@ -114,7 +114,6 @@ const agentName = 'mcporgagent';
 
 // Second user for join tests
 let owner2Token = '';
-let owner2PrivKey = '';
 let agent2PrivKey = '';
 let agent2Gaii = '';
 const owner2Name = `mcporg2${Date.now()}`;
@@ -142,18 +141,10 @@ await test('Register GHII identity (user 1)', async () => {
         method: 'POST',
         body: JSON.stringify({ username: ownerName, display_name: 'MCP Organisms Test', password: 'McpOrg1234' }),
     });
-    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-});
+    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);});
 
 await test('Owner 1 auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName, 'McpOrg1234');
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });
@@ -270,18 +261,10 @@ await test('Register GHII identity (user 2)', async () => {
         method: 'POST',
         body: JSON.stringify({ username: owner2Name, display_name: 'MCP Organisms Test 2', password: 'McpOrg1234' }),
     });
-    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
-    owner2PrivKey = body.data.private_key;
-});
+    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);});
 
 await test('Owner 2 auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = owner2Name + NODE_ID + timestamp;
-    const signature = await signMsg(owner2PrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: owner2Name, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, owner2Name, 'McpOrg1234');
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     owner2Token = body.data.token;
 });

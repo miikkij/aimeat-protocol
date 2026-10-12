@@ -28,10 +28,10 @@ import { createStorage, type StorageProvider } from '../src/storage/storage-fact
 import { migrateAgentScopeVocabulary } from '../src/services/scope-vocabulary-migration.js';
 import type { Storage } from '../src/storage/interface.js';
 import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const owner = `orgscope${Date.now() % 1000000}`;
 
 let passed = 0, failed = 0;
@@ -55,20 +55,7 @@ async function signMsg(privB64: string, message: string): Promise<string> {
 }
 
 async function registerOwner(name: string): Promise<string> {
-    let reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    for (let i = 0; reg.status === 429 && i < 8; i++) {
-        await new Promise(r => setTimeout(r, 1500));
-        reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    }
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data!.private_key as string;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(priv, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `owner token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data!.token as string;
+    return (await registerWithPassword(BASE, name)).token;
 }
 
 /** An agent under `owner` with EXACTLY these scopes, plus its key so a later token can be minted. */

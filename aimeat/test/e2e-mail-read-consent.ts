@@ -46,6 +46,7 @@ import type { Storage } from '../src/storage/interface.js';
 import type { ConnectionRecord } from '../src/models/connection-schemas.js';
 import { loadConfig, type AimeatConfig } from '../src/config.js';
 import { serverSqlitePath, serverDbUrl } from './helpers/server-db.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -86,8 +87,7 @@ async function setupOwner(label: string) {
         reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: `Mail ${label}`, password: 'MailRead1234' }) });
     }
     assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'MailRead1234');
     assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
     return { name, ghii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }

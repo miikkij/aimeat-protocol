@@ -7,12 +7,12 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let passed = 0;
@@ -106,23 +106,13 @@ console.log('\n=== Cortex-Core E2E Test ===\n');
 console.log('Setup — Auth');
 
 await test('Register owner', async () => {
-  const { status, body } = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-  });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  ownerPrivKey = body.data.private_key;
+  const owner = await registerOwner(BASE, ownerName);
+  ownerPrivKey = owner.privateKey;
   assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
 await test('Owner auth token', async () => {
-  const timestamp = new Date().toISOString();
-  const message = ownerName + NODE_ID + timestamp;
-  const signature = await signMsg(ownerPrivKey, message);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-  });
+  const { body } = await ownerSignIn(BASE, ownerName);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   ownerToken = body.data?.token;
   assert(typeof ownerToken === 'string', 'got owner token');
@@ -715,18 +705,8 @@ const otherOwnerName = `cortexother${Date.now()}`;
 let otherToken = '';
 
 await test('Register second owner + token', async () => {
-  const reg = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name: otherOwnerName, public_key: 'placeholder' }),
-  });
-  assert(reg.status === 201, `register status ${reg.status}: ${JSON.stringify(reg.body)}`);
-  const otherPriv = reg.body.data.private_key;
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(otherPriv, otherOwnerName + NODE_ID + timestamp);
-  const tok = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: otherOwnerName, timestamp, signature }),
-  });
+  await registerOwner(BASE, otherOwnerName);
+  const tok = await ownerSignIn(BASE, otherOwnerName);
   assert(tok.body.ok === true, `token ok: ${JSON.stringify(tok.body.error)}`);
   otherToken = tok.body.data?.token;
   assert(typeof otherToken === 'string', 'got second owner token');

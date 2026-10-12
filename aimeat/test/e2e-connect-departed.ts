@@ -24,6 +24,7 @@
 
 import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { registerOwner as registerPasswordOwner } from './helpers/owner-login.js';
 import { createHash } from 'node:crypto';
 import { request as httpRequest } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -63,19 +64,16 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function getAuthToken(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
+async function getAuthToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
-  const signature = await signMsg(priv, message);
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const signature = await signMsg(priv, gaii + ts);
+  const payload = { gaii, timestamp: ts, signature };
   const { body } = await json(BASE, '/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
 }
 async function registerOwner(name: string): Promise<string> {
-  const reg = await json(BASE, '/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `owner ${name} status ${reg.status}: ${JSON.stringify(reg.body)}`);
-  return getAuthToken(name, reg.body.data.private_key, false);
+  return (await registerPasswordOwner(BASE, name)).token;
 }
 /** Create an agent of `owner` and return its bearer. */
 async function createAgent(ownerToken: string, owner: string, agent: string): Promise<string> {
@@ -84,7 +82,7 @@ async function createAgent(ownerToken: string, owner: string, agent: string): Pr
     body: JSON.stringify({ name: agent, owner, capabilities: ['memory'], scopes: ['*'] }),
   });
   assert(ag.status === 201, `agent ${agent} status ${ag.status}: ${JSON.stringify(ag.body)}`);
-  return getAuthToken(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+  return getAuthToken(ag.body.data.agent.gaii, ag.body.data.private_key);
 }
 
 /** One identity of the connector home: a stored bearer and its own config. */

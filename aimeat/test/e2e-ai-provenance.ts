@@ -50,9 +50,9 @@
  *     /v1/ai-transparency.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
-import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -72,10 +72,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(privB64: string, msg: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const sha256 = (s: string) => `sha256:${createHash('sha256').update(s).digest('hex')}`;
 
@@ -88,8 +84,7 @@ async function setupOwner(label: string, exactName?: string) {
         reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Prov', password: 'Provenance1234' }) });
     }
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, name, 'Provenance1234');
     assert(tok.status === 200 && tok.body?.data?.token, `auth/token ${tok.status}: ${JSON.stringify(tok.body)}`);
     return { name, gaii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }

@@ -26,12 +26,9 @@
  *   v1.0.0 — 2026-08-27 — Initial.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const stamp = Date.now() % 100000;
 
 let passed = 0;
@@ -50,23 +47,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
-}
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
 }
 
 console.log('\n=== MCP install E2E (the config file and the one-click links) ===\n');
@@ -134,8 +114,8 @@ await test('The door tells a second principal nothing about the first', async ()
     // Three callers, one of them nobody: byte-identical, and neither owner's name anywhere in it.
     const alice = `mcia${stamp}`;
     const bob = `mcib${stamp}`;
-    const tokenA = await registerOwner(alice);
-    const tokenB = await registerOwner(bob);
+    const tokenA = (await registerOwner(BASE, alice)).token;
+    const tokenB = (await registerOwner(BASE, bob)).token;
 
     const bodyFor = async (headers: Record<string, string>) => {
         const res = await fetch(`${BASE}/v1/connect/mcp.json?client=vscode`, { headers });

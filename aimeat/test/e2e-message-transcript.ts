@@ -24,10 +24,7 @@
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-message-transcript.ts
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -54,26 +51,10 @@ async function json(path: string, opts: RequestInit = {}) {
   return { status: res.status, body };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-  const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-  return Buffer.from(sig).toString('base64');
-}
-
 async function makeOwner(prefix: string) {
   const name = `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const reg = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name, public_key: 'placeholder' }),
-  });
-  assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(reg.body.data.private_key, name + NODE_ID + timestamp);
-  const tok = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: name, timestamp, signature }),
-  });
-  assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-  return { name, ghii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
+  const owner = await registerOwner(BASE, name);
+  return { name, ghii: `${name}@${NODE_ID}`, token: owner.token };
 }
 
 console.log('\n=== Voice-message Transcript E2E Tests ===\n');

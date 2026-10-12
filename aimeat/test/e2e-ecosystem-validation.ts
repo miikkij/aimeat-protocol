@@ -13,7 +13,6 @@
  *     approving it afterwards as the positive control.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -34,9 +33,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
   throw new Error('unreachable');
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const ownerName = `ecovalowner${Date.now()}`;
 let ownerToken = '';
@@ -51,12 +48,7 @@ async function run() {
   console.log('\n=== AIMEAT Ecosystem Static-Validation E2E ===\n');
 
   await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    const ts = new Date().toISOString();
-    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(ownerName + NODE_ID + ts), Buffer.from(body.data.private_key, 'base64'))).toString('base64');
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: sig }) });
-    ownerToken = tok.body.data.token;
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
     auth = { Authorization: `Bearer ${ownerToken}` };
   });
 
@@ -109,12 +101,7 @@ async function run() {
     assert(!!p?.user_code, 'the request is pending with a user_code');
 
     const otherName = `ecovalthief${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register the second owner: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(otherName + NODE_ID + ts), Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: otherName, timestamp: ts, signature: sig }) });
-    const otherAuth = { Authorization: `Bearer ${tok.body.data.token}` };
+    const otherAuth = { Authorization: `Bearer ${(await registerOwner(BASE, otherName)).token}` };
 
     const ap = await json(`/v1/ecosystem-apps/${p.user_code}/approve`, {
       method: 'POST', headers: otherAuth, body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),

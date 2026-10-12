@@ -64,6 +64,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { TOOL_SCOPES } from '../src/tool-catalog/scopes.js';
 import { SCOPES_OUTSIDE_WILDCARD } from '../src/utils/scope-coverage.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/tool-catalog/definitions.js';
@@ -167,10 +168,7 @@ let broad: { gaii: string; key: string } = { gaii: '', key: '' };
 await test('Setup: register owner + narrow and broad agents', async () => {
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'Scope Test', password: 'ScopeTest1234' }) });
     assert(ghii.status === 201, `ghii ${ghii.status}: ${JSON.stringify(ghii.body)}`);
-    const ownerKey = ghii.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const sig = await signMsg(ownerKey, ownerName + NODE_ID + ts);
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: sig }) });
+    const tk = await ownerSignIn(BASE, ownerName, 'ScopeTest1234');
     ownerToken = tk.body.data.token;
 
     const mkAgent = async (name: string, scopes: string[]) => {
@@ -330,15 +328,11 @@ const OPERATOR_TOOLS = CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.caller === 'o
 
 await test("Setup: an operator, an agent holding memory:read only, and one holding operator:admin", async () => {
     const reg = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: opName }),
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: opName, password: OWNER_PASSWORD }),
     });
     assert(reg.status === 200 && reg.body.owner?.roles?.includes('operator'),
         `operator ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: opName, timestamp: ts, signature: await signMsg(reg.body.private_key, opName + NODE_ID + ts) }),
-    });
+    const tk = await ownerSignIn(BASE, opName);
     opToken = tk.body.data.token;
     const mk = async (name: string, scopes: string[]) => {
         const r = await json('/v1/agents', {
@@ -468,12 +462,9 @@ async function agentToken(a: { gaii: string; key: string }): Promise<string> {
 const answerText = (body: any): string => String(body?.result?.content?.[0]?.text ?? JSON.stringify(body?.error ?? body));
 
 await test("Setup: a plain owner, and two agents of the operator holding the tools' own words, one of them also operator:admin", async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: plainName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${plainName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    assert(!(reg.body.data.owner?.roles ?? []).includes('operator'), 'the plain owner came out an operator, so nothing below proves anything');
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: plainName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, plainName + NODE_ID + ts) }) });
-    plainToken = tk.body.data.token;
+    const plain = await registerOwner(BASE, plainName);
+    assert(!plain.roles.includes('operator'), 'the plain owner came out an operator, so nothing below proves anything');
+    plainToken = plain.token;
     const mk = async (name: string, scopes: string[]) => {
         const r = await json('/v1/agents', {
             method: 'POST', headers: { Authorization: `Bearer ${opToken}` },

@@ -37,22 +37,14 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(priv: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(priv, 'base64'))).toString('base64');
 }
-async function getToken(owner: string, priv: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(priv, owner + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp, signature }) });
-    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-    return body.data.token;
-}
 async function registerOwner(name: string): Promise<{ token: string; ghii: string }> {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(status === 201, `register ${name}: ${status} ${JSON.stringify(body)}`);
-    return { token: await getToken(name, body.data.private_key), ghii: `${name}@${NODE_ID}` };
+    return { token: (await registerWithPassword(BASE, name)).token, ghii: `${name}@${NODE_ID}` };
 }
 
 const stamp = Date.now();

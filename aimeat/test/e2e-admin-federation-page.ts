@@ -57,6 +57,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
@@ -79,15 +80,7 @@ const aKey = Buffer.from('a'.repeat(32)).toString('base64');
 
 await test('Setup: the first owner is the operator; a second is not', async () => {
     const mk = async (name: string) => {
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register ${name}: ${reg.status}`);
-        const ts = new Date().toISOString();
-        const tok = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-        });
-        assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-        return tok.body.data.token as string;
+        return (await registerOwner(BASE, name)).token;
     };
     opToken = await mk(opName);
     otherToken = await mk(otherName);

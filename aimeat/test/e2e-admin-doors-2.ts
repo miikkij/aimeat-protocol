@@ -24,6 +24,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -66,17 +67,6 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function ownerTokenFor(name: string, privKey: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature }),
-    });
-    assert(body.ok === true, `token for ${name}: ${JSON.stringify(body.error)}`);
-    return body.data.token as string;
-}
-
 /**
  * Headers for one of the three admin-password doors, spending from a named rate-limit bucket.
  *
@@ -98,7 +88,7 @@ async function registerOperator(name: string, bucketToken = ''): Promise<string>
     const { status, body } = await json('/v1/admin/setup/register', {
         method: 'POST',
         headers: pwHeaders(bucketToken),
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, password: OWNER_PASSWORD }),
     });
     assert(status === 200, `register ${name}: ${status} ${JSON.stringify(body)}`);
     assert(body.owner?.roles?.includes('operator'), `${name} has no operator role`);
@@ -132,15 +122,12 @@ console.log('\n=== AIMEAT Admin Doors E2E, part 2 (monitoring + setup + knowledg
 console.log('Setup');
 
 await test('An operator, a plain owner and an agent', async () => {
-    operatorToken = await ownerTokenFor(operatorName, await registerOperator(operatorName));
+    await registerOperator(operatorName);
+    operatorToken = await ownerToken(BASE, operatorName);
 
-    const reg = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: plainName, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `plain owner ${reg.status}: ${JSON.stringify(reg.body)}`);
-    assert(!(reg.body.data.owner?.roles ?? []).includes('operator'), 'the second owner must not be an operator');
-    plainToken = await ownerTokenFor(plainName, reg.body.data.private_key);
+    const plainOwner = await registerOwner(BASE, plainName);
+    assert(!plainOwner.roles.includes('operator'), 'the second owner must not be an operator');
+    plainToken = plainOwner.token;
 
     const ag = await json('/v1/agents', op({
         method: 'POST',
@@ -311,8 +298,8 @@ await test('POST /v1/admin/roles/grant promotes an owner, and the roster says so
 let staleOperatorToken = '';
 
 await test('POST /v1/admin/roles/revoke takes it back off, and the roster says so', async () => {
-    const key = await registerOperator(secondOpName, operatorToken);   // bucket: operator (1/5)
-    staleOperatorToken = await ownerTokenFor(secondOpName, key);
+    await registerOperator(secondOpName, operatorToken);   // bucket: operator (1/5)
+    staleOperatorToken = await ownerToken(BASE, secondOpName);
 
     const { status, body } = await json('/v1/admin/roles/revoke', op({
         method: 'POST', body: JSON.stringify({ owner: secondOpName, role: 'operator' }),

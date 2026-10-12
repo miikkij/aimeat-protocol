@@ -30,6 +30,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
@@ -76,9 +77,7 @@ async function setupAgent(label: string) {
     const ownerName = `wsbg${label}${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'WS Backing', password: 'WsBg12345' }) });
     assert(reg.status === 201, `ghii ${reg.status}`);
-    const ownerPriv = reg.body.data.private_key;
-    const ts1 = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts1, signature: await signMsg(ownerPriv, ownerName + NODE_ID + ts1) }) });
+    const tok = await ownerSignIn(BASE, ownerName, 'WsBg12345');
     const ownerToken = tok.body.data.token as string;
     const ag = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: `wsbgagent${label}`, owner: ownerName, capabilities: ['social'], model: 'gpt-4o' }) });
     assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body.error || ag.body)}`);

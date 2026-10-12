@@ -19,7 +19,6 @@
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial.
  */
-import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
@@ -30,12 +29,10 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, chatJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const PORT = process.env.E2E_AI_ROLES_PORT ?? '40444';
 const BASE = `http://localhost:${PORT}`;
-const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const REDIRECT = 'http://localhost:9912/callback';
 
 let passed = 0, failed = 0;
@@ -95,9 +92,7 @@ async function setupOwner(label: string): Promise<Owner> {
   const name = `airole${label}${Date.now()}`.toLowerCase();
   const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'AI Roles', password: 'AiRoles12345678' }) });
   assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-  const ts = new Date().toISOString();
-  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(name + NODE_ID + ts), Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
+  const tok = await ownerSignIn(BASE, name, 'AiRoles12345678');
   assert(tok.status === 200, `auth/token ${tok.status}`);
   return { name, token: tok.body.data.token as string };
 }

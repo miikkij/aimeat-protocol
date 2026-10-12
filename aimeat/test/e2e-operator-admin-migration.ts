@@ -34,6 +34,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { createStorage } from '../src/storage/storage-factory.js';
 import { TOOL_SCOPES } from '../src/tool-catalog/scopes.js';
 
@@ -125,11 +126,8 @@ async function withStorage<T>(fn: (s: Awaited<ReturnType<typeof createStorage>>)
 interface Agent { name: string; gaii: string; key: string }
 interface Owner { name: string; key: string; token: string }
 
-async function ownerToken(name: string, key: string): Promise<string> {
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(key, name + NODE_ID + ts) }),
-    });
+async function ownerToken(name: string): Promise<string> {
+    const tok = await ownerSignIn(BASE, name);
     assert(tok.body.ok === true, `owner token ${name}: ${JSON.stringify(tok.body.error)}`);
     return tok.body.data.token as string;
 }
@@ -276,16 +274,14 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
 
     await test('1a. an operator, an ordinary owner, and their agents', async () => {
         const reg = await json('/v1/admin/setup/register', {
-            method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: `opmig${stamp}` }),
+            method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: `opmig${stamp}`, password: OWNER_PASSWORD }),
         });
         assert(reg.status === 200 && reg.body.owner?.roles?.includes('operator'), `operator ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
         op = { name: `opmig${stamp}`, key: reg.body.private_key, token: '' };
-        op.token = await ownerToken(op.name, op.key);
-        const p = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: `plainmig${stamp}`, public_key: 'placeholder' }) });
-        assert(p.status === 201, `plain owner ${p.status}: ${JSON.stringify(p.body.error)}`);
-        assert(!(p.body.data.owner?.roles ?? []).includes('operator'), 'the ordinary owner came out an operator, so nothing below proves anything');
-        plain = { name: `plainmig${stamp}`, key: p.body.data.private_key, token: '' };
-        plain.token = await ownerToken(plain.name, plain.key);
+        op.token = await ownerToken(op.name);
+        const p = await registerOwner(BASE, `plainmig${stamp}`);
+        assert(!p.roles.includes('operator'), 'the ordinary owner came out an operator, so nothing below proves anything');
+        plain = { name: p.name, key: p.privateKey, token: p.token };
 
         opWide = await createAgent(op, 'opwide', ['*']);
         opNarrow = await createAgent(op, 'opnarrow', ['memory:read']);
@@ -318,8 +314,8 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
 
     console.log('\nPhase 2: the boot that carries the migration');
     server = await startServer();
-    op.token = await ownerToken(op.name, op.key);
-    plain.token = await ownerToken(plain.name, plain.key);
+    op.token = await ownerToken(op.name);
+    plain.token = await ownerToken(plain.name);
     const tickedOffered = await adminToolsOffered(await agentToken(opTicked));
 
     // Every boot also runs the scope-vocabulary migration (services/scope-vocabulary-migration.ts),
@@ -422,7 +418,7 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
 
     console.log('\nPhase 3: the next boot changes nothing');
     server = await startServer();
-    op.token = await ownerToken(op.name, op.key);
+    op.token = await ownerToken(op.name);
 
     await test('3a. the word the owner took back stays taken back', async () => {
         const held = await scopesOf(op, 'opwide');

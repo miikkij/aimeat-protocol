@@ -34,6 +34,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -75,12 +76,8 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
   return Buffer.from(sig).toString('base64');
 }
 
-async function ownerTokenFor(name: string, privKey: string): Promise<string> {
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }),
-  });
+async function ownerTokenFor(name: string): Promise<string> {
+  const { body } = await ownerSignIn(BASE, name);
   assert(body.ok === true, `owner token for ${name}: ${JSON.stringify(body.error)}`);
   return body.data.token as string;
 }
@@ -133,10 +130,10 @@ await test('register owner (operator) + token', async () => {
   const { status, body } = await json('/v1/admin/setup/register', {
     method: 'POST',
     headers: { 'X-Admin-Password': ADMIN_PW },
-    body: JSON.stringify({ name: ownerName }),
+    body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-  ownerToken = await ownerTokenFor(ownerName, body.private_key);
+  ownerToken = await ownerTokenFor(ownerName);
   ownerGhii = `${ownerName}@${NODE_ID}`;
 });
 
@@ -158,11 +155,7 @@ await test('register two agents of that owner', async () => {
 });
 
 await test('register a second owner with an agent of their own', async () => {
-  const reg = await json('/v1/owners', {
-    method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }),
-  });
-  assert(reg.status === 201, `status ${reg.status}: ${JSON.stringify(reg.body)}`);
-  strangerToken = await ownerTokenFor(strangerName, reg.body.data.private_key);
+  strangerToken = (await registerOwner(BASE, strangerName)).token;
   strangerGhii = `${strangerName}@${NODE_ID}`;
   // A REAL agent of another owner. A name the node has never heard of would be refused by the
   // `!targetAgent` half of the same line and would prove nothing about the ownership check.

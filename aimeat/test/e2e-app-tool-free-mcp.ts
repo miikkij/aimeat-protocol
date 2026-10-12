@@ -11,9 +11,9 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const stamp = randomBytes(5).toString('hex'), EXT = 'freetool' + stamp, FILE = 'free-' + stamp + '.html';
 const PRIVATE_FILE = 'private-' + stamp + '.html';
 let passed = 0, failed = 0, rpcId = 0;
@@ -42,9 +42,7 @@ async function makeOwner(prefix: string): Promise<Owner> {
   const owner = prefix + stamp;
   const registration = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: owner, display_name: owner, password: 'FreeToolTest1234' }) });
   assert(registration.status === 201, 'register ' + registration.status);
-  const timestamp = new Date().toISOString();
-  const login = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp,
-    signature: await signed(registration.body.data.private_key, owner + NODE_ID + timestamp) }) });
+  const login = await ownerSignIn(BASE, owner, 'FreeToolTest1234');
   assert(login.status === 200, 'owner login ' + login.status);
   const result = { owner, token: login.body.data.token as string }; owners.push(result); return result;
 }

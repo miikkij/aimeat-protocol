@@ -14,12 +14,9 @@
  *   v1.1.0 — 2026-09-03 — A library pack an app includes is an edge: ?pack=, requires.packs, the pack index used_by, and the edge goes with the app.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const stamp = Date.now() % 100000;
 const ownerA = `depowna${stamp}`;
 const ownerB = `depownb${stamp}`;
@@ -42,19 +39,8 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
 }
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
 async function makeOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201 || reg.status === 200, `owner ${name}: ${reg.status} ${JSON.stringify(reg.body).slice(0, 120)}`);
-    const priv = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(priv, name + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
+    return (await registerOwner(BASE, name)).token;
 }
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
     ({ ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${token}` } });

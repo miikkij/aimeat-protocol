@@ -29,6 +29,7 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-ai-provenance-content
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -66,8 +67,7 @@ async function owner(label: string): Promise<{ name: string; token: string; ghii
   const name = `prov${label}${stamp}`;
   const reg = await call('/v1/ghii', { body: { username: name, display_name: name, password: 'ProvContent1234' } });
   assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body.error)}`);
-  const ts = new Date().toISOString();
-  const tok = await call('/v1/auth/token', { body: { owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE + ts) } });
+  const tok = await ownerSignIn(BASE, name, 'ProvContent1234');
   assert(tok.status === 200, `token ${name}: ${tok.status}`);
   return { name, token: tok.body.data.token, ghii: `${name}@${NODE}` };
 }

@@ -14,7 +14,6 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=registration-mode
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -30,22 +29,12 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner } from './helpers/owner-login.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const tokenFrom = (url: string) => new URL(url).searchParams.get('token') || '';
 
-async function registerAndToken(name: string): Promise<{ token: string; status: number; body: any }> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    if (reg.status !== 201) return { token: '', status: reg.status, body: reg.body };
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
-    return { token: tok.body.data.token, status: reg.status, body: reg.body };
+async function registerViaOwners(name: string): Promise<{ status: number; body: any }> {
+    return json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
 }
 
 async function setMode(opToken: string, mode: string): Promise<{ status: number; body: any }> {
@@ -63,8 +52,8 @@ let invitedUserToken = '';
 const invitedUsername = `rminv${Date.now()}`;
 
 await test('Setup (open mode): first owner registers, becomes operator, mints an email invite', async () => {
-    const op = await registerAndToken(opName);
-    assert(op.status === 201, `register: ${op.status}`);
+    const op = await registerOwner(BASE, opName);
+    assert(op.registration.status === 201, `register: ${op.registration.status}`);
     opToken = op.token;
 
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(opToken), body: JSON.stringify({ name: 'Mode Org', type: 'project', join_policy: 'invite_only', visibility: 'private' }) });
@@ -89,7 +78,7 @@ await test('Discovery reports open, and switching mode is operator-only work tha
 });
 
 await test('CLOSED: every account-creating door answers 403 REGISTRATION_CLOSED', async () => {
-    const owners = await registerAndToken(`rmc1${Date.now()}`);
+    const owners = await registerViaOwners(`rmc1${Date.now()}`);
     assert(owners.status === 403 && owners.body.error?.code === 'REGISTRATION_CLOSED', `/v1/owners: ${owners.status} ${owners.body.error?.code}`);
 
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `rmc2${Date.now()}`, display_name: 'x', password: 'ClosedDoor123' }) });
@@ -113,7 +102,7 @@ await test('INVITE: direct doors stay refused', async () => {
     const r = await setMode(opToken, 'invite');
     assert(r.status === 200, `set invite: ${r.status}`);
 
-    const owners = await registerAndToken(`rmi1${Date.now()}`);
+    const owners = await registerViaOwners(`rmi1${Date.now()}`);
     assert(owners.status === 403 && owners.body.error?.code === 'REGISTRATION_CLOSED', `/v1/owners: ${owners.status}`);
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `rmi2${Date.now()}`, display_name: 'x', password: 'InviteMode123' }) });
     assert(ghii.status === 403, `/v1/ghii: ${ghii.status}`);
@@ -133,7 +122,7 @@ await test('OAUTH: the password doors are refused and discovery reports the mode
     const r = await setMode(opToken, 'oauth');
     assert(r.status === 200, `set oauth: ${r.status}: ${JSON.stringify(r.body.error)}`);
 
-    const owners = await registerAndToken(`rmoa1${Date.now()}`);
+    const owners = await registerViaOwners(`rmoa1${Date.now()}`);
     assert(owners.status === 403 && owners.body.error?.code === 'REGISTRATION_CLOSED', `/v1/owners: ${owners.status} ${owners.body.error?.code}`);
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `rmoa2${Date.now()}`, display_name: 'x', password: 'OauthMode123' }) });
     assert(ghii.status === 403 && ghii.body.error?.code === 'REGISTRATION_CLOSED', `/v1/ghii: ${ghii.status} ${ghii.body.error?.code}`);
@@ -165,7 +154,7 @@ await test('The config door is operator-only: the invited member cannot reopen r
 await test('OPEN again: direct registration works and discovery reports it', async () => {
     const r = await setMode(opToken, 'open');
     assert(r.status === 200, `set open: ${r.status}`);
-    const back = await registerAndToken(`rmo1${Date.now()}`);
+    const back = await registerViaOwners(`rmo1${Date.now()}`);
     assert(back.status === 201, `/v1/owners after reopen: ${back.status}`);
     const disc = await json('/?format=json');
     assert(JSON.stringify(disc.body).includes('"registration_mode":"open"'), 'discovery shows open again');

@@ -23,6 +23,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -108,9 +109,7 @@ const toolResult = (body: any): any => { try { return JSON.parse(body.result?.co
 async function registerOwner(name: string): Promise<{ name: string; ghii: string; token: string }> {
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: name, password: 'OrgTest12345' }) });
     assert(ghii.status === 201, `ghii ${name} ${ghii.status}: ${JSON.stringify(ghii.body)}`);
-    const key = ghii.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(key, name + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, name, 'OrgTest12345');
     return { name, ghii: `${name}@${NODE_ID}`, token: tk.body.data.token as string };
 }
 

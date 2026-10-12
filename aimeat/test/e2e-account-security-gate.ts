@@ -30,6 +30,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { authorizeParams, mcpPkce } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -72,11 +73,7 @@ async function registerOwner(username: string): Promise<{ token: string; private
     }
     assert(reg.status === 201, `register ${username}: ${reg.status} ${JSON.stringify(reg.body)}`);
     const privateKey = reg.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: username, timestamp: ts, signature: await signMsg(privateKey, username + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, username, PASSWORD);
     assert(tok.body.ok === true, `owner token ${username}: ${JSON.stringify(tok.body.error)}`);
     return { token: tok.body.data.token as string, privateKey };
 }
@@ -374,7 +371,10 @@ async function main() {
             method: 'POST',
             body: JSON.stringify({ owner: ownerA, timestamp: ts, signature: await signMsg(ownerAKey, ownerA + NODE_ID + ts) }),
         });
-        assert(byKey.body.ok !== true, 'the signing key from before the password change must no longer sign in');
+        // Refused one of two ways: 401 while the owner-key sign-in is on (the password change replaced
+        // the key), 410 OWNER_KEY_LOGIN_OFF once it is gone (switched off, or any 4.0.0 node).
+        assert(byKey.body.ok !== true && (byKey.status === 401 || (byKey.status === 410 && byKey.body.error?.code === 'OWNER_KEY_LOGIN_OFF')),
+            `the signing key from before the password change must no longer sign in: ${byKey.status} ${byKey.body.error?.code}`);
         const again = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: ownerA, password: 'TakenOver9876' }) });
         assert(again.body.ok === true, `owner re-auth: ${JSON.stringify(again.body.error)}`);
         ownerAToken = again.body.data.token as string;

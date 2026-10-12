@@ -16,8 +16,9 @@
  */
 // Run: cd aimeat && pnpm exec node --import tsx test/run-e2e-ci.ts --test=projects
 
+import { registerOwner } from './helpers/owner-login.js';
+
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -66,11 +67,10 @@ async function signMsg(privKeyB64: string, message: string): Promise<string> {
   return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
   const timestamp = new Date().toISOString();
-  const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-  const signature = await signMsg(privKey, message);
-  const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature } : { owner: ownerOrGaii, timestamp, signature };
+  const signature = await signMsg(privKey, gaii + timestamp);
+  const payload = { gaii, timestamp, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -80,16 +80,14 @@ const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 async function registerOwnerAndAgent(prefix: string) {
   const ownerName = `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const o = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(o.status === 201, `owner ${o.status}: ${JSON.stringify(o.body)}`);
-  const ownerToken = await getToken(ownerName, o.body.data.private_key, false);
+  const ownerToken = (await registerOwner(BASE, ownerName)).token;
   const a = await json('/v1/agents', {
     method: 'POST', headers: bearer(ownerToken),
     body: JSON.stringify({ name: 'projbot', owner: ownerName, capabilities: ['memory'] }),
   });
   assert(a.status === 201, `agent ${a.status}: ${JSON.stringify(a.body)}`);
   const agentGaii = a.body.data.agent.gaii;
-  const agentToken = await getToken(agentGaii, a.body.data.private_key, true);
+  const agentToken = await getToken(agentGaii, a.body.data.private_key);
   return { ownerName, ownerToken, agentGaii, agentToken };
 }
 

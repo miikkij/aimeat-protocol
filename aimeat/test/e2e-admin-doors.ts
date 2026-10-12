@@ -8,7 +8,7 @@
  *   doors, push templates, CSM and MSM. Every write is followed by the read that proves it landed,
  *   because a 200 on its own says only that a handler returned.
  * @structure
- *   - Setup: an operator through /v1/admin/setup/register, a second plain owner through /v1/owners
+ *   - Setup: an operator through /v1/admin/setup/register, a second plain owner through /v1/ghii
  *   - Section A: admin-extensions — catalogue, install, scaffold, script edit, action add, reinstall
  *   - Section B: admin-features writes — email templates, GHII cors/email, push, CSM, MSM
  *   - Refusals: each section proves a plain owner gets 403 and an anonymous caller 401
@@ -25,10 +25,9 @@
  *     the fix: no version was kept, and the reinstall answered 200.
  *   v1.0.0 — 2026-09-08 — Written for the coverage work. admin-extensions.ts had no suite at all.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { existsSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { registerOwner, ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -62,26 +61,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const priv = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), priv);
-    return Buffer.from(sig).toString('base64');
-}
-
-async function ownerTokenFor(name: string, privKey: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature }),
-    });
-    assert(body.ok === true, `token for ${name}: ${JSON.stringify(body.error)}`);
-    return body.data.token as string;
-}
-
 // ─── State ───
 const stamp = Date.now();
 const operatorName = `doorop${stamp}`;
@@ -108,22 +87,18 @@ await test('POST /v1/admin/setup/register — an operator, and its token', async
     const { status, body } = await json('/v1/admin/setup/register', {
         method: 'POST',
         headers: { 'X-Admin-Password': ADMIN_PW },
-        body: JSON.stringify({ name: operatorName }),
+        body: JSON.stringify({ name: operatorName, password: OWNER_PASSWORD }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.owner?.roles?.includes('operator'), `no operator role: ${JSON.stringify(body.owner)}`);
-    operatorToken = await ownerTokenFor(operatorName, body.private_key);
+    operatorToken = await ownerToken(BASE, operatorName);
 });
 
 await test('POST /v1/owners — a second, plain owner (the node already has an operator)', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: plainName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    assert(!(body.data.owner?.roles ?? []).includes('operator'),
-        `the second owner must NOT be an operator: ${JSON.stringify(body.data.owner?.roles)}`);
-    plainToken = await ownerTokenFor(plainName, body.data.private_key);
+    const plainOwner = await registerOwner(BASE, plainName);
+    assert(!plainOwner.roles.includes('operator'),
+        `the second owner must NOT be an operator: ${JSON.stringify(plainOwner.roles)}`);
+    plainToken = plainOwner.token;
 });
 
 // ══════════════════════════════════════════════════════════════════════════

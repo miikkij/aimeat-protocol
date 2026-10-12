@@ -35,14 +35,12 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
-import * as ed from '@noble/ed25519';
 import { TOTP, Secret } from 'otpauth';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeSmtp, type FakeSmtp } from './helpers/fake-smtp.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner, ownerToken as passwordToken, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { seedPassword } from './helpers/seed-password.js';
 
 const PORT = Number(process.env.E2E_MAGIC_RETURN_PORT ?? 40454);
 const SMTP_PORT = PORT + 1;
@@ -83,15 +81,14 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
     return { status: res.status, body };
 }
 
-async function ownerToken(owner: string, privB64: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(owner + NODE_ID + timestamp), Buffer.from(privB64, 'base64'));
-    const r = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(r.status === 200, `owner token ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
-    return r.body.data.token as string;
+/**
+ * A session for an account the web door made, which has no password. The owner-key sign-in that
+ * used to open it is removed in 4.0.0, so the account gets a password in this node's database and
+ * signs in with it (helpers/seed-password.ts). Done before two-step sign-in is armed.
+ */
+async function ownerToken(owner: string): Promise<string> {
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'magic.db') });
+    return passwordToken(BASE, owner);
 }
 
 /** The code an authenticator app shows now (or `offset` periods later) for this secret. */
@@ -207,12 +204,7 @@ async function run() {
     let opToken = '';
 
     await test('setup: an operator exists, so the next account is an ordinary one', async () => {
-        const reg = await json('/v1/ghii/register-web', {
-            method: 'POST',
-            body: JSON.stringify({ username: opName, display_name: 'Return Operator', email: `${opName}@aimeat.test` }),
-        });
-        assert(reg.status === 201, `operator register ${reg.status}: ${JSON.stringify(reg.body).slice(0, 300)}`);
-        opToken = await ownerToken(opName, reg.body.data.private_key);
+        opToken = (await registerOwner(BASE, opName, { displayName: 'Return Operator' })).token;
     });
 
     await test('setup: the person registers and verifies the address, which turns the link on', async () => {
@@ -227,7 +219,7 @@ async function run() {
             method: 'POST', body: JSON.stringify({ verification_id: reg.body.data.verification_id, code }),
         });
         assert(verify.status === 200, `verify-email ${verify.status}: ${JSON.stringify(verify.body).slice(0, 300)}`);
-        userToken = await ownerToken(userName, reg.body.data.private_key);
+        userToken = await ownerToken(userName);
     });
 
     await test('setup: the person publishes an app, and the node gives it an origin of its own', async () => {
@@ -377,7 +369,7 @@ async function run() {
             method: 'POST', body: JSON.stringify({ verification_id: reg.body.data.verification_id, code }),
         });
         assert(verify.status === 200, `verify-email ${verify.status}`);
-        totpSecret = await armTotp(await ownerToken(totpName, reg.body.data.private_key));
+        totpSecret = await armTotp(await ownerToken(totpName));
     });
 
     await test('a link for an account with TOTP armed opens no session; it asks for the code', async () => {
@@ -412,14 +404,14 @@ async function run() {
     });
 
     await test('attach-email on an account with TOTP armed asks for the code', async () => {
-        // An account below verification level 1 with a password, armed through its owner key: the
-        // only route to TOTP for such an account, and the one the attach-email check is for.
+        // An account below verification level 1 with a password, armed after a password sign-in:
+        // the account the attach-email check is for.
         const name = `mrattach${stamp}`;
         const password = 'AttachEmailTotp1234';
         const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: name, password }) });
         if (reg.status === 400 && reg.body.error?.code === 'EMAIL_REQUIRED') { console.log('    (this node requires an email to register; skipped)'); return; }
         assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body).slice(0, 300)}`);
-        await armTotp(await ownerToken(name, reg.body.data.private_key));
+        await armTotp(await passwordToken(BASE, name, password));
         const r = await json('/v1/ghii/login/attach-email', {
             method: 'POST', body: JSON.stringify({ username: name, password, email: `${name}@aimeat.test` }),
         });

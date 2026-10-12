@@ -67,6 +67,7 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { BROWSER_START, roundCookie, readRoundRow, readRawRow } from './helpers/oauth-round.js';
+import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -134,12 +135,8 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
   return Buffer.from(sig).toString('base64');
 }
 
-async function ownerTokenFor(name: string, privKey: string): Promise<string> {
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }),
-  });
+async function ownerTokenFor(name: string, password: string = OWNER_PASSWORD): Promise<string> {
+  const { body } = await ownerSignIn(BASE, name, password);
   assert(body.ok === true, `owner token for ${name}: ${JSON.stringify(body.error)}`);
   return body.data.token as string;
 }
@@ -168,7 +165,7 @@ async function plainOwner(prefix: string): Promise<{ name: string; token: string
     });
     if (reg.status === 429 && attempt < 8) { await new Promise((r) => setTimeout(r, 1500)); continue; }
     assert(reg.status === 201, `registration: ${reg.status} ${JSON.stringify(reg.body)}`);
-    return { name, token: await ownerTokenFor(name, reg.body.data.private_key) };
+    return { name, token: await ownerTokenFor(name, 'McpProxyTest1234') };
   }
 }
 
@@ -385,10 +382,10 @@ await test('register owner (operator) + token', async () => {
   const { status, body } = await json('/v1/admin/setup/register', {
     method: 'POST',
     headers: { 'X-Admin-Password': ADMIN_PW },
-    body: JSON.stringify({ name: ownerName }),
+    body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-  ownerToken = await ownerTokenFor(ownerName, body.private_key);
+  ownerToken = await ownerTokenFor(ownerName);
 });
 
 await test('register an agent of that owner, holding mcp:read and mcp:use but NOT mcp:manage', async () => {
@@ -418,10 +415,10 @@ await test('register a second owner, for the cross-owner arms', async () => {
   const { status, body } = await json('/v1/admin/setup/register', {
     method: 'POST',
     headers: { 'X-Admin-Password': ADMIN_PW },
-    body: JSON.stringify({ name: strangerName }),
+    body: JSON.stringify({ name: strangerName, password: OWNER_PASSWORD }),
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-  strangerToken = await ownerTokenFor(strangerName, body.private_key);
+  strangerToken = await ownerTokenFor(strangerName);
 });
 
 // ─── Phase 1: attaching ───

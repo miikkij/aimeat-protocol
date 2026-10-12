@@ -61,6 +61,8 @@ import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { startFakeSmtp, type FakeSmtp, type ParsedMail } from './helpers/fake-smtp.js';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { registerOwner as registerPasswordOwner, ownerToken as passwordToken, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { seedPassword } from './helpers/seed-password.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -118,22 +120,20 @@ async function signMsg(privB64: string, message: string): Promise<string> {
     return Buffer.from(sig).toString('base64');
 }
 
-/** Register through the protocol door and sign in. The FIRST such account is the node's operator. */
+/** Register with a password (POST /v1/ghii) and sign in. The FIRST such account is the node's operator. */
 async function registerOwner(name: string): Promise<{ name: string; token: string; privateKey: string }> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${short(reg.body)}`);
-    const privateKey = reg.body.data.private_key as string;
-    return { name, token: await ownerToken(name, privateKey), privateKey };
+    const owner = await registerPasswordOwner(BASE, name);
+    return { name, token: owner.token, privateKey: owner.privateKey };
 }
 
-async function ownerToken(owner: string, privB64: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const r = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp, signature: await signMsg(privB64, owner + NODE_ID + timestamp) }),
-    });
-    assert(r.status === 200, `owner token for ${owner}: ${r.status} ${short(r.body)}`);
-    return r.body.data.token as string;
+/**
+ * A session for an account the web door made, which has no password. The owner-key sign-in that
+ * used to open it is removed in 4.0.0, so the account gets a password in this node's database and
+ * signs in with it (helpers/seed-password.ts).
+ */
+async function webAccountToken(owner: string): Promise<string> {
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'core-jobs.db') });
+    return passwordToken(BASE, owner);
 }
 
 async function agentToken(gaii: string, privB64: string): Promise<string> {
@@ -716,7 +716,7 @@ async function run(): Promise<void> {
         assert(verify.status === 200, `verify-email: ${verify.status} ${short(verify.body)}`);
         assert(verify.body.data.verification_level === 1, `expected level 1, got ${verify.body.data.verification_level}`);
 
-        funnelToken = await ownerToken(funnelName, reg.body.data.private_key as string);
+        funnelToken = await webAccountToken(funnelName);
         // The web door already stamps onboarding.track at account creation, so this is an UPDATE
         // (200, version 2) rather than a create. The rescue reads it to decide which wording the
         // message would carry, so it has to say 'remake' before the pass is fired.

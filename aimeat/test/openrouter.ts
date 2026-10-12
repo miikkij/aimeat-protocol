@@ -14,14 +14,9 @@
 // Run: cd aimeat && pnpm exec tsx test/openrouter.ts
 // Requires: server running on port 40251 with AIMEAT_ENCRYPTION_KEY set
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-
-ed.hashes.sha512 = (m: Uint8Array) =>
-  new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -51,12 +46,6 @@ async function json(path: string, opts: RequestInit = {}) {
   return { status: res.status, body, headers: res.headers };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-  const privKey = Buffer.from(privateKeyB64, 'base64');
-  const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-  return Buffer.from(sig).toString('base64');
-}
-
 // ─── State ───
 let ownerToken = '';
 let ownerPrivKey = '';
@@ -70,23 +59,13 @@ console.log('\n=== OpenRouter Settings E2E Tests ===\n');
 console.log('Setup — Register owner');
 
 await test('Register test owner', async () => {
-  const { status, body } = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-  });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  ownerPrivKey = body.data.private_key;
+  const owner = await registerOwner(BASE, ownerName);
+  ownerPrivKey = owner.privateKey;
   assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
 await test('Owner auth — sign + token', async () => {
-  const timestamp = new Date().toISOString();
-  const message = ownerName + NODE_ID + timestamp;
-  const signature = await signMsg(ownerPrivKey, message);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-  });
+  const { body } = await ownerSignIn(BASE, ownerName);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   ownerToken = body.data?.token;
   assert(typeof ownerToken === 'string', 'got owner token');

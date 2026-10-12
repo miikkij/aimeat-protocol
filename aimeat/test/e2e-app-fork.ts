@@ -38,6 +38,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -102,23 +103,12 @@ function agentAuthed(opts: RequestInit = {}): RequestInit {
     return { ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${agentToken}` } };
 }
 
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name} status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(priv, name + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data?.token as string;
-}
-
 console.log('\n=== App Fork + forkable-flag E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register owner A + owner B', async () => {
-    aToken = await registerOwner(ownerAName);
-    bToken = await registerOwner(ownerBName);
+    aToken = (await registerOwner(BASE, ownerAName)).token;
+    bToken = (await registerOwner(BASE, ownerBName)).token;
     assert(!!aToken && !!bToken, 'both owner tokens issued');
 });
 
@@ -351,7 +341,7 @@ await test('GET /lineage returns the tree (self + descendants, counts)', async (
 const ownerCName = `forkownc${Date.now() % 100000}`;
 let cToken = '';
 await test('A grandchild fork appears in the ANCESTOR lineage (2 levels deep)', async () => {
-    cToken = await registerOwner(ownerCName);
+    cToken = (await registerOwner(BASE, ownerCName)).token;
     const open = await json(`/v1/apps/b-fork.html`, bAuthed({ method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
     assert(open.status === 200, `owner B enabling fork on b-fork status ${open.status}`);
     const fork = await json(`/v1/apps/${ownerBName}/b-fork.html/fork`, {

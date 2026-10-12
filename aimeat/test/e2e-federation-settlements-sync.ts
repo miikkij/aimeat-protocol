@@ -77,6 +77,7 @@ import {
     bootNode, setupOperator, addPeer, startFakePeer, modes, seen, auth, sleep,
     type NodeState,
 } from './helpers/federation-two-node.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -172,17 +173,12 @@ async function run(): Promise<void> {
     await test('operators on A and B, plus a plain owner on A', async () => {
         await setupOperator(A, `seta${stamp}`);
         await setupOperator(B, `setb${stamp}`);
-        // A second owner on A that is NOT an operator: POST /v1/owners grants the operator role only
+        // A second owner on A that is NOT an operator: POST /v1/ghii grants the operator role only
         // to the first real owner, and the admin setup door always grants it.
         const name = `plain${stamp}`;
-        const reg = await A.json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `plain owner: ${reg.status} ${JSON.stringify(reg.body)}`);
-        const timestamp = new Date().toISOString();
-        const signature = await sign(reg.body.data.private_key, name + A_ID + timestamp);
-        const tok = await A.json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-        assert(tok.body.ok === true, `plain owner token: ${JSON.stringify(tok.body)}`);
-        plainOwnerToken = tok.body.data.token;
-        assert(!(tok.body.data.roles ?? []).includes('operator'), `the second owner must not be an operator: ${JSON.stringify(tok.body.data.roles)}`);
+        const plain = await registerOwner(A.baseUrl, name);
+        plainOwnerToken = plain.token;
+        assert(!plain.roles.includes('operator'), `the second owner must not be an operator: ${JSON.stringify(plain.roles)}`);
     });
 
     await test('an agent on A, with a token of its own', async () => {

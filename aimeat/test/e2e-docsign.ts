@@ -43,6 +43,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compactVerify, decodeProtectedHeader } from 'jose';
 import { SoftAuthenticator } from './helpers/soft-authenticator.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 import { plainPdf, appendSignature, makeCert, name, newRsa } from './fixtures/docsign/pdf-sign.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -74,7 +75,7 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 const post = (path: string, token: string | null, body: unknown) =>
     json(path, { method: 'POST', headers: token ? auth(token) : {}, body: JSON.stringify(body) });
 
-/** An owner and its JWT, minted by signing with the key registration returns (no login limiter). */
+/** An owner and its JWT, from a password sign-in. */
 async function registerOwner(username: string): Promise<{ token: string; privateKey: string }> {
     let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username, display_name: username, password: PASSWORD }) });
     for (let i = 0; reg.status === 429 && i < 8; i++) {
@@ -83,9 +84,7 @@ async function registerOwner(username: string): Promise<{ token: string; private
     }
     assert(reg.status === 201, `register ${username}: ${reg.status} ${JSON.stringify(reg.body)}`);
     const priv = reg.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(username + NODE_ID + ts), Buffer.from(priv, 'base64'))).toString('base64');
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: username, timestamp: ts, signature: sig }) });
+    const tok = await ownerSignIn(BASE, username, PASSWORD);
     assert(tok.status === 200, `auth/token ${username}: ${tok.status}`);
     return { token: tok.body.data.token as string, privateKey: priv };
 }

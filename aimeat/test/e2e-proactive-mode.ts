@@ -26,6 +26,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -148,11 +149,7 @@ async function provision(base: string, stamp: number, tag: string) {
         body: JSON.stringify({ username: ownerName, display_name: 'Proactive Test', password: 'Proactive1234' }),
     });
     assert(ghii.status === 201, `ghii ${ghii.status}: ${JSON.stringify(ghii.body)}`);
-    let ts = new Date().toISOString();
-    const ownerTok = await jsonAt(base, '/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ghii.body.data.private_key, ownerName + NODE_ID + ts) }),
-    });
+    const ownerTok = await ownerSignIn(base, ownerName, 'Proactive1234');
     assert(ownerTok.body.ok === true, `owner token: ${JSON.stringify(ownerTok.body.error)}`);
     const ownerToken = ownerTok.body.data.token;
 
@@ -168,7 +165,7 @@ async function provision(base: string, stamp: number, tag: string) {
         method: 'POST', body: JSON.stringify({ client_name: 'Proactive E2E', redirect_uris: [] }),
     });
     assert(reg.status === 201, `mcp register ${reg.status}`);
-    ts = new Date().toISOString();
+    const ts = new Date().toISOString();
     const pkce = mcpPkce(base);
     const params = new URLSearchParams({
         response_type: 'code', client_id: reg.body.client_id, gaii: agentGaii,

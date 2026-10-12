@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -29,14 +30,7 @@ async function test(name: string, run: () => Promise<void>) {
 }
 
 await test('register and authenticate an isolated owner', async () => {
-    const registered = await json('/v1/owners', 'POST', { name: owner, public_key: 'placeholder' });
-    assert.equal(registered.status, 201);
-    const timestamp = new Date().toISOString();
-    const signature = Buffer.from(await ed.signAsync(new TextEncoder().encode(owner + NODE_ID + timestamp),
-        Buffer.from(registered.body.data.private_key, 'base64'))).toString('base64');
-    const login = await json('/v1/auth/token', 'POST', { owner, timestamp, signature });
-    assert.equal(login.body.ok, true);
-    token = login.body.data.token;
+    token = (await registerOwner(BASE, owner)).token;
 });
 
 const replayKey = randomUUID();
@@ -78,13 +72,7 @@ await test('an invalid key fails before the write and carries an error envelope'
 
 await test('another owner cannot replay the first owner response or write into its namespace', async () => {
     const other = `${owner}-b`;
-    const registered = await json('/v1/owners', 'POST', { name: other, public_key: 'placeholder' });
-    assert.equal(registered.status, 201);
-    const timestamp = new Date().toISOString();
-    const signature = Buffer.from(await ed.signAsync(new TextEncoder().encode(other + NODE_ID + timestamp),
-        Buffer.from(registered.body.data.private_key, 'base64'))).toString('base64');
-    const login = await json('/v1/auth/token', 'POST', { owner: other, timestamp, signature });
-    const otherToken = login.body.data.token;
+    const otherToken = (await registerOwner(BASE, other)).token;
     try {
         const refused = await json('/v1/memory', 'POST',
             { key: 'one-write', value: 'intrusion', agent: `${owner}@${NODE_ID}` }, replayKey, otherToken);

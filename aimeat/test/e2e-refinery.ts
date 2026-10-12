@@ -33,8 +33,6 @@
  *     cookie (secrets audit 2026-10-09, chapter 2).
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -45,8 +43,7 @@ import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeMailServer, type FakeMailServer } from '../scripts/lib/fake-mail-server.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 // Its own port, outside the 40251-up range sessions claim; the mailbox takes an ephemeral one.
 const PORT = process.env.E2E_REFINERY_PORT ?? '40449';
@@ -126,10 +123,7 @@ async function setupOwner(label: string): Promise<Owner> {
     method: 'POST', body: JSON.stringify({ username: name, display_name: 'Refinery Test', password: 'RefineryTest1234' }),
   });
   assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-  const ts = new Date().toISOString();
-  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(name + NODE_ID + ts),
-    Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
+  const tok = await ownerSignIn(BASE, name, 'RefineryTest1234');
   assert(tok.status === 200, `auth/token ${tok.status}`);
   return { name, gaii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }

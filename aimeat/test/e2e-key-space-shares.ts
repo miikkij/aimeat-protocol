@@ -25,6 +25,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 let NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -47,11 +48,12 @@ async function signMsg(priv: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(priv, 'base64'))).toString('base64');
 }
 async function getToken(subject: string, priv: string, isAgent: boolean): Promise<string> {
+    assert(isAgent, 'an owner signs in with registerOwner() from helpers/owner-login.js');
     const timestamp = new Date().toISOString();
-    const signature = await signMsg(priv, isAgent ? subject + timestamp : subject + NODE_ID + timestamp);
+    const signature = await signMsg(priv, subject + timestamp);
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
-        body: JSON.stringify(isAgent ? { gaii: subject, timestamp, signature } : { owner: subject, timestamp, signature }),
+        body: JSON.stringify({ gaii: subject, timestamp, signature }),
     });
     assert(body.ok === true, `token for ${subject}: ${JSON.stringify(body.error)}`);
     return body.data.token;
@@ -60,10 +62,10 @@ async function getToken(subject: string, priv: string, isAgent: boolean): Promis
 interface Party { name: string; ghii: string; ownerToken: string; gaii: string; agentToken: string }
 
 async function makeParty(name: string, agentScopes: string[]): Promise<Party> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const owner = await registerOwner(BASE, name);
+    const reg = owner.registration;
     if (typeof reg.body.node === 'string' && reg.body.node) NODE_ID = reg.body.node;
-    const ownerToken = await getToken(name, reg.body.data.private_key, false);
+    const ownerToken = owner.token;
     const ag = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ name: `${name}bot`, owner: name, capabilities: ['memory'], scopes: agentScopes }),

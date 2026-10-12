@@ -60,6 +60,7 @@ import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -111,13 +112,8 @@ async function setup(label: string, mode: string, base: string = BASE) {
     let r = await reg();
     for (let i = 0; r.status === 429 && i < 8; i++) { await new Promise(res => setTimeout(res, 1500)); r = await reg(); }
     assert(r.status === 201, `ghii ${r.status}: ${JSON.stringify(r.body?.error)}`);
-    const ownerKey = r.body.data.private_key as string;
 
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await sign(ownerKey, owner + NODE_ID + ts) }),
-    }, base);
+    const tok = await ownerSignIn(base, owner, 'McpTaskFlow1234');
     const ownerToken = tok.body.data.token as string;
 
     const ag = await json('/v1/agents', {

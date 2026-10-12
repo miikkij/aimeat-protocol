@@ -46,6 +46,7 @@ import { NOT_IN_WILDCARD } from '../public/views/profile/agents/scope-model.js';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -145,11 +146,7 @@ async function setup() {
     for (let i = 0; r.status === 429 && i < 8; i++) { await new Promise(res => setTimeout(res, 1500)); r = await reg(); }
     assert(r.status === 201, `ghii ${r.status}: ${JSON.stringify(r.body?.error)}`);
 
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await sign(r.body.data.private_key, owner + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, owner, 'SseParity1234');
     const ownerToken = tok.body.data.token as string;
 
     const ag = await json('/v1/agents', {

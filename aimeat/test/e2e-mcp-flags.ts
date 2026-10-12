@@ -45,6 +45,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -105,7 +106,6 @@ async function mcpRpc(method: string, params: Record<string, any> = {}, id: numb
 
 // ─── State ───
 let ownerToken = '';
-let ownerPrivKey = '';
 let agentPrivKey = '';
 let agentGaii = '';
 const ownerName = `mcpflg${Date.now()}`;
@@ -125,18 +125,10 @@ await test('Register GHII identity', async () => {
         method: 'POST',
         body: JSON.stringify({ username: ownerName, display_name: 'MCP Flags Test', password: 'McpFlg1234' }),
     });
-    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-});
+    assert(status === 201, `ghii status ${status}: ${JSON.stringify(body)}`);});
 
 await test('Owner auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName, 'McpFlg1234');
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });

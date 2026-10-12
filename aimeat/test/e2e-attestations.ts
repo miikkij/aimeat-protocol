@@ -48,6 +48,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -63,12 +64,7 @@ async function makeOwner(name: string): Promise<{ token: string; ghii: string; p
   });
   assert(reg.status === 201, `register ${name}: ${reg.status}`);
   const privKey = reg.body.data.private_key;
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-  const tok = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: name, timestamp, signature }),
-  });
+  const tok = await ownerSignIn(BASE, name, 'AttestTest1234');
   assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
   return { token: tok.body.data.token, ghii: `${name}@${NODE_ID}`, privKey };
 }

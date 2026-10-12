@@ -11,7 +11,6 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-revert
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
     try { await fn(); passed++; console.log(`  ✅ ${name}`); }
@@ -23,10 +22,7 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
 }
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(p: string, m: string) { return Buffer.from(await ed.signAsync(new TextEncoder().encode(m), Buffer.from(p, 'base64'))).toString('base64'); }
+import { ownerSignIn } from './helpers/owner-login.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 console.log('\n=== AIMEAT Workspace Revert-to-Draft E2E ===\n');
@@ -45,8 +41,7 @@ await test('Setup: owner + org + workspace + a published record (t1 v1)', async 
     ownerName = 'revtest' + Date.now();
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'Rev', password: 'Rev12345' }) });
     assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await sign(reg.body.data.private_key, ownerName + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, ownerName, 'Rev12345');
     token = tk.body.data.token;
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'Rev Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
     orgId = o.body.data.organism.id;
@@ -94,8 +89,7 @@ await test('5. revert with nothing published → 404', async () => {
 await test('6. a non-member cannot revert (403)', async () => {
     const other = ownerName + 'x';
     const reg2 = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: other, display_name: 'X', password: 'Rev12345' }) });
-    const ts = new Date().toISOString();
-    const tk2 = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: other, timestamp: ts, signature: await sign(reg2.body.data.private_key, other + NODE_ID + ts) }) });
+    const tk2 = await ownerSignIn(BASE, other, 'Rev12345');
     // First republish a draft so a fresh draft does not block — but a non-member is gated before that anyway.
     const r = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: auth(tk2.body.data.token), body: JSON.stringify({ ws: WS, namespace: NS, id: 't1' }) });
     assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body)}`);
@@ -113,8 +107,7 @@ await test('7. an organism member with no workspace grant cannot revert', async 
     const joiner = ownerName + 'j';
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: joiner, display_name: 'J', password: 'Rev12345' }) });
     assert(reg.status === 201, `joiner register: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: joiner, timestamp: ts, signature: await sign(reg.body.data.private_key, joiner + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, joiner, 'Rev12345');
     const jToken = tk.body.data.token;
     assert(typeof jToken === 'string' && jToken.length > 0, 'joiner token');
 

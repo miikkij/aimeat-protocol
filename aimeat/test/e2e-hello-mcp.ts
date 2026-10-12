@@ -23,6 +23,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -67,18 +68,6 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function registerOwner(name: string): Promise<{ token: string }> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { token: tok.body.data.token as string };
-}
-
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
     ({ ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${token}` } });
 
@@ -99,8 +88,8 @@ console.log('\n=== Hello MCP E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register two owners + an agent under owner A', async () => {
-    tokenA = (await registerOwner(ownerA)).token;
-    tokenB = (await registerOwner(ownerB)).token;
+    tokenA = (await registerOwner(BASE, ownerA)).token;
+    tokenB = (await registerOwner(BASE, ownerB)).token;
     const { status, body } = await json('/v1/agents', auth(tokenA, {
         method: 'POST',
         body: JSON.stringify({ name: agentName, owner: ownerA, capabilities: ['actions'], scopes: ['*'], model: 'test-model' }),

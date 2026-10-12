@@ -12,12 +12,9 @@
  *   v1.0.0 — 2026-07-07 — initial: near-duplicate detection, fork exclusion, watermark hit, authz.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const A = `scana${Date.now() % 100000}`;   // first owner → operator
 const B = `scanb${Date.now() % 100000}`;
 const C = `scanc${Date.now() % 100000}`;
@@ -37,14 +34,9 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
 }
-async function sign(priv: string, m: string) { return Buffer.from(await ed.signAsync(new TextEncoder().encode(m), Buffer.from(priv, 'base64'))).toString('base64'); }
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 async function tok(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const t = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
-    return t.body.data.token;
+    return (await registerOwner(BASE, name)).token;
 }
 const auth = (tk: string, o: RequestInit = {}): RequestInit => ({ ...o, headers: { ...((o.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${tk}` } });
 const pairMatches = (pairs: any[], x: string, y: string) => pairs.some((p: any) => (p.a === x && p.b === y) || (p.a === y && p.b === x));

@@ -24,6 +24,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -47,12 +48,6 @@ const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 async function signMsg(privB64: string, message: string): Promise<string> {
   return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
 }
-async function ownerToken(owner: string, priv: string): Promise<string> {
-  const ts = new Date().toISOString();
-  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp: ts, signature: await signMsg(priv, owner + NODE_ID + ts) }) });
-  assert(body.ok === true, `owner token: ${JSON.stringify(body.error)}`);
-  return body.data.token;
-}
 async function agentToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(priv, gaii + ts) }) });
@@ -64,9 +59,7 @@ interface Agent { name: string; gaii: string; priv: string; token: string }
 
 async function newOwner(prefix: string): Promise<{ name: string; token: string }> {
   const name = `${prefix}${Date.now()}`;
-  const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-  assert(status === 201, `owner ${status}: ${JSON.stringify(body)}`);
-  return { name, token: await ownerToken(name, body.data.private_key) };
+  return { name, token: (await registerOwner(BASE, name)).token };
 }
 async function newAgent(owner: { name: string; token: string }, name: string, scopes: string[], mode?: string): Promise<Agent> {
   const { status, body } = await json('/v1/agents', {

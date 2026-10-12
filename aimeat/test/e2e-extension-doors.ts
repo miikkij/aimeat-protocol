@@ -34,9 +34,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
 
 const MASK = '••••••••';
@@ -164,7 +164,7 @@ await test('register owner (operator)', async () => {
   const { status, body } = await json('/v1/admin/setup/register', {
     method: 'POST',
     headers: { 'X-Admin-Password': ADMIN_PW },
-    body: JSON.stringify({ name: ownerName }),
+    body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
   });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   ownerPrivKey = body.private_key;
@@ -172,33 +172,19 @@ await test('register owner (operator)', async () => {
 });
 
 await test('owner auth token', async () => {
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(ownerPrivKey, ownerName + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-  });
+  const { body } = await ownerSignIn(BASE, ownerName);
   assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
   ownerToken = body.data?.token;
   assert(typeof ownerToken === 'string', 'owner token');
 });
 
 await test('register a PLAIN second owner — not another operator', async () => {
-  // POST /v1/owners, never /v1/admin/setup/register: the setup route grants the operator role, and
+  // POST /v1/ghii, never /v1/admin/setup/register: the setup route grants the operator role, and
   // canManageInstalledExt lets an operator manage anyone's extension BY DESIGN. A second operator
   // would pass every refusal below and the block would prove nothing.
-  const reg = await json('/v1/owners', {
-    method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }),
-  });
-  assert(reg.status === 201, `status ${reg.status}: ${JSON.stringify(reg.body)}`);
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(reg.body.data.private_key, strangerName + NODE_ID + timestamp);
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST', body: JSON.stringify({ owner: strangerName, timestamp, signature }),
-  });
-  assert(body.ok === true, `stranger token: ${JSON.stringify(body.error)}`);
-  strangerToken = body.data?.token;
-  assert(!(body.data?.roles ?? []).includes('operator'), 'the second owner must not be an operator');
+  const stranger = await registerOwner(BASE, strangerName);
+  strangerToken = stranger.token;
+  assert(!stranger.roles.includes('operator'), 'the second owner must not be an operator');
 });
 
 await test('register a NARROW agent — memory:read only, no ext:write', async () => {

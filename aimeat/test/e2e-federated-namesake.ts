@@ -48,6 +48,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as ed from '@noble/ed25519';
 import { parse as parseYaml } from 'yaml';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -130,13 +131,8 @@ function startHomeNode(): Promise<{ server: Server; url: string }> {
 }
 
 async function registerOwner(name: string): Promise<{ ghii: string; token: string }> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, name + NODE_ID + ts);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { ghii: `${name}@${NODE_ID}`, token: tok.body.data.token };
+    const owner = await registerWithPassword(BASE, name);
+    return { ghii: `${name}@${NODE_ID}`, token: owner.token };
 }
 
 async function sendDm(fromToken: string, to: string, body: string): Promise<{ id: string; conversationId: string }> {

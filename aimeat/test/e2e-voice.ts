@@ -11,28 +11,22 @@
  */
 import { createServer } from 'node:http';
 import { createHash, randomBytes } from 'node:crypto';
-import * as ed from '@noble/ed25519';
-ed.hashes.sha512 = m => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 let passed = 0, failed = 0, providerCalls = 0;
 async function test(name: string, fn: () => Promise<void>) {
   try { await fn(); passed++; console.log(`PASS ${name}`); }
   catch (error) { failed++; console.error(`FAIL ${name}: ${String(error)}`); }
 }
 function assert(value: unknown, message: string): asserts value { if (!value) throw new Error(message); }
-async function sign(key: string, text: string) { return Buffer.from(await ed.signAsync(new TextEncoder().encode(text), Buffer.from(key, 'base64'))).toString('base64'); }
 async function call(path: string, body?: unknown, token?: string, method = 'POST') {
   const response = await fetch(BASE + path, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
   const text = await response.text();
   return { status: response.status, text, data: response.headers.get('content-type')?.includes('json') && !response.headers.get('content-type')?.includes('ndjson') ? JSON.parse(text) : null };
 }
 async function owner(prefix: string) {
-  const name = prefix + Date.now(); const registration = await call('/v1/owners', { name, public_key: 'placeholder' });
-  assert(registration.status === 201, registration.text);
-  const timestamp = new Date().toISOString();
-  const token = await call('/v1/auth/token', { owner: name, timestamp, signature: await sign(registration.data.data.private_key, name + NODE + timestamp) });
-  assert(token.status === 200, token.text); return { name, token: token.data.data.token as string };
+  const name = prefix + Date.now(); const registered = await registerOwner(BASE, name);
+  return { name, token: registered.token };
 }
 async function agent(owner: { name: string; token: string }, scopes: string[]) {
   const started = await call('/v1/agents/device-authorize', { agent_name: 'voice' + Date.now(), owner: owner.name });

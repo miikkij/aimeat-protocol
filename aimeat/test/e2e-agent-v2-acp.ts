@@ -23,10 +23,10 @@ import * as ed from '@noble/ed25519';
 import { client as acpClient, ndJsonStream, type Stream, type SessionNotification } from '@agentclientprotocol/sdk';
 import { AimeatClient } from '../src/cli/connect/api-client.js';
 import { buildAimeatAcpAgent } from '../src/cli/connect/acp/agent.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -55,11 +55,7 @@ async function setupOwner(label: string) {
         r = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: owner, display_name: 'T', password: 'AcpPass123456789' }) });
     }
     assert(r.status === 201, `ghii ${r.status}: ${JSON.stringify(r.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await sign(r.body.data.private_key, owner + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, owner, 'AcpPass123456789');
     return { owner, ownerToken: tok.body.data.token as string };
 }
 

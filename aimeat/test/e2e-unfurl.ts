@@ -11,14 +11,11 @@
  * @version-history
  *   v1.0.0 — 2026-07-21 — Initial: auth/validation, OG metadata happy path, image proxy, SSRF block.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { createServer, type Server } from 'node:http';
 import { AddressInfo } from 'node:net';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerName = `unftest${Date.now() % 100000}`;
 
 let passed = 0;
@@ -34,10 +31,6 @@ async function json(path: string, opts: RequestInit = {}) {
   const ct = res.headers.get('content-type') ?? '';
   const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
   return { status: res.status, body };
-}
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-  const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-  return Buffer.from(sig).toString('base64');
 }
 
 let ownerToken = '';
@@ -84,12 +77,7 @@ console.log('\n=== Unfurl (link preview) E2E Tests ===\n');
 await startFixture();
 
 await test('Register owner + get token', async () => {
-  const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  const ts = new Date().toISOString();
-  const sig = await signMsg(body.data.private_key, ownerName + NODE_ID + ts);
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: sig }) });
-  ownerToken = tok.body.data?.token;
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
   assert(typeof ownerToken === 'string', 'got owner token');
 });
 

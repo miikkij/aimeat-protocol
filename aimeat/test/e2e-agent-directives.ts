@@ -2,7 +2,6 @@
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-directives.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -44,6 +43,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -53,13 +53,11 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
+    const message = gaii + timestamp;
     const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: ownerOrGaii, timestamp, signature }
-        : { owner: ownerOrGaii, timestamp, signature };
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -83,13 +81,9 @@ console.log('\n=== AIMEAT Agent Directives E2E Test ===\n');
 console.log('Setup -- Owner & Agent');
 
 await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    const owner = await registerOwner(BASE, ownerName);
+    ownerPrivKey = owner.privateKey;
+    ownerToken = owner.token;
 });
 
 await test('Register agent', async () => {
@@ -109,7 +103,7 @@ await test('Register agent', async () => {
 });
 
 await test('Agent auth token', async () => {
-    agentToken = await getToken(agentGaii, agentPrivKey, true);
+    agentToken = await getToken(agentGaii, agentPrivKey);
     assert(typeof agentToken === 'string' && agentToken.length > 0, 'got agent token');
 });
 
@@ -266,7 +260,7 @@ await test('5c. data-access/overview owner-or-self: a sibling agent gets 403', a
         body: JSON.stringify({ name: 'dabot2', owner: ownerName, capabilities: ['memory'] }),
     });
     assert(rStatus === 201, `register agent2 ${rStatus}: ${JSON.stringify(rBody)}`);
-    const a2Token = await getToken(rBody.data.agent.gaii, rBody.data.private_key, true);
+    const a2Token = await getToken(rBody.data.agent.gaii, rBody.data.private_key);
     const { status } = await json(`/v1/agents/${agentName}/data-access/overview`, {
         headers: { Authorization: `Bearer ${a2Token}` },
     });

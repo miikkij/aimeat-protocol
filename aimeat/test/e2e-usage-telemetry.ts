@@ -34,13 +34,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner } from './helpers/owner-login.js';
 
 console.log('\n=== AIMEAT Usage Telemetry E2E ===\n');
 
@@ -52,16 +46,7 @@ const authOp = () => ({ Authorization: `Bearer ${opToken}` });
 const authOther = () => ({ Authorization: `Bearer ${otherToken}` });
 
 async function registerAndToken(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const priv = reg.body.data.private_key;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(priv, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token;
+    return (await registerOwner(BASE, name)).token;
 }
 
 await test('Setup: first owner is auto-operator; a second is not', async () => {

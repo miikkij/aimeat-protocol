@@ -15,7 +15,6 @@
  *     gained a workflow_run_started row for a run that never started.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -40,13 +39,14 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent = false): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
   const timestamp = new Date().toISOString();
-  const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
+  const message = gaii + timestamp;
   const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privKey, 'base64'))).toString('base64');
-  const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature: sig } : { owner: ownerOrGaii, timestamp, signature: sig };
+  const payload = { gaii, timestamp, signature: sig };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -98,12 +98,8 @@ async function run() {
   console.log('\n=== AIMEAT Workflow Parallel / Skip E2E ===\n');
 
   await test('Register owner, a second owner, and an agent without workflow:write', async () => {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(status === 201, `owner ${status}: ${JSON.stringify(body)}`);
-    auth = { Authorization: `Bearer ${await getToken(ownerName, body.data.private_key)}` };
-    const other = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherOwnerName, public_key: 'placeholder' }) });
-    assert(other.status === 201, `second owner ${other.status}: ${JSON.stringify(other.body)}`);
-    otherAuth = { Authorization: `Bearer ${await getToken(otherOwnerName, other.body.data.private_key)}` };
+    auth = { Authorization: `Bearer ${(await registerOwner(BASE, ownerName)).token}` };
+    otherAuth = { Authorization: `Bearer ${(await registerOwner(BASE, otherOwnerName)).token}` };
     // Scopes are baked into a token at mint time: an agent with memory:read only, so the fence on
     // the run door is proven by a principal that is otherwise this owner's own.
     const reg = await json('/v1/agents', {
@@ -111,7 +107,7 @@ async function run() {
       body: JSON.stringify({ name: 'pwf-narrow', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
     });
     assert(reg.status === 201, `narrow agent ${reg.status}: ${JSON.stringify(reg.body)}`);
-    narrowAuth = { Authorization: `Bearer ${await getToken(reg.body.data.agent.gaii, reg.body.data.private_key, true)}` };
+    narrowAuth = { Authorization: `Bearer ${await getToken(reg.body.data.agent.gaii, reg.body.data.private_key)}` };
   });
 
   await test('PUT refuses parallel beside fresh, and says why', async () => {

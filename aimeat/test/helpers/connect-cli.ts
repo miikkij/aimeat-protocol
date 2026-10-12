@@ -27,6 +27,7 @@
 
 import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './node-entry.js';
+import { registerOwner } from './owner-login.js';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -178,11 +179,10 @@ async function signMsg(privB64: string, message: string): Promise<string> {
 
 async function getAuthToken(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
+  assert(isAgent, 'getAuthToken signs in agents only; an owner signs in with registerOwner (./owner-login.ts)');
+  const message = idOrOwner + ts;
   const signature = await signMsg(priv, message);
-  const payload = isAgent
-    ? { gaii: idOrOwner, timestamp: ts, signature }
-    : { owner: idOrOwner, timestamp: ts, signature };
+  const payload = { gaii: idOrOwner, timestamp: ts, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -197,11 +197,7 @@ export interface NodeAccount {
 }
 
 export async function registerOwnerAndAgent(ownerName: string, agentName: string): Promise<NodeAccount> {
-  const reg = await json('/v1/owners', {
-    method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-  });
-  assert(reg.status === 201, `owner status ${reg.status}: ${JSON.stringify(reg.body)}`);
-  const ownerToken = await getAuthToken(ownerName, reg.body.data.private_key, false);
+  const ownerToken = (await registerOwner(BASE, ownerName)).token;
   const ag = await json('/v1/agents', {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
     body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*'] }),

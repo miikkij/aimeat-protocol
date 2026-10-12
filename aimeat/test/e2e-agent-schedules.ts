@@ -42,26 +42,25 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
     return Buffer.from(sig).toString('base64');
 }
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
+    const message = gaii + timestamp;
     const signature = await signMsg(privKey, message);
-    const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature } : { owner: ownerOrGaii, timestamp, signature };
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     return body.data.token;
 }
 async function registerOwnerAndAgent(prefix: string, agentName: string) {
     const ownerName = `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `owner reg: ${JSON.stringify(reg.body)}`);
-    const ownerToken = await getToken(ownerName, reg.body.data.private_key, false);
+    const ownerToken = (await registerOwner(BASE, ownerName)).token;
     const ar = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory', 'actions'] }),
@@ -76,7 +75,7 @@ async function registerAgent(ownerName: string, ownerToken: string, agentName: s
     });
     assert(ar.status === 201, `agent reg: ${JSON.stringify(ar.body)}`);
     const gaii = ar.body.data.agent.gaii;
-    const token = await getToken(gaii, ar.body.data.private_key, true);
+    const token = await getToken(gaii, ar.body.data.private_key);
     return { agentName, gaii, token };
 }
 
@@ -602,7 +601,7 @@ async function scopedAgent(ownerName: string, ownerToken: string, agentName: str
         body: JSON.stringify({ name: agentName, owner: ownerName, scopes }),
     });
     assert(ar.status === 201, `agent reg: ${JSON.stringify(ar.body)}`);
-    return getToken(ar.body.data.agent.gaii, ar.body.data.private_key, true);
+    return getToken(ar.body.data.agent.gaii, ar.body.data.private_key);
 }
 
 const promptAgent = await scopedAgent(o1.ownerName, o1.ownerToken, 'promptbot', ['task:write', 'workflow:read', 'workflow:write', 'ai:use']);

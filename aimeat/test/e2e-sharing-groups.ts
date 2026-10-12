@@ -42,31 +42,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
     throw new Error('unreachable');
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
-
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: ownerOrGaii, timestamp, signature }
-        : { owner: ownerOrGaii, timestamp, signature };
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-    });
-    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-    return body.data.token;
-}
+import { registerOwner } from './helpers/owner-login.js';
 
 // ─── State ───
 const ownerName = `sgowner${Date.now()}`;
@@ -89,33 +65,21 @@ console.log('\n=== AIMEAT Sharing Groups E2E Test ===\n');
 console.log('Setup -- Owners');
 
 await test('Register owner 1', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    const owner = await registerOwner(BASE, ownerName);
+    ownerPrivKey = owner.privateKey;
+    ownerToken = owner.token;
 });
 
 await test('Register owner 2', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: owner2Name, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    owner2PrivKey = body.data.private_key;
-    owner2Token = await getToken(owner2Name, owner2PrivKey, false);
+    const owner = await registerOwner(BASE, owner2Name);
+    owner2PrivKey = owner.privateKey;
+    owner2Token = owner.token;
 });
 
 await test('Register owner 3 (non-member)', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: owner3Name, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    owner3PrivKey = body.data.private_key;
-    owner3Token = await getToken(owner3Name, owner3PrivKey, false);
+    const owner = await registerOwner(BASE, owner3Name);
+    owner3PrivKey = owner.privateKey;
+    owner3Token = owner.token;
 });
 
 // ─── Phase 1: Create a sharing group ───

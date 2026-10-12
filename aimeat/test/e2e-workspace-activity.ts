@@ -12,7 +12,6 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-activity
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
     try { await fn(); passed++; console.log(`  ✅ ${name}`); }
@@ -24,10 +23,7 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
 }
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(p: string, m: string) { return Buffer.from(await ed.signAsync(new TextEncoder().encode(m), Buffer.from(p, 'base64'))).toString('base64'); }
+import { ownerSignIn } from './helpers/owner-login.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 console.log('\n=== AIMEAT Workspace Activity E2E ===\n');
@@ -37,8 +33,7 @@ const WS = 'ws-act1', root = () => `organism.${orgId}.w.${WS}`;
 await test('Setup owner + org + workspace + history (a draft + a published version)', async () => {
     ownerName = `wsact${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'Act', password: 'Act12345' }) });
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await sign(reg.body.data.private_key, ownerName + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, ownerName, 'Act12345');
     token = tk.body.data.token;
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'Act Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
     orgId = o.body.data.organism.id;
@@ -84,8 +79,7 @@ await test('3. a published instance (.version.N + .latest) is NOT double-counted
 
 await test('4. non-member is denied', async () => {
     const reg2 = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName + 'x', display_name: 'X', password: 'Act12345' }) });
-    const ts = new Date().toISOString();
-    const tk2 = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName + 'x', timestamp: ts, signature: await sign(reg2.body.data.private_key, ownerName + 'x' + NODE_ID + ts) }) });
+    const tk2 = await ownerSignIn(BASE, ownerName + 'x', 'Act12345');
     const r = await json(`/v1/organisms/${orgId}/workspace/activity?ws=${WS}`, { headers: auth(tk2.body.data.token) });
     assert(r.status === 403, `expected 403, got ${r.status}`);
     await json(`/v1/owners/${ownerName}x`, { method: 'DELETE', headers: auth(tk2.body.data.token) });

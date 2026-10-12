@@ -41,6 +41,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { APP_FRAME_SANDBOX } from '../src/utils/app-csp.js';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -103,17 +104,6 @@ const aAuthed = (o: RequestInit = {}) => bearer(aToken)(o);
 const bAuthed = (o: RequestInit = {}) => bearer(bToken)(o);
 const agentAuthed = (o: RequestInit = {}) => bearer(agentToken)(o);
 
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name} status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(priv, name + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data?.token as string;
-}
-
 const appPath = `/v1/apps/${ownerAName}/${FILE}`;
 async function patchA(body: unknown) {
     return json(`/v1/apps/${FILE}`, aAuthed({ method: 'PATCH', body: JSON.stringify(body) }));
@@ -127,8 +117,8 @@ console.log('\n=== App legal pages + audit log E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register owner A + owner B', async () => {
-    aToken = await registerOwner(ownerAName);
-    bToken = await registerOwner(ownerBName);
+    aToken = (await registerOwner(BASE, ownerAName)).token;
+    bToken = (await registerOwner(BASE, ownerBName)).token;
     assert(!!aToken && !!bToken, 'both owner tokens issued');
 });
 

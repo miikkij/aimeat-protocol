@@ -18,7 +18,6 @@
 // Run: cd aimeat && pnpm exec tsx test/e2e-inbox-cursor.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -60,6 +59,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -69,13 +69,10 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, privKey: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent
-        ? { gaii: ownerOrGaii, timestamp, signature }
-        : { owner: ownerOrGaii, timestamp, signature };
+    const signature = await signMsg(privKey, gaii + timestamp);
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -86,7 +83,6 @@ async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean):
 
 // ─── State ───
 const ownerName = `cursorowner${Date.now()}`;
-let ownerPrivKey = '';
 let ownerToken = '';
 let agentGaii = '';
 let agentToken = '';
@@ -99,13 +95,7 @@ console.log('\n=== AIMEAT Inbox Cursor E2E Test ===\n');
 console.log('Setup -- Owner & Agent');
 
 await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
-    ownerToken = await getToken(ownerName, ownerPrivKey, false);
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
 });
 
 await test('Register agent', async () => {
@@ -125,7 +115,7 @@ await test('Register agent', async () => {
 });
 
 await test('Agent auth token', async () => {
-    agentToken = await getToken(agentGaii, agentPrivKey, true);
+    agentToken = await getToken(agentGaii, agentPrivKey);
     assert(typeof agentToken === 'string' && agentToken.length > 0, 'got agent token');
 });
 
@@ -392,17 +382,13 @@ let otherAgentToken = '';
 let otherOwnerToken = '';
 
 await test('7a. Register a second owner with an agent of their own', async () => {
-    const reg = await json('/v1/owners', {
-        method: 'POST', body: JSON.stringify({ name: otherOwner, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `owner ${reg.status}: ${JSON.stringify(reg.body)}`);
-    otherOwnerToken = await getToken(otherOwner, reg.body.data.private_key, false);
+    otherOwnerToken = (await registerOwner(BASE, otherOwner)).token;
     const ag = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${otherOwnerToken}` },
         body: JSON.stringify({ name: otherAgentName, owner: otherOwner, capabilities: ['memory'] }),
     });
     assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body)}`);
-    otherAgentToken = await getToken(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+    otherAgentToken = await getToken(ag.body.data.agent.gaii, ag.body.data.private_key);
 });
 
 await test('7b. Another owner\'s agent cannot poll this inbox', async () => {

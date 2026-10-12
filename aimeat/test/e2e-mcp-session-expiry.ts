@@ -35,6 +35,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -86,11 +87,7 @@ const setIdle = (token: string, minutes: number) =>
 
 await test('Setup: operator owner + agent + MCP access token', async () => {
     const owner = `mexp${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp: ts, signature: await sign(reg.body.data.private_key, owner + NODE_ID + ts) }) });
-    ownerToken = tok.body.data.token;
+    ownerToken = (await registerOwner(BASE, owner)).token;
 
     const ag = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -116,10 +113,7 @@ await test('Setup: operator owner + agent + MCP access token', async () => {
     assert(token.status === 200, `mcp token: ${token.status}`);
     mcpAccessToken = token.body.access_token;
 
-    const reg2 = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: `${owner}b`, public_key: 'placeholder' }) });
-    const ts2 = new Date().toISOString();
-    const tok2 = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: `${owner}b`, timestamp: ts2, signature: await sign(reg2.body.data.private_key, `${owner}b` + NODE_ID + ts2) }) });
-    nonOpToken = tok2.body.data.token;
+    nonOpToken = (await registerOwner(BASE, `${owner}b`)).token;
 });
 
 await test('The idle knob is operator-only (non-operator 403, anonymous 401)', async () => {

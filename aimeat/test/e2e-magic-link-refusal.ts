@@ -39,11 +39,9 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
-import * as ed from '@noble/ed25519';
 import { waitForServer } from './helpers/wait-for-server.js';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { seedPassword } from './helpers/seed-password.js';
 
 const PORT = Number(process.env.E2E_MAGIC_LINK_PORT ?? 40289);
 const SMTP_PORT = PORT + 1;
@@ -80,15 +78,23 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
 }
 const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
 
-/** Sign the owner-auth message with the key registration handed back once. */
-async function ownerToken(owner: string, privB64: string): Promise<{ status: number; token: string }> {
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(owner + NODE_ID + timestamp), Buffer.from(privB64, 'base64'));
-    const r = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
+/**
+ * A session for an account the web door made. It has no password, and the owner-key sign-in that
+ * used to open it is removed in 4.0.0, so the account gets a password in this node's database and
+ * signs in with it (helpers/seed-password.ts). Whether the account KEY survived is read separately:
+ * the public key the node holds against the one registration returned (storedPublicKey).
+ */
+async function ownerToken(owner: string): Promise<{ status: number; token: string }> {
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'magic.db') });
+    const r = await ownerSignIn(BASE, owner);
     return { status: r.status, token: (r.body?.data?.token ?? '') as string };
+}
+
+/** The account public key the node holds, read with the account's own session. */
+async function storedPublicKey(token: string): Promise<string> {
+    const profile = await json('/v1/ghii/me', { headers: { Authorization: `Bearer ${token}` } });
+    assert(profile.status === 200, `GET /v1/ghii/me ${profile.status}`);
+    return String(profile.body?.data?.public_key ?? '');
 }
 
 // ─── A mailbox, not a mock ────────────────────────────────────────────────────
@@ -244,8 +250,8 @@ async function run() {
             body: JSON.stringify({ username: opName, display_name: 'Magic Link Operator', email: `${opName}@aimeat.test` }),
         });
         assert(reg.status === 201, `operator register ${reg.status}: ${JSON.stringify(reg.body).slice(0, 300)}`);
-        // register-web sets no password; the key it returns once is how this account signs in.
-        const tok = await ownerToken(opName, reg.body.data.private_key);
+        // register-web sets no password; ownerToken gives the account one and signs in with it.
+        const tok = await ownerToken(opName);
         assert(tok.status === 200 && tok.token.length > 0, `operator token ${tok.status}`);
         opToken = tok.token;
     });
@@ -274,9 +280,10 @@ async function run() {
         assert(verify.body.data.verification_level === 1, `expected level 1, got ${verify.body.data.verification_level}`);
     });
 
-    await test("the owner's key works, which is what the rest of this suite is about", async () => {
-        const r = await ownerToken(victimName, victimPrivKey);
-        assert(r.status === 200 && r.token.length > 0, `owner key must authenticate: ${r.status}`);
+    await test("the owner's key is the one the node holds, which is what the rest of this suite is about", async () => {
+        const r = await ownerToken(victimName);
+        assert(r.status === 200 && r.token.length > 0, `owner sign-in: ${r.status}`);
+        assert(await storedPublicKey(r.token) === victimPublicKey, 'the node must hold the public key registration returned');
         const me = await json(`/v1/ghii/${encodeURIComponent(`${victimName}@${NODE_ID}`)}`);
         assert(me.status === 200, `public profile ${me.status}`);
     });
@@ -319,12 +326,12 @@ async function run() {
         const en = await json(`/v1/admin/owners/${victimName}/enable`, { method: 'POST', headers: bearer(opToken) });
         assert(en.status === 200, `enable ${en.status}: ${JSON.stringify(en.body).slice(0, 300)}`);
 
-        const r = await ownerToken(victimName, victimPrivKey);
-        assert(r.status === 200 && r.token.length > 0,
-            `the owner's key must still authenticate after a REFUSED magic link, got ${r.status}. `
-            + 'This is the whole finding: the re-key ran before the refusal, so a request that was '
-            + 'denied still replaced the key and handed the replacement to nobody.');
+        const r = await ownerToken(victimName);
+        assert(r.status === 200 && r.token.length > 0, `owner sign-in after re-enable: ${r.status}`);
 
+        // This is the whole finding: the re-key ran before the refusal, so a request that was denied
+        // still replaced the key and handed the replacement to nobody. The key the person holds is
+        // theirs only while the node still holds its public half.
         const profile = await json('/v1/ghii/me', { headers: bearer(r.token) });
         assert(profile.status === 200 && profile.body.data.public_key === victimPublicKey,
             `the stored public key must be the one registration returned: ${profile.body?.data?.public_key?.slice(0, 20)} vs ${victimPublicKey.slice(0, 20)}`);
@@ -353,8 +360,7 @@ async function run() {
     // Secaudit 2026-10, AUTH-3: the spend was a read and a write, so two clicks at once both signed in,
     // and a link stayed good after the person moved their account to another address.
     // The JSON endpoint no longer re-keys the owner or answers an owner key (secrets audit 2026-10-09,
-    // S2): the key the account registered with stays the one that signs in, and the next case uses it.
-    let ownerKeyNow = '';
+    // S2): the key the account registered with stays the account's key.
     await test('a link is spent once when it is opened four times at the same moment', async () => {
         inbox.length = 0;
         const r = await json('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify({ email: victimEmail }) });
@@ -367,9 +373,9 @@ async function run() {
         // signs in as the owner and operator past two-step sign-in. A link proves a mailbox only.
         assert(won[0]!.body.data.owner_private_key === undefined, 'the program endpoint must not hand out an owner key');
         assert(!JSON.stringify(won[0]!.body).includes(victimPrivKey), 'nor the registered one');
-        const still = await ownerToken(victimName, victimPrivKey);
-        assert(still.status === 200, `the registered owner key still signs in after the link: ${still.status}`);
-        ownerKeyNow = victimPrivKey;
+        const still = await ownerToken(victimName);
+        assert(still.status === 200, `owner sign-in after the link: ${still.status}`);
+        assert(await storedPublicKey(still.token) === victimPublicKey, 'the registered owner key is still the account key after the link');
     });
 
     await test('a link mailed before the person changed their address no longer signs in', async () => {
@@ -377,7 +383,7 @@ async function run() {
         const r = await json('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify({ email: victimEmail }) });
         assert(r.status === 200, `magic-link ${r.status}`);
         const stale = /magic-link\/open\?token=([a-f0-9]+)/.exec(await waitForMail(victimEmail, /magic-link\/open\?token=/))![1];
-        const tok = await ownerToken(victimName, ownerKeyNow);
+        const tok = await ownerToken(victimName);
         assert(tok.status === 200, `owner token ${tok.status}`);
         const moved = await json('/v1/ghii', { method: 'PUT', headers: bearer(tok.token), body: JSON.stringify({ notification_email: `moved.${victimEmail}` }) });
         assert(moved.status === 200, `address change ${moved.status}: ${JSON.stringify(moved.body).slice(0, 300)}`);

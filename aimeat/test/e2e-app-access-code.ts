@@ -21,13 +21,9 @@
  *   v1.0.0 — 2026-08-07 — Initial.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerA = `aca${Date.now() % 100000}`;
 const ownerB = `acb${Date.now() % 100000}`;
 const FILENAME = 'code-test-app.html';
@@ -61,24 +57,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
-
-async function registerOwner(name: string): Promise<{ token: string }> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { token: tok.body.data.token as string };
-}
-
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
     ({ ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${token}` } });
 
@@ -91,8 +69,8 @@ console.log('\n=== App Access-Code E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register owners A + B, publish a protected app under A', async () => {
-    tokenA = (await registerOwner(ownerA)).token;
-    tokenB = (await registerOwner(ownerB)).token;
+    tokenA = (await registerOwner(BASE, ownerA)).token;
+    tokenB = (await registerOwner(BASE, ownerB)).token;
     const html = '<!DOCTYPE html><html><head><title>Code Test</title></head><body>secret content</body></html>';
     const r = await json('/v1/apps', auth(tokenA, {
         method: 'POST',

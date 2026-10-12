@@ -22,11 +22,9 @@
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, 1.4).
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
 
 let passed = 0;
@@ -57,33 +55,13 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const priv = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), priv);
-    return Buffer.from(sig).toString('base64');
-}
-
-async function ownerTokenFor(name: string, privKey: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature }),
-    });
-    assert(body.ok === true, `token for ${name}: ${JSON.stringify(body.error)}`);
-    return body.data.token as string;
-}
-
 // /v1/admin/setup/auth, /register and /token share one limiter: five requests per sixty seconds per
 // IP (middleware/rate-limit.ts). This suite makes four of them.
 function register(name: string, password = ADMIN_PW) {
     return json('/v1/admin/setup/register', {
         method: 'POST',
         headers: { 'X-Admin-Password': password },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, password: OWNER_PASSWORD }),
     });
 }
 
@@ -114,7 +92,7 @@ await test('The first operator registers with the admin password → 200, with t
     assert(status === 200, `register ${status}: ${JSON.stringify(body)}`);
     assert(body.owner?.roles?.includes('operator'), `no operator role: ${JSON.stringify(body.owner)}`);
     firstKey = body.private_key as string;
-    operatorToken = await ownerTokenFor(firstName, firstKey);
+    operatorToken = await ownerToken(BASE, firstName);
 });
 
 await test('The setup wizard\'s next step still works: setup/token for the first operator → 200', async () => {

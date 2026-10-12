@@ -35,10 +35,10 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { registerOwner as registerPasswordOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -60,12 +60,8 @@ const b64 = (html: string) => Buffer.from(html, 'utf8').toString('base64');
 const auth = (t: string): RequestInit => ({ headers: { Authorization: `Bearer ${t}` } });
 
 async function registerOwner(name: string): Promise<{ token: string; ghii: string }> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { token: tok.body.data.token, ghii: `${name}@${NODE_ID}` };
+    const owner = await registerPasswordOwner(BASE, name);
+    return { token: owner.token, ghii: owner.ghii };
 }
 async function createAgent(ownerName: string, ownerToken: string, agentName: string): Promise<{ gaii: string; token: string }> {
     const reg = await json('/v1/agents', { ...auth(ownerToken), method: 'POST', body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['actions'], scopes: ['*'], model: 'test-model' }) });

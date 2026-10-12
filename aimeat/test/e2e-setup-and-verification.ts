@@ -63,6 +63,7 @@ import { fileURLToPath } from 'node:url';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -113,20 +114,8 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     return Buffer.from(sig).toString('base64');
 }
 
-async function tokenFor(base: string, name: string, privateKey: string) {
-    const timestamp = new Date().toISOString();
-    return call(base, '/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: await signMsg(privateKey, name + NODE_ID + timestamp) }),
-    });
-}
-
 async function makeOwner(base: string, name: string): Promise<string> {
-    const reg = await call(base, '/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body.error)}`);
-    const tok = await tokenFor(base, name, reg.body.data.private_key);
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data.token as string;
+    return (await registerOwner(base, name)).token;
 }
 
 /**
@@ -201,7 +190,6 @@ let issuerId = '';
 
 /** The keypair whose PUBLIC half is imported into the first spawned node. */
 let importedPublic = '';
-let importedPrivate = '';
 
 console.log('\n=== AIMEAT node setup + identity verification E2E ===\n');
 
@@ -217,10 +205,10 @@ try {
 
     await test('Setup: an operator and a plain owner on the shared node', async () => {
         const op = await json('/v1/admin/setup/register', {
-            method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: OP }),
+            method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: OP, password: OWNER_PASSWORD }),
         });
         assert(op.status === 200, `operator register ${op.status}: ${JSON.stringify(op.body)}`);
-        const tok = await tokenFor(BASE, OP, op.body.private_key);
+        const tok = await ownerSignIn(BASE, OP);
         assert(tok.body.ok === true, `operator token: ${JSON.stringify(tok.body.error)}`);
         opToken = tok.body.data.token;
         plainToken = await makeOwner(BASE, PLAIN);
@@ -324,7 +312,6 @@ try {
 
         await test('6. The first owner is created with a key the operator brought', async () => {
             const priv = ed.utils.randomSecretKey();
-            importedPrivate = Buffer.from(priv).toString('base64');
             importedPublic = Buffer.from(await ed.getPublicKeyAsync(priv)).toString('base64');
 
             const { status, body } = await call(setupNode.base, '/v1/setup/init', {
@@ -350,12 +337,13 @@ try {
             setupGhii = `${SETUP_USER}@${NODE_ID}`;
         });
 
-        await test('7. The imported key is the one the node kept, proved by signing with its half', async () => {
-            // The only proof that matters: the node verifies a signature made with the private half
-            // the operator never sent. A generated key would refuse this.
-            const tok = await tokenFor(setupNode.base, SETUP_USER, importedPrivate);
-            assert(tok.body.ok === true, `the imported key authenticates: ${JSON.stringify(tok.body.error)}`);
-            assert(typeof tok.body.data.token === 'string', 'and yields a session');
+        await test('7. The imported key is the one the node kept, read back as the account key', async () => {
+            // This used to sign in with the private half the operator never sent, on the owner-key
+            // sign-in node 4.0.0 removes. The same fact, read without it: the account key the node
+            // holds is the imported public half, derived above from that private half.
+            const me = await call(setupNode.base, '/v1/ghii/me', { headers: authed(setupOwnerToken) });
+            assert(me.status === 200, `GET /v1/ghii/me ${me.status}: ${JSON.stringify(me.body.error)}`);
+            assert(me.body.data.public_key === importedPublic, `the account key is the imported one: ${String(me.body.data.public_key).slice(0, 16)}`);
         });
 
         await test('8. The session the wizard hands back is an OWNER session, not the new agent\'s', async () => {
@@ -397,9 +385,12 @@ try {
                 assert(body.data.owner.displayName === SECOND_USER, `displayName: ${body.data.owner.displayName}`);
                 assert(typeof body.data.token === 'string', 'a session comes back');
 
-                // The key was generated inside the node: the pair from the OTHER node does not open it.
-                const wrong = await tokenFor(other.base, SECOND_USER, importedPrivate);
-                assert(wrong.body.ok !== true, `a key the node never stored must not authenticate: ${JSON.stringify(wrong.body.data)}`);
+                // The key was generated inside the node: the account key is a new one, not the pair
+                // imported into the OTHER node.
+                const me = await call(other.base, '/v1/ghii/me', { headers: authed(body.data.token) });
+                assert(me.status === 200, `GET /v1/ghii/me ${me.status}: ${JSON.stringify(me.body.error)}`);
+                assert(typeof me.body.data.public_key === 'string' && me.body.data.public_key.length > 0, 'the node made an account key');
+                assert(me.body.data.public_key !== importedPublic, 'a key the node never stored must not be the account key');
 
                 // The password half of the account works, which is the credential the wizard set.
                 const login = await call(other.base, '/v1/ghii/login', {

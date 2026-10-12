@@ -23,13 +23,9 @@
  *   v1.0.0 — 2026-08-07 — Initial.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const owner = `dtg${Date.now() % 100000}`;
 
 let passed = 0;
@@ -60,12 +56,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
-
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
     ({ ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${token}` } });
 
@@ -87,15 +77,7 @@ console.log('\n=== Device-Token Grace + MCP Funnel E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register the owner', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await signMsg(reg.body.data.private_key, owner + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    ownerToken = tok.body.data.token;
+    ownerToken = (await registerOwner(BASE, owner)).token;
 });
 
 // ── Phase 1: the full RFC 8628 flow ──
@@ -124,14 +106,7 @@ await test('device-authorize returns device_code + user_code', async () => {
 // It runs BEFORE the real approval, so the request it is refused on is genuinely pending.
 await test('A DIFFERENT owner cannot approve this device request', async () => {
     const stranger = `dtgx${Date.now() % 100000}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: stranger, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `stranger register ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: stranger, timestamp: ts, signature: await signMsg(reg.body.data.private_key, stranger + NODE_ID + ts) }),
-    });
-    const strangerToken = tok.body.data.token as string;
+    const strangerToken = (await registerOwner(BASE, stranger)).token;
 
     const r = await json('/v1/agents/verify', {
         method: 'POST',

@@ -55,6 +55,7 @@ import { stringify as yamlStringify } from 'yaml';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -97,12 +98,7 @@ interface Owner { name: string; ghii: string; token: string }
 
 async function owner(label: string): Promise<Owner> {
   const name = `cls${label}${Date.now()}`;
-  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
-  const ts = new Date().toISOString();
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
-  assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-  return { name, ghii: `${name}@${NODE_ID}`, token: tok.body.data.token };
+  return { name, ghii: `${name}@${NODE_ID}`, token: (await registerOwner(BASE, name)).token };
 }
 
 async function rpc(s: Session, method: string, params: Record<string, unknown> = {}) {

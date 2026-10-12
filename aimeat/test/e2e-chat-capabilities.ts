@@ -47,6 +47,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -56,18 +57,17 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 
 async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
-    const signature = await signMsg(privKey, message);
-    const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature } : { owner: ownerOrGaii, timestamp, signature };
+    // Agents only: an owner signs in with the password (helpers/owner-login.ts).
+    assert(isAgent, 'an owner signs in with the password, not here');
+    const signature = await signMsg(privKey, ownerOrGaii + timestamp);
+    const payload = { gaii: ownerOrGaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     return body.data.token;
 }
 
 async function registerOwner(name: string): Promise<{ token: string; ghii: string; name: string }> {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(status === 201, `register owner ${name}: ${status} ${JSON.stringify(body)}`);
-    const token = await getToken(name, body.data.private_key, false);
+    const token = (await registerWithPassword(BASE, name)).token;
     return { token, ghii: `${name}@${NODE_ID}`, name };
 }
 

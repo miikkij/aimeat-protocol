@@ -20,7 +20,6 @@
 // machinery. Each is asserted separately.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -37,6 +36,8 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
   return { status: res.status, body: ct.includes('json') ? await res.json() : { _raw: await res.text() } };
 }
 
+import { registerOwner } from './helpers/owner-login.js';
+
 const ed = await import('@noble/ed25519');
 const { createHash } = await import('node:crypto');
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -49,17 +50,6 @@ async function getAgentToken(gaii: string, privB64: string): Promise<string> {
     body: JSON.stringify({ gaii, timestamp: ts, signature: Buffer.from(sig).toString('base64') }),
   });
   assert(body.ok === true, `agent token: ${JSON.stringify(body.error)}`);
-  return body.data.token;
-}
-
-async function getOwnerToken(owner: string, privB64: string): Promise<string> {
-  const ts = new Date().toISOString();
-  const sig = await ed.signAsync(new TextEncoder().encode(owner + NODE_ID + ts), Buffer.from(privB64, 'base64'));
-  const { body } = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner, timestamp: ts, signature: Buffer.from(sig).toString('base64') }),
-  });
-  assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
 }
 
@@ -76,12 +66,8 @@ console.log('\n=== AIMEAT: the memory bin ===\n');
 
 console.log('Setup');
 await test('Two owners, and two records under the first', async () => {
-  const a = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerA, public_key: 'placeholder' }) });
-  assert(a.status === 201, `owner A: ${JSON.stringify(a.body)}`);
-  tokA = await getOwnerToken(ownerA, a.body.data.private_key);
-  const b = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerB, public_key: 'placeholder' }) });
-  assert(b.status === 201, `owner B: ${JSON.stringify(b.body)}`);
-  tokB = await getOwnerToken(ownerB, b.body.data.private_key);
+  tokA = (await registerOwner(BASE, ownerA)).token;
+  tokB = (await registerOwner(BASE, ownerB)).token;
 
   // The word in the value is what the text search will look for. The bystander proves the delete is
   // about ONE record: a filter written slightly wrong takes the neighbour with it.

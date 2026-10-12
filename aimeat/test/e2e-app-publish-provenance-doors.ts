@@ -38,9 +38,8 @@
  *     resolves to nothing (410), with neither leaving an app behind.
  *   v1.0.0 — 2026-08-01 — TARGET-058: the declaration survives every publish door.
  */
-import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 let NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -91,17 +90,6 @@ const DECLARATION = {
     notes: 'Declared at publish time by the door-coverage E2E.',
 };
 
-async function getOwnerToken(name: string, priv: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + timestamp), Buffer.from(priv, 'base64'));
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(body.ok === true, `owner token: ${JSON.stringify(body.error)}`);
-    return body.data.token;
-}
-
 /** The stored record for a published app, as any reader gets it. */
 async function storedRecord(filename: string) {
     const r = await json(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/versions`);
@@ -133,10 +121,9 @@ async function main() {
     console.log('Setup');
 
     await test('register owner', async () => {
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register: ${reg.status}`);
-        if (typeof reg.body.node === 'string' && reg.body.node) NODE_ID = reg.body.node;
-        ownerToken = await getOwnerToken(owner, reg.body.data.private_key);
+        const reg = await registerOwner(BASE, owner);
+        if (typeof reg.registration.body.node === 'string' && reg.registration.body.node) NODE_ID = reg.registration.body.node;
+        ownerToken = reg.token;
     });
 
     /**
@@ -523,9 +510,7 @@ async function main() {
         assert((await json(`/v1/provenance/${sourceId}`)).status === 404, 'behind an access code the source record is not public');
 
         const other = `forker${Date.now() % 1000000}`;
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register forker: ${reg.status}`);
-        const otherToken = await getOwnerToken(other, reg.body.data.private_key);
+        const otherToken = (await registerOwner(BASE, other)).token;
         const fork = await json(`/v1/apps/${encodeURIComponent(owner)}/${inlineFile}/fork`, {
             method: 'POST', headers: auth(otherToken), body: JSON.stringify({ new_filename: 'forked-private.html' }),
         });

@@ -25,6 +25,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -90,10 +91,7 @@ async function provision(tag: string) {
     const ownerName = `journey${tag}${stamp}`;
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'Journey Test', password: 'Journey12345' }) });
     assert(ghii.status === 201, `ghii ${ghii.status}: ${JSON.stringify(ghii.body)}`);
-    let ts = new Date().toISOString();
-    const ownerTok = await json('/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ghii.body.data.private_key, ownerName + NODE_ID + ts) }),
-    });
+    const ownerTok = await ownerSignIn(BASE, ownerName, 'Journey12345');
     assert(ownerTok.body.ok === true, `owner token: ${JSON.stringify(ownerTok.body.error)}`);
     const ownerToken = ownerTok.body.data.token as string;
 
@@ -106,7 +104,7 @@ async function provision(tag: string) {
 
     const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'Journey E2E', redirect_uris: [] }) });
     assert(reg.status === 201, `mcp register ${reg.status}`);
-    ts = new Date().toISOString();
+    const ts = new Date().toISOString();
     const pkce = mcpPkce(BASE);
     const params = new URLSearchParams({
         response_type: 'code', client_id: reg.body.client_id, gaii: agentGaii,

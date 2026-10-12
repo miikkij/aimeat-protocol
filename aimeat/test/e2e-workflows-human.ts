@@ -17,7 +17,6 @@
  *   v1.0.0 — 2026-07-16 — Initial human-input coverage (happy + decline + sandbox + validation).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -42,16 +41,8 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-
-async function getToken(owner: string, privKey: string): Promise<string> {
-  const timestamp = new Date().toISOString();
-  const message = owner + NODE_ID + timestamp;
-  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privKey, 'base64'))).toString('base64');
-  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp, signature: sig }) });
-  assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-  return body.data.token;
-}
 
 const ownerName = `hwfowner${Date.now()}`;
 const agentName = 'hwf-bot';
@@ -134,9 +125,8 @@ async function run() {
   console.log('\n=== AIMEAT Workflows Human-Input E2E ===\n');
 
   await test('Register owner + agent + offers', async () => {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(status === 201, `owner ${status}: ${JSON.stringify(body)}`);
-    auth = { Authorization: `Bearer ${await getToken(ownerName, body.data.private_key)}` };
+    const owner = await registerOwner(BASE, ownerName);
+    auth = { Authorization: `Bearer ${owner.token}` };
     const a = await json('/v1/agents', { method: 'POST', headers: auth, body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory'] }) });
     assert(a.status === 201, `agent ${a.status}: ${JSON.stringify(a.body)}`);
     const o = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: auth, body: JSON.stringify({ offers: [DRAFT_OFFER, SHIP_OFFER] }) });
@@ -449,9 +439,8 @@ async function run() {
 
     // 3. Another OWNER entirely, holding every word their own account gives them.
     const strangerName = `hwfstranger${Date.now()}`;
-    const s = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }) });
-    assert(s.status === 201, `stranger owner ${s.status}: ${JSON.stringify(s.body)}`);
-    const strangerAuth = { Authorization: `Bearer ${await getToken(strangerName, s.body.data.private_key)}` };
+    const s = await registerOwner(BASE, strangerName);
+    const strangerAuth = { Authorization: `Bearer ${s.token}` };
 
     const foreign = await json(`/v1/workflows/gatedx/runs/${runId}/steps/gate/answer`, {
       method: 'POST', headers: strangerAuth, body: JSON.stringify({ picks: ['approve'] }),

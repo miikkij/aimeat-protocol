@@ -19,13 +19,9 @@
  *     owner's hidden app (visibility is decided purely by who is authenticated; no client flag).
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 // The FIRST owner registered against a fresh node becomes the operator.
 const operatorName = `modop${Date.now() % 100000}`;
@@ -61,12 +57,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
-
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
 let operatorToken = '';
@@ -81,37 +71,19 @@ function victimAuthed(opts: RequestInit = {}): RequestInit {
     return { ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${victimToken}` } };
 }
 
-async function register(name: string): Promise<string> {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `register ${name}: status ${status}: ${JSON.stringify(body)}`);
-    return body.data.private_key;
-}
-
-async function tokenFor(name: string, privKey: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature }),
-    });
-    assert(body.ok === true, `token ${name}: ${JSON.stringify(body.error)}`);
-    return body.data?.token;
-}
-
 console.log('\n=== App Moderation E2E Tests ===\n');
 console.log('Phase 0: Setup');
 
 await test('Register operator (first owner → auto-operator)', async () => {
-    operatorPrivKey = await register(operatorName);
-    operatorToken = await tokenFor(operatorName, operatorPrivKey);
+    const op = await registerOwner(BASE, operatorName);
+    operatorPrivKey = op.privateKey;
+    operatorToken = op.token;
 });
 
 await test('Register victim owner (non-operator)', async () => {
-    victimPrivKey = await register(victimName);
-    victimToken = await tokenFor(victimName, victimPrivKey);
+    const victim = await registerOwner(BASE, victimName);
+    victimPrivKey = victim.privateKey;
+    victimToken = victim.token;
 });
 
 await test('Victim publishes an app', async () => {

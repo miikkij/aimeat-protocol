@@ -33,6 +33,8 @@
  *     · --stub (the recorder answers every model call: no key, no money, the real request) · --dump <dir> (each round's request as JSON)
  *     · --as-sent (forward the node's request unchanged, without the recorder's own usage.include)
  * @version-history
+ *   v1.2.2 — 2026-10-12 — The owner registers with a password and signs in with POST /v1/ghii/login:
+ *     the owner-key sign-in it used is removed in node 4.0.0.
  *   v1.2.1 — 2026-10-04 — --as-sent: the recorder adds nothing, so a run shows what the node asks for.
  *   v1.2.0 — 2026-10-04 — Each round's anatomy (system, tools and messages in characters, the tool names,
  *     and a fingerprint of the system message and tools, which is what a prompt cache reuses); --stub
@@ -51,9 +53,6 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import * as ed from '@noble/ed25519';
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const NODE_ID = 'aimeat-local-001-dev';
 const DEFAULT_TEXT = 'Haluan uuden agentin, joka käy joka aamu läpi CRM:ni avoimet kaupat ja kirjoittaa listan siitä, mihin pitää tarttua tänään.';
@@ -274,14 +273,11 @@ async function call(base: string, path: string, init: RequestInit = {}, token?: 
     return res.json();
 }
 
+/** Register an owner with a password and sign them in with it (the owner-key sign-in is gone in 4.0.0). */
 async function registerOwner(base: string, name: string): Promise<string> {
-    const reg = await call(base, '/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    const priv = reg.data.private_key as string;
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + timestamp), Buffer.from(priv, 'base64'));
-    const tok = await call(base, '/v1/auth/token', {
-        method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
+    const password = 'ChatTurnMeasure-1';
+    await call(base, '/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: name, password }) });
+    const tok = await call(base, '/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: name, password }) });
     return tok.data.token as string;
 }
 

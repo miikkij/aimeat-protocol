@@ -18,8 +18,7 @@
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-outbound-organism-sender.ts
 
-import { createHash } from 'node:crypto';
-import * as ed from '@noble/ed25519';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -49,17 +48,6 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
   }
 }
 
-(ed as any).hashes.sha512 = (...msgs: Uint8Array[]) => {
-  const h = createHash('sha512');
-  for (const m of msgs) h.update(m);
-  return new Uint8Array(h.digest());
-};
-
-async function signMsg(privB64: string, msg: string): Promise<string> {
-  const sig = await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'));
-  return Buffer.from(sig).toString('base64');
-}
-
 async function makeOwner(name: string): Promise<{ token: string; owner: string; ghii: string }> {
   const owner = `${name}${Date.now().toString(36).slice(-5)}${Math.floor(Math.random() * 900 + 100)}`;
   for (let attempt = 0; ; attempt++) {
@@ -69,10 +57,7 @@ async function makeOwner(name: string): Promise<{ token: string; owner: string; 
     });
     if (reg.status === 429 && attempt < 8) { await new Promise((r) => setTimeout(r, 1500)); continue; }
     assert(reg.status === 201, `registration failed: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const privKey = reg.body.data.private_key as string;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey, owner + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp, signature }) });
+    const tok = await ownerSignIn(BASE, owner, 'SenderTest1234');
     assert(tok.status === 200, `token failed: ${tok.status}`);
     return { token: tok.body.data.token as string, owner, ghii: `${owner}@${NODE_ID}` };
   }

@@ -17,10 +17,7 @@
  *   v1.0.0 — 2026-08-09 — Initial (V1-V4).
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -52,11 +49,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
     return { status: res.status, body };
-}
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
 }
 
 const auth = (token: string, opts: RequestInit = {}): RequestInit =>
@@ -97,15 +89,7 @@ console.log('\n=== Agent Health E2E Tests ===\n');
 console.log('Phase 0: an owner with two agents');
 
 await test('Register the owner', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await signMsg(reg.body.data.private_key, owner + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    ownerToken = tok.body.data.token;
+    ownerToken = (await registerOwner(BASE, owner)).token;
 });
 
 await test('Two agents join, oldest first', async () => {
@@ -237,17 +221,10 @@ await test('a connection counts as a live agent, so the home does not call the a
 // which Hello Integration flow an agent is measured against, so setting it is not a cosmetic write.
 await test('another owner cannot set the mode of an agent that is not theirs', async () => {
     const stranger = `${owner}x`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: stranger, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register stranger ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: stranger, timestamp: ts, signature: await signMsg(reg.body.data.private_key, stranger + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `stranger token: ${JSON.stringify(tok.body.error)}`);
+    const strangerToken = (await registerOwner(BASE, stranger)).token;
 
     const target = encodeURIComponent(`ws-tool#${owner}@${NODE_ID}`);
-    const r = await json(`/v1/agents/${target}/mode`, auth(tok.body.data.token, {
+    const r = await json(`/v1/agents/${target}/mode`, auth(strangerToken, {
         method: 'PATCH', body: JSON.stringify({ mode: 'task-runner' }),
     }));
     assert(r.status === 403, `a stranger setting someone else's mode must be 403, got ${r.status}`);

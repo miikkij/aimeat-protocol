@@ -14,7 +14,6 @@
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -45,17 +44,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 
-// Helper: sign a message with a base64 private key
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 // ─── State ───
 let opToken = '';
@@ -80,43 +69,25 @@ console.log('\n=== AIMEAT Subdomain Routing E2E Test ===\n');
 console.log('Setup');
 
 await test('Register test owner (auto-operator)', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: opName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    opPrivKey = body.data.private_key;
+    const owner = await registerOwner(BASE, opName);
+    opPrivKey = owner.privateKey;
     assert(typeof opPrivKey === 'string' && opPrivKey.length > 0, 'got private key');
 });
 
 await test('Get operator token', async () => {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(opPrivKey, opName + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: opName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, opName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     opToken = body.data?.token;
     assert(typeof opToken === 'string', 'got token');
 });
 
 await test('Register non-operator owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: nonOpName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    nonOpPrivKey = body.data.private_key;
+    const owner = await registerOwner(BASE, nonOpName);
+    nonOpPrivKey = owner.privateKey;
 });
 
 await test('Get non-operator token', async () => {
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(nonOpPrivKey, nonOpName + NODE_ID + timestamp);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: nonOpName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, nonOpName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     nonOpToken = body.data?.token;
 });

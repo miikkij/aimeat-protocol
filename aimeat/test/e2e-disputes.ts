@@ -14,7 +14,6 @@
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -56,6 +55,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -141,22 +141,11 @@ console.log('\n=== AIMEAT Dispute Escalation E2E Test ===\n');
 console.log('Setup — Owner & Agents');
 
 await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
+    ownerPrivKey = (await registerOwner(BASE, ownerName)).privateKey;
 });
 
 await test('Owner auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });
@@ -190,22 +179,11 @@ await test('Requester auth token', async () => {
 });
 
 await test('Register provider owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: provOwnerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    provOwnerPriv = body.data.private_key;
+    provOwnerPriv = (await registerOwner(BASE, provOwnerName)).privateKey;
 });
 
 await test('Provider owner auth token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = provOwnerName + NODE_ID + timestamp;
-    const signature = await signMsg(provOwnerPriv, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: provOwnerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, provOwnerName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     provOwnerToken = body.data.token;
 });

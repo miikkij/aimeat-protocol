@@ -39,6 +39,7 @@ import { join, resolve } from 'node:path';
 import { stringify as yamlStringify } from 'yaml';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -73,11 +74,10 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function getAuthToken(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
+async function getAuthToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
-  const signature = await signMsg(priv, message);
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const signature = await signMsg(priv, gaii + ts);
+  const payload = { gaii, timestamp: ts, signature };
   const { body } = await json(BASE, '/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -168,9 +168,7 @@ console.log('Setup — owner, two agents, connector home, daemon');
 
 await test('Register owner + a declaring agent + an agent without provenance:write', async () => {
   ownerName = `provconn${stamp}`;
-  const reg = await json(BASE, '/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(reg.status === 201, `owner status ${reg.status}: ${JSON.stringify(reg.body)}`);
-  const ownerToken = await getAuthToken(ownerName, reg.body.data.private_key, false);
+  const ownerToken = (await registerOwner(BASE, ownerName)).token;
 
   const a1 = await json(BASE, '/v1/agents', {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -178,14 +176,14 @@ await test('Register owner + a declaring agent + an agent without provenance:wri
   });
   assert(a1.status === 201, `declarer status ${a1.status}: ${JSON.stringify(a1.body)}`);
   declarerGaii = a1.body.data.agent.gaii;
-  declarerToken = await getAuthToken(declarerGaii, a1.body.data.private_key, true);
+  declarerToken = await getAuthToken(declarerGaii, a1.body.data.private_key);
 
   const a2 = await json(BASE, '/v1/agents', {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
     body: JSON.stringify({ name: mute, owner: ownerName, capabilities: ['memory'], scopes: ['memory:write', 'memory:read'] }),
   });
   assert(a2.status === 201, `mute status ${a2.status}: ${JSON.stringify(a2.body)}`);
-  muteToken = await getAuthToken(a2.body.data.agent.gaii, a2.body.data.private_key, true);
+  muteToken = await getAuthToken(a2.body.data.agent.gaii, a2.body.data.private_key);
 
   writeConnectorHome(home, [
     { agent: declarer, owner: ownerName, token: declarerToken, primary: true },

@@ -58,6 +58,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { deliveryProof } from '../src/services/signed-node-request.js';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -95,22 +96,11 @@ console.log('\n=== T-1: Federation E2E Tests ===\n');
 console.log('Setup — Owner & Agent');
 
 await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.data.private_key;
+    ownerPrivKey = (await registerOwner(BASE, ownerName)).privateKey;
 });
 
 await test('Owner auth', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     ownerToken = body.data.token;
 });
@@ -1004,7 +994,7 @@ await test('30. Federation directory is public', async () => {
 });
 
 // ─── Phase 6: peering is an operator decision ───
-// The suite's owner is registered through POST /v1/owners on a freshly cleared database, so it is
+// The suite's owner is registered through POST /v1/ghii on a freshly cleared database, so it is
 // auto-promoted to operator and every call above went through on that role without anybody saying
 // so. A second plain owner is the missing principal: peering, de-peering, peer registration and
 // trust advisories decide who this node federates with, and a registered account is not that.
@@ -1014,16 +1004,11 @@ let plainOwnerToken = '';
 const plainOwnerName = `fedplain${Date.now()}`;
 
 await test('Setup: a second owner, minted WITHOUT the operator role', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: plainOwnerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, plainOwnerName + NODE_ID + ts);
-    const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: plainOwnerName, timestamp: ts, signature: sig }) });
-    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-    plainOwnerToken = body.data.token;
+    const plain = await registerOwner(BASE, plainOwnerName);
+    plainOwnerToken = plain.token;
     // The premise of every assertion below: this account is not an operator.
-    assert(Array.isArray(body.data.roles) && !body.data.roles.includes('operator'),
-        `the second owner must not be an operator: ${JSON.stringify(body.data.roles)}`);
+    assert(Array.isArray(plain.roles) && !plain.roles.includes('operator'),
+        `the second owner must not be an operator: ${JSON.stringify(plain.roles)}`);
 });
 
 await test('23b. A plain owner cannot register, update, promote or de-peer a peer → 403', async () => {

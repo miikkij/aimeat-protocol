@@ -16,12 +16,12 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -41,11 +41,11 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function getToken(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
+  const message = gaii + ts;
   const signature = await signMsg(priv, message);
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const payload = { gaii, timestamp: ts, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -64,12 +64,8 @@ console.log('\n=== AIMEAT: run mode and runtime source on a code-backed agent ==
 
 console.log('Setup');
 await test('Two owners and their agents', async () => {
-  const a = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerA, public_key: 'placeholder' }) });
-  assert(a.status === 201, `owner A: ${JSON.stringify(a.body)}`);
-  tokA = await getToken(ownerA, a.body.data.private_key, false);
-  const b = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerB, public_key: 'placeholder' }) });
-  assert(b.status === 201, `owner B: ${JSON.stringify(b.body)}`);
-  tokB = await getToken(ownerB, b.body.data.private_key, false);
+  tokA = (await registerOwner(BASE, ownerA)).token;
+  tokB = (await registerOwner(BASE, ownerB)).token;
 
   // Deliberately NO crew definition and no run_mode: this is `web-researcher` and its 57 siblings.
   const mk = await json('/v1/agents', {
@@ -78,7 +74,7 @@ await test('Two owners and their agents', async () => {
   });
   assert(mk.status === 201, `agent: ${JSON.stringify(mk.body)}`);
   codeBacked = mk.body.data.agent.gaii;
-  codeBackedTok = await getToken(codeBacked, mk.body.data.private_key, true);
+  codeBackedTok = await getToken(codeBacked, mk.body.data.private_key);
 
   const other = await json('/v1/agents', {
     method: 'POST', headers: { Authorization: `Bearer ${tokB}` },

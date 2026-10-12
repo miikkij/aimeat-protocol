@@ -37,16 +37,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
   throw new Error('unreachable');
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function getOwnerToken(owner: string, privKey: string): Promise<string> {
-  const ts = new Date().toISOString();
-  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(owner + NODE_ID + ts), Buffer.from(privKey, 'base64'))).toString('base64');
-  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp: ts, signature: sig }) });
-  assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-  return body.data.token;
-}
+import { registerOwner } from './helpers/owner-login.js';
 
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 const ownerName = `ecocapowner${Date.now()}`;
@@ -70,9 +61,7 @@ async function run() {
 
   console.log('Setup — Owner');
   await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerToken = await getOwnerToken(ownerName, body.data.private_key);
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
     auth = { Authorization: `Bearer ${ownerToken}` };
   });
 
@@ -117,9 +106,7 @@ async function run() {
     // check and any account invokes a stranger's private ecosystem capability OVER THAT STRANGER'S
     // TUNNEL — arbitrary calls into somebody else's connected app.
     const strangerName = `ecocapx${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `stranger register ${reg.status}`);
-    const strangerAuth = { Authorization: `Bearer ${await getOwnerToken(strangerName, reg.body.data.private_key)}` };
+    const strangerAuth = { Authorization: `Bearer ${(await registerOwner(BASE, strangerName)).token}` };
 
     // A live tunnel, so a missing one cannot be the reason for the refusal.
     const g = await connectGeai('billing', ['memory:read']);

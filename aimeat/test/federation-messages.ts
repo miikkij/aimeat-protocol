@@ -22,6 +22,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -175,13 +176,8 @@ async function signMsg(privKeyB64: string, message: string): Promise<string> {
 /** Register a NON-operator owner via public registration + mint its token (so its agent's owner is
  *  independent of the node operator, who may have blocked the sender in an earlier test). */
 async function registerOwnerOn(node: NodeState, name: string): Promise<{ token: string; ghii: string }> {
-    const reg = await node.json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register owner ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts2 = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, name + node.nodeId + ts2);
-    const tok = await node.json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts2, signature: sig }) });
-    assert(tok.body.ok === true, `owner token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { token: tok.body.data.token, ghii: `${name}@${node.nodeId}` };
+    const owner = await registerOwner(node.baseUrl, name);
+    return { token: owner.token, ghii: `${name}@${node.nodeId}` };
 }
 async function createAgentOn(node: NodeState, ownerName: string, ownerToken: string, agentName: string, scopes: string[]): Promise<{ gaii: string; token: string }> {
     const reg = await node.json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory'], scopes }) });

@@ -18,7 +18,6 @@
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -34,13 +33,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner } from './helpers/owner-login.js';
 
 console.log('\n=== AIMEAT Admin Organisation sign-in page E2E ===\n');
 
@@ -54,15 +47,7 @@ const list = () => json('/v1/admin/sso/connections', { headers: { Authorization:
 
 await test('Setup: the first owner is the operator; a second is not', async () => {
     const mk = async (name: string) => {
-        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-        assert(reg.status === 201, `register ${name}: ${reg.status}`);
-        const ts = new Date().toISOString();
-        const tok = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-        });
-        assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-        return tok.body.data.token as string;
+        return (await registerOwner(BASE, name)).token;
     };
     opToken = await mk(opName);
     otherToken = await mk(otherName);

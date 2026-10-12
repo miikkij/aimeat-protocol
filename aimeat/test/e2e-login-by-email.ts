@@ -18,10 +18,8 @@
  *     a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.0.0 — 2026-08-07 — Initial.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
 import { markEmailVerified } from './helpers/verified-email.js';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -51,9 +49,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
 }
-async function sign(privB64: string, msg: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 const login = (username: string, password: string) =>
     json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username, password }) });
 
@@ -67,11 +62,7 @@ await test('Provision the account through an organism code-invite', async () => 
         body: JSON.stringify({ username: inviterName, display_name: 'Inviter', password: 'InviteP123x' }),
     });
     assert(reg.status === 201, `inviter reg ${reg.status}: ${JSON.stringify(reg.body.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: inviterName, timestamp: ts, signature: await sign(reg.body.data.private_key, inviterName + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, inviterName, 'InviteP123x');
     const token = tok.body.data.token as string;
     const org = await json('/v1/organisms', {
         method: 'POST', headers: { Authorization: `Bearer ${token}` },

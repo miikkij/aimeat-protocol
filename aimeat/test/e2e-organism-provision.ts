@@ -22,9 +22,8 @@
  *     them list and stops the warning.
  *   v1.0.0 — 2026-07-14 — Initial: organism:write scope + POST /v1/organisms/:id/workspaces + role-or-scope gate.
  */
-import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -45,9 +44,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as Record<string, unknown> : { _raw: await res.text() };
     return { status: res.status, body: body as { ok?: boolean; data?: Record<string, unknown>; error?: { code?: string } } };
 }
-async function signMsg(privB64: string, message: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
-}
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 const codeVerifier = randomBytes(32).toString('base64url');
 const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
@@ -55,13 +51,7 @@ const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64ur
 let ownerToken = '';
 
 async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg((reg.body.data as { private_key: string }).private_key, name + NODE_ID + ts);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
-    assert(tok.body.ok === true, `token ${name}`);
-    return (tok.body.data as { token: string }).token;
+    return (await registerWithPassword(BASE, name)).token;
 }
 
 /** Full app-grant flow → an app access token carrying `scopes`. */

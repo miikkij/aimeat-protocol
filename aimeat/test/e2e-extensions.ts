@@ -4,7 +4,6 @@
 // Run: cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-extensions.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
 
 let passed = 0;
@@ -38,6 +37,7 @@ async function json(path: string, opts: RequestInit = {}) {
 // Helper: sign a message with a base64 private key, return base64 signature
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -65,7 +65,7 @@ await test('POST /v1/admin/setup/register \u2014 register owner with operator ro
     const { status, body } = await json('/v1/admin/setup/register', {
         method: 'POST',
         headers: { 'X-Admin-Password': ADMIN_PW },
-        body: JSON.stringify({ name: ownerName }),
+        body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
@@ -75,14 +75,7 @@ await test('POST /v1/admin/setup/register \u2014 register owner with operator ro
 });
 
 await test('Owner auth \u2014 sign + token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName);
     assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
     ownerToken = body.data?.token;
     assert(typeof ownerToken === 'string', 'got owner token');
@@ -220,13 +213,7 @@ await test('GET /v1/extensions/test-echo \u2014 verify status is active', async 
 // under ownerName here; a second owner must get 403 and change nothing.
 await test('Second owner CANNOT deactivate/activate first owner\'s extension (403)', async () => {
     const otherName = `extother${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(reg.body.data.private_key, otherName + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: otherName, timestamp, signature }) });
-    assert(tok.body.ok === true, `token ok: ${JSON.stringify(tok.body.error)}`);
-    const otherToken = tok.body.data.token;
+    const otherToken = (await registerOwner(BASE, otherName)).token;
 
     const deact = await json('/v1/extensions/test-echo/deactivate', {
         method: 'POST',

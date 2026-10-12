@@ -50,12 +50,7 @@ async function json(path: string, opts: RequestInit = {}) {
   return { status: res.status, body, headers: res.headers };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function sign(privB64: string, msg: string): Promise<string> {
-  return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
-}
+import { ownerSignIn } from './helpers/owner-login.js';
 async function setupOwner(label: string) {
   const name = `dps${label}${Date.now()}`;
   let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Slice1', password: 'DataPkgSlice1234' }) });
@@ -64,8 +59,7 @@ async function setupOwner(label: string) {
     reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Slice1', password: 'DataPkgSlice1234' }) });
   }
   assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-  const ts = new Date().toISOString();
-  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(reg.body.data.private_key, name + NODE_ID + ts) }) });
+  const tok = await ownerSignIn(BASE, name, 'DataPkgSlice1234');
   return { name, gaii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });

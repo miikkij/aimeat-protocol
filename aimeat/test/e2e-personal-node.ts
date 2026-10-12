@@ -45,17 +45,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 
-// Helper: sign a message with a base64 private key, return base64 signature
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
 // ─── State ───
 let ownerToken = '';
@@ -69,25 +59,14 @@ console.log('\n=== AIMEAT Personal Node E2E Test ===\n');
 console.log('Phase 1 — Setup');
 
 await test('POST /v1/owners — register owner', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.ok === true, 'ok');
-    ownerPrivKey = body.data.private_key;
+    const owner = await registerOwner(BASE, ownerName);
+    assert(owner.registration.body.ok === true, 'ok');
+    ownerPrivKey = owner.privateKey;
     assert(typeof ownerPrivKey === 'string' && ownerPrivKey.length > 0, 'got owner private key');
 });
 
 await test('Owner auth — sign + token', async () => {
-    const timestamp = new Date().toISOString();
-    const message = ownerName + NODE_ID + timestamp;
-    const signature = await signMsg(ownerPrivKey, message);
-
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp, signature }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName);
     assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
     ownerToken = body.data?.token;
     assert(typeof ownerToken === 'string', 'got owner token');
@@ -215,19 +194,7 @@ const ownerBName = `pnownerb${Date.now()}`;
 let ownerBToken = '';
 
 await test('Setup — a second, non-operator owner', async () => {
-    const reg = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: ownerBName, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `owner B register ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(reg.body.data.private_key, ownerBName + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerBName, timestamp, signature }),
-    });
-    assert(tok.body.ok === true, `owner B token: ${JSON.stringify(tok.body.error)}`);
-    ownerBToken = tok.body.data.token;
+    ownerBToken = (await registerOwner(BASE, ownerBName)).token;
     // The two callers really are different privilege levels — A is the node's first owner and
     // therefore an operator, B is not. Phase 4's "operator lists all" test depends on that.
     const rolesOf = (t: string) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()).roles ?? [];

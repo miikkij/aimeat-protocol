@@ -27,13 +27,10 @@
  *     A6-8): the writeRole cases above, with a plain member P added directly by A.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
-import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const FILENAME = 'rows-demo.html';
 const REDIRECT = 'http://localhost:9922/callback';
 const WS = 'ws-approws';
@@ -59,20 +56,12 @@ async function json(path: string, opts: RequestInit = {}) {
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
 }
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
 async function setupOwner(label: string) {
     const name = `approw${label}${Date.now() % 100000}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { name, token: tok.body.data.token as string };
+    const owner = await registerOwner(BASE, name);
+    return { name, token: owner.token };
 }
 
 /** The full app-grant flow, as a person approving `scopes` for the app `owner/FILENAME`. */

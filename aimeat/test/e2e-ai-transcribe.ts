@@ -21,11 +21,11 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -57,20 +57,8 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 /** Register an owner and return { name, token }. */
 async function makeOwner(prefix: string) {
   const name = `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
-  const reg = await json('/v1/owners', {
-    method: 'POST',
-    body: JSON.stringify({ name, public_key: 'placeholder' }),
-  });
-  assert(reg.status === 201, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-  const privKey = reg.body.data.private_key;
-  const timestamp = new Date().toISOString();
-  const signature = await signMsg(privKey, name + NODE_ID + timestamp);
-  const tok = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: name, timestamp, signature }),
-  });
-  assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-  return { name, token: tok.body.data.token as string };
+  const owner = await registerOwner(BASE, name);
+  return { name, token: owner.token };
 }
 
 console.log('\n=== AI Transcription E2E Tests ===\n');

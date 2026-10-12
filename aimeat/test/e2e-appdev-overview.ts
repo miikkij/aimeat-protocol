@@ -19,8 +19,9 @@
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
 
+import { ownerSignIn } from './helpers/owner-login.js';
+
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -50,16 +51,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
-
 const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
 
 console.log('\n=== AIMEAT AppDev Overview E2E Test ===\n');
@@ -76,11 +67,7 @@ async function makeOwner(name: string): Promise<string> {
         body: JSON.stringify({ username: name, display_name: name, password: 'Overview1!' }),
     });
     assert(status === 201, `ghii ${status}`);
-    const ts = new Date().toISOString();
-    const { body: tb } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(body.data.private_key, name + NODE_ID + ts) }),
-    });
+    const { body: tb } = await ownerSignIn(BASE, name, 'Overview1!');
     return tb.data.token;
 }
 

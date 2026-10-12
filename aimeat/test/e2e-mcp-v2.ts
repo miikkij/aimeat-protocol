@@ -40,6 +40,7 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -84,15 +85,11 @@ console.log('\n=== AIMEAT v2 MCP Surfaces E2E ===\n');
 
 const ownerName = `v2owner${Date.now()}`;
 let agent = { gaii: '', key: '' };
-let ownerKeyForTests = '';
 
 await test('Setup: owner + broad-scoped agent', async () => {
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'V2 Test', password: 'V2Test1234' }) });
     assert(ghii.status === 201, `ghii ${ghii.status}`);
-    const ownerKey = ghii.body.data.private_key as string;
-    ownerKeyForTests = ownerKey;
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ownerKey, ownerName + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, ownerName, 'V2Test1234');
     const ownerToken = tk.body.data.token;
     const r = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: 'v2agent', owner: ownerName, capabilities: ['memory'], model: 'gpt-4o', scopes: ['*', ...NOT_IN_WILDCARD] }) });
     assert(r.status === 201, `agent ${r.status}: ${JSON.stringify(r.body)}`);
@@ -123,8 +120,7 @@ for (const role of ['appdev', 'agent', 'service', 'admin'] as const) {
 let narrow = { gaii: '', key: '' };
 
 await test('Setup: a second agent holding only memory:read', async () => {
-    const ts = new Date().toISOString();
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ownerKeyForTests, ownerName + NODE_ID + ts) }) });
+    const tk = await ownerSignIn(BASE, ownerName, 'V2Test1234');
     const r = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${tk.body.data.token}` },
         body: JSON.stringify({ name: 'v2narrow', owner: ownerName, capabilities: ['memory'], model: 'gpt-4o', scopes: ['memory:read'] }),

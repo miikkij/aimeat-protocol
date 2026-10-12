@@ -74,13 +74,15 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function getToken(ownerOrGaii: string, privKey: string, isAgent: boolean): Promise<string> {
   const timestamp = new Date().toISOString();
-  const message = isAgent ? ownerOrGaii + timestamp : ownerOrGaii + NODE_ID + timestamp;
+  assert(isAgent, 'getToken signs in agents only; an owner signs in with ownerSignIn/registerOwner (helpers/owner-login.ts)');
+  const message = ownerOrGaii + timestamp;
   const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privKey, 'base64'))).toString('base64');
-  const payload = isAgent ? { gaii: ownerOrGaii, timestamp, signature: sig } : { owner: ownerOrGaii, timestamp, signature: sig };
+  const payload = { gaii: ownerOrGaii, timestamp, signature: sig };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -259,9 +261,7 @@ async function run() {
   console.log('\n=== AIMEAT Agent Workflows E2E ===\n');
 
   await test('Register owner', async () => {
-    const { status, body } = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    ownerToken = await getToken(ownerName, body.data.private_key, false);
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
     auth = { Authorization: `Bearer ${ownerToken}` };
   });
 
@@ -1672,9 +1672,8 @@ async function run() {
     assert(byAgent.status === 403, `an agent cannot run it as the owner: ${byAgent.status}`);
     // Another account cannot reach it at all.
     const otherName = `wfother${Date.now()}`;
-    const other = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
-    assert(other.status === 201, `second owner: ${other.status}`);
-    const otherAuth = { Authorization: `Bearer ${await getToken(otherName, other.body.data.private_key, false)}` };
+    const other = await registerOwner(BASE, otherName);
+    const otherAuth = { Authorization: `Bearer ${other.token}` };
     const foreign = await json(runAsMe.endpoint, { method: 'POST', headers: otherAuth, body: '{}' });
     assert(foreign.status === 404, `another owner finds no such run: ${foreign.status}`);
     const still = await json('/v1/workflows/agent-trig/runs', { headers: auth });

@@ -38,10 +38,10 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TOTP, Secret } from 'otpauth';
 import { SoftAuthenticator } from './helpers/soft-authenticator.js';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 /** What the node believes its own address is, which is what a browser origin must match. */
 const ORIGIN = process.env.AIMEAT_BASE_URL ?? BASE;
 const RP_ID = new URL(ORIGIN).hostname;
@@ -73,7 +73,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
-/** Register an owner and mint its owner JWT by signing; no login, so the login limiter is untouched. */
+/** Register an owner and sign it in with its password; ownerSignIn waits out the login limiter. */
 async function registerOwner(username: string): Promise<string> {
     let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username, display_name: username, password: PASSWORD }) });
     for (let i = 0; reg.status === 429 && i < 8; i++) {
@@ -81,10 +81,7 @@ async function registerOwner(username: string): Promise<string> {
         reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username, display_name: username, password: PASSWORD }) });
     }
     assert(reg.status === 201, `register ${username}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(username + NODE_ID + ts), Buffer.from(priv, 'base64'))).toString('base64');
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: username, timestamp: ts, signature: sig }) });
+    const tok = await ownerSignIn(BASE, username, PASSWORD);
     assert(tok.status === 200, `auth/token ${username}: ${tok.status}`);
     return tok.body.data.token as string;
 }

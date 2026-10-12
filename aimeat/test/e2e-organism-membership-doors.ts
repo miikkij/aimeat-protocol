@@ -59,31 +59,17 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner } from './helpers/owner-login.js';
 
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 interface Owner { name: string; token: string }
 
-/** An owner through POST /v1/owners — that door carries no registration rate limit. */
+/** An owner through POST /v1/ghii with a password, signed in with that password. */
 async function setupOwner(label: string): Promise<Owner> {
     const name = `orgdoor${label}${Date.now().toString(36)}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `owner ${label} ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name + NODE_ID + ts) }),
-    });
-    assert(tok.body.ok === true, `owner ${label} token: ${JSON.stringify(tok.body?.error)}`);
-    return { name, token: tok.body.data.token as string };
+    const owner = await registerOwner(BASE, name);
+    return { name, token: owner.token };
 }
 
 const MISSING = 'org-does-not-exist-0000';

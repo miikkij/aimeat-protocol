@@ -44,6 +44,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -69,11 +70,7 @@ async function setupOwner(label: string) {
     }
     assert(r.status === 201, `ghii ${r.status}: ${JSON.stringify(r.body?.error)}`);
     const privateKey = r.body.data.private_key as string;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner, timestamp: ts, signature: await sign(privateKey, owner + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, owner, PASSWORD);
     assert(tok.status === 200, `auth/token ${tok.status}: ${JSON.stringify(tok.body?.error)}`);
     return { owner, privateKey, ownerToken: tok.body.data.token as string };
 }
@@ -260,13 +257,20 @@ async function run() {
         assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(r.body.error?.code === 'ACCOUNT_DISABLED', `expected ACCOUNT_DISABLED, got ${r.body.error?.code}`);
     });
-    await test('the signed /v1/auth/token door answers 403 ACCOUNT_DISABLED', async () => {
+    // The owner-key sign-in is deprecated and removed in 4.0.0 (OWNER_KEY_LOGIN_REMOVED_IN). While a
+    // node still has it on (the 3.x default) it refuses a deactivated account with 403; on a node
+    // that switched it off, and on every 4.0.0 node, the route itself is gone (410). Either way the
+    // account gets no session through it.
+    await test('the signed /v1/auth/token route refuses: 403 ACCOUNT_DISABLED while the owner-key sign-in is on, 410 OWNER_KEY_LOGIN_OFF once it is gone', async () => {
         const ts = new Date().toISOString();
         const r = await json('/v1/auth/token', {
             method: 'POST',
             body: JSON.stringify({ owner: victim.owner, timestamp: ts, signature: await sign(victim.privateKey, victim.owner + NODE_ID + ts) }),
         });
-        assert(r.status === 403 && r.body.error?.code === 'ACCOUNT_DISABLED', `expected 403 ACCOUNT_DISABLED, got ${r.status} ${r.body.error?.code}`);
+        const disabled = r.status === 403 && r.body.error?.code === 'ACCOUNT_DISABLED';
+        const gone = r.status === 410 && r.body.error?.code === 'OWNER_KEY_LOGIN_OFF';
+        assert(disabled || gone, `expected 403 ACCOUNT_DISABLED or 410 OWNER_KEY_LOGIN_OFF, got ${r.status} ${r.body.error?.code}`);
+        assert(typeof r.body.data?.token !== 'string', 'a deactivated account got a token');
     });
     await test('the federation attestation refuses: deactivation holds on other nodes', async () => {
         const timestamp = new Date().toISOString();

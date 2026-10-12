@@ -26,6 +26,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -57,11 +58,11 @@ async function signMsg(privB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
     return Buffer.from(sig).toString('base64');
 }
-async function getToken(subject: string, priv: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, priv: string): Promise<string> {
     const timestamp = new Date().toISOString();
-    const message = isAgent ? subject + timestamp : subject + NODE_ID + timestamp;
+    const message = gaii + timestamp;
     const signature = await signMsg(priv, message);
-    const payload = isAgent ? { gaii: subject, timestamp, signature } : { owner: subject, timestamp, signature };
+    const payload = { gaii, timestamp, signature };
     const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
     return body.data.token;
@@ -93,9 +94,7 @@ console.log('\n=== AIMEAT Agent File Handoff E2E ===\n');
 console.log('Setup');
 
 await test('register owner + agent, and a second owner with an agent', async () => {
-    const o = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(o.status === 201, `owner: ${o.status} ${JSON.stringify(o.body)}`);
-    ownerToken = await getToken(ownerName, o.body.data.private_key, false);
+    ownerToken = (await registerOwner(BASE, ownerName)).token;
     ownerGhii = `${ownerName}@${NODE_ID}`;
 
     const a = await json('/v1/agents', {
@@ -104,18 +103,16 @@ await test('register owner + agent, and a second owner with an agent', async () 
     });
     assert(a.status === 201, `agent: ${a.status} ${JSON.stringify(a.body)}`);
     agentGaii = a.body.data.agent.gaii;
-    agentToken = await getToken(agentGaii, a.body.data.private_key, true);
+    agentToken = await getToken(agentGaii, a.body.data.private_key);
 
-    const o2 = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
-    assert(o2.status === 201, `owner2: ${o2.status}`);
-    otherToken = await getToken(otherName, o2.body.data.private_key, false);
+    otherToken = (await registerOwner(BASE, otherName)).token;
     otherGhii = `${otherName}@${NODE_ID}`;
     const a2 = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
         body: JSON.stringify({ name: 'fh-outsider', owner: otherName, capabilities: ['storage'], model: 'gpt-4o' }),
     });
     assert(a2.status === 201, `agent2: ${a2.status}`);
-    otherAgentToken = await getToken(a2.body.data.agent.gaii, a2.body.data.private_key, true);
+    otherAgentToken = await getToken(a2.body.data.agent.gaii, a2.body.data.private_key);
 });
 
 await test('owner uploads the document twice: default private, and visibility:"owner"', async () => {

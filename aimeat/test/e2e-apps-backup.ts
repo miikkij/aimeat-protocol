@@ -2,7 +2,6 @@
 // Run: cd aimeat && pnpm exec tsx test/e2e-apps-backup.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -32,18 +31,10 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body, headers: res.headers };
 }
 
-import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import yauzl from 'yauzl';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner } from './helpers/owner-login.js';
 
 function sha256(buf: Buffer | string): string {
     return createHash('sha256').update(buf).digest('hex');
@@ -140,25 +131,15 @@ console.log('\n=== AIMEAT Apps Backup E2E Test ===\n');
 console.log('Setup');
 
 await test('Register owner + token', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${reg.status}`);
-    privKey = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey, owner + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner, timestamp, signature }) });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    token = tok.body.data.token;
+    const reg = await registerOwner(BASE, owner);
+    privKey = reg.privateKey;
+    token = reg.token;
 });
 
 await test('Register second owner + token', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: owner2, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${reg.status}`);
-    privKey2 = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(privKey2, owner2 + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: owner2, timestamp, signature }) });
-    assert(tok.body.ok === true, `token2: ${JSON.stringify(tok.body.error)}`);
-    token2 = tok.body.data.token;
+    const reg = await registerOwner(BASE, owner2);
+    privKey2 = reg.privateKey;
+    token2 = reg.token;
 });
 
 await test('Publish test apps (A: 3 versions, B: 1 version, C: 5 versions)', async () => {

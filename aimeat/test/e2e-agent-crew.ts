@@ -10,6 +10,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TunnelClient } from './helpers/tunnel-harness.js';
+import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -33,11 +34,11 @@ async function signMsg(privB64: string, message: string): Promise<string> {
   const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
   return Buffer.from(sig).toString('base64');
 }
-async function getToken(idOrOwner: string, priv: string, isAgent: boolean): Promise<string> {
+async function getToken(gaii: string, priv: string): Promise<string> {
   const ts = new Date().toISOString();
-  const message = isAgent ? idOrOwner + ts : idOrOwner + NODE_ID + ts;
+  const message = gaii + ts;
   const signature = await signMsg(priv, message);
-  const payload = isAgent ? { gaii: idOrOwner, timestamp: ts, signature } : { owner: idOrOwner, timestamp: ts, signature };
+  const payload = { gaii, timestamp: ts, signature };
   const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify(payload) });
   assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
   return body.data.token;
@@ -107,16 +108,12 @@ console.log('\n=== AIMEAT Crew tab routes — E2E ===\n');
 
 console.log('Setup');
 await test('Register owner, agent and a second owner', async () => {
-  let r = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-  assert(r.status === 201, `owner ${r.status}: ${JSON.stringify(r.body)}`);
-  ownerToken = await getToken(ownerName, r.body.data.private_key, false);
-  r = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
-  assert(r.status === 201, `other ${r.status}`);
-  otherToken = await getToken(otherName, r.body.data.private_key, false);
-  r = await json('/v1/agents', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory'], scopes: ['*'] }) });
+  ownerToken = (await registerOwner(BASE, ownerName)).token;
+  otherToken = (await registerOwner(BASE, otherName)).token;
+  const r = await json('/v1/agents', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory'], scopes: ['*'] }) });
   assert(r.status === 201, `agent ${r.status}: ${JSON.stringify(r.body)}`);
   agentGaii = r.body.data.agent.gaii;
-  agentToken = await getToken(agentGaii, r.body.data.private_key, true);
+  agentToken = await getToken(agentGaii, r.body.data.private_key);
 });
 
 console.log('\nPhase 1 — nothing yet, agent offline');
@@ -320,7 +317,7 @@ await test('19b. A plain memory write of crews.registry.<agent> from another pri
 await test('19c. A same-owner agent WITHOUT memory:write cannot publish → 403', async () => {
   const r = await json('/v1/agents', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ name: 'noscope', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }) });
   assert(r.status === 201, `register noscope ${r.status}`);
-  const tok = await getToken(r.body.data.agent.gaii, r.body.data.private_key, true);
+  const tok = await getToken(r.body.data.agent.gaii, r.body.data.private_key);
   const pub = await json(crew('/publish'), { method: 'POST', headers: auth(tok), body: JSON.stringify({ doc: goodDoc }) });
   assert(pub.status === 403, `scope-less sibling publish ${pub.status}: ${JSON.stringify(pub.body)}`);
   const get = await json(crew(), { headers: auth(tok) });

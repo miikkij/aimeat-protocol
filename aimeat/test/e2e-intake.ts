@@ -17,9 +17,7 @@
  *     schema in place fixes it without recreating the workspace.
  *   v1.0.0 — 2026-07-16 — Initial: forms CRUD + anon submit (allow-list, honeypot, schema-lock, isolation).
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -37,18 +35,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as Record<string, unknown> : { _raw: await res.text() };
     return { status: res.status, body: body as { ok?: boolean; data?: Record<string, unknown>; error?: { code?: string } } };
-}
-async function signMsg(privB64: string, message: string): Promise<string> {
-    return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
-}
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name}: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg((reg.body.data as { private_key: string }).private_key, name + NODE_ID + ts);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp: ts, signature: sig }) });
-    assert(tok.body.ok === true, `token ${name}`);
-    return (tok.body.data as { token: string }).token;
 }
 
 const LEADS_MANIFEST = {
@@ -79,8 +65,8 @@ async function main() {
     let formId = '', disabledForm = '', badForm = '';
 
     await test('setup: owner + owner2 + org + schema-locked Leads workspace', async () => {
-        ownerToken = await registerOwner(owner);
-        owner2Token = await registerOwner(owner2);
+        ownerToken = (await registerOwner(BASE, owner)).token;
+        owner2Token = (await registerOwner(BASE, owner2)).token;
         ownerGhii = `${owner}@${NODE_ID}`;
         const org = await json('/v1/organisms', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: 'Leads Org', type: 'project', visibility: 'private' }) });
         assert(org.status === 201, `create org: ${org.status}`);

@@ -21,13 +21,9 @@
  *   v1.0.0 — 2026-08-16 — initial: auth, ownership, not-published, and the browserless answer.
  */
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
+import { registerOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ownerAName = `shota${Date.now() % 100000}`;
 const ownerBName = `shotb${Date.now() % 100000}`;
 const APP = 'shot-target.html';
@@ -60,11 +56,6 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privateKeyB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
-
 const b64 = (html: string) => Buffer.from(html, 'utf8').toString('base64');
 
 let aToken = '';
@@ -74,25 +65,14 @@ const aAuthed = (o: RequestInit = {}): RequestInit =>
 const bAuthed = (o: RequestInit = {}): RequestInit =>
     ({ ...o, headers: { ...((o.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${bToken}` } });
 
-async function registerOwner(name: string): Promise<string> {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register ${name} status ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data.private_key;
-    const timestamp = new Date().toISOString();
-    const signature = await signMsg(priv, name + NODE_ID + timestamp);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name, timestamp, signature }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.data?.token as string;
-}
-
 const capture = (owner: string, file: string, authed: (o?: RequestInit) => RequestInit) =>
     json(`/v1/apps/${owner}/${file}/screenshot/capture`, authed({ method: 'POST', body: '{}' }));
 
 console.log('\n=== App Screenshot Capture E2E Tests ===\n');
 
 await test('Setup: two owners, one published app', async () => {
-    aToken = await registerOwner(ownerAName);
-    bToken = await registerOwner(ownerBName);
+    aToken = (await registerOwner(BASE, ownerAName)).token;
+    bToken = (await registerOwner(BASE, ownerBName)).token;
     const pub = await json('/v1/apps', aAuthed({
         method: 'POST',
         body: JSON.stringify({

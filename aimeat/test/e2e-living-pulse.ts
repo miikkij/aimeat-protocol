@@ -14,7 +14,6 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=living-pulse
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -30,13 +29,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner } from './helpers/owner-login.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 console.log('\n=== AIMEAT Living-Pulse Due-Scan E2E ===\n');
@@ -49,12 +42,7 @@ const DOC = 'lpdoc1';
 const configKey = () => `organism.${orgId}.w.${WS}.living.${DOC}.latest`;
 
 await test('Setup: first owner (auto-operator) + organism + a DUE living-config', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, ownerName + NODE_ID + ts) }) });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    token = tok.body.data.token;
+    token = (await registerOwner(BASE, ownerName)).token;
 
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'Pulse Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
     assert(o.status === 201, `organism: ${o.status}`);
@@ -98,13 +86,9 @@ await test('Right after a pulse, the owner pulse-due door honours the cadence (p
 
 await test('A non-operator owner cannot trigger the scheduler job (403), and anonymous cannot (401)', async () => {
     const name2 = `lpnop${Date.now()}`;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: name2, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register second owner: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: name2, timestamp: ts, signature: await signMsg(reg.body.data.private_key, name2 + NODE_ID + ts) }) });
-    assert(tok.body.ok === true, `second token: ${JSON.stringify(tok.body.error)}`);
+    const second = await registerOwner(BASE, name2);
 
-    const nonOp = await json('/v1/admin/scheduler/jobs/core:living-pulse/trigger', { method: 'POST', headers: auth(tok.body.data.token) });
+    const nonOp = await json('/v1/admin/scheduler/jobs/core:living-pulse/trigger', { method: 'POST', headers: auth(second.token) });
     assert(nonOp.status === 403, `non-operator trigger expected 403, got ${nonOp.status}`);
     const anon = await json('/v1/admin/scheduler/jobs/core:living-pulse/trigger', { method: 'POST' });
     assert(anon.status === 401, `anonymous trigger expected 401, got ${anon.status}`);

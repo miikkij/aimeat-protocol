@@ -23,7 +23,6 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-doc-edit
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -38,22 +37,14 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body: ct.includes('json') ? await res.json() as any : { _raw: await res.text() } };
 }
 
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-async function signMsg(privB64: string, message: string): Promise<string> {
-    const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
-    return Buffer.from(sig).toString('base64');
-}
+import { ownerSignIn } from './helpers/owner-login.js';
 
 /** An owner with a token. Two of them, because part of what this proves is the boundary. */
 async function setupOwner(label: string) {
     const ownerName = `wsdoc${label}${Date.now()}`;
     const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'WS Doc', password: 'WsDoc12345' }) });
     assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const priv = reg.body.data.private_key;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(priv, ownerName + NODE_ID + ts) }) });
+    const tok = await ownerSignIn(BASE, ownerName, 'WsDoc12345');
     assert(tok.status === 200, `token ${tok.status}`);
     return { ownerName, token: tok.body.data.token as string };
 }

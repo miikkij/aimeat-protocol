@@ -49,7 +49,6 @@ import requests
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 AIMEAT_DIR = REPO_ROOT / "aimeat"
-NODE_ID = "aimeat-local-001-dev"
 AGENT_NAME = "loopcrew"
 
 pytestmark = pytest.mark.skipif(
@@ -85,18 +84,26 @@ def _node_sign(private_key_b64: str, message: str) -> str:
     return out.stdout.strip()
 
 
-def _auth_token(base: str, id_or_owner: str, priv: str, is_agent: bool) -> str:
+def _auth_token(base: str, gaii: str, priv: str) -> str:
+    """An agent's token, from its own key (the agent sign-in). An owner signs in with _owner_token."""
     ts = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
-    message = (id_or_owner + ts) if is_agent else (id_or_owner + NODE_ID + ts)
-    sig = _node_sign(priv, message)
-    payload = (
-        {"gaii": id_or_owner, "timestamp": ts, "signature": sig}
-        if is_agent else
-        {"owner": id_or_owner, "timestamp": ts, "signature": sig}
-    )
+    payload = {"gaii": gaii, "timestamp": ts, "signature": _node_sign(priv, gaii + ts)}
     r = requests.post(f"{base}/v1/auth/token", json=payload, timeout=15)
     body = r.json()
     assert body.get("ok") is True, f"auth token failed: {body}"
+    return body["data"]["token"]
+
+
+OWNER_PASSWORD = "ServeLoopback-2026"
+
+
+def _owner_token(base: str, owner: str) -> str:
+    """The owner's token from the password sign-in, POST /v1/ghii/login (the owner-key sign-in is
+    removed in node 4.0.0)."""
+    r = requests.post(f"{base}/v1/ghii/login",
+                      json={"username": owner, "password": OWNER_PASSWORD}, timeout=15)
+    body = r.json()
+    assert body.get("ok") is True, f"owner sign-in failed: {body}"
     return body["data"]["token"]
 
 
@@ -175,10 +182,11 @@ def env(tmp_path_factory: pytest.TempPathFactory) -> Env:
         pytest.fail("node did not become ready within 90s")
 
     # ── Register owner + agent, lay down the connector home ──
-    r = requests.post(f"{e.node_base}/v1/owners",
-                      json={"name": e.owner, "public_key": "placeholder"}, timeout=15)
+    r = requests.post(f"{e.node_base}/v1/ghii",
+                      json={"username": e.owner, "display_name": e.owner, "password": OWNER_PASSWORD},
+                      timeout=15)
     assert r.status_code == 201, f"owner register: {r.status_code} {r.text}"
-    e.owner_token = _auth_token(e.node_base, e.owner, r.json()["data"]["private_key"], False)
+    e.owner_token = _owner_token(e.node_base, e.owner)
 
     r = requests.post(
         f"{e.node_base}/v1/agents",
@@ -189,7 +197,7 @@ def env(tmp_path_factory: pytest.TempPathFactory) -> Env:
     )
     assert r.status_code == 201, f"agent register: {r.status_code} {r.text}"
     gaii = r.json()["data"]["agent"]["gaii"]
-    e.agent_token = _auth_token(e.node_base, gaii, r.json()["data"]["private_key"], True)
+    e.agent_token = _auth_token(e.node_base, gaii, r.json()["data"]["private_key"])
 
     (e.home / "tokens").mkdir()
     (e.home / "tokens" / f"{AGENT_NAME}@{e.owner}.token").write_text(

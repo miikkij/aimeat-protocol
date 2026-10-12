@@ -52,22 +52,13 @@ async function json(path: string, opts: RequestInit = {}, base = BASE) {
     return { status: res.status, body, headers: res.headers };
 }
 
-import * as ed from '@noble/ed25519';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { suitePort } from './helpers/free-port.js';
-ed.hashes.sha512 = (m: Uint8Array) =>
-    new Uint8Array(createHash('sha512').update(m).digest());
-
-async function signMsg(privateKeyB64: string, message: string): Promise<string> {
-    const privKey = Buffer.from(privateKeyB64, 'base64');
-    const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
-    return Buffer.from(sig).toString('base64');
-}
+import { registerOwner, ownerSignIn, tokenRoles } from './helpers/owner-login.js';
 
 // ─── State ───
 const ownerName = 'captest-' + Math.random().toString(36).slice(2, 8);
@@ -93,12 +84,8 @@ await test('Register owner', async () => {
         ownerPrivKey = body.private_key;
         isOperator = true;
     } else {
-        const { status, body } = await json('/v1/owners', {
-            method: 'POST',
-            body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }),
-        });
-        assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-        ownerPrivKey = body.data.private_key;
+        const reg = await registerOwner(BASE, ownerName);
+        ownerPrivKey = reg.privateKey;
     }
 });
 
@@ -112,13 +99,7 @@ await test('Owner auth', async () => {
         assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
         ownerToken = body.token;
     } else {
-        const ts = new Date().toISOString();
-        const message = ownerName + NODE_ID + ts;
-        const sig = await signMsg(ownerPrivKey, message);
-        const { body } = await json('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ gaii: ownerName, timestamp: ts, signature: sig }),
-        });
+        const { body } = await ownerSignIn(BASE, ownerName);
         assert(body.ok === true, 'auth ok');
         ownerToken = body.data.token;
     }
@@ -296,19 +277,7 @@ await test('Stats updated after telemetry', async () => {
 // this test fails on the first assertion with 204 for a capability id that was never created.
 await test('A stranger cannot write telemetry for a capability that does not exist, or its error text', async () => {
     const strangerName = 'capstranger-' + Math.random().toString(36).slice(2, 8);
-    const reg = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }),
-    });
-    assert(reg.status === 201, `stranger register expected 201, got ${reg.status}: ${JSON.stringify(reg.body)}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts);
-    const tk = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: sig }),
-    });
-    assert(tk.body.ok === true, `stranger auth: ${JSON.stringify(tk.body.error)}`);
-    const strangerToken = tk.body.data.token;
+    const strangerToken = (await registerOwner(BASE, strangerName)).token;
 
     // A capability id nobody created: this wrote stats for a row with no owner.
     const ghost = await json(`/v1/capabilities/no-such-cap-${Math.random().toString(36).slice(2, 8)}/telemetry`, {
@@ -794,12 +763,7 @@ await test('A vouch is one row per person: dedup, comment landing, and taking on
         }),
     });
     const vb = 'vch' + Date.now() % 100000;
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: vb, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register voucher: ${reg.status}`);
-    const ts = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, vb + NODE_ID + ts);
-    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: vb, timestamp: ts, signature: sig }) });
-    const vToken = tok.body.data.token as string;
+    const vToken = (await registerOwner(BASE, vb)).token;
 
     const first = await json(`/v1/capabilities/${capIdV}/vouch`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${vToken}` },
@@ -885,20 +849,10 @@ await test('Operator creates a PRIVATE + a PUBLIC capability', async () => {
 });
 
 await test('Register a non-operator owner (B)', async () => {
-    const { status, body } = await json('/v1/owners', {
-        method: 'POST',
-        body: JSON.stringify({ name: nonOp, public_key: 'placeholder' }),
-    });
-    assert(status === 201, `register ${nonOp}: ${status} ${JSON.stringify(body)}`);
-    const priv = body.data.private_key;
-    const ts = new Date().toISOString();
-    const sig = await signMsg(priv, nonOp + NODE_ID + ts);
-    const { body: tb } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: nonOp, timestamp: ts, signature: sig }),
-    });
+    await registerOwner(BASE, nonOp);
+    const { body: tb } = await ownerSignIn(BASE, nonOp);
     assert(tb.ok === true, `auth ${nonOp}: ${JSON.stringify(tb.error)}`);
-    assert(!(tb.data.roles ?? []).includes('operator'), 'B must NOT be an operator');
+    assert(!tokenRoles(tb.data.token).includes('operator'), 'B must NOT be an operator');
     nonOpToken = tb.data.token;
 });
 

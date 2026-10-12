@@ -25,8 +25,7 @@
  *   v1.0.0 — 2026-10-11 — Initial (docs audit phase 2). On the code before: the installer was credited
  *     nothing for a listing, and the purchase debited the buyer price + fee in morsels.
  */
-import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { registerOwner, ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -58,19 +57,6 @@ async function json(path: string, opts: RequestInit = {}) {
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text(), _ct: ct };
     return { status: res.status, body };
-}
-
-ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
-
-async function ownerTokenFor(name: string, privKey: string): Promise<string> {
-    const timestamp = new Date().toISOString();
-    const sig = await ed.signAsync(new TextEncoder().encode(name + NODE_ID + timestamp), Buffer.from(privKey, 'base64'));
-    const { body } = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp, signature: Buffer.from(sig).toString('base64') }),
-    });
-    assert(body.ok === true, `token for ${name}: ${JSON.stringify(body.error)}`);
-    return body.data.token as string;
 }
 
 const stamp = Date.now();
@@ -107,19 +93,15 @@ console.log('Setup');
 
 await test('an operator, who installs the bundled extensions', async () => {
     const { status, body } = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: operatorName }),
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: operatorName, password: OWNER_PASSWORD }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    tokens[operatorName] = await ownerTokenFor(operatorName, body.private_key);
+    tokens[operatorName] = await ownerToken(BASE, operatorName);
 });
 
 for (const name of [sellerName, buyerName]) {
     await test(`a member of the node: ${name.replace(String(stamp), '')}`, async () => {
-        const { status, body } = await json('/v1/owners', {
-            method: 'POST', body: JSON.stringify({ name, public_key: 'placeholder' }),
-        });
-        assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-        tokens[name] = await ownerTokenFor(name, body.data.private_key);
+        tokens[name] = (await registerOwner(BASE, name)).token;
     });
 }
 

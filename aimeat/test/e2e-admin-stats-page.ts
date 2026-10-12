@@ -23,7 +23,6 @@
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -41,6 +40,7 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function signMsg(privB64: string, message: string): Promise<string> {
     const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'));
@@ -64,15 +64,9 @@ let ownerToken = '';
 let narrowToken = '';
 
 await test('Setup: an operator, and an agent holding memory:read only', async () => {
-    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: ownerName, public_key: 'placeholder' }) });
-    assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body.error ?? '')}`);
-    const ownerKey = reg.body.data.private_key as string;
+    await registerOwner(BASE, ownerName);
 
-    let ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ownerKey, ownerName + NODE_ID + ts) }),
-    });
+    const tok = await ownerSignIn(BASE, ownerName);
     assert(tok.body.ok === true, `owner token: ${JSON.stringify(tok.body.error)}`);
     ownerToken = tok.body.data.token;
 
@@ -85,9 +79,9 @@ await test('Setup: an operator, and an agent holding memory:read only', async ()
     const gaii = agent.body.data.agent.gaii as string;
     const agentKey = agent.body.data.private_key as string;
 
-    // An agent signs gaii + timestamp; an owner signs name + nodeId + timestamp. Two shapes, and
-    // the wrong one here reads as "Invalid signature" rather than as a mistake in the test.
-    ts = new Date().toISOString();
+    // An agent signs gaii + timestamp, with no node id in it; the wrong shape here reads as
+    // "Invalid signature" rather than as a mistake in the test.
+    const ts = new Date().toISOString();
     const atok = await json('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(agentKey, gaii + ts) }),
