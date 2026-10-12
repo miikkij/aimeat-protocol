@@ -9,12 +9,18 @@
  *   surfaces can never drift on gates (public record, priced tool, dotted appIds) or on the sku
  *   grammar "app-tool:<owner>/<appId>:<tool>".
  * @structure PricedAppTool · OwnAppTool · publicManifestTools · listPublicAppTools ·
- *   listPricedAppTools · listOwnCallableAppTools · toolPacing · paceFreeToolUse · FreeToolPacing
+ *   listPricedAppTools · listOwnCallableAppTools · OwnerAppToolName · listOwnerAppToolNames ·
+ *   toolPacing · paceFreeToolUse · FreeToolPacing
  * @usage
  *   const tools = await listPricedAppTools(storage, config, 100);
  *   const all = await listPublicAppTools(storage, config, { pricedOnly: false });
  *   const mine = await listOwnCallableAppTools(storage, config, req.auth.owner, 500);
+ *   const byApp = await listOwnerAppToolNames(storage, ownerGhii);
  * @version-history
+ *   v1.5.0 — 2026-10-12 — listOwnerAppToolNames(): the names and descriptions of every tool an
+ *     owner's own agent can call on the owner's apps, priced ones included, by app. The home's
+ *     agent draft reads it (GET /v1/home/agents/choices?include=tools). It and
+ *     listOwnCallableAppTools are made from one read of the owner's manifests (ownPublicManifests).
  *   v1.4.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). An entry carries `toll_morsels`; `price` is a deprecated mirror of it
  *     until 4.0.0. The catalog lists every tool offered to other owners (isToolOffered: a money price,
@@ -170,6 +176,27 @@ export async function listPublicAppTools(
   return out;
 }
 
+/** One of an owner's public, well-formed tool manifests. */
+interface OwnManifest { appId: string; ownerName: string; updatedAt: string; tools: AppTool[] }
+
+/**
+ * The public, well-formed tool manifests stored under one owner, in the store's order. The one read
+ * both owner listings below are made from: only the records under `ownerGhii`, the identity the
+ * invoke route reads a manifest from, so another owner's tools cannot enter either list.
+ */
+async function ownPublicManifests(storage: Storage, ownerGhii: string): Promise<OwnManifest[]> {
+  const out: OwnManifest[] = [];
+  const records = await storage.listMemory(ownerGhii, { prefix: 'apps.', visibility: 'public' });
+  for (const rec of records) {
+    const appId = appIdFromToolsKey(rec.key);
+    if (!appId) continue;
+    const tools = publicManifestTools(rec);
+    if (!tools) continue;
+    out.push({ appId, ownerName: localAccountName(rec.ownerGaii), updatedAt: rec.updatedAt, tools });
+  }
+  return out;
+}
+
 /**
  * The UNPRICED callable tools of one owner's PUBLIC manifests: what that owner's own principals
  * (the owner, their agents, their apps) can run directly on the WebMCP invoke route.
@@ -187,14 +214,8 @@ export async function listOwnCallableAppTools(
   cap = 500,
 ): Promise<OwnAppTool[]> {
   const out: OwnAppTool[] = [];
-  const records = await storage.listMemory(ownerGhii, { prefix: 'apps.', visibility: 'public' });
-  for (const rec of records) {
+  for (const { appId, ownerName, updatedAt, tools } of await ownPublicManifests(storage, ownerGhii)) {
     if (out.length >= cap) break;
-    const appId = appIdFromToolsKey(rec.key);
-    if (!appId) continue;
-    const tools = publicManifestTools(rec);
-    if (!tools) continue;
-    const ownerName = localAccountName(rec.ownerGaii);
     for (const tool of tools) {
       if (out.length >= cap) break;
       if (isToolOffered(tool) || !tool.action_id) continue;
@@ -203,7 +224,7 @@ export async function listOwnCallableAppTools(
         app: `${ownerName}/${appId}`,
         ownerName,
         appId,
-        updatedAt: rec.updatedAt,
+        updatedAt,
         name: tool.name,
         description: tool.description ?? '',
         inputSchema: tool.inputSchema ?? { type: 'object', properties: {} },
@@ -214,6 +235,60 @@ export async function listOwnCallableAppTools(
         own: true,
       });
     }
+  }
+  return out;
+}
+
+/** One tool of an owner's app, as a page names it to the person or to a model: no schema, no price. */
+export interface OwnerAppToolName {
+  name: string;
+  /** "app-tool:<owner>/<appId>:<tool>", the address an agent calls the tool by. */
+  sku: string;
+  /** The tool's own description, cut at OWNER_TOOL_DESCRIPTION_MAX characters. */
+  description: string;
+}
+
+/** The longest description listOwnerAppToolNames answers with. A manifest allows 10 000 characters. */
+export const OWNER_TOOL_DESCRIPTION_MAX = 300;
+
+/**
+ * Every tool an agent of this owner can call on the owner's own apps, by app id (the published
+ * filename), in the manifest's order: the tools of the owner's PUBLIC manifests that have something
+ * to run (`action_id`), priced or not. The owner's own principals run both free on the WebMCP
+ * invoke route (services/metered-access.ts answers `free_owner` before any price is asked).
+ *
+ * A tool with no `action_id` is left out whether or not it has a price. It is fulfilled as a task,
+ * and only through a checkout session (commerce/sellable-resolvers.ts); a direct call answers 422
+ * TOOL_NOT_INVOKABLE for the owner too (routes/webmcp.ts). The first version of this function
+ * listed a priced one as callable, and a draft would have told an agent to call a tool that
+ * nothing runs (found in review, 2026-10-12).
+ *
+ * Reads only the records stored under `ownerGhii`, the same read as listOwnCallableAppTools, so
+ * another owner's tools cannot enter. Stops at `cap` tools. Measured on aimeat.io on 2026-10-12:
+ * one account, 26 manifests, 157 such tools, 22 of them priced.
+ */
+export async function listOwnerAppToolNames(
+  storage: Storage,
+  ownerGhii: string,
+  cap = 500,
+): Promise<Map<string, OwnerAppToolName[]>> {
+  const out = new Map<string, OwnerAppToolName[]>();
+  let count = 0;
+  for (const { appId, ownerName, tools } of await ownPublicManifests(storage, ownerGhii)) {
+    if (count >= cap) break;
+    const named: OwnerAppToolName[] = [];
+    const appRef = `${ownerName}/${appId}`;
+    for (const tool of tools) {
+      if (count >= cap) break;
+      if (!tool.action_id) continue;
+      named.push({
+        name: tool.name,
+        sku: `app-tool:${appRef}:${tool.name}`,
+        description: (tool.description ?? '').trim().slice(0, OWNER_TOOL_DESCRIPTION_MAX),
+      });
+      count++;
+    }
+    if (named.length > 0) out.set(appId, named);
   }
   return out;
 }

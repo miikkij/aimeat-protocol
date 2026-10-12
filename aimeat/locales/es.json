@@ -11222,7 +11222,11 @@
       "cancel": "Cancelar",
       "after": "Puedes cambiar o eliminar el agente cuando quieras.",
       "offer": "Qué ofrece",
-      "offerHint": "Esto aparece en tu página Pide a tus agentes cuando el agente haya iniciado. No tiene precio y no está en el Exchange."
+      "offerHint": "Esto aparece en tu página Pide a tus agentes cuando el agente haya iniciado. No tiene precio y no está en el Exchange.",
+      "usesApps": "Aplicaciones cuyas herramientas usa",
+      "readsPlaces": "Espacios de trabajo que lee",
+      "writesPlaces": "Espacios de trabajo que lee y en los que escribe",
+      "inOrganism": "En el organismo {organism}"
     },
     "agentPage": {
       "signInTitle": "Tu agente",

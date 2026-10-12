@@ -22,6 +22,7 @@
  *   draftAppOptions · plainOption · buildRequest · readFullBuildPrompt · WHO
  * @usage import { draftAppOptions, buildRequest } from '/js/services/agent-ties.js';
  * @version-history
+ *   v1.1.0 — 2026-10-12 — readTieChoices({ tools: true }) asks for each app's tools as well.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
 import { api, apiGet } from '/js/api.js';
@@ -59,10 +60,12 @@ export async function clearWorkplace(agent) {
 
 /**
  * What the person can pick for an agent's ties, in one read (GET /v1/home/agents/choices):
- * `places`, the workspaces of the organisms they are in, and `apps`, their own apps.
+ * `places`, the workspaces of the organisms they are in, and `apps`, their own apps. With
+ * `tools`, each app carries the tools an agent of the person can call on it, which the page that
+ * drafts a new agent gives to the model.
  */
-export async function readTieChoices() {
-  const resp = await apiGet('/v1/home/agents/choices');
+export async function readTieChoices({ tools = false } = {}) {
+  const resp = await apiGet('/v1/home/agents/choices' + (tools ? '?include=tools' : ''));
   return { places: resp?.data?.places ?? [], apps: resp?.data?.apps ?? [] };
 }
 

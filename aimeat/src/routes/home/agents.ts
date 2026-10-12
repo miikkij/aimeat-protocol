@@ -17,6 +17,8 @@
  * @structure registerHomeAgentsRoutes(router, ctx)
  * @usage registerHomeAgentsRoutes(router, ctx);
  * @version-history
+ *   v1.2.0 — 2026-10-12 — GET /v1/home/agents/choices?include=tools: each app with the tools an
+ *     agent of the person can call on it.
  *   v1.1.0 — 2026-10-11 — PUT and DELETE /v1/agents/:name/workplace: where an agent's finished
  *     work goes (services/agent-workplace.ts).
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
@@ -51,8 +53,11 @@ export function registerHomeAgentsRoutes(router: Router, ctx: HomeRouteCtx): voi
 
     // GET /v1/home/agents/choices — what the person can pick for an agent's ties: the workspaces of
     // the organisms they are in (where its work may go) and their own apps (which may show it).
+    // ?include=tools adds, to each app, the tools an agent of the person can call on it: the page
+    // that drafts a new agent gives them to the model that writes the draft.
     router.get('/v1/home/agents/choices', requireAuth(), requireRole('owner'), requireOwnerSession(config.nodeId), async (req, res) => {
-        res.json(success(config.nodeId, await readTieChoices({ config, storage }, req.auth!.owner)));
+        const include = typeof req.query.include === 'string' ? req.query.include.split(',') : [];
+        res.json(success(config.nodeId, await readTieChoices({ config, storage }, req.auth!.owner, { tools: include.includes('tools') })));
     });
 
     /** Who is asking, in the terms services/agent-workplace.ts takes. */
