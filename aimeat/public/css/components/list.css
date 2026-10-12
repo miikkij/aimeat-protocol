@@ -15,6 +15,8 @@
  *   thumbnail's second bar, a found word) are poster.css's .poster-chip--sun in the markup.
  *   NOTE: this file must be linked in spa.html, after listing.css.
  * @version-history
+ *   v1.14.0 — 2026-10-12 — The index row .is-members: its mark's edge is double (4px), apart from the
+ *     faded row's dashed one (Jouni's choice for appcat's Community listing).
  *   v1.13.1 — 2026-09-27 — The index: the state's capitals read var(--shape-case-label), and the open
  *     panel's literal corner 0 goes (nothing under it draws a corner, so AIMEAT is unchanged; a theme
  *     reaches the case). check:shape-tokens.
@@ -335,6 +337,9 @@
 .listing.list--index > .listing-row.is-open { background: var(--shape-chosen-ground); color: var(--on-sun); }
 .listing.list--index > .listing-row.is-open .listing-name small, .listing.list--index > .listing-row.is-open > .listing-desc { color: var(--on-sun); }
 .listing.list--index > .listing-row.is-faded .avatar { border-style: dashed; border-color: var(--muted); }
+/* A thing only the node's signed-in members see (appcat's Community listing): a double edge, so it
+   reads apart from the faded row's dashed one at a glance (Jouni's choice, 2026-10-12). */
+.listing.list--index > .listing-row.is-members .avatar { border-style: double; border-width: 4px; }
 /* The old page faded the whole row, its ground too: an unlisted row under the pointer or opened
    shows its ground at the same 60%. */
 .listing.list--index > .listing-row.is-faded:hover { background: color-mix(in srgb, var(--bg-surface) 60%, transparent); }

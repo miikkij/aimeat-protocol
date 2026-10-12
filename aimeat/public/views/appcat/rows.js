@@ -12,6 +12,7 @@
  * @structure AppRow({ sa, i, own, open, onToggle, starred }) · openApp(sa) · openDraft(sa)
  * @usage html`<${AppRow} key=${ref} sa=${sa} i=${i} own open=${ref === openRef} onToggle=${…} starred=${favs.has(ref)} />`
  * @version-history
+ *   v1.2.0 — 2026-10-12 — A community app's row is List `members`: its icon has a double edge.
  *   v1.1.0 — 2026-10-12 — The state column and the line say Community for an app listed to signed-in
  *     members only, on the owner's row and on another person's; only an unlisted row is faded.
  *   v1.0.0 — 2026-09-27 — Initial (appcat, the shell).
@@ -98,7 +99,7 @@ export function AppRow({ sa, i, own, open, onToggle, starred }) {
       ${sa.forkable ? html`<${Action} title=${x('card.forkHint')} onClick=${() => openDialog('fork', { owner: sa.owner, filename: sa.filename, version: sa.version_number || 0 })}>${x('card.fork')}<//>` : null}
       ${shipsAgents(sa) ? html`<${Action} title=${x('card.agentHint')} onClick=${() => openDialog('agents', { owner: sa.owner, filename: sa.filename })}>${x('card.agent')}<//>` : null}
       <${Action} title=${x('ctx.details')} onClick=${() => openDetail(sa)}>${x('card.details')}<//>`;
-  return html`<${Row} order=${i} open=${open} onToggle=${onToggle} faded=${listing === 'unlisted'}>
+  return html`<${Row} order=${i} open=${open} onToggle=${onToggle} faded=${listing === 'unlisted'} members=${listing === 'community'}>
     <${Cell} sign>${n}<//>
     <${Lead} text=${appIcon(sa)} />
     <${Name} before=${star} after=${markers(sa, own)} meta=${meta}>${appName(sa)}<//>
