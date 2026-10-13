@@ -101,6 +101,10 @@ import { logger } from '../utils/logger.js';
 import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
 import { registerIsOwed } from './app-build-level-meta.js';
 import { undeclaredScopeFindings } from './app-scope-needs.js';
+import { readTextCapped } from '../utils/read-capped.js';
+
+/** The most of one cortex lib the scope check reads; a larger one is not read (its calls are not seen). */
+const LIB_READ_MAX_BYTES = 2 * 1024 * 1024;
 
 /**
  * One finding, shaped so an agent can act on it without prose parsing: a curated pitfall id, the
@@ -590,8 +594,9 @@ async function readNodeLib(path: string, config: AimeatConfig): Promise<string |
   const target = new URL(`http://127.0.0.1:${config.port}`);
   target.pathname = path;
   try {
-    const res = await fetch(target, { redirect: 'manual', headers: { 'User-Agent': 'aimeat-publish-asset-probe' }, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-    return res.ok ? (await res.text()).slice(0, 2_000_000) : null;
+    const libRes = await fetch(target, { redirect: 'manual', headers: { 'User-Agent': 'aimeat-publish-asset-probe' }, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    if (!libRes.ok) { await libRes.body?.cancel(); return null; }
+    return await readTextCapped(libRes, LIB_READ_MAX_BYTES);
   } catch (err) {
     logger.warn('app artifact lint: a cortex lib could not be read for the scope check', { path, error: String(err) });
     return null;
