@@ -263,7 +263,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:9e4626764f7ba49be266dcc7"
+      "digest": "sha256:85e6c5b91528de9658fb2e98"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-12",
@@ -599,7 +599,7 @@
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "562ec994ef35b79c",
-      "aimeat/src/tool-catalog/scopes.ts": "e894a4db577f6054",
+      "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "83c214d092ea4949",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "dc1d5f9f4f61d0ea",
       "aimeat/src/data/basic-agents.ts": "24d901efdc265451"
