@@ -8,6 +8,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.14.1 — 2026-10-13 — archiveHandler hands the session's scopes to the fenced-space rule: a
+ *     session that covers organism:direct archives and brings back a record of a space that names
+ *     extensions (ruled by the developer on 2026-10-13).
  *   v1.14.0 — 2026-10-13 — archiveHandler asks the fenced-space rule (services/fenced-space.ts) for a
  *     record or a space before it archives or brings back: a record space that names extensions
  *     takes that from an agent only through one of them (ruled by the developer on 2026-10-13).
@@ -746,7 +749,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // stays with the creator-or-admin rule above.
     const fenceTarget = archiveFenceTarget(v.target);
     if (fenceTarget && v.target.ws) {
-      const fenced = await fencedSpaceRefusal({ storage, config }, { principal: actor, roles: callerOf(req, config.nodeId, storage).roles }, id, v.target.ws, fenceTarget);
+      const session = callerOf(req, config.nodeId, storage);
+      const fenced = await fencedSpaceRefusal({ storage, config }, { principal: actor, roles: session.roles, scopes: session.scopes }, id, v.target.ws, fenceTarget);
       if (fenced) { res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details)); return; }
     }
     try {

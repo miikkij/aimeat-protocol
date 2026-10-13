@@ -20,6 +20,9 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   v1.7.0 — 2026-10-13 — The organism namespace rule is asked with the session's scopes, which the
+ *     fenced-space rule reads: a session that covers organism:direct removes and puts back a record
+ *     of a space that names extensions (ruled by the developer on 2026-10-13).
  *   v1.6.0 — 2026-10-12 — With owner_scope an agent holding memory:write-as-owner deletes and
  *     restores a record stored under its owner's own identity (and memory:write-reserved for a
  *     reserved key), the two words the write under the owner asks. The lookup covered the caller and
@@ -183,8 +186,12 @@ async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'dele
   }
   const operatorOverride = !!req.ownerOverride && (req.roles ?? []).includes('operator');
   if (!operatorOverride) {
+    // The session's scopes ride along for the fenced-space rule (services/fenced-space.ts): a session
+    // that covers organism:direct removes and puts back a record of a space that names extensions.
+    // No value is handed over, so a workspace's manifest record that declares a fence is neither
+    // removed nor put back by a caller that may not change one.
     const denied = await checkOrganismNamespaceAccess(deps, {
-      principal: req.caller, owner: req.ownerName, roles: req.roles ?? [],
+      principal: req.caller, owner: req.ownerName, roles: req.roles ?? [], scopes: req.scopes,
     }, req.key, 'write');
     if (denied) return { ok: false, code: denied.code, message: denied.message, status: denied.status };
   }

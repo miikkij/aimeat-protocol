@@ -10,8 +10,15 @@
  *     - what counts as a fence, and that a list of invalid entries closes the space
  *     - the match by namespace prefix, for a key in any form and for an archived subtree
  *     - that a caller the rule allows directly costs no manifest read
+ *   The second part (ruled 2026-10-13): the permission `organism:direct` is read from the session's
+ *   scopes with the node's one cover test and fails closed without them; a change to a fenced
+ *   space's list, object type, namespace or backing is protected and every other change is not; and
+ *   the manifest record is a target of the rule, compared by value where a code path hands the value
+ *   over and read as a removal where it does not.
  * @usage cd aimeat && pnpm exec vitest run test/unit/fenced-space.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-13 — organism:direct, mayChangeFence, protectedFenceChanges and
+ *     fenceChangeRefusal, and the manifest record as a target of the rule.
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -19,7 +26,9 @@ import type { Storage } from '../../src/storage/interface.js';
 import {
     callerIsFenced, fenceOf, fencesOf, fencesMet, fencedSpaceMessage, fencedSpaceRefusal, fencedKeysRefusal,
     extensionMarker, archiveFenceTarget, fencedFormRefusal,
+    DIRECT_WRITE_SCOPE, mayChangeFence, protectedFenceChanges, fenceChangeRefusal, fenceChangeMessage,
 } from '../../src/services/fenced-space.js';
+import { isOutsideWildcard } from '../../src/utils/scope-coverage.js';
 
 const NODE = 'test-node';
 const ORG = 'org1';
@@ -240,6 +249,200 @@ describe('fencedKeysRefusal: keys of several workspaces', () => {
         expect(await fencedKeysRefusal(deps, agent, keys.slice(0, 4))).toBeNull();
         expect(await fencedKeysRefusal(deps, person, keys)).toBeNull();
         expect(reads.manifest).toBe(2);
+    });
+});
+
+// ── The permission organism:direct, and the protected list (ruled 2026-10-13, second part). ──
+
+const withScopes = (scopes: string[] | undefined) => ({ ...agent, ...(scopes ? { scopes } : {}) });
+
+describe('organism:direct: a session that covers the word writes a fenced space directly', () => {
+    it('reads the session\'s scopes with the node\'s one cover test: the word, `*` and the family wildcard', () => {
+        expect(DIRECT_WRITE_SCOPE).toBe('organism:direct');
+        expect(callerIsFenced(withScopes(['memory:write', 'organism:direct']), NODE)).toBe(false);
+        expect(callerIsFenced(withScopes(['*']), NODE)).toBe(false);
+        expect(callerIsFenced(withScopes(['organism:*']), NODE)).toBe(false);
+        // An ordinary word: no list keeps it out of the wildcard.
+        expect(isOutsideWildcard('organism:direct')).toBe(false);
+    });
+
+    it('FAILS CLOSED: a list without the word, an empty list and no list at all stay fenced', () => {
+        expect(callerIsFenced(withScopes(['memory:read', 'memory:write', 'organism:read', 'organism:write', 'organism:rows']), NODE)).toBe(true);
+        expect(callerIsFenced(withScopes(['memory:*']), NODE)).toBe(true);
+        expect(callerIsFenced(withScopes([]), NODE)).toBe(true);
+        expect(callerIsFenced(withScopes(undefined), NODE)).toBe(true);
+    });
+
+    it('is a session\'s word: an identity with no session is decided by its shape, whatever list is beside it', () => {
+        expect(callerIsFenced({ principal: AGENT, scopes: ['*'] }, NODE)).toBe(true);
+        expect(callerIsFenced({ principal: `alice@${NODE}`, scopes: [] }, NODE)).toBe(false);
+    });
+
+    it('changes nothing for the callers the rule already allowed', () => {
+        expect(callerIsFenced({ ...person, scopes: [] }, NODE)).toBe(false);
+        expect(callerIsFenced({ principal: `alice@${NODE}`, roles: ['app'], scopes: ['memory:read'] }, NODE)).toBe(false);
+    });
+
+    it('lets the rule return before the manifest is read, and refuses the narrowed session of the same agent', async () => {
+        const key = `${ROOT}.app.decisions.d1.draft`;
+        const { deps, reads } = store([DECISIONS, NOTES]);
+        expect(await fencedSpaceRefusal(deps, withScopes(['organism:direct']), ORG, WS, { key })).toBeNull();
+        expect(await fencedSpaceRefusal(deps, withScopes(['*']), ORG, WS, { key })).toBeNull();
+        expect(reads.manifest).toBe(0);
+        expect((await fencedSpaceRefusal(deps, withScopes(['memory:write', 'organism:write']), ORG, WS, { key }))?.details.reason).toBe('FENCED_SPACE');
+        expect((await fencedKeysRefusal(deps, withScopes(['memory:delete']), [key]))?.code).toBe('ACCESS_DENIED');
+        expect(await fencedKeysRefusal(deps, withScopes(['organism:direct']), [key])).toBeNull();
+    });
+});
+
+describe('mayChangeFence: who changes the list of a fenced space', () => {
+    it('admits the account holder in person and a session that covers organism:direct', () => {
+        expect(mayChangeFence(person)).toBe(true);
+        expect(mayChangeFence(withScopes(['organism:direct']))).toBe(true);
+        expect(mayChangeFence(withScopes(['*']))).toBe(true);
+    });
+
+    it('refuses an agent without the word, a hosted app whatever its words, and a caller with no session', () => {
+        expect(mayChangeFence(withScopes(['organism:write', 'memory:write']))).toBe(false);
+        expect(mayChangeFence(withScopes(undefined))).toBe(false);
+        // A hosted app writes records directly; its way to a list is the add-only route.
+        expect(mayChangeFence({ principal: `alice@${NODE}`, roles: ['app'], scopes: ['organism:write'] })).toBe(false);
+        expect(mayChangeFence({ principal: `alice@${NODE}`, roles: ['app'], scopes: ['*', 'organism:direct'] })).toBe(false);
+        expect(mayChangeFence({ principal: `alice@${NODE}` })).toBe(false);
+    });
+});
+
+describe('fenceChangeRefusal: the protected change', () => {
+    const ROWS = { name: 'log', namespace: 'app.log', backing: 'rows', extensions: ['alice/ingest'] };
+    const before = { name: 'WS', objectTypes: [DECISIONS, NOTES, ROWS] };
+    const replace = (name: string, change: (o: Record<string, unknown>) => Record<string, unknown> | null) =>
+        ({ ...before, objectTypes: before.objectTypes.map(o => (o.name === name ? change(o) : o)).filter(o => o !== null) });
+    const touched = (after: unknown) => protectedFenceChanges(before, after);
+
+    it('protects the list of a fenced space: removed, emptied, widened, replaced, reordered, respelled', () => {
+        const changes: Array<[string, unknown]> = [
+            ['removed', { name: DECISIONS.name, namespace: DECISIONS.namespace, backing: DECISIONS.backing }],
+            ['emptied', { ...DECISIONS, extensions: [] }],
+            ['null', { ...DECISIONS, extensions: null }],
+            ['widened', { ...DECISIONS, extensions: ['Alice/Muistio', 'alice/other'] }],
+            ['replaced', { ...DECISIONS, extensions: ['bob/muistio'] }],
+            ['respelled', { ...DECISIONS, extensions: ['alice/muistio'] }],
+        ];
+        for (const [what, ot] of changes) {
+            expect(touched(replace('decision', () => ot as Record<string, unknown>)), what).toEqual([{ space: 'decision', change: 'extensions' }]);
+        }
+        const two = { objectTypes: [{ ...DECISIONS, extensions: ['alice/a', 'alice/b'] }] };
+        expect(protectedFenceChanges(two, { objectTypes: [{ ...DECISIONS, extensions: ['alice/b', 'alice/a'] }] })).toEqual([{ space: 'decision', change: 'extensions' }]);
+    });
+
+    it('protects the object type itself: removed, its namespace moved, its backing changed', () => {
+        expect(touched(replace('decision', () => null))).toEqual([{ space: 'decision', change: 'removed' }]);
+        expect(touched(replace('decision', o => ({ ...o, namespace: 'app.elsewhere' })))).toEqual([{ space: 'decision', change: 'namespace' }]);
+        expect(touched(replace('decision', o => ({ ...o, backing: 'rows' })))).toEqual([{ space: 'decision', change: 'backing' }]);
+        expect(touched(replace('decision', o => ({ ...o, backing: 'tasks' })))).toEqual([{ space: 'decision', change: 'backing' }]);
+    });
+
+    it('reads a manifest that is gone or unreadable as every fence removed', () => {
+        for (const after of [null, undefined, 'manifest', [], {}, { objectTypes: 'none' }, { objectTypes: [] }]) {
+            expect(touched(after), JSON.stringify(after)).toEqual([{ space: 'decision', change: 'removed' }]);
+        }
+    });
+
+    it('protects a fence that opens to nobody too: correcting its one invalid entry is a change of the list', () => {
+        const closed = { objectTypes: [{ ...DECISIONS, extensions: ['alice x/muistio'] }] };
+        expect(protectedFenceChanges(closed, { objectTypes: [DECISIONS] })).toEqual([{ space: 'decision', change: 'extensions' }]);
+        expect(protectedFenceChanges(closed, closed)).toEqual([]);
+    });
+
+    it('leaves every other change as it is', () => {
+        const unprotected: Array<[string, unknown]> = [
+            ['the same manifest', before],
+            ['a copy of it', JSON.parse(JSON.stringify(before))],
+            ['another field of the fenced space', replace('decision', o => ({ ...o, writeRole: 'admin', schemaRef: 'schema:decision@2' }))],
+            ['the fenced space under a new name', replace('decision', o => ({ ...o, name: 'ruling' }))],
+            ['a space with no fence, changed', replace('note', o => ({ ...o, namespace: 'shared.other', backing: 'tasks' }))],
+            ['a space with no fence, removed', replace('note', () => null)],
+            ['a space with no fence that now names an extension', replace('note', o => ({ ...o, extensions: ['alice/muistio'] }))],
+            ['a row space\'s list, which is the row service\'s', replace('log', o => ({ ...o, extensions: [] }))],
+            ['a row space removed', replace('log', () => null)],
+            ['a new object type that names extensions', { ...before, objectTypes: [...before.objectTypes, { name: 'action', namespace: 'app.actions', extensions: ['alice/tasks'] }] }],
+            ['the order of the object types', { ...before, objectTypes: [...before.objectTypes].reverse() }],
+            ['the name of the workspace', { ...before, name: 'Renamed' }],
+        ];
+        for (const [what, after] of unprotected) expect(touched(after), what).toEqual([]);
+        // A manifest that declares no fence has nothing to protect.
+        expect(protectedFenceChanges({ objectTypes: [NOTES, ROWS] }, null)).toEqual([]);
+        expect(protectedFenceChanges(null, { objectTypes: [DECISIONS] })).toEqual([]);
+    });
+
+    it('refuses a protected change with 403 ACCESS_DENIED, the spaces it touches and the permission by name', () => {
+        const after = replace('decision', () => null);
+        const refusal = fenceChangeRefusal(before, after, withScopes(['organism:write', 'memory:write']));
+        expect(refusal).toEqual({
+            status: 403, code: 'ACCESS_DENIED', message: fenceChangeMessage(['decision']),
+            details: { reason: 'FENCE_CHANGE', spaces: [{ space: 'decision', change: 'removed' }] },
+        });
+        expect(refusal?.message).toContain('organism:direct');
+        expect(refusal?.message).toContain('decision');
+    });
+
+    it('accepts it from the account holder in person and from a session that covers organism:direct, and from nobody else', () => {
+        const after = replace('decision', () => null);
+        expect(fenceChangeRefusal(before, after, person)).toBeNull();
+        expect(fenceChangeRefusal(before, after, withScopes(['organism:direct']))).toBeNull();
+        expect(fenceChangeRefusal(before, after, withScopes(['*']))).toBeNull();
+        expect(fenceChangeRefusal(before, after, withScopes(undefined))?.code).toBe('ACCESS_DENIED');
+        expect(fenceChangeRefusal(before, after, { principal: `alice@${NODE}`, roles: ['app'], scopes: ['organism:write'] })?.code).toBe('ACCESS_DENIED');
+        expect(fenceChangeRefusal(before, after, { principal: `alice@${NODE}` })?.code).toBe('ACCESS_DENIED');
+        // A change that is not protected is nobody's refusal.
+        expect(fenceChangeRefusal(before, replace('note', () => null), withScopes(undefined))).toBeNull();
+    });
+});
+
+describe('the manifest record as a target of the rule', () => {
+    const manifestKey = `${ROOT}.meta.manifest`;
+    const noWord = withScopes(['memory:write', 'memory:delete', 'organism:write']);
+
+    it('reads a write whose value the code path does not hand over as the removal of every fence', async () => {
+        const { deps } = store([DECISIONS, NOTES]);
+        const refusal = await fencedSpaceRefusal(deps, noWord, ORG, WS, { key: manifestKey });
+        expect(refusal?.details).toEqual({ reason: 'FENCE_CHANGE', spaces: [{ space: 'decision', change: 'removed' }] });
+        expect((await fencedSpaceRefusal(deps, noWord, ORG, WS, { keys: [`${ROOT}.shared.notes.n1`, manifestKey] }))?.details.reason).toBe('FENCE_CHANGE');
+        expect((await fencedKeysRefusal(deps, noWord, [manifestKey]))?.details.reason).toBe('FENCE_CHANGE');
+    });
+
+    it('compares the value a code path hands over, and takes a write that keeps every fence', async () => {
+        const { deps } = store([DECISIONS, NOTES]);
+        expect(await fencedSpaceRefusal(deps, noWord, ORG, WS, { key: manifestKey }, { after: { objectTypes: [DECISIONS, NOTES], name: 'renamed' } })).toBeNull();
+        expect(await fencedSpaceRefusal(deps, noWord, ORG, WS, { key: manifestKey }, { after: { objectTypes: [DECISIONS] } })).toBeNull();
+        expect((await fencedSpaceRefusal(deps, noWord, ORG, WS, { key: manifestKey }, { after: { objectTypes: [NOTES] } }))?.details.reason).toBe('FENCE_CHANGE');
+        // A code path that joins object types and changes none says so, and makes its own comparison.
+        expect(await fencedSpaceRefusal(deps, noWord, ORG, WS, { key: manifestKey }, { keepsFences: true })).toBeNull();
+    });
+
+    it('asks nothing of the account holder in person or of a session with the word, and reads no manifest for them', async () => {
+        const { deps, reads } = store([DECISIONS, NOTES]);
+        expect(await fencedSpaceRefusal(deps, person, ORG, WS, { key: manifestKey })).toBeNull();
+        expect(await fencedSpaceRefusal(deps, withScopes(['organism:direct']), ORG, WS, { key: manifestKey })).toBeNull();
+        expect(reads.manifest).toBe(0);
+    });
+
+    it('refuses a hosted app, which the fence itself lets write records', async () => {
+        const { deps } = store([DECISIONS, NOTES]);
+        const app = { principal: `alice@${NODE}`, roles: ['app'], scopes: ['memory:write'] };
+        expect((await fencedSpaceRefusal(deps, app, ORG, WS, { key: manifestKey }))?.details.reason).toBe('FENCE_CHANGE');
+        expect(await fencedSpaceRefusal(deps, app, ORG, WS, { key: `${ROOT}.app.decisions.d1.draft` })).toBeNull();
+    });
+
+    it('is the record itself and nothing beside it, and nothing at all where no fence is declared', async () => {
+        const { deps } = store([DECISIONS, NOTES]);
+        for (const key of [`${manifestKey}.draft`, `${manifestKey}.latest`, `${ROOT}.meta.readme`, `${ROOT}.meta.manifestx`, `organism.${ORG}.meta.manifest`]) {
+            expect(await fencedSpaceRefusal(deps, noWord, ORG, WS, { key }), key).toBeNull();
+        }
+        // An archive of the record changes no value, and the rule reads an archived manifest too.
+        expect(await fencedSpaceRefusal(deps, noWord, ORG, WS, { subtree: manifestKey })).toBeNull();
+        expect(await fencedSpaceRefusal(store([NOTES]).deps, noWord, ORG, WS, { key: manifestKey })).toBeNull();
+        expect(await fencedSpaceRefusal(store(null).deps, noWord, ORG, WS, { key: manifestKey })).toBeNull();
     });
 });
 

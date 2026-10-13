@@ -17,6 +17,14 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-13 — The permission organism:direct (services/fenced-space.ts, ruled by the developer on
+ *     2026-10-13). The workspace operations' caller is built on every call with the request's own
+ *     scopes (it was built once at registration), and the reopen and the delete hand those scopes to
+ *     the rule: a session that covers the word writes a record space that names extensions directly.
+ *     aimeat_workspace_update hands the session to updateWorkspaceMeta, which refuses a change to
+ *     such a space's list to a session without the word (ACCESS_DENIED), and
+ *     aimeat_workspace_object_delete asks the rule for the record's bare key too, which is what
+ *     names a workspace's manifest record.
  *   2026-10-13 — aimeat_workspace_revert_to_draft and aimeat_workspace_object_delete ask the
  *     fenced-space rule (services/fenced-space.ts) before they write: a record space that names
  *     extensions takes an agent's reopen or delete only through one of them (ruled by the developer on
@@ -177,7 +185,7 @@ import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries }
 import { emitChange } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { writeWorkspaceRecord, deleteWorkspaceInstance } from '../services/workspace-write.js';
-import { workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp } from '../services/workspace-tool-ops.js';
+import { workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp, type WorkspaceOpsCaller } from '../services/workspace-tool-ops.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, type WsRole } from '../services/workspace-roles.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
 import { registerWorkspaceMemberChangeTools } from './workspace-member-changes.js';
@@ -222,11 +230,16 @@ export function registerWorkspaceTools(
     // The session caller, in the shape services/workspace-tool-ops.ts takes: the read, the draft
     // write and the publish run there, so the extension sandbox can run them as its caller too.
     // Its roles are the agent role alone: an MCP session is always an agent record (mcp/index.ts).
-    // Built once, at registration, as before. It carries the session's scopes, because a provenance
-    // declaration asks provenance:write of them as well as of the grant (secaudit 2026-10 last
-    // items, F2).
-    const session = caller();
-    const opsCaller = workspaceCallerOf({ principal: session.principal, ownerName: session.owner, roles: [...session.roles], scopes: session.scopes }, config);
+    // It carries the session's scopes, which two rules read: a provenance declaration asks
+    // provenance:write of them as well as of the grant (secaudit 2026-10 last items, F2), and a
+    // session that covers organism:direct writes a record space that names extensions directly
+    // (services/fenced-space.ts). BUILT ON EVERY CALL since 2026-10-13: the scopes are the current
+    // request's (mcp/request-authority.ts), which a token refresh can narrow, and a caller built at
+    // registration held the words of whichever request registered the tools.
+    const opsCaller = (): WorkspaceOpsCaller => {
+        const session = caller();
+        return workspaceCallerOf({ principal: session.principal, ownerName: session.owner, roles: [...session.roles], scopes: session.scopes }, config);
+    };
     const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
 
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
@@ -238,15 +251,20 @@ export function registerWorkspaceTools(
         r.code === 'UNDECLARED_SPACE'
             ? fail(JSON.stringify({ error: r.code, message: r.message, ...(r.details ?? {}) }, null, 2))
             // A scope refusal is new on these tools (F2), so it takes the toolError shape the REST
-            // door's code reads in: `SCOPE_DENIED: what happened`. The fenced-space refusal
-            // (services/fenced-space.ts) is new too and takes the same shape.
-            : r.code === 'SCOPE_DENIED' || r.details?.reason === 'FENCED_SPACE' ? fail(`${r.code}: ${r.message}`) : fail(r.message);
+            // door's code reads in: `SCOPE_DENIED: what happened`. The two refusals of the
+            // fenced-space rule (services/fenced-space.ts) are new too and take the same shape.
+            : r.code === 'SCOPE_DENIED' || r.details?.reason === 'FENCED_SPACE' || r.details?.reason === 'FENCE_CHANGE' ? fail(`${r.code}: ${r.message}`) : fail(r.message);
     /** The fenced-space rule for one record, as a tool error, or null: a record space that names
-     *  extensions takes an agent's reopen or delete only through one of them. The two tools below
-     *  ask it themselves because neither hands the record's key to the organism namespace rule. */
-    const fencedToolError = async (orgId: string, ws: string, namespace: string, id: string): Promise<TextResult | null> => {
-        const fenced = await fencedSpaceRefusal({ storage, config }, { principal: opsCaller.principal, roles: opsCaller.roles },
-            orgId, ws, { key: `${wsRoot(orgId, ws)}.${namespace}.${id}.latest` });
+     *  extensions takes an agent's reopen or delete only through one of them, unless the session
+     *  covers organism:direct. The two tools below ask it themselves because neither hands the
+     *  record's key to the organism namespace rule. `whole` is for the delete, which removes the
+     *  bare key as well as its suffixed forms: the bare key is what names a workspace's manifest
+     *  record, whose removal the same rule refuses to a caller that may not change a fence. */
+    const fencedToolError = async (orgId: string, ws: string, namespace: string, id: string, whole = false): Promise<TextResult | null> => {
+        const session = caller();
+        const base = `${wsRoot(orgId, ws)}.${namespace}.${id}`;
+        const fenced = await fencedSpaceRefusal({ storage, config }, { principal: session.principal, roles: session.roles, scopes: session.scopes },
+            orgId, ws, whole ? { keys: [base, `${base}.latest`] } : { key: `${base}.latest` });
         return fenced ? toolError(fenced.code, fenced.message) : null;
     };
 
@@ -360,7 +378,7 @@ export function registerWorkspaceTools(
             // ctx.workspace calls as well: a workspace is SHARED, authorization is at the workspace
             // level (whoever may read the manifest sees all of its content), version history is
             // never surfaced, and row spaces answer with a count.
-            const r = await readWorkspaceOp({ storage, config }, opsCaller, {
+            const r = await readWorkspaceOp({ storage, config }, opsCaller(), {
                 organismId: organism_id, ws, ids, space, includeArchived: include_archived,
                 reader: readerForAgent({ storage, config }, agentGaii),
             });
@@ -396,7 +414,7 @@ export function registerWorkspaceTools(
             // resolved and schema-validated before any is written, the archive flags, the memory
             // ceilings, one provenance record per item, and the fan-out a workspace write sets off.
             // The extension sandbox's ctx.workspace.write is the same function.
-            const r = await writeWorkspaceDraftsOp({ storage, config }, opsCaller, {
+            const r = await writeWorkspaceDraftsOp({ storage, config }, opsCaller(), {
                 organismId: organism_id, ws, space, value, id, section, items,
                 aiProvenance: toDeclaredProvenance(ai_provenance), aiProvenanceId: ai_provenance_id,
                 pipeline: 'mcp.workspace_write',
@@ -412,7 +430,7 @@ export function registerWorkspaceTools(
             // services/workspace-tool-ops.ts: membership, the meta.* role, the archive flag, the
             // publish gate (read across every owner), then the same publishDraft POST
             // /v1/organisms/:id/publish calls, the decision-log entry and the timeline snapshot.
-            const r = await publishWorkspaceOp({ storage, config }, opsCaller, { organismId: organism_id, ws, namespace, id, expectedVersion: expected_version ?? null });
+            const r = await publishWorkspaceOp({ storage, config }, opsCaller(), { organismId: organism_id, ws, namespace, id, expectedVersion: expected_version ?? null });
             return r.ok ? ok(r.data) : failRefusal(r);
         });
 
@@ -470,9 +488,15 @@ export function registerWorkspaceTools(
             try {
                 const addParsed = parseObj(add_spaces);
                 const appsParsed = parseObj(apps);
+                // The session rides along, read on this call: updateWorkspaceMeta refuses a change
+                // to the list of extensions of a space an app closed to agents unless the session
+                // covers organism:direct (services/fenced-space.ts). The same function, and so the
+                // same refusal, as PUT /v1/organisms/:id/workspace.
+                const session = caller();
                 const result = await updateWorkspaceMeta(storage, config, {
                     orgId: organism_id, ws, callerOwner: ownerName,
                     isAdmin: role === 'admin' || role === 'creator', name, readme,
+                    caller: { principal: session.principal, roles: session.roles, scopes: session.scopes },
                     addObjectTypes: Array.isArray(addParsed) ? addParsed as Array<Record<string, unknown>> : undefined,
                     manifest: parseObj(manifest) as Record<string, unknown> | undefined,
                     schemas: parseObj(schemas) as Record<string, Record<string, unknown>> | undefined,
@@ -483,6 +507,9 @@ export function registerWorkspaceTools(
                 void updateOrganismStructure(storage, config, organism_id, { event: 'workspace updated', actor: writerGaii }).catch(err => { logger.warn('async: timeline best-effort', { error: String(err) }); });
                 return ok(result);
             } catch (e) {
+                // The refusal of a protected change is new on this tool and takes the toolError
+                // shape, with the code the REST route answers; the older refusals keep their sentence.
+                if (e instanceof WorkspaceMetaError && e.code === 'ACCESS_DENIED') return toolError(e.code, e.message);
                 if (e instanceof WorkspaceMetaError) return fail(e.message);
                 return fail((e as Error).message || 'Update failed');
             }
@@ -506,7 +533,7 @@ export function registerWorkspaceTools(
             const base = `${root}.${namespace}.${id}`;
             // The delete below removes the owner's rows of the record as well as the agent's own
             // (deleteWorkspaceInstance, same-owner), so the fenced-space rule is asked first.
-            const deleteFenced = await fencedToolError(organism_id, ws, namespace, id);
+            const deleteFenced = await fencedToolError(organism_id, ws, namespace, id, true);
             if (deleteFenced) return deleteFenced;
             // TARGET-009 S1/S3: an append-only namespace (manifest create_only) refuses record
             // deletion on every path — existing events can never be erased.

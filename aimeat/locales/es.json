@@ -6611,6 +6611,7 @@
   "accesspage.scope.notifications.send": "te envía notificaciones",
   "accesspage.scope.organism.read": "lee tus espacios compartidos",
   "accesspage.scope.organism.rows": "lleva un registro de eventos en un espacio compartido abierto para él",
+  "accesspage.scope.organism.direct": "escribe directamente en partes de espacios compartidos que una app reservó para sus propias herramientas",
   "accesspage.scope.workflow.read": "ve tus automatizaciones",
   "accesspage.scope.workflow.write": "ejecuta y cambia tus automatizaciones",
   "accesspage.scope.task.read": "ve las tareas de tus agentes",
@@ -14844,7 +14845,8 @@
             "read": "Leer el contenido publicado de los espacios compartidos a los que perteneces.",
             "write": "Crear espacios compartidos, escribir y publicar documentos en ellos, y comentar.",
             "invite": "Dejar entrar a otras personas: invitar miembros y repartir acceso a un espacio compartido.",
-            "rows": "Añadir filas al registro de eventos de un espacio compartido y leerlas, cuando el espacio se ha abierto a esta app o agente por su nombre. Nada más del espacio se abre."
+            "rows": "Añadir filas al registro de eventos de un espacio compartido y leerlas, cuando el espacio se ha abierto a esta app o agente por su nombre. Nada más del espacio se abre.",
+            "direct": "Escribir directamente en una parte de un espacio compartido que una app ha reservado para sus propias herramientas, y cambiar qué herramientas pueden escribir allí. Sin este permiso, el agente escribe en esa parte solo con la herramienta de la app."
           },
           "outbound": {
             "send": "Mandar correo desde la dirección de tu empresa a los contactos que tienes guardados."

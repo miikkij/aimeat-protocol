@@ -29,6 +29,12 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.15.0 — 2026-10-13 — The organism namespace rule is asked with the session's scopes and with
+ *     the value being written, for the fenced-space rule: a session that covers organism:direct
+ *     writes a record space that names extensions directly, and a write to a workspace's manifest
+ *     record that changes a fenced space's list is refused to an agent without that word. An agent
+ *     of the workspace's creator stored its own copy of the manifest here, and the newest copy of
+ *     the creator's is the one that counts.
  *   v1.14.0 — 2026-10-13 — A knowledge package manifest's sharing.morsel_price is counted as a
  *     deprecated use, and a mismatch with sharing.toll_morsels is refused (TOLL_MORSELS_MISMATCH,
  *     services/legacy-pacing-write.ts).
@@ -332,9 +338,14 @@ export async function writeMemoryRecord(
         // which is on no roll here, as the read and delete doors already pass it. It is never taken
         // for the local account that shares its local part.
         const ownerName = localAccountName(caller.principal);
+        // The session's scopes and the value ride along for the fenced-space rule
+        // (services/fenced-space.ts): a session that covers organism:direct writes a record space
+        // that names extensions directly, and a write to a workspace's manifest record is compared
+        // with the manifest that counts, so a change to a fenced space's list is refused to a
+        // caller that may not make it.
         const refusal = await checkOrganismNamespaceAccess({ storage, config }, {
-            principal: caller.principal, owner: ownerName, roles: caller.roles,
-        }, input.key, 'write');
+            principal: caller.principal, owner: ownerName, roles: caller.roles, scopes: caller.scopes,
+        }, input.key, 'write', { after: input.value });
         if (refusal) return { ok: false, ...refusal };
     }
     // 1d. A crew definition (crews.registry.<agent>, crews.runtime.<agent>) belongs in the namespace

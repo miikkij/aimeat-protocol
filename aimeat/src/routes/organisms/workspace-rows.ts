@@ -18,6 +18,8 @@
  * @structure registerOrganismWorkspaceRowRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceRowRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.4.0 — 2026-10-13 — The row caller carries the session's scopes, which the fenced-space rule
+ *     reads through the access rule (services/fenced-space.ts, ruled 2026-10-13).
  *   v1.3.0 — 2026-10-02 — The two DELETE routes need memory:purge beside organism:write: a removed
  *     row has no version history to come back from (Jouni, 2026-10-02).
  *   v1.2.0 — 2026-09-29 — Reading rows passes the caller's classification reader (TARGET-082).
@@ -51,6 +53,8 @@ export function registerOrganismWorkspaceRowRoutes(
     identity: resolveIdentity(req.auth!, config.nodeId),
     owner: (req.auth?.owner as string) ?? '',
     roles: req.auth?.roles ?? [],
+    // The session's scopes, which the fenced-space rule reads through the access rule.
+    scopes: req.auth?.scopes ?? [],
     // The app's own id on a role-'app' token, which the space's `apps` list is matched against.
     app: typeof req.auth?.app === 'string' ? req.auth.app : undefined,
   });

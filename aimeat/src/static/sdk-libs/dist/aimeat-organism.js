@@ -801,6 +801,37 @@
       if (res.ok === false) throw fail(res, "Failed to create workspace");
       return res.data !== void 0 ? res.data : res;
     },
+    /**
+     * Name extensions of the signed-in person's own account on one space of an existing workspace:
+     * each entry is added to that space's `extensions` in the workspace manifest. It adds only. An
+     * entry already in the list is not an error, and nothing is removed.
+     *
+     * On a memory-backed space (records or documents) the first entry closes the space to agents:
+     * an agent's write is then accepted only through an action of a named extension, which is how an
+     * app keeps its own checks on what agents write. On a row space an entry lets that extension
+     * append and read rows. The app itself, and the person, keep writing the space directly.
+     *
+     * Needs the organism:write app scope, and the person must be the workspace's creator or a
+     * creator or admin of the organism. Each entry is `installer/name` of an extension that the
+     * person's own account installed on this node. One entry that is not refuses the whole call
+     * (`err.code === 'INVALID_INPUT'`, and `err.message` names the entry), and nothing is written.
+     *
+     * @param {string} orgId The organism id.
+     * @param {string} wsId The workspace id.
+     * @param {string} space The space's name or its namespace.
+     * @param {string[]} entries 1 to 5 extensions, each written `installer/name`.
+     * @returns {Promise<{ ws: string, space: { name: string, namespace: string, backing: string, extensions: string[] },
+     *   added: string[], already: string[], fenced: boolean }>} The space with its whole list after the call.
+     */
+    async nameExtensions(orgId, wsId, space, entries) {
+      var res = await authFetch("/v1/organisms/" + encodeURIComponent(orgId) + "/workspace/spaces/" + encodeURIComponent(space) + "/extensions?ws=" + encodeURIComponent(wsId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ add: entries })
+      });
+      if (res.ok === false) throw fail(res, "Failed to name the extensions on the space");
+      return res.data !== void 0 ? res.data : res;
+    },
     // List workspaces (access + enrichment counts included).
     async workspaces(orgId) {
       var res = await authFetch("/v1/organisms/" + encodeURIComponent(orgId) + "/workspaces?include=enrichment");

@@ -19,6 +19,8 @@
  *   v1.1.0 — 2026-09-29 — aimeat_workspace_rows_read passes the agent's classification reader (TARGET-082).
  *   v1.2.0 — 2026-10-02 — aimeat_workspace_rows_delete needs memory:purge (its catalog gate) and
  *     organism:write, the two words the REST DELETE routes ask (Jouni, 2026-10-02).
+ *   v1.3.0 — 2026-10-13 — The row caller carries the session's scopes, which the fenced-space rule
+ *     reads through the access rule (services/fenced-space.ts, ruled 2026-10-13).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
@@ -64,7 +66,8 @@ export function registerWorkspaceRowTools(
     // owner and the roles are the session caller's.
     const rowCaller = (): RowCaller => {
         const session = caller();
-        return { principal: session.principal, identity: writerGaii, owner: session.owner, roles: [...session.roles] };
+        // The scopes are the session's: the fenced-space rule reads them (services/fenced-space.ts).
+        return { principal: session.principal, identity: writerGaii, owner: session.owner, roles: [...session.roles], scopes: session.scopes };
     };
 
     /** One place that renders a service refusal, so every row tool fails with the same sentence. */

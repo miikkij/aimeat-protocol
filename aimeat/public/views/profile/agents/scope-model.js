@@ -18,6 +18,9 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.19.0 — 2026-10-13 — organism:direct, inside the wildcard and in neither preset: writing a
+ *     record space directly that an app closed to agents, and changing which extensions such a space
+ *     names. No permission let an agent through that rule before (Jouni, 2026-10-13).
  *   v1.18.0 — 2026-10-12 — agent:read, inside the wildcard: seeing the owner's agents, the word the agent
  *     list asks from 4.0.0; the standard preset carries it.
  *   v1.17.0 — 2026-10-12 — packages:read, inside the wildcard: seeing the packages installed for the owner,
@@ -260,7 +263,13 @@ export const SCOPE_DOMAINS = [
   //                 (an app's event log or audit trail on a group). The person's half of a
   //                 two-hand rule: the organism names the app in the space's manifest, the person
   //                 grants this; neither alone opens anything (2026-08-29).
-  { key: 'organism',  permissions: ['read', 'write', 'invite', 'rows'] },
+  // organism:direct — write a record space directly that an app closed to agents, and change which
+  //                 extensions such a space names. A space whose manifest object type names
+  //                 extensions takes an agent's write only through one of them
+  //                 (src/services/fenced-space.ts); this word lets the agent past that, on the
+  //                 owner's own tick. An ORDINARY word: inside the wildcard, so "Full access" carries
+  //                 it, and in neither preset below (ruled by Jouni, 2026-10-13).
+  { key: 'organism',  permissions: ['read', 'write', 'invite', 'rows', 'direct'] },
   { key: 'provenance', permissions: ['write'] },
   // cortex:write — install/activate/deactivate/delete cortex libraries (browser-side UI)
   // ext:write    — activate/deactivate/delete extensions, manage instances (server-side WASM)
@@ -357,6 +366,8 @@ export const SCOPE_TEMPLATES = {
   // organism:read and organism:write: the workspace tools ask them since 2026-10-06, so an agent
   // approved with this preset reads and publishes in its owner's workspaces (Jouni 2026-10-06, D4).
   // agent:read: the owner's agent list, which the node's default scopes carry too (2026-10-12).
+  // organism:direct is in neither preset on purpose (Jouni, 2026-10-13): an agent approved with a
+  // preset writes an app's closed space through the app's own tool; writing it directly is a tick.
   standard:  ['memory:read', 'memory:write', 'storage:read', 'storage:write', 'catalogue:read', 'social:read', 'work:request', 'work:read', 'organism:read', 'organism:write', 'agent:read'],
   full:      ['*'],
 };

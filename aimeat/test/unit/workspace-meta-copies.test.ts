@@ -22,6 +22,9 @@
  *     changes none of their answers
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-meta-copies.test.ts
  * @version-history
+ *   v1.1.1 — 2026-10-13 — updateWorkspaceMeta takes the session that asks (`caller`), which the
+ *     fenced-space rule reads before a manifest is written; the update case passes the account
+ *     holder in person. No assertion changed.
  *   v1.1.0 — 2026-09-24 — The readers that decide access, sharing and publishing read the copy that
  *     counts too: canReadWorkspace, the route helpers' canReadWs / readWsManifests /
  *     readWsManifestValue / readShareMeta, and readPublishSpace's object type.
@@ -195,6 +198,8 @@ describe('the update path writes the copy the read takes', () => {
     await put(storage, `alice@${NODE}`, manifestKey(), ledger('admin'));
     const res = await updateWorkspaceMeta(storage as never, config, {
       orgId: ORG, ws: WS, callerOwner: 'alice', isAdmin: false,
+      // The session that asks (required since 2026-10-13): the account holder in person.
+      caller: { principal: `alice@${NODE}`, roles: ['owner'], scopes: [] },
       addObjectTypes: [{ name: 'journal', namespace: 'books.journal', backing: 'rows' }],
     });
     expect(res.added).toEqual(['journal']);

@@ -35,6 +35,9 @@
  * @usage
  *   const r = await decideSuggestion({ storage, config }, caller, { orgId, id, decision: 'approve' });
  * @version-history
+ *   2026-10-13 — Approving a suggestion hands the approver's session (its scopes included) to the
+ *     organism namespace rule and to applySpaces, which compares the manifest before and after with
+ *     the fenced-space rule before it writes (services/fenced-space.ts, ruled 2026-10-13).
  *   2026-09-28 — An agent listed by an organism that admits only listed agents is a member's agent here, not an attached participant.
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  */
@@ -362,7 +365,13 @@ export async function decideSuggestion(
     const metaKey = stored?.kind === 'sections'
         ? `organism.${orgId}.w.${ws}.meta.sections.${stored.space ?? ''}`
         : `organism.${orgId}.w.${ws}.meta.manifest`;
-    const gate = await checkOrganismNamespaceAccess({ storage, config }, { principal: caller.principal, owner: caller.owner, roles: caller.roles }, metaKey, 'write');
+    // `keepsFences`: this asks whether the approver's session may write the record at all. What an
+    // approval writes into a manifest is a union that joins spaces and changes none, and applySpaces
+    // compares the manifest itself before it writes (services/fenced-space.ts). Without the marker
+    // the rule would read this check as the removal of every fence and refuse an agent's approval
+    // in any workspace that holds a fenced space.
+    const gate = await checkOrganismNamespaceAccess({ storage, config },
+        { principal: caller.principal, owner: caller.owner, roles: caller.roles, scopes: caller.scopes }, metaKey, 'write', { keepsFences: true });
     if (gate) {
         return refusal(gate.status, gate.code, 'Deciding this suggestion takes the permission to change what it changes, and this session does not hold it. Decide it from your own session instead.');
     }
@@ -394,7 +403,7 @@ export async function decideSuggestion(
     if (stored.kind === 'space') {
         const request = validateSpaceRequest(stored.spaces, stored.schemas);
         if ('error' in request) return refusal(409, 'INVALID_STATE', `This suggestion no longer describes a valid space: ${request.error} Decline it instead.`);
-        const applied = await applySpaces(deps, standing, { orgId, ws, request, stamp: { addedBy: a.actor, addedAt: nowIso, ...approval } });
+        const applied = await applySpaces(deps, standing, { orgId, ws, request, stamp: { addedBy: a.actor, addedAt: nowIso, ...approval }, caller });
         if (isRefusal(applied)) return applied;
         result = applied;
     } else {

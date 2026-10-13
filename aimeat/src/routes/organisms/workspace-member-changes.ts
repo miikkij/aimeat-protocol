@@ -17,6 +17,8 @@
  * @structure registerOrganismWorkspaceMemberChangeRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceMemberChangeRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.0.1 — 2026-10-13 — The caller carries the session's scopes, which the fenced-space rule reads
+ *     when a change writes the manifest (services/fenced-space.ts, ruled 2026-10-13).
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  */
 import type { Router, Request, Response } from 'express';
@@ -43,6 +45,8 @@ export function registerOrganismWorkspaceMemberChangeRoutes(
         principal: resolveIdentity(req.auth!, config.nodeId),
         owner: (req.auth!.owner as string) ?? '',
         roles: req.auth!.roles ?? [],
+        // The fenced-space rule reads the session's scopes when a change writes the manifest.
+        scopes: req.auth!.scopes ?? [],
     });
 
     const wsOf = (req: Request): string => (typeof req.query.ws === 'string' ? req.query.ws.trim() : '');

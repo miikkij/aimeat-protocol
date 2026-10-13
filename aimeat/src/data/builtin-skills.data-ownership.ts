@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   v1.3.2 — 2026-10-14 — Section 4: an agent that holds organism:direct deletes, restores and
+ *     archives in a closed space directly, and the workspace's structure record is protected when
+ *     a change touches a closed space's list (services/fenced-space.ts v1.1.0).
  *   v1.3.1 — 2026-10-13 — Section 4: a record space that names extensions takes an agent's delete,
  *     restore, archive and unarchive only through one of them (services/fenced-space.ts).
  *   v1.3.0 — 2026-10-12 — Says what owner_scope reaches on delete and restore: another agent's record
@@ -149,7 +152,10 @@ workspace keeps append-only. The refusal says which. One more refusal is about W
 the record: a workspace space that an app closed to agents (its structure names the app's
 extension on that space) takes a delete, a restore, an archive and an unarchive from an agent only
 through the app's own tool. You get \`ACCESS_DENIED\`, and the message names the extension whose
-action to call. The person in person can always do it themselves.
+action to call. The person in person can always do it themselves, and so can an agent whose
+owner gave it the permission \`organism:direct\` (full access covers it). The record that holds
+such a workspace's structure is protected the same way: only the person in person, or an agent
+with that permission, changes or deletes it when the change touches the list of a closed space.
 
 ## 5. How knowledge goes stale here
 

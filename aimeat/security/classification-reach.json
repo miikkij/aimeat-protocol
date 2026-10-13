@@ -2321,9 +2321,15 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update, file dedupe existence and registry append."
     },
+    "src/services/workspace-meta-read.ts": {
+      "reads": {
+        "listAllMemory": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4) in services/workspace-meta.ts and moved here unchanged on 2026-10-13, the node's own read: the registry scan and the meta-copy reader; readme and manifest content reaches callers through workspace-content.ts with a reader."
+    },
     "src/services/workspace-meta.ts": {
       "reads": {
-        "listAllMemory": 4
+        "listAllMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Registry and meta-copy helpers; readme and manifest content reaches callers through workspace-content.ts with a reader."
     },

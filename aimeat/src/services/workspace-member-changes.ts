@@ -35,6 +35,8 @@
  *   const r = await addWorkspaceSpaces({ storage, config }, caller, { orgId, ws, spaces });
  *   if (!isRefusal(r)) res.status(r.status === 'pending_approval' ? 202 : 200).json(...);
  * @version-history
+ *   v1.0.1 — 2026-10-13 — addWorkspaceSpaces hands its caller to applySpaces, which compares the
+ *     manifest before and after with the fenced-space rule before it writes (ruled 2026-10-13).
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  */
 import {
@@ -114,7 +116,7 @@ export async function addWorkspaceSpaces(
     };
     if (writesAtOnce(standing)) {
         const at = nowOf(deps).toISOString();
-        const applied = await applySpaces(deps, standing, { orgId, ws, request: fresh, stamp: { addedBy: caller.principal, addedAt: at } });
+        const applied = await applySpaces(deps, standing, { orgId, ws, request: fresh, stamp: { addedBy: caller.principal, addedAt: at }, caller });
         if (isRefusal(applied)) return applied;
         emitChange('organisms');
         void updateOrganismStructure(deps.storage, deps.config, orgId, { event: 'workspace updated', actor: caller.principal })

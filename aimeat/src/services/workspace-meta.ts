@@ -70,14 +70,45 @@
  *     (services/workspace-member-changes.ts) add a space the way this path does. NOT_CREATOR names
  *     those doors.
  *   v1.12.1 — 2026-09-26 — bareOwnerOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.13.0 — 2026-10-13 — updateWorkspaceMeta takes the session (`caller`) and compares the manifest
+ *     before and after with fenceChangeRefusal (services/fenced-space.ts) before it writes anything:
+ *     a change to the list of extensions of a space an app closed to agents, the removal of that
+ *     object type, or a change of its namespace or backing is accepted from the account holder in
+ *     person or from a session that covers `organism:direct`, and answers ACCESS_DENIED (403) to
+ *     anyone else (ruled by the developer on 2026-10-13). The workspace creator's own agent could
+ *     replace the manifest and so remove the list that kept the agent out. The read half (the
+ *     registry lookup, the choice between copies, the one reader) moved to ./workspace-meta-read.ts,
+ *     a pure move, so that this module can import the rule without an import cycle; every name is
+ *     re-exported here.
  */
-import type { Storage, MemoryRecord, ArchiveFilter } from '../storage/interface.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { localAccountName } from '../utils/gaii.js';
 import { validateMemoryWrite } from './schema-validator.js';
+import {
+  isRowBackedSpace, findWorkspaceRegistration, pickWorkspaceMetaCopy, readWorkspaceMetaRecord,
+  type WorkspaceManifest, type WorkspaceRegistryEntry,
+} from './workspace-meta-read.js';
+import { fenceChangeRefusal, type FenceCaller } from './fenced-space.js';
+
+// The read half (who registered a workspace, which copy of a meta record counts, the one reader)
+// is ./workspace-meta-read.ts since 2026-10-13. Every name is re-exported, so importers of this
+// module are unchanged.
+export {
+  isMemoryBackedSpace, isRowBackedSpace, workspaceRegistrations, findWorkspaceRegistration,
+  pickWorkspaceMetaCopy, workspaceMetaReader, readWorkspaceMetaRecord,
+  type WorkspaceManifest, type WorkspaceRegistryEntry, type WorkspaceRegistration, type WorkspaceMetaReader,
+} from './workspace-meta-read.js';
 
 export class WorkspaceMetaError extends Error {
-  constructor(public code: 'WS_NOT_FOUND' | 'NOT_CREATOR' | 'NOTHING_TO_UPDATE' | 'INVALID_MANIFEST' | 'INVALID_APPS' | 'INVALID_RULE', message: string) {
+  constructor(
+    public code: 'WS_NOT_FOUND' | 'NOT_CREATOR' | 'NOTHING_TO_UPDATE' | 'INVALID_MANIFEST' | 'INVALID_APPS' | 'INVALID_RULE'
+      // A change to the extensions of a space an app closed to agents, from a caller that may not
+      // make it (services/fenced-space.ts fenceChangeRefusal). The HTTP status is 403.
+      | 'ACCESS_DENIED',
+    message: string,
+    /** Set with ACCESS_DENIED: the spaces the refused change touches. */
+    public details?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = 'WorkspaceMetaError';
   }
@@ -116,22 +147,8 @@ export const SUPPORTED_BACKINGS = new Set(['memory', 'tasks', 'rows']);
 /** How many fields a row space may promote to indexed columns. Three is the whole budget. */
 export const MAX_INDEX_ON = 3;
 
-/** Does this space's data live in workspace memory keys (so reads must list them)? A missing
- *  backing counts as memory — the write path stores memory keys regardless. This is THE shared
- *  predicate for every read surface (MCP workspace_read, REST GET /workspace, the UI via the REST
- *  response); three hand-rolled variants of this check is how published content once went invisible. */
-export function isMemoryBackedSpace(ot: { backing?: unknown }): boolean {
-  return !ot.backing || ot.backing === 'memory';
-}
-
-/** Does this space's data live in the row table? THE shared predicate, for the same reason as above:
- *  a read surface that hand-rolls this check is a surface a row space eventually goes missing from. */
-export function isRowBackedSpace(ot: { backing?: unknown }): boolean {
-  return ot.backing === 'rows';
-}
-
-/** The manifest as a caller resolving a space needs it. Everything else in it is somebody else's. */
-export type WorkspaceManifest = { objectTypes?: Array<Record<string, unknown>> } & Record<string, unknown>;
+// isMemoryBackedSpace, isRowBackedSpace and WorkspaceManifest live in ./workspace-meta-read.ts
+// (re-exported above), with the readers that share them.
 
 /**
  * Read a workspace's manifest from the member who created it.
@@ -253,9 +270,6 @@ export function backfillManifestEnvelope(
   };
 }
 
-/** One entry in the organism's workspace registry (`organism.{id}.meta.workspaces`). */
-export interface WorkspaceRegistryEntry { id: string; name?: string; createdBy?: string }
-
 /** List every workspace of an organism, aggregated across ALL members' registry records. Each
  *  workspace is registered under its CREATOR's own GHII copy of `organism.{id}.meta.workspaces`,
  *  so any consumer that reads only one identity's record sees only the workspaces that member
@@ -278,156 +292,9 @@ export async function listOrganismWorkspaceEntries(storage: Storage, orgId: stri
   return out;
 }
 
-/** Where a workspace is registered, and who the registry names as its creator. */
-export interface WorkspaceRegistration {
-  entry: WorkspaceRegistryEntry;
-  /** The registry record that lists the workspace. Its owner is the identity that registered it. */
-  record: MemoryRecord;
-  /** The creator's bare owner name: the entry's `createdBy`, else the owner of the registry record. */
-  creator: string;
-}
-
-/** The bare owner behind a memory owner id: `agent#owner@node` and `owner@node` both give `owner`. */
-function bareOwnerOf(gaii: string): string {
-  return localAccountName(gaii);
-}
-
-/** The node an owner id belongs to: what follows its last `@`. */
-function nodeOf(gaii: string): string {
-  return gaii.slice(gaii.lastIndexOf('@') + 1);
-}
-
-/** Owner-id order, the tie-break that makes a choice between copies the same on every backend. */
-function byOwnerId(a: MemoryRecord, b: MemoryRecord): number {
-  return a.ownerGaii < b.ownerGaii ? -1 : a.ownerGaii > b.ownerGaii ? 1 : 0;
-}
-
-/** Newest write first, then owner-id order. */
-function freshestFirst(a: MemoryRecord, b: MemoryRecord): number {
-  const at = String(a.updatedAt);
-  const bt = String(b.updatedAt);
-  return at > bt ? -1 : at < bt ? 1 : byOwnerId(a, b);
-}
-
-/**
- * Every workspace of an organism, each with its registration: one registry scan for all of them.
- *
- * The registry is one record per creator, so every copy is read, as updateWorkspaceMeta always has,
- * archived copies included, because an archived organism's workspaces still have the creators who
- * made them. When more than one copy lists a workspace, the answer must not depend on the order the
- * store returns them in: a copy whose entry names its own owner as the creator wins over one that
- * names somebody else, and owner-id order breaks a remaining tie. Only an organism manager or a
- * workspace's provisioning writes a registry copy, so two that disagree are an administrator's doing.
- */
-export async function workspaceRegistrations(
-  storage: Storage, orgId: string,
-): Promise<Map<string, WorkspaceRegistration>> {
-  const regKey = `organism.${orgId}.meta.workspaces`;
-  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000, archived: 'include' });
-  const found = new Map<string, WorkspaceRegistration[]>();
-  for (const record of items) {
-    if (record.key !== regKey) continue;
-    const list = ((record.value as { workspaces?: WorkspaceRegistryEntry[] } | null)?.workspaces) ?? [];
-    for (const entry of list) {
-      if (!entry || typeof entry.id !== 'string') continue;
-      const all = found.get(entry.id) ?? [];
-      all.push({ entry, record, creator: entry.createdBy ?? bareOwnerOf(record.ownerGaii) });
-      found.set(entry.id, all);
-    }
-  }
-  const selfNamed = (r: WorkspaceRegistration) => (r.creator === bareOwnerOf(r.record.ownerGaii) ? 0 : 1);
-  const out = new Map<string, WorkspaceRegistration>();
-  for (const [wsId, all] of found) {
-    out.set(wsId, all.sort((a, b) => selfNamed(a) - selfNamed(b) || byOwnerId(a.record, b.record))[0]);
-  }
-  return out;
-}
-
-/** Find one workspace in the organism's registry, and the creator it names (workspaceRegistrations). */
-export async function findWorkspaceRegistration(
-  storage: Storage, orgId: string, wsId: string,
-): Promise<WorkspaceRegistration | null> {
-  return (await workspaceRegistrations(storage, orgId)).get(wsId) ?? null;
-}
-
-/**
- * Which copy of a workspace meta record counts, when the key is stored under several identities.
- *
- * A copy counts when its writer is someone the organism namespace rule lets write there
- * (services/organism-namespace-access.ts): the workspace's registered creator, and after them an
- * organism creator or admin. The creator's copies come first, including one under an agent of
- * theirs, and the newest of those wins, because they are all the same person's. Only when the creator
- * holds no copy does an organism manager's count, newest first. A plain member's copy never counts,
- * and neither does a copy under another node's identity. Returns null when no copy counts.
- *
- * The order the store returned the copies in plays no part: that order is what decided this before,
- * and on Postgres it is not defined for rows that share a key. `roles` caches the members' roles
- * across calls; a reader that picks for many workspaces passes one map.
- */
-export async function pickWorkspaceMetaCopy(
-  storage: Storage, orgId: string, copies: MemoryRecord[], nodeId: string,
-  registration: WorkspaceRegistration | null, roles: Map<string, string | null> = new Map(),
-): Promise<MemoryRecord | null> {
-  const local = copies.filter(r => nodeOf(r.ownerGaii) === nodeId);
-  if (registration) {
-    const creators = local.filter(r => bareOwnerOf(r.ownerGaii) === registration.creator);
-    if (creators.length) return creators.sort(freshestFirst)[0];
-  }
-  const managers: MemoryRecord[] = [];
-  for (const rec of local) {
-    const name = bareOwnerOf(rec.ownerGaii);
-    if (!roles.has(name)) {
-      const m = await storage.getMembership(orgId, name);
-      roles.set(name, m && m.status === 'active' ? m.role : null);
-    }
-    const role = roles.get(name);
-    if (role === 'creator' || role === 'admin') managers.push(rec);
-  }
-  return managers.sort(freshestFirst)[0] ?? null;
-}
-
-/**
- * The meta records of one organism's workspaces, read the one way every reader shares: for each key
- * the copy that counts (pickWorkspaceMetaCopy), never the first row the store returns and never the
- * freshest whoever wrote it. The manifest decides who reads a workspace and how its spaces behave,
- * the share record what the public reads, an intake record what a public form does, so a reader that
- * took whichever copy came first let a member's own copy decide all of that. The registry and the
- * members' roles are looked up once per reader, so a list of workspaces costs one registry scan.
- */
-export interface WorkspaceMetaReader {
-  /** The copy of `organism.{org}.w.{ws}.{rel}` that counts, among records the caller already read. */
-  pick(wsId: string, rel: string, records: MemoryRecord[]): Promise<MemoryRecord | null>;
-  /** Read `organism.{org}.w.{ws}.{rel}` and pick the copy that counts. */
-  read(wsId: string, rel: string, opts?: { archived?: ArchiveFilter }): Promise<MemoryRecord | null>;
-}
-
-export function workspaceMetaReader(storage: Storage, orgId: string, nodeId: string): WorkspaceMetaReader {
-  let registrations: Promise<Map<string, WorkspaceRegistration>> | undefined;
-  const roles = new Map<string, string | null>();
-  const pick = async (wsId: string, rel: string, records: MemoryRecord[]): Promise<MemoryRecord | null> => {
-    const key = `organism.${orgId}.w.${wsId}.${rel}`;
-    const copies = records.filter(r => r.key === key);
-    if (!copies.length) return null;
-    registrations ??= workspaceRegistrations(storage, orgId);
-    return pickWorkspaceMetaCopy(storage, orgId, copies, nodeId, (await registrations).get(wsId) ?? null, roles);
-  };
-  return {
-    pick,
-    async read(wsId, rel, opts) {
-      const key = `organism.${orgId}.w.${wsId}.${rel}`;
-      const { items } = await storage.listAllMemory({ prefix: key, limit: 100, ...(opts?.archived ? { archived: opts.archived } : {}) });
-      return pick(wsId, rel, items);
-    },
-  };
-}
-
-/** One meta record of one workspace (`rel` such as 'meta.manifest'): the copy that counts, or null. */
-export function readWorkspaceMetaRecord(
-  storage: Storage, orgId: string, wsId: string, rel: string, nodeId: string,
-  opts?: { archived?: ArchiveFilter },
-): Promise<MemoryRecord | null> {
-  return workspaceMetaReader(storage, orgId, nodeId).read(wsId, rel, opts);
-}
+// The registry lookup, the choice between copies and the one reader (workspaceRegistrations,
+// findWorkspaceRegistration, pickWorkspaceMetaCopy, workspaceMetaReader, readWorkspaceMetaRecord)
+// live in ./workspace-meta-read.ts, re-exported above.
 
 /**
  * Write one workspace meta record over `prev`, the copy the readers take, keeping its owner, its
@@ -489,6 +356,13 @@ export interface UpdateWorkspaceOpts {
   ws: string;
   callerOwner: string;
   isAdmin: boolean;
+  /**
+   * The session that asks: its identity, its roles and its scope words, as the token carries them.
+   * Required, so no code path reaches the manifest write without it: a change to the list of
+   * extensions of a space an app closed to agents is accepted only from the account holder in
+   * person or from a session that covers `organism:direct` (services/fenced-space.ts).
+   */
+  caller: FenceCaller;
   name?: string;
   readme?: string;
   /** Full replacement manifest (objectTypes + policy/gate + settings). Add/remove a space by
@@ -546,6 +420,19 @@ export async function updateWorkspaceMeta(
   const appsRec = await pickMeta('meta.apps');
   const creatorGhii = regRec.ownerGaii;
 
+  // THE LIST OF A FENCED SPACE IS PROTECTED (services/fenced-space.ts, ruled by the developer on
+  // 2026-10-13). A full replacement that changes the `extensions` of a memory-backed space that
+  // names some, removes that object type, or moves its namespace or backing is accepted from the
+  // account holder in person or from a session that covers `organism:direct`, and from nobody
+  // else: the workspace creator's own agent replaced the manifest here, and with it the list that
+  // kept the agent out of the space. Asked BEFORE the schema locks below, so a refused change
+  // writes nothing. A manifest that is not an object with objectTypes is compared as it came: it
+  // declares no object type, which removes every fence.
+  if (manifest) {
+    const changed = fenceChangeRefusal(manRec?.value, manifest, opts.caller);
+    if (changed) throw new WorkspaceMetaError('ACCESS_DENIED', changed.message, changed.details);
+  }
+
   const now = new Date().toISOString();
   const updated: string[] = [];
   const added: string[] = [];
@@ -591,6 +478,10 @@ export async function updateWorkspaceMeta(
     if (added.length) {
       const manifestValue: Record<string, unknown> = { ...current, objectTypes: union.objectTypes, id: orgId, status: (current.status as string) || 'active' };
       if (name) manifestValue.name = name;
+      // The same comparison as the full replacement above. The union joins object types and
+      // changes none, so this refuses nothing today; it holds if the union ever does more.
+      const changed = fenceChangeRefusal(current, manifestValue, opts.caller);
+      if (changed) throw new WorkspaceMetaError('ACCESS_DENIED', changed.message, changed.details);
       const valid = await validateMemoryWrite(`${root}.meta.manifest`, manifestValue, storage);
       if (!valid.valid) throw new WorkspaceMetaError('INVALID_MANIFEST', 'Manifest rejected by schema: ' + JSON.stringify(valid.errors));
       await write(`${root}.meta.manifest`, manRec?.ownerGaii ?? creatorGhii, manifestValue, manRec);

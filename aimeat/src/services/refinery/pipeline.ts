@@ -35,6 +35,8 @@
  *     20 000 characters each. A row held a 280-character snippet and a count of the attachment
  *     characters, so an agent's tool could not check the read fields against what the mail said
  *     (the October agents plan, brief 08; found by the aimeat-apps session).
+ *   v1.1.1 — 2026-10-13 — The row caller carries the caller's scopes, which the fenced-space rule
+ *     reads through the row service's access rule (services/fenced-space.ts, ruled 2026-10-13).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -175,7 +177,7 @@ async function writeOwn(deps: RefineryDeps, caller: RefineryCaller, key: string,
 export function rowIdOf(def: RefineryDefinition, messageId: string): string { return `${def.provider || 'mail'}:${messageId}`; }
 
 function rowCaller(caller: RefineryCaller): RowCaller {
-  return { principal: caller.principal, identity: caller.ownerGhii, owner: caller.owner, roles: caller.roles, app: caller.appRef };
+  return { principal: caller.principal, identity: caller.ownerGhii, owner: caller.owner, roles: caller.roles, scopes: caller.scopes, app: caller.appRef };
 }
 
 export interface Ctx { deps: RefineryDeps; caller: RefineryCaller; def: RefineryDefinition; conn: { config: AimeatConfig; storage: Storage; providers: ReturnType<typeof buildOutboundProviders>; key: Buffer } }

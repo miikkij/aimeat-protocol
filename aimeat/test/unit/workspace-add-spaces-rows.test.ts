@@ -14,6 +14,9 @@
  *   - an explicit value still wins over every default
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-add-spaces-rows.test.ts
  * @version-history
+ *   v1.1.1 — 2026-10-13 — updateWorkspaceMeta takes the session that asks (`caller`), which the
+ *     fenced-space rule reads before a manifest is written; the cases pass the account holder in
+ *     person. No assertion changed.
  *   v1.1.0 — 2026-09-24 — readWorkspaceManifest takes the node id, and the owner's id is built from
  *     the same config the update runs with, so the two agree on which identities are this node's.
  *   v1.0.0 — 2026-09-14 — Initial.
@@ -52,6 +55,8 @@ async function aWorkspace(storage: SqliteStorage): Promise<string> {
 async function addSpaces(storage: SqliteStorage, ws: string, spaces: ObjType[]) {
   return updateWorkspaceMeta(storage as never, loadConfig().config, {
     orgId: ORG, ws, callerOwner: OWNER, isAdmin: false, addObjectTypes: spaces,
+    // The session that asks (required since 2026-10-13): the account holder in person.
+    caller: { principal: `${OWNER}@${NODE}`, roles: ['owner'], scopes: [] },
   });
 }
 

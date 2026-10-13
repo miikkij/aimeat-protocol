@@ -15,6 +15,9 @@
  *   const caller = workspaceCallerOf({ principal: agentGaii, ownerName, roles: ['agent'] }, config);
  *   const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
  * @version-history
+ *   v1.2.0 — 2026-10-13 — fencedOpRefusal hands the session's `scopes` to the fenced-space rule: a
+ *     session that covers `organism:direct` writes a record space that names extensions directly
+ *     (ruled by the developer on 2026-10-13; no permission let an agent through before).
  *   v1.1.0 — 2026-10-13 — The caller carries `extension` (`installer/name`), which only the workspace
  *     capability of an extension action sets, and fencedOpRefusal asks the fenced-space rule with it:
  *     a record space that names extensions takes an agent's write only through one of them (ruled by
@@ -42,8 +45,14 @@ export interface WorkspaceOpsCaller {
     writerGaii: string;
     /** The session's roles, for the organism namespace rule. */
     roles: string[];
-    /** The session's own scope words, when the door has them: a provenance declaration needs
-     *  provenance:write there as well as on the grant. Absent for the extension sandbox. */
+    /**
+     * The session's own scope words, as the token carries them. Two rules read them: a provenance
+     * declaration needs provenance:write there as well as on the grant, and a session that covers
+     * `organism:direct` writes a record space that names extensions directly
+     * (services/fenced-space.ts). Every code path hands them over, the extension sandbox included
+     * (its writes carry the node's own provenance stamp, so the first rule is not asked there). A
+     * caller built without them is read as not holding `organism:direct`.
+     */
     scopes?: readonly string[];
     /**
      * `installer/name` of the extension whose action makes the call, lower-cased. Set only by
@@ -109,6 +118,6 @@ export async function fencedOpRefusal(
     deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, organismId: string, ws: string, target: FenceTarget,
 ): Promise<WorkspaceOpRefusal | null> {
     const fenced = await fencedSpaceRefusal(deps,
-        { principal: caller.principal, roles: caller.roles, extension: caller.extension }, organismId, ws, target);
+        { principal: caller.principal, roles: caller.roles, scopes: caller.scopes, extension: caller.extension }, organismId, ws, target);
     return fenced ? refuse(fenced.status, fenced.code, fenced.message, fenced.details) : null;
 }

@@ -7697,6 +7697,7 @@
   "accesspage.scope.notifications.send": "sends you notifications",
   "accesspage.scope.organism.read": "reads your shared spaces",
   "accesspage.scope.organism.rows": "keeps an event log in a shared space opened to it",
+  "accesspage.scope.organism.direct": "writes straight into parts of shared spaces that an app reserved for its own tools",
   "accesspage.scope.workflow.read": "sees your automations",
   "accesspage.scope.workflow.write": "runs and changes your automations",
   "accesspage.scope.task.read": "sees your agents' tasks",
@@ -16614,7 +16615,8 @@
             "read": "Read the published content of the shared spaces you belong to.",
             "write": "Create shared spaces, write and publish documents in them, and comment.",
             "invite": "Let other people in: invite members and hand out access to a shared space.",
-            "rows": "Add to, and read back, the event logs of a shared space that has been opened to this app or agent by name. Nothing else in the space opens."
+            "rows": "Add to, and read back, the event logs of a shared space that has been opened to this app or agent by name. Nothing else in the space opens.",
+            "direct": "Write straight into a part of a shared space that an app has reserved for its own tools, and change which tools may write there. Without this permission the agent writes such a part only through the app's tool."
           },
           "outbound": {
             "send": "Send email from your company address to your saved contacts."

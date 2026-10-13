@@ -11,6 +11,9 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-13 — aimeat_organism_archive hands the session's scopes to the fenced-space rule: a
+ *     session that covers organism:direct archives and brings back a record of a space that names
+ *     extensions (ruled by the developer on 2026-10-13).
  *   2026-10-13 — aimeat_organism_archive asks the fenced-space rule (services/fenced-space.ts) for a
  *     record or a space before it archives or brings back: a record space that names extensions
  *     takes that from an agent only through one of them (ruled by the developer on 2026-10-13).
@@ -472,7 +475,7 @@ export function registerOrganismsTools(
             const fenceTarget = archiveFenceTarget(target);
             if (fenceTarget && ws) {
                 const session = caller();
-                const fenced = await fencedSpaceRefusal({ storage, config }, { principal: session.principal, roles: session.roles }, organism_id, ws, fenceTarget);
+                const fenced = await fencedSpaceRefusal({ storage, config }, { principal: session.principal, roles: session.roles, scopes: session.scopes }, organism_id, ws, fenceTarget);
                 if (fenced) return toolError(fenced.code, fenced.message);
             }
             try {
