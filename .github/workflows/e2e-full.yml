@@ -106,13 +106,65 @@ jobs:
           AIMEAT_E2E_NODE_ENTRY: dist
         run: pnpm test:e2e:${{ matrix.backend }}
 
+  # THE 4.0.0 HALF OF THE VERSION-AWARE SUITES, EVERY NIGHT. A suite whose expected answer depends on
+  # the release (removedOn, helpers/node-release, a *_REMOVED_IN constant) asserts the 3.x answer in
+  # the sweep above and the 4.0.0 answer only on a node run as 4.0.0. Until 2026-10-13 that second
+  # half ran only when somebody started it by hand (docs-audit 2026-10, 4.0-testimuutokset.md §4
+  # item 4). AIMEAT_TEST_SOFTWARE_VERSION is honoured only by a test node on a loopback address
+  # (src/utils/version.ts testVersionOverride), which is what the runner starts. The list is
+  # test/version-aware-suites.txt; test/unit/version-aware-suites.test.ts refuses a version-aware
+  # suite that is not on it, so a new one is added there and nowhere else. SQLite only: the backend
+  # is not what the release changes, and the sweep above runs both backends at the package version.
+  release-4-0-0:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare the E2E env file (from the committed example)
+        working-directory: aimeat
+        run: cp .env.test.sqlite.example .env.test.sqlite
+
+      # Same reason as in the sweep above: the E2E ports stay out of the kernel's ephemeral range.
+      - name: Reserve the E2E port range
+        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=40000-40999
+
+      # Same reason as in the sweep above: every node starts from dist/, not through tsx.
+      - name: Build the node the run starts
+        working-directory: aimeat
+        run: pnpm build
+
+      - name: Version-aware suites as node 4.0.0 (sqlite)
+        working-directory: aimeat
+        env:
+          AIMEAT_E2E_NODE_ENTRY: dist
+          AIMEAT_TEST_SOFTWARE_VERSION: '4.0.0'
+        run: node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --tests-file=test/version-aware-suites.txt --workers=4
+
   # THE ISSUE IS WRITTEN BY A JOB OF ITS OWN. The sweep installs and runs the whole dependency tree,
   # so it holds a token that can only read; this job holds the one that writes issues and runs
-  # nothing but the gh CLI the runner carries. It reads each backend's result from this run (the
-  # sweep leg is named "sweep (<backend>)" after its job id and matrix value) and does what the
-  # sweep's own last two steps did: a red leg opens or updates its issue, a green one closes it.
+  # nothing but the gh CLI the runner carries. It reads each leg's result from this run (a sweep leg
+  # is named "sweep (<backend>)" after its job id and matrix value, the 4.0.0 run "release-4-0-0")
+  # and does what the sweep's own last two steps did: a red leg opens or updates its issue, a green
+  # one closes it. Each leg has its own issue title, and no title contains another, because the
+  # lookup is a phrase search on the title.
   issue:
-    needs: sweep
+    needs: [sweep, release-4-0-0]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
@@ -121,17 +173,26 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        backend: [sqlite, postgres-kysely]
+        include:
+          - job: sweep (sqlite)
+            title: Nightly E2E sweep is red on sqlite
+            what: The full E2E sweep on **sqlite**
+          - job: sweep (postgres-kysely)
+            title: Nightly E2E sweep is red on postgres-kysely
+            what: The full E2E sweep on **postgres-kysely**
+          - job: release-4-0-0
+            title: Nightly 4.0.0 run of the version-aware suites is red
+            what: The version-aware suites (test/version-aware-suites.txt) run as node **4.0.0** on sqlite
     steps:
-      - name: Read this backend's sweep result
+      - name: Read this leg's result
         id: sweep
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BACKEND: ${{ matrix.backend }}
+          JOB: ${{ matrix.job }}
         run: |
-          CONCLUSION="$(gh run view "$GITHUB_RUN_ID" --json jobs --jq ".jobs[] | select(.name == \"sweep ($BACKEND)\") | .conclusion")"
-          echo "sweep ($BACKEND): ${CONCLUSION:-not found}"
+          CONCLUSION="$(gh run view "$GITHUB_RUN_ID" --json jobs --jq ".jobs[] | select(.name == \"$JOB\") | .conclusion")"
+          echo "$JOB: ${CONCLUSION:-not found}"
           echo "conclusion=$CONCLUSION" >> "$GITHUB_OUTPUT"
 
       - name: Open or update the issue for a red sweep
@@ -139,11 +200,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BACKEND: ${{ matrix.backend }}
+          TITLE: ${{ matrix.title }}
+          WHAT: ${{ matrix.what }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          TITLE="Nightly E2E sweep is red on $BACKEND"
-          BODY="The full E2E sweep on **$BACKEND** failed: $RUN_URL
+          BODY="$WHAT failed: $RUN_URL
 
           The sweep is advisory and blocks nothing; a suite that is red here and matters is one to fix and promote into the guard tier (test/run-e2e-ci.ts, GUARD_SUITES). See docs/coding-guidelines/testing-requirements.md Rule 1b and docs/pitfalls.md §18 before reading a red suite as a regression."
           EXISTING="$(gh issue list --label nightly-sweep --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
@@ -164,10 +225,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BACKEND: ${{ matrix.backend }}
+          TITLE: ${{ matrix.title }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          TITLE="Nightly E2E sweep is red on $BACKEND"
           EXISTING="$(gh issue list --label nightly-sweep --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
           if [ -n "$EXISTING" ]; then
             gh issue close "$EXISTING" --comment "Green on $(date -u +%Y-%m-%d): $RUN_URL"

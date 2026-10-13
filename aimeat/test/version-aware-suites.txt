@@ -1,0 +1,70 @@
+# The E2E suites whose expected answers depend on the release the node runs. The nightly sweep
+# (.github/workflows/e2e-full.yml, job release-4-0-0) runs exactly these on SQLite with
+# AIMEAT_TEST_SOFTWARE_VERSION=4.0.0, so the 4.0.0 half of every version-aware assertion is run
+# every night and not only by hand. Their 3.x half runs in the ordinary sweep.
+#
+# A suite belongs here when it branches on the release or names a removal: it calls removedOn() or
+# imports helpers/node-release or helpers/owner-key-sign-in, reads AIMEAT_TEST_SOFTWARE_VERSION,
+# calls versionAtLeast(), or names a *_REMOVED_IN constant. test/unit/version-aware-suites.test.ts
+# refuses a suite that does any of these and is not listed, and a listed name that is no suite.
+#
+# e2e-node-update asserts that the node reports AIMEAT_TEST_SOFTWARE_VERSION on GET /v1/build, so a
+# run that did not start the node as 4.0.0 fails there and is not green by accident.
+#
+# Run the same list locally (from aimeat/, on your own claimed port):
+#   AIMEAT_TEST_SOFTWARE_VERSION=4.0.0 node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --tests-file=test/version-aware-suites.txt
+#
+# One suite name a line, as --test= takes it. Lines starting with # and empty lines are skipped.
+ai
+api-full
+e2e-account-security-gate
+e2e-admin-federation-page
+e2e-admin-work-page
+e2e-agent-v2-agui
+e2e-ai-provider-allowlist
+e2e-ai-provider-stub
+e2e-ai-providers
+e2e-app-agent-deploy
+e2e-app-draft
+e2e-app-grants
+e2e-app-store-license
+e2e-app-template-proposals
+e2e-app-tool-free-mcp
+e2e-commerce
+e2e-exchange
+e2e-exchange-projection
+e2e-ext-hardening
+e2e-ext-paywall
+e2e-federation
+e2e-federation-contact-link
+e2e-federation-nodeinfo
+e2e-federation-policy
+e2e-federation-relay-claim
+e2e-federation-settlements-sync
+e2e-federation-visiting
+e2e-home-journey
+e2e-mcp
+e2e-mcp-commerce
+e2e-mcp-core-doors
+e2e-mcp-exchange
+e2e-mcp-knowledge
+e2e-mcp-session-authority
+e2e-mcp-token-rest
+e2e-mcp-workspaces
+e2e-memory-bin
+e2e-money-audit
+e2e-node-update
+e2e-own-key-roads
+e2e-owner-deactivation
+e2e-pacing-two-values
+e2e-peer-registration-proof
+e2e-personal-tunnel
+e2e-presence
+e2e-proactive-mode
+e2e-realtime-rooms
+e2e-rest-scope-gates
+e2e-sealed-config
+e2e-secret-canaries
+e2e-secret-canary-sweep
+e2e-workflows
+openrouter
