@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 -- 2026-10-13 -- GET .../workspace/public/records?format=ics serves one shared records
+ *     space as a calendar feed, and PUT .../workspace/share { ics_key } makes or clears the feed key
+ *     that opens that format for a share with a password or an account (services/calendar-feed.ts).
  *   v1.16.0 -- 2026-10-12 -- POST .../workspace/records/delete puts the records in the bin and asks
  *     memory:delete, as aimeat_workspace_object_delete does (ruling
  *     decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 9).
@@ -49,7 +52,7 @@
  *   v1.4.0 — 2026-08-14 — SECURITY: POST /v1/organisms/:id/workspaces is gated by
  *     requireScope('organism:write'); requireRoleOrScope('agent', …) let every agent through on role.
  */
-import type { Router } from 'express';
+import type { Router, Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -61,6 +64,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import { hashPassword, verifyPassword } from '../../services/password.js';
 import { generateShareToken, shareTokenVersionOf, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
+import { recordsToIcs, newIcsKey, icsKeyMatches } from '../../services/calendar-feed.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, workspaceMetaReader, readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
 import { provisionWorkspace, WorkspaceProvisionError } from '../../services/workspace-provision.js';
 import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
@@ -463,19 +467,41 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * 404 (no disclosure) if nothing is public; the share access mode (open/account/password) still gates
    * the read like the public documents path. This is the generic anonymous read for public record
    * spaces — any public showroom / catalogue / knowledge client reads its structured data through it. ── */
-  router.get('/v1/organisms/:id/workspace/public/records', async (req, res) => {
+  // A calendar program fetches its feed every few minutes to hours. This bounds what one address
+  // can cost the node, and applies to the calendar format only; the JSON read is as it was.
+  const icsLimit = rateLimit({ windowMs: 15 * 60_000, max: 120, keyBy: 'ip' });
+  const icsFeedLimit = (req: Request, res: Response, next: NextFunction): void => {
+    if (req.query.format === 'ics') icsLimit(req, res, next); else next();
+  };
+
+  // ?format=ics is the same read as an RFC 5545 calendar, for a calendar program to subscribe to
+  // (services/calendar-feed.ts). It names ONE space, whose records are events in the shape the
+  // served library aimeat-calendar defines; only an event's own fields are written. A calendar
+  // program cannot sign in or send a share token, so for this format alone `?key=` (the share's
+  // feed key, made with PUT …/workspace/share { ics_key: true }) passes the access mode. The key
+  // opens nothing the share does not open, and nothing in any other format.
+  router.get('/v1/organisms/:id/workspace/public/records', icsFeedLimit, async (req, res) => {
     const id = req.params.id as string;
     const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
     const space = typeof req.query.space === 'string' ? req.query.space : undefined;
+    const asIcs = req.query.format === 'ics';
     const organism = await storage.getOrganism(id);
     if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
+    if (asIcs && !space) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'format=ics takes one space: add space=<the records space that holds the events>')); return; }
     const share = await readShareMeta(id, ws);
     const found = await collectPublicRecords(id, ws, share, space ? { space } : undefined);
     if (found.count === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
-    const denied = await shareGateDenied(req, organism, id, ws, share);
+    const denied = asIcs && icsKeyMatches(share.icsKeyHash, req.query.key) ? null : await shareGateDenied(req, organism, id, ws, share);
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const records = await found.release(readerFor({ storage, config }, req.auth));
     if (records.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
+    if (asIcs) {
+      const feed = await recordsToIcs(records, (await findWsEntry(id, ws))?.name);
+      // The address may carry the feed key: no shared cache keeps the answer, and no page it is opened from learns the address.
+      res.set({ 'Cache-Control': 'private, max-age=300', 'Referrer-Policy': 'no-referrer', 'X-Calendar-Events': String(feed.events), 'X-Calendar-Skipped': String(feed.skipped) });
+      res.type('text/calendar; charset=utf-8').send(feed.ics);
+      return;
+    }
     res.json(success(config.nodeId, { organism_id: id, ws, records: await withItemProvenance(storage, config, records) }));
   });
 
@@ -531,7 +557,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (createdBy !== (req.auth!.owner as string) && role !== 'creator' && role !== 'admin') {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can change sharing')); return;
     }
-    const body = (req.body ?? {}) as ShareMeta & { password?: string | null };
+    const body = (req.body ?? {}) as ShareMeta & { password?: string | null; ics_key?: true | null };
     const isBoolMap = (m: unknown): m is Record<string, boolean> =>
       !!m && typeof m === 'object' && !Array.isArray(m) && Object.values(m).every(v => typeof v === 'boolean');
     if (body.spaces !== undefined && !isBoolMap(body.spaces)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'spaces must be a map of name → boolean')); return; }
@@ -545,16 +571,22 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (typeof body.password === 'string' && (body.password.length < 4 || body.password.length > 128)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password must be 4–128 characters')); return;
     }
+    if (body.ics_key !== undefined && body.ics_key !== true && body.ics_key !== null) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ics_key is true (make a new feed key; it ends the one before) or null (clear it)')); return;
+    }
     const prev = await readShareMeta(id, ws);
     // password: string sets a new scrypt hash, null clears it, absent keeps the previous one.
     const nextHash = typeof body.password === 'string' ? await hashPassword(body.password)
       : body.password === null ? null : prev.passwordHash;
+    // ics_key: true makes a new feed key (shown once, in this answer), null clears it, absent keeps it.
+    const feedKey = body.ics_key === true ? newIcsKey() : null;
     const next: ResolvedShare = {
       public: typeof body.public === 'boolean' ? body.public : prev.public,
       spaces: { ...prev.spaces, ...(body.spaces ?? {}) },
       docs: { ...prev.docs, ...(body.docs ?? {}) },
       access: body.access ?? prev.access,
       passwordHash: nextHash,
+      icsKeyHash: feedKey ? feedKey.hash : body.ics_key === null ? null : prev.icsKeyHash,
     };
     if (next.access === 'password' && !next.passwordHash) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', "access 'password' requires a password to be set")); return;
@@ -569,7 +601,11 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
     emitChange('organisms');
-    res.json(success(config.nodeId, { organism_id: id, ws, share: redactShare(next) }));
+    // A new feed key is in this answer and in no later one: only its hash is kept.
+    res.json(success(config.nodeId, {
+      organism_id: id, ws, share: redactShare(next),
+      ...(feedKey ? { ics_key: feedKey.key, ics_url: `/v1/organisms/${id}/workspace/public/records?ws=${encodeURIComponent(ws)}&space=<space>&format=ics&key=${feedKey.key}` } : {}),
+    }));
     // Public landing feed — fire once on the FIRST public edge of this PUT: the whole
     // workspace, any space, or any document transitioning private→public ("publish to feed").
     const newlyPublic = (

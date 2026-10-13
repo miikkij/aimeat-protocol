@@ -2,8 +2,13 @@
  * @file calendar/events.js
  * @description Bounded RRULE expansion in civil time, with additions, exclusions and detached overrides.
  * @version-history v1.0.0 - 2026-09-18 - Calendar event model and recurrence.
+ *   2026-10-13 - The recurrence class is read from the package's namespace or its default, so Node imports this file.
  */
-import { RRule } from 'rrule';
+import * as rruleModule from 'rrule';
+// The package is an ES module to the bundler and CommonJS to Node, which finds no named export in
+// it: the class is on the namespace in one and on its default in the other. Read from either, so
+// the node itself can import this file (services/calendar-feed.ts) as core.js says it can.
+const RRule = rruleModule.RRule ?? /** @type {any} */ (rruleModule).default.RRule;
 import { local, zoned, fromInstant, iso, wallMs, wallString, rangeMs } from './time.js';
 
 /** @typedef {{id:string,title?:string,start:string,end:string,timeZone?:string,allDay?:boolean,rrule?:string,rdates?:string[],exdates?:string[],overrides?:Record<string,any>,description?:string,location?:string,transparent?:boolean,cancelled?:boolean}} CalendarEvent */

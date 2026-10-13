@@ -935,6 +935,9 @@ const ALL_SUITES = [
     'test/e2e-workspace-member-changes.ts',
     'test/e2e-workspace-public-sharing.ts',
     'test/e2e-workspace-public-records.ts',
+    // The same public read as an ICS feed a calendar program subscribes to, and the feed key that
+    // opens it (and nothing else) for a share that asks for a password or an account.
+    'test/e2e-calendar-feed.ts',
     'test/e2e-workspace-member-records.ts',
     'test/e2e-signage-agent-faced.ts',
     'test/e2e-mcp-catalogue.ts',

@@ -898,6 +898,15 @@
      "plain": "Public workspace sharing Share selected documents and record spaces through a public viewer. Choose open access, a password or an account requirement, and withdraw sharing later. /v1/organisms/:id/workspace/share, /v1/organisms/:id/workspace/public/*"
     },
     {
+     "slug": "g-6-workspace-calendar-in-your-own-calendar-program",
+     "cells": [
+      "<strong>Workspace calendar in your own calendar program</strong>",
+      "A record space that holds events can be subscribed to from Google, Apple or Outlook calendar as a calendar feed, so approved bookings show there without copying. The workspace's creator or an admin opens the space in the share. A calendar that is not public gets a secret address: the node shows it once, a new one ends the old, and it opens the calendar and nothing else. Only an event's own fields are in the feed. No page draws the address yet: an app, or your AI through the REST endpoint, sets it.",
+      "<code>/v1/organisms/:id/workspace/public/records?format=ics</code>, <code>/v1/organisms/:id/workspace/share</code> (<code>ics_key</code>)"
+     ],
+     "plain": "Workspace calendar in your own calendar program A record space that holds events can be subscribed to from Google, Apple or Outlook calendar as a calendar feed, so approved bookings show there without copying. The workspace's creator or an admin opens the space in the share. A calendar that is not public gets a secret address: the node shows it once, a new one ends the old, and it opens the calendar and nothing else. Only an event's own fields are in the feed. No page draws the address yet: an app, or your AI through the REST endpoint, sets it. /v1/organisms/:id/workspace/public/records?format=ics, /v1/organisms/:id/workspace/share (ics_key)"
+    },
+    {
      "slug": "g-6-partial-document-editing",
      "cells": [
       "<strong>Partial document editing</strong>",
@@ -3997,6 +4006,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative from node 4.0.0; RFC v4.0 Core and Platform until then), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 401
+  "rows": 402
  }
 }
