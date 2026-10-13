@@ -19,6 +19,8 @@
  *   allowlist have no other REST route), and are tested to answer at 4.0.0.
  * @usage cd aimeat && pnpm exec vitest run test/unit/removals-4-0-0.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-13 — 3.26.1 refuses an owner signature from a key the node does not hold and issues
+ *     no token; 4.0.0 refuses it as removed (4.0-testimuutokset.md §4 item 1).
  *   v1.1.0 — 2026-10-12 — The real AI routers: the three /v1/openrouter routes answer 410 at 4.0.0, and
  *     GET and POST /v1/ai/settings answer there, GET with limits.voice_msg_max_seconds.
  *   v1.0.0 — 2026-10-12 — Initial (wish-4-0-0-n-poistot-koodiin-versioporttina-ei-kommenttina).
@@ -172,6 +174,36 @@ describe('owner-key sign-in (AUTH-05)', () => {
         const again = await post('/v1/auth/token', body);
         expect(again.status).toBe(401);
         expect(again.body.error.code).toBe('AUTH_REQUIRED');
+    });
+
+    // A key the node does not hold must not sign in as the owner. e2e-setup-and-verification proved
+    // this until the 4.0.0 cleanup made that suite expect 410 (4.0-testimuutokset.md §4 item 1), so on
+    // 3.x nothing proved it. Shown to fail with verify() stubbed to accept every signature.
+    async function foreignKeyBody(): Promise<Record<string, string>> {
+        const foreign = await generateKeyPair();
+        const timestamp = new Date().toISOString();
+        return { owner: OWNER, timestamp, signature: await sign(foreign.privateKey, OWNER + NODE_ID + timestamp) };
+    }
+
+    it('3.26.1 refuses an owner signature made with a key the node does not hold, and issues no token', async () => {
+        v.version = OLD;
+        const sessionsBefore = (await storage.listActiveSessions(OWNER)).length;
+        const r = await post('/v1/auth/token', await foreignKeyBody());
+        expect(r.status).toBe(401);
+        expect(r.body.error.code).toBe('AUTH_REQUIRED');
+        expect(r.body.data).toBeUndefined();
+        expect((await storage.listActiveSessions(OWNER)).length).toBe(sessionsBefore);
+    });
+
+    it('4.0.0 refuses the same foreign-key signature as removed, and issues no token', async () => {
+        v.version = NEW;
+        const sessionsBefore = (await storage.listActiveSessions(OWNER)).length;
+        const r = await post('/v1/auth/token', await foreignKeyBody());
+        expect(r.status).toBe(410);
+        expect(r.body.error.code).toBe('OWNER_KEY_LOGIN_OFF');
+        expect(r.body.error.details?.removed_in).toBe('4.0.0');
+        expect(r.body.data).toBeUndefined();
+        expect((await storage.listActiveSessions(OWNER)).length).toBe(sessionsBefore);
     });
 });
 

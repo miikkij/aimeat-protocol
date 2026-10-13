@@ -17,14 +17,18 @@
  *   agent's sessions and not the sibling standing next to it.
  *
  *   Two more mint paths and one more replay (Core 2026-11): the agent token POST /v1/ghii/verify-email
- *   hands out dies with the agent (ID-10), and one signature renews an agent token once (AUTH-11).
+ *   and GET /v1/ghii/magic-link/verify hand out dies with the agent (ID-10), and one signature renews
+ *   an agent token once (AUTH-11).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-token-revocation
  * @version-history
+ *   v1.2.0 — 2026-10-13 — The token GET /v1/ghii/magic-link/verify hands out dies with its agent too
+ *     (ID-10, 4.0-testimuutokset.md §4 item 8).
  *   v1.1.0 — 2026-10-12 — A renewal signature works once (AUTH-11); the e-mail verification token dies
  *     with its agent (ID-10).
  *   v1.0.0 — 2026-08-13 — Initial, with the fix.
  */
 import { seedEmailVerification } from './helpers/verified-email.js';
+import { seedSignInLink } from './helpers/seed-password.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -167,6 +171,25 @@ async function run() {
         assert(del.status === 200, `delete ${name}: ${del.status}`);
         const after = await probe();
         assert(after.status === 401, `a deleted agent's verification token must not authenticate, got ${after.status}`);
+    });
+
+    // ID-10, the other mailbox proof. GET /v1/ghii/magic-link/verify mints through the same
+    // mintVerifiedAgentToken as verify-email, and nothing tested that its token dies with the agent
+    // (4.0-testimuutokset.md §4 item 8). The link is issued by the node's own issueLoginLink.
+    await test('ID-10: the token a sign-in link hands out (magic-link/verify) dies when its agent is deleted', async () => {
+        const link = await seedSignInLink(BASE, o.owner, `${o.owner}@example.test`);
+        const linkToken = new URL(link).searchParams.get('token') ?? '';
+        const v = await json(`/v1/ghii/magic-link/verify?token=${encodeURIComponent(linkToken)}`);
+        assert(v.status === 200, `magic-link/verify ${v.status}: ${JSON.stringify(v.body?.error)}`);
+        const linkAgentToken = v.body.data.token as string;
+        const probe = () => json('/v1/ghii/me', { headers: { Authorization: `Bearer ${linkAgentToken}` } });
+        const before = await probe();
+        assert(before.status === 200, `the sign-in link token authenticates before the agent is deleted, got ${before.status} ${JSON.stringify(before.body?.error)}`);
+        const name = String(v.body.data.agent.gaii).split('#')[0];
+        const del = await json(`/v1/agents/${encodeURIComponent(name)}`, { method: 'DELETE', headers: auth });
+        assert(del.status === 200, `delete ${name}: ${del.status}`);
+        const after = await probe();
+        assert(after.status === 401, `a deleted agent's sign-in link token must not authenticate, got ${after.status}`);
     });
 
     // A second owner for the two session-scope tests: the first one is about to sign itself out.

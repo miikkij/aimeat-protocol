@@ -16,6 +16,9 @@
  *   every REST route — including the session-resume branch, which asked nothing at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-deactivation
  * @version-history
+ *   v1.0.4 -- 2026-10-13 -- The owner-key /v1/auth/token answer is chosen by the node's release and
+ *     security.owner_key_login: 403 ACCOUNT_DISABLED on 3.x with the sign-in on, 410 OWNER_KEY_LOGIN_OFF
+ *     otherwise. It accepted either one before (4.0-testimuutokset.md §4 item 2).
  *   v1.0.3 -- 2026-10-12 -- The federation attestation request carries the audience proof for this
  *     node. Node 4.0.0 refuses one without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), so
  *     the test failed there on the proof and not on the deactivation it is about.
@@ -48,6 +51,8 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { ownerKeySignInOn, OWNER_KEY_LOGIN_REMOVED_IN } from './helpers/owner-key-sign-in.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, message: string): Promise<string> {
@@ -263,17 +268,23 @@ async function run() {
     });
     // The owner-key sign-in is deprecated and removed in 4.0.0 (OWNER_KEY_LOGIN_REMOVED_IN). While a
     // node still has it on (the 3.x default) it refuses a deactivated account with 403; on a node
-    // that switched it off, and on every 4.0.0 node, the route itself is gone (410). Either way the
-    // account gets no session through it.
+    // that switched it off, and on every 4.0.0 node, the route itself is gone (410). The node's
+    // release and setting say which of the two applies, so a 3.x node that answered 410 with the
+    // sign-in on, or a 4.0.0 node that still reached the account check, fails here.
     await test('the signed /v1/auth/token route refuses: 403 ACCOUNT_DISABLED while the owner-key sign-in is on, 410 OWNER_KEY_LOGIN_OFF once it is gone', async () => {
+        const removed = await removedOn(BASE, OWNER_KEY_LOGIN_REMOVED_IN);
+        const on = await ownerKeySignInOn(BASE, op.ownerToken);
         const ts = new Date().toISOString();
         const r = await json('/v1/auth/token', {
             method: 'POST',
             body: JSON.stringify({ owner: victim.owner, timestamp: ts, signature: await sign(victim.privateKey, victim.owner + NODE_ID + ts) }),
         });
-        const disabled = r.status === 403 && r.body.error?.code === 'ACCOUNT_DISABLED';
-        const gone = r.status === 410 && r.body.error?.code === 'OWNER_KEY_LOGIN_OFF';
-        assert(disabled || gone, `expected 403 ACCOUNT_DISABLED or 410 OWNER_KEY_LOGIN_OFF, got ${r.status} ${r.body.error?.code}`);
+        const want = on ? { status: 403, code: 'ACCOUNT_DISABLED' } : { status: 410, code: 'OWNER_KEY_LOGIN_OFF' };
+        const state = on ? 'on (3.x)' : removed ? 'removed (4.0.0)' : 'off (3.x)';
+        assert(r.status === want.status && r.body.error?.code === want.code, `sign-in ${state}: expected ${want.status} ${want.code}, got ${r.status} ${r.body.error?.code}`);
+        // removed_in is in the 410 of a node at or after the removal, and in no other answer.
+        assert((r.body.error?.details?.removed_in === OWNER_KEY_LOGIN_REMOVED_IN) === removed,
+            `sign-in ${state}: removed_in ${removed ? 'expected' : 'not expected'}, got ${JSON.stringify(r.body.error?.details)}`);
         assert(typeof r.body.data?.token !== 'string', 'a deactivated account got a token');
     });
     await test('the federation attestation refuses: deactivation holds on other nodes', async () => {

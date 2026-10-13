@@ -17,20 +17,38 @@
  *   signInByLink() is for a suite whose subject is an account that HAS no password (setting the
  *   first one, NO_PASSWORD): it signs the account in by an emailed sign-in link, the way such an
  *   account signs in from 4.0.0, and leaves it without a password.
- * @structure seedPassword · signInByLink
+ * @structure seedPassword · seedSignInLink · signInByLink
  * @usage
- *   import { seedPassword, signInByLink } from './helpers/seed-password.js';
+ *   import { seedPassword, seedSignInLink, signInByLink } from './helpers/seed-password.js';
  *   const token = await signInByLink(BASE, name, `${name}@example.test`);
+ *   const link = await seedSignInLink(BASE, name, `${name}@example.test`);   // unspent, for magic-link/verify
  *   await seedPassword(name);                              // the runner's server, OWNER_PASSWORD
  *   const token = await ownerToken(BASE, name);
  *   await seedPassword(name, 'Pw12345678', { sqlitePath }); // a suite's own node
  * @version-history
+ *   v1.1.0 — 2026-10-13 — seedSignInLink(), the first half of signInByLink, for a suite whose subject
+ *     is what GET /v1/ghii/magic-link/verify hands out (e2e-agent-token-revocation).
  *   v1.0.0 — 2026-10-12 — Initial (wish-e2e-testit-ja-sandbox-kirjautuvat-omistaja-avaimella-joka-po).
  */
 import { hashPassword } from '../../src/services/password.js';
 import { issueLoginLink } from '../../src/services/login-link.js';
 import { storageFor, markEmailVerified } from './verified-email.js';
 import { OWNER_PASSWORD } from './owner-login.js';
+
+/**
+ * An unspent sign-in link for `username`, as the node mails one: the address is marked verified and
+ * the link turned on behind the server's back (as markEmailVerified does), and the link is issued
+ * through the node's own issueLoginLink. Returns the link (GET /v1/ghii/magic-link/open?token=…); its
+ * `token` query parameter is what GET /v1/ghii/magic-link/verify takes.
+ */
+export async function seedSignInLink(base: string, username: string, email: string, opts: { sqlitePath?: string; nodeId?: string } = {}): Promise<string> {
+    const nodeId = opts.nodeId ?? process.env.E2E_NODE_ID ?? process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
+    await markEmailVerified(username, email, opts);
+    const storage = await storageFor(opts.sqlitePath);
+    const ghii = await storage.updateGHII(`${username}@${nodeId}`, { magicLinkEnabled: true });
+    if (!ghii) throw new Error(`seedSignInLink: no account ${username}@${nodeId}`);
+    return issueLoginLink(storage, { baseUrl: base } as Parameters<typeof issueLoginLink>[1], ghii, email.trim().toLowerCase(), 15 * 60 * 1000);
+}
 
 /**
  * A session for an account WITHOUT a password, the way such an account signs in from 4.0.0: by an
@@ -41,12 +59,7 @@ import { OWNER_PASSWORD } from './owner-login.js';
  * whose subject is a password-less account stays about one.
  */
 export async function signInByLink(base: string, username: string, email: string, opts: { sqlitePath?: string; nodeId?: string } = {}): Promise<string> {
-    const nodeId = opts.nodeId ?? process.env.E2E_NODE_ID ?? process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
-    await markEmailVerified(username, email, opts);
-    const storage = await storageFor(opts.sqlitePath);
-    const ghii = await storage.updateGHII(`${username}@${nodeId}`, { magicLinkEnabled: true });
-    if (!ghii) throw new Error(`signInByLink: no account ${username}@${nodeId}`);
-    const link = await issueLoginLink(storage, { baseUrl: base } as Parameters<typeof issueLoginLink>[1], ghii, email.trim().toLowerCase(), 15 * 60 * 1000);
+    const link = await seedSignInLink(base, username, email, opts);
     const opened = await fetch(link, { redirect: 'manual' });
     const rt = /(?:^|;\s*)aimeat_rt=([^;]*)/.exec(opened.headers.getSetCookie().join('\n'))?.[1];
     if (opened.status !== 302 || !rt) throw new Error(`signInByLink ${username}: the link opened no session (${opened.status} ${opened.headers.get('location')})`);
