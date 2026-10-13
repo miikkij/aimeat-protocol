@@ -1109,7 +1109,8 @@
           "zip_import": "ZIP-tuonti hylätty",
           "held_account_names": "Tietueet, jotka päivitys jätti ennalleen",
           "workspace_schema_closed": "Työtilan tilat, jotka hylkäävät jokaisen tietueen",
-          "headless_browser": "Palvelimen oma selain ei käynnisty"
+          "headless_browser": "Palvelimen oma selain ei käynnisty",
+          "scope_words_kept": "Oikeudet, jotka päivitys antoi olemassa oleville agenteille"
         },
         "source": {
           "workspace_import": "työtilan tuonti",
@@ -13346,6 +13347,8 @@
       "operatorActed": "Operaattori teki muutoksen tiliisi ({area}: {action}).",
       "operatorAdminGrantedOne": "{name} sai oikeuden ylläpitää tätä asennusta, koska sillä oli täysi pääsy. Voit poistaa oikeuden agentin asetuksista.",
       "operatorAdminGrantedMany": "{names} saivat oikeuden ylläpitää tätä asennusta, koska niillä oli täysi pääsy. Voit poistaa oikeuden kunkin agentin asetuksista.",
+      "scopeWordsKeptOne": "{name} toimii AIMEATin päivityksen jälkeen kuten ennenkin: se sai oikeudet, joita päivitys nyt vaatii ({words}). Voit poistaa ne agentin asetuksista.",
+      "scopeWordsKeptMany": "{names} toimivat AIMEATin päivityksen jälkeen kuten ennenkin: ne saivat oikeudet, joita päivitys nyt vaatii ({words}). Voit poistaa ne kunkin asetuksista.",
       "appPublished": "Julkaisit applikaation {name}.",
       "appUpdated": "Päivitit applikaation {name}.",
       "appFixDrafted": "Sovelluksen {app} korjattu luonnos odottaa sinua. Sovellus pysyy ennallaan, kunnes julkaiset luonnoksen.",

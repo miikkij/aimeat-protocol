@@ -6,6 +6,16 @@
  *   ruling decision-core-2026-11-avoimet-kysymykset-ja-agenttien-automaattinen-l Q21: "grant the new
  *   scope words once to every existing agent that used those routes").
  *
+ *   SUPERSEDED IN PART, 2026-10-13. Jouni overruled the "only new words" rule below: "jos ne oli
+ *   entuudestaan niiden pitäisi toimia nytkin. en mä ala käymään 70 agenttia läpi." (ruling
+ *   decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san). A third step,
+ *   services/rest-scope-keep-working-migration.ts, runs on a node's first start as 4.0.x and gives
+ *   every agent and approved ecosystem app that existed before it EVERY word the 4.0.0 gates check on
+ *   REST and MCP, the existing words included, so nobody reviews agents by hand; the owner is told on
+ *   the activity feed and narrows afterwards. The two steps here stay as they are and still run on any
+ *   release: they ran on nodes before 4.0.0, and their records keep them from running twice. The text
+ *   below is the reasoning they were written with.
+ *
  *   WHICH WORDS. Only the words that did not exist before the gates: one, `packages:read`. Every other
  *   word the gates ask (task:write, organism:invite, memory:read and the rest) already existed and
  *   already opens other routes and MCP tools. Writing one of those onto a principal that did not hold
@@ -36,6 +46,9 @@
  *   migrateAgentReadGrantOnce(storage, nodeId)
  * @usage migrateRestScopeGatesOnce(storage, config.nodeId).then(() => migrateAgentReadGrantOnce(storage, config.nodeId))
  * @version-history
+ *   v1.1.1 — 2026-10-13 — Header only: the "only new words" rule is superseded for 4.0.x by the third step,
+ *     services/rest-scope-keep-working-migration.ts (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-
+ *     rest-porttien-uudet-san). No code changed.
  *   v1.1.0 — 2026-10-12 — A second step, migrateAgentReadGrantOnce: agent:read, the word of the owner's
  *     agent list from 4.0.0, once, under its own record so a node that ran the first step runs it too
  *     (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 11).

@@ -35,7 +35,9 @@ at start, in order, each once, and the node always starts; nobody runs a script 
    - `GET /v1/health` reads `status: healthy`;
    - the admin Security page (or `aimeat_admin_security_overview`) lists no new incident. A database
      change that cannot place some data on evidence leaves that data as it was and opens one incident
-     there, with a decision per case (`aimeat_admin_incident_resolve`).
+     there, with a decision per case (`aimeat_admin_incident_resolve`). The one expected incident is
+     the first start as 4.0.x, which records the permission words it gave existing agents (see
+     [What else changes in 4.0.0](#what-else-changes-in-400)).
 
 **Going back.** Restore the backup you took in step 1 and start the old version. An older version
 does not undo the database changes a newer one made, so going back without that backup is not
@@ -95,17 +97,21 @@ constant.
 | **The REST routes that asked no scope word** (70 of them: organism membership and invitations, task creation for another agent and the v2 task roster, schedules, extension actions and instances, cortex reads, knowledge package writes, installs, appeals, checkout completion and a few more; `x-aimeat-scope` in `openapi.yaml` names each one's word) | an agent, an app or an ecosystem app without the word is refused with 403 `SCOPE_DENIED`. The owner in person needs no word, and an agent acting on its own record (its own tasks, offers and reports) needs none either | the call is allowed, answers with the Deprecation headers, and is counted per word in `GET /v1/stats` (`deprecated_use_by_type`, `rest_scope_missing:<word>`). The same holds for their MCP twins (`aimeat_workspace_list`, `aimeat_organism_invitations`, `aimeat_organism_invitation_respond`, `aimeat_skill_list`, `aimeat_package_instances`, `aimeat_v2_task_list`, `aimeat_v2_task_get`), and for `ext:invoke` on `aimeat_app_tool_invoke`, which runs the app tool's extension action and asks `exchange:write` on every release | `REST_SCOPE_GATES_ENFORCED_IN` (`aimeat/src/utils/rest-scope-release.ts`) |
 | **The owner's agent list** (`GET /v1/agents`, `GET /v1/agents/v2/basic-agents`, `GET /v1/agents/v2/migrate`, and the MCP tools `aimeat_agents_list` and `aimeat_agent_basics_get`) | an agent, an app or an ecosystem app without `agent:read` is refused with 403 `SCOPE_DENIED` | allowed with the Deprecation headers and counted under `rest_scope_missing:agent:read` | `REST_SCOPE_GATES_ENFORCED_IN` |
 
-**Agents need the new words before the node runs 4.0.0.** On its first start on a version with the gates, the node
-gives the words that did not exist before, `packages:read` and `agent:read`, to every agent and
-approved ecosystem app it has (`aimeat/src/services/rest-scope-gates-migration.ts`, once per node and
-word; the start-up log names who got them). `agent:read` is also in the default agent scopes. It does not give the words that existed already (`task:write`, `organism:invite`,
-`ext:invoke`, `memory:read` and the rest), because each of them also opens other routes and tools
-that the agent's owner never granted. So before the upgrade: read `deprecated_use_by_type` in
-`GET /v1/stats` for the `rest_scope_missing:` entries (and the node log, which names the caller and
-the route once a day per word), and tick the missing word on each agent that needs it (Profile →
-Agents, or `aimeat_operator_agent_configure`). An app declares the word in its
-`aimeat-scopes` meta tag and its owner approves it on the consent screen. An agent or app holding `*`
-is not affected.
+**Existing agents keep their access by themselves; only apps need a check.** On its first start as
+4.0.x, the node gives every agent and approved ecosystem app that existed before that start each word
+the 4.0.0 gates check and it does not hold (`aimeat/src/services/rest-scope-keep-working-migration.ts`,
+once per node). What an agent could do on 3.x it can still do on 4.0.x, with its next token, and
+nobody goes through the agents by hand. The node removes nothing, and leaves an agent or app holding
+`*` (or a covering wildcard such as `task:*`) as it is. Each owner sees one line on the home page's
+activity feed that names the agents and the words, and narrows any of them in Profile → Agents or with
+`aimeat_agent_scope_narrow`; a word removed after the start stays removed. The operator sees one
+incident on the Security page with the count per word, which is expected after this upgrade and is
+resolved once read. An app signed in with an app grant is the exception: its permissions follow its
+`aimeat-scopes` meta tag, and a word the node wrote would be trimmed at the app's next sign-in. So
+before the upgrade, check each app that calls one of these routes or tools: read
+`deprecated_use_by_type` in `GET /v1/stats` for the `rest_scope_missing:` entries (the node log names
+the caller and the route once a day per word), add the word to the app's `aimeat-scopes`, and its
+owner approves it on the consent screen.
 
 A peer row stored with a plain-http address before 4.0.0 is not rewritten: on a public node the key
 exchange refuses it from 4.0.0. Change its address to `https://` before the upgrade.

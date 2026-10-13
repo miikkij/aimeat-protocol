@@ -11,6 +11,9 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   v1.22.0 — 2026-10-13 — migrateRestScopeKeepWorkingOnce(), chained after migrateAgentReadGrantOnce: on the
+ *     first start as 4.0.x, every word the 4.0.0 scope gates check goes to the agents and approved
+ *     ecosystem apps that existed before the start (services/rest-scope-keep-working-migration.ts).
  *   v1.21.0 — 2026-10-12 — migrateAgentReadGrantOnce(), chained after migrateRestScopeGatesOnce: once per
  *     node, agent:read goes to every existing agent and approved ecosystem app.
  *   v1.20.0 — 2026-10-12 — migrateRestScopeGatesOnce(), chained after migrateToolScopeWordsOnce: once per
@@ -113,6 +116,7 @@ import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../s
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { migrateToolScopeWordsOnce } from '../services/tool-scope-words-migration.js';
 import { migrateRestScopeGatesOnce, migrateAgentReadGrantOnce } from '../services/rest-scope-gates-migration.js';
+import { migrateRestScopeKeepWorkingOnce } from '../services/rest-scope-keep-working-migration.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -354,6 +358,9 @@ export async function initializeServices(
     .catch(err => logger.error('Failed to clear the implicit free model from AI settings; the next boot tries again', { error: String(err) }));
   // The MCP tool scope words of 2026-10-06 (services/tool-scope-words-migration.ts), once per node:
   // an agent approved before them keeps its workspace read tools and its send-as-owner tool.
+  // Taken before the chain starts, so the third step below hands its words only to principals that
+  // existed before this start, never to one made while the steps still run.
+  const scopeStepsBegan = new Date().toISOString();
   migrateToolScopeWordsOnce(storage, config.nodeId)
     .catch(err => logger.error('Failed to carry existing agents onto the 2026-10-06 tool scope words; the next boot tries again', { error: String(err) }))
     // The REST scope gates of 4.0.0 (services/rest-scope-gates-migration.ts), once per node: the one new
@@ -362,6 +369,10 @@ export async function initializeServices(
     .then(() => migrateRestScopeGatesOnce(storage, config.nodeId))
     // agent:read, the word of the owner's agent list from 4.0.0: the second step, once, under its own record.
     .then(() => migrateAgentReadGrantOnce(storage, config.nodeId))
+    // The third step, on the first start as 4.0.x only: every word the 4.0.0 gates check goes to the
+    // agents and ecosystem apps that existed before, so what worked on 3.x keeps working (ruling
+    // decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
+    .then(() => migrateRestScopeKeepWorkingOnce(storage, config, { existedBefore: scopeStepsBegan }))
     .catch(err => logger.error('Failed to give the REST scope gate words to existing principals; the next boot tries again', { error: String(err) }));
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.

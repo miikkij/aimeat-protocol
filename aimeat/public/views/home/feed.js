@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-13: scope_words_kept, filed under access: which of your agents and apps the first start as
+ *     4.0.x gave the permissions that version started to check, and which permissions.
  *   2026-10-08: app_fix_drafted, with the agents' news: the fixing agent wrote a corrected draft.
  *   2026-10-04: agent_task_declined, filed with the agents' news and not under trouble: the agent's
  *     refusal and its reason.
@@ -148,6 +150,12 @@ export function line(item) {
       return d.count === '1'
         ? tr('home.feed.operatorAdminGrantedOne', '{name} got the permission to administer this installation because it had full access. You can take it away in the agent\'s settings.').replace('{name}', d.names || '')
         : tr('home.feed.operatorAdminGrantedMany', '{names} got the permission to administer this installation because they had full access. You can take it away in each agent\'s settings.').replace('{names}', d.names || '');
+    case 'scope_words_kept':
+      return d.count === '1'
+        ? tr('home.feed.scopeWordsKeptOne', '{name} keeps working as before after the AIMEAT update: it got the permissions the update now asks for ({words}). You can take them away in the agent\'s settings.')
+          .replace('{name}', d.names || '').replace('{words}', d.words || '')
+        : tr('home.feed.scopeWordsKeptMany', '{names} keep working as before after the AIMEAT update: they got the permissions the update now asks for ({words}). You can take them away in each one\'s settings.')
+          .replace('{names}', d.names || '').replace('{words}', d.words || '');
     case 'app_published':
       return tr('home.feed.appPublished', 'You published {name}.').replace('{name}', d.name || '');
     case 'app_updated':
@@ -263,7 +271,7 @@ export function kindCategory(kind) {
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
-    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted'].includes(k)) return 'access';
+    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept'].includes(k)) return 'access';
   return 'system';
 }
 

@@ -15,6 +15,9 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.9.0 — 2026-10-13 — scope_words_kept: the node's first start as 4.0.x gave the owner's existing
+ *     agents and ecosystem apps the permission words 4.0.0 started to check, so they keep working
+ *     (services/rest-scope-keep-working-migration.ts).
  *   v1.8.0 — 2026-10-08 — app_fix_drafted: the fixing agent wrote a corrected draft of an app (AI
  *     visibility, layer D). The live app is unchanged until the owner publishes the draft.
  *   v1.7.0 — 2026-10-04 — agent_task_declined: an agent refused a task and said why.
@@ -144,6 +147,10 @@ export type AccountEventKind =
   // full-access agents operator:admin. `data.names` lists the agents and `data.count` how many, so
   // the operator can take the permission back from any of them.
   | 'operator_admin_granted'
+  // `scope_words_kept` is written once per node, by the first start as 4.0.x, for each owner whose
+  // agents or ecosystem apps got the permission words 4.0.0 started to check. `data.names` lists them,
+  // `data.count` how many, `data.words` the words, so the owner can narrow any of them.
+  | 'scope_words_kept'
   | 'consent_granted'
   | 'consent_revoked'
   | 'app_granted'
