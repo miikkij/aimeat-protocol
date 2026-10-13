@@ -2,7 +2,7 @@
 
 **Version:** 1.0
 **Phase:** 0.6
-**Status:** Describes node 3.26 (checked against the code on 2026-10-11). Its normative content moves to AIMEAT Core 2026-11, which is released with node 4.0.0. Where this page and the code disagree, the code wins.
+**Status:** Describes node 3.26 (checked against the code on 2026-10-11). Its normative content moved to AIMEAT Core 2026-11, normative since node 4.0.0. Where this page and the code disagree, the code wins.
 
 ---
 

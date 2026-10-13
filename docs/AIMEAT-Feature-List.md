@@ -6,8 +6,8 @@ AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps 
 
 This list covers two layers:
 
-- **Core** is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in [AIMEAT-Core-2026-11.md](AIMEAT-Core-2026-11.md), normative from node 4.0.0; until then [AIMEAT-RFC-v4.0-Core-full.md](AIMEAT-RFC-v4.0-Core-full.md) with its errata.
-- **Platform** is what the aimeat.io reference implementation builds on it: apps, the agent fleet, extensions, AI, commerce, the web surfaces. This list is its inventory, and the [Platform reference](AIMEAT-Platform-reference.md) says how it is put together; it replaces [AIMEAT-RFC-v4.0-Platform-full.md](AIMEAT-RFC-v4.0-Platform-full.md) from node 4.0.0.
+- **Core** is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in [AIMEAT-Core-2026-11.md](AIMEAT-Core-2026-11.md), normative since node 4.0.0; before it, [AIMEAT-RFC-v4.0-Core-full.md](AIMEAT-RFC-v4.0-Core-full.md) with its errata.
+- **Platform** is what the aimeat.io reference implementation builds on it: apps, the agent fleet, extensions, AI, commerce, the web surfaces. This list is its inventory, and the [Platform reference](AIMEAT-Platform-reference.md) says how it is put together; it replaces [AIMEAT-RFC-v4.0-Platform-full.md](AIMEAT-RFC-v4.0-Platform-full.md) since node 4.0.0.
 
 The API contract is [openapi.yaml](../openapi.yaml). Where this list and the contract disagree, the contract wins. Individual apps built on the node (Lifecycle Central, the Design Book's apps, games) are not listed here; they are users of these features.
 
@@ -615,13 +615,13 @@ The operator dashboard is the one place with server-built screens. Everything on
 | **Secretary agent** | Removed | The owner's own agents, schedules and workflows. |
 | **Feedback channel** | Removed 2026-08-12 | `support@operators`. |
 | **Pricing page** | Removed 2026-08-28 | Prices live in the store. |
-| **Morsel prices and the morsel payment handler (`io.aimeat.morsels`)** | Removed 2026-10-11; the old price fields are read as pacing until release 4.0.0 | A money price (EUR or USD, optional) and a pacing amount in morsels per use, see section 14. |
+| **Morsel prices and the morsel payment handler (`io.aimeat.morsels`)** | Removed 2026-10-11; the old price fields were read as pacing in 3.x and are refused from 4.0.0. A knowledge package's `sharing.morsel_price` and a capability's `cost.morsels` are `toll_morsels` from 4.0.0; the old names are accepted with the Deprecation headers until 5.0.0 | A money price (EUR or USD, optional) and a pacing amount in morsels per use, see section 14. |
 | **Home and profile switch** | Removed 2026-08-27 | One start-page setting. |
 | **AI matching engine** | Not in the code | Discover, EXCHANGE needs and bids. |
 | **Wash-trading detection** | Not in the code | Trust caps an agent with fewer than three counterparties at 40. |
 | **Knowledge contributor reputation** | Not in the code | Reputation per knowledge package. |
 | **Boards** | Deprecated, then reinstated 2026-08-30 | Current, see section 13. |
-| **Legacy Ed25519 challenge-response** (the owner-key sign-in on `POST /v1/auth/token`) | Deprecated, still mounted in 3.x with the Deprecation headers; refused from 4.0.0 whatever `AIMEAT_OWNER_KEY_LOGIN` says | Password, passkey or outside sign-in for a person; device authorization and agent keys for an agent; the keypair still serves federation and node signing. |
+| **Legacy Ed25519 challenge-response** (the owner-key sign-in on `POST /v1/auth/token`) | Removed in 4.0.0: refused whatever `AIMEAT_OWNER_KEY_LOGIN` says (3.x still mounted it, with the Deprecation headers) | Password, passkey or outside sign-in for a person; device authorization and agent keys for an agent; the keypair still serves federation and node signing. |
 
 ---
 
@@ -654,4 +654,4 @@ Every piece of content you keep can carry a classification: how sensitive it is.
 
 ---
 
-*AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is `openapi.yaml`; the specification is AIMEAT Core 2026-11 (normative from node 4.0.0; RFC v4.0 Core and Platform until then), and the Platform reference describes what the node builds on it; later changes are at [the change log](/v1/changelog).*
+*AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is `openapi.yaml`; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at [the change log](/v1/changelog).*

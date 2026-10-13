@@ -9,7 +9,7 @@ purpose and maintenance status. [Maintenance](maintenance.md) explains the check
 | You want to | Read |
 |---|---|
 | Understand what AIMEAT provides | [Feature guide](AIMEAT-Feature-List.md) |
-| Read the protocol | [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md) (draft, normative from node 4.0.0) and its [conformance evidence](AIMEAT-Core-2026-11-evidence.md); the [Platform reference](AIMEAT-Platform-reference.md) for what the node builds on it. Until 4.0.0: [Core v4.0](AIMEAT-RFC-v4.0-Core-full.md), [Platform v4.0](AIMEAT-RFC-v4.0-Platform-full.md) and their [errata](AIMEAT-RFC-v4.0-errata.md) |
+| Read the protocol | [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md) (normative since node 4.0.0) and its [conformance evidence](AIMEAT-Core-2026-11-evidence.md); the [Platform reference](AIMEAT-Platform-reference.md) for what the node builds on it. Superseded, kept as history: [Core v4.0](AIMEAT-RFC-v4.0-Core-full.md), [Platform v4.0](AIMEAT-RFC-v4.0-Platform-full.md) and their [errata](AIMEAT-RFC-v4.0-errata.md) |
 | Find an API operation | [API reference](a-endpoints.md), [OpenAPI](../openapi.yaml) |
 | Connect an agent | [Agent guide](building-an-aimeat-compatible-agent.md), [client connection paths](c-platform-notes.md) |
 | Connect an external application | [Ecosystem guide](building-an-aimeat-compatible-ecosystem-app.md) |

@@ -351,7 +351,7 @@ Translations are in `aimeat/locales/`, not under `public/`. See the [frontend gu
 |------|---------|
 | `docs/AIMEAT-Core-2026-11.md`, `docs/AIMEAT-Core-2026-11-evidence.md` | The specification and its conformance evidence |
 | `docs/AIMEAT-Platform-reference.md` | The architecture note of the platform on top of Core |
-| `docs/AIMEAT-RFC-v4.0-*.md` | The v4.0 specification (Core, Platform, errata), kept until node 4.0.0 |
+| `docs/AIMEAT-RFC-v4.0-*.md` | The v4.0 specification (Core, Platform, errata), superseded since node 4.0.0 and kept as history |
 | `docs/a-endpoints.md`, `docs/b-config.md` | API reference and configuration reference |
 | `docs/coding-guidelines/` | Development standards (this folder) |
 | `docs/frontend-development-guide.md` | Frontend architecture and conventions |
