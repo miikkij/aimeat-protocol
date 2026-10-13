@@ -10,6 +10,7 @@
  *   another one.
  * @usage pnpm test -- agent-draft-known
  * @version-history
+ *   v1.3.0 — 2026-10-13 — Whether a record-woken agent goes onto its organism's agent list (joinsAgentList).
  *   v1.2.0 — 2026-10-13 — The model a person picks for a new agent (llmChoiceOf).
  *   v1.1.0 — 2026-10-12 — An agent that works on a workspace's records: the prompt text, the
  *     workspace a draft names, and the definition's `record_spaces`
@@ -20,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import {
     DEFAULT_TOOL_MENU, clipLine, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
     RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, recordSpacesOf, withSpaceNote,
-    BROWSER_FEATURE, browserBlock, withBrowserSites, llmChoiceOf, withToolSkus,
+    BROWSER_FEATURE, browserBlock, withBrowserSites, llmChoiceOf, withToolSkus, joinsAgentList,
 } from '../../public/js/services/agent-draft-known.js';
 
 const MENU = [
@@ -261,9 +262,17 @@ describe('reach', () => {
     // preset carries the word, so an agent made here that calls its owner's app tool would have
     // stopped working at 4.0.0.
     it('calling an app tool asks for the word the extension action route checks', () => {
-        expect(extraScopes(def('{{ctx.prompt}}', ['app_tools']))).toEqual(['ext:invoke']);
+        expect(extraScopes(def('{{ctx.prompt}}', ['app_tools']))).toContain('ext:invoke');
         expect(extraScopes(def('{{ctx.prompt}}', ['workspace', 'app_tools']))).toEqual(['organism:read', 'ext:invoke']);
         expect(extraScopes(def('{{ctx.prompt}}', ['web', 'memory']))).toEqual([]);
+    });
+
+    // Measured on aimeat.io on 2026-10-13: an agent of the "reads only" reach, built on one app
+    // tool, held ext:invoke and no organism:read. The tool's extension reads the app's workspace
+    // as the caller, the node refused that read, and the tool answered that the workspace is not
+    // one the agent can read. The agent's first work delivered that refusal and nothing else.
+    it('calling an app tool also asks for the word a workspace read checks, because the tool reads the app\'s workspace as the agent', () => {
+        expect(extraScopes(def('{{ctx.prompt}}', ['app_tools']))).toEqual(['organism:read', 'ext:invoke']);
     });
 });
 
@@ -512,5 +521,25 @@ describe('the model a person picks for a new agent', () => {
 
     it('a picked profile is named and nothing else', () => {
         expect(llmChoiceOf('profile:content', llm)).toEqual({ kind: 'profile', profile: 'content' });
+    });
+});
+
+describe('whether an agent that works on a workspace\'s records goes onto the organism\'s agent list', () => {
+    // Measured on aimeat.io on 2026-10-13: an agent made on the page was put on the list of an
+    // organism that admits every member's agent, and every write it made into the workspace it
+    // watched was refused (services/organism-namespace-access.ts gives a listed agent of such an
+    // organism the shared area only). Taken off the list, the same agent wrote its records.
+    it('an organism that admits only listed agents: yes, the list is how the agent gets in', () => {
+        expect(joinsAgentList({ agentAccess: 'listed' })).toBe(true);
+    });
+
+    it('an organism that admits every member\'s agent: no, the list would take the workspace away from it', () => {
+        expect(joinsAgentList({ agentAccess: 'all' })).toBe(false);
+        // The node leaves the field out for such an organism (GET /v1/organisms/:id).
+        expect(joinsAgentList({ agentGaiis: [] })).toBe(false);
+    });
+
+    it('an organism that could not be read: no, because a wrong yes stops the agent and a wrong no only leaves a refusal that names the list', () => {
+        for (const organism of [null, undefined, {}, 'listed']) expect(joinsAgentList(organism as any)).toBe(false);
     });
 });

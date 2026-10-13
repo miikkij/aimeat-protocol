@@ -33,6 +33,10 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.5.1 — 2026-10-13 — "When you propose the agent": an app tool reads and writes the app's
+ *     workspace as the agent that called it, so the agent needs organism:read (and the writing
+ *     reach for a tool that saves). Seen on aimeat.io that day: ext:invoke alone left a tool
+ *     answering that the workspace is not the caller's to read.
  *   v1.5.0 — 2026-10-13 — `ctx.calendar` in the table of what an extension has.
  *   v1.4.0 — 2026-10-13 — A visitor who expects an answer on the page: an intake form with `thread`,
  *     and the signal record that wakes the agent (routes/organisms/intake-thread.ts).
@@ -298,6 +302,10 @@ Ask for the scopes those tools use. An agent that calls an app tool needs \`ext:
 runs an extension action, and the node calls it with the agent's own token. From node 4.0.0 that
 call is refused without the word; before it, the call works and its answer carries a
 \`Deprecation\` header. An agent that reads a workspace needs \`organism:read\`, and one that writes
-into it \`organism:write\` as well.
+into it \`organism:write\` as well. **An app tool that reads or writes the app's workspace does it
+as the agent that called it**, so the agent needs those same words for the tool to work: with
+\`ext:invoke\` alone the call arrives and the tool answers that the workspace is not one the caller
+can read. The home's new-agent page asks \`organism:read\` for every agent that calls an app tool;
+a tool that saves something needs the reach that writes.
 `,
 };
