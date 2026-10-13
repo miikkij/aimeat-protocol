@@ -8,6 +8,8 @@
  *   audience (secaudit 2026-10 last items, D3; Jouni 2026-10-06: all four).
  * @usage pnpm test -- signed-delivery-proof
  * @version-history
+ *   v1.1.1 — 2026-10-13 — The running-version expectation follows the version instead of assuming
+ *     one below 3.27.0, which went false at the 3.27.0 bump (4804d12cc) and stopped pnpm gate.
  *   v1.1.0 — 2026-10-10 — The pin (secaudit 2026-10-10 I21), the default that follows the version
  *     (I22), and nodeRequestSignedBy leaving the nonce (I7).
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 last items, D3).
@@ -24,6 +26,7 @@ import {
 import {
     AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, audienceRequiredByDefault, federationDefaults,
 } from '../../src/config-federation.js';
+import { getSoftwareVersion, versionAtLeast } from '../../src/utils/version.js';
 
 describe('a delivery names its node and its moment', () => {
     let keys: { publicKey: string; privateKey: string };
@@ -168,12 +171,12 @@ describe('the audience default follows the version', () => {
         expect(audienceRequiredByDefault('unknown')).toBe(false);
     });
 
-    it('is off on the running version (3.25.0), and the environment wins either way', () => {
+    it('follows the running version (on from AUDIENCE_REQUIRED_BY_DEFAULT_IN, off below it), and the environment wins either way', () => {
         const saved = process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED;
         try {
             delete process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED;
             expect(federationDefaults().federationAudienceRequired).toBe(audienceRequiredByDefault());
-            expect(audienceRequiredByDefault()).toBe(false);
+            expect(audienceRequiredByDefault()).toBe(versionAtLeast(getSoftwareVersion(), AUDIENCE_REQUIRED_BY_DEFAULT_IN));
             process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED = 'true';
             expect(federationDefaults().federationAudienceRequired).toBe(true);
             process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED = 'false';
