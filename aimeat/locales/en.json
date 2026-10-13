@@ -1109,7 +1109,8 @@
           "zip_import": "ZIP import refused",
           "held_account_names": "Records the update left as they were",
           "workspace_schema_closed": "Workspace spaces that refuse every record",
-          "headless_browser": "The server's own browser does not start"
+          "headless_browser": "The server's own browser does not start",
+          "scope_words_kept": "Permissions the update gave to existing agents"
         },
         "source": {
           "workspace_import": "workspace import",
@@ -13347,6 +13348,8 @@
       "operatorActed": "An operator made a change in your account ({area}: {action}).",
       "operatorAdminGrantedOne": "{name} got the permission to administer this installation because it had full access. You can take it away in the agent's settings.",
       "operatorAdminGrantedMany": "{names} got the permission to administer this installation because they had full access. You can take it away in each agent's settings.",
+      "scopeWordsKeptOne": "{name} keeps working as before after the AIMEAT update: it got the permissions the update now asks for ({words}). You can take them away in the agent's settings.",
+      "scopeWordsKeptMany": "{names} keep working as before after the AIMEAT update: they got the permissions the update now asks for ({words}). You can take them away in each one's settings.",
       "appPublished": "You published {name}.",
       "appUpdated": "You updated {name}.",
       "appFixDrafted": "A corrected draft of {app} is waiting for you. Your app is unchanged until you publish it.",

@@ -63,6 +63,7 @@ e2e-presence
 e2e-proactive-mode
 e2e-realtime-rooms
 e2e-rest-scope-gates
+e2e-rest-scope-keep-working
 e2e-sealed-config
 e2e-secret-canaries
 e2e-secret-canary-sweep

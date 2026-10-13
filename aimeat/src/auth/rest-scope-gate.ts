@@ -14,7 +14,9 @@
  *   word in GET /v1/stats (`deprecated_use_by_type`, kind `rest_scope_missing:<word>`). From that
  *   release the caller gets 403 SCOPE_DENIED, the same refusal requireScope sends.
  *
- *   The one-time grant that keeps the existing callers working is services/rest-scope-gates-migration.ts.
+ *   The grants that keep the existing callers working are services/rest-scope-gates-migration.ts (the
+ *   two words that did not exist before) and, on a node's first start as 4.0.x, services/rest-scope-
+ *   keep-working-migration.ts (every word these gates check, to every principal that existed before).
  *
  *   WHO PASSES WITHOUT THE WORD, as with requireScope: the owner in person (an owner session that is
  *   neither an agent, an ecosystem app nor a visitor from another node). With `unlessSelf`, also an
@@ -27,6 +29,7 @@
  *   router.put('/v1/agents/:name/offers', requireAuth(), requireRestScope('commerce:sell', { unlessSelf: config.nodeId }), handler)
  *   router.get('/v1/extensions/:name/instances', requireAuth(), requireRestScope('ext:invoke', { orScope: 'ext:write' }), handler)
  * @version-history
+ *   v1.0.1 — 2026-10-13 — Header only: names the third grant step (services/rest-scope-keep-working-migration.ts).
  *   v1.0.0 — 2026-10-12 — Initial (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  */
 import type { Request, Response, NextFunction } from 'express';

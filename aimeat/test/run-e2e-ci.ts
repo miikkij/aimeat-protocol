@@ -10,6 +10,9 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-13 -- e2e-rest-scope-keep-working.ts joins the list (not the guard tier): an agent that
+ *     worked on a 3.x node keeps the scope words 4.0.0 started to check, across boots of its own node
+ *     on 40477 (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
  *   2026-10-13 -- --tests-file=<path> skips a line starting with #, so test/version-aware-suites.txt (the
  *     nightly 4.0.0 run's list) carries its own explanation.
  *   2026-10-12 -- --tests-file=<path> takes the suite names from a file, one a line, for a list too long
@@ -768,6 +771,9 @@ const ALL_SUITES = [
     // Owns its server on 40452 and boots it three times on one database: the move to the full
     // identity runs when the store opens, and what it cannot place becomes one incident.
     'test/e2e-held-account-names.ts',
+    // Owns its server on 40477 and boots one database as 3.27.0, then twice as 4.0.0: the agents that
+    // worked on 3.x keep the scope words 4.0.0 started to check, once, and only those agents.
+    'test/e2e-rest-scope-keep-working.ts',
     'test/e2e-mcp-v2.ts',
     // Self-spawns its own server with the app origin ON (the shared one pins it OFF), the same
     // way e2e-app-origin does: an app's public address only exists when that flag is set.
