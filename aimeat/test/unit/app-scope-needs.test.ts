@@ -11,7 +11,14 @@
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { scanScopeNeeds, cortexLibRefs, undeclaredScopeNeeds, undeclaredScopeFindings } from '../../src/services/app-scope-needs.js';
+import { scanScopeNeeds, cortexLibRefs, undeclaredScopeNeeds, undeclaredScopeFindings, SCOPE_NEED_WORDS } from '../../src/services/app-scope-needs.js';
+import { APP_GRANTABLE_SCOPES } from '../../src/routes/app-grant-vocabulary.js';
+
+describe('the words a finding names', () => {
+    it('are all words an app grant can hold, so the sign-in can ask for each', () => {
+        for (const w of SCOPE_NEED_WORDS) expect([w, Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, w)]).toEqual([w, true]);
+    });
+});
 
 /** An app page that signs in, declares `scopes` (none: the default set) and runs `code`. */
 function page(code: string, scopes?: string): string {

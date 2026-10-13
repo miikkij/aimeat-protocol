@@ -1985,7 +1985,7 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The refinery config record, read for its connection id."
     },
-    "src/services/app-scope-allowance.ts": {
+    "src/services/app-scope-allowance-store.ts": {
       "reads": {
         "getMemory": 1
       },

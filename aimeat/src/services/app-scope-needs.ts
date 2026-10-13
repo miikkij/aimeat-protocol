@@ -22,10 +22,10 @@
  *   with the same rules. cortexLibRefs() names the libs an app loads.
  *
  *   WHAT AN APP ASKS FOR. Its `<meta name="aimeat-scopes">`, or the SDK's default set when it declares
- *   nothing (services/protected-resource.ts appScopesOf). A word an app grant cannot hold
- *   (APP_GRANTABLE_SCOPES) is read as its app twin where one exists (commerce:buy -> contract:spend),
- *   and dropped otherwise, because no sign-in could ask for it.
- * @structure ScopeNeed · scanScopeNeeds(sources) · cortexLibRefs(html) · undeclaredScopeNeeds(html, libs) ·
+ *   nothing (services/protected-resource.ts appScopesOf). Every rule names a word an app grant can
+ *   hold (routes/app-grant-vocabulary.ts): a gate that also takes a word no app is granted names the
+ *   app's word, as checkout completion names contract:spend with commerce:buy as its alternative.
+ * @structure ScopeNeed · SCOPE_NEED_WORDS · scanScopeNeeds(sources) · cortexLibRefs(html) · undeclaredScopeNeeds(html, libs) ·
  *   undeclaredScopeFindings(html, loadLib)
  * @usage
  *   const libs = await loadLibs(cortexLibRefs(html));
@@ -35,7 +35,6 @@
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { appScopesOf } from './protected-resource.js';
-import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
 
 /** One word the code needs, the text that shows it, and where that text is. */
 export interface ScopeNeed {
@@ -86,8 +85,9 @@ const RULES: Rule[] = [
   // Installs, money and appeals.
   { word: 'packages:read', re: new RegExp(`${LIT}/v1/instances(?:['"\\x60?]|/[^'"\\x60]*?(?:/status)?['"\\x60])`, 'g') },
   { word: 'packages:write', re: /\/v1\/instances\/[^\n;]{0,80}?\/(?:check-update|migration-prompt)\b/g },
-  { word: 'commerce:buy', alternatives: ['contract:spend'], re: /\bAIMEAT\.commerce\.completeCheckout\s*\(/g },
-  { word: 'commerce:buy', alternatives: ['contract:spend'], re: new RegExp(`${LIT}/v1/app-store/purchase['"\\x60]|checkout-sessions/[^\\n;]{0,80}?/complete\\b`, 'g') },
+  // The gate takes commerce:buy or contract:spend; an app grant can hold only the second.
+  { word: 'contract:spend', alternatives: ['commerce:buy'], re: /\bAIMEAT\.commerce\.completeCheckout\s*\(/g },
+  { word: 'contract:spend', alternatives: ['commerce:buy'], re: new RegExp(`${LIT}/v1/app-store/purchase['"\\x60]|checkout-sessions/[^\\n;]{0,80}?/complete\\b`, 'g') },
   { word: 'wallet:read', re: /\bAIMEAT\.exchange\.approval\s*\(/g },
   { word: 'wallet:read', re: new RegExp(`${LIT}/v1/(?:app-store/purchases/|commerce/beneficiary/approvals)`, 'g') },
   { word: 'social:read', re: new RegExp(`${LIT}/v1/appeals['"\\x60?]`, 'g') },
@@ -99,6 +99,9 @@ const RULES: Rule[] = [
 function excerpt(text: string, at: number, length: number): string {
   return text.slice(Math.max(0, at - 30), Math.min(text.length, at + length + 50)).replace(/\s+/g, ' ').trim();
 }
+
+/** Every word a finding can name (the rules' and the schedule calls'), for the test that each is grantable. */
+export const SCOPE_NEED_WORDS: readonly string[] = [...new Set([...RULES.map(r => r.word), 'task:write', 'workflow:write', 'memory:write'])].sort();
 
 /** A `/v1/schedules` call: its word follows its HTTP method (routes/schedules.ts). */
 function scheduleNeeds(text: string, source: string): ScopeNeed[] {
@@ -159,13 +162,6 @@ export function cortexLibRefs(html: string): Array<{ name: string; file: string;
   return [...out.values()];
 }
 
-/** The word an app grant would hold for a need: the word, its app twin, or none. */
-function grantableWord(need: ScopeNeed): string | null {
-  const grantable = (w: string) => Object.prototype.hasOwnProperty.call(APP_GRANTABLE_SCOPES, w);
-  if (grantable(need.word)) return need.word;
-  return (need.alternatives ?? []).find(grantable) ?? null;
-}
-
 /**
  * What an app's code needs and its sign-in does not ask for. `asks` is its declaration or the
  * default set; a need counts as met when that covers the word or one of its alternatives.
@@ -183,10 +179,8 @@ export function undeclaredScopeNeeds(
   const missing = new Set<string>();
   const evidence: ScopeNeed[] = [];
   for (const n of unmet) {
-    const word = grantableWord(n);
-    if (!word) continue;
-    if (!missing.has(word)) evidence.push({ ...n, word });
-    missing.add(word);
+    if (!missing.has(n.word)) evidence.push(n);
+    missing.add(n.word);
   }
   return { asks, declared, signsIn, needs, missing: [...missing].sort(), evidence };
 }

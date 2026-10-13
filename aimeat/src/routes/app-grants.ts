@@ -145,7 +145,7 @@ import { PORTFOLIO_TARGET_PREFIX, appOriginHostFamily, resolveAppOriginTarget, r
 import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
-import { appAllowanceWords, withAllowance } from '../services/app-scope-allowance.js';
+import { appAllowanceWords, withAllowance } from '../services/app-scope-allowance-store.js';
 import { hashGrantToken, upsertAppGrant, type GrantSpec } from '../services/app-grant-upsert.js';
 import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';

@@ -28,8 +28,9 @@
  *   DELETE /v1/apps/:owner/:filename/scope-allowance?words=...: the word leaves the allowance and
  *   every live grant of the app (unless a grant's own holder added it by hand), and it is kept in
  *   `removed`, so nothing puts it back.
- * @structure APP_SCOPE_ALLOWANCE_NS · appScopeAllowanceKey · AppScopeAllowance · readAppScopeAllowance ·
- *   appAllowanceWords · withAllowance · keepWorkingAppsOnce · readScopeAllowanceFor · removeScopeAllowanceFor
+ * @structure (re-exported from app-scope-allowance-store.ts: APP_SCOPE_ALLOWANCE_NS · appScopeAllowanceKey ·
+ *   AppScopeAllowance · readAppScopeAllowance · appAllowanceWords · withAllowance) · keepWorkingAppsOnce ·
+ *   readScopeAllowanceFor · removeScopeAllowanceFor
  * @usage
  *   const words = await appAllowanceWords(storage, 'alice/notes.html');
  *   const asked = withAllowance(requested, words);
@@ -40,7 +41,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName, resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { appKeySegment, equalAppId } from './app-record-keys.js';
+import { equalAppId } from './app-record-keys.js';
 import { resolveAppTarget } from './app-dev-grant.js';
 import { recordAppAudit } from './app-audit.js';
 import { resolveCortexLib } from './component-versions.js';
@@ -48,59 +49,17 @@ import { cortexLibRefs, undeclaredScopeNeeds } from './app-scope-needs.js';
 import { heldOwnerAdded } from './app-grant-scopes.js';
 import { emitChange } from './event-bus.js';
 import { done, refuse, type AppOpCaller, type AppOpOutcome } from './app-op-outcome.js';
+import {
+  APP_SCOPE_ALLOWANCE_SPEC, allowanceAppId, readAppScopeAllowance, writeAppScopeAllowance as writeAllowance,
+} from './app-scope-allowance-store.js';
 
-/** The namespace the allowance records live under: the node's, not the owner's key budget. */
-export const APP_SCOPE_ALLOWANCE_NS = 'app-scope-allowance';
-const SPEC = 'aimeat.app-scope-allowance/1';
-
-/** `owner/filename` with the owner as a bare account name, as every grant and key reads it. */
-function appIdOf(target: string): string {
-  const slash = target.indexOf('/');
-  return slash <= 0 ? target : `${localAccountName(target.slice(0, slash))}/${target.slice(slash + 1)}`;
-}
-
-export const appScopeAllowanceKey = (appId: string): string => `appscopeallowance.${appKeySegment(appIdOf(appId))}`;
-
-export interface AppScopeAllowance {
-  spec: typeof SPEC;
-  appId: string;
-  /** The words in force. */
-  words: string[];
-  /** Words the owner took away; nothing adds them back. */
-  removed: string[];
-  /** Why each word was given: the code that calls the route, and where it is. */
-  evidence: Array<{ word: string; source: string; evidence: string }>;
-  at: string;
-}
-
-/** This app's allowance, or null when it has none. A portfolio target has none. */
-export async function readAppScopeAllowance(storage: Storage, target: string): Promise<AppScopeAllowance | null> {
-  if (!target.includes('/') || target.startsWith('portfolio:')) return null;
-  const appId = appIdOf(target);
-  const rec = await storage.getMemory(APP_SCOPE_ALLOWANCE_NS, appScopeAllowanceKey(appId));
-  const v = rec?.value as AppScopeAllowance | undefined;
-  return v && v.spec === SPEC && equalAppId(v.appId, appId) && Array.isArray(v.words) ? v : null;
-}
-
-/** The words this app keeps; none when it has no allowance. */
-export async function appAllowanceWords(storage: Storage, target: string): Promise<string[]> {
-  return (await readAppScopeAllowance(storage, target))?.words ?? [];
-}
-
-/** `scopes` and the allowance words it lacks, in that order. */
-export function withAllowance(scopes: readonly string[], words: readonly string[]): string[] {
-  return [...scopes, ...words.filter(w => !scopes.includes(w))];
-}
-
-async function writeAllowance(storage: Storage, value: AppScopeAllowance): Promise<void> {
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key: appScopeAllowanceKey(value.appId), ownerGaii: APP_SCOPE_ALLOWANCE_NS, value,
-    visibility: 'private', tags: ['app-scope-allowance'],
-    // Never swept: an allowance that expired would cut an app the step promised would keep working.
-    ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-  });
-}
+// The record, its key and the reads the grant routes make live in the leaf app-scope-allowance-store.ts.
+export {
+  APP_SCOPE_ALLOWANCE_NS, appScopeAllowanceKey, readAppScopeAllowance, appAllowanceWords, withAllowance,
+  type AppScopeAllowance,
+} from './app-scope-allowance-store.js';
+const SPEC = APP_SCOPE_ALLOWANCE_SPEC;
+const appIdOf = allowanceAppId;
 
 /** The live grants of one app (any holder). */
 async function liveGrantsOf(storage: Storage, appId: string) {
