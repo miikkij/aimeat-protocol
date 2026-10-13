@@ -12,13 +12,15 @@
  *   agent sends its work, and cannot read the build instructions about it.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-ties
  * @version-history
+ *   v1.0.1 — 2026-10-13 — The owner signs in with the password (helpers/owner-login.ts ownerSignIn), because
+ *     node 4.0.0 removes the owner-key sign-in. Nothing else in the suite changed.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
 let passed = 0;
 let failed = 0;
@@ -51,12 +53,8 @@ async function setupOwner(label: string): Promise<Owner> {
         r = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Ties', password: 'AgentTiesPass12345' }) });
     }
     assert(r.status === 201, `ghii ${r.status}: ${JSON.stringify(r.body?.error)}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: name, timestamp: ts, signature: await sign(r.body.data.private_key, name + NODE_ID + ts) }),
-    });
-    assert(tok.status === 200 && tok.body?.data?.token, `auth/token ${tok.status}`);
+    const tok = await ownerSignIn(BASE, name, 'AgentTiesPass12345');
+    assert(tok.status === 200 && tok.body?.data?.token, `ghii/login ${tok.status}`);
     return { name, token: tok.body.data.token as string };
 }
 

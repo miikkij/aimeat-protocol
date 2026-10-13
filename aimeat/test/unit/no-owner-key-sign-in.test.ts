@@ -19,6 +19,7 @@
  *   owner-key sign-in. ALLOWED names the files whose subject is that sign-in itself.
  * @usage cd aimeat && pnpm exec vitest run test/unit/no-owner-key-sign-in.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-13 — test/e2e-agent-ties.ts leaves ALLOWED: its owner signs in with the password now.
  *   v1.0.0 — 2026-10-12 — Initial (wish-e2e-testit-ja-sandbox-kirjautuvat-omistaja-avaimella-joka-po).
  */
 import { describe, it, expect } from 'vitest';
@@ -38,11 +39,6 @@ const ALLOWED: Record<string, string> = {
         'Proves the owner-key sign-in is refused from 4.0.0 whatever the setting says, and still accepted with the Deprecation headers before it.',
     'aimeat/test/e2e-account-security-gate.ts':
         'One assertion proves the key from before a password change no longer signs in: 401 while the owner-key sign-in is on, 410 OWNER_KEY_LOGIN_OFF once it is gone. Its owners sign in with the password.',
-    // NOT a subject: a migration left to the session that held the file on 2026-10-12
-    // (cc-jouni-agents-p1). The owner registers with 'AgentTiesPass12345'; its token call becomes
-    // ownerSignIn(BASE, name, 'AgentTiesPass12345') from helpers/owner-login.ts, and this line goes.
-    'aimeat/test/e2e-agent-ties.ts':
-        'Held by another session when the suites moved to the password sign-in; it fails on a node with the owner-key sign-in off until migrated.',
     'aimeat/test/e2e-owner-deactivation.ts':
         'One test proves a deactivated account gets no session through the owner-key sign-in: 403 ACCOUNT_DISABLED while it is on, 410 OWNER_KEY_LOGIN_OFF once it is gone. Its owners sign in with the password.',
     'aimeat/test/unit/no-owner-key-sign-in.test.ts':
