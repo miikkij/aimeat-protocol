@@ -171,6 +171,39 @@
     }
     return body.data;
   }
+  async function threadCall(org, ws, formId, tail, payload, fallback) {
+    var res = await fetch(base() + submitPath(org, ws, formId) + "/thread" + tail, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {})
+    });
+    var body = await res.json().catch(function() {
+      return null;
+    });
+    if (!body || body.ok === false) throw refused(body, res.status, fallback);
+    return body.data;
+  }
+  var thread = {
+    // The visitor's first message. Answers { ok, thread_token, turn, turns_left, handler }; the token is
+    // given this once. `extra` carries the form's honeypot field when the page draws one.
+    start: function(org, ws, formId, text, extra) {
+      return threadCall(org, ws, formId, "", Object.assign({}, extra || {}, { text }), "The conversation could not be started");
+    },
+    // The visitor's next message. Answers { ok, turn, turns_left, handler }: handler "person" means a
+    // person answers this one (they took the conversation over, or the form's agent turns for today are spent).
+    send: function(org, ws, formId, token, text) {
+      return threadCall(org, ws, formId, "", { text, token }, "The message could not be sent");
+    },
+    // Both sides' turns in time order: { turns: [{ role: "visitor" | "agent" | "person", text, at }],
+    // handler, closed, turns_left }. A visitor has no live channel, so a page polls this while it is open.
+    read: function(org, ws, formId, token) {
+      return threadCall(org, ws, formId, "/read", { token }, "The conversation could not be read");
+    },
+    // Deletes the conversation on the node, on both sides. The token opens nothing after it.
+    forget: function(org, ws, formId, token) {
+      return threadCall(org, ws, formId, "/forget", { token }, "The conversation could not be deleted");
+    }
+  };
   async function authFetch(path, opts) {
     if (!window.AIMEAT || !window.AIMEAT.auth) throw new Error("AIMEAT.auth is required for owner methods (load aimeat-auth.js first)");
     var s = window.AIMEAT.auth.getSession();
@@ -194,5 +227,5 @@
     if (!body || body.ok === false) throw new Error(body && body.error && body.error.message || "deleteForm failed");
     return body.data;
   }
-  attach("intake", { getForm, submit, fields, defineForm, listForms, deleteForm, submitPath, nodeUrl: base() });
+  attach("intake", { getForm, submit, fields, thread, defineForm, listForms, deleteForm, submitPath, nodeUrl: base() });
 })();

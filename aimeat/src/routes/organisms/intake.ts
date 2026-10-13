@@ -19,6 +19,11 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   v1.6.0 — 2026-10-13 — A form may take a conversation: `thread` in the definition names the reply
+ *     space and the signal space and the limits (services/intake-thread.ts). Such a form names no
+ *     field list, all three of its spaces are checked when it is defined, its public description
+ *     carries `thread`, and an ordinary submit to it is refused (THREAD_FORM). The visitor's routes
+ *     are in routes/organisms/intake-thread.ts.
  *   v1.5.0 — 2026-10-13 — The public submit enforces the form's `max_per_day`: past it, 429
  *     INTAKE_DAILY_LIMIT and nothing is written (services/intake-daily-count.ts). The field was
  *     stored from the first version and nothing read it.
@@ -53,6 +58,7 @@ import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
 import { takeDailySlot, forgetDailyCount } from '../../services/intake-daily-count.js';
+import { parseThreadConfig, THREAD_RECORD_FIELDS, SIGNAL_RECORD_FIELDS, type IntakeThreadConfig } from '../../services/intake-thread.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
@@ -66,6 +72,8 @@ interface IntakeFormConfig {
   maxPerDay: number | null; title: string;
   fields: Array<{ key: string; label?: string; type?: string; required?: boolean; options?: unknown[]; maxLength?: number }>;
   successMessage: string; redirectUrl: string | null; createdAt: string; updatedAt: string;
+  /** Set on a form that takes a conversation (routes/organisms/intake-thread.ts); absent or null on an ordinary form. */
+  thread?: IntakeThreadConfig | null;
 }
 
 const FORM_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/; // human slug rules (a token uses the frm_ prefix, also matches)
@@ -173,22 +181,40 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     } else {
       formId = 'frm_' + randomBytes(12).toString('base64url').toLowerCase();
     }
+    // A form that takes a conversation (`thread`): the node writes the thread record's own fields,
+    // so the form names no field list, and its two other spaces are checked as the destination is.
+    let thread: IntakeThreadConfig | null = null;
+    if (b.thread !== undefined && b.thread !== null) {
+      const parsed = parseThreadConfig(b.thread, namespace);
+      if (!parsed.ok) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.message)); return; }
+      thread = parsed.thread;
+      for (const other of [thread.replyNamespace, thread.signalNamespace]) {
+        const declared = await readPublishSpace(storage, org, ws, other);
+        if (declared.refusal) { res.status(declared.refusal.status).json(error(config.nodeId, declared.refusal.code, declared.refusal.message, declared.refusal.status, declared.refusal.details)); return; }
+      }
+    }
     const allowedFields = strList(b.allowed_fields);
-    if (!allowedFields.length) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_fields (non-empty array) is required')); return; }
+    if (!allowedFields.length && !thread) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_fields (non-empty array) is required')); return; }
     const defaults = (b.defaults && typeof b.defaults === 'object') ? b.defaults as Record<string, unknown> : {};
 
     // Refused before anything is stored: a form whose records the destination cannot hold would take
-    // no submission at all, and the only one told would be an anonymous visitor.
-    const refused = await namesTheSchemaRefuses(org, ws, namespace, ['id', ...allowedFields, ...Object.keys(defaults)]);
+    // no submission at all, and the only one told would be an anonymous visitor. A conversation
+    // form is checked for the fields the node writes into the thread record and the signal record.
+    const refusedSignal = thread ? await namesTheSchemaRefuses(org, ws, thread.signalNamespace, [...SIGNAL_RECORD_FIELDS]) : [];
+    const checkedNamespace = refusedSignal.length && thread ? thread.signalNamespace : namespace;
+    const refused = refusedSignal.length ? refusedSignal
+      : await namesTheSchemaRefuses(org, ws, namespace, thread ? [...THREAD_RECORD_FIELDS] : ['id', ...allowedFields, ...Object.keys(defaults)]);
     if (refused.length) {
       const list = refused.map(n => `"${n}"`).join(', ');
       res.status(422).json(error(config.nodeId, 'INTAKE_SCHEMA_MISMATCH',
-        `Every submission to this form would be refused: the locked schema for "${namespace}" does not allow additional properties and does not list ${list}. `
-        + 'The node adds "id" to each record and writes the allowed fields and defaults into it. Add these to the schema\'s properties, or take them out of the form.',
+        `Every submission to this form would be refused: the locked schema for "${checkedNamespace}" does not allow additional properties and does not list ${list}. `
+        + (thread
+          ? 'For a conversation the node writes these properties into each record of that space itself. Add them to the schema\'s properties.'
+          : 'The node adds "id" to each record and writes the allowed fields and defaults into it. Add these to the schema\'s properties, or take them out of the form.'),
         422, {
           missing_properties: refused,
-          schema_url: `/v1/memory/${encodeURIComponent(`organism.${org}.w.${ws}.${namespace}`)}/schema`,
-          how_to_fix: `Re-lock the schema in place with the missing properties added: PUT /v1/organisms/${org}/workspace?ws=${ws} with { schemas: { "${namespace}": <schema> } }, or aimeat_workspace_update { organism_id, ws, schemas }. The workspace does not need to be recreated.`,
+          schema_url: `/v1/memory/${encodeURIComponent(`organism.${org}.w.${ws}.${checkedNamespace}`)}/schema`,
+          how_to_fix: `Re-lock the schema in place with the missing properties added: PUT /v1/organisms/${org}/workspace?ws=${ws} with { schemas: { "${checkedNamespace}": <schema> } }, or aimeat_workspace_update { organism_id, ws, schemas }. The workspace does not need to be recreated.`,
         }));
       return;
     }
@@ -210,6 +236,7 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
       successMessage: typeof b.success_message === 'string' ? b.success_message : '',
       redirectUrl: typeof b.redirect_url === 'string' ? b.redirect_url : null,
       createdAt: existing?.createdAt ?? now, updatedAt: now,
+      ...(thread ? { thread } : {}),
     };
     await storage.setMemory({
       key: cfgKey(org, ws, formId), ownerGaii: ownerGhii, value: cfg as unknown as Record<string, unknown>,
@@ -220,6 +247,8 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     res.json(success(config.nodeId, {
       form_id: formId, submit_url: `/v1/intake/${org}/${ws}/${formId}`,
       discoverable: cfg.discoverable, enabled: cfg.enabled, mode: cfg.mode,
+      // A conversation form: a visitor writes to `thread_url`, never to `submit_url`.
+      thread: !!cfg.thread, ...(cfg.thread ? { thread_url: `/v1/intake/${org}/${ws}/${formId}/thread` } : {}),
     }, cfg.discoverable ? [{ description: 'This form id is a guessable slug — for a public form, keep the per-IP rate limit and consider a per-form daily cap / captcha.', method: 'POST', url: `/v1/intake/${org}/${ws}/${formId}` }] : undefined));
   });
 
@@ -238,7 +267,7 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     const counted = await Promise.all(formIds.map(fid => metaReader.pick(ws, `meta.intake.${fid}`, items)));
     const forms = counted
       .map(r => r?.value as IntakeFormConfig | undefined).filter((f): f is IntakeFormConfig => !!f)
-      .map(f => ({ form_id: f.formId, namespace: f.namespace, mode: f.mode, enabled: f.enabled, discoverable: f.discoverable, title: f.title, allowed_fields: f.allowedFields, submit_url: `/v1/intake/${org}/${ws}/${f.formId}` }));
+      .map(f => ({ form_id: f.formId, namespace: f.namespace, mode: f.mode, enabled: f.enabled, discoverable: f.discoverable, title: f.title, allowed_fields: f.allowedFields, submit_url: `/v1/intake/${org}/${ws}/${f.formId}`, thread: !!f.thread }));
     res.json(success(config.nodeId, { forms }));
   });
 
@@ -255,6 +284,8 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     const rec = await readFormRecord(org, ws, formId);
     if (rec) await storage.deleteMemory(rec.ownerGaii, key);
     if (rec) await forgetDailyCount(storage, config.nodeId, { org, ws, formId });
+    // A conversation form also counts the turns that wake an agent (routes/organisms/intake-thread.ts).
+    if (rec) await forgetDailyCount(storage, config.nodeId, { org, ws, formId: `${formId}.turns` });
     emitChange('organisms');
     res.json(success(config.nodeId, { deleted: !!rec }));
   });
@@ -276,6 +307,8 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
         ...(typeof f.maxLength === 'number' && f.maxLength > 0 ? { maxLength: Math.min(8000, Math.floor(f.maxLength)) } : {}),
       })),
       honeypot_field: cfg.honeypotField, success_message: cfg.successMessage, redirect_url: cfg.redirectUrl,
+      // A form that takes a conversation says so, with the two limits a page needs before it sends.
+      ...(cfg.thread ? { thread: { max_turns: cfg.thread.maxTurns, max_chars: cfg.thread.maxChars } } : {}),
     }));
   });
 
@@ -286,6 +319,12 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
       const org = req.params.org as string, ws = req.params.ws as string, formId = req.params.formId as string;
       const cfg = await readForm(org, ws, formId);
       if (!cfg || !cfg.enabled) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Form not found')); return; }
+      // A conversation form's records are written by its own routes, in the thread record's shape.
+      if (cfg.thread) {
+        res.status(400).json(error(config.nodeId, 'THREAD_FORM', 'This form takes a conversation, not a single submission. Send the message to the conversation address of the form.',
+          400, { thread_url: `/v1/intake/${org}/${ws}/${formId}/thread` }));
+        return;
+      }
       const body = (req.body ?? {}) as Record<string, unknown>;
 
       // Honeypot: a filled hidden field is a bot → accept silently but write nothing.

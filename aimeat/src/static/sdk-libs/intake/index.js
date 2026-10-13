@@ -15,6 +15,9 @@
  *   const list = AIMEAT.intake.fields(form);   // [{ name, label, type, required, options?, maxLength? }]
  *   await AIMEAT.intake.submit(org, ws, 'contact-us', { nimi: '…', email: '…' });
  * @version-history
+ *   v1.2.0 — 2026-10-13 — thread.start / send / read / forget: a conversation through a form whose
+ *     definition carries `thread`, for a visitor with no session. A refusal carries the node's code
+ *     (THREAD_FULL, THREAD_TOO_FAST, THREAD_CLOSED, THREAD_NOT_FOUND, INTAKE_DAILY_LIMIT) and status.
  *   v1.1.0 — 2026-10-01 — fields(form): the normalised field list a renderer draws. A refusal from
  *     getForm or submit carries code, details, status and, from submit, the `field` it concerns when
  *     the node's answer names one.
@@ -75,6 +78,50 @@ async function submit(org, ws, formId, values) {
   return body.data; // { ok, id, mode }; a filled honeypot answers { ok: true, id: null } and writes nothing
 }
 
+// ── PUBLIC: a conversation through a form that takes one (no session) ─────────
+// The token a start returns opens that one conversation for writing, reading and deleting. It goes
+// in the request body, never in an address. Keep it where the visitor's page keeps its own state
+// (sessionStorage for one visit, localStorage to come back to it); whoever holds it reads the
+// conversation.
+/**
+ * One call to a conversation route.
+ * @param {string} org
+ * @param {string} ws
+ * @param {string} formId
+ * @param {string} tail  '' | '/read' | '/forget'
+ * @param {object} payload
+ * @param {string} fallback
+ */
+async function threadCall(org, ws, formId, tail, payload, fallback) {
+  var res = await fetch(base() + submitPath(org, ws, formId) + '/thread' + tail, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload || {}),
+  });
+  var body = await res.json().catch(function () { return null; });
+  if (!body || body.ok === false) throw refused(body, res.status, fallback);
+  return body.data;
+}
+var thread = {
+  // The visitor's first message. Answers { ok, thread_token, turn, turns_left, handler }; the token is
+  // given this once. `extra` carries the form's honeypot field when the page draws one.
+  start: function (org, ws, formId, text, extra) {
+    return threadCall(org, ws, formId, '', Object.assign({}, extra || {}, { text: text }), 'The conversation could not be started');
+  },
+  // The visitor's next message. Answers { ok, turn, turns_left, handler }: handler "person" means a
+  // person answers this one (they took the conversation over, or the form's agent turns for today are spent).
+  send: function (org, ws, formId, token, text) {
+    return threadCall(org, ws, formId, '', { text: text, token: token }, 'The message could not be sent');
+  },
+  // Both sides' turns in time order: { turns: [{ role: "visitor" | "agent" | "person", text, at }],
+  // handler, closed, turns_left }. A visitor has no live channel, so a page polls this while it is open.
+  read: function (org, ws, formId, token) {
+    return threadCall(org, ws, formId, '/read', { token: token }, 'The conversation could not be read');
+  },
+  // Deletes the conversation on the node, on both sides. The token opens nothing after it.
+  forget: function (org, ws, formId, token) {
+    return threadCall(org, ws, formId, '/forget', { token: token }, 'The conversation could not be deleted');
+  },
+};
+
 // ── OWNER (needs aimeat-auth) ─────────────────────────────────────────────────
 async function authFetch(path, opts) {
   if (!window.AIMEAT || !window.AIMEAT.auth) throw new Error('AIMEAT.auth is required for owner methods (load aimeat-auth.js first)');
@@ -100,4 +147,4 @@ async function deleteForm(org, ws, formId) {
   return body.data;
 }
 
-attach('intake', { getForm: getForm, submit: submit, fields: fields, defineForm: defineForm, listForms: listForms, deleteForm: deleteForm, submitPath: submitPath, nodeUrl: base() });
+attach('intake', { getForm: getForm, submit: submit, fields: fields, thread: thread, defineForm: defineForm, listForms: listForms, deleteForm: deleteForm, submitPath: submitPath, nodeUrl: base() });

@@ -789,6 +789,9 @@ const ALL_SUITES = [
     // only way out of it. Four refusals guard the door, including an operator's own '*' agent.
     'test/e2e-organism-owner-repair.ts',
     'test/e2e-intake.ts',
+    // A conversation through an intake form: a visitor's token opens one conversation and no
+    // other, and the node's caps refuse before a write.
+    'test/e2e-intake-thread.ts',
     'test/e2e-organism-workspace-engagements.ts',
     'test/e2e-write-guards.ts',
     'test/e2e-wallet-page.ts',

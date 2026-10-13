@@ -979,6 +979,15 @@
      "plain": "Public intake forms Collect a response without requiring an account. The owner defines the workspace destination, allowed fields and draft or publish mode. The node validates the response against the declared space and schema, with rate limits and spam screening. The owner can cap how many responses one form takes in a day, from all senders together. /v1/intake/forms, /v1/intake/:org/:ws/:formId"
     },
     {
+     "slug": "g-6-a-conversation-with-a-visitor-who-is-not-signed-in",
+     "cells": [
+      "<strong>A conversation with a visitor who is not signed in</strong>",
+      "A form can take a conversation in place of single responses: a visitor writes, your agent or you answer, and the visitor reads the answers on the same page. Starting one gives the visitor a secret that opens that one conversation and no other; the node stores no copy of it, and the record in your workspace cannot be used to open the conversation. The conversation is three records in your workspace: the visitor's messages, written by the node; the answers, written by your agent or by you in an app; and a signal the node writes when an agent is to answer, which is what wakes an agent that watches it. The node decides what a conversation may cost you, before it stores anything: conversations started per day, messages per conversation, the length of a message, the time between two messages, and how many messages a day wake an agent. When you take a conversation over, or the day's agent messages are spent, a message is still stored, no agent is woken, and the visitor is told that a person answers. The visitor can delete the conversation, and the node deletes it by itself a set number of days after the visitor's last message. Limits: the visitor's page asks for new answers at intervals, because a visitor has no live channel; the page that shows the conversation and the app where you answer are apps, built on these routes; the only bot screen is the form's hidden field and the rate limits; an agent's answer takes as long as the agent takes to wake and think.",
+      "<code>/v1/intake/forms</code> with <code>thread</code>, <code>POST /v1/intake/:org/:ws/:formId/thread</code>, <code>…/thread/read</code>, <code>…/thread/forget</code>; library <code>aimeat-intake.js</code> (<code>AIMEAT.intake.thread</code>)"
+     ],
+     "plain": "A conversation with a visitor who is not signed in A form can take a conversation in place of single responses: a visitor writes, your agent or you answer, and the visitor reads the answers on the same page. Starting one gives the visitor a secret that opens that one conversation and no other; the node stores no copy of it, and the record in your workspace cannot be used to open the conversation. The conversation is three records in your workspace: the visitor's messages, written by the node; the answers, written by your agent or by you in an app; and a signal the node writes when an agent is to answer, which is what wakes an agent that watches it. The node decides what a conversation may cost you, before it stores anything: conversations started per day, messages per conversation, the length of a message, the time between two messages, and how many messages a day wake an agent. When you take a conversation over, or the day's agent messages are spent, a message is still stored, no agent is woken, and the visitor is told that a person answers. The visitor can delete the conversation, and the node deletes it by itself a set number of days after the visitor's last message. Limits: the visitor's page asks for new answers at intervals, because a visitor has no live channel; the page that shows the conversation and the app where you answer are apps, built on these routes; the only bot screen is the form's hidden field and the rate limits; an agent's answer takes as long as the agent takes to wake and think. /v1/intake/forms with thread, POST /v1/intake/:org/:ws/:formId/thread, …/thread/read, …/thread/forget; library aimeat-intake.js (AIMEAT.intake.thread)"
+    },
+    {
      "slug": "g-6-live-documents",
      "cells": [
       "<strong>Live documents</strong>",
@@ -4015,6 +4024,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative from node 4.0.0; RFC v4.0 Core and Platform until then), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 403
+  "rows": 404
  }
 }

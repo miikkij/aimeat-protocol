@@ -548,6 +548,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Intake form configuration records."
     },
+    "src/routes/organisms/intake-thread.ts": {
+      "reads": {
+        "listAllMemory": 3
+      },
+      "why": "Reviewed 2026-10-13, the node's own read: the thread record and the reply record of ONE conversation, by the record id that is the hash of the visitor's token. They are read to append the visitor's next message, to decide the caps, and to answer the visitor the turns of their own conversation: the visitor's own words and the answers the owner's side wrote for that visitor (role, text and time only; no other field of either record leaves). The third read lists the form's thread records when a conversation starts, to delete the ones past the form's keeping time; nothing of them is returned. A classification label on a reply record does not hide an answer from the visitor it was written to."
+    },
     "src/routes/organisms/record-helpers.ts": {
       "reads": {
         "listAllMemory": 3
