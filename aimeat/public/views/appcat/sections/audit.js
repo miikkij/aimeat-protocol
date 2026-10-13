@@ -12,6 +12,8 @@
  * @structure meta · AuditSection({ d }) · actWords(entry)
  * @usage const mod = await import('./sections/audit.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.3.0 — 2026-10-13 — An entry's `words` follows its act: the permissions an app kept when the node
+ *     moved to 4.0, or the ones its owner removed (services/app-scope-allowance.ts).
  *   v1.2.0 — 2026-10-01 — Keeping the log (audit-keep.js) under the entries: what is kept, the
  *     archived years, "Archive entries before" and the owner's limit.
  *   v1.1.0 — 2026-09-27 — Parity with the old page (sections-c): the log as .mk-log (List tone log),
@@ -51,6 +53,7 @@ export function actWords(e) {
   if (dt.name) extra.push(String(dt.name));
   if (dt.state) extra.push(String(dt.state));
   if (dt.flags) extra.push(String(dt.flags));
+  if (dt.words) extra.push(String(dt.words));
   return s + (extra.length ? ' · ' + extra.join(' · ') : '');
 }
 

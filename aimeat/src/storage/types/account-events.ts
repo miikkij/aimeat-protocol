@@ -15,6 +15,8 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.10.0 — 2026-10-13 — app_scope_words_kept: the owner's published apps that kept permissions on the
+ *     first start as 4.0.x (services/app-scope-allowance.ts).
  *   v1.9.0 — 2026-10-13 — scope_words_kept: the node's first start as 4.0.x gave the owner's existing
  *     agents and ecosystem apps the permission words 4.0.0 started to check, so they keep working
  *     (services/rest-scope-keep-working-migration.ts).
@@ -151,6 +153,9 @@ export type AccountEventKind =
   // agents or ecosystem apps got the permission words 4.0.0 started to check. `data.names` lists them,
   // `data.count` how many, `data.words` the words, so the owner can narrow any of them.
   | 'scope_words_kept'
+  // `app_scope_words_kept` is the same start's line for the owner's published apps whose code calls
+  // a route their aimeat-scopes declaration does not name (services/app-scope-allowance.ts).
+  | 'app_scope_words_kept'
   | 'consent_granted'
   | 'consent_revoked'
   | 'app_granted'

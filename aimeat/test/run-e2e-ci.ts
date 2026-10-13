@@ -13,6 +13,8 @@
  *   2026-10-13 -- e2e-workspace-fenced-space.ts joins the list (not the guard tier): a record space
  *     that names extensions refuses an agent's direct write on every code path and takes it through
  *     a named extension.
+ *   2026-10-13 -- e2e-app-scope-allowance.ts joins the list (not the guard tier): a published app that
+ *     worked on a 3.x node keeps the scope words its code needs, on its own node on 40478.
  *   2026-10-13 -- e2e-rest-scope-keep-working.ts joins the list (not the guard tier): an agent that
  *     worked on a 3.x node keeps the scope words 4.0.0 started to check, across boots of its own node
  *     on 40477 (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
@@ -777,6 +779,9 @@ const ALL_SUITES = [
     // Owns its server on 40477 and boots one database as 3.27.0, then twice as 4.0.0: the agents that
     // worked on 3.x keep the scope words 4.0.0 started to check, once, and only those agents.
     'test/e2e-rest-scope-keep-working.ts',
+    // Owns its server on 40478, the same three boots for a published app: an app that calls a gated
+    // route its aimeat-scopes does not name keeps the word, and a new app gets a publish warning.
+    'test/e2e-app-scope-allowance.ts',
     'test/e2e-mcp-v2.ts',
     // Self-spawns its own server with the app origin ON (the shared one pins it OFF), the same
     // way e2e-app-origin does: an app's public address only exists when that flag is set.

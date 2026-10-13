@@ -19,13 +19,15 @@
  *   adds one; call `allowHost()` only from a control the person presses, because a host on that list
  *   is an address every app and agent of this person may send to.
  * @usage
- *   <meta name="aimeat-scopes" content="memory:read memory:write">
+ *   <meta name="aimeat-scopes" content="memory:read memory:write ext:invoke">
  *   <script src="https://aimeat.io/v1/libs/aimeat-auth.js"></script>
  *   <script src="https://aimeat.io/v1/libs/aimeat-webhook.js"></script>
  *   const r = await AIMEAT.webhook.send({ url: 'https://hooks.example.com/in', body: { id: 1 },
  *     headers: { Authorization: 'Bearer {{secret:EXAMPLE_TOKEN}}' } });
  *   if (r.refusal) show(AIMEAT.webhook.words(r.refusal)); else show(r.status);
  * @version-history
+ *   v1.0.2 — 2026-10-13 — The usage example declares ext:invoke: send and read call the living-hooks
+ *     extension action, which node 4.0 refuses without it. Comment only.
  *   v1.0.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.0.0 — 2026-09-28 — Initial: the living-hooks send and read for any app.
  */

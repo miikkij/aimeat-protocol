@@ -1110,7 +1110,7 @@
           "held_account_names": "Tietueet, jotka päivitys jätti ennalleen",
           "workspace_schema_closed": "Työtilan tilat, jotka hylkäävät jokaisen tietueen",
           "headless_browser": "Palvelimen oma selain ei käynnisty",
-          "scope_words_kept": "Oikeudet, jotka päivitys antoi olemassa oleville agenteille"
+          "scope_words_kept": "Oikeudet, jotka päivitys antoi olemassa oleville agenteille ja sovelluksille"
         },
         "source": {
           "workspace_import": "työtilan tuonti",
@@ -13349,6 +13349,8 @@
       "operatorAdminGrantedMany": "{names} saivat oikeuden ylläpitää tätä asennusta, koska niillä oli täysi pääsy. Voit poistaa oikeuden kunkin agentin asetuksista.",
       "scopeWordsKeptOne": "{name} toimii AIMEATin päivityksen jälkeen kuten ennenkin: se sai oikeudet, joita päivitys nyt vaatii ({words}). Voit poistaa ne agentin asetuksista.",
       "scopeWordsKeptMany": "{names} toimivat AIMEATin päivityksen jälkeen kuten ennenkin: ne saivat oikeudet, joita päivitys nyt vaatii ({words}). Voit poistaa ne kunkin asetuksista.",
+      "appScopeWordsKeptOne": "Sovelluksesi {name} toimii AIMEATin päivityksen jälkeen kuten ennenkin: se säilytti oikeudet, joita sen koodi käyttää ({words}). Sovelluksen muutosloki Sovellukset-sivulla kertoo syyn. Voit poistaa oikeuden tekoälysi avulla.",
+      "appScopeWordsKeptMany": "Sovelluksesi {names} toimivat AIMEATin päivityksen jälkeen kuten ennenkin: ne säilyttivät oikeudet, joita niiden koodi käyttää ({words}). Kunkin sovelluksen muutosloki Sovellukset-sivulla kertoo syyn. Voit poistaa oikeuden tekoälysi avulla.",
       "appPublished": "Julkaisit applikaation {name}.",
       "appUpdated": "Päivitit applikaation {name}.",
       "appFixDrafted": "Sovelluksen {app} korjattu luonnos odottaa sinua. Sovellus pysyy ennallaan, kunnes julkaiset luonnoksen.",
@@ -23186,6 +23188,8 @@
     "audit.action.protection": "Kopiosuojaus",
     "audit.action.name": "Nimi vaihdettu",
     "audit.action.description": "Kuvaus muutettu",
+    "audit.action.scope_allowance.kept": "Säilytti koodinsa käyttämät oikeudet AIMEATin päivityksessä",
+    "audit.action.scope_allowance.removed": "Säilytetty oikeus poistettu",
     "marks.title": "Merkinnät ja tekijyys",
     "marks.intro": "Mitä tämä palvelin lisää sovellukseen, kun se tarjoilee sen, ja kuka siitä vastaa.",
     "marks.loading": "Tarkistetaan…",

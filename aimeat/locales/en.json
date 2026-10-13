@@ -1110,7 +1110,7 @@
           "held_account_names": "Records the update left as they were",
           "workspace_schema_closed": "Workspace spaces that refuse every record",
           "headless_browser": "The server's own browser does not start",
-          "scope_words_kept": "Permissions the update gave to existing agents"
+          "scope_words_kept": "Permissions the update gave to existing agents and apps"
         },
         "source": {
           "workspace_import": "workspace import",
@@ -13350,6 +13350,8 @@
       "operatorAdminGrantedMany": "{names} got the permission to administer this installation because they had full access. You can take it away in each agent's settings.",
       "scopeWordsKeptOne": "{name} keeps working as before after the AIMEAT update: it got the permissions the update now asks for ({words}). You can take them away in the agent's settings.",
       "scopeWordsKeptMany": "{names} keep working as before after the AIMEAT update: they got the permissions the update now asks for ({words}). You can take them away in each one's settings.",
+      "appScopeWordsKeptOne": "Your app {name} keeps working as before after the AIMEAT update: it kept the permissions its code uses ({words}). Each app's change log in Apps says why; you can remove a permission there with your AI.",
+      "appScopeWordsKeptMany": "Your apps {names} keep working as before after the AIMEAT update: they kept the permissions their code uses ({words}). Each app's change log in Apps says why; you can remove a permission there with your AI.",
       "appPublished": "You published {name}.",
       "appUpdated": "You updated {name}.",
       "appFixDrafted": "A corrected draft of {app} is waiting for you. Your app is unchanged until you publish it.",
@@ -23206,6 +23208,8 @@
     "audit.action.protection": "Copy-protection",
     "audit.action.name": "Renamed",
     "audit.action.description": "Description changed",
+    "audit.action.scope_allowance.kept": "Kept permissions its code uses after the AIMEAT update",
+    "audit.action.scope_allowance.removed": "Kept permission removed",
     "marks.title": "Marks and authorship",
     "marks.intro": "What this server adds to the app when it serves it, and who answers for it.",
     "marks.loading": "Checking…",

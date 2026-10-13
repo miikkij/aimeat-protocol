@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-13 -- scope_allowance and scope_allowance_remove over GET and DELETE .../scope-allowance.
  *   2026-10-12 -- settings forwards `listing` to PATCH /v1/apps/:filename.
  *   2026-10-05 -- MEMBER_ACTIONS removed: the node MCP server calls the member, plan, audit-keeping,
  *     builder and spec services directly; aimeat_app_manage calls the service in place of the route
@@ -201,6 +202,12 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
             return client.put(`/v1/apps/${enc(ownerName)}/${file}/design-spec`, pick(input, ['markdown', 'expected_revision']));
         case 'spec_clear':
             return client.delete(`/v1/apps/${enc(ownerName)}/${file}/design-spec`);
+        case 'scope_allowance':
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/scope-allowance`);
+        case 'scope_allowance_remove': {
+            const words = Array.isArray(input.words) ? input.words.map(String).join(',') : String(input.words ?? '');
+            return client.delete(`/v1/apps/${enc(ownerName)}/${file}/scope-allowance?words=${enc(words)}`);
+        }
         default:
             return { ok: false, error: { code: 'INVALID_INPUT', message: `Unknown action "${checked.action}".` } };
     }

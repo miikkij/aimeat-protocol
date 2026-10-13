@@ -38,6 +38,8 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.7.0 — 2026-10-13 — scope_allowance.kept and scope_allowance.removed: the permissions the app kept
+ *     when the node moved to 4.0, and each one its owner took away (services/app-scope-allowance.ts).
  *   v1.6.0 — 2026-10-12 — `community`: the owner listed the app to signed-in members only.
  *   v1.5.0 — 2026-10-02 — design_spec.set and design_spec.cleared: the design spec beside the app.
  *   v1.4.0 — 2026-10-01 — Nothing falls off any more: the log was cut at 500 entries across every
@@ -90,7 +92,10 @@ export type AppAuditAction =
   | 'member.approved' | 'member.role_changed' | 'member.removed'
   | 'request.declined' | 'visitor.dismissed'
   | 'invite.sent' | 'invite.cancelled'
-  | 'plan.changed' | 'roster.swept';
+  | 'plan.changed' | 'roster.swept'
+  // The permissions the app kept when the node moved to 4.0 (services/app-scope-allowance.ts), and
+  // each word its owner took away.
+  | 'scope_allowance.kept' | 'scope_allowance.removed';
 
 export interface AppAuditEntry {
   at: string;
