@@ -16,6 +16,9 @@
  *   with the running version switched per test: a 4.0.0 run and a 3.26.1 run of the same code.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-token-on-rest.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-13 — aimeat_app_tool_invoke is not offered to a caller without ext:invoke, which the
+ *     tool now declares (wish-aimeat-app-tool-invoke-ilmoittaa-vain-exchange-write-vaikka-); the route's
+ *     refusal is still asserted through aimeat_capabilities_invoke.
  *   v1.0.0 — 2026-10-12 — Initial (wish-mcp-tokeni-ei-kelpaa-rest-reiteill-4-0-0-sta-ensin-kolme-mcp).
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -330,9 +333,13 @@ describe('the three MCP tools that reach REST routes, with an MCP OAuth token on
         expect(result?.input?.query).toBe('tool');
     });
 
-    it('aimeat_app_tool_invoke still refuses a caller without ext:invoke', async () => {
+    // Since 2026-10-13 the tool declares ext:invoke beside exchange:write, so on 4.0.0 a caller without
+    // it is not offered the tool at all and the call stops before the loopback route. Until then the
+    // route refused it with "Scope ext:invoke required".
+    it('aimeat_app_tool_invoke is not offered to a caller without ext:invoke', async () => {
         const out = await callTool(limitedMcp, 'aimeat_app_tool_invoke', { owner: SELLER, app: APP_FILE, tool: 'echo', input: { query: 'tool' } });
         expect(out.isError).toBe(true);
-        expect(out.text).toContain('ext:invoke');
+        expect(out.text).toContain('aimeat_app_tool_invoke not found');
+        expect(out.data?.result).toBeUndefined();
     });
 });
