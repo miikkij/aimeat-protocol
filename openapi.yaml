@@ -36,8 +36,7 @@ info:
     - **Operator** (Tier 2): any of the above for an account that holds the `operator` role, or an agent
       holding `operator:admin`.
 
-    The legacy owner-key login (`POST /v1/auth/token`, an Ed25519 signature) is deprecated and is removed
-    in 4.0.0.
+    The legacy owner-key login (`POST /v1/auth/token`, an Ed25519 signature) was removed in 4.0.0.
 
     ## Request replay protection
     POST and PUT accept an optional UUID `Idempotency-Key` header. Keys are scoped to the
@@ -58,20 +57,23 @@ info:
     ## Versions and removals
     `info.version` is the node's software version. `x-aimeat-protocol` names the edition of AIMEAT
     Core this contract is written to (docs/AIMEAT-Core-2026-11.md); a node states it in discovery as
-    `protocol_version` from node 4.0.0, when that edition becomes normative.
+    `protocol_version` from node 4.0.0, the release in which that edition became normative.
     A form that a release removes is refused from that release whatever the node's configuration
     says. Before it, each use is answered with `Deprecation: true`, `X-AIMEAT-Removed-In: <release>`
     and, where one exists, `Link: <successor>; rel="successor-version"`, and is counted in
     `GET /v1/stats` (`deprecated_use_by_type`). Removed in 4.0.0: the owner-key sign-in on
     `POST /v1/auth/token`, `?token=` on a WebSocket upgrade, federation messages without the audience
     proof, an optional relay claim, the morsel price fields, `costCapMorsels` on a workflow, the AI
-    settings routes from before providers, the static TURN pair, and an MCP OAuth access token
+    settings routes from before providers, the static TURN pair, an MCP OAuth client that sends no
+    PKCE or no resource indicator, and an MCP OAuth access token
     (audience: this node's MCP endpoint) on a REST route, which is refused with 401 `INVALID_TOKEN`
     and `WWW-Authenticate: Bearer error="invalid_token"` (counted before 4.0.0 as
     `mcp_token_on_rest`; the MCP endpoints keep taking it). Also from 4.0.0: a consent made
     without a reach is `local`, a public node takes only `https://` peer addresses, and a public node
-    records AI provenance whatever `AIMEAT_AI_PROVENANCE` says.
-  version: 3.27.0
+    records AI provenance whatever `AIMEAT_AI_PROVENANCE` says. Deprecated in 4.0.0 and removed in
+    5.0.0: `sharing.morsel_price` on a knowledge package and `cost.morsels` on a capability, the old
+    names of `toll_morsels`.
+  version: 4.0.0
   x-aimeat-protocol: '2026-11'
   contact:
     name: Jouni Miikki

@@ -113,7 +113,7 @@
       "current": "2026-11",
       "verifiedOn": "2026-10-12",
       "verdict": "current",
-      "note": "Our own protocol, a Draft that becomes normative with node 4.0.0. Discovery (/.well-known/aimeat and GET / this_node) states protocol_version 2026-11 and the claimed profiles from node 4.0.0 and leaves both out before it (services/core-discovery.ts CORE_PROTOCOL_FROM), because a 3.x node does not yet keep the edition's removals. Ruling decision-core-2026-11-avoimet-kysymykset-ja-agenttien-automaattinen-l Q2. A new edition moves both declaration sites together; docs/AIMEAT-Core-2026-11-evidence.md says which requirements the node meets."
+      "note": "Our own protocol, normative from node 4.0.0 (it was a Draft before that release). Discovery (/.well-known/aimeat and GET / this_node) states protocol_version 2026-11 and the claimed profiles from node 4.0.0 and leaves both out before it (services/core-discovery.ts CORE_PROTOCOL_FROM), because a 3.x node does not yet keep the edition's removals. Ruling decision-core-2026-11-avoimet-kysymykset-ja-agenttien-automaattinen-l Q2. A new edition moves both declaration sites together; docs/AIMEAT-Core-2026-11-evidence.md says which requirements the node meets."
     }
   ]
 }
