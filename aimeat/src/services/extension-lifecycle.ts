@@ -39,6 +39,9 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.8.0 — 2026-10-13 — activateExtension makes the extension's capability rows before it answers
+ *     (capability-aggregator.ts aggregateExtensionNow), so an app tool bound to an action is callable
+ *     at once.
  *   v1.7.0 — 2026-10-09 — Secrets are prepared and compared bound to the extension's name
  *     (SecretBinding; secrets audit 2026-10-09, 1.1). uninstallExtension needs only storage (and the
  *     scheduler when there is one), so account erasure can call it; with no scheduler the stored
@@ -63,6 +66,7 @@ import type { Scheduler } from './scheduler.js';
 import { upsertExtensionInPlace } from './extension-upsert.js';
 import { recordAccountEvent } from './account-events.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
+import { aggregateExtensionNow } from './capability-aggregator.js';
 import { reconcileAfterExtensionWrite } from './exchange-projection.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 import { extensionInstallRefusal } from './install-quotas.js';
@@ -261,6 +265,10 @@ export async function activateExtension(
     });
 
     await registerExtensionSchedules({ storage, config: deps.config, scheduler }, ext, actor);
+
+    // Its actions are capability rows before this answers: an app tool bound to one of them is
+    // callable from the moment the extension is on, and not five minutes later.
+    await aggregateExtensionNow(deps.config, storage, name);
 
     // The extension's first run, once it is on. Deliberately not awaited: an @activate job may be
     // long, and activation has already happened.

@@ -672,6 +672,16 @@ await test('Install package (POST /v1/packages/:groupId/install)', async () => {
   assert(Array.isArray(body.data?.installedComponents), 'Missing installedComponents');
   assert(body.data?.installedComponents.length === 3, `Expected 3 installed components, got ${body.data?.installedComponents.length}`);
   instanceId = body.data.id;
+
+  // The installed extension's action is in the capability registry when the install answers. An app
+  // tool is bound to that row (`ext:<name>:<action>`), so until 2026-10-13 every tool of a freshly
+  // installed package answered 404 CAPABILITY_NOT_FOUND for up to five minutes, until the
+  // aggregator's clock came round (found installing the KIIKARI package on a sandbox).
+  const ext = (body.data.installedComponents as Array<{ componentId: string; registeredAs: string }>).find(c => c.componentId === 'ext-helper');
+  assert(!!ext, 'the helper extension is among the installed components');
+  const cap = await json(`/v1/capabilities/${encodeURIComponent(`ext:${ext!.registeredAs}:helper`)}`, { headers: authed(ownerToken) });
+  assert(cap.status === 200, `the extension's action is a capability at once: expected 200, got ${cap.status} for ext:${ext!.registeredAs}:helper`);
+  assert(cap.body.data?.status === 'active' && cap.body.data?.callable === true, `an active, callable capability, got ${JSON.stringify({ status: cap.body.data?.status, callable: cap.body.data?.callable })}`);
 });
 
 await test('An app component gets a filename that an app origin recognises', async () => {

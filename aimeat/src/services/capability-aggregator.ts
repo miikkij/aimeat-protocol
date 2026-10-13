@@ -5,6 +5,9 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.6.0 - 2026-10-13 - aggregateExtensionCapabilities and aggregateExtensionNow: the extension
+ *     part of the scan for ONE extension, which a package install and an activation run before they
+ *     answer. The scan's own extension loop calls the same function, so the rows are made one way.
  *   v1.5.0 - 2026-10-11 - A capability's `cost.morsels` is the pacing amount per use: an action's
  *     tollMorsels, an app tool's tollMorsels plus its old price.morsels, an offer's normalized
  *     tollMorsels. A morsel is pacing, not a price.
@@ -69,6 +72,95 @@ function ownerGhiiOf(installedBy: string | null | undefined, nodeId: string): st
   return installedBy.includes('@') ? installedBy : `${installedBy}@${nodeId}`;
 }
 
+/** What the aggregator reads of one extension: its name, its actions' shapes and who installed it. */
+type AggregatedExtension = Awaited<ReturnType<Storage['listExtensions']>>[number];
+
+/**
+ * One active extension's actions as capability rows: a row is made for a new action, switched on
+ * again when the extension came back, and refreshed when its version, shape or owner changed.
+ * `seenRefs`, when given, collects the refs for the full scan's cleanup.
+ *
+ * Exported so that whatever makes an extension live can do this for that one extension BEFORE it
+ * answers (a package install, an activation). The full scan walks every owner, agent, app tool list
+ * and cortex on the node and runs on a five-minute clock; an app tool is bound to the row
+ * `ext:<name>:<action>`, so until 2026-10-13 every tool of a freshly installed package answered 404
+ * CAPABILITY_NOT_FOUND until that clock came round.
+ */
+export async function aggregateExtensionCapabilities(
+  config: AimeatConfig, storage: Storage, ext: AggregatedExtension, seenRefs?: Set<string>,
+): Promise<{ created: number; updated: number }> {
+  let created = 0, updated = 0;
+  if (ext.status !== 'active' || !ext.actions) return { created, updated };
+  const now = new Date().toISOString();
+  for (const action of ext.actions) {
+    const ref = `ext:${ext.name}:${action.id}`;
+    seenRefs?.add(ref);
+    const existing = await storage.getCapabilityBySourceRef(ref);
+    const schemaHash = makeSchemaHash(action.inputSchema, action.outputSchema);
+
+    if (!existing) {
+      const cap: CapabilityRecord = {
+        id: ref, name: `${ext.name}: ${action.id}`,
+        summary: (action as { description?: string }).description || ext.description || '',
+        ownerGhii: ownerGhiiOf(ext.installedBy, config.nodeId),
+        visibility: 'public', scope: 'local', status: 'active',
+        rejectionReason: null, deprecationMessage: null, replacedBy: null,
+        source: { type: 'extension', ref, version: ext.version },
+        authRequired: 'registered', callable: true,
+        inputSchema: action.inputSchema || null,
+        outputSchema: action.outputSchema || null,
+        exports: null,
+        usage: `await AIMEAT.capabilities.invoke('${ref}', input)`,
+        whenToUse: '', whenNotToUse: '',
+        examples: [], dependencies: [], schemaHash,
+        webhookUrl: null, cost: null, trustRequired: null,
+        trust: makeDefaultTrust(), redactedFields: [],
+        operatorOverride: null, stats: makeDefaultStats(),
+        tags: [], createdAt: now, updatedAt: now,
+      };
+      await storage.createCapability(cap);
+      created++;
+    } else if (existing.status === 'disabled') {
+      // Re-enable: source is active again (extension was reinstalled)
+      await storage.updateCapability(existing.id, {
+        status: 'active',
+        source: { type: 'extension', ref, version: ext.version },
+        inputSchema: action.inputSchema || null,
+        outputSchema: action.outputSchema || null,
+        schemaHash, updatedAt: now,
+      });
+      updated++;
+    } else if (existing.source.version !== ext.version || existing.schemaHash !== schemaHash
+      || existing.ownerGhii !== ownerGhiiOf(ext.installedBy, config.nodeId)) {
+      // The owner is repaired too: rows written before 2026-09-03 carry the bare installer name,
+      // which no route's `ownerGhii === resolveIdentity(...)` check ever matched.
+      await storage.updateCapability(existing.id, {
+        source: { type: 'extension', ref, version: ext.version },
+        ownerGhii: ownerGhiiOf(ext.installedBy, config.nodeId),
+        inputSchema: action.inputSchema || null,
+        outputSchema: action.outputSchema || null,
+        schemaHash, updatedAt: now,
+      });
+      updated++;
+    }
+  }
+  return { created, updated };
+}
+
+/**
+ * The same, for an extension that just went live, by name. Never throws: the install or the
+ * activation that calls it has already happened, and the five-minute scan makes the rows if this
+ * could not.
+ */
+export async function aggregateExtensionNow(config: AimeatConfig, storage: Storage, name: string): Promise<void> {
+  try {
+    const ext = await storage.getExtension(name);
+    if (ext) await aggregateExtensionCapabilities(config, storage, ext);
+  } catch (err) {
+    logger.error('Capability aggregator: the rows of an extension that just went live were not made; the next scan makes them', { extension: name, error: String(err) });
+  }
+}
+
 export async function runCapabilityAggregation(config: AimeatConfig, storage: Storage): Promise<{ created: number; updated: number; disabled: number }> {
   let created = 0, updated = 0, disabled = 0;
   const seenRefs = new Set<string>();
@@ -80,59 +172,9 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
   try {
     const extensions = await storage.listExtensions({ lean: true });
     for (const ext of extensions) {
-      if (ext.status !== 'active' || !ext.actions) continue;
-      for (const action of ext.actions) {
-        const ref = `ext:${ext.name}:${action.id}`;
-        seenRefs.add(ref);
-        const existing = await storage.getCapabilityBySourceRef(ref);
-        const schemaHash = makeSchemaHash(action.inputSchema, action.outputSchema);
-
-        if (!existing) {
-          const cap: CapabilityRecord = {
-            id: ref, name: `${ext.name}: ${action.id}`,
-            summary: (action as { description?: string }).description || ext.description || '',
-            ownerGhii: ownerGhiiOf(ext.installedBy, config.nodeId),
-            visibility: 'public', scope: 'local', status: 'active',
-            rejectionReason: null, deprecationMessage: null, replacedBy: null,
-            source: { type: 'extension', ref, version: ext.version },
-            authRequired: 'registered', callable: true,
-            inputSchema: action.inputSchema || null,
-            outputSchema: action.outputSchema || null,
-            exports: null,
-            usage: `await AIMEAT.capabilities.invoke('${ref}', input)`,
-            whenToUse: '', whenNotToUse: '',
-            examples: [], dependencies: [], schemaHash,
-            webhookUrl: null, cost: null, trustRequired: null,
-            trust: makeDefaultTrust(), redactedFields: [],
-            operatorOverride: null, stats: makeDefaultStats(),
-            tags: [], createdAt: now, updatedAt: now,
-          };
-          await storage.createCapability(cap);
-          created++;
-        } else if (existing.status === 'disabled') {
-          // Re-enable: source is active again (extension was reinstalled)
-          await storage.updateCapability(existing.id, {
-            status: 'active',
-            source: { type: 'extension', ref, version: ext.version },
-            inputSchema: action.inputSchema || null,
-            outputSchema: action.outputSchema || null,
-            schemaHash, updatedAt: now,
-          });
-          updated++;
-        } else if (existing.source.version !== ext.version || existing.schemaHash !== schemaHash
-          || existing.ownerGhii !== ownerGhiiOf(ext.installedBy, config.nodeId)) {
-          // The owner is repaired too: rows written before 2026-09-03 carry the bare installer name,
-          // which no route's `ownerGhii === resolveIdentity(...)` check ever matched.
-          await storage.updateCapability(existing.id, {
-            source: { type: 'extension', ref, version: ext.version },
-            ownerGhii: ownerGhiiOf(ext.installedBy, config.nodeId),
-            inputSchema: action.inputSchema || null,
-            outputSchema: action.outputSchema || null,
-            schemaHash, updatedAt: now,
-          });
-          updated++;
-        }
-      }
+      const made = await aggregateExtensionCapabilities(config, storage, ext, seenRefs);
+      created += made.created;
+      updated += made.updated;
     }
   } catch (err) { logger.error('Capability aggregator: extension scan failed', { error: String(err) }); }
 
