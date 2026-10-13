@@ -3,6 +3,19 @@
   "entries": [
     {
       "date": "2026-10-13",
+      "version": "4.0.1",
+      "kind": "fix",
+      "title": {
+        "en": "Agents and apps that worked before 4.0.0 keep working",
+        "fi": "Ennen versiota 4.0.0 toimineet agentit ja sovellukset toimivat edelleen"
+      },
+      "body": {
+        "en": "Version 4.0.0 asks every agent and app for the permission word of each route it calls. On its first start, 4.0.1 gives each agent and each approved outside app that existed before 4.0.0 the words those checks ask for, once. What worked before keeps working, and nobody has to go through their agents by hand. Your home page names the agents and the words they got, and you can remove a word. A word you remove stays removed. A published app whose code calls a route that its permissions do not name keeps that word too. The App Catalog shows it, and the app's owner can remove it. An app published for the first time from now on gets no such word: the publish answer says which word its code needs, so the app can declare it. An app can now also say that its records are written only through its own tool. An agent's direct write to such a record space is refused, and a new agent that watches the space gets the app's tool. 4.0.0 already carried two security fixes from code scanning that its notes did not name: a pattern match that a long address could slow down at MCP sign-in, and the text answer of the agent prompt route, which now tells the browser not to guess its type.",
+        "fi": "Versio 4.0.0 vaatii jokaiselta agentilta ja sovellukselta käyttöoikeuden jokaiseen reittiin, jota se kutsuu. Kun 4.0.1 käynnistyy ensimmäisen kerran, se antaa kerran jokaiselle ennen versiota 4.0.0 tehdylle agentille ja hyväksytylle ulkoiselle sovellukselle ne käyttöoikeudet, joita tarkistukset vaativat. Se, mikä toimi ennen, toimii edelleen, eikä kenenkään tarvitse käydä agenttejaan läpi käsin. Kotisivusi kertoo, mitkä agentit saivat minkäkin oikeuden, ja voit poistaa oikeuden. Poistamasi oikeus pysyy poissa. Myös julkaistu sovellus saa pitää oikeuden, jos sen koodi kutsuu reittiä, jota sen omat käyttöoikeudet eivät nimeä. Sovelluskatalogi näyttää oikeuden, ja sovelluksen omistaja voi poistaa sen. Tästä eteenpäin ensimmäistä kertaa julkaistu sovellus ei saa tällaista oikeutta. Julkaisun vastaus kertoo, mitä oikeutta sen koodi tarvitsee, jotta sovellus voi ilmoittaa sen itse. Sovellus voi nyt myös määrätä, että sen tietueisiin kirjoitetaan vain sen oman työkalun kautta. Agentin suora kirjoitus tällaiseen tietuetilaan hylätään, ja uusi agentti, joka seuraa tilaa, saa sovelluksen työkalun. Versiossa 4.0.0 oli jo kaksi koodiskannauksen löytämää tietoturvakorjausta, joita sen julkaisutiedot eivät maininneet: säännöllinen lauseke, jota pitkä osoite saattoi hidastaa MCP-kirjautumisessa, ja agenttikehotteen reitin tekstivastaus, joka nyt kieltää selainta arvaamasta sisällön tyyppiä."
+      }
+    },
+    {
+      "date": "2026-10-13",
       "version": "4.0.0",
       "kind": "notice",
       "title": {
