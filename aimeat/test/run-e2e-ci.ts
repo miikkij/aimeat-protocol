@@ -10,6 +10,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-13 -- --tests-file=<path> skips a line starting with #, so test/version-aware-suites.txt (the
+ *     nightly 4.0.0 run's list) carries its own explanation.
  *   2026-10-12 -- --tests-file=<path> takes the suite names from a file, one a line, for a list too long
  *     for a Windows command line (pnpm gate after a change to 404 suites).
  *   2026-10-12 -- e2e-mcp-token-rest.ts joins the list (not the guard tier): an MCP OAuth token on a
@@ -1501,7 +1503,8 @@ function parseArgs(): string[] {
     for (const arg of args) {
         if (arg.startsWith('--test=')) names.push(arg.slice(7));
         else if (arg.startsWith('--tests-file=')) {
-            names.push(...readFileSync(arg.slice('--tests-file='.length), 'utf-8').split(/\r?\n/).map(s => s.trim()).filter(Boolean));
+            // A line starting with # is a comment (test/version-aware-suites.txt explains itself).
+            names.push(...readFileSync(arg.slice('--tests-file='.length), 'utf-8').split(/\r?\n/).map(s => s.trim()).filter(s => s && !s.startsWith('#')));
         }
     }
     // --all is default behavior (run everything)

@@ -12,6 +12,9 @@
  *   WHAT IS NEW IS A DIFF. The stub's change log carries one entry this node already has (the newest
  *   of its own public/changelog.json) and one it does not; only the second may come back.
  * @version-history
+ *   v1.2.1 — 2026-10-13 — GET /v1/build from a node started from dist/ (the nightly sweep) is held to
+ *     the build stamp: commit_source stamp, state fresh, a dirty flag. The test expected a source run
+ *     only and was red in every nightly sweep since 2026-10-11 (issues #19, #20).
  *   v1.2.0 — 2026-10-12 — The expected current release is AIMEAT_TEST_SOFTWARE_VERSION when the test
  *     node runs as another release (the 4.0.0 sweep), else the package version; the stub's newer
  *     release stays the next major after it, and GET /v1/build and /v1/health are held to the same.
@@ -26,6 +29,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerOwner } from './helpers/owner-login.js';
+import { NODE_ENTRY_ENV } from './helpers/node-entry.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -129,12 +133,19 @@ await test('GET /v1/build and GET /v1/health say which code runs: the commit, an
     assert(b.status === 200 && typeof b.body.build === 'string' && b.body.version === current, `build ${b.status}: ${short(b.body)}`);
     assert(new Date(parseInt(b.body.build, 36)).toISOString() === b.body.started_at, `started_at ${b.body.started_at} is the build id as a time`);
     assert(Date.now() - Date.parse(b.body.started_at) < 60 * 60_000, `started within the hour: ${b.body.started_at}`);
-    // This server runs from source in a checkout, so the commit is the checkout's HEAD.
+    // From source in a checkout the commit is the checkout's HEAD (commit_source git, state source,
+    // no dirty flag). The nightly sweep starts every node from dist/ (AIMEAT_E2E_NODE_ENTRY=dist,
+    // helpers/node-entry.ts), and there the commit is the build stamp's, the build is fresh, and the
+    // stamp says whether the tree was dirty. This assertion took only the first, so every nightly
+    // sweep was red here from 2026-10-11 (issues #19 and #20).
+    const fromDist = process.env[NODE_ENTRY_ENV] === 'dist';
+    const want = fromDist ? { source: 'stamp', state: 'fresh' } : { source: 'git', state: 'source' };
     assert(/^[0-9a-f]{40}$/.test(b.body.commit ?? ''), `commit: ${b.body.commit}`);
-    assert(b.body.commit_source === 'git' && b.body.state === 'source' && b.body.dirty === null, `source ${b.body.commit_source}, state ${b.body.state}, dirty ${b.body.dirty}`);
+    assert(b.body.commit_source === want.source && b.body.state === want.state && (fromDist ? typeof b.body.dirty === 'boolean' : b.body.dirty === null),
+        `${fromDist ? 'from dist' : 'from source'}: source ${b.body.commit_source}, state ${b.body.state}, dirty ${b.body.dirty}`);
     const h = await json('/v1/health');
     const hb = h.body?.data?.build;
-    assert(h.status === 200 && hb?.commit === b.body.commit && hb?.version === current && hb?.state === 'source', `health build: ${short(hb)}`);
+    assert(h.status === 200 && hb?.commit === b.body.commit && hb?.version === current && hb?.state === want.state, `health build: ${short(hb)}`);
 });
 
 await test('The same version on npm: no update and no prompt', async () => {
