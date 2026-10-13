@@ -15,6 +15,7 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.15.0 — 2026-10-13 — An extension component's actions are capability rows when its install answers (capability-aggregator.ts aggregateExtensionNow).
  *   v1.14.0 — 2026-10-09 — An extension component's config always goes through mergeExtensionConfig,
  *     bound to its stored name: with no config values it was stored as built, a manifest secret
  *     default in plain text (secrets audit 2026-10-09, finding 1.1).
@@ -73,6 +74,7 @@
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from './extension-manifest.js';
+import { aggregateExtensionNow } from './capability-aggregator.js';
 import YAML from 'yaml';
 import type { Storage, PackageComponentType, CortexComponent, CortexActivationArtifacts } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -369,6 +371,7 @@ export async function registerComponent(
           // activate step in that flow.
           status: 'active',
         });
+        await aggregateExtensionNow(config, storage, registeredAs); // its tools answer when the install does
         break;
       }
 
