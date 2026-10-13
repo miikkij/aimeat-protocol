@@ -274,6 +274,18 @@ describe('reach', () => {
     it('calling an app tool also asks for the word a workspace read checks, because the tool reads the app\'s workspace as the agent', () => {
         expect(extraScopes(def('{{ctx.prompt}}', ['app_tools']))).toEqual(['organism:read', 'ext:invoke']);
     });
+
+    // Measured on aimeat.io on 2026-10-13: a draft gave its member the tool "dm" for "send the
+    // report to the owner". The agent held no messages:read, the tool's first call was refused
+    // (GET /v1/messages/agent-inbox), and the crew runtime fails a run on one refused call: the
+    // agent failed every task it was given, before it did any of its work.
+    it('a tool of the runtime whose calls the node checks a word for brings that word', () => {
+        expect(extraScopes(def('{{ctx.prompt}}', ['dm']))).toEqual(['messages:read', 'messages:send']);
+        expect(extraScopes(def('{{ctx.prompt}}', ['mcp']))).toEqual(['mcp:use']);
+        expect(extraScopes(def('{{ctx.prompt}}', ['mcp:tracker']))).toEqual(['mcp:use']);
+        expect(extraScopes(def('{{ctx.prompt}}', ['schedule']))).toEqual(['task:write']);
+        expect(extraScopes(def('{{ctx.prompt}}', ['app_tools', 'dm']))).toEqual(['organism:read', 'ext:invoke', 'messages:read', 'messages:send']);
+    });
 });
 
 describe('an agent that works when a record is published in a workspace', () => {
