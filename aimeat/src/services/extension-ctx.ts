@@ -28,6 +28,7 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.16.0 — 2026-10-13 — ctx.calendar on every code path (services/extension-calendar.ts).
  *   v1.15.0 — 2026-10-13 — ctx.fetch takes `timeoutMs`, the script's own deadline for one call
  *     (100 ms to 30 s, inside the run's): past it the call throws FETCH_TIMEOUT, which the script
  *     can catch. Asked for by the KIIKARI extension, which checks up to 40 source addresses in one
@@ -130,6 +131,7 @@ import { presentMemories, presentMemory, classificationWarningOf } from './class
 import { readerForCaller, systemReader } from './classification/reader.js';
 import { shareCarriesKey } from './group-shares-classification.js';
 import { capabilityNotDeclared, type ExtensionCapabilitySet } from './extension-capability-declaration.js';
+import { buildExtensionCalendar } from './extension-calendar.js';
 
 /** How long one guest-initiated outbound call may take. Same ceiling every copy used. */
 const FETCH_TIMEOUT_MS = 30_000;
@@ -733,6 +735,9 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     // rather than a missing function.
     if (!caps.network) ctx.fetch = async () => { throw capabilityNotDeclared('network'); };
     if (deps.workspace) ctx.workspace = deps.workspace;
+    // Pure computation with no storage and no network behind it, so it is on every code path and
+    // asks for no capability (services/extension-calendar.ts).
+    ctx.calendar = buildExtensionCalendar();
 
     return ctx;
 }

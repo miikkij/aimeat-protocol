@@ -84,7 +84,7 @@ import { logger } from '../../utils/logger.js';
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
     memberRole, toAgentGaii, findWsEntry, bareOwner, wsRegPrefix, canReadWs, canReadWsManifest, readWsManifests,
-    readShareMeta, collectPublicDocs, collectPublicRecords, collectWsRecords, shareGateDenied, docsToMarkdown, redactShare, archiveHandler,
+    readShareMeta, collectPublicDocs, collectPublicRecords, collectWsRecords, shareGateDenied, docsToMarkdown, redactShare, archiveHandler, readWsManifestValue,
   } = H;
 
   /* ── Contract engagements — the first-class link between an agent's contract capability and a
@@ -490,11 +490,18 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (asIcs && !space) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'format=ics takes one space: add space=<the records space that holds the events>')); return; }
     const share = await readShareMeta(id, ws);
     const found = await collectPublicRecords(id, ws, share, space ? { space } : undefined);
-    if (found.count === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
+    // A calendar with no event yet is still a calendar: when the share opens the WHOLE space the
+    // feed names (the space's own setting, else the workspace's), the feed answers an empty
+    // calendar where the JSON read answers 404. A person subscribes before they add their first
+    // event, and a calendar program shows a 404 as a broken subscription. Nothing new is told: the
+    // space is one the share made public, and the access mode below still applies.
+    const emptyFeed = asIcs && !!space && (space in share.spaces ? !!share.spaces[space] : !!share.public)
+      && ((await readWsManifestValue(id, ws))?.objectTypes as Array<Record<string, unknown>> | undefined ?? []).some(ot => ot.name === space && ot.mode === 'records');
+    if (found.count === 0 && !emptyFeed) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
     const denied = asIcs && icsKeyMatches(share.icsKeyHash, req.query.key) ? null : await shareGateDenied(req, organism, id, ws, share);
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const records = await found.release(readerFor({ storage, config }, req.auth));
-    if (records.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
+    if (records.length === 0 && !emptyFeed) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
     if (asIcs) {
       const feed = await recordsToIcs(records, (await findWsEntry(id, ws))?.name);
       // The address may carry the feed key: no shared cache keeps the answer, and no page it is opened from learns the address.

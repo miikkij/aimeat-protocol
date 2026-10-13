@@ -13,6 +13,8 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.10.0 — 2026-10-13 — `ctx.calendar`: the calendar library's computation as host calls
+ *     (services/extension-calendar.ts).
  *   v1.9.0 — 2026-10-13 — `ctx.workspace.readRow`: one row by its id, under the same rule as
  *     `readRows`. An extension that had a row id read pages of rows to find it. `fetch` takes
  *     `timeoutMs`, the script's own deadline for one call.
@@ -246,6 +248,22 @@ export interface ExtensionCtx {
         readRows(organismId: string, ws: string, space: string, opts?: { where?: Record<string, unknown>; since?: string; until?: string; changedSince?: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' }): Promise<unknown>;
         /** One row of such a row space by its id, in the shape `readRows` gives a row; null when there is none. */
         readRow(organismId: string, ws: string, space: string, rowId: string): Promise<unknown>;
+    };
+    /**
+     * The calendar library's computation (aimeat-calendar), run on the node: the sandbox has no
+     * time-zone data, so this is how an extension expands a recurrence, finds free time or
+     * converts between a zone's local time and an instant. Pure computation, on every code path,
+     * with no capability to declare; a refusal is thrown as `CALENDAR: <message>`
+     * (services/extension-calendar.ts, which also names the host's bounds).
+     */
+    calendar?: {
+        occurrences(events: unknown, options: unknown): Promise<unknown[]>;
+        freeSlots(busy: unknown, options: unknown): Promise<unknown[]>;
+        toInstant(local: unknown, timeZone: unknown): Promise<string>;
+        fromInstant(instant: unknown, timeZone: unknown): Promise<string>;
+        normalize(event: unknown): Promise<unknown>;
+        fromICS(ics: unknown, options?: unknown): Promise<unknown>;
+        toICS(events: unknown, options?: unknown): Promise<string>;
     };
     /**
      * Who invoked this action. `member` is their standing in the app this extension gates, resolved

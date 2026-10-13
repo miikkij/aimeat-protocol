@@ -302,10 +302,10 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:8360e259d951769aeeb27776"
+      "digest": "sha256:4ae477f06182795a21f526ca"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-12",
+      "reviewedOn": "2026-10-13",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -314,7 +314,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:ad1fda7f58c9f9224240831a"
+      "digest": "sha256:13f94bda0876da8a620c7f21"
     },
     "node:aimeat-agent-capability": {
       "reviewedOn": "2026-10-13",
@@ -327,7 +327,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:5ab808fd86c811c6030ba058"
+      "digest": "sha256:3d2d0effab2a5b1a844176e5"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-12",
@@ -458,7 +458,7 @@
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:58c8fc5aecd6a3b0d52bd3a6"
+      "digest": "sha256:79f811da898cb8ef2ff0240c"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -467,11 +467,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-12",
+      "reviewedOn": "2026-10-13",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:6ffa1d791b63b8b93243dd01"
+      "digest": "sha256:4f802e8805ab3eee66715981"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -647,11 +647,11 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "ce24737f2db6272f",
       ".githooks/pre-commit": "e8840eb33aa805c0",
-      "aimeat/src/services/build-extension-prompt.ts": "c16b42991b84dde5"
+      "aimeat/src/services/build-extension-prompt.ts": "036fb183fe2b30b3"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "5e1068af35f9fe92"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "d045952179627005"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -702,14 +702,14 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/cli/connect/mcp/local-server.ts": "8843e486d97c7154",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "5e1068af35f9fe92",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "d045952179627005",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "f7c1dc7cc0193e76",
       "aimeat/src/services/agent-task-rules.ts": "920bd83aa13aebf4"
     },
     "node:aimeat-extension-builder": {
-      "aimeat/src/services/build-extension-prompt.ts": "c16b42991b84dde5",
-      "aimeat/src/services/extension-ctx-contract.ts": "790ec98174345e07",
+      "aimeat/src/services/build-extension-prompt.ts": "036fb183fe2b30b3",
+      "aimeat/src/services/extension-ctx-contract.ts": "430a87e8facd9657",
       "aimeat/src/services/extension-manifest.ts": "de6a421448539916",
       "aimeat/src/routes/extensions/paywall.ts": "8924454dfe762c8a",
       "aimeat/src/routes/extensions/crud.ts": "d9197a969e9160e8",
@@ -748,7 +748,7 @@
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
       "aimeat/src/commerce/app-tool-catalog.ts": "c6cd3abb7698d83a",
-      "aimeat/src/services/extension-ctx-contract.ts": "790ec98174345e07",
+      "aimeat/src/services/extension-ctx-contract.ts": "430a87e8facd9657",
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/services/workspace-rows/row-service.ts": "776902c9f46bddd8",
       "aimeat/src/services/refinery/pipeline.ts": "521769f32868798c",
