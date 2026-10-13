@@ -10,6 +10,9 @@
  *   - ManifestSchema: JSON Schema for a package manifest (name, version, synthesis, references, entries)
  *
  * @version-history
+ *   v1.2.0 — 2026-10-13 — sharing.toll_morsels, the pacing amount; sharing.morsel_price is its
+ *     deprecated name, and either one satisfies the requirement
+ *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-01 — `synthesis.level` now references AI_PROVENANCE_LEVELS instead of
  *     spelling the four strings a second time. Same vocabulary, one definition (TARGET-058).
@@ -113,11 +116,15 @@ export const ManifestSchema = {
     },
     sharing: {
       type: 'object',
-      required: ['catalog_listed', 'allow_clone', 'morsel_price'],
+      required: ['catalog_listed', 'allow_clone'],
+      // The pacing amount, under its 4.0.0 name or the deprecated 3.x one; either satisfies the
+      // requirement. The import routes store it as toll_morsels (services/toll-morsels-names.ts).
+      anyOf: [{ required: ['toll_morsels'] }, { required: ['morsel_price'] }],
       properties: {
         catalog_listed: { type: 'boolean' },
         allow_clone: { type: 'boolean' },
         license: { type: 'string' },
+        toll_morsels: { type: 'number', minimum: 0 },
         morsel_price: { type: 'number', minimum: 0 },
       },
     },

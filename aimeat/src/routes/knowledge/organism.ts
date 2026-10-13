@@ -6,6 +6,8 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-13 — GET /v1/knowledge/organism/:id answers a contributed manifest's pacing amount as
+ *     sharing.toll_morsels (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:write on POST /v1/knowledge/:id/contribute. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   2026-10-12 — The contribution consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   2026-09-29 — TARGET-082 V4: GET /v1/knowledge/organism/:id passes the contributed manifests
@@ -28,6 +30,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
 
 export function registerOrganismRoutes(
   router: Router,
@@ -156,7 +159,8 @@ export function registerOrganismRoutes(
       const warning = classificationWarningOf(f);
       return {
         key: f.record.key,
-        manifest: f.record.value,
+        // A manifest stored before 4.0.0 answers sharing.morsel_price as sharing.toll_morsels.
+        manifest: presentKnowledgeManifest(f.record.value),
         ownerGaii: f.record.ownerGaii,
         contributed_at: f.contributedAt,
         ...(warning ? { classificationWarning: warning } : {}),

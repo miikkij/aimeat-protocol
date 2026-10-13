@@ -11,9 +11,12 @@
  *   v1.0.0 — 2026-10-05 — 16 methods (deserializeCapability, createCapability, getCapability, …) moved here
  *     from capability-agents.ts so the file mirrors postgres-kysely/methods/capabilities.ts (secaudit
  *     2026-10, M8).
+ *   v1.1.0 — 2026-10-13 — A stored `cost.morsels` reads as `cost.toll_morsels` (utils/toll-name.ts;
+ *     decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  */
 import type { CapabilityRecord, CapabilityLogEntry, CapabilityStats } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { tollNameOnRead } from '../../../../utils/toll-name.js';
 
 /** Refresh the trust blob's derived vouch count from the rows — one truth, copied for cheap reads. */
 async function syncVouchCount(storage: SqliteStorage, capabilityId: string): Promise<void> {
@@ -54,7 +57,8 @@ export const capabilityMethods = {
       dependencies: JSON.parse((row.dependencies as string) || '[]'),
       schemaHash: (row.schemaHash as string) || '',
       webhookUrl: (row.webhookUrl as string) || null,
-      cost: row.cost ? JSON.parse(row.cost as string) : null,
+      // A row stored before 4.0.0 names the pacing amount `morsels`; it reads as toll_morsels.
+      cost: row.cost ? tollNameOnRead(JSON.parse(row.cost as string), 'morsels') : null,
       trustRequired: row.trustRequired as number | null,
       trust: JSON.parse((row.trust as string) || '{}'),
       redactedFields: JSON.parse((row.redactedFields as string) || '[]'),

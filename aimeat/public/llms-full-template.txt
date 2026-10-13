@@ -2265,9 +2265,11 @@ Only fetch entries whose titles match what you actually need.
     { "key": "packages/{id}/fidonet", "title": "FidoNet Federation", "visibility": "public" },
     { "key": "packages/{id}/private-notes", "title": "Author Notes", "visibility": "private" }
   ],
-  "sharing": { "catalog_listed": true, "allow_clone": true, "license": "CC-BY-4.0", "morsel_price": 0 }
+  "sharing": { "catalog_listed": true, "allow_clone": true, "license": "CC-BY-4.0", "toll_morsels": 0 }
 }
 ```
+`sharing.toll_morsels` is the pacing amount in morsels, never a price. Its old name `morsel_price` is
+still accepted in 4.x with a Deprecation header and stored as `toll_morsels`; 5.0.0 refuses it.
 
 - **content_type**: idea, research, plan, dataset, document, tutorial, collection, article, story, fiction, guide
 - **synthesis.level**: original (human wrote it), assisted (AI organized), synthesized (AI combined sources), ai-generated
@@ -2321,7 +2323,7 @@ POST {{BASE_URL}}/v1/knowledge/import — Import a knowledge package
           "references": [{ "url": "https://example.com/paper", "title": "Source Paper", "accessed": "2026-05-16", "verified": true }] },
         { "key": "notes", "title": "Personal Notes", "visibility": "private" }
       ],
-      "sharing": { "catalog_listed": true, "allow_clone": true, "morsel_price": 0 }
+      "sharing": { "catalog_listed": true, "allow_clone": true, "toll_morsels": 0 }
     },
     "entry_data": {
       "findings": { "title": "Main Findings", "summary": "...", "body": "..." },
@@ -2346,7 +2348,7 @@ DELETE {{BASE_URL}}/v1/knowledge/:id/link — Remove a link
 PATCH {{BASE_URL}}/v1/knowledge/:id/sharing — Update sharing settings
   Authorization: Bearer <jwt>
   Body: { "catalog_listed": true, "allow_clone": true }
-  → 200: { "ok": true, "data": { "package_id": "...", "sharing": { "catalog_listed": true, "allow_clone": true, "morsel_price": 0 } } }
+  → 200: { "ok": true, "data": { "package_id": "...", "sharing": { "catalog_listed": true, "allow_clone": true, "toll_morsels": 0 } } }
 
 PATCH {{BASE_URL}}/v1/knowledge/:id/entries/:entryKey/visibility — Change entry visibility
   Authorization: Bearer <jwt>

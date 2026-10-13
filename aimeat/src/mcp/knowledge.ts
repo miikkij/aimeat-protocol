@@ -11,6 +11,9 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-13 — aimeat_knowledge_get and the knowledge-package resource answer a manifest's pacing
+ *     amount as sharing.toll_morsels, also for one stored with sharing.morsel_price
+ *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-06 — aimeat_knowledge_contribute takes the catalog's schema too.
@@ -57,6 +60,7 @@ import {
 } from '../services/knowledge-package-entry.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import { presentKnowledgeManifest } from '../services/toll-morsels-names.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -140,7 +144,7 @@ export function registerKnowledgeTools(
                     uri: uri.toString(),
                     text: JSON.stringify({
                         package_id: packageId,
-                        manifest: manifest.value,
+                        manifest: presentKnowledgeManifest(manifest.value),
                         ...warningOf(manifest),
                         entry_count: entryList.length,
                         entries: entryList,
@@ -222,7 +226,7 @@ export function registerKnowledgeTools(
                     type: 'text' as const,
                     text: JSON.stringify({
                         package_id,
-                        manifest: manifest.value,
+                        manifest: presentKnowledgeManifest(manifest.value),
                         ...warningOf(manifest),
                         entries: entryDetails,
                     }, null, 2),

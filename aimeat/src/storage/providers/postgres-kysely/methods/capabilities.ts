@@ -8,6 +8,8 @@
  *   cost/examples/tags JSON columns) are stored as JSONB, so the increment/trust mutators are
  *   read-modify-write on the JSON blob — identical semantics to the Prisma (Mongo/PG) implementation.
  * @version-history
+ *   v1.2.0 — 2026-10-13 — A stored `cost.morsels` reads as `cost.toll_morsels` (utils/toll-name.ts;
+ *     decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.1.0 — 2026-09-09 — deleteCapabilityLogsBefore and setCapabilityTrust deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: capability layer on Postgres+Kysely.
  */
@@ -17,6 +19,7 @@ import type { CapabilityRecord, CapabilityLogEntry, CapabilityOverride, Capabili
 import type { Capability } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError } from '../helpers.js';
+import { tollNameOnRead } from '../../../../utils/toll-name.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
@@ -48,7 +51,8 @@ function toCapability(r: Selectable<Capability>): CapabilityRecord {
     dependencies: (r.dependencies ?? []) as unknown as CapabilityRecord['dependencies'],
     schemaHash: r.schemaHash ?? '',
     webhookUrl: r.webhookUrl ?? null,
-    cost: (r.cost ?? null) as CapabilityRecord['cost'],
+    // A row stored before 4.0.0 names the pacing amount `morsels`; it reads as toll_morsels.
+    cost: tollNameOnRead(r.cost ?? null, 'morsels') as CapabilityRecord['cost'],
     trustRequired: r.trustRequired ?? null,
     trust: (r.trust ?? DEFAULT_TRUST) as CapabilityRecord['trust'],
     redactedFields: (r.redactedFields ?? []) as CapabilityRecord['redactedFields'],

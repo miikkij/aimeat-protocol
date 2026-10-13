@@ -28,6 +28,8 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   v1.2.0 -- 2026-10-13 -- The catalogue manifest names its pacing amount sharing.toll_morsels, the
+ *     4.0.0 name (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.1.0 -- 2026-10-08 -- The provenance record hashes the exact stored descriptor bytes (held until the
  *     descriptor is written, then stored), the descriptor file and the catalogue rows carry its id, and a
  *     re-publish of bytes already there stores no new record and names the one those bytes carry.
@@ -649,7 +651,7 @@ async function upsertCatalogueEntry(
             visibility: 'public',
         })),
         links: [],
-        sharing: { catalog_listed: true, allow_clone: false, morsel_price: 0 },
+        sharing: { catalog_listed: true, allow_clone: false, toll_morsels: 0 },
         // The pointer back to the canonical bytes. The catalogue never holds them: a knowledge
         // package is a collection of memory entries, and memory does not carry files.
         x_aimeat_datapackage: {

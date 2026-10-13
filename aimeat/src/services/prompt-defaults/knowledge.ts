@@ -6,6 +6,9 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   v1.1.2 — 2026-10-13 — knowledge-packager-human's example manifest names the pacing amount
+ *     sharing.toll_morsels; morsel_price is its deprecated name
+ *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.1.1 — 2026-09-18 — chat-session-human connects by device authorization. It taught the
  *     connectivity-key flow, which nothing has generated a key for since v1.1.0 of the bootstrap,
  *     followed by the Ed25519 signature login; it named /v1/knowledge and /v1/openapi.yaml, neither
@@ -194,7 +197,7 @@ Each entry is an **independent knowledge unit**. References (citations, sources)
       "catalog_listed": true,
       "allow_clone": true,
       "license": "CC-BY-4.0",
-      "morsel_price": 0
+      "toll_morsels": 0
     }
   },
   "entry_data": {

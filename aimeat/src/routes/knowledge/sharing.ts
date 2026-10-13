@@ -6,6 +6,9 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-10-13 — The pacing amount is sharing.toll_morsels: the PATCH write-back, the clone
+ *     and the export use the new name, and a manifest stored with sharing.morsel_price is answered
+ *     under it (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.1.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:write on PATCH /v1/knowledge/:id/sharing, PATCH /v1/knowledge/:id/entries/:entryKey/visibility. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — clone + export manifest lookups batch the per-identity scan (listMemoryForOwners)
@@ -28,6 +31,7 @@ import { refuseClassified } from '../../middleware/refusals.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import type { KnowledgeHelpers } from './helpers.js';
+import { presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
 import { logger } from '../../utils/logger.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
@@ -66,7 +70,11 @@ export function registerSharingRoutes(
     const manifest: KnowledgeManifest = typeof existing.value === 'string'
       ? JSON.parse(existing.value as string)
       : { ...(existing.value as KnowledgeManifest) };
-    if (!manifest.sharing) manifest.sharing = { catalog_listed: false, allow_clone: false, morsel_price: 0 };
+    // A manifest stored before 4.0.0 carries sharing.morsel_price; the write-back stores it as
+    // sharing.toll_morsels, the name the response and every later read use.
+    manifest.sharing = manifest.sharing
+      ? presentKnowledgeManifest(manifest).sharing
+      : { catalog_listed: false, allow_clone: false, toll_morsels: 0 };
 
     if (catalog_listed !== undefined) manifest.sharing.catalog_listed = !!catalog_listed;
     if (allow_clone !== undefined) manifest.sharing.allow_clone = !!allow_clone;
@@ -267,7 +275,7 @@ export function registerSharingRoutes(
         catalog_listed: false,
         allow_clone: manifest.sharing.allow_clone,
         license: manifest.sharing.license,
-        morsel_price: 0,
+        toll_morsels: 0,
       },
     };
 
@@ -381,7 +389,8 @@ export function registerSharingRoutes(
         auth_endpoint: `${nodeUrl}/v1/auth/token`,
       },
       package: {
-        ...manifest,
+        // A manifest stored before 4.0.0 is exported with sharing.toll_morsels, not morsel_price.
+        ...presentKnowledgeManifest(manifest),
         entries: entriesToExport,
       },
       entry_data: entryData,
