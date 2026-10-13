@@ -11,6 +11,8 @@
  * @structure registerBuildAppAgentPrompt(router, config, storage)
  * @usage registered in routes/prompts.ts, before /v1/prompts/:tier
  * @version-history
+ *   v1.0.1 — 2026-10-13 — Both `?format=txt` answers go through sendPlainText, which adds
+ *     `X-Content-Type-Options: nosniff` to the same content type (code scanning alerts 1731, 1732).
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
 import type { Router } from 'express';
@@ -19,6 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { readerFor } from '../services/classification/reader.js';
 import { success, error } from '../middleware/envelope.js';
+import { sendPlainText } from '../middleware/plain-text.js';
 import { buildAppPrompt, buildAppSpecToken } from '../services/build-app-prompt.js';
 import { buildAppAgentContext } from '../services/build-app-agent-context.js';
 
@@ -40,7 +43,7 @@ export function registerBuildAppAgentPrompt(router: Router, config: AimeatConfig
     if (req.query.part === 'context') {
       const next = 'Next: read the build specification, aimeat_handbook_get { tier: "build-app" }.';
       if (req.query.format === 'txt') {
-        res.type('text/plain; charset=utf-8').send(`${ctx.text}\n${next}\n`);
+        sendPlainText(res, `${ctx.text}\n${next}\n`);
         return;
       }
       res.json(success(config.nodeId, {
@@ -54,7 +57,7 @@ export function registerBuildAppAgentPrompt(router: Router, config: AimeatConfig
     const { full } = buildAppPrompt(config, { lang, mode: 'new', idea });
     const prompt = `${ctx.text}\n---\n\n${full}`;
     if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
+      sendPlainText(res, prompt);
       return;
     }
     res.json(success(config.nodeId, {
