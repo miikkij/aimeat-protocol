@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.4.0 -- 2026-10-13 -- "What it offers": the three fields that make the agent a workflow step,
+ *     the key rule, and the runtime feature `task_scope` they need (crewaimeat 0ca3cbb).
  *   v1.3.2 -- 2026-10-12 -- Step 1.2: approving on the page adds the agent to the organism's agents,
  *     and an organism that admits only listed agents needs that.
  *   v1.3.1 -- 2026-10-12 -- Step 1.2: `backfill: true` on a `record_spaces` item, for the records
@@ -186,6 +188,24 @@ with the other keys the runtime reads (\`cost\`, \`latency\`, \`repeatability\`,
 The entry carries no price and no visibility, so the offer is the owner's own: it is not on the
 Exchange until the owner prices and lists it, and it is a workflow step only once it declares its
 signals (https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md).
+
+**To make the agent a workflow step**, write three more fields into that FIRST offer entry, all
+three or none (a part of them is refused when you propose, because the runtime would then publish
+no offer at all):
+
+\`\`\`json
+"required_to_function": "none",
+"success_signal": { "kind": "deterministic", "key": "crews.<agent name>.wf.{run}", "op": "nonempty" },
+"deliverable_location": { "key": "crews.<agent name>.wf.{run}" }
+\`\`\`
+
+The key is under the agent's own \`crews.<agent name>.\` keys; any other key is refused. \`{run}\` is
+the workflow run's id, so each run has its own result. Do this only when \`aimeat_crew_menu\` names
+\`task_scope\` in \`features\`: a runtime with that feature writes a workflow task's result to the key
+the workflow gave it, and shows the model the values the workflow attached to the task (the
+\`event_*\` variables of a run an event started, and any variable the workflow declares). A runtime
+without it writes the result under a key of its own, and the step ends red. Leave the three fields
+out when the owner did not ask for a workflow: an offer without them works everywhere else.
 
 ## 2. A runtime of your own: device authorization
 

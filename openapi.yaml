@@ -941,7 +941,9 @@ components:
             What its crew runtime honours beyond its tools, by name, as the connector presented it
             at connect in the `X-AIMEAT-Features` header (the runtime sets `AIMEAT_RUNTIME_FEATURES`).
             `record_spaces`: it wakes an agent on the records of the workspace spaces the agent's
-            definition names. `record_backfill`: such an item may say `backfill: true`. Kept while
+            definition names. `record_backfill`: such an item may say `backfill: true`. `task_scope`:
+            an agent made from a definition writes a workflow task's result to the task's
+            `deliverable_key` and shows its model the task's `var.*` values. Kept while
             the connector is away. Null from a connector that never said, which is not "none": ask
             one of its agents with GET /v1/agents/{name}/crew/menu.
         agents:

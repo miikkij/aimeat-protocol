@@ -180,7 +180,10 @@ fixed time. Its definition has this trigger and an agent step:
 - The same variables come with the other events: \`event_key\` for \`memory.write\`, \`event_offer\`
   for \`offer.ordered\`. Save the workflow with \`aimeat_workflow_save\`.
 - An agent is a workflow step only when its offer declares its workflow signals (skill
-  \`add-a-crew-agent\`, "What it offers"). Where no agent is needed, the step can be an extension
+  \`add-a-crew-agent\`, "What it offers", which has the three fields). An agent made from a crew
+  definition reads the \`var.event_*\` values and writes its result where the workflow looks only
+  when its runtime names \`task_scope\` in \`aimeat_crew_menu\` \`features\`; a crew written in Python
+  reads the task's scope in its own code. Where no agent is needed, the step can be an extension
   action or the owner's model instead, and \`{event_row_ids}\` goes into its input or prompt.
 
 "Where its work goes" is a different choice. It decides who reads the agent's finished result (its

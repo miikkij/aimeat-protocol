@@ -27,9 +27,11 @@
  *
  *   `verification` is `ungated` and `repeatability` is `accumulative` by default: the result is a
  *   model's free prose that nothing checks, and each run adds a result beside the earlier ones.
- * @structure InlineOffer · defaultOfferFor(agent) · firstRequestOf(crewDef) · withDefaultOffer(crewDef, agent)
+ * @structure InlineOffer · defaultOfferFor(agent) · firstRequestOf(crewDef) · offerSignalError(crewDef, name) · withDefaultOffer(crewDef, agent)
  * @usage const def = withDefaultOffer(proposal.crew_def, { name, displayName, purpose });
  * @version-history
+ *   v1.2.0 — 2026-10-13 — offerSignalError: a proposer may write the three workflow signals into the
+ *     first offer; a half set, or a result key outside the agent's own keys, is refused at the proposal.
  *   v1.1.0 — 2026-10-11 — firstRequestOf: the first offer's example, which a new agent is given as
  *     its first work.
  *   v1.0.0 — 2026-10-11 — Initial (wish-kodista-tehty-agentti-saa-tarjoaman-automaattisesti-offering).
@@ -110,6 +112,50 @@ export function firstRequestOf(crewDef: unknown): string {
   if (!Array.isArray(offers)) return '';
   const first = offers.find((o): o is Record<string, unknown> => !!o && typeof o === 'object' && !Array.isArray(o));
   return first ? text(first.example) : '';
+}
+
+/** The three fields that make an offer a workflow step, as a crew definition's offer entry names them. */
+const SIGNAL_FIELDS = ['required_to_function', 'success_signal', 'deliverable_location'] as const;
+
+/**
+ * What is wrong with the workflow signals of a definition's first offer, or null.
+ *
+ * The default offer carries none, on purpose (above), and none is fine. A proposer who wants the
+ * agent to be a workflow step writes all three into the first offer entry. The crew runtime then
+ * publishes them with the offer, and a workflow's agent step is accepted
+ * (services/workflow/store.ts resolveStep). Two things the runtime does with a wrong set, both
+ * silent on this node, are refused here, where the proposer is told:
+ *   - A HALF SET. The runtime skips the publication of the whole offer, so the agent shows on no
+ *     Offerings page, and only the worker's own log says why.
+ *   - A RESULT KEY OUTSIDE THE AGENT'S OWN `crews.<name>.` KEYS. The runtime writes a workflow
+ *     task's result only there (crewaimeat, feature `task_scope`, 2026-10-13), and fails every such
+ *     task otherwise.
+ * Only the first entry is read, because only the first is published.
+ */
+export function offerSignalError(crewDef: unknown, agentName: string): string | null {
+  const offers = (crewDef as { offers?: unknown } | null)?.offers;
+  const first = Array.isArray(offers) ? offers[0] : null;
+  if (!first || typeof first !== 'object' || Array.isArray(first)) return null;
+  const entry = first as Record<string, unknown>;
+  const present = SIGNAL_FIELDS.filter(f => entry[f] !== undefined && entry[f] !== null);
+  if (present.length === 0) return null;
+  const missing = SIGNAL_FIELDS.filter(f => !present.includes(f));
+  if (missing.length > 0) {
+    return `The first offer names ${present.join(' and ')} and not ${missing.join(' and ')}. An offer is a workflow step with all three (required_to_function, success_signal, deliverable_location) or with none; with a part of them the agent's runtime publishes no offer at all.`;
+  }
+  const location = entry.deliverable_location;
+  const key = location && typeof location === 'object' && !Array.isArray(location) ? (location as { key?: unknown }).key : undefined;
+  if (typeof key !== 'string' || !key) {
+    return 'The first offer\'s deliverable_location needs a key: { "key": "crews.<agent name>.<...>" }, the memory key the result is written to.';
+  }
+  const own = `crews.${agentName}.`;
+  if (!key.startsWith(own) || key.length === own.length) {
+    return `The first offer's deliverable_location.key is "${key}". The agent's runtime writes a workflow step's result only under the agent's own keys, so the key starts with "${own}", for example "${own}wf.{run}".`;
+  }
+  if (/\s/.test(key)) {
+    return `The first offer's deliverable_location.key is "${key}". A memory key has no space in it.`;
+  }
+  return null;
 }
 
 /**

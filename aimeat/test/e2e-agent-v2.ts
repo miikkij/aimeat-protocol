@@ -1149,6 +1149,43 @@ async function run() {
         assert(r.status === 400 && r.body?.error?.code === 'INVALID_CREW_DEF', `got ${r.status} ${r.body?.error?.code}`);
     });
 
+    await test('workflow signals in the first offer: a half set and a key outside the agent\'s own keys are refused, a whole set is taken', async () => {
+        // The crew runtime publishes NO offer when the first entry carries a part of the three, and
+        // writes a workflow step's result only under crews.<agent name>. Both failures are silent on
+        // the node, so the proposal is where the proposer is told (agent-default-offer.ts).
+        const propose = (name: string, offer: Record<string, unknown>) => json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({
+                name, purpose: 'Handles what a workflow hands it and writes the result where the workflow looks.',
+                scopes: ['memory:read'],
+                crew_def: {
+                    readme_md: '# x', tags: [], process: 'sequential', listen_for: ['tasks'],
+                    agents: [{ role: 'Reader', goal: 'g', backstory: 'b', allow_delegation: false }],
+                    tasks: [{ id: 't', description: 'do {{ctx.prompt}}', expected_output: 'e', agent: 'Reader' }],
+                    offers: [{ id: name, title: 'Handle it', ask: 'Give it what arrived.', ...offer }],
+                },
+            }),
+        });
+        const signal = (agent: string) => ({ kind: 'deterministic', key: `crews.${agent}.wf.{run}`, op: 'nonempty' });
+        const half = await propose('wf-half', { success_signal: signal('wf-half') });
+        assert(half.status === 400 && half.body?.error?.code === 'INVALID_CREW_DEF', `a half set: got ${half.status} ${half.body?.error?.code}`);
+        assert(String(half.body?.error?.message).includes('deliverable_location') && String(half.body?.error?.message).includes('required_to_function'),
+            `the refusal names what is missing, got ${half.body?.error?.message}`);
+        const elsewhere = await propose('wf-elsewhere', {
+            required_to_function: 'none', success_signal: signal('wf-elsewhere'), deliverable_location: { key: 'agents.wf-elsewhere.offers' },
+        });
+        assert(elsewhere.status === 400 && String(elsewhere.body?.error?.message).includes('crews.wf-elsewhere.'),
+            `a key outside the agent's own keys: got ${elsewhere.status} ${elsewhere.body?.error?.message}`);
+        const whole = await propose('wf-whole', {
+            required_to_function: 'none', success_signal: signal('wf-whole'), deliverable_location: { key: 'crews.wf-whole.wf.{run}' },
+        });
+        assert(whole.status === 201, `a whole set: expected 201, got ${whole.status} ${JSON.stringify(whole.body?.error)}`);
+        const kept = whole.body.data.proposal?.crew_def?.offers?.[0] ?? whole.body.data.crew_def?.offers?.[0];
+        assert(kept?.deliverable_location?.key === 'crews.wf-whole.wf.{run}', `the proposal keeps the fields, got ${JSON.stringify(kept)}`);
+        const gone = await json(`/v1/agents/v2/agent-proposals/${whole.body.data.proposal?.id ?? whole.body.data.id}/decline`, { method: 'POST', headers: authA });
+        assert(gone.status === 200, `decline ${gone.status}`);
+    });
+
     // ── 8a. Approving credentials the agent, or says why it could not ────────
     //
     // Until 2026-09-08 approval stopped at the seed and told the owner to start their connector. A
