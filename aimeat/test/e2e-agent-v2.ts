@@ -1305,6 +1305,57 @@ async function run() {
         assert(asOther.status === 404, `another owner must not even learn it exists: got ${asOther.status}`);
     });
 
+    // The model the owner picks on the approval. Measured on aimeat.io 2026-10-13: an agent made on
+    // the home ran its first work on the computer's cheapest default, which nobody had been shown,
+    // and a choice set after the approval misses that run: the computer reads it when it starts
+    // the agent, seconds after the enrolment.
+    await test('a model picked on the approval is stored before the connector is offered the agent', async () => {
+        const p = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ name: 'model-watcher', purpose: 'Watches the sources with the model its owner picked.', scopes: ['memory:read'], crew_def: APPROVED_DEF }),
+        });
+        assert(p.status === 201, `propose: ${p.status} ${JSON.stringify(p.body?.error)}`);
+        // What the node answers for the agent's model at the moment the connector is offered it.
+        let atOffer: any = null;
+        const enrol = enrolWith(daemonA.token, a.owner);
+        dA.onEnrol = async (offer: any) => {
+            atOffer = (await json('/v1/agents/model-watcher/crew/llm', { headers: authA })).body?.data ?? null;
+            return enrol(offer);
+        };
+        const r = await json(`/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/approve`, {
+            method: 'POST', headers: authA, body: JSON.stringify({ llm_choice: { kind: 'profile', profile: 'content' } }),
+        });
+        assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.llm_choice?.saved === true && r.body.data.llm_choice?.label === 'content',
+            `the answer says the choice was stored, got ${JSON.stringify(r.body.data.llm_choice)}`);
+        assert(atOffer?.scope === 'agent' && atOffer?.value?.profile === 'content',
+            `the choice is the agent's own when the connector is offered the agent, got ${JSON.stringify(atOffer)}`);
+        const none = await proposeAndApprove('plain-watcher', 'Watches the sources with no model picked.');
+        assert(none.status === 200 && none.body.data.llm_choice === null, `no pick, no choice: ${JSON.stringify(none.body.data.llm_choice)}`);
+        const plain = (await json('/v1/agents/plain-watcher/crew/llm', { headers: authA })).body?.data;
+        assert(plain?.scope !== 'agent', `an agent approved with no pick has no choice of its own, got ${JSON.stringify(plain)}`);
+    });
+
+    await test('a model choice the node would not store refuses the approval, and nothing is created', async () => {
+        const p = await json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: authA,
+            body: JSON.stringify({ name: 'badmodel-watcher', purpose: 'Is approved with a model choice that names the wrong key.', scopes: ['memory:read'], crew_def: APPROVED_DEF }),
+        });
+        assert(p.status === 201, `propose: ${p.status} ${JSON.stringify(p.body?.error)}`);
+        const approve = (choice: unknown) => json(`/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/approve`, {
+            method: 'POST', headers: authA, body: JSON.stringify({ llm_choice: choice }),
+        });
+        // A provider block that would send one of the node's own variables as the crew's key.
+        const unsafe = await approve({ kind: 'model', label: 'x', provider: { type: 'openrouter', api_key_env: 'AIMEAT_JWT_SECRET' } });
+        assert(unsafe.status === 400 && unsafe.body?.error?.code === 'UNSAFE_CHOICE', `expected 400 UNSAFE_CHOICE, got ${unsafe.status} ${unsafe.body?.error?.code}`);
+        const shapeless = await approve({ kind: 'cheapest' });
+        assert(shapeless.status === 400 && shapeless.body?.error?.code === 'INVALID_CHOICE', `expected 400 INVALID_CHOICE, got ${shapeless.status} ${shapeless.body?.error?.code}`);
+        const agents = (await json('/v1/agents?owner=' + a.owner, { headers: authA })).body.data.agents as any[];
+        assert(!agents.some(x => x.name === 'badmodel-watcher'), 'no agent was made');
+        const still = (await json('/v1/agents/v2/agent-proposals', { headers: authA })).body.data.proposals.find((x: any) => x.name === 'badmodel-watcher');
+        assert(still?.state === 'proposed', `the proposal still waits, got ${still?.state}`);
+    });
+
     await test('a task may name its member by NAME, which is what the Crew tab\'s own shapes do', async () => {
         // crewaimeat's `_agent_key` is `name` first and `role` only when there is no name. This
         // check read the role alone, so every definition the three starting shapes produce was

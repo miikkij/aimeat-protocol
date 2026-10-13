@@ -12,6 +12,9 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.6.0 -- 2026-10-13 -- Step 4: the approval page asks which model the agent thinks with and
+ *     the pick is stored before the first run (`llm_choice` on the approval); section 3: a machine
+ *     with its own model routing applies it when nothing is chosen for the agent.
  *   v1.5.0 -- 2026-10-13 -- "A browser on the agent's computer": the tool `browser`, the definition's
  *     `browser_domains`, what the browser does and does not do (crewaimeat 57b2cf0), and that the
  *     proposal refuses the tool without the list (services/crew-browser-domains.ts).
@@ -150,6 +153,14 @@ examples: email, a calendar, meeting notes from a recording.
    request with a sample of what a person would give the agent ("Make a slogan for the product
    Morning Coffee"), never as an input with its result. A definition whose offer has no example is
    given the \`purpose\` as the task, which suits only an agent that needs no input.
+   **The model is the owner's pick on that page.** The page asks "Which model it thinks with" and
+   lists the models the chosen computer reaches; the pick goes with the approval (\`llm_choice\`) and
+   is stored before the agent is handed to the connector, so the first run already uses it. With no
+   pick the computer's own setting applies, and that can be a small, cheap model (measured on
+   aimeat.io 2026-10-13: a new agent's first run on such a default answered its search step with a
+   refusal, and its next step then saved three findings it had invented). So when the work
+   searches, reads sources or runs in many steps, tell the owner to pick a strong model on the
+   page. \`aimeat_crew_llm_set\` sets it after the approval, which is after the first run began.
 5. **Work on a clock comes after.** "Every morning" is a schedule of kind \`agent_task\` for the new
    agent (\`aimeat_schedule_create\`), made once the agent exists. Say so when you propose it.
 
@@ -260,7 +271,10 @@ agent or the owner's default; \`{kind: "node"}\` makes the crew think through th
 owner's own key pays before the node's (the agent needs \`ai:use\`), and a pinned \`model\` may name
 only a provider key variable and a public https address. With nothing chosen, an agent holding
 \`ai:use\` thinks through this node when the node has a key to pay with; without \`ai:use\`, or with no
-key, it uses the key on the machine that runs it, even when the owner's default says the node.
+key, it uses the key on the machine that runs it, even when the owner's default says the node. A
+machine that carries its own model routing for its agents applies that routing when nothing is
+chosen for the agent (seen on aimeat.io 2026-10-13), so a choice made for the agent is the one
+that is certain to apply.
 \`aimeat_crew_menu\` answers which choice applies as \`effective\`. Never write \`crews.registry.<agent>\` with \`aimeat_memory_write\`:
 it lands in YOUR namespace, where neither the runtime nor the Crew tab looks.
 

@@ -12923,6 +12923,12 @@
       "writesPlaces": "Workspaces it reads and writes",
       "browserSites": "Web sites its browser may open",
       "browserLimit": "It opens these sites and no other, on the computer it runs on. It never sends a form: it stops at the button that would send it, and you send it yourself.",
+      "model": "Which model it thinks with",
+      "modelUnset": "Not chosen: the computer picks",
+      "modelHintSet": "The agent uses this model from its first work. It is paid with the key that is on the computer. You can change it later on the agent's page.",
+      "modelHintUnset": "With no choice, the computer uses the model in its own settings. That can be a small, cheap model whose work you need to check. Choose a model here when the work needs a strong one.",
+      "modelComputer": "The computer picks",
+      "modelNoList": "No agent on this computer is connected to say which models it reaches, so the computer uses the model in its own settings. You can choose a model on the agent's page after it has started.",
       "inOrganism": "In the organism {organism}",
       "whenRecordsHint": "It gets a task each time a record is published in the spaces of a workspace that you choose.",
       "whenRecordsHintProposal": "It gets a task each time a record is published in the workspace spaces that the proposal names.",
@@ -23991,6 +23997,19 @@
         "ex1": "fast: a profile that you named for a cheap, quick model. Good for a crew that sorts messages.",
         "ex2": "Empty: the crew uses the model that you chose for all your agents, or the machine's default.",
         "tip": "When the crew does not use the model you expect, check first whether a model is chosen for this agent itself. Copy the profile name exactly from the file."
+      },
+      "agent_model": {
+        "title": "Which model it thinks with",
+        "short": "The AI model that does the agent's work. With no choice, the agent's computer uses the model in its own settings.",
+        "what": "An AI model does the agent's work. The computer that runs the agent reaches a set of models, and this list shows them. The model you choose here is stored for the agent before it starts, so its first work already uses it. With no choice, the next setting applies: your default for all agents if you set one, and otherwise the computer's own default. A computer's default is often a small, cheap model.",
+        "range": "One model from the list of the chosen computer, or no choice. The default is no choice.",
+        "lowLabel": "A small model",
+        "low": "Cheap and fast. It is enough for sorting and short answers. It can fail on work that has many steps, and it can write findings that it did not get from its sources.",
+        "highLabel": "A strong model",
+        "high": "It costs more for each piece of work and takes longer. It follows many steps, uses its tools correctly and keeps to what it found.",
+        "ex1": "An agent that searches the web and saves findings with their sources: choose a strong model.",
+        "ex2": "An agent that moves each new message into the right folder: a small model is enough.",
+        "tip": "Read the first result of a new agent before you trust it. When the result is wrong or empty, change the model on the agent's page first, and the instructions after that."
       },
       "delegation": {
         "title": "May delegate to other members",

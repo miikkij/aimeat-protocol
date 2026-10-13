@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   v1.8.1 — 2026-10-13 — Section 4: the approval page asks which model the agent thinks with, and
+ *     with no pick the computer's own setting applies, which can be a small model.
  *   v1.8.0 — 2026-10-11 — Section 5, putting the work on a clock: the schedule kinds and fields, the
  *     REST routes for an agent with no model, steps joined by memory keys, who starts a task a fire
  *     gives (the agent's task-start answer, not its mode alone) and the edge cases. Folded in from
@@ -181,6 +183,11 @@ answer to the approval says so; when their connector next connects, the node giv
 key and the connector starts it, with nothing for them to press. A person with more than one
 connector says which computer: \`aimeat_connector_list\` names them, and the proposal's
 \`connector\` carries the choice, so the agent waits for that computer and no other.
+
+Say which model the work needs, too. The approval page asks "Which model it thinks with" and lists
+the models the chosen computer reaches; the person's pick is stored before the first run. With no
+pick the computer uses the model in its own settings, which can be a small one: tell a person
+whose agent searches, reads sources or works in many steps to pick a strong model there.
 
 ## 5. Putting the work on a clock
 

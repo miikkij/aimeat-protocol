@@ -31,12 +31,14 @@
  * @structure DEFAULT_TOOL_MENU · clipLine(text, max) · knownBlock(menu, known) · namedIn(crewDef, known) ·
  *   withNeededTools(crewDef, named, offered) · readOnlyTools(crewDef) · extraScopes(crewDef) ·
  *   RECORDS_FEATURE · BACKFILL_FEATURE · recordsBlock(known, features) · watchedPlace(when, known) · recordSpacesOf(crewDef) ·
- *   withRecordSpaces(crewDef, watch) · withSpaceNote(crewDef, watch)
+ *   withRecordSpaces(crewDef, watch) · withSpaceNote(crewDef, watch) · llmChoiceOf(pick, llm)
  * @usage
  *   const prompt = base + knownBlock(menu, { apps, places }) + recordsBlock({ places }, features);
  *   const named = namedIn(draft.crewDef, { apps, places });
  *   const def = withRecordSpaces(draft.crewDef, { organism_id, workspace_id, spaces: ['shared.requests'] });
  * @version-history
+ *   v1.5.0 — 2026-10-13 — llmChoiceOf(): the model choice the node stores, built from the pick on the
+ *     new-agent page and the models the chosen computer reaches.
  *   v1.4.0 — 2026-10-13 — A browser on the agent's computer: browserBlock() (the prompt text, for a
  *     runtime that names the feature) and withBrowserSites() (a draft keeps the tool only with plain
  *     hostnames in `browser_domains`).
@@ -495,4 +497,23 @@ export function withBrowserSites(crewDef) {
     agents: agents.map((m) => (Array.isArray(m?.tools) && m.tools.includes(BROWSER_TOOL)
       ? { ...m, tools: m.tools.filter((x) => x !== BROWSER_TOOL) } : m)),
   };
+}
+
+/**
+ * The model choice the node stores for a pick on a form: 'profile:<name>' or 'model:<label>' (the
+ * values of the picker on the agent's own settings, crew-llm-picker.js), read against the models a
+ * computer says it reaches (the `llm` of runtimeMenu()). A model's provider block travels whole, as
+ * the computer built it, without the display label: rebuilding it here would be this page deciding
+ * what a provider is. Null for no pick, and for a model the list does not have.
+ */
+export function llmChoiceOf(pick, llm) {
+  const value = String(pick || '');
+  if (value.startsWith('profile:')) return value.length > 8 ? { kind: 'profile', profile: value.slice(8) } : null;
+  if (!value.startsWith('model:')) return null;
+  const label = value.slice(6);
+  const model = (llm?.models ?? []).find((m) => m?.label === label);
+  if (!model) return null;
+  const provider = { ...(model.provider && typeof model.provider === 'object' ? model.provider : model) };
+  delete provider.label;
+  return { kind: 'model', label, provider };
 }

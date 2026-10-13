@@ -30,14 +30,14 @@
       "digest": "sha256:90f67577f4bed52222bc7fd5"
     },
     "node:aimeat-recurring-work": {
-      "reviewedOn": "2026-10-11",
+      "reviewedOn": "2026-10-13",
       "watches": [
         "aimeat/src/services/schedule-gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:a7f160c70127503f264fa4d2"
+      "digest": "sha256:2a4ce9c35503292431aa9f2d"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-02",
@@ -263,7 +263,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:4ebab5186072045495236570"
+      "digest": "sha256:9e4626764f7ba49be266dcc7"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-12",
@@ -601,7 +601,7 @@
       "aimeat/src/routes/agents/device-auth.ts": "562ec994ef35b79c",
       "aimeat/src/tool-catalog/scopes.ts": "e894a4db577f6054",
       "aimeat/src/tool-catalog/definitions/crew.ts": "83c214d092ea4949",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "5482b79661bdf3c4",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "dc1d5f9f4f61d0ea",
       "aimeat/src/data/basic-agents.ts": "24d901efdc265451"
     },
     "node:set-up-content-pipeline": {
@@ -661,7 +661,7 @@
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "d10acbe327138c37",
       "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "5482b79661bdf3c4",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "dc1d5f9f4f61d0ea",
       "aimeat/src/services/schedule-write.ts": "0b47c20b310b9a59"
     },
     "node:aimeat-decide": {

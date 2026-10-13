@@ -11230,6 +11230,12 @@
       "writesPlaces": "Espacios de trabajo que lee y en los que escribe",
       "browserSites": "Sitios web que su navegador puede abrir",
       "browserLimit": "Abre estos sitios y ningún otro, en la computadora donde trabaja. Nunca envía un formulario: se detiene en el botón de envío, y lo envías tú.",
+      "model": "Con qué modelo piensa",
+      "modelUnset": "Sin elegir: decide la computadora",
+      "modelHintSet": "El agente usa este modelo desde su primer trabajo. Se paga con la clave que está en la computadora. Puedes cambiarlo después en la página del agente.",
+      "modelHintUnset": "Si no eliges, la computadora usa el modelo de su propia configuración. Puede ser un modelo pequeño y barato, y tendrás que revisar su trabajo. Elige un modelo aquí cuando el trabajo necesite uno potente.",
+      "modelComputer": "Decide la computadora",
+      "modelNoList": "En esta computadora no hay ningún agente conectado que diga a qué modelos tiene acceso, así que la computadora usa el modelo de su propia configuración. Puedes elegir un modelo en la página del agente cuando haya empezado.",
       "inOrganism": "En el organismo {organism}",
       "whenRecordsHint": "Recibe una tarea cada vez que se publica un registro en los espacios que elijas de un espacio de trabajo.",
       "whenRecordsHintProposal": "Recibe una tarea cada vez que se publica un registro en los espacios que nombra la propuesta.",
@@ -21776,6 +21782,19 @@
         "ex1": "fast: un perfil al que pusiste nombre para un modelo barato y rápido. Sirve para un equipo que ordena mensajes.",
         "ex2": "Vacío: el equipo usa el modelo que elegiste para todos tus agentes, o el de la computadora.",
         "tip": "Si el equipo no usa el modelo que esperas, revisa primero si hay un modelo elegido para el propio agente. Copia el nombre del perfil del archivo tal cual."
+      },
+      "agent_model": {
+        "title": "Con qué modelo piensa",
+        "short": "El modelo de IA que hace el trabajo del agente. Si no eliges, la computadora del agente usa el modelo de su propia configuración.",
+        "what": "Un modelo de IA hace el trabajo del agente. La computadora donde corre el agente tiene acceso a ciertos modelos, y esta lista los muestra. El modelo que eliges aquí se guarda para el agente antes de que empiece, así que lo usa desde su primer trabajo. Si no eliges, decide la siguiente configuración: el modelo que definiste para todos tus agentes y, si no hay ninguno, el de la propia computadora. El modelo predeterminado de una computadora suele ser pequeño y barato.",
+        "range": "Un modelo de la lista de la computadora elegida, o ninguno. Lo predeterminado es ninguno.",
+        "lowLabel": "Un modelo pequeño",
+        "low": "Barato y rápido. Alcanza para clasificar y dar respuestas cortas. Puede fallar en un trabajo de muchos pasos y puede escribir hallazgos que no sacó de sus fuentes.",
+        "highLabel": "Un modelo potente",
+        "high": "Cuesta más por cada trabajo y tarda más. Sigue muchos pasos, usa bien sus herramientas y se limita a lo que encontró.",
+        "ex1": "Un agente que busca en la web y guarda hallazgos con sus fuentes: elige un modelo potente.",
+        "ex2": "Un agente que mueve cada mensaje nuevo a la carpeta correcta: un modelo pequeño alcanza.",
+        "tip": "Lee el primer resultado de un agente nuevo antes de confiar en él. Si está mal o vacío, cambia primero el modelo en la página del agente y después las instrucciones."
       },
       "delegation": {
         "title": "Puede delegar en otros miembros",

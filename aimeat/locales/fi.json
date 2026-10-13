@@ -12922,6 +12922,12 @@
       "writesPlaces": "Työtilat, joista se lukee ja joihin se kirjoittaa",
       "browserSites": "Sivustot, jotka sen selain saa avata",
       "browserLimit": "Se avaa vain nämä sivustot, sillä tietokoneella, jolla se toimii. Se ei koskaan lähetä lomaketta: se pysähtyy lähetyspainikkeen kohdalla, ja sinä lähetät lomakkeen itse.",
+      "model": "Millä mallilla se ajattelee",
+      "modelUnset": "Ei valittu: tietokone päättää",
+      "modelHintSet": "Agentti käyttää tätä mallia ensimmäisestä työstään alkaen. Malli maksetaan avaimella, joka on tietokoneella. Voit vaihtaa mallin myöhemmin agentin sivulla.",
+      "modelHintUnset": "Jos et valitse, tietokone käyttää omien asetustensa mallia. Se voi olla pieni ja halpa malli, jonka työ pitää tarkistaa. Valitse malli tästä, kun työ vaatii vahvan mallin.",
+      "modelComputer": "Tietokone päättää",
+      "modelNoList": "Tällä tietokoneella ei ole yhteydessä agenttia, joka kertoisi, mihin malleihin tietokone yltää. Siksi tietokone käyttää omien asetustensa mallia. Voit valita mallin agentin sivulla, kun agentti on käynnistynyt.",
       "inOrganism": "Organismissa {organism}",
       "whenRecordsHint": "Se saa tehtävän aina, kun valitsemaasi työtilan tilaan julkaistaan tietue.",
       "whenRecordsHintProposal": "Se saa tehtävän aina, kun ehdotuksen nimeämiin työtilan tiloihin julkaistaan tietue.",
@@ -23971,6 +23977,19 @@
         "ex1": "fast: itse nimeämäsi profiili halvalle ja nopealle mallille. Sopii miehistölle, joka lajittelee viestejä.",
         "ex2": "Tyhjä: miehistö käyttää mallia, jonka valitsit kaikille agenteillesi, tai koneen oletusta.",
         "tip": "Jos miehistö ei käytä odottamaasi mallia, tarkista ensin, onko agentille itselleen valittu malli. Kopioi profiilin nimi tiedostosta täsmälleen."
+      },
+      "agent_model": {
+        "title": "Millä mallilla se ajattelee",
+        "short": "Tekoälymalli, joka tekee agentin työn. Jos et valitse, agentin tietokone käyttää omien asetustensa mallia.",
+        "what": "Agentin työn tekee tekoälymalli. Tietokone, jolla agentti toimii, yltää tiettyihin malleihin, ja ne näkyvät tässä listassa. Tässä valitsemasi malli tallennetaan agentille ennen kuin se käynnistyy, joten agentti käyttää sitä jo ensimmäisessä työssään. Jos et valitse, seuraava asetus ratkaisee: kaikille agenteillesi asettamasi oletus, ja jos sitä ei ole, tietokoneen oma oletus. Tietokoneen oletus on usein pieni ja halpa malli.",
+        "range": "Yksi malli valitun tietokoneen listasta tai ei valintaa. Oletus on ei valintaa.",
+        "lowLabel": "Pieni malli",
+        "low": "Halpa ja nopea. Se riittää lajitteluun ja lyhyisiin vastauksiin. Monivaiheisessa työssä se voi epäonnistua, ja se voi kirjoittaa havaintoja, joita se ei saanut lähteistään.",
+        "highLabel": "Vahva malli",
+        "high": "Se maksaa enemmän jokaista työtä kohti ja vie enemmän aikaa. Se seuraa monta vaihetta, käyttää työkalujaan oikein ja pysyy siinä, mitä se löysi.",
+        "ex1": "Agentti, joka hakee verkosta ja tallentaa havainnot lähteineen: valitse vahva malli.",
+        "ex2": "Agentti, joka siirtää jokaisen uuden viestin oikeaan kansioon: pieni malli riittää.",
+        "tip": "Lue uuden agentin ensimmäinen tulos ennen kuin luotat siihen. Jos tulos on väärä tai tyhjä, vaihda ensin malli agentin sivulla ja muuta ohjeita vasta sen jälkeen."
       },
       "delegation": {
         "title": "Saa delegoida muille jäsenille",
