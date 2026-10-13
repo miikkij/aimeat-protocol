@@ -1,8 +1,8 @@
 # AIMEAT Core 2026-11: conformance evidence for the reference node
 
-**For:** [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md), which is normative from node 4.0.0.
-**Checked against:** `origin/main` at `9902b6287` (node 3.26.1), 2026-10-12. Paths are relative to the repository root. A line number is where the behaviour is, read from the file; a few rows say "not verified" where nobody read every code path.
-**Gaps and the wish bucket:** every gap is scheduled for node 4.0.0 and names the wish in the Lifecycle Central wish bucket (organism AIMEAT CODING CENTRAL, workspace `ws-mtemu9rieuk`) that carries the fix. The list is at the end.
+**For:** [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md), which is normative since node 4.0.0 (released 2026-10-13).
+**Checked against:** `origin/main` at `9902b6287` (node 3.26.1), 2026-10-12, with the updates below for what closed after that. Paths are relative to the repository root. A line number is where the behaviour is, read from the file; a few rows say "not verified" where nobody read every code path.
+**Gaps and the wish bucket:** every gap names the wish in the Lifecycle Central wish bucket (organism AIMEAT CODING CENTRAL, workspace `ws-mtemu9rieuk`) that carries the fix. The list is at the end.
 
 ## Answer first
 
@@ -17,6 +17,8 @@
 **Update 2026-10-12 (session cc-joumii-rest-scopes).** AUTHZ-01 and SEC-03 are closed in code as **met (4.0.0)**: the 70 authenticated REST routes that asked no scope word ask one through `requireRestScope` (`aimeat/src/auth/rest-scope-gate.ts`), refused from 4.0.0 and allowed before it with the Deprecation headers, and every other authenticated route asks a word or carries its reason in `aimeat/security/route-scope-exemptions.json`, held by `pnpm check:route-scopes`. Ruling Q21. The counts above are not recomputed.
 
 **Update 2026-10-12 (session cc-joumii-mcp-token-rest).** MCP-07 is closed in code as **met (4.0.0)**: besides the binding and the MCP endpoint's refusal, a REST route refuses a token bound to the MCP endpoint from 4.0.0 and counts it before (`aimeat/src/auth/mcp-token-on-rest.ts`). Ruling `decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan` item 8. The counts above are not recomputed.
+
+**Update 2026-10-13 (node 4.0.0 released, session cc-joumii-release-4-0-0).** The reference node runs as 4.0.0, so every **met (4.0.0)** row is met by the released node. PACE-11 is closer: a capability's pacing amount is `cost.toll_morsels`, and a knowledge package's is `sharing.toll_morsels`. The old names `cost.morsels` and `sharing.morsel_price` are accepted with the Deprecation headers and refused from node 5.0.0 (ruling `decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll`; `aimeat/src/services/toll-morsels-names.ts`). The board's "post cost" wording is still open, so PACE-11 stays a gap. The counts above are not recomputed.
 
 Status words: **met** · **met (4.0.0)** (met from the release the requirement is normative in; the code gates it by the running version, and 3.x keeps the old behaviour with the Deprecation headers) · **partial** (met, with a stated shortfall, or not verified on every path) · **gap** (not met) · **n/a** (a rule for readers or editors, no node behaviour to check).
 
@@ -204,7 +206,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | PACE-08 | met | `aimeat/src/services/metered-settlement.ts:80-86` (`resolvePacingToll`: the provider's amount, the node default when none, clamped to the ceiling); ceiling `aimeat/src/config.ts:631`; `aimeat/src/models/offer-schemas.ts:225` | Node default 0 (`aimeat/src/config.ts:641`). |
 | PACE-09 | met | `aimeat/src/services/metered-settlement.ts:122-185` (`chargePacing`: one transaction; debit, burn at `burnRate`, an existing operator share `:133-136`, the rest to the provider, every ledger row; `reverse` gives it all back); burn rate 10 % by default `aimeat/src/config.ts:317`; chokepoint `aimeat/src/services/metered-access.ts:335-347`; own use free `aimeat/src/routes/extensions/pacing.ts:69` | The operator share applies only to flows that had a marketplace fee before the pacing ruling; with no operator account it burns. |
 | PACE-10 | met | `aimeat/src/commerce/pacing-pack.ts:43-49` (`insufficientMorselsMessage`: the daily allowance and, when the operator sells one, the pacing pack); used by checkout `aimeat/src/commerce/session-service.ts:594` and by the metered refusal `aimeat/src/routes/extensions/metered-response.ts`; `aimeat/src/routes/extensions/pacing.ts:76-79` | |
-| PACE-11 | **gap** | | Capabilities expose the pacing amount as `cost.morsels` (`aimeat/src/services/capability-aggregator.ts:37-43,165,354`); listing rows call it `basePrice` (PACE-05); board code calls it a price (`aimeat/src/services/board-post.ts`). |
+| PACE-11 | **gap** | | Capabilities exposed the pacing amount as `cost.morsels`; since 4.0.0 it is `cost.toll_morsels`, and the old name is deprecated until 5.0.0 (`aimeat/src/services/toll-morsels-names.ts`). Listing rows call it `basePrice` (PACE-05); board code calls it a price (`aimeat/src/services/board-post.ts`). |
 | PACE-12 | met | `aimeat/src/services/usage-metering.ts:79,226-250`; `aimeat/src/services/ai-usage-record.ts:185-212`; `aimeat/src/routes/ledger.ts:170-345` | |
 | PACE-13 | met | No conversion path found | |
 | PACE-14 | met | `requireScope('ai:use')` in 14 places | |
@@ -318,7 +320,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 
 ## The 31 gaps in one list, with their wishes
 
-Every gap is work for node 4.0.0. The wish column names the record in the Lifecycle Central wish bucket that carries the fix. Items 1 to 8, 13, 14, 16, 20, 21, 23, 25 and 28 are closed in code since 2026-10-12 (see the updates under "Answer first"); they stay in the list so the numbering holds.
+The list was written as the work for node 4.0.0; a gap still open in the released node stays open under its wish. The wish column names the record in the Lifecycle Central wish bucket that carries the fix. Items 1 to 8, 13, 14, 16, 20, 21, 23, 25 and 28 are closed in code since 2026-10-12 (see the updates under "Answer first"); they stay in the list so the numbering holds.
 
 | # | ID | What is missing | Kind | Wish |
 |---|---|---|---|---|
@@ -339,8 +341,8 @@ Every gap is work for node 4.0.0. The wish column names the record in the Lifecy
 | 15 | DATA-06 | Visibility values not accepted uniformly on records and files | defect | `wish-core-luonnoksen-pienemm-t-aukot-tilin-poisto-peerit-http-ll-` |
 | 16 | DATA-26 | Memory copy answers 429 for a quota | defect | `wish-core-2026-11-gaps-with-no-wish-consent-reach-local-discovery` |
 | 17 | PACE-04 | Daily allowance writes no ledger row | defect | `wish-core-luonnoksen-pienemm-t-aukot-tilin-poisto-peerit-http-ll-` |
-| 18 | PACE-05 | Listing rows carry morsels in a price field | pacing cleanup | `wish-4-0-0-morselhinnan-j-nteet-pois-tallennuksesta-ja-muistikirj` |
-| 19 | PACE-11 | `cost.morsels`, `basePrice`, "post cost" | pacing cleanup | `wish-4-0-0-morselhinnan-j-nteet-pois-tallennuksesta-ja-muistikirj` |
+| 18 | PACE-05 | Listing rows carry morsels in a price field | pacing cleanup | `wish-morselhinnan-sql-nimet-ja-kuolleet-sqlite-taulut-pois-4-0-0-` (was `wish-4-0-0-morselhinnan-j-nteet-pois-tallennuksesta-ja-muistikirj`, done 2026-10-13) |
+| 19 | PACE-11 | `cost.morsels` (renamed `cost.toll_morsels` in 4.0.0), `basePrice`, "post cost" | pacing cleanup | `wish-morselhinnan-sql-nimet-ja-kuolleet-sqlite-taulut-pois-4-0-0-` (was `wish-4-0-0-morselhinnan-j-nteet-pois-tallennuksesta-ja-muistikirj`, done 2026-10-13) |
 | 20 | PACE-21 | Payment bindings not in discovery | new field | `wish-core-2026-11-gaps-with-no-wish-consent-reach-local-discovery` |
 | 21 | DISC-05 | Same as 20 | new field | `wish-core-2026-11-gaps-with-no-wish-consent-reach-local-discovery` |
 | 22 | FED-06 | Link invitation single use not atomic | defect | `wish-core-luonnoksen-pienemm-t-aukot-tilin-poisto-peerit-http-ll-` |

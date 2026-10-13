@@ -1,5 +1,7 @@
 # AIMEAT Protocol Specification v4.0 — Core
 
+> **Superseded.** Since node 4.0.0 (2026-10-13) the Core is [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md), and the platform is described by the [Platform reference](AIMEAT-Platform-reference.md). This document is kept unchanged as the historical v4.0 text. Do not build against it.
+
 ## AI Memory Exchange and Action Transfer — Core Protocol
 
 **Status:** v4.0 (Two-Layer Re-baseline: Core Protocol)

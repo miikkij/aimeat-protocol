@@ -30,7 +30,7 @@
 ## Authentication
 
 - [ ] First registered owner automatically gets `operator` role
-- [ ] Owners sign in with a password (`POST /v1/ghii/login`), a passkey or a configured identity provider. Registration at `POST /v1/owners` still returns an Ed25519 private key once; signing in with that key (`POST /v1/auth/token` with `owner`) is the legacy owner-key login, deprecated and removed in 4.0.0, and `AIMEAT_OWNER_KEY_LOGIN=false` switches it off now
+- [ ] Owners sign in with a password (`POST /v1/ghii/login`), a passkey or a configured identity provider. Registration at `POST /v1/owners` still returns an Ed25519 private key once; signing in with that key (`POST /v1/auth/token` with `owner`) is the legacy owner-key login, removed in 4.0.0 (on a 3.x node `AIMEAT_OWNER_KEY_LOGIN=false` switches it off)
 - [ ] Enable TOTP for operator accounts
 - [ ] Set `AIMEAT_JWT_TTL` to appropriate value (default: 3600s)
 - [ ] Token revocation persists across restarts (requires sqlite/postgres-kysely)

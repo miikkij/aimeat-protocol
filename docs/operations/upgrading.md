@@ -1,7 +1,8 @@
 # Upgrading a node
 
-How a node moves from one version to the next, what runs by itself, what to check afterwards, and what
-version 4.0.0 removes and what an operator or a client changes before it arrives.
+How a node moves from one version to the next, what runs by itself, what to check afterwards, what
+version 4.0.0 removed and what an operator or a client changes before a 3.x node moves to it, and what
+4.0.0 deprecates for the next major release.
 
 ## Find out what is available
 
@@ -42,18 +43,18 @@ supported.
 
 ## What 4.0.0 removes
 
-Each item below is deprecated in 3.x and still works there, so a node and its clients can move off it
-before 4.0.0. Most of them have a setting that turns the old way off now: turn it off on a test node
-first, watch the refusals, and fix the clients that hit them.
+Each item below was deprecated in 3.x and still works on a 3.x node, so a node and its clients can
+move off it before the upgrade. Most of them have a setting that turns the old way off on 3.x: turn it
+off on a test node first, watch the refusals, and fix the clients that hit them.
 
 From 4.0.0 each one is refused whatever the configuration says: a setting that kept it on has no
-effect, and the Config page refuses the value that would keep it on. Until then, every use answers
+effect, and the Config page refuses the value that would keep it on. On a 3.x node, every use answers
 with `Deprecation: true`, `X-AIMEAT-Removed-In: 4.0.0` and, where there is one, a `Link` to the way
 that replaces it (`rel="successor-version"`). `GET /v1/stats` counts each use under
 `deprecated_use_by_type` (`ws_query_token` and `mcp_oauth_legacy` keep their own counters), and the
 node log names each kind once a day. When a count stays at zero, nothing on that node still uses it.
 
-| What goes | Setting today | After it goes, a client gets | What to change first |
+| What goes | Setting on 3.x | From 4.0.0, a client gets | What to change first |
 |---|---|---|---|
 | **Owner-key sign-in**: `POST /v1/auth/token` with an owner name and a signature made with the account's private key | `AIMEAT_OWNER_KEY_LOGIN` (on by default in 3.x) | 410 `OWNER_KEY_LOGIN_OFF`, naming `POST /v1/ghii/login` | people sign in with a password or a passkey; scripts use a personal access token or device authorization. A client that registers people without a password must give them one |
 | **A session token in a WebSocket address** (`?token=` on `/v1/realtime/ws`, `/v1/connect/tunnel`, `/v1/personal/tunnel`). A proxy writes addresses to its access log, so that log held live tokens | `AIMEAT_WS_QUERY_TOKEN` (on by default in 3.x) | 401 `WS_QUERY_TOKEN_DISABLED` | clients take a single-use ticket from `POST /v1/ws/ticket` and connect with `?ticket=`, or send an `Authorization` header |
@@ -94,7 +95,7 @@ constant.
 | **The REST routes that asked no scope word** (70 of them: organism membership and invitations, task creation for another agent and the v2 task roster, schedules, extension actions and instances, cortex reads, knowledge package writes, installs, appeals, checkout completion and a few more; `x-aimeat-scope` in `openapi.yaml` names each one's word) | an agent, an app or an ecosystem app without the word is refused with 403 `SCOPE_DENIED`. The owner in person needs no word, and an agent acting on its own record (its own tasks, offers and reports) needs none either | the call is allowed, answers with the Deprecation headers, and is counted per word in `GET /v1/stats` (`deprecated_use_by_type`, `rest_scope_missing:<word>`). The same holds for their MCP twins (`aimeat_workspace_list`, `aimeat_organism_invitations`, `aimeat_organism_invitation_respond`, `aimeat_skill_list`, `aimeat_package_instances`, `aimeat_v2_task_list`, `aimeat_v2_task_get`), and for `ext:invoke` on `aimeat_app_tool_invoke`, which runs the app tool's extension action and asks `exchange:write` on every release | `REST_SCOPE_GATES_ENFORCED_IN` (`aimeat/src/utils/rest-scope-release.ts`) |
 | **The owner's agent list** (`GET /v1/agents`, `GET /v1/agents/v2/basic-agents`, `GET /v1/agents/v2/migrate`, and the MCP tools `aimeat_agents_list` and `aimeat_agent_basics_get`) | an agent, an app or an ecosystem app without `agent:read` is refused with 403 `SCOPE_DENIED` | allowed with the Deprecation headers and counted under `rest_scope_missing:agent:read` | `REST_SCOPE_GATES_ENFORCED_IN` |
 
-**Agents need the new words before 4.0.0.** On its first start on a version with the gates, the node
+**Agents need the new words before the node runs 4.0.0.** On its first start on a version with the gates, the node
 gives the words that did not exist before, `packages:read` and `agent:read`, to every agent and
 approved ecosystem app it has (`aimeat/src/services/rest-scope-gates-migration.ts`, once per node and
 word; the start-up log names who got them). `agent:read` is also in the default agent scopes. It does not give the words that existed already (`task:write`, `organism:invite`,
@@ -114,6 +115,20 @@ routes, the one-time-key write routes, the Ed25519 owner key returned by registr
 sign in (see the first row), MongoDB and Prisma storage. The
 [feature list](../AIMEAT-Feature-List.md) has a section on what was removed and what replaced it.
 
+## What 4.0.0 deprecates for 5.0.0
+
+Two names made a morsel amount sound like a price. In 4.0.0 both are `toll_morsels`, the pacing
+amount. The old names still work through the 4.x releases, and 5.0.0 refuses them.
+
+| Old name | New name | In 4.x | From 5.0.0 |
+|---|---|---|---|
+| A knowledge package's `sharing.morsel_price` (`POST /v1/knowledge/import`, and a manifest written as memory under `packages/{id}/manifest`) | `sharing.toll_morsels` | accepted with `Deprecation: true` and `X-AIMEAT-Removed-In: 5.0.0`, counted in `GET /v1/stats` as `knowledge_morsel_price`, and stored as `toll_morsels` by the import | 400 `MORSEL_PRICE_REMOVED` |
+| A capability's `cost.morsels` (`POST` and `PUT /v1/capabilities`) | `cost.toll_morsels` | the same headers, counted as `capability_cost_morsels`, stored as `toll_morsels` | 400 `MORSEL_PRICE_REMOVED` |
+
+Both names in one request with different amounts are 400 `TOLL_MORSELS_MISMATCH`. A record stored with
+the old name before 4.0.0 is read as `toll_morsels`; nothing needs to be rewritten. The constant is
+`MORSEL_PRICE_NAMES_REMOVED_IN` in `aimeat/src/config-pacing.ts`.
+
 ## Protocol versions
 
 The versions of outside protocols the node declares (MCP, A2A, OAuth metadata and others) are kept in
@@ -121,6 +136,6 @@ The versions of outside protocols the node declares (MCP, A2A, OAuth metadata an
 that pins an older one should read that file in the release it upgrades to.
 
 AIMEAT Core itself is the `aimeat-core` row there: the edition the node is written to (`2026-11`),
-held to `x-aimeat-protocol` in `openapi.yaml`. The node states it in discovery as
-`protocol_version` from 4.0.0. `openapi.yaml` `info.version` and the MCP `serverInfo.version` are the
+held to `x-aimeat-protocol` in `openapi.yaml`. The edition is normative since node 4.0.0, and a node
+from that release states it in discovery as `protocol_version`. `openapi.yaml` `info.version` and the MCP `serverInfo.version` are the
 node's own version.

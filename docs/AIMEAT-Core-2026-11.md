@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | Draft. Normative from node 4.0.0. Discovery reports `protocol_version` `2026-11` from that release. |
+| Status | Current. Normative since node 4.0.0 (released 2026-10-13). A node from that release reports `protocol_version` `2026-11` in discovery. |
 | Replaces | AIMEAT Protocol Specification v4.0, Core, and the normative parts of the v4.0 Platform document |
 | Released with | the reference node 4.0.0 |
 | API path version | `v1` |
@@ -19,7 +19,7 @@
 
 ### 0.1 Status of this document
 
-This is a draft. It describes what the reference node does today and what it must do before node 4.0.0 is released. Each requirement that the reference node does not meet yet is listed as a gap in the evidence file. The text becomes normative with node 4.0.0, and from that release discovery reports the protocol version `2026-11`.
+This is the current edition of the Core. It became normative with node 4.0.0, released on 2026-10-13, and a node from that release reports the protocol version `2026-11` in discovery. Each requirement that the reference node does not meet is listed as a gap in the evidence file, with the wish that carries the fix.
 
 ### 0.2 Three version numbers
 
@@ -1144,6 +1144,7 @@ Totals: 209 lines. 205 carry at least one MUST or MUST NOT; 4 are SHOULD only (A
 | What | Status | Default changed in | How the reference node signals it |
 |---|---|---|---|
 | Consent reach values `private` and `dmz` | accepted as other names for `local` through the 4.x releases of the reference node; a later edition removes them | node 4.0.0: a consent made without a reach is `local`, not `federation` | the node stores and answers `local` (AUTHZ-18) |
+| A knowledge package's `sharing.morsel_price` and a capability's `cost.morsels`, the old names of `toll_morsels` (PACE-11) | accepted through the 4.x releases of the reference node; refused from node 5.0.0 | node 4.0.0: the node stores and answers `toll_morsels` | `Deprecation` and `X-AIMEAT-Removed-In: 5.0.0` headers and a usage counter; 400 `TOLL_MORSELS_MISMATCH` when the two names disagree |
 
 **Removed earlier**, listed so that a v4.0 reader finds them.
 
@@ -1151,7 +1152,7 @@ Totals: 209 lines. 205 carry at least one MUST or MUST NOT; 4 are SHOULD only (A
 |---|---|
 | One-time keys in URLs (Tier 0.5) and the micro-memory store | node 3.6.0 |
 
-**Removed in node 4.0.0 but outside Core**: the legacy AI settings routes (they already answer with `Deprecation`, a successor `Link` and a removal header), static TURN credentials, and a workflow cost cap stated in morsels.
+**Removed in node 4.0.0 but outside Core**: the legacy AI settings routes (they answer 410 `GONE`), static TURN credentials, and a workflow cost cap stated in morsels.
 
 ---
 
@@ -1231,4 +1232,4 @@ Totals: 209 lines. 205 carry at least one MUST or MUST NOT; 4 are SHOULD only (A
 
 ---
 
-*AIMEAT Core 2026-11. Draft, normative from node 4.0.0. Canonical API contract: `openapi.yaml`. Tool catalog: the node's MCP tool catalog. Conformance evidence: [AIMEAT-Core-2026-11-evidence.md](AIMEAT-Core-2026-11-evidence.md).*
+*AIMEAT Core 2026-11. Normative since node 4.0.0. Canonical API contract: `openapi.yaml`. Tool catalog: the node's MCP tool catalog. Conformance evidence: [AIMEAT-Core-2026-11-evidence.md](AIMEAT-Core-2026-11-evidence.md).*

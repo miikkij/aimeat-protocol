@@ -81,13 +81,14 @@ receiver:
   carry stored data (replication, catalogue sync, the read receipt) also carry their send time under
   the same signature. A message without this proof is refused with `AUDIENCE_REQUIRED` when
   `AIMEAT_FEDERATION_AUDIENCE_REQUIRED` says so, and always from a peer that has sent a proof before.
-  The format without it goes away in 4.0.0 ([upgrading](upgrading.md#what-400-removes)).
+  From 4.0.0 the format without it is refused whatever the setting says ([upgrading](upgrading.md#what-400-removes)).
 - **Relay claim.** A request that one node forwards for another carries `x-relay-claim`, a short-lived,
   single-use statement signed by the relaying node (which node, for whom, which method and path), and
   `x-relay-signature`. Without it the request is refused with `RELAY_CLAIM_REQUIRED`, unless the
   setting or that peer's own answer is `optional`. Set a peer's answer with
-  `aimeat_admin_federation_relay_claim_set` (`PUT /v1/federation/peers/{nodeId}/relay-claim`), and
-  move every peer to `required` before 4.0.0.
+  `aimeat_admin_federation_relay_claim_set` (`PUT /v1/federation/peers/{nodeId}/relay-claim`). From
+  4.0.0 `optional` is gone and every relay needs a claim, so a 3.x node moves every peer to `required`
+  before it upgrades.
 
 ## What to watch
 

@@ -1,7 +1,7 @@
 # AIMEAT Platform reference
 
-**Node version:** 3.26.1, checked against the code on 2026-10-12. This note is re-checked at every node release, and its version line follows the node.
-**Replaces:** the AIMEAT.IO Platform & Ecosystem Specification v4.0 ([AIMEAT-RFC-v4.0-Platform-full.md](AIMEAT-RFC-v4.0-Platform-full.md)), from node 4.0.0.
+**Node version:** 4.0.0, released 2026-10-13. The clusters were checked against the code on 2026-10-12, and the 4.0.0 removals add or remove none of them. The version line follows the node at every release.
+**Replaces:** the AIMEAT.IO Platform & Ecosystem Specification v4.0 ([AIMEAT-RFC-v4.0-Platform-full.md](AIMEAT-RFC-v4.0-Platform-full.md)), since node 4.0.0.
 **Normative base:** [AIMEAT Core 2026-11](AIMEAT-Core-2026-11.md). Nothing in this note is normative.
 
 ## Answer first
