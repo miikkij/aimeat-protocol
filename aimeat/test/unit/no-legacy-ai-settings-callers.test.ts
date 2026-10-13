@@ -26,6 +26,8 @@
  *   LEGACY_FIRST, and the file must show it handles the 410 (handlesLegacyGone).
  * @usage cd aimeat && pnpm exec vitest run test/unit/no-legacy-ai-settings-callers.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-13 — The desktop app's ai_connector.rs leaves ALLOWED: it reads and saves the
+ *     connection through GET /v1/ai/providers and PUT /v1/ai/providers/custom (cargo test, GNU toolchain).
  *   v1.1.0 — 2026-10-13 — LEGACY_FIRST: the AI page, the calibrator, the inbox voice hook, the app
  *     catalogue checks and the offers search call the legacy route first again, through legacyOr()
  *     (public/js/services/ai-connection.js); a file listed with that reason must handle the 410.
@@ -68,14 +70,6 @@ const ALLOWED: Record<string, string> = {
     'aimeat/src/static/app-catalog/js/detail.js': LEGACY_FIRST,
     // The old catalogue's built page: detail.js above, bundled by scripts/build-app-catalog.ts.
     'aimeat/src/static/app-catalog.html': LEGACY_FIRST,
-    // NOT a reason to keep it: a move left undone on 2026-10-12 because `cargo check` cannot link on
-    // the machine that made the sweep (no MSVC build tools), and an unchecked Rust edit is not shipped.
-    // get_ai_settings becomes GET /v1/ai/providers (the owner's provider openrouter, lmstudio or
-    // custom: id, base_url, capabilities.text.model, auth.has_key) and save_ai_endpoint becomes
-    // PUT /v1/ai/providers/custom { type: 'openai-compatible', baseUrl, auth: { type: 'none' },
-    // capabilities: { text: { enabled: true, pool: false, model } } }. Then this line goes.
-    'aimeat-desktop/src-tauri/src/ai_connector.rs':
-        'Not moved yet: the desktop app reads and saves its local AI server through /v1/openrouter/settings, so on node 4.0.0 its AI connector fails until it is moved to /v1/ai/providers.',
 };
 
 const SKIP_DIRS = new Set(['node_modules', 'target', 'vendor']);
