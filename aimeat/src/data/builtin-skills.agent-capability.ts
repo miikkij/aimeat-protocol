@@ -33,6 +33,8 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.2.0 — 2026-10-13 — A calendar goes out as an ICS feed of a shared records space
+ *     (services/calendar-feed.ts, routes/organisms/workspace-ops.ts): the table and the example.
  *   v1.1.0 — 2026-10-13 — A row still wakes no agent by itself, and a workflow now starts on it: the
  *     `workspace.rows` event, the `event_*` variables a run carries, and `coalesce`. The table, question
  *     4 and the email example said "a new row wakes nobody" and named the clock as the only way.
@@ -196,7 +198,7 @@ permission to send, so the agent needs none.
 | A notice, a reminder, a newsletter | The extension's \`ctx.email\`, within what the owner consented to |
 | A post to social media | The connected accounts, through a publishing workflow with an approval step |
 | An outside system | The extension's \`ctx.fetch\` to a declared host, or \`aimeat-webhook\` |
-| A calendar | The app's own calendar in a workspace; ICS export |
+| A calendar | The app's own calendar in a workspace; an ICS file from the app; and the event space as an ICS feed the person subscribes to once in their own calendar program (below) |
 
 Sending, paying and deleting are approved by a person on a screen. An instruction in the agent's
 definition is not that approval.
@@ -243,6 +245,16 @@ definition is not that approval.
   An extension that uses the calendar library's code is behind them.
 - **The agent:** calls those tools (\`app_tools\`) and proposes times.
 - **The person:** approves the booking in the app.
+- **Out to the person's own calendar:** the approved bookings are published records of one records
+  space, each in the event shape of \`aimeat-calendar\`. The node serves that space as a calendar
+  feed: \`GET /v1/organisms/<id>/workspace/public/records?ws=<ws>&space=<space>&format=ics\`. The
+  workspace's creator or an organism admin opens the space in the workspace share, and for a
+  calendar that is not public sets the share to ask a password and makes a feed key
+  (\`PUT /v1/organisms/<id>/workspace/share?ws=<ws>\` with \`{ "ics_key": true }\`); the answer shows
+  the address with the key once, and the person pastes it into Google, Apple or Outlook calendar.
+  A new key ends the old address. Whoever holds the address reads every event of the space, so
+  opening a space and making a key is the person's decision: propose it, and do it only when they
+  said so.
 - **The runtime gets no calendar tool.**
 
 ### Meeting notes from a recording

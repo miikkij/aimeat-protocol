@@ -3452,7 +3452,7 @@
   var RRule = (
     /** @class */
     (function() {
-      function RRule2(options, noCache) {
+      function RRule3(options, noCache) {
         if (options === void 0) {
           options = {};
         }
@@ -3464,29 +3464,29 @@
         var parsedOptions = parseOptions(options).parsedOptions;
         this.options = parsedOptions;
       }
-      RRule2.parseText = function(text, language) {
+      RRule3.parseText = function(text, language) {
         return parseText(text, language);
       };
-      RRule2.fromText = function(text, language) {
+      RRule3.fromText = function(text, language) {
         return fromText(text, language);
       };
-      RRule2.fromString = function(str) {
-        return new RRule2(RRule2.parseString(str) || void 0);
+      RRule3.fromString = function(str) {
+        return new RRule3(RRule3.parseString(str) || void 0);
       };
-      RRule2.prototype._iter = function(iterResult) {
+      RRule3.prototype._iter = function(iterResult) {
         return iter(iterResult, this.options);
       };
-      RRule2.prototype._cacheGet = function(what, args) {
+      RRule3.prototype._cacheGet = function(what, args) {
         if (!this._cache)
           return false;
         return this._cache._cacheGet(what, args);
       };
-      RRule2.prototype._cacheAdd = function(what, value, args) {
+      RRule3.prototype._cacheAdd = function(what, value, args) {
         if (!this._cache)
           return;
         return this._cache._cacheAdd(what, value, args);
       };
-      RRule2.prototype.all = function(iterator) {
+      RRule3.prototype.all = function(iterator) {
         if (iterator) {
           return this._iter(new callbackiterresult_default("all", {}, iterator));
         }
@@ -3497,7 +3497,7 @@
         }
         return result;
       };
-      RRule2.prototype.between = function(after, before, inc, iterator) {
+      RRule3.prototype.between = function(after, before, inc, iterator) {
         if (inc === void 0) {
           inc = false;
         }
@@ -3519,7 +3519,7 @@
         }
         return result;
       };
-      RRule2.prototype.before = function(dt2, inc) {
+      RRule3.prototype.before = function(dt2, inc) {
         if (inc === void 0) {
           inc = false;
         }
@@ -3534,7 +3534,7 @@
         }
         return result;
       };
-      RRule2.prototype.after = function(dt2, inc) {
+      RRule3.prototype.after = function(dt2, inc) {
         if (inc === void 0) {
           inc = false;
         }
@@ -3549,22 +3549,22 @@
         }
         return result;
       };
-      RRule2.prototype.count = function() {
+      RRule3.prototype.count = function() {
         return this.all().length;
       };
-      RRule2.prototype.toString = function() {
+      RRule3.prototype.toString = function() {
         return optionsToString(this.origOptions);
       };
-      RRule2.prototype.toText = function(gettext, language, dateFormatter) {
+      RRule3.prototype.toText = function(gettext, language, dateFormatter) {
         return toText(this, gettext, language, dateFormatter);
       };
-      RRule2.prototype.isFullyConvertibleToText = function() {
+      RRule3.prototype.isFullyConvertibleToText = function() {
         return isFullyConvertible(this);
       };
-      RRule2.prototype.clone = function() {
-        return new RRule2(this.origOptions);
+      RRule3.prototype.clone = function() {
+        return new RRule3(this.origOptions);
       };
-      RRule2.FREQUENCIES = [
+      RRule3.FREQUENCIES = [
         "YEARLY",
         "MONTHLY",
         "WEEKLY",
@@ -3573,23 +3573,23 @@
         "MINUTELY",
         "SECONDLY"
       ];
-      RRule2.YEARLY = Frequency.YEARLY;
-      RRule2.MONTHLY = Frequency.MONTHLY;
-      RRule2.WEEKLY = Frequency.WEEKLY;
-      RRule2.DAILY = Frequency.DAILY;
-      RRule2.HOURLY = Frequency.HOURLY;
-      RRule2.MINUTELY = Frequency.MINUTELY;
-      RRule2.SECONDLY = Frequency.SECONDLY;
-      RRule2.MO = Days.MO;
-      RRule2.TU = Days.TU;
-      RRule2.WE = Days.WE;
-      RRule2.TH = Days.TH;
-      RRule2.FR = Days.FR;
-      RRule2.SA = Days.SA;
-      RRule2.SU = Days.SU;
-      RRule2.parseString = parseString;
-      RRule2.optionsToString = optionsToString;
-      return RRule2;
+      RRule3.YEARLY = Frequency.YEARLY;
+      RRule3.MONTHLY = Frequency.MONTHLY;
+      RRule3.WEEKLY = Frequency.WEEKLY;
+      RRule3.DAILY = Frequency.DAILY;
+      RRule3.HOURLY = Frequency.HOURLY;
+      RRule3.MINUTELY = Frequency.MINUTELY;
+      RRule3.SECONDLY = Frequency.SECONDLY;
+      RRule3.MO = Days.MO;
+      RRule3.TU = Days.TU;
+      RRule3.WE = Days.WE;
+      RRule3.TH = Days.TH;
+      RRule3.FR = Days.FR;
+      RRule3.SA = Days.SA;
+      RRule3.SU = Days.SU;
+      RRule3.parseString = parseString;
+      RRule3.optionsToString = optionsToString;
+      return RRule3;
     })()
   );
 
@@ -8028,6 +8028,8 @@
   }
 
   // src/static/sdk-libs/calendar/events.js
+  var RRule2 = RRule ?? /** @type {any} */
+  (void 0).RRule;
   function normalize(source) {
     if (!source || !source.id || typeof source.id !== "string") throw new TypeError("Event id is required");
     const e2 = { ...source, timeZone: source.timeZone || "UTC", allDay: !!source.allDay };
@@ -8042,10 +8044,10 @@
   function ruleOptions(text) {
     if (typeof text !== "string" || text.length > 4096 || /[\r\n]/.test(text)) throw new RangeError("Use one RRULE value");
     const clean = text.replace(/^RRULE:/i, "").toUpperCase();
-    const options = RRule.parseString(clean);
+    const options = RRule2.parseString(clean);
     if (!/(^|;)FREQ=/.test(clean) || options.interval != null && options.interval < 1 || options.count != null && options.count < 1) throw new RangeError("Invalid recurrence frequency, interval or count");
     if (options.count && options.until) throw new RangeError("Use COUNT or UNTIL, not both");
-    new RRule(options);
+    new RRule2(options);
     return options;
   }
   function occurrences(events, options) {
@@ -8092,7 +8094,7 @@
         delete opts.tzid;
         const endWall = wallMs(fromInstant(options.to, e2.timeZone));
         let validCount = 0;
-        const rule = new RRule({ ...opts, dtstart: new Date(wallMs(e2.start)), until: new Date(endWall) });
+        const rule = new RRule2({ ...opts, dtstart: new Date(wallMs(e2.start)), until: new Date(endWall) });
         rule.all((date) => {
           if (++iterations > maxIterations) throw new RangeError("Recurrence iteration limit exceeded; shorten the series");
           if (date.getTime() > endWall || count && validCount >= count) return false;

@@ -8,18 +8,21 @@
  * @structure ShareAccess · ShareMeta · ResolvedShare · PublicDoc · PublicRecord
  * @usage import type { ResolvedShare } from './share-types.js';
  * @version-history
+ *   v1.2.0 — 2026-10-13 — icsKeyHash on the share: the feed key of the ICS rendering.
  *   v1.1.0 — 2026-10-08 — PublicDoc and PublicRecord carry the row's aiProvenanceId (aiprov E1).
  *   v1.0.0 — 2026-09-29 — Moved from routes/organisms/shared.ts (TARGET-082 V1).
  */
 
 export type ShareAccess = 'open' | 'password' | 'account';
+/** `icsKeyHash`: the SHA-256 of the feed key that opens the ICS rendering of a shared records space
+ *  to a calendar program, which cannot sign in or send a share token (services/calendar-feed.ts). */
 export type ShareMeta = {
   public?: boolean; spaces?: Record<string, boolean>; docs?: Record<string, boolean>;
-  access?: ShareAccess; passwordHash?: string | null;
+  access?: ShareAccess; passwordHash?: string | null; icsKeyHash?: string | null;
 };
 export type ResolvedShare = {
   public: boolean; spaces: Record<string, boolean>; docs: Record<string, boolean>;
-  access: ShareAccess; passwordHash: string | null;
+  access: ShareAccess; passwordHash: string | null; icsKeyHash: string | null;
 };
 /** `aiProvenanceId`: the provenance record the published row carries, which the route serves as the
  *  item's `ai_provenance` block (and never as this field). */

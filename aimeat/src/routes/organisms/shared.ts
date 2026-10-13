@@ -623,13 +623,14 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return {
       public: !!v.public, spaces: v.spaces ?? {}, docs: v.docs ?? {},
       access, passwordHash: typeof v.passwordHash === 'string' ? v.passwordHash : null,
+      icsKeyHash: typeof v.icsKeyHash === 'string' ? v.icsKeyHash : null,
     };
   };
 
-  /** The share state as the API is allowed to show it — the password hash NEVER leaves the server. */
+  /** The share state as the API is allowed to show it — the password hash and the feed key's hash NEVER leave the server. */
   const redactShare = (share: ResolvedShare): Record<string, unknown> => ({
     public: share.public, spaces: share.spaces, docs: share.docs,
-    access: share.access, has_password: !!share.passwordHash,
+    access: share.access, has_password: !!share.passwordHash, has_ics_key: !!share.icsKeyHash,
   });
 
   /** Gate the NO-AUTH public read path by the share's access mode. Returns null when allowed,

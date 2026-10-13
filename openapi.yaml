@@ -40577,10 +40577,10 @@ paths:
       description: |
         Returns the `meta.share` record for a workspace —
         `{ public, spaces: { [typeName]: boolean }, docs: { [`${typeName}/${id}`]: boolean },
-        access: 'open'|'password'|'account', has_password: boolean }` —
+        access: 'open'|'password'|'account', has_password: boolean, has_ics_key: boolean }` —
         which controls what document-space content is served by the no-auth public endpoints and how
-        that public read path is gated. The stored password hash is never returned — only
-        `has_password`. Any active member may read it. Absent record → the empty default
+        that public read path is gated. The stored password hash and the feed key's hash are never
+        returned — only `has_password` and `has_ics_key`. Any active member may read it. Absent record → the empty default
         (nothing public, access `open`).
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
@@ -40606,6 +40606,12 @@ paths:
         requires a password to be set. Only the workspace creator or an org admin may write. The
         record is stored under the workspace creator's GHII so there is exactly one canonical share
         record per workspace.
+
+        `ics_key: true` makes a new feed key for the calendar format of the public records read
+        (`GET /workspace/public/records?format=ics&key=`). The answer carries it ONCE as `ics_key`,
+        with `ics_url` (put the space's name in place of `<space>`); the node keeps only its SHA-256
+        and no later answer shows it. A new key ends the one before; `ics_key: null` clears it;
+        absent keeps it. The share state says `has_ics_key`.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -40637,8 +40643,12 @@ paths:
                   minLength: 4
                   maxLength: 128
                   description: Set (string) or clear (null) the share password; absent keeps the previous one
+                ics_key:
+                  type: boolean
+                  nullable: true
+                  description: true makes a new feed key for the calendar format (shown once in the answer, ends the one before); null clears it; absent keeps it
       responses:
-        '200': { description: The merged share state (redacted — has_password, never the hash) }
+        '200': { description: 'The merged share state (redacted: has_password and has_ics_key, never a hash). With ics_key true also `ics_key` and `ics_url`, once.' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -40742,16 +40752,32 @@ paths:
         account on this node). This is the generic anonymous read for public record spaces — any public
         showroom / catalogue / knowledge client reads its structured data through it. An entry whose
         record has a provenance record carries it as `ai_provenance` (AiProvenanceItemBlock).
+
+        `?format=ics` returns the same read as an RFC 5545 calendar (text/calendar) for a calendar
+        program to subscribe to. It names ONE space (`space` is then required, 400 without it) whose
+        records are events in the shape the served library aimeat-calendar defines: `id`, `title`,
+        `start`, `end`, `timeZone`, `allDay`, `rrule`, `rdates`, `exdates`, `overrides`,
+        `description`, `location`, `transparent`, `cancelled`. Only those fields of a record are
+        written; a record that is not an event is left out (`X-Calendar-Skipped` counts them,
+        `X-Calendar-Events` the events written, at most 5000). A calendar program cannot sign in or
+        send a share token, so for this format alone `?key=` (the share's feed key, made with
+        `PUT /workspace/share { "ics_key": true }`) passes the access mode. The key opens nothing the
+        share does not open and nothing in any other format. The calendar format is rate-limited per
+        client IP (120 fetches in 15 minutes).
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
         - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
-        - { name: space, in: query, required: false, schema: { type: string }, description: Limit to one records-space (objectType name) }
+        - { name: space, in: query, required: false, schema: { type: string }, description: Limit to one records-space (objectType name). Required with format=ics. }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [ics] }, description: Return the space's events as an RFC 5545 calendar instead of JSON }
+        - { name: key, in: query, required: false, schema: { type: string }, description: 'With format=ics: the share''s feed key, for a share whose access is password or account' }
         - { name: X-Share-Token, in: header, required: false, schema: { type: string }, description: Share token from POST /workspace/share/unlock (password access mode) }
       responses:
-        '200': { description: "The public records as an array of { type, id, value }" }
-        '401': { description: SHARE_PASSWORD_REQUIRED or SHARE_ACCOUNT_REQUIRED (access-gated share) }
+        '200': { description: "The public records as an array of { type, id, value }, or with format=ics a text/calendar document" }
+        '400': { description: format=ics without space }
+        '401': { description: SHARE_PASSWORD_REQUIRED or SHARE_ACCOUNT_REQUIRED (access-gated share; with format=ics also a missing or wrong feed key) }
         '404': { $ref: '#/components/responses/NotFound' }
+        '429': { description: Too many fetches of the calendar format (per-IP rate limit) }
 
   /v1/organisms/{id}/workspace/records:
     get:
