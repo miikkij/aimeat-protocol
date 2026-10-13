@@ -19,6 +19,11 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   v1.7.0 — 2026-10-13 — The fenced-space rule (services/fenced-space.ts): an agent, an ecosystem
+ *     app or a visitor defining a form onto a record space that names extensions is refused 403
+ *     ACCESS_DENIED, and a submission to a stored form whose owner identity is not a person's is
+ *     refused the same way before anything is written. A form writes as whoever defined it, so it
+ *     was a write path past the app's own tool (ruled by the developer on 2026-10-13).
  *   v1.6.0 — 2026-10-13 — A form may take a conversation: `thread` in the definition names the reply
  *     space and the signal space and the limits (services/intake-thread.ts). Such a form names no
  *     field list, all three of its spaces are checked when it is defined, its public description
@@ -57,6 +62,8 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
+import { fencedFormRefusal, FENCED_FORM_PUBLIC_MESSAGE } from '../../services/fenced-space.js';
+import { callerOf } from '../../middleware/caller.js';
 import { takeDailySlot, forgetDailyCount } from '../../services/intake-daily-count.js';
 import { parseThreadConfig, THREAD_RECORD_FIELDS, SIGNAL_RECORD_FIELDS, type IntakeThreadConfig } from '../../services/intake-thread.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -192,6 +199,15 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
         const declared = await readPublishSpace(storage, org, ws, other);
         if (declared.refusal) { res.status(declared.refusal.status).json(error(config.nodeId, declared.refusal.code, declared.refusal.message, declared.refusal.status, declared.refusal.details)); return; }
       }
+    }
+    // A form's records are written as the identity that defines it, with no session present. A
+    // record space that names extensions takes a record from a caller that is not a person only
+    // through one of them (services/fenced-space.ts), so a form defined by an agent onto such a
+    // space would be a write path past the app's own tool: the definition is refused. A person and
+    // a hosted app define one as before.
+    for (const written of [namespace, ...(thread ? [thread.signalNamespace] : [])]) {
+      const fenced = await fencedFormRefusal({ storage, config }, ownerGhii, callerOf(req, config.nodeId, storage).roles, org, ws, written);
+      if (fenced) { res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details)); return; }
     }
     const allowedFields = strList(b.allowed_fields);
     if (!allowedFields.length && !thread) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'allowed_fields (non-empty array) is required')); return; }
@@ -338,6 +354,14 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
       // names neither the namespace nor the workspace's spaces.
       const undeclared = (await readPublishSpace(storage, org, ws, cfg.namespace, { audience: 'public' })).refusal;
       if (undeclared) { res.status(undeclared.status).json(error(config.nodeId, undeclared.code, undeclared.message, undeclared.status, undeclared.details)); return; }
+      // The record is written as the identity the form stores, so the fenced-space rule is asked
+      // for THAT identity (services/fenced-space.ts): a form stored under an agent's identity,
+      // from before the definition refused it, writes nothing into a space that names extensions.
+      // A form a person defined returns from the rule before the manifest is read.
+      const fenced = await fencedFormRefusal({ storage, config }, cfg.ownerGhii, undefined, org, ws, cfg.namespace);
+      // The visitor is told that the form takes nothing, in words that name neither the space nor
+      // the extension: an extension's name holds the account name of whoever installed it.
+      if (fenced) { res.status(fenced.status).json(error(config.nodeId, fenced.code, FENCED_FORM_PUBLIC_MESSAGE)); return; }
 
       // Build the record from the ALLOW-LIST only (defaults first — with server tokens resolved — then
       // the permitted submitter values).

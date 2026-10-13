@@ -19,6 +19,10 @@
  *   archiveRoleOf (the creator-or-admin rule); archiveRecordsBatchOp (many records of one space)
  * @usage import { archiveTarget, unarchiveTarget, isKeyArchived } from '../services/archive.js';
  * @version-history
+ *   v1.2.0 — 2026-10-13 — archiveRecordsBatchOp takes one more refusal for the keys it would archive
+ *     and asks it before the first record is archived. The extension sandbox passes the fenced-space
+ *     rule (services/fenced-space.ts): a record space that names extensions takes an agent's archive
+ *     only through one of them.
  *   v1.1.0 — 2026-10-09 — archiveRoleOf, which the archive route now asks, and archiveRecordsBatchOp,
  *     which ctx.workspace.archiveRecords runs: an extension keeps a space bounded by archiving what
  *     has stopped mattering (Lifecycle Central's closed claims, 771 of them, made every read 9 s).
@@ -201,6 +205,12 @@ export type ArchiveBatchResult =
 export async function archiveRecordsBatchOp(
   storage: Storage, who: ArchiveCaller,
   args: { organismId: string; ws: string; namespace: string; ids: string[] },
+  /**
+   * One more refusal for the record keys this call would archive, asked after every check below
+   * and before the first record is archived. The extension sandbox passes the fenced-space rule
+   * here (services/fenced-space.ts), which needs the session's roles this function does not take.
+   */
+  refusalForKeys?: (keys: string[]) => Promise<{ status: number; code: string; message: string } | null>,
 ): Promise<ArchiveBatchResult> {
   const { organismId, ws, namespace, ids } = args;
   if (!SEGMENT.test(String(ws || ''))) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'ws must be a workspace id' };
@@ -215,9 +225,12 @@ export async function archiveRecordsBatchOp(
   if (role !== 'creator' && role !== 'admin') {
     return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the creator or an admin can archive organism content' };
   }
+  const unique = [...new Set(ids.map(String))];
+  const refused = await refusalForKeys?.(unique.map(id => `organism.${organismId}.w.${ws}.${namespace}.${id}`));
+  if (refused) return { ok: false, status: refused.status, code: refused.code, message: refused.message };
   const archived: string[] = [];
   let rows = 0;
-  for (const id of [...new Set(ids.map(String))]) {
+  for (const id of unique) {
     const key = `organism.${organismId}.w.${ws}.${namespace}.${id}`;
     const r = await archiveTarget(storage, { level: 'record', orgId: organismId, ws, key }, who.principal);
     if (r.count > 0) archived.push(id);

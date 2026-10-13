@@ -52,6 +52,11 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.6.0 — 2026-10-13 — Every operation the capability makes (write, writeDoc, publish,
+ *     publishRecords, deleteRecords, archiveRecords) carries the extension's marker,
+ *     `installer/name`: a record space that names extensions takes an agent's write only through
+ *     one of them (services/fenced-space.ts, ruled by the developer on 2026-10-13, after an agent
+ *     wrote records into an app's spaces with the plain write tool, past the app's own tool).
  *   v1.5.0 — 2026-10-12 — deleteRecords puts the records in the bin and asks memory:delete of a token,
  *     as the batch route does now (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan,
  *     item 9); it asked memory:purge.
@@ -87,6 +92,7 @@ import {
 } from './workspace-tool-ops.js';
 import { buildRowCalls, type ExtensionWorkspaceRefusal } from './extension-workspace-rows.js';
 import { archiveRecordsBatchOp } from './archive.js';
+import { extensionMarker, fencedSpaceRefusal } from './fenced-space.js';
 import { emitChange } from './event-bus.js';
 
 // The declaration itself (WorkspaceDeclaration, WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf)
@@ -138,7 +144,14 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
     const { config, storage, extName, actionId, declaration, caller } = deps;
     // The ws ops below act AS the caller; the row calls stand on the installer (buildRowCalls).
     const ops = { storage, config };
-    const opsCaller: WorkspaceOpsCaller = workspaceCallerOf({ principal: caller.gaii, ownerName: caller.owner, roles: caller.roles }, config);
+    // The marker of THIS extension, `installer/name`, on every operation the capability makes: a
+    // record space that names extensions takes the write of a caller that is not a person only
+    // through one of them (services/fenced-space.ts). Built here from the installed record, never
+    // from the action's input, and in the form the row service compares (row-service.ts
+    // authorizeExtension). It opens nothing by itself: the caller's membership, grant and scopes
+    // are asked exactly as before.
+    const through = extensionMarker(deps.installer, extName);
+    const opsCaller: WorkspaceOpsCaller = workspaceCallerOf({ principal: caller.gaii, ownerName: caller.owner, roles: caller.roles, extension: through }, config);
     // The classification reader of the caller who invoked the action (TARGET-082).
     const reader = readerForCaller({ storage, config }, caller);
     let last: ExtensionWorkspaceRefusal | null = null;
@@ -234,7 +247,11 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         // token, and the creator or an admin of the organism (services/archive.ts archiveRoleOf).
         archiveRecords: async (organismId, ws, namespace, ids) => {
             allow('archive');
-            const r = await archiveRecordsBatchOp(storage, { principal: caller.gaii, ownerName: caller.owner }, { organismId, ws, namespace, ids });
+            // The fenced-space rule is handed in, because archiveRecordsBatchOp takes no session: it
+            // asks it after its own checks and before the first record is archived, so an extension
+            // the space does not name archives none of its records for an agent.
+            const r = await archiveRecordsBatchOp(storage, { principal: caller.gaii, ownerName: caller.owner }, { organismId, ws, namespace, ids },
+                keys => fencedSpaceRefusal(ops, { principal: caller.gaii, roles: caller.roles, extension: through }, organismId, ws, { keys }));
             if (r.ok) emitChange('organisms');
             return settle(r);
         },

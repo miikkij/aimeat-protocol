@@ -26,6 +26,9 @@
  *   POST /v1/intake/:org/:ws/:formId/thread/read    (PUBLIC) the conversation the token opens
  *   POST /v1/intake/:org/:ws/:formId/thread/forget  (PUBLIC) delete it: all three records, every version
  * @version-history
+ *   v1.1.0 — 2026-10-13 — A turn asks the fenced-space rule (services/fenced-space.ts) for the
+ *     identity the form stores, before anything is written: a form stored under an agent's identity
+ *     writes nothing into a record space that names extensions (ruled by the developer on 2026-10-13).
  *   v1.0.0 — 2026-10-13 — Initial (the October agents plan, P4:
  *     wish-el-v-keskustelu-kirjautumattoman-vierailijan-kanssa-p4-p-t-k).
  */
@@ -36,6 +39,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { readPublishSpace } from '../../services/workspace-write-items.js';
 import { readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
+import { fencedFormRefusal, FENCED_FORM_PUBLIC_MESSAGE } from '../../services/fenced-space.js';
 import { takeDailySlot } from '../../services/intake-daily-count.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -146,6 +150,11 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
       for (const namespace of [cfg.namespace, cfg.thread.signalNamespace]) {
         const undeclared = (await readPublishSpace(storage, org, ws, namespace, { audience: 'public' })).refusal;
         if (undeclared) { res.status(undeclared.status).json(error(config.nodeId, undeclared.code, undeclared.message, undeclared.status, undeclared.details)); return; }
+        // The turn and its signal are written as the identity the form stores, so the fenced-space
+        // rule is asked for that identity (services/fenced-space.ts), as the ordinary submit asks it.
+        const fenced = await fencedFormRefusal({ storage, config }, cfg.ownerGhii, undefined, org, ws, namespace);
+        // In words that name neither the space nor the extension, as the ordinary submit answers.
+        if (fenced) { refuse(res, fenced.status, fenced.code, FENCED_FORM_PUBLIC_MESSAGE); return; }
       }
 
       await inOrder(`${org}/${ws}/${formId}`, async () => {

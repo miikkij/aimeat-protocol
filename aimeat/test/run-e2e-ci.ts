@@ -10,6 +10,9 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-13 -- e2e-workspace-fenced-space.ts joins the list (not the guard tier): a record space
+ *     that names extensions refuses an agent's direct write on every code path and takes it through
+ *     a named extension.
  *   2026-10-13 -- e2e-rest-scope-keep-working.ts joins the list (not the guard tier): an agent that
  *     worked on a 3.x node keeps the scope words 4.0.0 started to check, across boots of its own node
  *     on 40477 (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
@@ -944,6 +947,9 @@ const ALL_SUITES = [
     'test/e2e-workspace-publish-guard.ts',
     'test/e2e-workspace-retention.ts',
     'test/e2e-workspace-backing-gate.ts',
+    // A record space that names extensions takes an agent's write only through one of them: every
+    // direct write, publish, reopen, delete and archive of an agent refused, the named extension let in.
+    'test/e2e-workspace-fenced-space.ts',
     'test/e2e-workspace-rows.ts',
     'test/e2e-workspace-doc-edit.ts',
     'test/e2e-workspace-member-changes.ts',

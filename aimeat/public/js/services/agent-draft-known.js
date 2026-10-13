@@ -32,12 +32,18 @@
  *   withNeededTools(crewDef, named, offered) · readOnlyTools(crewDef) · extraScopes(crewDef) ·
  *   RECORDS_FEATURE · BACKFILL_FEATURE · recordsBlock(known, features) · watchedPlace(when, known) · recordSpacesOf(crewDef) ·
  *   withRecordSpaces(crewDef, watch) · withSpaceNote(crewDef, watch) · llmChoiceOf(pick, llm) · withToolSkus(crewDef, known) ·
- *   joinsAgentList(organism)
+ *   joinsAgentList(organism) · withToolOnlySpaces(crewDef, watch)
  * @usage
  *   const prompt = base + knownBlock(menu, { apps, places }) + recordsBlock({ places }, features);
  *   const named = namedIn(draft.crewDef, { apps, places });
  *   const def = withRecordSpaces(draft.crewDef, { organism_id, workspace_id, spaces: ['shared.requests'] });
  * @version-history
+ *   v1.8.0 — 2026-10-13 — A space an agent writes only through the app's own tool (`tool_only`):
+ *     withSpaceNote() says so on that space's line, and withToolOnlySpaces() gives every member
+ *     "app_tools". The node refuses the direct write from the same day (Jouni: "sovelluksen
+ *     tietuetila ottaa agentin kirjoituksen vain sovelluksen oman laajennuksen kautta").
+ *     withToolSkus(): an app's address with no tool part gets the addresses of the tools the task
+ *     names, the third form the production draft model writes.
  *   v1.7.0 — 2026-10-13 — joinsAgentList(): an agent that works on a workspace's records goes onto
  *     its organism's agent list only where the organism admits listed agents alone. In any other
  *     organism the list took the workspace away from it (seen on aimeat.io 2026-10-13).
@@ -262,7 +268,11 @@ const replaceAddress = (text, token, to) =>
  * - an address without its prefix gets the prefix;
  * - the open form is replaced by the full addresses of that app's tools the same task names as
  *   whole words. A task that names none keeps the open form: the page then names no app for it,
- *   and a missing row is the safe mistake.
+ *   and a missing row is the safe mistake;
+ * - the app's address with no tool part ("<owner>/<file>", with the prefix or without it) is
+ *   replaced the same way. Seen twice on 2026-10-13, once in a measurement and once on aimeat.io
+ *   ("the Postinjalostamo tools under sku happydude500001/postinjalostamo.html: … open_requests,
+ *   … save_reply_draft"). A task that names no tool beside it keeps it as it came.
  * Nothing is added that the task does not name. Returns the same object when nothing changed.
  */
 export function withToolSkus(crewDef, known) {
@@ -282,12 +292,19 @@ export function withToolSkus(crewDef, known) {
       // The prefix first, on a tool's address and on the open form alike.
       for (const tool of app.tools) text = replaceAddress(text, tool.sku.slice(SKU_PREFIX.length), tool.sku);
       text = text.split(open.slice(SKU_PREFIX.length)).join(open).split(SKU_PREFIX + open).join(open);
-      if (!text.includes(open)) continue;
-      // The tools the task names beside the open form: as a whole word, outside any address.
-      let beside = text.split(open).join(' ');
+      // The app's address with no tool part ("<owner>/<file>", with the prefix or without it): not
+      // followed by a tool's name or the open form, and not part of a longer name.
+      const bare = new RegExp(`(?<![A-Za-z0-9_/:.-])(?:${escapeRe(SKU_PREFIX)})?${escapeRe(stem.slice(SKU_PREFIX.length, -1))}(?!:[A-Za-z0-9_<]|[A-Za-z0-9_/-]|\\.[A-Za-z0-9])`, 'g');
+      const hasBare = bare.test(text);
+      if (!text.includes(open) && !hasBare) continue;
+      // The tools the task names beside it: as a whole word, outside any address.
+      let beside = text.split(open).join(' ').replace(bare, ' ');
       for (const tool of app.tools) beside = replaceAddress(beside, tool.sku, ' ');
       const named = app.tools.filter((tool) => new RegExp(`(?<![A-Za-z0-9_/:.-])${escapeRe(tool.name)}(?![A-Za-z0-9_-])`).test(beside));
-      if (named.length > 0) text = text.split(open).join(named.map((tool) => tool.sku).join(', '));
+      if (named.length > 0) {
+        const addresses = named.map((tool) => tool.sku).join(', ');
+        text = text.split(open).join(addresses).replace(bare, () => addresses);
+      }
     }
     if (text === task.description) return task;
     changed = true;
@@ -496,7 +513,11 @@ export function withSpaceNote(crewDef, watch) {
   const lines = all.map((s) => {
     const what = clipLine(String(s.description ?? '').replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s/)[0], SPACE_DESCRIPTION_MAX);
     const named = what ? `- ${nameLine(s.name)}: ${what}` : `- ${nameLine(s.name)}`;
-    return watched.has(s.namespace) ? `${named}${/[.!?…]$/.test(named) ? '' : '.'} You watch this space: its records are your work.` : named;
+    const stop = /[.!?…]$/.test(named) ? '' : '.';
+    if (watched.has(s.namespace)) return `${named}${stop} You watch this space: its records are your work.`;
+    // The node refuses an agent's direct write into such a space (tool_only, GET
+    // /v1/home/agents/choices/spaces), so the agent is told which way in works.
+    return s.tool_only === true ? `${named}${stop} ${TOOL_ONLY_LINE}` : named;
   });
   const note = [
     `${SPACES_NOTE} "${nameLine(watch.workspace_name || watch.workspace_id)}" (id ${watch.workspace_id}), by name:`,
@@ -507,6 +528,30 @@ export function withSpaceNote(crewDef, watch) {
     ...crewDef,
     tasks: tasks.map((x) => (typeof x?.description === 'string' && !x.description.includes(SPACES_NOTE) ? { ...x, description: `${x.description}\n\n${note}` } : x)),
   };
+}
+
+/** What a task says after a space an agent writes only through the app's tool. */
+const TOOL_ONLY_LINE = 'Written only through the app\'s own tool: find it with list_app_tools and call it; a record you write here directly is refused.';
+
+/**
+ * A definition whose members can write into the workspace it watches, when a space there takes an
+ * agent's write only through the app's own tool (`tool_only` on a space of `watch.all`): every
+ * member gets "app_tools", the runtime tool that finds and calls an app's tools.
+ *
+ * WHY. Measured on aimeat.io on 2026-10-13: two of three drafts for one app's sentence gave the
+ * agent the plain workspace-write tool and no "app_tools". It wrote into the app's spaces directly,
+ * past the checks the app's tool makes: a quote with spelling slips, a decision the note said was
+ * not decided, an author field the model typed wrongly. The node now refuses that direct write,
+ * and a member with no "app_tools" would have no way left to save its result.
+ *
+ * The draft's other tools stay: the workspace may hold spaces that take a direct write. Returns
+ * the same object when no space is `tool_only` or every member already has the tool.
+ */
+export function withToolOnlySpaces(crewDef, watch) {
+  if (!crewDef || typeof crewDef !== 'object' || !Array.isArray(crewDef.agents)) return crewDef;
+  const fenced = (Array.isArray(watch?.all) ? watch.all : []).some((s) => s?.tool_only === true);
+  if (!fenced || crewDef.agents.every((m) => toolsOf(m).includes('app_tools'))) return crewDef;
+  return { ...crewDef, agents: crewDef.agents.map((m) => (toolsOf(m).includes('app_tools') ? m : { ...m, tools: [...toolsOf(m), 'app_tools'] })) };
 }
 
 /**

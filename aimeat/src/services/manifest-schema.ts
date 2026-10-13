@@ -41,6 +41,10 @@
  *     absent objectives stay valid, but the defined subschema enforces the kind/op enums when present.
  *     Seed version bumped 3→4 so the stored system schema upgrades in place. Design:
  *     docs/internal/2026-06-23-organism-measurability-design.md.
+ *   v1.9.1 -- 2026-10-13 -- Comment only, the schema text and the seed version are unchanged: the
+ *     comment on objectTypes[].extensions said "Row spaces only" and now says what the field means
+ *     on a memory-backed space too, where it closes the space to an agent's direct write
+ *     (services/fenced-space.ts).
  *   v1.9.0 -- 2026-10-08 -- objectTypes[].extensions (row spaces): the installed extensions the
  *     organism opens the space to, by name. Seed version 7. See row-service.ts authorizeExtension.
  *   v1.7.0 -- 2026-08-29 -- objectTypes[].apps (row spaces): the apps the organism opens the space
@@ -145,11 +149,21 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           // this one space (services/workspace-rows/row-service.ts, authorizeApp). Decided
           // 2026-08-29 for the legal-pages demo's audit trail.
           apps: { type: 'array', items: { type: 'string', pattern: '^[^/]+/[^/]+$' }, maxItems: 20 },
-          // Row spaces only. The installed EXTENSIONS this space is open to, as `installer/name`. A
-          // scheduled ingest has nobody present to borrow a membership from, so the organism names the
-          // extension here, its manifest declares workspace.rows, and its installer must be an active
-          // member (row-service.ts, authorizeExtension). The installer is in the name because an
-          // extension name is free again after an uninstall. Decided 2026-10-08 for the aimeat-soc alert queue.
+          // The installed EXTENSIONS this space names, as `installer/name`. The field means two
+          // different things by backing, and both are enforced.
+          // On a ROW space it OPENS the space to the extension: a scheduled ingest has nobody present
+          // to borrow a membership from, so the organism names the extension here, its manifest
+          // declares workspace.rows, and its installer must be an active member (row-service.ts,
+          // authorizeExtension). Decided 2026-10-08 for the aimeat-soc alert queue.
+          // On a MEMORY space (records or documents) it CLOSES the space to every caller that is not
+          // a person, except through one of the named extensions: an agent, an ecosystem app or a
+          // visitor writes, publishes, reopens, deletes or archives a record there only by calling
+          // an action of a named extension, which acts as that caller and still needs the caller's
+          // membership, grant and scopes. The account holder in person and a hosted app's grant write
+          // directly as before. A list whose entries are all invalid closes the space to every
+          // extension; an absent field or an empty list names nothing (services/fenced-space.ts).
+          // Ruled 2026-10-13, after an agent wrote records into an app's spaces past the app's tool.
+          // The installer is in the name because an extension name is free again after an uninstall.
           extensions: { type: 'array', items: { type: 'string', pattern: '^[^/]+/[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$' }, maxItems: 20 },
           append: { type: 'boolean' },
           versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)

@@ -15104,6 +15104,7 @@ paths:
                                 name: { type: string }
                                 namespace: { type: string }
                                 description: { type: string }
+                                tool_only: { type: boolean, description: "True when the space names extensions in its manifest (`objectTypes[].extensions`). An agent's write into such a space is accepted only through one of those extensions, which is the app's own tool; a direct write by an agent is refused with ACCESS_DENIED. The owner in person and a hosted app write directly." }
                                 records: { type: integer, description: "With `include=counts`: how many published records the space holds now. A draft is not counted." }
         '400': { description: organism_id or workspace_id is missing }
         '403': { description: Not the account holder in person }

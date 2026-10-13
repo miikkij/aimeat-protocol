@@ -26,6 +26,10 @@
  *   readWatchableSpaces · readWorkplace · placeNames · workplaceKey
  * @usage const ties = await readAgentTies({ config, storage }, owner);
  * @version-history
+ *   v1.3.0 — 2026-10-13 — A watchable space says `tool_only` when it names extensions: an agent
+ *     writes there only through the app's own tool. On aimeat.io that day two of three drafts for
+ *     one app built the agent on the plain workspace-write tool, and it wrote wrong records past
+ *     the app's checks.
  *   v1.2.0 — 2026-10-12 — readWatchableSpaces: the record spaces of one workspace whose published
  *     records wake an agent, for the page that makes a contract agent
  *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
@@ -37,6 +41,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { fenceOf } from './fenced-space.js';
 import type { MemoryRecord } from '../storage/types/commerce.js';
 import { isValidAgentName } from '../utils/gaii.js';
 import { resolveAppUrls } from './app-urls.js';
@@ -184,6 +189,13 @@ export interface WatchableSpace {
   /** The namespace a record subscription names (`record_spaces[].space` in a crew definition). */
   namespace: string;
   description: string;
+  /**
+   * True when the space names extensions (`objectTypes[].extensions`): an agent's write is then
+   * accepted only through one of them, which is the app's own tool, and a direct write is refused
+   * (services/fenced-space.ts). The page that makes an agent gives it the tool that
+   * calls app tools and says so in its tasks.
+   */
+  tool_only: boolean;
 }
 
 /**
@@ -213,7 +225,10 @@ export async function readWatchableSpaces(
     const namespace = typeof ot.namespace === 'string' ? ot.namespace : '';
     // A manifest that names no mode is a records space (services/manifest-schema.ts).
     if (!name || !namespace || !isMemoryBackedSpace(ot) || (ot.mode ?? 'records') !== 'records') continue;
-    spaces.push({ name, namespace, description: typeof ot.description === 'string' ? ot.description : '' });
+    // The write rule's own reading (services/fenced-space.ts fenceOf), so the page and the rule
+    // cannot disagree: a list with no valid entry also closes the space, and the page must not
+    // tell an agent that such a space takes a direct write.
+    spaces.push({ name, namespace, description: typeof ot.description === 'string' ? ot.description : '', tool_only: fenceOf(ot) !== null });
   }
   return spaces;
 }

@@ -17,6 +17,10 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-13 — aimeat_workspace_revert_to_draft and aimeat_workspace_object_delete ask the
+ *     fenced-space rule (services/fenced-space.ts) before they write: a record space that names
+ *     extensions takes an agent's reopen or delete only through one of them (ruled by the developer on
+ *     2026-10-13). The refusal reads `ACCESS_DENIED: ...` on these two and on _write and _publish.
  *   2026-10-06 — aimeat_organism_overview, aimeat_workspace_publish and aimeat_workspace_update take the
  *     catalog's schema too; include_archived, expected_version and apps are on the catalog entry now
  *     (secaudit 2026-10 follow-up, Part B).
@@ -183,6 +187,8 @@ import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { fencedSpaceRefusal } from '../services/fenced-space.js';
+import { toolError } from './tool-error.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -232,8 +238,17 @@ export function registerWorkspaceTools(
         r.code === 'UNDECLARED_SPACE'
             ? fail(JSON.stringify({ error: r.code, message: r.message, ...(r.details ?? {}) }, null, 2))
             // A scope refusal is new on these tools (F2), so it takes the toolError shape the REST
-            // door's code reads in: `SCOPE_DENIED: what happened`.
-            : r.code === 'SCOPE_DENIED' ? fail(`${r.code}: ${r.message}`) : fail(r.message);
+            // door's code reads in: `SCOPE_DENIED: what happened`. The fenced-space refusal
+            // (services/fenced-space.ts) is new too and takes the same shape.
+            : r.code === 'SCOPE_DENIED' || r.details?.reason === 'FENCED_SPACE' ? fail(`${r.code}: ${r.message}`) : fail(r.message);
+    /** The fenced-space rule for one record, as a tool error, or null: a record space that names
+     *  extensions takes an agent's reopen or delete only through one of them. The two tools below
+     *  ask it themselves because neither hands the record's key to the organism namespace rule. */
+    const fencedToolError = async (orgId: string, ws: string, namespace: string, id: string): Promise<TextResult | null> => {
+        const fenced = await fencedSpaceRefusal({ storage, config }, { principal: opsCaller.principal, roles: opsCaller.roles },
+            orgId, ws, { key: `${wsRoot(orgId, ws)}.${namespace}.${id}.latest` });
+        return fenced ? toolError(fenced.code, fenced.message) : null;
+    };
 
     /** Parse a possibly-JSON-stringified object param (manifest / schemas) back to an object. */
     const parseObj = (v: unknown): unknown => {
@@ -411,6 +426,9 @@ export function registerWorkspaceTools(
             if (!revertRole || !canWriteNamespaceRule(revertRole, namespace)) {
                 return fail('Admin/creator role required to reopen a meta.* record');
             }
+            // Reopening WRITES a draft of the record: the fenced-space rule, as on the REST route.
+            const revertFenced = await fencedToolError(organism_id, ws, namespace, id);
+            if (revertFenced) return revertFenced;
             // Organism membership is not workspace access, and reverting COPIES the published
             // record's full value into a draft the caller then owns. Without this, an agent whose
             // owner holds no grant on this workspace reads its records one revert at a time, while
@@ -486,6 +504,10 @@ export function registerWorkspaceTools(
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);
             const base = `${root}.${namespace}.${id}`;
+            // The delete below removes the owner's rows of the record as well as the agent's own
+            // (deleteWorkspaceInstance, same-owner), so the fenced-space rule is asked first.
+            const deleteFenced = await fencedToolError(organism_id, ws, namespace, id);
+            if (deleteFenced) return deleteFenced;
             // TARGET-009 S1/S3: an append-only namespace (manifest create_only) refuses record
             // deletion on every path — existing events can never be erased.
             const delGuard = await checkDeleteGuard(`${base}.latest`, storage);

@@ -6,6 +6,11 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-13 — POST /publish and POST /revert ask the fenced-space rule
+ *     (services/fenced-space.ts) before the publish gate files an approval and before any write: a
+ *     record space that names extensions takes an agent's publish or reopen only through one of
+ *     them (ruled by the developer on 2026-10-13). Neither route asked an access rule with the
+ *     record's key, so an agent published and reopened records of an app's space directly.
  *   v1.5.1 — 2026-10-08 — The batch publish route hands the session's scopes to publishRecordsBatchOp,
  *     which now records provenance for each direct value and takes a record's own `ai_provenance` /
  *     `ai_provenance_id` (aiprov E3).
@@ -51,6 +56,7 @@ import { logger } from '../../utils/logger.js';
 import { callerOf } from '../../middleware/caller.js';
 import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace-tool-ops.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
+import { fencedSpaceRefusal } from '../../services/fenced-space.js';
 
 /**
  * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
@@ -76,6 +82,21 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   /** The shared UNDECLARED_SPACE refusal (services/workspace-write-items.ts), sent as it comes. */
   const sendRefusal = (res: Response, r: UndeclaredSpaceRefusal): void => {
     res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details));
+  };
+  /**
+   * The fenced-space rule (services/fenced-space.ts) for one record: true when the refusal was sent.
+   * The publish and the reopen below write the record without asking the organism namespace rule
+   * with its key, so they ask this themselves, before the publish gate files an approval and before
+   * any write. A record space that names extensions takes this from an agent only through one of them.
+   */
+  const refusedByFence = async (req: Request, res: Response, orgId: string, wsId: string | undefined, namespace: string, instance: string): Promise<boolean> => {
+    if (!wsId) return false;
+    const who = callerOf(req, config.nodeId, storage);
+    const fenced = await fencedSpaceRefusal({ storage, config }, { principal: who.principal, roles: who.roles },
+      orgId, wsId, { key: `organism.${orgId}.w.${wsId}.${namespace}.${instance}.latest` });
+    if (!fenced) return false;
+    res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));
+    return true;
   };
 
   // POST /v1/organisms/:id/approvals — request approval for an action (gate or auto-run).
@@ -202,6 +223,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an admin or whoever created this space can publish here. Ask one of them, or publish somewhere you own.'));
       return;
     }
+    if (await refusedByFence(req, res, id, wsId, namespace, instance)) return;
     // Archived content is read-only — block publishing into an archived organism/workspace.
     const pubGuard = await isKeyArchived(storage, wsId ? `organism.${id}.w.${wsId}.` : `organism.${id}.`);
     if (pubGuard.archived) {
@@ -347,6 +369,8 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an admin or whoever created this space can change this. Ask one of them.'));
       return;
     }
+    // Reopening WRITES a draft of the record, so the fenced-space rule applies as it does to a draft write.
+    if (await refusedByFence(req, res, id, wsId, namespace, instance)) return;
 
     const reverter = resolveIdentity(req.auth!, config.nodeId);
     // Organism membership is not workspace access. Revert READS the published record and writes its

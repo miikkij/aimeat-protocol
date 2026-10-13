@@ -22,6 +22,9 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.8.2 — 2026-10-13 — The permissions shown before approval count the tool the page adds for
+ *     a watched workspace whose space is written only through an app's tool (scopesFor is given
+ *     the workspace's spaces).
  *   v1.8.1 — 2026-10-13 — An agent that works on a workspace's records joins the organism's agent
  *     list only where the organism admits listed agents alone (joinsAgentList). v1.6.0 listed it in
  *     every organism, and in one that admits every member's agent a listed agent reaches the
@@ -439,7 +442,9 @@ export default function AgentNewView({ navigate }) {
   }
 
   // ── The form: the agent, and the person's four choices ──
-  const scopes = proposal ? (proposal.scopes ?? []) : scopesFor(draft, { when });
+  // The spaces of the watched workspace go in as well: a space written only through an app's
+  // tool gives the agent that tool, and the tool asks a permission the person must see here.
+  const scopes = proposal ? (proposal.scopes ?? []) : scopesFor(draft, { when, watch: { all: watchSpaces } });
   // The offer in the definition: the draft's own, or the one the proposer wrote.
   const offered = offerShown(draft.crewDef ?? proposal?.crew_def);
   // The person's apps and workspaces the definition names, for a draft and a proposal alike.

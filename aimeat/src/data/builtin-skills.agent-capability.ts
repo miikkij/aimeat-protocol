@@ -33,6 +33,10 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.6.0 — 2026-10-13 — "What an app tool is": a record space that names extensions takes an
+ *     agent's write only through one of them (services/organism-namespace-access.ts), and what the
+ *     app's builder writes in the workspace's structure for it. Ruled by Jouni after an agent
+ *     wrote past an app's tool on aimeat.io that day.
  *   v1.5.1 — 2026-10-13 — "When you propose the agent": an app tool reads and writes the app's
  *     workspace as the agent that called it, so the agent needs organism:read (and the writing
  *     reach for a tool that saves). Seen on aimeat.io that day: ext:invoke alone left a tool
@@ -122,6 +126,19 @@ running:
 
 A tool may carry a money price and a pacing amount, and it can be listed on the Exchange. A tool
 with an action and no price is the owner's own: their agents call it directly.
+
+**A tool's checks hold only if the agent cannot write past the tool.** The extension writes the
+workspace as the agent that called it, so the same agent can write the same record directly with
+the plain workspace tools, and then nothing the tool checks is checked. Close that in the
+workspace's structure: name the extension on every record space an agent may write only through
+your tool, \`objectTypes[].extensions: ["<installer>/<extension name>"]\` (the installer is the
+account that installed the extension on this node). From then on the node refuses an agent's
+draft, direct write, publish, revert, delete, archive, copy and import into that space
+(\`ACCESS_DENIED\`) unless it arrives through one of the named extensions. A person in person and
+the app's own page still write directly. A list with no valid entry closes the space to every
+agent. Say in the space's \`description\` which tool writes it: the home's new-agent page shows
+that sentence beside the space, writes it into the agent's tasks, and gives an agent that watches
+such a workspace the tool that calls app tools.
 
 ## What the extension behind a tool can do
 

@@ -116,7 +116,12 @@ guest receives is missing from that table, so change the table in the same commi
   without the declaration; check `if (!ctx.workspace)`. A schedule or a workflow step gets only
   `appendRows`, `readRows` and `readRow` (one row by its id, `null` when there is none), and only with `workspace: { rows: true }`: they reach a ROW space whose
   manifest names the extension as `installer/name` in `objectTypes[].extensions`, they do not act as
-  the caller (a row records `ext:<name>`), and a repeated `rowId` replaces the row. Do not reach a
+  the caller (a row records `ext:<name>`), and a repeated `rowId` replaces the row. On a MEMORY-backed
+  record space the same field means something else: a space that names extensions takes an agent's
+  write (draft, publish, revert, delete, archive, copy, import) only when it arrives through one of
+  them, and refuses the agent's direct write with `ACCESS_DENIED`; a person in person and a hosted
+  app still write directly, and a list with no valid entry closes the space to every agent (since
+  2026-10-13, after an agent wrote past an app's tool on aimeat.io). Do not reach a
   workspace through `ctx.fetch` or `ctx.memory`: the first cannot reach the node and the second is
   fenced to `ext:`. Many records go through `publishRecords` (up to 1000, with `dryRun` and
   `createOnly`) and come out through `deleteRecords` (up to 2000, into the bin, needs `memory:delete` on a token),

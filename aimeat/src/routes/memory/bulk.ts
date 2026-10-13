@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-13 — bulk-delete asks the fenced-space rule (services/fenced-space.ts) for the
+ *     `organism.` keys it would remove and refuses the whole request before the first delete: a
+ *     record space that names extensions takes an agent's delete only through one of them (ruled by
+ *     the developer on 2026-10-13). Import and copy get the rule from the organism rule they ask.
  *   v1.12.1 — 2026-10-12 — The bulk write, the batch and the copy refuse an app tool manifest or offers
  *     document carrying the old morsel price from 4.0.0 (services/legacy-pacing-write.ts).
  *   v1.12.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/memory/discover. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
@@ -68,6 +72,8 @@ import { leaveMemories, carryLabelToCopy, CopyLabelError } from '../../services/
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
+import { fencedKeysRefusal } from '../../services/fenced-space.js';
+import { callerOf } from '../../middleware/caller.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
@@ -433,6 +439,17 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const records = (isOwnerSession && !agentParam)
       ? await memoryDb.listOwnerScope(req.auth!.owner, { prefix })
       : await storage.listMemory(gaii, { prefix });
+
+    // A record space that names extensions takes a delete from a caller that is not a person only
+    // through one of them (services/fenced-space.ts). This route asks no organism rule for the keys
+    // it removes, and it removes them for good, so one such key refuses the whole request before
+    // the first delete. The account holder in person returns from the rule before any manifest is read.
+    const fenced = await fencedKeysRefusal({ storage, config }, { principal: gaii, roles: callerOf(req, config.nodeId, storage).roles },
+      records.filter(r => (!keys || keys.has(r.key)) && r.key.startsWith('organism.')).map(r => r.key));
+    if (fenced) {
+      res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));
+      return;
+    }
 
     let deleted = 0;
     const deletedVisibility: string[] = [];

@@ -27,6 +27,11 @@
  *   const refusal = await checkOrganismNamespaceAccess({ storage, config }, caller, key, 'write');
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   2026-10-13 — A write into a record space that names extensions is refused to a caller that is
+ *     not a person unless it arrives through one of them (services/fenced-space.ts, ruled by the
+ *     developer on 2026-10-13). The caller carries `extension`, which only the workspace capability
+ *     of an extension action sets; a refusal may carry `details`. An agent wrote records into an
+ *     app's spaces with the plain write tools, past the checks of the app's own tool.
  *   2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   2026-09-28 — An organism that admits only listed agents refuses the others; a listed agent of an
  *     active member acts with the member's rights (services/organism-agent-access.ts).
@@ -45,6 +50,7 @@ import type { Storage } from '../storage/interface.js';
 import { findWorkspaceRegistration } from './workspace-meta.js';
 import { agentBarred, agentBarredMessage, attachedAsParticipant } from './organism-agent-access.js';
 import { isOwnerInPerson } from '../utils/gaii.js';
+import { fencedSpaceRefusal } from './fenced-space.js';
 
 /** The session asking, in the terms this rule decides on. */
 export interface OrganismAccessCaller {
@@ -54,6 +60,13 @@ export interface OrganismAccessCaller {
     owner: string;
     /** The session's roles. isOwnerInPerson (utils/gaii.ts) reads the human principal from them. */
     roles: string[];
+    /**
+     * `installer/name` of the extension whose action makes this call, lower-cased. Set only by the
+     * workspace capability of an extension action (services/extension-workspace.ts), never from a
+     * request: it is what lets a caller that is not a person write a record space that names the
+     * extension (services/fenced-space.ts).
+     */
+    extension?: string;
 }
 
 /** What to answer when the access is refused. `status` and `code` match what the HTTP door sent. */
@@ -61,6 +74,8 @@ export interface OrganismAccessRefusal {
     status: number;
     code: 'AUTH_REQUIRED' | 'NOT_FOUND' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED';
     message: string;
+    /** Set by the fenced-space refusal: the space and the extensions that open it. */
+    details?: Record<string, unknown>;
 }
 
 /**
@@ -205,6 +220,16 @@ export async function checkOrganismNamespaceAccess(
         if (memberMatch[1] !== caller.owner) {
             return { status: 403, code: 'ACCESS_DENIED', message: 'Cannot write to another member\'s workspace' };
         }
+    }
+
+    // A record space that names extensions takes the write of a caller that is not a person only
+    // through one of them (services/fenced-space.ts). Asked last, so every refusal above is still
+    // the one a caller hears first, and with the real key: the space is matched by its namespace
+    // prefix. The account holder in person returns from it before the manifest is read.
+    if (mode === 'write' && wsId) {
+        const fenced = await fencedSpaceRefusal({ storage, config },
+            { principal: caller.principal, roles: caller.roles, extension: caller.extension }, organismId, wsId, { key });
+        if (fenced) return fenced;
     }
 
     return null;
