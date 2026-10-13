@@ -30,7 +30,9 @@
  *   one, created before the step began (`existedBefore`, taken when the boot schedules it, so an agent
  *   made while the boot steps still run is not handed the words). `*` and a covering domain wildcard
  *   are left alone (scopeIsCovered), an agent with no list of its own holds nothing on a request
- *   (auth/effective-scopes.ts) and is left alone, and nothing is ever removed. NOT APP GRANTS: a grant
+ *   (auth/effective-scopes.ts) and is left alone, and nothing is ever removed. Anonymous mode's shared
+ *   agent is left alone too: anyone may hold it, and its words are fixed in auth/anonymous-scopes.ts.
+ *   NOT APP GRANTS: a grant
  *   follows its app's `aimeat-scopes` declaration and every refresh trims a word it does not declare
  *   (services/app-grant-scopes.ts), so a word written here would not last.
  *
@@ -205,6 +207,17 @@ export interface KeepWorkingOptions {
   existedBefore?: string;
 }
 
+/**
+ * The account of anonymous mode's shared agent (`shared#anonymous@<node>`, server-bootstrap/service-init.ts).
+ * Anyone may hold that identity, so its words are fixed in auth/anonymous-scopes.ts (no work, no
+ * social write, nothing granted away) and this step never adds to them. The node makes that agent at
+ * every start with anonymous mode on, before this step runs, so without this test it would be taken
+ * for an agent that existed before.
+ */
+function isSharedAnonymous(owner: string): boolean {
+  return owner === 'anonymous' || owner.startsWith('anonymous@');
+}
+
 /** Created before `cutoff`; a record without a readable time is taken as existing. */
 function existed(createdAt: string | undefined, cutoff: number): boolean {
   const t = createdAt ? Date.parse(createdAt) : NaN;
@@ -228,7 +241,7 @@ export async function migrateRestScopeKeepWorkingOnce(
   const cutoff = Date.parse(opts.existedBefore ?? new Date().toISOString());
 
   for (const listed of await storage.listAgents()) {
-    if (!existed(listed.createdAt, cutoff)) continue;
+    if (!existed(listed.createdAt, cutoff) || isSharedAnonymous(listed.owner)) continue;
     // Read again just before the write, because the write replaces the whole list.
     const agent = await storage.getAgent(listed.gaii);
     const held = agent?.defaultScopes;
@@ -240,6 +253,7 @@ export async function migrateRestScopeKeepWorkingOnce(
   }
 
   for (const owner of await storage.listOwners()) {
+    if (isSharedAnonymous(owner.name)) continue;
     for (const app of await storage.getEcosystemAppsByOwner(owner.name)) {
       if (app.status !== 'approved' && app.status !== 'active') continue;
       if (!existed(app.createdAt, cutoff) || !Array.isArray(app.scopes)) continue;

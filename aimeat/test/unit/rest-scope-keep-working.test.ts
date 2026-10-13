@@ -12,8 +12,10 @@
  *     that passes every gate of a word (`passedBy`) and the words only an agent can reach
  *     (`agentsOnly`) are derived from the same source.
  *   - It runs only on a node at 4.0.0 or later, once, and only for principals that existed before it.
- *   - It adds the missing words, leaves `*`, a covering domain wildcard and an agent with no list of
- *     its own alone, never removes a word, and never writes an app grant.
+ *   - It adds the missing words, leaves `*`, a covering domain wildcard, an agent with no list of
+ *     its own and anonymous mode's shared agent alone, never removes a word, and never writes an app
+ *     grant. The shared agent case was found by the guard tier (e2e-zip-security saw the incident the
+ *     step wrote for it on a node started with anonymous mode on).
  *   - A word the owner removes after the step stays removed.
  *   - The owner gets one line on the activity feed, the operator one incident on the Security page.
  * @usage cd aimeat && pnpm exec vitest run test/unit/rest-scope-keep-working.test.ts
@@ -206,6 +208,13 @@ beforeAll(async () => {
     await makeAgent('wild', ['*']);
     await makeAgent('tasks', ['task:*']);
     await makeAgent('nolist', undefined);
+    // Anonymous mode's shared agent, which the node makes at start before the step runs.
+    const anonKeys = await generateKeyPair();
+    await storage.createAgent({
+        name: 'shared', owner: 'anonymous', gaii: `shared#anonymous@${NODE_ID}`, publicKey: anonKeys.publicKey, trustScore: 50,
+        morselBalance: 0, capabilities: [], defaultScopes: ['memory:read', 'catalogue:read'],
+        createdAt: new Date(Date.now() - 60_000).toISOString(), lastSeen: new Date().toISOString(),
+    } as never);
 
     const now = new Date(Date.now() - 60_000).toISOString();
     await storage.createAppGrant({
@@ -267,6 +276,8 @@ describe('the third step on a node', () => {
         expect(tasks).not.toContain('task:write');
         expect(await scopesOf('nolist')).toBeUndefined();
         expect(await scopesOf('late')).toEqual(['memory:read']);
+        // Anyone may hold the anonymous identity: its words stay what auth/anonymous-scopes.ts says.
+        expect((await storage.getAgent(`shared#anonymous@${NODE_ID}`))!.defaultScopes).toEqual(['memory:read', 'catalogue:read']);
 
         const radio = (await storage.getEcosystemApp(geai('radio')))!.scopes;
         expect(radio[0]).toBe('memory:write');
