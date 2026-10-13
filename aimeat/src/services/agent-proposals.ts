@@ -65,6 +65,7 @@ import { findConnector, listConnectors } from './connector-registry.js';
 import { logger } from '../utils/logger.js';
 import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
 import { offerSignalError } from './agent-default-offer.js';
+import { browserDomainsError } from './crew-browser-domains.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
@@ -293,6 +294,11 @@ export async function proposeAgent(
     // there are none (agent-default-offer.ts offerSignalError).
     const signals = offerSignalError(def, name);
     if (signals) return fail(400, 'INVALID_CREW_DEF', signals);
+    // A member with the tool `browser` needs the hostnames it may open, each a plain public
+    // hostname, so the owner is never shown an agent with a browser and no limit
+    // (crew-browser-domains.ts).
+    const browser = browserDomainsError(def);
+    if (browser) return fail(400, 'INVALID_CREW_DEF', browser);
   }
 
   const asked = Array.isArray(input.scopes) ? input.scopes.filter(s => typeof s === 'string') : [];

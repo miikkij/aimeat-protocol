@@ -12,6 +12,9 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   v1.5.0 -- 2026-10-13 -- "A browser on the agent's computer": the tool `browser`, the definition's
+ *     `browser_domains`, what the browser does and does not do (crewaimeat 57b2cf0), and that the
+ *     proposal refuses the tool without the list (services/crew-browser-domains.ts).
  *   v1.4.0 -- 2026-10-13 -- "What it offers": the three fields that make the agent a workflow step,
  *     the key rule, and the runtime feature `task_scope` they need (crewaimeat 0ca3cbb).
  *   v1.3.2 -- 2026-10-12 -- Step 1.2: approving on the page adds the agent to the organism's agents,
@@ -206,6 +209,33 @@ the workflow gave it, and shows the model the values the workflow attached to th
 \`event_*\` variables of a run an event started, and any variable the workflow declares). A runtime
 without it writes the result under a key of its own, and the step ends red. Leave the three fields
 out when the owner did not ask for a workflow: an offer without them works everywhere else.
+
+**A browser on the agent's computer.** When \`aimeat_crew_menu\` lists the tool \`browser\` (and
+\`browser_domains\` in \`features\`), a member may have that tool, and the definition then names, at
+its top level, the sites it may open:
+
+\`\`\`json
+"browser_domains": ["example.com", "www.example.com"]
+\`\`\`
+
+- 1 to 20 hostnames, each written out and exact: \`example.com\` does not allow \`www.example.com\`.
+  No address (\`https://…\`), no path, no port, no wildcard, no IP address, no \`localhost\`, no name
+  inside a private network (\`.local\`, \`.internal\`, \`.lan\`, \`.corp\` and the like), lower case. The
+  proposal is refused with the reason when the tool has no list, the list has no member with the
+  tool, or an entry is not such a hostname.
+- What the browser does: it opens pages of those hosts, reads them, clicks and fills fields. **It
+  never sends a form.** It stops at the control that would send it and says so, and the person
+  sends the form themselves. It fills no password, payment card or file field and saves no download.
+- What it cannot promise: a page's own script may put typed text into an address it requests on its
+  own host (a search-as-you-type field does), and a plain link that acts when opened (an
+  unsubscribe link) acts. Both reach only a host the owner named. So tell the owner "it never sends
+  a form", and name only sites where opening a link changes nothing.
+- A page's text is written by a stranger. The runtime gives it to the model as data, and puts the
+  browser's own record of the run under the task's result, word for word. Where the model's
+  account and that record differ, the record is what happened: show the owner all of the result.
+- Name a site only when the owner named it. A computer with no browser installed offers neither the
+  tool nor the feature; then the agent cannot have it, and \`web\` and \`article_fetch\` read public
+  pages without one.
 
 ## 2. A runtime of your own: device authorization
 
