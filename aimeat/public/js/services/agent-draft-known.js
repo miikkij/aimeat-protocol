@@ -31,12 +31,14 @@
  * @structure DEFAULT_TOOL_MENU · clipLine(text, max) · knownBlock(menu, known) · namedIn(crewDef, known) ·
  *   withNeededTools(crewDef, named, offered) · readOnlyTools(crewDef) · extraScopes(crewDef) ·
  *   RECORDS_FEATURE · BACKFILL_FEATURE · recordsBlock(known, features) · watchedPlace(when, known) · recordSpacesOf(crewDef) ·
- *   withRecordSpaces(crewDef, watch) · withSpaceNote(crewDef, watch) · llmChoiceOf(pick, llm)
+ *   withRecordSpaces(crewDef, watch) · withSpaceNote(crewDef, watch) · llmChoiceOf(pick, llm) · withToolSkus(crewDef, known)
  * @usage
  *   const prompt = base + knownBlock(menu, { apps, places }) + recordsBlock({ places }, features);
  *   const named = namedIn(draft.crewDef, { apps, places });
  *   const def = withRecordSpaces(draft.crewDef, { organism_id, workspace_id, spaces: ['shared.requests'] });
  * @version-history
+ *   v1.6.0 — 2026-10-13 — withToolSkus(): a tool address without its prefix, and the prompt's open
+ *     form with the tool named beside it, become the tool's full address, per task.
  *   v1.5.0 — 2026-10-13 — llmChoiceOf(): the model choice the node stores, built from the pick on the
  *     new-agent page and the models the chosen computer reaches.
  *   v1.4.0 — 2026-10-13 — A browser on the agent's computer: browserBlock() (the prompt text, for a
@@ -231,8 +233,62 @@ export function namedIn(crewDef, known) {
   return { apps, places };
 }
 
+const SKU_PREFIX = 'app-tool:';
+/** `text` with every whole occurrence of the address `token` replaced. `mentions` has the rule for "whole". */
+const replaceAddress = (text, token, to) =>
+  text.replace(new RegExp(`(?<![A-Za-z0-9_/:.-])${escapeRe(token)}(?![A-Za-z0-9_-]|\\.[A-Za-z0-9])`, 'g'), () => to);
+
+/**
+ * A definition whose tasks name the person's app tools by an address the runtime can call.
+ *
+ * The prompt gives one address per app with the tool's name left open
+ * (`app-tool:<owner>/<file>:<tool>`) and asks the model to put the name in. Measured on 2026-10-13
+ * with the model production drafts with, nine drafts from three home sentences on a prompt of
+ * production size: three wrote the full address, two wrote it without the `app-tool:` prefix, and
+ * four copied the open form as it stood and named the tools beside it ("[…:<tool>] … call
+ * `new_messages`"). In the last two forms the page named no app before the person approved, and
+ * the agent's instructions held an address nothing answers to.
+ *
+ * Both are repaired here from what the task itself says, per task, for the apps in `known`:
+ * - an address without its prefix gets the prefix;
+ * - the open form is replaced by the full addresses of that app's tools the same task names as
+ *   whole words. A task that names none keeps the open form: the page then names no app for it,
+ *   and a missing row is the safe mistake.
+ * Nothing is added that the task does not name. Returns the same object when nothing changed.
+ */
+export function withToolSkus(crewDef, known) {
+  if (!crewDef || typeof crewDef !== 'object' || !Array.isArray(crewDef.tasks)) return crewDef;
+  const apps = (known?.apps ?? []).map((app) => ({
+    tools: (app?.tools ?? []).filter((x) => typeof x?.name === 'string' && x.name && String(x?.sku ?? '').startsWith(SKU_PREFIX) && String(x.sku).endsWith(`:${x.name}`)),
+  })).filter((app) => app.tools.length > 0);
+  if (apps.length === 0) return crewDef;
+  let changed = false;
+  const tasks = crewDef.tasks.map((task) => {
+    if (typeof task?.description !== 'string') return task;
+    let text = task.description;
+    for (const app of apps) {
+      // "app-tool:<owner>/<file>:", the part every tool of the app shares.
+      const stem = app.tools[0].sku.slice(0, app.tools[0].sku.length - app.tools[0].name.length);
+      const open = `${stem}<tool>`;
+      // The prefix first, on a tool's address and on the open form alike.
+      for (const tool of app.tools) text = replaceAddress(text, tool.sku.slice(SKU_PREFIX.length), tool.sku);
+      text = text.split(open.slice(SKU_PREFIX.length)).join(open).split(SKU_PREFIX + open).join(open);
+      if (!text.includes(open)) continue;
+      // The tools the task names beside the open form: as a whole word, outside any address.
+      let beside = text.split(open).join(' ');
+      for (const tool of app.tools) beside = replaceAddress(beside, tool.sku, ' ');
+      const named = app.tools.filter((tool) => new RegExp(`(?<![A-Za-z0-9_/:.-])${escapeRe(tool.name)}(?![A-Za-z0-9_-])`).test(beside));
+      if (named.length > 0) text = text.split(open).join(named.map((tool) => tool.sku).join(', '));
+    }
+    if (text === task.description) return task;
+    changed = true;
+    return { ...task, description: text };
+  });
+  return changed ? { ...crewDef, tasks } : crewDef;
+}
+
 const toolsOf = (member) => (Array.isArray(member?.tools) ? member.tools : []);
-const anyMemberHas = (crewDef, ids) => (Array.isArray(crewDef?.agents) ? crewDef.agents : []).some((m) => toolsOf(m).some((x) => ids.includes(x)));
+const anyMemberHas =(crewDef, ids) => (Array.isArray(crewDef?.agents) ? crewDef.agents : []).some((m) => toolsOf(m).some((x) => ids.includes(x)));
 
 /**
  * A definition whose members can reach what it names. A member whose own text or whose task names

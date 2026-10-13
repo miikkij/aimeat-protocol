@@ -31,6 +31,10 @@
  *   const draft = await draftAgent('Sort my incoming mail and draft the answers', { tools, known: { apps, places } });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.7.1 — 2026-10-13 — parseDraft gives an app tool its full address when the model wrote it
+ *     without the prefix or left the prompt's open form with the tool's name beside it
+ *     (agent-draft-known.js withToolSkus). Measured with the production model on nine drafts: six
+ *     named no callable address before, and the page then named no app for them.
  *   v1.7.0 — 2026-10-13 — The model the person picks goes with the approval. runtimeMenu() carries
  *     `llm`, the model profiles and models the answering computer reaches; `choice.llm` of
  *     startAgent and approveProposal is sent as `llm_choice`, which the node stores before the
@@ -75,7 +79,7 @@ import { buildTemplate } from '/views/profile/agents/crew-templates.js';
 import { SCOPE_TEMPLATES } from '/views/profile/agents/scope-model.js';
 import {
   DEFAULT_TOOL_MENU, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
-  RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, withSpaceNote, browserBlock, withBrowserSites,
+  RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, withSpaceNote, browserBlock, withBrowserSites, withToolSkus,
 } from '/js/services/agent-draft-known.js';
 
 /** When an agent works, as the pages offer it. */
@@ -168,7 +172,10 @@ const cronOf = (v) => (typeof v === 'string' && v.trim().split(/\s+/).length ===
  */
 export function parseDraft(text, { known, offered, features } = {}) {
   const raw = firstObject(text);
-  const written = raw?.crew_def;
+  // An app tool the model named in a form nothing can call (no prefix, or the prompt's own open
+  // form with the tool's name beside it) gets its full address first, so the page names the app
+  // and the agent's instructions hold an address the runtime answers to.
+  const written = withToolSkus(raw?.crew_def, known);
   const named = namedIn(written, known);
   // A browser stays only with the hostnames it may open; the proposal refuses it otherwise.
   const def = withBrowserSites(withNeededTools(written, named, offered instanceof Set ? offered : new Set(offered ?? [])));

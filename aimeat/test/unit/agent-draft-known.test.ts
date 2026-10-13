@@ -20,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 import {
     DEFAULT_TOOL_MENU, clipLine, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
     RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, recordSpacesOf, withSpaceNote,
-    BROWSER_FEATURE, browserBlock, withBrowserSites, llmChoiceOf,
+    BROWSER_FEATURE, browserBlock, withBrowserSites, llmChoiceOf, withToolSkus,
 } from '../../public/js/services/agent-draft-known.js';
 
 const MENU = [
@@ -429,6 +429,63 @@ describe('a browser on the agent\'s computer', () => {
     it('a definition with no browser and no list is returned as it came', () => {
         const d = def('{{ctx.prompt}}', ['web']);
         expect(withBrowserSites(d)).toBe(d);
+    });
+});
+
+describe('a tool address the model wrote in a form the runtime cannot call', () => {
+    // Measured on 2026-10-13 with the model production drafts with (qwen/qwen3.7-plus), nine drafts
+    // from the home sentences of Postinjalostamo and MUISTIO on a prompt of production size: three
+    // wrote the full address, two left the prefix out, four copied the prompt's own placeholder
+    // and named the tools beside it. The task texts below are those drafts' own.
+    const POSTI = { filename: 'postinjalostamo.html', name: 'Postinjalostamo', tools: ['new_messages', 'read_message', 'save_note'].map((name) => ({ name, sku: `app-tool:happydude500001/postinjalostamo.html:${name}`, description: '' })) };
+    const MUISTIO = { filename: 'muistio.html', name: 'MUISTIO', tools: ['notes_to_read', 'read_note', 'save_findings', 'open_actions', 'update_action', 'save_reminder'].map((name) => ({ name, sku: `app-tool:happydude500001/muistio.html:${name}`, description: '' })) };
+    const known = { apps: [POSTI, MUISTIO], places: [] };
+    const one = (description: string) => ({ ...def(description, ['app_tools']) });
+    const text = (d: any) => d.tasks[0].description as string;
+    const namesOf = (d: any) => namedIn(d, known).apps.map((a: any) => `${a.filename}:${a.tools.map((x: any) => x.name).join(',')}`);
+
+    it('an address without its prefix gets the prefix', () => {
+        const d = withToolSkus(one('Use the app_tools to call happydude500001/postinjalostamo.html:new_messages to list messages. For each, call happydude500001/postinjalostamo.html:read_message. {{ctx.prompt}}'), known);
+        expect(text(d)).toContain('call app-tool:happydude500001/postinjalostamo.html:new_messages to list');
+        expect(namesOf(d)).toEqual(['postinjalostamo.html:new_messages,read_message']);
+    });
+
+    it('the prompt\'s placeholder becomes the addresses of the tools the same task names beside it', () => {
+        const d = withToolSkus(one('Use the Postinjalostamo app tools [app-tool:happydude500001/postinjalostamo.html:<tool>] to process the daily mail. First, call `new_messages`. Then call `read_message`. Finally, call `save_note` for each message. {{ctx.prompt}}'), known);
+        expect(text(d)).toContain('[app-tool:happydude500001/postinjalostamo.html:new_messages, app-tool:happydude500001/postinjalostamo.html:read_message, app-tool:happydude500001/postinjalostamo.html:save_note]');
+        expect(text(d)).not.toContain('<tool>');
+        expect(namesOf(d)).toEqual(['postinjalostamo.html:new_messages,read_message,save_note']);
+    });
+
+    it('each task gets the tools that task names, and every placeholder in it', () => {
+        const d = withToolSkus({ ...def('{{ctx.prompt}}', ['app_tools']), tasks: [
+            { id: 'a', agent: 'worker', description: 'Fetch all open actions from MUISTIO [app-tool:happydude500001/muistio.html:<tool>] using the open_actions tool. {{ctx.prompt}}' },
+            { id: 'b', agent: 'worker', description: 'Create a reminder draft using MUISTIO [app-tool:happydude500001/muistio.html:<tool>] with the save_reminder tool, from app-tool:happydude500001/muistio.html:<tool>.' },
+        ] }, known);
+        expect(d.tasks[0].description).toContain('[app-tool:happydude500001/muistio.html:open_actions]');
+        expect(d.tasks[1].description.split('app-tool:happydude500001/muistio.html:save_reminder').length - 1).toBe(2);
+        expect(JSON.stringify(d)).not.toContain('<tool>');
+    });
+
+    it('a placeholder with no tool of that app named beside it is left as it came, and the page names no app for it', () => {
+        const d = withToolSkus(one('Use MUISTIO [app-tool:happydude500001/muistio.html:<tool>] to do the work. {{ctx.prompt}}'), known);
+        expect(text(d)).toContain(':<tool>]');
+        expect(namesOf(d)).toEqual([]);
+    });
+
+    it('a full address is left alone, and a word that is only part of a longer name is not a tool', () => {
+        const full = one('Call app-tool:happydude500001/muistio.html:read_note, then save. {{ctx.prompt}}');
+        expect(withToolSkus(full, known)).toBe(full);
+        // "read_note" is inside "read_notes_later" and inside the address of another owner's app.
+        const d = withToolSkus(one('MUISTIO [app-tool:happydude500001/muistio.html:<tool>]: read_notes_later, and someone/muistio.html:read_note. {{ctx.prompt}}'), known);
+        expect(text(d)).toContain(':<tool>]');
+    });
+
+    it('a definition with no tasks, and an account with no app tools, come back as they were', () => {
+        const d = one('happydude500001/muistio.html:read_note {{ctx.prompt}}');
+        expect(withToolSkus(d, { apps: [], places: [] })).toBe(d);
+        expect(withToolSkus(null as any, known)).toBe(null);
+        expect(withToolSkus({ agents: [] } as any, known)).toEqual({ agents: [] });
     });
 });
 
