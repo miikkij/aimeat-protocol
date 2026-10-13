@@ -21,6 +21,11 @@
  *   9 the idle reaper.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-realtime-rooms
  * @version-history
+ *   v1.2.1 — 2026-10-13 — queryTokenUses throws again when GET /v1/stats has no ws_query_token family
+ *     (it read 0 since 2026-10-12, so a dropped counter passed); the counted-use test makes one use
+ *     before it reads. On 4.0.0 the "a refused query token is not counted" check compares the
+ *     ws_query_token and deprecated_use counters around the refusal, read from a checked stats
+ *     snapshot. The release is read with helpers/node-release (4.0-testimuutokset.md §4 item 5).
  *   v1.2.0 — 2026-10-09 — Phase 2b, the socket ticket (secrets audit 2026-10-09, d3): POST /v1/ws/ticket
  *     opens a room once and a spent ticket is 401 INVALID_TICKET; a personal-tunnel ticket is 401
  *     TICKET_WRONG_SOCKET here; ?token= still works and is counted in /v1/stats while
@@ -35,6 +40,8 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { registerOwner } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { WS_QUERY_TOKEN_REMOVED_IN } from '../src/config-security.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const WS_BASE = BASE.replace(/^http/, 'ws').replace(/\/+$/, '');
@@ -201,16 +208,45 @@ async function mintTicket(socket: string, headers: Record<string, string>) {
     return json('/v1/ws/ticket', { method: 'POST', headers, body: JSON.stringify({ socket }) });
 }
 
+/** GET /v1/stats, refused unless it is a real snapshot: a broken read must not pass as "no use". */
+async function statsSnapshot(): Promise<Record<string, any>> {
+    const { status, body } = await json('/v1/stats', { headers: authA() });
+    const data = body?.data;
+    if (status !== 200 || typeof data?.requests_total !== 'number' || typeof data?.uptime_seconds !== 'number') {
+        throw new Error(`GET /v1/stats is not a stats snapshot: ${status} ${JSON.stringify(Object.keys(data ?? {}))}`);
+    }
+    return data;
+}
+
 /**
  * How many upgrades this node has accepted with ?token= on a socket kind (GET /v1/stats). The
- * counter family appears with its first use, so before any use it reads 0; a caller that asserts a
- * use asserts the count went up, which needs the family to be there.
+ * counter family appears with its first use, so a caller reads it only after one use it caused
+ * itself, and a missing family throws: a renamed or dropped counter fails here instead of reading 0
+ * on both sides of a comparison (4.0-testimuutokset.md §4 item 5). For a 3.x node only; a 4.0.0
+ * node never counts a use and is read with queryTokenCountersWithoutUse().
  */
 async function queryTokenUses(kind: string): Promise<number> {
-    const { body } = await json('/v1/stats', { headers: authA() });
-    const byType = body?.data?.ws_query_token_by_type;
-    if (!byType || typeof byType !== 'object') return 0;
+    const data = await statsSnapshot();
+    const byType = data.ws_query_token_by_type;
+    if (!byType || typeof byType !== 'object') throw new Error(`GET /v1/stats carries no ws_query_token_by_type: ${JSON.stringify(Object.keys(data))}`);
     return Number(byType[kind] ?? 0);
+}
+
+/**
+ * Every counter that could record a ?token= use on a node that takes none (4.0.0): the
+ * ws_query_token family by socket kind, and the deprecated_use family under any kind naming the
+ * query token. A family that is missing reads 0, because on that node it has never been created;
+ * the answer itself must be a real snapshot (statsSnapshot), and the 3.x half of this suite pins the
+ * counter's name by throwing when it is missing after a counted use.
+ */
+async function queryTokenCountersWithoutUse(kind: string): Promise<{ wsQueryToken: number; deprecatedUse: number }> {
+    const data = await statsSnapshot();
+    const wsQueryToken = Number(data.ws_query_token_by_type?.[kind] ?? 0);
+    const deprecated = (data.deprecated_use_by_type ?? {}) as Record<string, number>;
+    const deprecatedUse = Object.entries(deprecated)
+        .filter(([k]) => k.includes('query_token'))
+        .reduce((sum, [, n]) => sum + Number(n), 0);
+    return { wsQueryToken, deprecatedUse };
 }
 
 /**
@@ -219,9 +255,7 @@ async function queryTokenUses(kind: string): Promise<number> {
  * sweep may start the node with it off (AIMEAT_WS_QUERY_TOKEN=false).
  */
 async function queryTokenRemoved(): Promise<boolean> {
-    const { body } = await json('/v1/build');
-    const [major] = String(body?.version ?? '0').split('.').map(n => parseInt(n, 10));
-    return (major ?? 0) >= 4;
+    return removedOn(BASE, WS_QUERY_TOKEN_REMOVED_IN);
 }
 
 // ─── State ───
@@ -517,11 +551,16 @@ await test('ws upgrade — ?token= still opens the socket while security.ws_quer
     }
     // The 3.x half: the setting decides, and a sweep may have started the node with it off.
     await setConfig('security.ws_query_token', true);
-    const before = await queryTokenUses('realtime');
     const { body } = await createRoom({ app_type: 'whiteboard', name: 'rt-query-token' });
+    // The family appears with its first use, so one use comes first; queryTokenUses then throws if
+    // the counter is missing after it, which is the assertion that the use was counted at all.
+    const first = await Sock.open(`room=${body.data.id}&token=${encodeURIComponent(ownerA.token)}&nick=legacy0`);
+    await first.waitFor('joined');
+    const before = await queryTokenUses('realtime');
     const s = await Sock.open(`room=${body.data.id}&token=${encodeURIComponent(ownerA.token)}&nick=legacy`);
     await s.waitFor('joined');
     s.close();
+    first.close();
     const after = await queryTokenUses('realtime');
     assert(after === before + 1, `one query-token upgrade must count once: ${before} → ${after}`);
 });
@@ -535,11 +574,15 @@ await test('ws upgrade — with security.ws_query_token off, ?token= is refused 
     // From 4.0.0 there is no setting to turn off: the refusal below holds on its own.
     if (!removed) await setConfig('security.ws_query_token', false);
     try {
-        const before = await queryTokenUses('realtime');
+        // 3.x: the previous test counted a use, so the family is there and a missing one throws.
+        // 4.0.0: no use is ever counted, so both counter families that could record one are read
+        // and compared (queryTokenCountersWithoutUse).
+        const before = removed ? await queryTokenCountersWithoutUse('realtime') : await queryTokenUses('realtime');
         const refused = await upgradeAnswer(`room=${room}&token=${encodeURIComponent(ownerA.token)}&nick=legacy`);
         assert(refused.status === 401, `a query token must be refused when the setting is off, got ${refused.status}`);
         assert(refused.code === 'WS_QUERY_TOKEN_DISABLED', `refusal code: "${refused.code}"`);
-        assert(await queryTokenUses('realtime') === before, 'a refused query token is not counted as a use');
+        const after = removed ? await queryTokenCountersWithoutUse('realtime') : await queryTokenUses('realtime');
+        assert(JSON.stringify(after) === JSON.stringify(before), `a refused query token is not counted as a use: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
         const viaHeader = await upgradeAnswer(`room=${room}&nick=header`, authA());
         assert(viaHeader.status === 101, `the Authorization header must still open the socket, got ${viaHeader.status}`);
         const ticket = (await mintTicket('realtime', authA())).body.data.ticket as string;

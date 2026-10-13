@@ -17,6 +17,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-account-security-gate
  * @version-history
+ *   v1.2.1 — 2026-10-13 — The replaced key's /v1/auth/token answer is chosen by the node's release and
+ *     security.owner_key_login: 401 AUTH_REQUIRED on 3.x with the sign-in on, 410 OWNER_KEY_LOGIN_OFF
+ *     otherwise. It accepted either one before (4.0-testimuutokset.md §4 item 2).
  *   v1.2.0 — 2026-10-09 — The owner signs back in with the changed password: the password change
  *     replaces the signing key, and the old key is asserted refused (secrets audit 2026-10-09, S2).
  *   v1.1.0 — 2026-09-12 — Phase 1b: the read side, on the one door of this family that could not
@@ -31,6 +34,8 @@ import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { authorizeParams, mcpPkce } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { removedOn } from './helpers/node-release.js';
+import { ownerKeySignInOn, OWNER_KEY_LOGIN_REMOVED_IN } from './helpers/owner-key-sign-in.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -99,6 +104,10 @@ async function agentToken(name: string, scopes: string[]): Promise<string> {
 let ownerAToken = '';
 let ownerAKey = '';
 let ownerBToken = '';
+/** The node's release is at or after OWNER_KEY_LOGIN_REMOVED_IN. */
+let ownerKeyRemoved = false;
+/** The node still takes the owner-key sign-in: a release before the removal, with the setting on. */
+let ownerKeyOn = false;
 let plainAgentToken = '';
 let grantedAgentToken = '';
 let appToken = '';
@@ -168,6 +177,10 @@ async function main() {
         ownerAKey = a.privateKey;
         const b = await registerOwner(ownerB);
         ownerBToken = b.token;
+        // Read now: owner A is the first owner of the suite's clean database, so the operator, and
+        // its session is signed out everywhere before the owner-key assertion below runs.
+        ownerKeyRemoved = await removedOn(BASE, OWNER_KEY_LOGIN_REMOVED_IN);
+        ownerKeyOn = await ownerKeySignInOn(BASE, ownerAToken);
         // Full access, which is what most agents hold. The point of the assertions below is that
         // '*' does not reach these doors.
         plainAgentToken = await agentToken('plainbot', ['*']);
@@ -371,10 +384,18 @@ async function main() {
             method: 'POST',
             body: JSON.stringify({ owner: ownerA, timestamp: ts, signature: await signMsg(ownerAKey, ownerA + NODE_ID + ts) }),
         });
-        // Refused one of two ways: 401 while the owner-key sign-in is on (the password change replaced
-        // the key), 410 OWNER_KEY_LOGIN_OFF once it is gone (switched off, or any 4.0.0 node).
-        assert(byKey.body.ok !== true && (byKey.status === 401 || (byKey.status === 410 && byKey.body.error?.code === 'OWNER_KEY_LOGIN_OFF')),
+        // Refused one of two ways, chosen by the node's release and setting: 401 AUTH_REQUIRED while the
+        // owner-key sign-in is on (the password change replaced the key), 410 OWNER_KEY_LOGIN_OFF once
+        // it is gone (switched off, or any 4.0.0 node).
+        assert(byKey.body.ok !== true && typeof byKey.body.data?.token !== 'string',
             `the signing key from before the password change must no longer sign in: ${byKey.status} ${byKey.body.error?.code}`);
+        const want = ownerKeyOn ? { status: 401, code: 'AUTH_REQUIRED' } : { status: 410, code: 'OWNER_KEY_LOGIN_OFF' };
+        const state = ownerKeyOn ? 'on (3.x)' : ownerKeyRemoved ? 'removed (4.0.0)' : 'off (3.x)';
+        assert(byKey.status === want.status && byKey.body.error?.code === want.code,
+            `sign-in ${state}: expected ${want.status} ${want.code} for the replaced key, got ${byKey.status} ${byKey.body.error?.code}`);
+        // removed_in is in the 410 of a node at or after the removal, and in no other answer.
+        assert((byKey.body.error?.details?.removed_in === OWNER_KEY_LOGIN_REMOVED_IN) === ownerKeyRemoved,
+            `sign-in ${state}: removed_in ${ownerKeyRemoved ? 'expected' : 'not expected'}, got ${JSON.stringify(byKey.body.error?.details)}`);
         const again = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: ownerA, password: 'TakenOver9876' }) });
         assert(again.body.ok === true, `owner re-auth: ${JSON.stringify(again.body.error)}`);
         ownerAToken = again.body.data.token as string;
