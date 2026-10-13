@@ -21,6 +21,8 @@
  *   WatchedFacts({ spaces, places })
  * @usage html`<${WatchChoice} places=${places} place=${watchPlace} onPlace=${setWatchPlace} watched=${watched} onWatched=${setWatched} />`
  * @version-history
+ *   v1.2.1 — 2026-10-13 — The line about the organism's agent list says when it happens: only where
+ *     the organism admits listed agents alone (views/home/agent-new.js v1.8.1).
  *   v1.2.0 — 2026-10-12 — The page says that the agent is added to the agents of the workspace's
  *     organism, for a draft (in the hint under the spaces) and for a proposal (under what it watches).
  *   v1.1.1 — 2026-10-12 — `onSpaces`: the chosen workspace's record spaces are handed to the page,
@@ -99,7 +101,7 @@ export function WatchChoice({ places, place, onPlace, watched, onWatched, onSpac
   const hint = [
     w('spacesHint', 'It gets one task for each record published there after it has started.'),
     !canBackfill && w('leftAsIs', 'Records that are already there are left as they are.'),
-    w('joins', 'It is added to the agents of this workspace\'s organism, where the members see it.'),
+    w('joins', 'Where the organism admits only the agents on its list, it is added to that list.'),
     w('retire', 'You can retire the agent from this workspace later: open its settings and the Contracts tab. It then stops working on this workspace.'),
   ].filter(Boolean).join(' ');
   const toggle = (namespace) => (on) => onWatched(on ? [...new Set([...(watched ?? []), namespace])] : (watched ?? []).filter((ns) => ns !== namespace));
@@ -161,6 +163,6 @@ export function WatchedFacts({ spaces, places }) {
     const pl = (places ?? []).find((x) => placeValue(x) === key);
     return html`<${FactLine} key=${key} sub=${names.join(', ')}>${pl ? `${decodeEntities(pl.workspace_name)} · ${inOrganism(pl)}` : key}<//>`;
   });
-  // Approving adds the agent to the agents of each organism it watches a workspace in.
-  return html`<${Facts} wide rows=${[{ k: w('watches', 'What it watches'), v: lines, sub: w('joins', 'It is added to the agents of this workspace\'s organism, where the members see it.') }]} />`;
+  // Approving adds the agent to an organism's agent list only where the organism admits listed agents alone.
+  return html`<${Facts} wide rows=${[{ k: w('watches', 'What it watches'), v: lines, sub: w('joins', 'Where the organism admits only the agents on its list, it is added to that list.') }]} />`;
 }

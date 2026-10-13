@@ -12945,7 +12945,7 @@
       "spacesLabel": "Which spaces does it watch?",
       "spacesHint": "It gets one task for each record published there after it has started.",
       "leftAsIs": "Records that are already there are left as they are.",
-      "joins": "It is added to the agents of this workspace's organism, where the members see it.",
+      "joins": "Where the organism admits only the agents on its list, it is added to that list.",
       "backfill": "Also work on the records that are already there",
       "backfillHint": "Records there now: {n}. Each becomes a task and a run of the model, worked ten at a time. Stopping the agent stops it.",
       "backfillNone": "The spaces you ticked hold no published record now.",

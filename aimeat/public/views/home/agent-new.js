@@ -22,6 +22,12 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.8.1 — 2026-10-13 — An agent that works on a workspace's records joins the organism's agent
+ *     list only where the organism admits listed agents alone (joinsAgentList). v1.6.0 listed it in
+ *     every organism, and in one that admits every member's agent a listed agent reaches the
+ *     shared area and no workspace: on aimeat.io that day such an agent read the record it was
+ *     woken for and had every write into the workspace refused. Elsewhere it shows on the
+ *     workspace's contracts and on its own Contracts tab, as before.
  *   v1.8.0 — 2026-10-13 — "Which model it thinks with", before the agent starts: the models the
  *     chosen computer reaches, and the person's pick, which goes with the approval so the first
  *     work already uses it. With no pick the page says the computer uses its own setting and that
@@ -96,10 +102,10 @@ import { timeOfCron } from '/views/profile/scheduler/cron-words.js';
 import {
   draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeMenu, readHomeAgents, offerShown, scopesFor,
 } from '/js/services/agent-draft.js';
-import { namedIn, recordSpacesOf, RECORDS_FEATURE, BACKFILL_FEATURE, llmChoiceOf } from '/js/services/agent-draft-known.js';
+import { namedIn, recordSpacesOf, RECORDS_FEATURE, BACKFILL_FEATURE, llmChoiceOf, joinsAgentList } from '/js/services/agent-draft-known.js';
 import { decodeEntities } from '/js/utils.js';
 import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
-import { activateEngagement, attachAgent } from '/js/services/organisms.js';
+import { activateEngagement, attachAgent, getOrganism } from '/js/services/organisms.js';
 import { WorkplaceChoice } from '/views/home/agent-ties-parts.js';
 import { WatchChoice, WatchedFacts } from '/views/home/agent-watch-parts.js';
 import { machineName } from '/views/home/agents-band.js';
@@ -331,15 +337,18 @@ export default function AgentNewView({ navigate }) {
           seen.add(key);
           await activateEngagement(s.organism_id, s.ws, name).catch((err) => swallowed('agent-new: engagement', err));
         }
-        // It also joins the agents of each organism it watches a workspace in. The organism's
-        // Agents section lists it there, with its contract mark, for every member to see. And an
-        // organism that admits only the agents on that list would refuse it otherwise: the node
-        // would then send it no record and say nothing, and the agent would never work. The
-        // person approving in person is who may add their own agent. One that is already there
-        // answers 409, which is the state wanted.
+        // Where the organism admits only the agents on its list, the agent joins that list: the
+        // node would otherwise send it no record and say nothing, and the agent would never work.
+        // The person approving in person is who may add their own agent, and one that is already
+        // there answers 409, which is the state wanted. In an organism that admits every member's
+        // agent it must stay OFF the list: a listed agent there reaches the shared area and no
+        // workspace, so it could not write into the workspace it watches (joinsAgentList).
         const gaii = out?.agent?.gaii;
         for (const organismId of new Set(spaces.map((s) => s.organism_id))) {
-          if (gaii) await attachAgent(organismId, gaii).catch((err) => swallowed('agent-new: attach to the organism', err));
+          if (!gaii) continue;
+          const organism = await getOrganism(organismId).then((r) => r?.data?.organism ?? null)
+            .catch((err) => { swallowed('agent-new: read the organism', err); return null; });
+          if (joinsAgentList(organism)) await attachAgent(organismId, gaii).catch((err) => swallowed('agent-new: attach to the organism', err));
         }
       }
       navigate(`${HOME}?agent=${encodeURIComponent(name)}&started=${state}${out?.schedule_problem ? '&schedule=failed' : ''}`);

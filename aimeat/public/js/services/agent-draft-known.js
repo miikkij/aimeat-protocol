@@ -31,12 +31,18 @@
  * @structure DEFAULT_TOOL_MENU · clipLine(text, max) · knownBlock(menu, known) · namedIn(crewDef, known) ·
  *   withNeededTools(crewDef, named, offered) · readOnlyTools(crewDef) · extraScopes(crewDef) ·
  *   RECORDS_FEATURE · BACKFILL_FEATURE · recordsBlock(known, features) · watchedPlace(when, known) · recordSpacesOf(crewDef) ·
- *   withRecordSpaces(crewDef, watch) · withSpaceNote(crewDef, watch) · llmChoiceOf(pick, llm) · withToolSkus(crewDef, known)
+ *   withRecordSpaces(crewDef, watch) · withSpaceNote(crewDef, watch) · llmChoiceOf(pick, llm) · withToolSkus(crewDef, known) ·
+ *   joinsAgentList(organism)
  * @usage
  *   const prompt = base + knownBlock(menu, { apps, places }) + recordsBlock({ places }, features);
  *   const named = namedIn(draft.crewDef, { apps, places });
  *   const def = withRecordSpaces(draft.crewDef, { organism_id, workspace_id, spaces: ['shared.requests'] });
  * @version-history
+ *   v1.7.0 — 2026-10-13 — joinsAgentList(): an agent that works on a workspace's records goes onto
+ *     its organism's agent list only where the organism admits listed agents alone. In any other
+ *     organism the list took the workspace away from it (seen on aimeat.io 2026-10-13).
+ *     extraScopes(): an agent that calls an app tool is proposed with organism:read as well,
+ *     because the tool's extension reads the app's workspace as the agent (same day, same run).
  *   v1.6.0 — 2026-10-13 — withToolSkus(): a tool address without its prefix, and the prompt's open
  *     form with the tool named beside it, become the tool's full address, per task.
  *   v1.5.0 — 2026-10-13 — llmChoiceOf(): the model choice the node stores, built from the pick on the
@@ -350,11 +356,19 @@ export function readOnlyTools(crewDef) {
  *   with a Deprecation header before node 4.0.0 and refuses it from 4.0.0
  *   (auth/rest-scope-gate.ts). Without the word here, an agent that calls its owner's app tool
  *   stops working on the day the node becomes 4.0.0.
+ * - Calling an app tool also asks organism:read. An app keeps its data in a workspace, and its
+ *   tool's extension reads that workspace AS THE CALLER (`ctx.workspace`, the same check as the
+ *   workspace tools), so the agent is the one the read is decided for. Seen on aimeat.io on
+ *   2026-10-13: an agent of the "reads only" reach, built on one app tool, had every call
+ *   answered "the workspace is not one you can read". The "reads and writes" reach carries the
+ *   word already. What a tool WRITES into a workspace still needs that reach: the page cannot
+ *   tell a tool that writes from one that reads.
  */
 export function extraScopes(crewDef) {
+  const callsAppTool = anyMemberHas(crewDef, ['app_tools']);
   return [
-    ...(anyMemberHas(crewDef, ['workspace', 'workspace_write']) || recordSpacesOf(crewDef).length > 0 ? ['organism:read'] : []),
-    ...(anyMemberHas(crewDef, ['app_tools']) ? ['ext:invoke'] : []),
+    ...(anyMemberHas(crewDef, ['workspace', 'workspace_write']) || recordSpacesOf(crewDef).length > 0 || callsAppTool ? ['organism:read'] : []),
+    ...(callsAppTool ? ['ext:invoke'] : []),
   ];
 }
 
@@ -553,6 +567,26 @@ export function withBrowserSites(crewDef) {
     agents: agents.map((m) => (Array.isArray(m?.tools) && m.tools.includes(BROWSER_TOOL)
       ? { ...m, tools: m.tools.filter((x) => x !== BROWSER_TOOL) } : m)),
   };
+}
+
+/**
+ * Whether an agent that works on a workspace's records goes onto its organism's agent list
+ * (`agentGaiis`). `organism` is the organism as GET /v1/organisms/:id answers it.
+ *
+ * The list means two different things (services/organism-agent-access.ts). In an organism that
+ * admits only listed agents it is how a member's agent gets in, and a listed agent acts with its
+ * owner's rights: the agent must be on it. In an organism that admits every member's agent (the
+ * node leaves `agentAccess` out for it) a listed agent is an organism-level participant, which
+ * reaches the organism's shared area and no workspace: the agent must NOT be on it. Measured on
+ * aimeat.io on 2026-10-13: an agent the page had listed in such an organism read the meeting note
+ * it was woken for, and every record it wrote into that workspace was refused (ACCESS_DENIED);
+ * taken off the list, the same agent wrote them.
+ *
+ * An organism that could not be read counts as "no": a wrong yes stops the agent's work, and a
+ * wrong no leaves a refusal whose message names the list and who can add the agent to it.
+ */
+export function joinsAgentList(organism) {
+  return !!organism && typeof organism === 'object' && organism.agentAccess === 'listed';
 }
 
 /**
