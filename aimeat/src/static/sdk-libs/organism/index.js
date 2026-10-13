@@ -13,6 +13,10 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   const ws = await AIMEAT.organism.read(orgId, wsId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.6.0 — 2026-10-13 — nameExtensions(orgId, wsId, space, entries) over
+ *     POST /v1/organisms/:id/workspace/spaces/:space/extensions: an app names its own extension on a
+ *     space of a workspace it built earlier. The list of a space that names extensions is otherwise
+ *     changed only by the person or by an agent holding organism:direct (Jouni, 2026-10-13).
  *   v1.5.0 — 2026-10-02 — invitations and cancelInvitation (members.js) over the email-invitation
  *     list and cancel routes; remember/recall take the private choice, and rememberList/recallList
  *     keep several workspaces per app (first-run.js).
@@ -283,6 +287,37 @@ var organism = {
       body: JSON.stringify({ name: name, manifest: m, schemas: sc, readme: readme }),
     });
     if (res.ok === false) throw fail(res, 'Failed to create workspace');
+    return res.data !== undefined ? res.data : res;
+  },
+
+  /**
+   * Name extensions of the signed-in person's own account on one space of an existing workspace:
+   * each entry is added to that space's `extensions` in the workspace manifest. It adds only. An
+   * entry already in the list is not an error, and nothing is removed.
+   *
+   * On a memory-backed space (records or documents) the first entry closes the space to agents:
+   * an agent's write is then accepted only through an action of a named extension, which is how an
+   * app keeps its own checks on what agents write. On a row space an entry lets that extension
+   * append and read rows. The app itself, and the person, keep writing the space directly.
+   *
+   * Needs the organism:write app scope, and the person must be the workspace's creator or a
+   * creator or admin of the organism. Each entry is `installer/name` of an extension that the
+   * person's own account installed on this node. One entry that is not refuses the whole call
+   * (`err.code === 'INVALID_INPUT'`, and `err.message` names the entry), and nothing is written.
+   *
+   * @param {string} orgId The organism id.
+   * @param {string} wsId The workspace id.
+   * @param {string} space The space's name or its namespace.
+   * @param {string[]} entries 1 to 5 extensions, each written `installer/name`.
+   * @returns {Promise<{ ws: string, space: { name: string, namespace: string, backing: string, extensions: string[] },
+   *   added: string[], already: string[], fenced: boolean }>} The space with its whole list after the call.
+   */
+  async nameExtensions(orgId, wsId, space, entries) {
+    var res = await authFetch('/v1/organisms/' + encodeURIComponent(orgId) + '/workspace/spaces/' + encodeURIComponent(space)
+      + '/extensions?ws=' + encodeURIComponent(wsId), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ add: entries }),
+    });
+    if (res.ok === false) throw fail(res, 'Failed to name the extensions on the space');
     return res.data !== undefined ? res.data : res;
   },
 

@@ -52,6 +52,10 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.6.1 — 2026-10-13 — The capability hands the caller's scopes to the fenced-space rule on every
+ *     operation: a session that covers organism:direct writes a record space that names extensions
+ *     directly, also through an extension the space does not name (ruled by the developer on
+ *     2026-10-13).
  *   v1.6.0 — 2026-10-13 — Every operation the capability makes (write, writeDoc, publish,
  *     publishRecords, deleteRecords, archiveRecords) carries the extension's marker,
  *     `installer/name`: a record space that names extensions takes an agent's write only through
@@ -150,8 +154,12 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
     // from the action's input, and in the form the row service compares (row-service.ts
     // authorizeExtension). It opens nothing by itself: the caller's membership, grant and scopes
     // are asked exactly as before.
+    // The caller's scopes ride along for the same rule: a session that covers organism:direct
+    // writes such a space directly, whichever extension its call arrives through. They are the
+    // token's own words (routes/extensions/actions.ts hands them over), and the provenance rule
+    // that also reads them is not asked here, because every write below carries the node's stamp.
     const through = extensionMarker(deps.installer, extName);
-    const opsCaller: WorkspaceOpsCaller = workspaceCallerOf({ principal: caller.gaii, ownerName: caller.owner, roles: caller.roles, extension: through }, config);
+    const opsCaller: WorkspaceOpsCaller = workspaceCallerOf({ principal: caller.gaii, ownerName: caller.owner, roles: caller.roles, scopes: caller.scopes, extension: through }, config);
     // The classification reader of the caller who invoked the action (TARGET-082).
     const reader = readerForCaller({ storage, config }, caller);
     let last: ExtensionWorkspaceRefusal | null = null;
@@ -251,7 +259,7 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
             // asks it after its own checks and before the first record is archived, so an extension
             // the space does not name archives none of its records for an agent.
             const r = await archiveRecordsBatchOp(storage, { principal: caller.gaii, ownerName: caller.owner }, { organismId, ws, namespace, ids },
-                keys => fencedSpaceRefusal(ops, { principal: caller.gaii, roles: caller.roles, extension: through }, organismId, ws, { keys }));
+                keys => fencedSpaceRefusal(ops, { principal: caller.gaii, roles: caller.roles, scopes: caller.scopes, extension: through }, organismId, ws, { keys }));
             if (r.ok) emitChange('organisms');
             return settle(r);
         },

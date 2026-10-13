@@ -22,6 +22,9 @@
  *     meta.* admin-role gates still apply).
  *   v2.0.0 -- 2026-08-11 -- The rule moves to services/organism-namespace-access.ts so every door gets
  *     it. This file keeps its behaviour and becomes the Express half of it.
+ *   v2.1.0 -- 2026-10-13 -- The caller carries the session's scopes, which the fenced-space rule reads
+ *     (a session that covers organism:direct writes a record space that names extensions directly,
+ *     ruled by the developer on 2026-10-13), and a refusal is sent with its details.
  */
 import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -49,14 +52,20 @@ export function workspaceAccessMiddleware(
     const key = (req.params as Record<string, string>).key;
     if (!key || !key.startsWith('organism.')) return next();
 
+    // The session's scopes ride along for the fenced-space rule (services/fenced-space.ts): a session
+    // that covers organism:direct writes a record space that names extensions directly. No value is
+    // handed over here, because this runs before the route has validated one: a PUT, PATCH, DELETE
+    // or restore of a workspace's manifest record is therefore read as the removal of every fence,
+    // and is refused to a caller that may not change one.
     const refusal = await checkOrganismNamespaceAccess({ storage, config }, {
       principal: req.auth?.sub ?? '',
       owner: (req.auth?.owner as string) ?? '',
       roles: req.auth?.roles ?? [],
+      scopes: req.auth?.scopes ?? [],
     }, key, ['GET', 'HEAD'].includes(req.method) ? 'read' : 'write');
 
     if (refusal) {
-      res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
+      res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message, refusal.status, refusal.details));
       return;
     }
     next();

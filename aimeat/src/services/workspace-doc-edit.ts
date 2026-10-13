@@ -34,6 +34,9 @@
  *   const res = await appendToDocument({ storage, config }, caller,
  *     { organismId, wsId, space: 'notes', id: 'doc-x', markdown: '## Found\n\n…' });
  * @version-history
+ *   v1.4.0 — 2026-10-13 — The caller carries the session's scopes, and the organism namespace rule
+ *     is asked with them: a session that covers organism:direct edits a document of a space that
+ *     names extensions directly (services/fenced-space.ts, ruled by the developer on 2026-10-13).
  *   v1.3.0 — 2026-10-08 — The edit's record comes from provenanceForDocEdit
  *     (services/workspace-doc-provenance.ts): an edit that mixes a person's text with a model's is
  *     `assisted`, derived from the previous record, where an agent's one-line append had labelled a
@@ -104,6 +107,10 @@ export interface DocEditCaller {
     principal: string;
     owner: string;
     roles: string[];
+    /** The session's scope words. The fenced-space rule reads them through the organism namespace
+     *  rule: a session that covers organism:direct edits a document of a space that names
+     *  extensions directly (services/fenced-space.ts). Absent reads as not holding the word. */
+    scopes?: readonly string[];
 }
 
 export interface DocEditResult {
@@ -227,7 +234,7 @@ async function editDocument(
         // manifest content, so a caller who may not write this workspace is refused for THAT first,
         // with the key the access rule would read for any content space here.
         const denied = await checkOrganismNamespaceAccess(deps,
-            { principal: caller.principal, owner: caller.owner, roles: caller.roles }, `${root}.probe`, 'write');
+            { principal: caller.principal, owner: caller.owner, roles: caller.roles, scopes: caller.scopes }, `${root}.probe`, 'write');
         if (denied) throw new WorkspaceDocError(denied.code, denied.status, denied.message);
         throw new WorkspaceDocError(space.refusal.code, space.refusal.status, space.refusal.message, space.refusal.details);
     }
@@ -243,7 +250,7 @@ async function editDocument(
     // 2. May this caller write here? The one rule the HTTP memory door answers to, asked with the
     //    key that is actually about to be written rather than with a stand-in.
     const refusal = await checkOrganismNamespaceAccess(deps,
-        { principal: caller.principal, owner: caller.owner, roles: caller.roles }, draftKey, 'write');
+        { principal: caller.principal, owner: caller.owner, roles: caller.roles, scopes: caller.scopes }, draftKey, 'write');
     if (refusal) throw new WorkspaceDocError(refusal.code, refusal.status, refusal.message);
 
     // 3. Archived is read-only, and it means it on every surface.

@@ -6,6 +6,9 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-10-13 — POST /publish, POST /revert and the suggestion decision hand the session's
+ *     scopes to the fenced-space rule: a session that covers organism:direct publishes and reopens
+ *     a record of a space that names extensions directly (ruled by the developer on 2026-10-13).
  *   v1.6.0 — 2026-10-13 — POST /publish and POST /revert ask the fenced-space rule
  *     (services/fenced-space.ts) before the publish gate files an approval and before any write: a
  *     record space that names extensions takes an agent's publish or reopen only through one of
@@ -78,6 +81,8 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   /** The session as the suggestion service takes it: its full identity, owner and roles. */
   const suggestionCaller = (req: Request) => ({
     principal: resolveIdentity(req.auth!, config.nodeId), owner: (req.auth!.owner as string) ?? '', roles: req.auth!.roles ?? [],
+    // The fenced-space rule reads the session's scopes when an approval writes the manifest.
+    scopes: req.auth!.scopes ?? [],
   });
   /** The shared UNDECLARED_SPACE refusal (services/workspace-write-items.ts), sent as it comes. */
   const sendRefusal = (res: Response, r: UndeclaredSpaceRefusal): void => {
@@ -92,7 +97,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   const refusedByFence = async (req: Request, res: Response, orgId: string, wsId: string | undefined, namespace: string, instance: string): Promise<boolean> => {
     if (!wsId) return false;
     const who = callerOf(req, config.nodeId, storage);
-    const fenced = await fencedSpaceRefusal({ storage, config }, { principal: who.principal, roles: who.roles },
+    const fenced = await fencedSpaceRefusal({ storage, config }, { principal: who.principal, roles: who.roles, scopes: who.scopes },
       orgId, wsId, { key: `organism.${orgId}.w.${wsId}.${namespace}.${instance}.latest` });
     if (!fenced) return false;
     res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));

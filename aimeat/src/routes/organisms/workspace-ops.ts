@@ -7,6 +7,11 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.18.0 -- 2026-10-13 -- PUT /v1/organisms/:id/workspace hands the session to updateWorkspaceMeta,
+ *     which refuses a change to the list of extensions of a space an app closed to agents unless the
+ *     account holder makes it in person or the session covers organism:direct (403 ACCESS_DENIED,
+ *     details.reason FENCE_CHANGE, nothing written); POST .../workspace/records/delete hands the
+ *     session's scopes to the fenced-space rule (services/fenced-space.ts, ruled 2026-10-13).
  *   v1.17.0 -- 2026-10-13 -- GET .../workspace/public/records?format=ics serves one shared records
  *     space as a calendar feed, and PUT .../workspace/share { ics_key } makes or clears the feed key
  *     that opens that format for a share with a password or an account (services/calendar-feed.ts).
@@ -348,9 +353,14 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const wsGuard = await isKeyArchived(storage, `organism.${id}.w.${ws}.`);
     if (wsGuard.archived) { res.status(409).json(error(config.nodeId, 'ARCHIVED', `This ${wsGuard.level} is archived (read-only). Unarchive it before editing.`)); return; }
     try {
+      // The session rides along: a change to the list of extensions of a space an app closed to
+      // agents is the account holder's in person, or a session's that covers organism:direct
+      // (services/fenced-space.ts). The service compares the manifest and refuses before any write.
+      const who = callerOf(req, config.nodeId, storage);
       const result = await updateWorkspaceMeta(storage, config, {
         orgId: id, ws, callerOwner: req.auth!.owner as string,
         isAdmin: role === 'admin' || role === 'creator',
+        caller: { principal: who.principal, roles: who.roles, scopes: who.scopes },
         name: req.body?.name, readme: req.body?.readme,
         addObjectTypes: Array.isArray(req.body?.add_object_types) ? req.body.add_object_types : (Array.isArray(req.body?.add_spaces) ? req.body.add_spaces : undefined),
         manifest: req.body?.manifest, schemas: req.body?.schemas,
@@ -363,8 +373,8 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       void updateOrganismStructure(storage, config, id, { event: 'workspace updated', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(err => { logger.warn('PUT /v1/organisms/:id/workspace: best-effort', { error: String(err) }); });
     } catch (e) {
       if (e instanceof WorkspaceMetaError) {
-        const status = e.code === 'WS_NOT_FOUND' ? 404 : e.code === 'NOT_CREATOR' ? 403 : 400;
-        res.status(status).json(error(config.nodeId, e.code, e.message));
+        const status = e.code === 'WS_NOT_FOUND' ? 404 : e.code === 'NOT_CREATOR' || e.code === 'ACCESS_DENIED' ? 403 : 400;
+        res.status(status).json(error(config.nodeId, e.code, e.message, status, e.details));
         return;
       }
       res.status(500).json(error(config.nodeId, 'UPDATE_FAILED', (e as Error).message || 'Could not update the workspace'));
@@ -715,7 +725,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (who.visitor) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'A session from another node is not a member of this organism.')); return; }
     const body = req.body ?? {};
     const r = await deleteRecordsBatchOp({ storage, config },
-      workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles] }, config), {
+      workspaceCallerOf({ principal: who.principal, ownerName: who.owner, roles: [...who.roles], scopes: who.scopes }, config), {
         organismId: req.params.id as string,
         ws: typeof body.ws === 'string' && body.ws ? body.ws : undefined,
         namespace: body.namespace,

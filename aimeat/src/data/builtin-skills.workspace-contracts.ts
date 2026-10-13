@@ -30,6 +30,9 @@
  * @structure WORKSPACE_CONTRACTS_SKILL_ENTRY
  * @usage import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
  * @version-history
+ *   v1.1.1 — 2026-10-14 — Section 3: a replacement manifest that changes the list of a space an app
+ *     closed to agents is refused unless the person sends it in person or the session holds
+ *     organism:direct (services/fenced-space.ts fenceChangeRefusal).
  *   v1.1.0 — 2026-10-12 — Section 10: the node does not send workspace.record to an agent whose
  *     engagements in the workspace are all retired (services/connect-tunnel-push.ts).
  *   v1.0.0 — 2026-10-11 — From docs/agent-workspace-contracts.md, corrected against the code.
@@ -129,7 +132,11 @@ Changing a workspace's structure is the creator's right:
    answers \`skipped: true\` and makes no version.
 
 \`add_spaces\` can only add. To rename or remove a space, or to change the publish gate, the creator
-sends a whole replacement \`manifest\`.
+sends a whole replacement \`manifest\`. One part of a replacement is not every caller's to change: a
+record space that names extensions (\`extensions: ["<installer>/<name>"]\`, a space an app closed to
+agents). Changing or removing that list, removing the space, or moving it to another namespace is
+refused (\`ACCESS_DENIED\`, details \`reason: "FENCE_CHANGE"\`) unless the person sends it in person or
+your session holds the permission \`organism:direct\`. Send those spaces back as you read them.
 
 ## 4. The work, one request at a time
 

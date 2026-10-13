@@ -39320,6 +39320,12 @@ paths:
           description: >
             Not the workspace creator (or an org admin). A member adds a space with
             POST .../workspace/spaces and changes sections with PUT .../workspace/sections/{space}.
+            Also ACCESS_DENIED, with `details.reason: FENCE_CHANGE` and the spaces the change
+            touches, when a `manifest` changes the `extensions` of a memory-backed space that names
+            some, removes that object type, or moves its namespace or backing, and the caller is
+            neither the account holder in person nor an agent whose session holds `organism:direct`.
+            Nothing is written. An app adds its own extension to such a list with
+            POST .../workspace/spaces/{space}/extensions.
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -39370,6 +39376,84 @@ paths:
         '404': { description: No such organism or workspace }
         '409': { description: The workspace is archived, or it has no structure yet }
         '429': { description: The member already has 20 space suggestions waiting in this workspace }
+
+  /v1/organisms/{id}/workspace/spaces/{space}/extensions:
+    post:
+      operationId: nameWorkspaceSpaceExtensions
+      summary: Name an installed extension of your own account on one space of a workspace
+      description: |
+        Adds 1 to 5 entries, each written `installer/name`, to the `extensions` of one object type
+        in the workspace manifest, and answers the space with its whole list. It adds only: an entry
+        already in the list is not an error, and this route removes nothing.
+
+        What the list does depends on the space. On a memory-backed space the first entry closes the
+        space to callers that are not a person: an agent's write is then accepted only through an
+        action of a named extension, and a further entry lets one more extension write it. On a row
+        space an entry lets that extension append and read rows. A space that points at the task
+        system holds no records and is refused.
+
+        Who may call it: the session needs `organism:write`, and it is the account holder in
+        person, a hosted app the account holder signed in to, or an agent whose session holds
+        `organism:direct`. The caller's account is the workspace's creator, or a creator or admin of
+        the organism (the test PUT /v1/organisms/{id}/workspace makes).
+
+        Which entries: each names an extension installed on this node whose installer is the
+        caller's own account. One entry that names another account's extension, or an extension
+        that is not installed, refuses the whole call and nothing is written.
+
+        The list of a space that names extensions is otherwise changed only by the account holder
+        in person or by an agent holding `organism:direct`: PUT /v1/organisms/{id}/workspace and the
+        `aimeat_workspace_update` MCP tool answer 403 ACCESS_DENIED to any other caller whose change
+        touches such a list, removes the object type, or moves its namespace or backing.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: "The object type's name or its namespace" }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [add]
+              properties:
+                add:
+                  type: array
+                  minItems: 1
+                  maxItems: 5
+                  items: { type: string, description: "`installer/name` of an extension the caller's own account installed" }
+                  description: The extensions to add to the space's list.
+      responses:
+        '200':
+          description: The space with its list after the call.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ws: { type: string }
+                          space:
+                            type: object
+                            properties:
+                              name: { type: string }
+                              namespace: { type: string }
+                              backing: { type: string, enum: [memory, rows] }
+                              extensions: { type: array, items: { type: string }, description: "Every entry the space names now, `installer/name`" }
+                          added: { type: array, items: { type: string }, description: The entries this call added }
+                          already: { type: array, items: { type: string }, description: The entries that were in the list before }
+                          fenced: { type: boolean, description: "True for a memory-backed space that names an extension: it takes the write of a caller that is not a person only through its list" }
+        '400': { description: "No `ws` (WS_REQUIRED); or INVALID_INPUT: `add` is not a list of 1 to 5 entries, an entry is not `installer/name`, an entry names another account's extension or one that is not installed (the message names the entry), or the space points at the task system" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "SCOPE_DENIED without `organism:write`; ACCESS_DENIED for an agent without `organism:direct`, an ecosystem app, a session from another node, an account that is not an active member, or a member who is neither the workspace's creator nor an organism admin" }
+        '404': { description: No such organism, workspace or space }
+        '409': { description: "The workspace is archived (ARCHIVED), it has no structure yet (NO_STRUCTURE), or the space's `extensions` value is not a list (INVALID_STATE)" }
 
   /v1/organisms/{id}/workspace/sections/{space}:
     put:

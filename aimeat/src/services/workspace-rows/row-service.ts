@@ -28,6 +28,9 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   v1.7.0 — 2026-10-13 — RowCaller carries the session's scopes and the member path hands them to
+ *     the organism namespace rule, where the fenced-space rule reads them (a session that covers
+ *     organism:direct writes under a record space that names extensions; ruled 2026-10-13).
  *   v1.6.0 — 2026-10-13 — appendRows emits one `rowsAppended` event per call (event-bus.ts), which
  *     a workflow's `workspace.rows` trigger starts from.
  *   v1.5.0 — 2026-10-08 — authorizeExtension + gate(): an extension caller (ctx.workspace.appendRows,
@@ -90,6 +93,12 @@ export interface RowCaller {
    * services/extension-workspace.ts, never from a request, and `owner` is then the installer.
    */
   extension?: string;
+  /**
+   * The session's scope words, for the member path's access rule: the fenced-space rule
+   * (services/fenced-space.ts) reads them when a row space lies under the namespace of a record
+   * space that names extensions. Absent for an extension's row call, which holds no session.
+   */
+  scopes?: readonly string[];
 }
 
 export interface RowServiceDeps {
@@ -132,7 +141,7 @@ async function authorize(
 ): Promise<void> {
   const refusal = await checkOrganismNamespaceAccess(
     deps,
-    { principal: caller.principal, owner: caller.owner, roles: caller.roles },
+    { principal: caller.principal, owner: caller.owner, roles: caller.roles, scopes: caller.scopes },
     gateKey(organismId, wsId, namespace), mode,
   );
   if (refusal) throw new WorkspaceRowError(refusal.code, refusal.status, refusal.message);

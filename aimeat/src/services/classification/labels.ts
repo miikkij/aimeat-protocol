@@ -44,6 +44,9 @@
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.8.2 — 2026-10-13 — The organism namespace rule is asked with the actor's scopes, which the
+ *     fenced-space rule reads (services/fenced-space.ts; a session that covers organism:direct
+ *     writes a record space that names extensions directly, ruled 2026-10-13).
  *   v1.8.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.8.0 — 2026-10-05 — A file shared into an organism workspace takes the organism's
@@ -338,7 +341,9 @@ async function assertMayLabel(deps: ClassificationDeps, actor: LabelActor, targe
     const read = await decideWorkspaceRead(deps.storage, config, organism, accessId, actor.ownerName, accessId, ws);
     if (!read.canRead && !read.manager) throw new ClassificationError('NOT_FOUND', 404, NOT_A_READER);
   }
-  const caller = { principal: accessId, owner: actor.ownerName, roles };
+  // The credential's words ride along: the fenced-space rule reads them for a write-mode check on a
+  // record of a space that names extensions (services/fenced-space.ts).
+  const caller = { principal: accessId, owner: actor.ownerName, roles, scopes: actor.scopes };
   if ((!ws || mode === 'write') && await checkOrganismNamespaceAccess({ storage: deps.storage, config }, caller, key, mode)) {
     throw new ClassificationError('NOT_FOUND', 404, NOT_A_READER);
   }

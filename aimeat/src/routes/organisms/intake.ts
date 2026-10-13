@@ -19,6 +19,10 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   v1.7.1 — 2026-10-13 — A comment only: why defining a form does not hand the session's scopes to
+ *     the fenced-space rule, although every other code path does since the permission
+ *     organism:direct (ruled 2026-10-13). A submission holds no session, so a form an agent defined
+ *     on that word would take no message.
  *   v1.7.0 — 2026-10-13 — The fenced-space rule (services/fenced-space.ts): an agent, an ecosystem
  *     app or a visitor defining a form onto a record space that names extensions is refused 403
  *     ACCESS_DENIED, and a submission to a stored form whose owner identity is not a person's is
@@ -205,6 +209,11 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     // through one of them (services/fenced-space.ts), so a form defined by an agent onto such a
     // space would be a write path past the app's own tool: the definition is refused. A person and
     // a hosted app define one as before.
+    // The session's scopes are NOT handed over, on purpose: the permission organism:direct is a
+    // session's, and a submission holds no session. A form an agent defines is stored under the
+    // agent's own identity (requireWsOwner answers resolveIdentity), and every submission to it is
+    // decided on that identity's shape, which refuses an agent. Admitting the definition on the
+    // word would store a form that takes no message. The person, or their app, defines the form.
     for (const written of [namespace, ...(thread ? [thread.signalNamespace] : [])]) {
       const fenced = await fencedFormRefusal({ storage, config }, ownerGhii, callerOf(req, config.nodeId, storage).roles, org, ws, written);
       if (fenced) { res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details)); return; }

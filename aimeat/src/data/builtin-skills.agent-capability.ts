@@ -33,6 +33,11 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.7.0 — 2026-10-14 — "What an app tool is": the permission organism:direct lets one agent
+ *     write a closed space directly, the list of a closed space is changed only by the person in
+ *     person or by such an agent, and an app names its extension on an existing workspace's space
+ *     through POST …/workspace/spaces/{space}/extensions (services/fenced-space.ts v1.1.0,
+ *     services/workspace-space-extensions.ts).
  *   v1.6.0 — 2026-10-13 — "What an app tool is": a record space that names extensions takes an
  *     agent's write only through one of them (services/organism-namespace-access.ts), and what the
  *     app's builder writes in the workspace's structure for it. Ruled by Jouni after an agent
@@ -139,6 +144,22 @@ the app's own page still write directly. A list with no valid entry closes the s
 agent. Say in the space's \`description\` which tool writes it: the home's new-agent page shows
 that sentence beside the space, writes it into the agent's tasks, and gives an agent that watches
 such a workspace the tool that calls app tools.
+
+The owner can let one agent through: the permission \`organism:direct\` (the agent editor's
+organism row; full access \`*\` covers it, the read-only and read-and-write presets do not hold
+it). An agent whose session holds it writes a closed space directly, and it may change the list.
+Nobody else changes a list that is there: a change to the workspace's structure that alters or
+removes the list of a closed space, or moves that space to another namespace or backing, is
+refused (\`ACCESS_DENIED\`, details \`reason: "FENCE_CHANGE"\`) unless the person makes it in person
+or the agent holds the permission. That holds for the structure record itself too, whichever
+memory route or tool names it.
+
+A workspace that existed before the app had its extension gets the list from the app's own page:
+\`POST /v1/organisms/{id}/workspace/spaces/{space}/extensions?ws=<workspace>\` with
+\`{ "add": ["<installer>/<extension name>"] }\`, or \`AIMEAT.organism.nameExtensions\`. It adds and
+never removes, takes one to five entries, and takes only extensions the caller's own account
+installed on this node. The person in person, the app the person signed in to, or an agent with
+\`organism:direct\` may call it, as the workspace's creator or an admin of the organism.
 
 ## What the extension behind a tool can do
 

@@ -30,6 +30,11 @@
  *   const standing = await workspaceStanding(deps, caller, orgId, ws);
  *   if (isRefusal(standing)) return standing;
  * @version-history
+ *   v1.1.0 — 2026-10-13 — ChangeCaller carries the session's scopes, and applySpaces takes the
+ *     caller and compares the manifest before and after with fenceChangeRefusal
+ *     (services/fenced-space.ts) before it locks a schema or writes: every code path that writes a
+ *     manifest makes that comparison since the list of a fenced space became protected (ruled by the
+ *     developer on 2026-10-13).
  *   2026-09-28 — An agent listed by an organism that admits only listed agents is a member's agent here, not an attached participant.
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  */
@@ -45,9 +50,14 @@ import { isPlatformWorkspaceNamespace } from './workspace-write-items.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { readStoredSections, type Section } from './workspace-sections.js';
 import { attachedAsParticipant } from './organism-agent-access.js';
+import { fenceChangeRefusal } from './fenced-space.js';
 
-/** Who is asking, in the terms the rules decide on. `principal` is the full identity (GHII or GAII). */
-export interface ChangeCaller { principal: string; owner: string; roles: string[] }
+/**
+ * Who is asking, in the terms the rules decide on. `principal` is the full identity (GHII or GAII).
+ * `scopes` are the session's scope words: the fenced-space rule reads them when a change writes the
+ * manifest (services/fenced-space.ts). A caller built without them is read as holding none.
+ */
+export interface ChangeCaller { principal: string; owner: string; roles: string[]; scopes?: readonly string[] }
 
 /** What every function here needs. `now` is the clock, so a test can move it. */
 export interface ChangeDeps { storage: Storage; config: AimeatConfig; now?: () => Date }
@@ -203,13 +213,19 @@ export async function newSpacesOf(
  * whose name or namespace already exists are skipped, so running the same change twice adds nothing
  * the second time. A schema is locked only where no lock exists yet. `stamp` goes on every space this
  * adds: who added it, when, and who approved it when it came through a suggestion.
+ *
+ * `caller` is the session whose request writes the manifest: the member on the direct path, the
+ * approver on the suggestion path. The manifest is compared before and after with the fenced-space
+ * rule's fenceChangeRefusal, as every code path that writes a manifest does. The union joins object
+ * types and changes none, so the comparison refuses nothing today; it holds if the union ever does
+ * more.
  */
 export async function applySpaces(
     deps: ChangeDeps, standing: WorkspaceStanding,
-    args: { orgId: string; ws: string; request: SpaceRequest; stamp: Record<string, unknown> },
+    args: { orgId: string; ws: string; request: SpaceRequest; stamp: Record<string, unknown>; caller: ChangeCaller },
 ): Promise<{ added: string[]; skipped: string[] } | ChangeRefusal> {
     const { storage, config } = deps;
-    const { orgId, ws, request, stamp } = args;
+    const { orgId, ws, request, stamp, caller } = args;
     const root = wsRoot(orgId, ws);
     const man = await readWorkspaceMetaRecord(storage, orgId, ws, 'meta.manifest', config.nodeId);
     const value = man?.value && typeof man.value === 'object' && !Array.isArray(man.value) ? man.value as Record<string, unknown> : null;
@@ -225,6 +241,9 @@ export async function applySpaces(
     }
     if (!union.added.length) return { added: [], skipped: union.skipped };
     const manifestValue: Record<string, unknown> = { ...value, objectTypes: union.objectTypes, id: orgId, status: (value.status as string) || 'active' };
+    // Before the schema locks and the write below, so a refused change writes nothing.
+    const changed = fenceChangeRefusal(value, manifestValue, { principal: caller.principal, roles: caller.roles, scopes: caller.scopes });
+    if (changed) return refusal(changed.status, changed.code, changed.message, changed.details);
     const valid = await validateMemoryWrite(`${root}.meta.manifest`, manifestValue, storage);
     if (!valid.valid) return refusal(422, 'INVALID_SPACE', 'The workspace structure would not be valid with this space: ' + JSON.stringify(valid.errors), { violations: valid.errors });
     const now = nowOf(deps).toISOString();

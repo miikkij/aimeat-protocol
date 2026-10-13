@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.11.1 — 2026-10-13 — The organism namespace rule is asked with the caller's scopes, which the
+ *     fenced-space rule reads (a session that covers organism:direct writes directly; ruled 2026-10-13).
  *   v1.11.0 — 2026-10-13 — The draft write, the publish, the batch publish (direct values and draft
  *     ids) and the batch delete ask the fenced-space rule (services/fenced-space.ts) with each
  *     record's real key before anything is validated or written: a record space that names
@@ -333,7 +335,7 @@ export async function writeWorkspaceDraftsOp(
     const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
     // The rule is services/organism-namespace-access.ts, the one the HTTP door answers to.
     const writeRefusal = await checkOrganismNamespaceAccess({ storage, config },
-        { principal: caller.principal, owner: caller.ownerName, roles: caller.roles }, `${wsRoot(organismId, ws)}.probe`, 'write');
+        { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes }, `${wsRoot(organismId, ws)}.probe`, 'write');
     if (writeRefusal) return refuse(403, 'ACCESS_DENIED', 'You are not approved to write to this workspace. Request access with aimeat_workspace_access(action:"request") and wait for the creator to approve.');
     const norm = normalizeWriteItems({ space: args.space, value: args.value, id: args.id, section: args.section, items: args.items });
     if ('error' in norm) return refuse(400, 'INVALID_INPUT', norm.error);
@@ -589,7 +591,7 @@ export async function publishRecordsBatchOp(
     const firstId = useRecords ? (list.find(r => typeof (r as { id?: unknown } | null)?.id === 'string') as { id: string } | undefined)?.id : undefined;
     if (firstId) {
         const access = await checkOrganismNamespaceAccess({ storage, config },
-            { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, extension: caller.extension },
+            { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes, extension: caller.extension },
             `${rootOf(organismId, ws)}.${namespace}.${firstId}`, 'write');
         if (access) return refuse(access.status, access.code, access.message, access.details);
     }

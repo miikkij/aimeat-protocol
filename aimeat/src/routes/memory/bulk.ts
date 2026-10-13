@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-13 — Import, copy and bulk-delete hand the session's scopes to the fenced-space
+ *     rule, and import hands it each entry's value: a session that covers organism:direct writes a
+ *     record space that names extensions directly, and a write or removal of a workspace's manifest
+ *     record that changes a fenced space's list is refused to an agent without that word (ruled by
+ *     the developer on 2026-10-13).
  *   v1.13.0 — 2026-10-13 — bulk-delete asks the fenced-space rule (services/fenced-space.ts) for the
  *     `organism.` keys it would remove and refuses the whole request before the first delete: a
  *     record space that names extensions takes an agent's delete only through one of them (ruled by
@@ -72,7 +77,7 @@ import { leaveMemories, carryLabelToCopy, CopyLabelError } from '../../services/
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
-import { fencedKeysRefusal } from '../../services/fenced-space.js';
+import { fencedKeysRefusal, type ManifestWrite } from '../../services/fenced-space.js';
 import { callerOf } from '../../middleware/caller.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
@@ -96,11 +101,16 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
    * The organism rule (services/organism-namespace-access.ts) for a key this file writes under
    * `principal`, the identity the record lands under, as services/memory-write.ts asks it for
    * POST /v1/memory and the MCP write. Null for a key outside `organism.`.
+   *
+   * The session's scopes and `write` ride along for the fenced-space rule (services/fenced-space.ts):
+   * a session that covers organism:direct writes a record space that names extensions directly, and
+   * a write to a workspace's manifest record is compared by value when the caller of this helper
+   * hands the value over, and read as the removal of every fence when it does not.
    */
-  const organismWriteRefusal = (req: Request, principal: string, key: string) =>
+  const organismWriteRefusal = (req: Request, principal: string, key: string, write?: ManifestWrite) =>
     checkOrganismNamespaceAccess({ storage, config }, {
-      principal, owner: String(req.auth!.owner ?? ''), roles: req.auth!.roles ?? [],
-    }, key, 'write');
+      principal, owner: String(req.auth!.owner ?? ''), roles: req.auth!.roles ?? [], scopes: req.auth!.scopes ?? [],
+    }, key, 'write', write);
 
   // POST /v1/memory/bulk — write MANY entries in one request (agent auth). Net-new batched write: the
   // service batches the existing-key lookup + byte-sum + key-count and commits the valid rows together,
@@ -319,7 +329,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
         // Membership, the organism's and a workspace's meta namespaces, the member namespaces and the
         // consent layer: the same answer POST /v1/memory gets. Without it a member stored a copy of a
         // workspace's manifest under their own name, and a non-member stored any organism key.
-        const refusal = await organismWriteRefusal(req, gaii, key);
+        // The value is the entry's own, which is what the batch below stores.
+        const refusal = await organismWriteRefusal(req, gaii, key, { after: (entry as { value?: unknown }).value });
         if (refusal) { failed.push({ key, reason: `${refusal.code}: ${refusal.message}` }); continue; }
         const container = /^organism\.[^.]+(?:\.w\.[^.]+)?/.exec(key)?.[0] ?? key;
         let check = archiveChecks.get(container);
@@ -444,7 +455,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // through one of them (services/fenced-space.ts). This route asks no organism rule for the keys
     // it removes, and it removes them for good, so one such key refuses the whole request before
     // the first delete. The account holder in person returns from the rule before any manifest is read.
-    const fenced = await fencedKeysRefusal({ storage, config }, { principal: gaii, roles: callerOf(req, config.nodeId, storage).roles },
+    // The same call refuses the removal of a workspace's manifest record that declares a fence, to
+    // every caller but the account holder in person and a session that covers organism:direct.
+    const session = callerOf(req, config.nodeId, storage);
+    const fenced = await fencedKeysRefusal({ storage, config }, { principal: gaii, roles: session.roles, scopes: session.scopes },
       records.filter(r => (!keys || keys.has(r.key)) && r.key.startsWith('organism.')).map(r => r.key));
     if (fenced) {
       res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));

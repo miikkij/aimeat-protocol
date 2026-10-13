@@ -16,6 +16,9 @@
  * @structure registerOrganismWorkspaceDocumentRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceDocumentRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.1.0 — 2026-10-13 — The caller carries the session's scopes, which the fenced-space rule reads
+ *     (services/fenced-space.ts): a session that covers organism:direct edits a document of a space
+ *     that names extensions directly (ruled by the developer on 2026-10-13).
  *   v1.0.0 — 2026-09-02 — Initial (wish-workspace-append-ja-osiomuokkaus).
  */
 import type { Router, Request, Response } from 'express';
@@ -38,6 +41,8 @@ export function registerOrganismWorkspaceDocumentRoutes(
         principal: req.auth?.sub ?? '',
         owner: (req.auth?.owner as string) ?? '',
         roles: req.auth?.roles ?? [],
+        // The fenced-space rule reads the session's scopes (services/fenced-space.ts).
+        scopes: req.auth?.scopes ?? [],
     });
 
     /** The workspace id. Required: a document belongs to one workspace, never to the organism at large. */

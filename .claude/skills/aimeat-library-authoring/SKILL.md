@@ -121,7 +121,12 @@ guest receives is missing from that table, so change the table in the same commi
   write (draft, publish, revert, delete, archive, copy, import) only when it arrives through one of
   them, and refuses the agent's direct write with `ACCESS_DENIED`; a person in person and a hosted
   app still write directly, and a list with no valid entry closes the space to every agent (since
-  2026-10-13, after an agent wrote past an app's tool on aimeat.io). Do not reach a
+  2026-10-13, after an agent wrote past an app's tool on aimeat.io). An agent whose session holds
+  `organism:direct` (`*` covers it) writes such a space directly and may change its list; nobody
+  else alters or removes a list that is there, the workspace's creator's own agent included. An app
+  adds its extension to a space of a workspace it built earlier with
+  `AIMEAT.organism.nameExtensions(orgId, wsId, space, ['installer/name'])`, which adds only, and
+  only extensions its own account installed (since 2026-10-14). Do not reach a
   workspace through `ctx.fetch` or `ctx.memory`: the first cannot reach the node and the second is
   fenced to `ext:`. Many records go through `publishRecords` (up to 1000, with `dryRun` and
   `createOnly`) and come out through `deleteRecords` (up to 2000, into the bin, needs `memory:delete` on a token),

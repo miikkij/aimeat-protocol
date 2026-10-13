@@ -52,25 +52,77 @@
  *   admin, and the delete also asks memory:purge), and a ZIP import into a NEW workspace, which
  *   creates the spaces it fills. A visitor deleting their own intake conversation is the node's
  *   act for that visitor, not a caller's write.
+ *
+ *   THE PERMISSION `organism:direct` (v1.1.0). Ruled by the developer on 2026-10-13, on a
+ *   recommendation in three parts ("tehdään niinkuin suosittelet"), after his objection to the rule
+ *   above: "miksi se hylättäisiin jos agentille on annettu lupa tehdä niin? … voiko sen tehdä niin
+ *   että agentille antaa täydet oikeudet?"
+ *     1. A fenced caller whose SESSION scopes cover `organism:direct` writes a fenced space
+ *        directly. The word is an ordinary one: the cover test is the node's one
+ *        (utils/scope-coverage.ts scopeIsCovered), so `*` and `organism:*` cover it. It is the
+ *        session's scopes that are read, never the agent record's: a token narrowed below the
+ *        agent's grant does not pass. A code path that hands over no scopes FAILS CLOSED (fenced),
+ *        and an identity with no session is decided by its shape as before, whatever list is
+ *        beside it.
+ *     2. A hosted app names its own extension on a space of an existing workspace through its own
+ *        add-only route (services/workspace-space-extensions.ts), which asks callerIsFenced() for
+ *        who may call it.
+ *     3. THE LIST IS PROTECTED. A change to the manifest is protected when it touches the fence of
+ *        a memory-backed object type that has one BEFORE the change: its `extensions` value differs
+ *        in any way, the object type is removed, or its namespace or backing changes. It is
+ *        accepted from the account holder in person, or from a caller whose session covers
+ *        `organism:direct`. A hosted app is not accepted here: its way to a list is the route of
+ *        part 2, which adds and never removes. Before this, the workspace creator's own agent
+ *        replaced the manifest and with it the list that kept the agent out. A new object type
+ *        that names extensions, and any change to a space with no fence, stay as they were.
+ *
+ *   WHERE THE PROTECTION RUNS. Every code path that writes a manifest compares it before the write
+ *   with fenceChangeRefusal(): updateWorkspaceMeta (PUT /v1/organisms/:id/workspace and the MCP tool
+ *   aimeat_workspace_update) and applySpaces (the member space-add and an approved suggestion). The
+ *   manifest is also a memory record, `organism.<org>.w.<ws>.meta.manifest`, and a copy under an
+ *   agent of the creator is the copy that counts when it is the newest (workspace-meta-read.ts
+ *   pickWorkspaceMetaCopy). So that record is a TARGET of fencedSpaceRefusal() as well: a write-mode
+ *   operation that names it is compared by value where the code path hands the value over
+ *   (services/memory-write.ts) and is read as the removal of every fence where it does not (PUT,
+ *   PATCH and DELETE /v1/memory/:key, the bin, the batch delete, the bulk delete, the MCP record
+ *   delete). No request reaches the manifest record without passing one of the two.
  * @structure
+ *   - DIRECT_WRITE_SCOPE — the word `organism:direct`
  *   - FenceCaller / callerIsFenced() — who the rule lets write directly
+ *   - mayChangeFence() — who changes the list of a fenced space
  *   - SpaceFence / fenceOf() — the fence one object type declares, or none
  *   - extensionMarker() — `installer/name`, as the capability marks its caller
+ *   - protectedFenceChanges() / fenceChangeRefusal() — the comparison of a manifest before and after
+ *   - ManifestWrite / manifestWriteRefusal() — the manifest record as a target
  *   - fencedSpaceRefusal() — the rule for one workspace; fencedKeysRefusal() for keys of several
  *   - archiveFenceTarget() — what an archive or unarchive touches, as a target of the rule
  *   - fencedFormRefusal() — the rule for the identity a public intake form writes under
- *   - fencedSpaceMessage() — the one sentence every code path answers with
+ *   - fencedSpaceMessage() / fenceChangeMessage() — the one sentence each refusal answers with
  * @usage
- *   const fenced = await fencedSpaceRefusal({ storage, config }, { principal, roles }, orgId, wsId, { key });
+ *   const fenced = await fencedSpaceRefusal({ storage, config }, { principal, roles, scopes }, orgId, wsId, { key });
  *   if (fenced) return res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));
+ *   const changed = fenceChangeRefusal(manifestBefore, manifestAfter, { principal, roles, scopes });
  * @version-history
+ *   v1.1.0 — 2026-10-13 — The permission `organism:direct`: a session that covers it writes a
+ *     fenced space directly (the caller carries `scopes`), and a change to a fenced space's list,
+ *     object type, namespace or backing is accepted only from the account holder in person or from
+ *     such a session (fenceChangeRefusal, and the manifest record as a target of the rule). Ruled by
+ *     the developer on 2026-10-13: no permission let an agent through, and the creator's own agent
+ *     could replace the manifest that held the list.
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import type { Storage } from '../storage/interface.js';
 import { isOwnerInPerson, isGEAI } from '../utils/gaii.js';
-import { isMemoryBackedSpace, readWorkspaceMetaRecord, type WorkspaceManifest } from './workspace-meta.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isMemoryBackedSpace, readWorkspaceMetaRecord, type WorkspaceManifest } from './workspace-meta-read.js';
 
 export interface FenceDeps { storage: Storage; config: { nodeId: string } }
+
+/**
+ * The permission that lets a caller that is not a person write a fenced space directly, and change
+ * which extensions such a space names. An ordinary scope word: `*` and `organism:*` cover it.
+ */
+export const DIRECT_WRITE_SCOPE = 'organism:direct';
 
 /** The caller of a write-mode operation, in the terms this rule decides on. */
 export interface FenceCaller {
@@ -82,6 +134,13 @@ export interface FenceCaller {
      * then. An empty list is a session with no role, which is fenced.
      */
     roles?: readonly string[];
+    /**
+     * The SESSION's scope words, as the token carries them: never the agent record's stored list,
+     * which a narrowed token does not hold. A session that covers `organism:direct` writes a fenced
+     * space directly. Absent means the code path has no scopes to hand over, which reads as "does
+     * not hold the word".
+     */
+    scopes?: readonly string[];
     /** `installer/name` of the extension whose action makes the call. Set by
      *  services/extension-workspace.ts and by nothing else. */
     extension?: string;
@@ -102,6 +161,29 @@ export interface FencedSpaceRefusal {
     message: string;
     details: { reason: 'FENCED_SPACE'; space: string; extensions: string[] };
 }
+
+/** How a change touches the fence of one object type. */
+export type FenceChangeKind = 'extensions' | 'removed' | 'namespace' | 'backing';
+
+/** The refusal of a protected change to a manifest: the spaces it touches, and how. */
+export interface FenceChangeRefusal {
+    status: 403;
+    code: 'ACCESS_DENIED';
+    message: string;
+    details: { reason: 'FENCE_CHANGE'; spaces: Array<{ space: string; change: FenceChangeKind }> };
+}
+
+/** What the rule answers: the write into a fenced space, or the change to a fenced space's list. */
+export type FenceRefusal = FencedSpaceRefusal | FenceChangeRefusal;
+
+/**
+ * What a write-mode operation that names a workspace's manifest record will store, when the code
+ * path knows it. `after` is the value itself, which is compared with the manifest that counts.
+ * `keepsFences` is for a code path that joins object types and changes none (unionObjectTypes) and
+ * makes its own comparison before it writes. A code path that hands over neither is read as the
+ * removal of every fence, which is what a delete is and what a replacement of unknown value may be.
+ */
+export type ManifestWrite = { after: unknown } | { keepsFences: true };
 
 /**
  * What the operation touches. `key` and `keys` are record keys in any form (bare, `.draft`,
@@ -150,13 +232,36 @@ function isLocalPersonIdentity(identity: string, nodeId: string): boolean {
  * app's grant write directly. A hosted app's grant is the role `app` ALONE, which is what
  * routes/app-grants.ts and services/schedule-actor.ts mint; the role beside any other one is not
  * that grant, so it is fenced.
+ *
+ * Every other session is fenced unless its scopes cover `organism:direct`: the account holder gave
+ * that session the permission to write such a space directly. The scopes count only beside a
+ * session's roles: an identity with no session is decided by its shape.
  */
 export function callerIsFenced(caller: FenceCaller, nodeId: string): boolean {
     if (caller.roles === undefined) return !isLocalPersonIdentity(caller.principal, nodeId);
     const roles = caller.roles;
     if (isOwnerInPerson({ roles })) return false;
-    const hostedApp = roles.length === 1 && roles[0] === 'app';
-    return !hostedApp;
+    if (isHostedAppGrant(roles)) return false;
+    return !scopeIsCovered(caller.scopes ?? [], DIRECT_WRITE_SCOPE);
+}
+
+/** A hosted app's grant: the role `app` and no other. */
+function isHostedAppGrant(roles: readonly string[]): boolean {
+    return roles.length === 1 && roles[0] === 'app';
+}
+
+/**
+ * May this caller change the list of a fenced space? The account holder in person, or a session
+ * whose scopes cover `organism:direct`. A hosted app's grant may not, whatever words it holds: it
+ * writes records directly because it acts as its person, and its way to a list is the add-only
+ * route (services/workspace-space-extensions.ts). A caller with no session may not either: no code
+ * path changes a manifest without one.
+ */
+export function mayChangeFence(caller: FenceCaller): boolean {
+    if (caller.roles === undefined) return false;
+    if (isOwnerInPerson({ roles: caller.roles })) return true;
+    if (isHostedAppGrant(caller.roles)) return false;
+    return scopeIsCovered(caller.scopes ?? [], DIRECT_WRITE_SCOPE);
 }
 
 /**
@@ -225,16 +330,123 @@ function refusalFor(fence: SpaceFence): FencedSpaceRefusal {
     };
 }
 
+/** The object types of a manifest value of any shape; a value that holds none gives an empty list. */
+function objectTypesOf(manifest: unknown): Array<Record<string, unknown>> {
+    const list = manifest && typeof manifest === 'object' && !Array.isArray(manifest)
+        ? (manifest as { objectTypes?: unknown }).objectTypes : undefined;
+    return Array.isArray(list)
+        ? list.filter((o): o is Record<string, unknown> => !!o && typeof o === 'object' && !Array.isArray(o))
+        : [];
+}
+
+/** Two `extensions` values are the same list only when they are the same value, entry for entry. */
+function sameList(a: unknown, b: unknown): boolean {
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+/**
+ * The fences a manifest change touches: every memory-backed object type that declares a fence
+ * BEFORE the change and does not stand the same AFTER it.
+ *
+ * A fence stands the same when the manifest after the change holds a memory-backed object type on
+ * the same namespace with the same `extensions` value. The namespace is what the rule matches a
+ * record by, so that is what the comparison follows: a new name on the same namespace and list
+ * changes nothing the rule reads. The list is compared as written, so a reordered or respelled
+ * list is a change. A manifest that is gone or holds no object types removes every fence.
+ *
+ * Not touched, and so never protected: an object type with no fence (changed, removed, or given a
+ * list), a row space's list (the row service reads it under its own rule), and a new object type.
+ */
+export function protectedFenceChanges(before: unknown, after: unknown): Array<{ space: string; change: FenceChangeKind }> {
+    const afterTypes = objectTypesOf(after);
+    const touched: Array<{ space: string; change: FenceChangeKind }> = [];
+    for (const ot of objectTypesOf(before)) {
+        const fence = fenceOf(ot);
+        if (!fence) continue;
+        const onNamespace = afterTypes.filter(o => o.namespace === fence.namespace);
+        const memoryBacked = onNamespace.filter(o => isMemoryBackedSpace(o));
+        if (memoryBacked.some(o => sameList(o.extensions, ot.extensions))) continue;
+        const change: FenceChangeKind = memoryBacked.length ? 'extensions'
+            : onNamespace.length ? 'backing'
+                : afterTypes.some(o => o.name === ot.name) ? 'namespace' : 'removed';
+        touched.push({ space: fence.space, change });
+    }
+    return touched;
+}
+
+/**
+ * The one sentence a refused change answers with. It says who makes the change and names the
+ * permission, because that is what the caller's person can act on.
+ */
+export function fenceChangeMessage(spaces: readonly string[]): string {
+    const which = spaces.length === 1 ? `the space ${spaces[0]}` : `the spaces ${spaces.join(', ')}`;
+    return `The list of extensions of a space that an app closed to agents is changed by the account holder in person, or by an agent that holds the permission ${DIRECT_WRITE_SCOPE}. This change touches ${which}, so nothing was written.`;
+}
+
+/**
+ * The comparison every code path that writes a manifest makes before the write: null when the
+ * change is allowed, else the refusal. `before` is the manifest that counts and `after` the value
+ * about to be stored, each in any shape.
+ *
+ * A protected change (protectedFenceChanges) is accepted from the account holder in person and
+ * from a session whose scopes cover `organism:direct` (mayChangeFence). Every other change is
+ * accepted from whoever the code path's own checks let this far.
+ */
+export function fenceChangeRefusal(before: unknown, after: unknown, caller: FenceCaller): FenceChangeRefusal | null {
+    if (mayChangeFence(caller)) return null;
+    const spaces = protectedFenceChanges(before, after);
+    if (spaces.length === 0) return null;
+    return {
+        status: 403, code: 'ACCESS_DENIED', message: fenceChangeMessage(spaces.map(s => s.space)),
+        details: { reason: 'FENCE_CHANGE', spaces },
+    };
+}
+
+/** The key of a workspace's manifest record. Readers take this exact key and no suffixed form. */
+function manifestKeyOf(organismId: string, wsId: string): string {
+    return `organism.${organismId}.w.${wsId}.meta.manifest`;
+}
+
+/** Does the target name this exact key? A subtree does not: an archive changes no value. */
+function targetNames(target: FenceTarget, key: string): boolean {
+    if ('key' in target) return target.key === key;
+    if ('keys' in target) return target.keys.includes(key);
+    return false;
+}
+
+/**
+ * The rule for a write-mode operation on a workspace's manifest RECORD: null when allowed, else
+ * the refusal. The manifest is a memory record, so the generic memory code paths reach it, and a
+ * copy stored under an agent of the workspace's creator counts when it is the newest. A caller who
+ * may change a fence returns before the manifest is read.
+ */
+export async function manifestWriteRefusal(
+    deps: FenceDeps, caller: FenceCaller, organismId: string, wsId: string, write?: ManifestWrite,
+): Promise<FenceChangeRefusal | null> {
+    if (mayChangeFence(caller)) return null;
+    if (write && 'keepsFences' in write) return null;
+    const record = await readWorkspaceMetaRecord(deps.storage, organismId, wsId, 'meta.manifest', deps.config.nodeId, { archived: 'include' });
+    return fenceChangeRefusal(record?.value, write ? write.after : null, caller);
+}
+
 /**
  * The rule for one workspace: null when the operation is allowed, else the refusal.
  *
  * A caller the rule allows directly returns before the manifest is read. The manifest is the copy
  * that counts, archived or not: an archived workspace's records are unarchived one by one, and its
  * fence still holds then.
+ *
+ * A target that names the workspace's manifest record is asked manifestWriteRefusal() first, with
+ * `write` when the code path knows the value it stores. That question has its own callers allowed
+ * (mayChangeFence): a hosted app writes a fenced space and does not change its list.
  */
 export async function fencedSpaceRefusal(
-    deps: FenceDeps, caller: FenceCaller, organismId: string, wsId: string, target: FenceTarget,
-): Promise<FencedSpaceRefusal | null> {
+    deps: FenceDeps, caller: FenceCaller, organismId: string, wsId: string, target: FenceTarget, write?: ManifestWrite,
+): Promise<FenceRefusal | null> {
+    if (targetNames(target, manifestKeyOf(organismId, wsId))) {
+        const changed = await manifestWriteRefusal(deps, caller, organismId, wsId, write);
+        if (changed) return changed;
+    }
     if (!callerIsFenced(caller, deps.config.nodeId)) return null;
     const record = await readWorkspaceMetaRecord(deps.storage, organismId, wsId, 'meta.manifest', deps.config.nodeId, { archived: 'include' });
     const fences = fencesOf(record?.value as WorkspaceManifest | null | undefined);
@@ -252,10 +464,14 @@ export async function fencedSpaceRefusal(
  * asked for THAT identity: with the session's `roles` when the form is being defined, and with
  * none when a visitor submits, where the stored identity's shape decides. The target is the whole
  * destination namespace, because the node makes the record ids.
+ *
+ * No scopes are taken, so the permission `organism:direct` does not open this: it is a session's,
+ * a submission holds no session, and a form defined on the word would be stored under an agent's
+ * identity and then take no message.
  */
 export function fencedFormRefusal(
     deps: FenceDeps, identity: string, roles: readonly string[] | undefined, organismId: string, wsId: string, namespace: string,
-): Promise<FencedSpaceRefusal | null> {
+): Promise<FenceRefusal | null> {
     return fencedSpaceRefusal(deps, { principal: identity, ...(roles ? { roles } : {}) },
         organismId, wsId, { subtree: `organism.${organismId}.w.${wsId}.${namespace}` });
 }
@@ -265,12 +481,13 @@ const WORKSPACE_KEY = /^organism\.([^.]+)\.w\.([^.]+)\./;
 /**
  * The rule for a list of keys that may lie in several workspaces (the bulk delete): one manifest
  * read per workspace named, and none for a caller the rule allows directly. A key outside every
- * workspace is not this rule's.
+ * workspace is not this rule's. A key that is a workspace's manifest record is asked as a removal of
+ * that manifest (fencedSpaceRefusal), which a hosted app is refused too.
  */
 export async function fencedKeysRefusal(
     deps: FenceDeps, caller: FenceCaller, keys: Iterable<string>,
-): Promise<FencedSpaceRefusal | null> {
-    if (!callerIsFenced(caller, deps.config.nodeId)) return null;
+): Promise<FenceRefusal | null> {
+    if (!callerIsFenced(caller, deps.config.nodeId) && mayChangeFence(caller)) return null;
     const byWorkspace = new Map<string, { organismId: string; wsId: string; keys: string[] }>();
     for (const key of keys) {
         const m = WORKSPACE_KEY.exec(key);

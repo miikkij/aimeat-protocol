@@ -20,7 +20,7 @@
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:2ac52820ee79d8d8ce8d041e"
+      "digest": "sha256:5846c0714eb80fa8c0f94ddf"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-09-29",
@@ -314,7 +314,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:13f94bda0876da8a620c7f21"
+      "digest": "sha256:471c8ff47349d017a0b9ee0d"
     },
     "node:aimeat-agent-capability": {
       "reviewedOn": "2026-10-13",
@@ -327,7 +327,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:3d2d0effab2a5b1a844176e5"
+      "digest": "sha256:2b55d9f8e95adaa4e0c4a971"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-13",
@@ -341,7 +341,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:67b7f1a0c016acdfddf56407",
+      "digest": "sha256:3b80b5e14b27020d43b736d3",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -471,7 +471,7 @@
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:4f802e8805ab3eee66715981"
+      "digest": "sha256:f0871573af8ee77ac192c8af"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -651,7 +651,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "d045952179627005"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "eeebddd8f4e9c044"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -684,7 +684,7 @@
       "aimeat/src/services/ai-jobs/ext-capability.ts": "7899a2526e2df8ba"
     },
     "node:aimeat-refinery": {
-      "aimeat/src/services/refinery/pipeline.ts": "521769f32868798c",
+      "aimeat/src/services/refinery/pipeline.ts": "e51d2a097f60fede",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "a2229bb9b8d28948",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
@@ -702,7 +702,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/cli/connect/mcp/local-server.ts": "8843e486d97c7154",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "d045952179627005",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "eeebddd8f4e9c044",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "f7c1dc7cc0193e76",
       "aimeat/src/services/agent-task-rules.ts": "920bd83aa13aebf4"
@@ -717,14 +717,14 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "8ee95f0cf07ea131",
+      "aimeat/src/routes/memory/bulk.ts": "541c1fae900337fa",
       "aimeat/src/routes/memory/key.ts": "df920d68d5abd2a4",
-      "aimeat/src/services/memory-bin.ts": "c0079363e27ed6e7",
+      "aimeat/src/services/memory-bin.ts": "7509bee33c25994f",
       "aimeat/src/routes/memory-hands.ts": "deb0da289637f20c",
       "aimeat/src/routes/owners/export.ts": "9ed397ed069b2735",
       "aimeat/src/services/owner-erasure.ts": "18e38187bc10c89d",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
-      "aimeat/src/mcp/organisms.ts": "6bfcc6f01adad40d"
+      "aimeat/src/mcp/organisms.ts": "3b2da6e686852311"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "46e7160d2a579e7b",
@@ -750,8 +750,8 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "c6cd3abb7698d83a",
       "aimeat/src/services/extension-ctx-contract.ts": "430a87e8facd9657",
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
-      "aimeat/src/services/workspace-rows/row-service.ts": "776902c9f46bddd8",
-      "aimeat/src/services/refinery/pipeline.ts": "521769f32868798c",
+      "aimeat/src/services/workspace-rows/row-service.ts": "63095910320e3ff3",
+      "aimeat/src/services/refinery/pipeline.ts": "e51d2a097f60fede",
       "aimeat/src/routes/outbound.ts": "c778ece9fe93e8d1"
     }
   }

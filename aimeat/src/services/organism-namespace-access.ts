@@ -27,6 +27,13 @@
  *   const refusal = await checkOrganismNamespaceAccess({ storage, config }, caller, key, 'write');
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   2026-10-13 — The caller carries the session's `scopes`, and a write-mode check takes `write`,
+ *     what a write to a workspace's manifest record stores. The fenced-space rule reads both: a
+ *     session that covers `organism:direct` writes a fenced space directly, and a change to a fenced
+ *     space's list is accepted only from the account holder in person or from such a session (ruled
+ *     by the developer on 2026-10-13). An agent of the workspace's creator could store its own copy
+ *     of the manifest through the memory write, and the newest copy of the creator's is the one that
+ *     counts.
  *   2026-10-13 — A write into a record space that names extensions is refused to a caller that is
  *     not a person unless it arrives through one of them (services/fenced-space.ts, ruled by the
  *     developer on 2026-10-13). The caller carries `extension`, which only the workspace capability
@@ -50,7 +57,7 @@ import type { Storage } from '../storage/interface.js';
 import { findWorkspaceRegistration } from './workspace-meta.js';
 import { agentBarred, agentBarredMessage, attachedAsParticipant } from './organism-agent-access.js';
 import { isOwnerInPerson } from '../utils/gaii.js';
-import { fencedSpaceRefusal } from './fenced-space.js';
+import { fencedSpaceRefusal, type ManifestWrite } from './fenced-space.js';
 
 /** The session asking, in the terms this rule decides on. */
 export interface OrganismAccessCaller {
@@ -67,6 +74,13 @@ export interface OrganismAccessCaller {
      * extension (services/fenced-space.ts).
      */
     extension?: string;
+    /**
+     * The SESSION's scope words, as the token carries them. The fenced-space rule reads them: a
+     * session that covers `organism:direct` writes a record space that names extensions directly,
+     * and changes which extensions such a space names. A code path that hands none over is read as
+     * not holding the word, which refuses.
+     */
+    scopes?: readonly string[];
 }
 
 /** What to answer when the access is refused. `status` and `code` match what the HTTP door sent. */
@@ -84,12 +98,17 @@ export interface OrganismAccessRefusal {
  * Returns null when the access is allowed, including for a key outside the `organism.` namespace,
  * which this rule has nothing to say about. `mode` separates reads from writes: the meta and member
  * namespaces are readable by every member and writable by fewer.
+ *
+ * `write` matters for one key, a workspace's manifest record: a code path that writes it says what
+ * it stores, so the fenced-space rule can compare the manifest before and after. Without it a
+ * write-mode check on that key is read as the removal of every fence (services/fenced-space.ts).
  */
 export async function checkOrganismNamespaceAccess(
     deps: { storage: Storage; config: AimeatConfig },
     caller: OrganismAccessCaller,
     key: string,
     mode: 'read' | 'write',
+    write?: ManifestWrite,
 ): Promise<OrganismAccessRefusal | null> {
     const { storage, config } = deps;
 
@@ -225,10 +244,13 @@ export async function checkOrganismNamespaceAccess(
     // A record space that names extensions takes the write of a caller that is not a person only
     // through one of them (services/fenced-space.ts). Asked last, so every refusal above is still
     // the one a caller hears first, and with the real key: the space is matched by its namespace
-    // prefix. The account holder in person returns from it before the manifest is read.
+    // prefix. The account holder in person returns from it before the manifest is read, and so does
+    // a session whose scopes cover organism:direct. The same call protects the workspace's manifest
+    // record: a write to it that changes the list of a fenced space is accepted from those two only.
     if (mode === 'write' && wsId) {
         const fenced = await fencedSpaceRefusal({ storage, config },
-            { principal: caller.principal, roles: caller.roles, extension: caller.extension }, organismId, wsId, { key });
+            { principal: caller.principal, roles: caller.roles, scopes: caller.scopes, extension: caller.extension },
+            organismId, wsId, { key }, write);
         if (fenced) return fenced;
     }
 

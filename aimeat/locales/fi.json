@@ -7696,6 +7696,7 @@
   "accesspage.scope.notifications.send": "lähettää sinulle ilmoituksia",
   "accesspage.scope.organism.read": "lukee jaettuja tilojasi",
   "accesspage.scope.organism.rows": "pitää tapahtumalokia sille avatussa jaetussa tilassa",
+  "accesspage.scope.organism.direct": "kirjoittaa suoraan jaettujen tilojen osiin, jotka sovellus on varannut omille työkaluilleen",
   "accesspage.scope.workflow.read": "näkee automaatiosi",
   "accesspage.scope.workflow.write": "ajaa ja muuttaa automaatioitasi",
   "accesspage.scope.task.read": "näkee agenttiesi tehtävät",
@@ -16613,7 +16614,8 @@
             "read": "Lue niiden jaettujen tilojen julkaistu sisältö joihin kuulut.",
             "write": "Luo jaettuja tiloja, kirjoita ja julkaise niissä dokumentteja sekä kommentoi.",
             "invite": "Päästä muita mukaan: kutsu jäseniä ja jaa pääsy jaettuun tilaan.",
-            "rows": "Lisää rivejä yhteisen paikan tapahtumalokiin ja lue niitä takaisin, kun paikka on avattu nimeltä tälle sovellukselle tai agentille. Mikään muu paikassa ei avaudu."
+            "rows": "Lisää rivejä yhteisen paikan tapahtumalokiin ja lue niitä takaisin, kun paikka on avattu nimeltä tälle sovellukselle tai agentille. Mikään muu paikassa ei avaudu.",
+            "direct": "Kirjoita suoraan jaetun tilan osaan, jonka sovellus on varannut omille työkaluilleen, ja muuta sitä, mitkä työkalut saavat kirjoittaa sinne. Ilman tätä oikeutta agentti kirjoittaa sellaiseen osaan vain sovelluksen työkalulla."
           },
           "outbound": {
             "send": "Lähetä sähköpostia yrityksesi osoitteesta tallennetuille yhteystiedoillesi."
