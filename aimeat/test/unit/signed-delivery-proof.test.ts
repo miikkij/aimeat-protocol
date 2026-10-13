@@ -8,6 +8,10 @@
  *   audience (secaudit 2026-10 last items, D3; Jouni 2026-10-06: all four).
  * @usage pnpm test -- signed-delivery-proof
  * @version-history
+ *   v1.2.0 — 2026-10-13 — Version-aware in both directions on unprovenFormatLive(): below
+ *     UNPROVEN_FORMAT_REMOVED_IN a delivery without the proof passes while not required and `false` in
+ *     the environment turns the requirement off, as before; from it the same delivery is refused with
+ *     AUDIENCE_REQUIRED and the environment cannot turn the requirement off.
  *   v1.1.1 — 2026-10-13 — The running-version expectation follows the version instead of assuming
  *     one below 3.27.0, which went false at the 3.27.0 bump (4804d12cc) and stopped pnpm gate.
  *   v1.1.0 — 2026-10-10 — The pin (secaudit 2026-10-10 I21), the default that follows the version
@@ -24,7 +28,7 @@ import {
     signNodeRequest, checkNodeRequest, type ProofPin,
 } from '../../src/services/signed-node-request.js';
 import {
-    AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, audienceRequiredByDefault, federationDefaults,
+    AUDIENCE_REQUIRED_BY_DEFAULT_IN, UNPROVEN_FORMAT_REMOVED_IN, audienceRequiredByDefault, federationDefaults, unprovenFormatLive,
 } from '../../src/config-federation.js';
 import { getSoftwareVersion, versionAtLeast } from '../../src/utils/version.js';
 
@@ -78,8 +82,14 @@ describe('a delivery names its node and its moment', () => {
         expect((await check(s, { ...a7, sent_at: new Date().toISOString() }))?.code).toBe('UNAUTHORIZED');
     });
 
-    it('a delivery that carries none passes while not required, and is AUDIENCE_REQUIRED when required', async () => {
-        expect(await check(signed(6), {})).toBeNull();
+    it('a delivery that carries none passes while not required (until UNPROVEN_FORMAT_REMOVED_IN, refused from it), and is AUDIENCE_REQUIRED when required', async () => {
+        if (unprovenFormatLive()) {
+            expect(await check(signed(6), {})).toBeNull();
+        } else {
+            const r = await check(signed(6), {});
+            expect(r?.code).toBe('AUDIENCE_REQUIRED');
+            expect(r?.status).toBe(401);
+        }
         expect((await check(signed(6), {}, { required: true }))?.code).toBe('AUDIENCE_REQUIRED');
     });
 });
@@ -101,9 +111,15 @@ describe('the pin: a peer that has sent the proof is held to it', () => {
 
     beforeAll(async () => { keys = await generateKeyPair(); });
 
-    it('a peer that never sent a proof is heard without one, and is not pinned', async () => {
+    it('a peer that never sent a proof is heard without one (refused from UNPROVEN_FORMAT_REMOVED_IN), and is not pinned', async () => {
         const pin = memoryPin();
-        expect(await run(pin, signed(1), {})).toBeNull();
+        if (unprovenFormatLive()) {
+            expect(await run(pin, signed(1), {})).toBeNull();
+        } else {
+            const r = await run(pin, signed(1), {});
+            expect(r?.code).toBe('AUDIENCE_REQUIRED');
+            expect(r?.status).toBe(401);
+        }
         expect(pin.at).toBeNull();
         expect(pin.writes).toHaveLength(0);
     });
@@ -134,9 +150,12 @@ describe('the pin: a peer that has sent the proof is held to it', () => {
             thisNodeId: 'node-b', required: false, provenSince: '2026-10-10T00:00:00.000Z',
         });
         expect(refusal?.code).toBe('AUDIENCE_REQUIRED');
-        expect(await audienceRefusal({
+        // Without the pin the unproven message passes while the format is live, and is refused from its removal.
+        const unpinned = await audienceRefusal({
             signed: s, audience: undefined, audienceSignature: undefined, publicKey: keys.publicKey, thisNodeId: 'node-b', required: false,
-        })).toBeNull();
+        });
+        if (unprovenFormatLive()) expect(unpinned).toBeNull();
+        else expect(unpinned?.code).toBe('AUDIENCE_REQUIRED');
     });
 
     it('carriesProof sees any one of the three fields', () => {
@@ -171,7 +190,7 @@ describe('the audience default follows the version', () => {
         expect(audienceRequiredByDefault('unknown')).toBe(false);
     });
 
-    it('follows the running version (on from AUDIENCE_REQUIRED_BY_DEFAULT_IN, off below it), and the environment wins either way', () => {
+    it('follows the running version (on from AUDIENCE_REQUIRED_BY_DEFAULT_IN, off below it), and the environment wins either way until UNPROVEN_FORMAT_REMOVED_IN, only towards on from it', () => {
         const saved = process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED;
         try {
             delete process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED;
@@ -180,7 +199,8 @@ describe('the audience default follows the version', () => {
             process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED = 'true';
             expect(federationDefaults().federationAudienceRequired).toBe(true);
             process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED = 'false';
-            expect(federationDefaults().federationAudienceRequired).toBe(false);
+            // From UNPROVEN_FORMAT_REMOVED_IN the environment can no longer turn the requirement off.
+            expect(federationDefaults().federationAudienceRequired).toBe(!unprovenFormatLive());
             // And loadConfig() carries it: config.ts no longer reads the variable itself.
             const noFile = join(tmpdir(), `aimeat-no-config-${process.pid}.ini`);
             delete process.env.AIMEAT_FEDERATION_AUDIENCE_REQUIRED;

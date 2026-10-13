@@ -24,6 +24,9 @@
  *   tunnel and the realtime rooms, each reached through a real WebSocket.
  * @usage cd aimeat && pnpm exec vitest run test/unit/two-node-process.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-13 — The realtime peer joins with ?token= below WS_QUERY_TOKEN_REMOVED_IN, as
+ *     before; from it that form is asserted refused (401) and the peer joins with the Authorization
+ *     header. What the test asks (which node the frames run as) is unchanged.
  *   v1.0.1 — 2026-10-12 — The stub store answers getMailboxItem with an item of the connected node: the
  *     mailbox_ack reads the item before it deletes it. The setup no longer matched production; the
  *     assertions are unchanged.
@@ -34,6 +37,8 @@ import http from 'node:http';
 import type { AddressInfo, Socket } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
+import { WS_QUERY_TOKEN_REMOVED_IN } from '../../src/config-security.js';
+import { removedFrom } from '../../src/services/deprecation.js';
 
 type Pass = (req: unknown, res: unknown, next: () => void) => void;
 
@@ -573,7 +578,15 @@ describe('an event on an open socket of node A, while node B booted last', () =>
         const joined = async (what: string) => {
             const room = await mgr.createRoom({ appType: 'probe', name: what.replace(/\W+/g, '-'), createdBy: `alice@${NODE_A}` });
             h.roomProbes.set(room.id, what);
-            const peer = await socketTo(portA, `/v1/realtime/ws?room=${room.id}&nick=probe&token=alice-owner`);
+            // The session token rides in ?token= until WS_QUERY_TOKEN_REMOVED_IN; from it that form is
+            // refused (401) and the peer joins with the Authorization header.
+            const path = `/v1/realtime/ws?room=${room.id}&nick=probe`;
+            if (removedFrom(WS_QUERY_TOKEN_REMOVED_IN)) {
+                await expect(socketTo(portA, `${path}&token=alice-owner`)).rejects.toThrow('upgrade answered 401');
+            }
+            const peer = removedFrom(WS_QUERY_TOKEN_REMOVED_IN)
+                ? await socketTo(portA, path, { Authorization: 'Bearer alice-owner' })
+                : await socketTo(portA, `${path}&token=alice-owner`);
             await until(() => peer.frames.some((f) => f.type === 'joined'));
             h.answers.delete(`${NODE_A} ${what}`);
             return peer.ws;

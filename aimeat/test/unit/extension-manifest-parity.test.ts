@@ -14,6 +14,9 @@
  *      became a free one purely by being installed as a ZIP. One builder, asserted here on both.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-manifest-parity.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-13 — Version-aware on MORSEL_PRICE_FIELDS_REMOVED_IN: below it the parity runs on
+ *     the fixture with commercial.payMorsels, as before; from it that fixture is refused with
+ *     MORSEL_PRICE_REMOVED on both paths, and the parity runs on the same fixture without it.
  *   v1.0.0 — 2026-07-26 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -21,6 +24,7 @@ import { deflateRawSync, crc32 } from 'node:zlib';
 import { buildExtensionRecordFromManifest } from '../../src/services/extension-manifest.js';
 import { parseExtensionZip } from '../../src/services/upload-zip.js';
 import type { AimeatConfig } from '../../src/config.js';
+import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../../src/config-pacing.js';
 
 const config = {
     extensionMaxCodeSizeKb: 512,
@@ -119,6 +123,14 @@ actions:
       payMoney: { amount: 500000, currency: EUR }
 `;
 
+/**
+ * The same provider without the 3.x morsel price (commercial.payMorsels), which is refused from
+ * MORSEL_PRICE_FIELDS_REMOVED_IN. From that release the parity assertions run on this one.
+ */
+const PRICED_MANIFEST_NO_MORSEL_PRICE = PRICED_MANIFEST.replace('      payMorsels: 10\n', '');
+/** The priced fixture this release accepts. */
+const priced = () => (legacyMorselFieldsLive() ? PRICED_MANIFEST : PRICED_MANIFEST_NO_MORSEL_PRICE);
+
 describe('manifest shape validation', () => {
     it('refuses a mis-typed action field with a 400 naming the field, instead of throwing', () => {
         const manifest = GOOD_MANIFEST.replace('method: post', 'method: { a: 1 }');
@@ -166,24 +178,42 @@ describe('manifest shape validation', () => {
 
 describe('ZIP install builds the same record as the inline install', () => {
     it('carries per-action pricing (tollMorsels, commercial, payMoney, exchange)', async () => {
-        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config, 'parityowner');
+        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': priced(), 'scripts/ping.js': SCRIPT }), config, 'parityowner');
         expect(parsed.ok).toBe(true);
         const action = parsed.record!.actions[0];
         expect(action.tollMorsels).toBe(3);
-        expect(action.commercial?.payMorsels).toBe(10);
+        if (legacyMorselFieldsLive()) expect(action.commercial?.payMorsels).toBe(10);
+        else expect(action.commercial?.payMorsels ?? 0).toBe(0);
         expect(action.commercial?.exchange).toBe(true);
         expect(action.commercial?.payMoney).toEqual({ amount: 500_000, currency: 'EUR' });
     });
 
-    it('marks `type: secret` config so the value is encrypted at rest', async () => {
+    it('refuses the 3.x morsel price on both paths from MORSEL_PRICE_FIELDS_REMOVED_IN, and takes it before', async () => {
         const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config, 'parityowner');
+        const inline = buildExtensionRecordFromManifest(PRICED_MANIFEST, SCRIPTS, config, 'parityowner', 'FIXED');
+        if (legacyMorselFieldsLive()) {
+            expect(parsed.ok).toBe(true);
+            expect(inline.ok).toBe(true);
+            return;
+        }
+        expect(parsed.ok).toBe(false);
+        expect(parsed.code).toBe('MORSEL_PRICE_REMOVED');
+        expect(parsed.error).toContain(`removed in ${MORSEL_PRICE_FIELDS_REMOVED_IN}`);
+        expect(inline.ok).toBe(false);
+        if (inline.ok) return;
+        expect(inline.status).toBe(400);
+        expect(inline.code).toBe('MORSEL_PRICE_REMOVED');
+    });
+
+    it('marks `type: secret` config so the value is encrypted at rest', async () => {
+        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': priced(), 'scripts/ping.js': SCRIPT }), config, 'parityowner');
         expect(parsed.ok).toBe(true);
         expect(parsed.record!.config.__secretKeys).toEqual(['apiKey']);
     });
 
     it('produces a record identical to the inline builder, field for field', async () => {
-        const inline = buildExtensionRecordFromManifest(PRICED_MANIFEST, SCRIPTS, config, 'parityowner', 'FIXED');
-        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config, 'parityowner');
+        const inline = buildExtensionRecordFromManifest(priced(), SCRIPTS, config, 'parityowner', 'FIXED');
+        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': priced(), 'scripts/ping.js': SCRIPT }), config, 'parityowner');
         expect(inline.ok).toBe(true);
         expect(parsed.ok).toBe(true);
         if (!inline.ok) return;
