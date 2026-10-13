@@ -43,6 +43,9 @@
  *     organism the list took the workspace away from it (seen on aimeat.io 2026-10-13).
  *     extraScopes(): an agent that calls an app tool is proposed with organism:read as well,
  *     because the tool's extension reads the app's workspace as the agent (same day, same run).
+ *   v1.7.1 — 2026-10-13 — extraScopes(): the runtime tools `dm`, `mcp` and `schedule` bring the
+ *     word the node checks on their calls (TOOL_SCOPES). An agent whose draft held `dm` failed
+ *     every task on aimeat.io that day, on the first refused call.
  *   v1.6.0 — 2026-10-13 — withToolSkus(): a tool address without its prefix, and the prompt's open
  *     form with the tool named beside it, become the tool's full address, per task.
  *   v1.5.0 — 2026-10-13 — llmChoiceOf(): the model choice the node stores, built from the pick on the
@@ -363,14 +366,37 @@ export function readOnlyTools(crewDef) {
  *   answered "the workspace is not one you can read". The "reads and writes" reach carries the
  *   word already. What a tool WRITES into a workspace still needs that reach: the page cannot
  *   tell a tool that writes from one that reads.
+ * - A runtime tool whose calls the node checks a word for brings that word (TOOL_SCOPES). The crew
+ *   runtime fails a run on one refused call, so a member that has such a tool and not its word
+ *   fails every task before it does any work. Seen on aimeat.io on 2026-10-13: a draft gave its
+ *   member "dm" for "send the report to the owner", and the agent failed each task on
+ *   GET /v1/messages/agent-inbox.
  */
 export function extraScopes(crewDef) {
   const callsAppTool = anyMemberHas(crewDef, ['app_tools']);
-  return [
+  const tools = (Array.isArray(crewDef?.agents) ? crewDef.agents : []).flatMap(toolsOf).filter((x) => typeof x === 'string');
+  // "mcp:<server>" is the tool "mcp" narrowed to one server; the word is the same.
+  const named = (id) => tools.some((x) => x === id || x.startsWith(`${id}:`));
+  return [...new Set([
     ...(anyMemberHas(crewDef, ['workspace', 'workspace_write']) || recordSpacesOf(crewDef).length > 0 || callsAppTool ? ['organism:read'] : []),
     ...(callsAppTool ? ['ext:invoke'] : []),
-  ];
+    ...Object.entries(TOOL_SCOPES).flatMap(([id, words]) => (named(id) ? words : [])),
+  ])];
 }
+
+/**
+ * The words the node checks on the calls of a runtime tool, for the tools whose word neither reach
+ * preset carries. Each is the `scope` of the node's own tools the runtime tool calls
+ * (src/tool-catalog/definitions): `dm` reads the agent's inbox and threads (aimeat_dm_inbox,
+ * aimeat_dm_thread: messages:read) and answers (aimeat_dm_send: messages:send); `mcp` calls a tool
+ * on a server the owner attached (aimeat_mcp_call: mcp:use); `schedule` makes a schedule
+ * (aimeat_schedule_create: task:write).
+ */
+const TOOL_SCOPES = {
+  dm: ['messages:read', 'messages:send'],
+  mcp: ['mcp:use'],
+  schedule: ['task:write'],
+};
 
 /**
  * The name a runtime's menu carries in `features` when it subscribes the spaces a definition names
