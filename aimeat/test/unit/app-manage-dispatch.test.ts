@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.7.0 — 2026-10-13 — scope_allowance and scope_allowance_remove, and the words field.
  *   v1.6.3 — 2026-10-12 — A probe value for settings.listing (listed, community, unlisted).
  *   v1.6.2 — 2026-10-09 — A probe value for marks.aiUse, the third mark switch.
  *   v1.6.1 — 2026-10-05 — The shape compared is zodShapeFor('aimeat_app_manage'): src/mcp/app-manage-shape.ts
@@ -61,7 +62,7 @@ const VALUE: Record<string, unknown> = {
     access: 'members-only', roster_visibility: 'members',
     email: 'zqx@example.com', locale: 'fi', q: 'zqxq', offset: 11, before: '2026-09-01T00:00:00Z', invite_id: 'zqxinv',
     manage_roles: ['zqxmgr'], year: '2026', keep: '12345', dev_level: 'publisher',
-    markdown: '# zqxspec', expected_revision: 4,
+    markdown: '# zqxspec', expected_revision: 4, words: ['zqxword'],
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -116,11 +117,14 @@ const EXPECT: Record<string, [string, string]> = {
     spec: ['GET', '/v1/apps/alice/shop.html/design-spec'],
     spec_set: ['PUT', '/v1/apps/alice/shop.html/design-spec'],
     spec_clear: ['DELETE', '/v1/apps/alice/shop.html/design-spec'],
+    // The permissions the app kept at the move to 4.0; the words to remove travel in the query.
+    scope_allowance: ['GET', '/v1/apps/alice/shop.html/scope-allowance'],
+    scope_allowance_remove: ['DELETE', '/v1/apps/alice/shop.html/scope-allowance?words=zqxword'],
 };
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */
 const IN_PATH = new Set(['filename', 'owner', 'bundled_agent', 'subdomain', 'limit', 'playtest', 'days', 'detail', 'runner_agent',
-    'q', 'offset', 'before', 'invite_id', 'year']);
+    'q', 'offset', 'before', 'invite_id', 'year', 'words']);
 
 function fullInput(action: string): Record<string, unknown> {
     const input: Record<string, unknown> = { action };
