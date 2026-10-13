@@ -14,6 +14,8 @@
  *   import { securityPostureWarnings } from './config-posture.js';
  *   for (const w of securityPostureWarnings(config)) logger.warn(w);
  * @version-history
+ *   v1.4.0 — 2026-10-13 — AIMEAT_TEST_MONEY_HANDLER on a non-loopback node is reported as ACTIVE, not
+ *     refused: the flag is in force on any node (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v1.3.0 — 2026-10-12 — AIMEAT_AI_PROVENANCE=false on a public node is reported: refused from 4.0.0,
  *     deprecated before it (Core 2026-11 PROV-07).
  *   v1.2.0 — 2026-10-11 — AIMEAT_TEST_MONEY_HANDLER is reported as refused on any node whose public
@@ -23,7 +25,7 @@
  *   v1.0.0 — 2026-08-10 — Extracted from config.ts (max-file-lines), no behaviour change.
  */
 import type { AimeatConfig } from './config-types.js';
-import { testMoneyHandlerRefused } from './utils/test-money-guard.js';
+import { testMoneyHandlerOnPublicNode } from './utils/test-money-guard.js';
 import { PROVENANCE_SWITCH_LOCAL_ONLY_IN } from './config-ai-label.js';
 
 /**
@@ -35,8 +37,8 @@ import { PROVENANCE_SWITCH_LOCAL_ONLY_IN } from './config-ai-label.js';
 export function securityPostureWarnings(config: AimeatConfig): string[] {
   const w: string[] = [];
   // Before the profile check: a node with a private LAN address is `local` and still serves people.
-  if (testMoneyHandlerRefused(config)) {
-    w.push(`AIMEAT_TEST_MONEY_HANDLER=true was REFUSED — the test-only money handler settles EUR and USD with no real payment, and ${config.baseUrl} is not a loopback address. test.money is not registered. Remove the variable from this node's environment.`);
+  if (testMoneyHandlerOnPublicNode(config)) {
+    w.push(`AIMEAT_TEST_MONEY_HANDLER=true is ACTIVE on a public node — ${config.baseUrl} is not a loopback address, and any buyer can complete a EUR or USD checkout without paying through test.money. To turn it off, remove the variable from this node's environment and restart.`);
   }
   if (config.securityProfile !== 'public') return w;
   if (config.anonymousMode) w.push('AIMEAT_ANONYMOUS=true — anyone can act as the shared anonymous identity.');
