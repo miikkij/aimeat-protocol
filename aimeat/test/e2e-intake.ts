@@ -280,6 +280,42 @@ async function main() {
         assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body.error)}`);
     });
 
+    // max_per_day was stored with the form from the first version and nothing read it: a form whose
+    // owner set a daily cap took every submission the per-IP limit let through (found 2026-10-13).
+    await test('max_per_day: the form takes that many submissions in a day and refuses the next → 429', async () => {
+        const def = await json('/v1/intake/forms', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ organism_id: orgId, ws, namespace: 'crm.unlocked', form_id: 'capped', allowed_fields: ['nimi'], required_fields: ['nimi'], honeypot_field: 'company_url', max_per_day: 2 }),
+        });
+        assert(def.status === 200, `define: ${def.status} ${JSON.stringify(def.body.error)}`);
+        const send = (body: Record<string, unknown>) => json(`/v1/intake/${orgId}/${ws}/capped`, { method: 'POST', body: JSON.stringify(body) });
+        // A submission that writes nothing uses none of the day's count: a bot in the honeypot, and one
+        // the form refuses for a missing field.
+        const bot = await send({ nimi: 'Bot', company_url: 'http://spam.example' });
+        assert(bot.status === 200 && (bot.body.data as { id: string | null }).id === null, `honeypot: ${bot.status}`);
+        const bad = await send({});
+        assert(bad.status === 400, `missing field: ${bad.status}`);
+        const one = await send({ nimi: 'First' });
+        const two = await send({ nimi: 'Second' });
+        assert(one.status === 200 && two.status === 200, `the first two are taken: ${one.status} ${two.status}`);
+        const three = await send({ nimi: 'Third' });
+        assert(three.status === 429 && three.body.error?.code === 'INTAKE_DAILY_LIMIT', `the third is refused: ${three.status} ${JSON.stringify(three.body.error)}`);
+        assert(!JSON.stringify(three.body).includes('crm.unlocked'), 'the refusal names no destination');
+        // Another form of the same workspace has its own count.
+        const other = await json(`/v1/intake/${orgId}/${ws}/unlocked`, { method: 'POST', body: JSON.stringify({ anything: 'x' }) });
+        assert(other.status === 200, `another form still takes a submission: ${other.status} ${JSON.stringify(other.body.error)}`);
+        // Raising the cap lets the next one in the same day.
+        const raise = await json('/v1/intake/forms', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ organism_id: orgId, ws, namespace: 'crm.unlocked', form_id: 'capped', allowed_fields: ['nimi'], required_fields: ['nimi'], honeypot_field: 'company_url', max_per_day: 3 }),
+        });
+        assert(raise.status === 200, `raise: ${raise.status}`);
+        const four = await send({ nimi: 'After the raise' });
+        assert(four.status === 200, `after the raise: ${four.status} ${JSON.stringify(four.body.error)}`);
+        const five = await send({ nimi: 'Over again' });
+        assert(five.status === 429, `and the new cap holds: ${five.status}`);
+    });
+
     await test('delete a form → its public link stops working (404)', async () => {
         const del = await json(`/v1/intake/forms?organism_id=${orgId}&ws=${ws}&form_id=${disabledForm}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
         assert(del.status === 200 && (del.body.data as { deleted: boolean }).deleted === true, `delete: ${del.status}`);

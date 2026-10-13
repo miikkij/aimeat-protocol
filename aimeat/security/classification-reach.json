@@ -1560,6 +1560,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records, read for repository node ids. 2026-10-02 (package sale design, phase 3): the claimed-repositories record in the same install-sets system namespace, a list of repository node ids the operator redeemed a claim at."
     },
+    "src/services/intake-daily-count.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-13, the node's own read: the per-form count of today's public intake submissions in the system namespace (a day and a number), read to decide whether the form takes one more. No caller is handed it."
+    },
     "src/services/invitations.ts": {
       "reads": {
         "listAllMemory": 3

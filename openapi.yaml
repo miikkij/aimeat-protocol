@@ -39941,7 +39941,7 @@ paths:
                 mode: { type: string, enum: [publish, draft] }
                 honeypot_field: { type: string }
                 enabled: { type: boolean }
-                max_per_day: { type: integer }
+                max_per_day: { type: integer, description: 'How many submissions the form takes in one UTC day, from all senders together. Past it the public submit answers 429 INTAKE_DAILY_LIMIT. Absent or 0: no daily cap (the per-IP limit still applies).' }
                 title: { type: string }
                 fields: { type: array, items: { type: object } }
                 success_message: { type: string }
@@ -40010,7 +40010,9 @@ paths:
         Anonymous submission. The node honeypot-screens, per-IP rate-limits, builds the record from the
         allow-list only, sets the owner server-side (from the form config — never the caller), validates
         against the destination's locked schema, and writes ONE record (published or draft). Returns only
-        { ok, id, mode } — never any other record.
+        { ok, id, mode } — never any other record. A form defined with `max_per_day` takes that many
+        submissions in one UTC day, from all senders together, and answers 429 INTAKE_DAILY_LIMIT to
+        the next; a submission that writes nothing (the honeypot, a refusal) uses none of the count.
       tags: [Public Intake]
       security: []
       parameters:
@@ -40035,7 +40037,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
-        '429': { description: Rate limit exceeded }
+        '429': { description: 'The per-IP rate limit, or INTAKE_DAILY_LIMIT: the form has taken its max_per_day submissions today. Nothing was saved.' }
   /v1/organisms/{id}/workspaces:
     post:
       operationId: createOrganismWorkspace

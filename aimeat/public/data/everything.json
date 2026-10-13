@@ -973,10 +973,10 @@
      "slug": "g-6-public-intake-forms",
      "cells": [
       "<strong>Public intake forms</strong>",
-      "Collect a response without requiring an account. The owner defines the workspace destination, allowed fields and draft or publish mode. The node validates the response against the declared space and schema, with rate limits and spam screening.",
+      "Collect a response without requiring an account. The owner defines the workspace destination, allowed fields and draft or publish mode. The node validates the response against the declared space and schema, with rate limits and spam screening. The owner can cap how many responses one form takes in a day, from all senders together.",
       "<code>/v1/intake/forms</code>, <code>/v1/intake/:org/:ws/:formId</code>"
      ],
-     "plain": "Public intake forms Collect a response without requiring an account. The owner defines the workspace destination, allowed fields and draft or publish mode. The node validates the response against the declared space and schema, with rate limits and spam screening. /v1/intake/forms, /v1/intake/:org/:ws/:formId"
+     "plain": "Public intake forms Collect a response without requiring an account. The owner defines the workspace destination, allowed fields and draft or publish mode. The node validates the response against the declared space and schema, with rate limits and spam screening. The owner can cap how many responses one form takes in a day, from all senders together. /v1/intake/forms, /v1/intake/:org/:ws/:formId"
     },
     {
      "slug": "g-6-live-documents",
