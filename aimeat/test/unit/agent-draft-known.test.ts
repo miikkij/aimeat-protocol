@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import {
     DEFAULT_TOOL_MENU, clipLine, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
     RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, recordSpacesOf, withSpaceNote,
-    BROWSER_FEATURE, browserBlock, withBrowserSites, llmChoiceOf, withToolSkus, joinsAgentList,
+    BROWSER_FEATURE, browserBlock, withBrowserSites, llmChoiceOf, withToolSkus, joinsAgentList, withToolOnlySpaces,
 } from '../../public/js/services/agent-draft-known.js';
 
 const MENU = [
@@ -406,6 +406,37 @@ describe('an agent that works when a record is published in a workspace', () => 
     it('the prompt tells the model that the spaces are named for it, so it names none', () => {
         expect(recordsBlock(KNOWN, [RECORDS_FEATURE])).toMatch(/name no space yourself/i);
     });
+
+    // Measured on aimeat.io on 2026-10-13: two of three drafts for one app's sentence built the
+    // agent on the plain workspace-write tool. It wrote straight into the app's spaces: a quote
+    // with spelling slips, a "decision" the note said was not decided, an author it typed wrongly.
+    // A space that names extensions takes an agent's write only through the app's tool, so the
+    // page gives the agent the tool that calls app tools and says so where the agent reads it.
+    const FENCED = { ...NOTED, all: [SPACES[0], { ...SPACES[1], tool_only: true }] };
+
+    it('a space an agent writes only through the app\'s tool says so in every task', () => {
+        const out = withSpaceNote(def('{{ctx.prompt}}'), FENCED);
+        expect(out.tasks[0].description).toMatch(/- vastaus: The draft answer to a request\. Written only through the app's own tool/);
+        expect(out.tasks[0].description).toMatch(/list_app_tools/);
+        // The space the node lets the agent write directly says nothing of the kind.
+        expect(out.tasks[0].description).not.toMatch(/- pyynto:.*Written only through/);
+        // A workspace with no such space keeps the note as it was.
+        expect(withSpaceNote(def('{{ctx.prompt}}'), NOTED).tasks[0].description).not.toMatch(/app's own tool/);
+    });
+
+    it('an agent that watches a workspace with such a space gets the tool that calls app tools, and the permission it needs', () => {
+        const drafted = def('{{ctx.prompt}}', ['workspace_write']);
+        const out = withToolOnlySpaces(drafted, FENCED);
+        expect(out.agents[0].tools).toEqual(['workspace_write', 'app_tools']);
+        expect(out.agents[1].tools).toEqual(['app_tools']);
+        expect(extraScopes(out)).toEqual(['organism:read', 'ext:invoke']);
+        // A member that has the tool is left as it is, and so is a workspace with no such space.
+        const has = def('{{ctx.prompt}}', ['app_tools']);
+        expect(withToolOnlySpaces(has, FENCED).agents[0].tools).toEqual(['app_tools']);
+        expect(withToolOnlySpaces(drafted, NOTED)).toBe(drafted);
+        expect(withToolOnlySpaces(drafted, null)).toBe(drafted);
+        expect(withToolOnlySpaces(null as any, FENCED)).toBe(null);
+    });
     it('watching a workspace asks for the word the node checks before it sends a record', () => {
         expect(extraScopes(withRecordSpaces(def('{{ctx.prompt}}', ['web']), WATCH))).toEqual(['organism:read']);
         expect(extraScopes(withRecordSpaces(def('{{ctx.prompt}}', ['workspace_write']), WATCH))).toEqual(['organism:read']);
@@ -500,6 +531,26 @@ describe('a tool address the model wrote in a form the runtime cannot call', () 
         // "read_note" is inside "read_notes_later" and inside the address of another owner's app.
         const d = withToolSkus(one('MUISTIO [app-tool:happydude500001/muistio.html:<tool>]: read_notes_later, and someone/muistio.html:read_note. {{ctx.prompt}}'), known);
         expect(text(d)).toContain(':<tool>]');
+    });
+
+    // Seen twice with the production draft model on 2026-10-13 (LUUKKU's sentence in a measurement,
+    // Postinjalostamo's on aimeat.io): the model wrote the app's address with no tool part and
+    // named the tools beside it, and the page showed no app before the person approved.
+    it('an app\'s address with no tool part becomes the addresses of the tools the same task names', () => {
+        const d = withToolSkus(one('If a record is present, use app_tools to call the Postinjalostamo tools under sku happydude500001/postinjalostamo.html: list with new_messages, read with read_message, and save with save_note. {{ctx.prompt}}'), known);
+        expect(text(d)).toContain('under sku app-tool:happydude500001/postinjalostamo.html:new_messages, app-tool:happydude500001/postinjalostamo.html:read_message, app-tool:happydude500001/postinjalostamo.html:save_note: list with');
+        expect(namesOf(d)).toEqual(['postinjalostamo.html:new_messages,read_message,save_note']);
+        // With the prefix and in brackets, as the other draft wrote it.
+        const e = withToolSkus(one('Use the MUISTIO app tools (sku: app-tool:happydude500001/muistio.html) and the \'read_note\' tool, then the \'save_findings\' tool. {{ctx.prompt}}'), known);
+        expect(text(e)).toContain('(sku: app-tool:happydude500001/muistio.html:read_note, app-tool:happydude500001/muistio.html:save_findings)');
+        expect(namesOf(e)).toEqual(['muistio.html:read_note,save_findings']);
+    });
+
+    it('an app\'s address with no tool named beside it, and another owner\'s app of the same file, are left as they came', () => {
+        const none = one('Open happydude500001/muistio.html and do the work. {{ctx.prompt}}');
+        expect(withToolSkus(none, known)).toBe(none);
+        const other = one('Call someone/muistio.html with read_note. {{ctx.prompt}}');
+        expect(withToolSkus(other, known)).toBe(other);
     });
 
     it('a definition with no tasks, and an account with no app tools, come back as they were', () => {

@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   v1.3.1 — 2026-10-13 — Section 4: a record space that names extensions takes an agent's delete,
+ *     restore, archive and unarchive only through one of them (services/fenced-space.ts).
  *   v1.3.0 — 2026-10-12 — Says what owner_scope reaches on delete and restore: another agent's record
  *     of the same person, and the person's own with memory:write-as-owner (services/memory-bin.ts v1.6.0).
  *   v1.2.0 — 2026-10-12 — The batch delete of workspace records goes to the bin and needs memory:delete,
@@ -143,7 +145,11 @@ What an export leaves out, and why:
 - the whole account (section 6).
 
 Some records refuse a delete: records a service owns, records that hold a credential, and spaces a
-workspace keeps append-only. The refusal says which.
+workspace keeps append-only. The refusal says which. One more refusal is about WHO asks, not about
+the record: a workspace space that an app closed to agents (its structure names the app's
+extension on that space) takes a delete, a restore, an archive and an unarchive from an agent only
+through the app's own tool. You get \`ACCESS_DENIED\`, and the message names the extension whose
+action to call. The person in person can always do it themselves.
 
 ## 5. How knowledge goes stale here
 

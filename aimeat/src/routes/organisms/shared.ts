@@ -8,6 +8,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.14.0 — 2026-10-13 — archiveHandler asks the fenced-space rule (services/fenced-space.ts) for a
+ *     record or a space before it archives or brings back: a record space that names extensions
+ *     takes that from an agent only through one of them (ruled by the developer on 2026-10-13).
  *   v1.13.3 — 2026-10-12 — The member consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   v1.13.2 — 2026-10-09 — The password gate admits a share token only when its password version
  *     matches the share's current password (secrets audit 2026-10-09, S-6).
@@ -75,6 +78,8 @@ import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
 import { archiveTarget, unarchiveTarget, archiveRoleOf, type ArchiveLevel } from '../../services/archive.js';
+import { archiveFenceTarget, fencedSpaceRefusal } from '../../services/fenced-space.js';
+import { callerOf } from '../../middleware/caller.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
@@ -736,6 +741,14 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const v = validateArchiveTarget(id, (req.body ?? {}) as Record<string, unknown>);
     if (!v.ok) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', v.msg)); return; }
     const actor = resolveIdentity(req.auth!, config.nodeId);
+    // A record or a space of a record space that names extensions is archived, or brought back, for
+    // an agent only through one of them (services/fenced-space.ts). A whole workspace or organism
+    // stays with the creator-or-admin rule above.
+    const fenceTarget = archiveFenceTarget(v.target);
+    if (fenceTarget && v.target.ws) {
+      const fenced = await fencedSpaceRefusal({ storage, config }, { principal: actor, roles: callerOf(req, config.nodeId, storage).roles }, id, v.target.ws, fenceTarget);
+      if (fenced) { res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details)); return; }
+    }
     try {
       const result = mode === 'archive'
         ? await archiveTarget(storage, v.target, actor)

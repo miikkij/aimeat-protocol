@@ -31,6 +31,9 @@
  *   const draft = await draftAgent('Sort my incoming mail and draft the answers', { tools, known: { apps, places } });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.8.0 — 2026-10-13 — An agent that watches a workspace where a space is written only through
+ *     an app's tool gets "app_tools" (definitionFor), and scopesFor reads the permissions from that
+ *     same definition (agent-draft-known.js withToolOnlySpaces).
  *   v1.7.1 — 2026-10-13 — parseDraft gives an app tool its full address when the model wrote it
  *     without the prefix or left the prompt's open form with the tool's name beside it
  *     (agent-draft-known.js withToolSkus). Measured with the production model on nine drafts: six
@@ -80,6 +83,7 @@ import { SCOPE_TEMPLATES } from '/views/profile/agents/scope-model.js';
 import {
   DEFAULT_TOOL_MENU, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
   RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, withSpaceNote, browserBlock, withBrowserSites, withToolSkus,
+  withToolOnlySpaces,
 } from '/js/services/agent-draft-known.js';
 
 /** When an agent works, as the pages offer it. */
@@ -221,7 +225,10 @@ const writesWorkspace = (def) => (Array.isArray(def?.agents) ? def.agents : []).
  */
 export function scopesFor(draft, choice) {
   const base = SCOPE_TEMPLATES[draft?.reach] ?? SCOPE_TEMPLATES.standard;
-  const def = draft?.reach === 'readonly' ? readOnlyTools(draft?.crewDef) : draft?.crewDef;
+  const drafted = draft?.reach === 'readonly' ? readOnlyTools(draft?.crewDef) : draft?.crewDef;
+  // The tool the page adds for a workspace whose space is written only through an app's tool
+  // (definitionFor) asks its own permission, so the scopes are read from the same definition.
+  const def = choice?.when === 'records' ? withToolOnlySpaces(drafted, choice.watch) : drafted;
   return [...new Set([...base, ...extraScopes(def), ...(choice?.when === 'records' ? ['organism:read'] : [])])];
 }
 
@@ -315,7 +322,10 @@ export function definitionFor(draft, when, watch) {
     : buildTemplate(draft.template || 'researcher', draft.name);
   // The watched spaces go into the definition, and every task is told the workspace's spaces by
   // name: the draft was written without them, so it could not say where a result belongs.
-  const def = withSpaceNote(withRecordSpaces(named, when === 'records' ? watch : null), when === 'records' ? watch : null);
+  // Where a space of that workspace takes an agent's write only through the app's own tool, the
+  // members get the tool that calls app tools, and the note says which spaces those are.
+  const watching = when === 'records' ? watch : null;
+  const def = withSpaceNote(withToolOnlySpaces(withRecordSpaces(named, watching), watching), watching);
   const hears = new Set(Array.isArray(def.listen_for) && def.listen_for.length ? def.listen_for : ['tasks']);
   if (when === 'talk' || when === 'always') { hears.add('messages'); hears.add('dms'); }
   // AN AGENT THAT HEARS A MESSAGE MUST BE ABLE TO ANSWER IT. The `dm` tool is what sends a reply, and

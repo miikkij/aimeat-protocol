@@ -11,6 +11,9 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-13 — aimeat_organism_archive asks the fenced-space rule (services/fenced-space.ts) for a
+ *     record or a space before it archives or brings back: a record space that names extensions
+ *     takes that from an agent only through one of them (ruled by the developer on 2026-10-13).
  *   2026-10-08 — aimeat_workspace_comment asks a declaration's provenance:write of the session's scopes
  *     too (aiprov E8).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The roster's operator answer is caller().operator(), which is isOperatorCaller for the session.
@@ -71,6 +74,7 @@ import { registerOrganismNameInviteTools } from './organisms-name-invites.js';
 import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
 import { searchOrganismContent } from '../services/organism-search.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../services/archive.js';
+import { archiveFenceTarget, fencedSpaceRefusal } from '../services/fenced-space.js';
 import { canAccessWorkspaceComments, addComment, listComments, deleteComment } from '../services/organism-comments.js';
 import { toolError } from './tool-error.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
@@ -462,6 +466,15 @@ export function registerOrganismsTools(
                 if (!key.startsWith(`organism.${organism_id}.w.${ws}.`)) return { content: [{ type: 'text' as const, text: 'key must be inside organism.{id}.w.{ws}.' }], isError: true };
             }
             const target = { level: level as ArchiveLevel, orgId: organism_id, ws, namespace, key };
+            // A record or a space of a record space that names extensions is archived, or brought
+            // back, for an agent only through one of them (services/fenced-space.ts): archiving
+            // takes a record out of every read, which is a change to what the app shows.
+            const fenceTarget = archiveFenceTarget(target);
+            if (fenceTarget && ws) {
+                const session = caller();
+                const fenced = await fencedSpaceRefusal({ storage, config }, { principal: session.principal, roles: session.roles }, organism_id, ws, fenceTarget);
+                if (fenced) return toolError(fenced.code, fenced.message);
+            }
             try {
                 const result = action === 'archive' ? await archiveTarget(storage, target, agentGaii) : await unarchiveTarget(storage, target, agentGaii);
                 emitChange('organisms');

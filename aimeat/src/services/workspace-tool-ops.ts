@@ -30,6 +30,13 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   v1.11.0 — 2026-10-13 — The draft write, the publish, the batch publish (direct values and draft
+ *     ids) and the batch delete ask the fenced-space rule (services/fenced-space.ts) with each
+ *     record's real key before anything is validated or written: a record space that names
+ *     extensions takes an agent's write only through one of them (ruled by the developer on
+ *     2026-10-13, after an agent wrote records into an app's spaces past the app's own tool). The
+ *     caller, the verdict types, workspaceCallerOf and the membership checks moved to
+ *     ./workspace-ops-caller.ts (max-file-lines), a pure move, and are re-exported.
  *   v1.10.0 — 2026-10-12 — deleteRecordsBatchOp puts the rows in the bin (storage.bulkBinMemory); it removed
  *     them for good (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 9).
  *   v1.9.0 — 2026-10-08 — publishRecordsBatchOp records provenance for every direct value through
@@ -92,7 +99,6 @@
  *     compare-and-swap services/workspace-write.ts already offered) and `_draftVersion` on an
  *     opened record, which is what a script needs to swap against.
  */
-import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { canWriteNamespaceRule, readOrganismConfig, createOrganismHelpers, fresherRec } from '../routes/organisms/shared.js';
 import type { BatchPublishItemResult } from '../routes/organisms/shared.js';
@@ -102,7 +108,6 @@ import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { workspaceRowIndex } from './workspace-rows/row-service.js';
 import type { RowObjectType } from './workspace-rows/row-space.js';
 import { archivedRefusal, checkWorkspaceWriteLimits } from './workspace-write-guards.js';
-import { parseGAII } from '../utils/gaii.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { entryTitle } from './structure-overview.js';
 import { isMemoryBackedSpace, readWorkspaceSchemas, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE, type WorkspaceMetaReader } from './workspace-meta.js';
@@ -123,75 +128,19 @@ import { memoryContentBytes, documentContentBytes } from '../utils/memory-conten
 import { directValueProvenance, type DeclarationParser } from './workspace-direct-provenance.js';
 import { instanceFromKey } from './workspace-record-key.js';
 import { logger } from '../utils/logger.js';
+import {
+    refuse, denyReason, memberRoleOf, fencedOpRefusal,
+    type WorkspaceOpsDeps, type WorkspaceOpsCaller, type WorkspaceOpResult,
+} from './workspace-ops-caller.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
 
-export interface WorkspaceOpsDeps { storage: Storage; config: AimeatConfig }
-
-/** Who is asking, in the terms every rule below decides on. */
-export interface WorkspaceOpsCaller {
-    /** The session principal: an agent GAII, an owner GHII, or an app or ecosystem id. */
-    principal: string;
-    /** The bare account name. Memberships are keyed by it. */
-    ownerName: string;
-    /** `${ownerName}@${nodeId}`: where current state and meta live. */
-    ownerGhii: string;
-    /** Who AUTHORS content: an agent's own GAII when an agent calls, else the owner GHII. */
-    writerGaii: string;
-    /** The session's roles, for the organism namespace rule. */
-    roles: string[];
-    /** The session's own scope words, when the door has them: a provenance declaration needs
-     *  provenance:write there as well as on the grant. Absent for the extension sandbox. */
-    scopes?: readonly string[];
-}
-
-/** A refusal, with the status and code the HTTP doors send for the same thing. */
-export interface WorkspaceOpRefusal { ok: false; status: number; code: string; message: string; details?: Record<string, unknown> }
-export type WorkspaceOpResult<T> = { ok: true; data: T } | WorkspaceOpRefusal;
-
-const refuse = (status: number, code: string, message: string, details?: Record<string, unknown>): WorkspaceOpRefusal =>
-    ({ ok: false, status, code, message, ...(details ? { details } : {}) });
-
-/**
- * Build the caller from a principal. The owner name is the door's to give: the session knows it (an
- * owner GHII carries no `#`, so parsing cannot recover it from an agent-shaped id), and every door
- * names it with localAccountName, which keeps a visitor from another node whole. This function used
- * to cut one itself when none was given, and no door relied on that.
- */
-export function workspaceCallerOf(
-    args: { principal: string; ownerName: string; roles: string[]; scopes?: readonly string[] },
-    config: AimeatConfig,
-): WorkspaceOpsCaller {
-    const parsed = parseGAII(args.principal);
-    const ownerName = args.ownerName;
-    const ownerGhii = `${ownerName}@${config.nodeId}`;
-    return {
-        principal: args.principal, ownerName, ownerGhii,
-        writerGaii: parsed ? args.principal : ownerGhii,
-        roles: args.roles,
-        ...(args.scopes ? { scopes: args.scopes } : {}),
-    };
-}
+// The caller, the verdict types, workspaceCallerOf and the membership checks moved to
+// ./workspace-ops-caller.ts (max-file-lines) and are re-exported for their importers.
+export { workspaceCallerOf, type WorkspaceOpsDeps, type WorkspaceOpsCaller, type WorkspaceOpRefusal, type WorkspaceOpResult } from './workspace-ops-caller.js';
 
 const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
-
-/** Membership gate — an organism agent, or the owner is an active member. Null when allowed. */
-async function denyReason(storage: Storage, caller: WorkspaceOpsCaller, orgId: string): Promise<WorkspaceOpRefusal | null> {
-    const org = await storage.getOrganism(orgId);
-    if (!org) return refuse(404, 'NOT_FOUND', 'Organism not found');
-    if (org.agentGaiis?.includes(caller.principal)) return null;
-    const m = await storage.getMembership(orgId, caller.ownerName);
-    return m && m.status === 'active' ? null : refuse(403, 'ACCESS_DENIED', 'Not an active member of this organism');
-}
-
-/** The caller's role for the meta.* rule; an organism agent is a member and nothing more. */
-async function memberRoleOf(storage: Storage, caller: WorkspaceOpsCaller, orgId: string): Promise<'creator' | 'admin' | 'member' | null> {
-    const m = await storage.getMembership(orgId, caller.ownerName);
-    if (m && m.status === 'active') return m.role;
-    const org = await storage.getOrganism(orgId);
-    return org?.agentGaiis?.includes(caller.principal) ? 'member' : null;
-}
 
 /**
  * The spaces a write may resolve against: the objectTypes of EVERY copy of the manifest, in scan
@@ -402,6 +351,13 @@ export async function writeWorkspaceDraftsOp(
         if ('error' in item) return item.refusal ?? refuse(400, 'INVALID_INPUT', item.error);
         resolved.push(item);
     }
+    // A record space that names extensions takes the draft of a caller that is not a person only
+    // through one of them (services/fenced-space.ts). Asked here with each item's real key, because
+    // the access check above reads a stand-in key that lies in no space; one fenced item refuses the
+    // whole batch, before any item is validated or written.
+    const fenced = await fencedOpRefusal(deps, caller, organismId, ws,
+        { keys: resolved.map(item => `${root}.${item.namespace}.${item.instanceId}.draft`) });
+    if (fenced) return fenced;
     const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
     for (const [i, item] of resolved.entries()) {
         const key = `${root}.${item.namespace}.${item.instanceId}.draft`;
@@ -520,6 +476,11 @@ export async function publishWorkspaceOp(
     if (!role || !canWriteNamespaceRule(role, namespace)) {
         return refuse(403, 'ACCESS_DENIED', 'Admin/creator role required to publish in a meta.* namespace');
     }
+    // A record space that names extensions takes the publish of a caller that is not a person only
+    // through one of them (services/fenced-space.ts): publishing a draft is what makes it the
+    // record, and this operation asks no access rule with the record's key.
+    const fenced = await fencedOpRefusal(deps, caller, organismId, ws, { key: `${wsRoot(organismId, ws)}.${namespace}.${id}.latest` });
+    if (fenced) return fenced;
     const archived = await archivedRefusal(storage, `${wsRoot(organismId, ws)}.`);
     if (archived) return refuse(409, 'ARCHIVED', archived);
     const cfg = await readOrganismConfig(storage, organismId);
@@ -628,9 +589,19 @@ export async function publishRecordsBatchOp(
     const firstId = useRecords ? (list.find(r => typeof (r as { id?: unknown } | null)?.id === 'string') as { id: string } | undefined)?.id : undefined;
     if (firstId) {
         const access = await checkOrganismNamespaceAccess({ storage, config },
-            { principal: caller.principal, owner: caller.ownerName, roles: caller.roles },
+            { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, extension: caller.extension },
             `${rootOf(organismId, ws)}.${namespace}.${firstId}`, 'write');
-        if (access) return refuse(access.status, access.code, access.message);
+        if (access) return refuse(access.status, access.code, access.message, access.details);
+    }
+    // A record space that names extensions takes the publish of a caller that is not a person only
+    // through one of them (services/fenced-space.ts). Asked for EVERY record of the batch, a draft
+    // id as much as a direct value: the access check above reads one key of a batch of direct values
+    // and none of a batch of draft ids.
+    if (ws) {
+        const keys = list.map(r => (useRecords ? (r as { id?: unknown } | null)?.id : r))
+            .filter((x): x is string => typeof x === 'string' && !!x).map(x => `${rootOf(organismId, ws)}.${namespace}.${x}`);
+        const fenced = await fencedOpRefusal(deps, caller, organismId, ws, { keys });
+        if (fenced) return fenced;
     }
     // The publish review gate is one approval per record (POST /v1/organisms/:id/publish files it on
     // the record's draft). A batch of direct values has no drafts to approve, so it is refused whole,
@@ -745,6 +716,15 @@ export async function deleteRecordsBatchOp(
     const callerId = caller.principal;
     const ids = args.ids.filter((x: unknown): x is string => typeof x === 'string' && !!x);
     if (ids.length === 0) return refuse(400, 'INVALID_INPUT', 'ids must hold at least one non-empty string');
+
+    // A record space that names extensions takes a delete from a caller that is not a person only
+    // through one of them (services/fenced-space.ts). The family a caller owns includes the rows
+    // under its owner's name (isSameOwner below), so an agent removed the published copy of a
+    // record the app's tool had written.
+    if (ws) {
+        const fenced = await fencedOpRefusal(deps, caller, organismId, ws, { keys: ids.map(x => `${root}.${namespace}.${x}`) });
+        if (fenced) return fenced;
+    }
 
     // Append-only guard ONCE (per-namespace policy): a create_only namespace refuses record deletion
     // on every path, so existing events can never be erased. If it is append-only, refuse the batch.
