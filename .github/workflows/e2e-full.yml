@@ -156,6 +156,20 @@ jobs:
           AIMEAT_TEST_SOFTWARE_VERSION: '4.0.0'
         run: node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --tests-file=test/version-aware-suites.txt --workers=4
 
+      # The unit tests branch on the release too (a *_REMOVED_IN constant, unprovenFormatLive,
+      # legacyMorselFieldsLive), so the whole unit suite runs as 4.0.0 here, with no list: a new
+      # version-aware unit test is covered the night it lands. The override needs test mode and a
+      # loopback base URL (src/utils/version.ts testVersionOverride). It runs even when the step above
+      # is red, so one night reports both halves.
+      - name: Unit suite as node 4.0.0
+        if: ${{ !cancelled() }}
+        working-directory: aimeat
+        env:
+          AIMEAT_TEST_SOFTWARE_VERSION: '4.0.0'
+          AIMEAT_TEST_MODE: 'true'
+          AIMEAT_BASE_URL: 'http://localhost:40050'
+        run: pnpm test
+
   # THE ISSUE IS WRITTEN BY A JOB OF ITS OWN. The sweep installs and runs the whole dependency tree,
   # so it holds a token that can only read; this job holds the one that writes issues and runs
   # nothing but the gh CLI the runner carries. It reads each leg's result from this run (a sweep leg
