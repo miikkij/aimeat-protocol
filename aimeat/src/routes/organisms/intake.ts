@@ -19,6 +19,9 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   v1.5.0 — 2026-10-13 — The public submit enforces the form's `max_per_day`: past it, 429
+ *     INTAKE_DAILY_LIMIT and nothing is written (services/intake-daily-count.ts). The field was
+ *     stored from the first version and nothing read it.
  *   v1.2.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/intake/forms. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.1.0 — 2026-10-01 — The public form read carries a field's options and length limit, and marks a
  *     field required when the form lists it in required_fields, so a renderer draws what the submit enforces.
@@ -49,6 +52,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
+import { takeDailySlot, forgetDailyCount } from '../../services/intake-daily-count.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
@@ -250,6 +254,7 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     // The copy the public door reads is the one removed, so the link really stops working.
     const rec = await readFormRecord(org, ws, formId);
     if (rec) await storage.deleteMemory(rec.ownerGaii, key);
+    if (rec) await forgetDailyCount(storage, config.nodeId, { org, ws, formId });
     emitChange('organisms');
     res.json(success(config.nodeId, { deleted: !!rec }));
   });
@@ -322,6 +327,13 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
       const destLatest = `organism.${org}.w.${ws}.${cfg.namespace}.${id}.latest`;
       const vres = await validateMemoryWrite(destLatest, record, storage);
       if (!vres.valid) { res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED', 'Submission does not match the form schema', 422, vres.errors)); return; }
+
+      // The form's own cap for a day, after every refusal that writes nothing and before the write:
+      // a submission the form would not have stored uses none of the count. The per-IP limit above
+      // bounds one sender; this bounds the form, whoever sends.
+      if (cfg.maxPerDay && !(await takeDailySlot(storage, config.nodeId, { org, ws, formId }, cfg.maxPerDay))) {
+        res.status(429).json(error(config.nodeId, 'INTAKE_DAILY_LIMIT', 'This form has taken all the submissions it takes in one day. Try again tomorrow.')); return;
+      }
 
       // Respect the workspace publish-review gate: if it's on, a submission can only become a draft.
       const orgCfg = await readConfig(org);
