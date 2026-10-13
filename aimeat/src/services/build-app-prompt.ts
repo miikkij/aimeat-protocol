@@ -15,6 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-13 — The scope notes name the words node 4.0 asks of an app's calls (ext:invoke, agent:read, task:write, workflow:write, organism:read, organism:invite). Additive.
  *   2026-10-11 — A comment calls a morsel amount pacing, not a price (no prompt text changed).
  *   2026-10-11 — Events first, a timer last: the section "Live updates without a firehose" moved to build-events-first.ts and opens with that rule; the real-time section's last line points a simple app at AIMEAT.live, where it said "on a timer".
  *   2026-10-02 — The agent-face part names aimeat-format-md: the app's own extension action answers ?format=md. The AI line: when a capability is off, show its `fix` with a link to `settingsUrl`.
@@ -255,7 +256,7 @@ function composeAppPrompt(
   for (const [s, d] of Object.entries(APP_GRANTABLE_SCOPES)) {
     body += '- `' + s + '` — ' + d + '\n';
   }
-  body += 'Notes: deleting memory keys needs `memory:delete` (NOT in the defaults). File DELETION is covered by `storage:write` — there is NO storage:delete scope. AI features need `ai:use`.\n\n';
+  body += 'Notes: deleting memory keys needs `memory:delete` (NOT in the defaults). File DELETION is covered by `storage:write` — there is NO storage:delete scope. AI features need `ai:use`. From node 4.0 these calls need a word of their own, and the publish answer names a missing one (undeclared-scope-words): an extension action (`/v1/ext/...`, `AIMEAT.webhook`, `AIMEAT.iam.init({ ext })`, a cortex lib that calls one) needs `ext:invoke`; the agent list (`AIMEAT.agents.list`) `agent:read`; a task or a new schedule (`AIMEAT.agents.createTask`, `AIMEAT.refinery.schedule`) `task:write`; a schedule edit `workflow:write`; an organism\'s workspaces or intake forms `organism:read`; workspace access `organism:invite`.\n\n';
 
   // Data storage
   body += '### Data Storage\n';

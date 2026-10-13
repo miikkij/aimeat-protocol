@@ -32,19 +32,26 @@
  *   are left alone (scopeIsCovered), an agent with no list of its own holds nothing on a request
  *   (auth/effective-scopes.ts) and is left alone, and nothing is ever removed. Anonymous mode's shared
  *   agent is left alone too: anyone may hold it, and its words are fixed in auth/anonymous-scopes.ts.
- *   NOT APP GRANTS: a grant
- *   follows its app's `aimeat-scopes` declaration and every refresh trims a word it does not declare
- *   (services/app-grant-scopes.ts), so a word written here would not last.
+ *
+ *   PUBLISHED APPS, the second half (the coordinator's follow-up to the same ruling, 2026-10-13: apps
+ *   too, and nobody edits sixty apps by hand). An app grant follows its app's `aimeat-scopes`
+ *   declaration and a refresh trims what the app does not declare, so a word cannot simply be written
+ *   onto a grant. Instead each app published before the step whose code calls a gated route its
+ *   declaration (or the default set) does not cover gets an allowance (services/app-scope-allowance.ts
+ *   keepWorkingAppsOnce, read by services/app-scope-needs.ts): the words count as declared, and they
+ *   go onto the app's live grants. Its own record, APP_SCOPE_KEEP_WORKING_KEY.
  *
  *   WHEN. Only on a node that runs REST_SCOPE_GATES_ENFORCED_IN or later, so a 3.x node does not run it
- *   and its first 4.0.x start does. ONCE, recorded under `system@<nodeId>`
- *   (REST_SCOPE_KEEP_WORKING_KEY) after the principals, so a start that stops half way runs it again,
- *   and a word the owner removes later stays removed.
+ *   and its first 4.0.x start does. ONCE per half, recorded under `system@<nodeId>`
+ *   (REST_SCOPE_KEEP_WORKING_KEY, APP_SCOPE_KEEP_WORKING_KEY) after the work, so a start that stops
+ *   half way runs it again, and a word the owner removes later stays removed.
  *
- *   WHAT THE OWNER AND THE OPERATOR SEE. One line on each owner's activity feed
- *   (`scope_words_kept`, public/views/home/feed.js) naming the agents and apps and the words they got,
- *   linking to the agent list. One incident on the operator's Security page (`scope_words_kept`,
- *   services/security-incident.ts) with the counts per word. The start-up log names every principal.
+ *   WHAT THE OWNER AND THE OPERATOR SEE. One line on each owner's activity feed for the agents
+ *   (`scope_words_kept`, linking to the agent list) and one for the published apps
+ *   (`app_scope_words_kept`, linking to the App Catalog, where each app's change log names its words
+ *   and the code that needs them), public/views/home/feed.js. One incident on the operator's Security
+ *   page (`scope_words_kept`, services/security-incident.ts) with the counts per word for both. The
+ *   start-up log names every principal and app.
  *
  *   A TOKEN IS A CEILING. A token minted on 3.x carries the list the agent had then, and
  *   withCurrentScopes only narrows it (auth/effective-scopes.ts), so the words take effect from the
@@ -55,6 +62,10 @@
  *   const before = new Date().toISOString();
  *   migrateRestScopeKeepWorkingOnce(storage, config, { existedBefore: before });
  * @version-history
+ *   v1.1.0 — 2026-10-13 — The published apps half (APP_SCOPE_KEEP_WORKING_KEY, keepWorkingAppsOnce), its
+ *     feed line and its counts in the one incident. The principals half takes back from anonymous mode's
+ *     shared agent the words the two earlier steps wrote on it (their run records name it), recorded as
+ *     `sharedAnonymousTakenBack` in this step's record.
  *   v1.0.0 — 2026-10-13 — Initial (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
  */
 import type { AimeatConfig } from '../config.js';
@@ -65,9 +76,15 @@ import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../utils/rest-scope-release.js';
 import { recordAccountEvent } from './account-events.js';
 import { recordSecurityIncident } from './security-incident.js';
+import { keepWorkingAppsOnce, type KeptApp } from './app-scope-allowance.js';
+import {
+  AGENT_READ_GRANT_KEY, AGENT_READ_WORDS, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS, isSharedAnonymous,
+} from './rest-scope-gates-migration.js';
 
-/** The record under `system@<nodeId>` that says this node has run the step. */
+/** The record under `system@<nodeId>` that says this node has run the step for agents and ecosystem apps. */
 export const REST_SCOPE_KEEP_WORKING_KEY = 'migrations.rest-scope-gates-4-0-x.keep-working';
+/** The record that says it has run the published apps half. */
+export const APP_SCOPE_KEEP_WORKING_KEY = 'migrations.rest-scope-gates-4-0-x.app-allowance';
 
 /** One word the 4.0.0 gates check, what it opens there, and who already passes without it. */
 export interface KeepWorkingWord {
@@ -198,6 +215,8 @@ export interface KeepWorkingResult {
   ran: boolean;
   agents: KeptPrincipal[];
   ecosystemApps: KeptPrincipal[];
+  /** Published apps that got an allowance (services/app-scope-allowance.ts). */
+  apps: KeptApp[];
 }
 
 export interface KeepWorkingOptions {
@@ -208,14 +227,28 @@ export interface KeepWorkingOptions {
 }
 
 /**
- * The account of anonymous mode's shared agent (`shared#anonymous@<node>`, server-bootstrap/service-init.ts).
- * Anyone may hold that identity, so its words are fixed in auth/anonymous-scopes.ts (no work, no
- * social write, nothing granted away) and this step never adds to them. The node makes that agent at
- * every start with anonymous mode on, before this step runs, so without this test it would be taken
- * for an agent that existed before.
+ * Take back from anonymous mode's shared agent the words the two earlier steps wrote on it, once:
+ * a word goes only when that step's own run record names this agent, which is the evidence that the
+ * step wrote it. Anyone may hold the shared identity (auth/anonymous-scopes.ts), and the node makes it
+ * at every start with anonymous mode on, so isSharedAnonymous also keeps this step's own words off it.
  */
-function isSharedAnonymous(owner: string): boolean {
-  return owner === 'anonymous' || owner.startsWith('anonymous@');
+async function takeBackFromSharedAnonymous(storage: Storage, system: string): Promise<{ id: string; removed: string[] } | null> {
+  const steps: Array<[string, ReadonlyArray<{ word: string }>]> = [[REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS], [AGENT_READ_GRANT_KEY, AGENT_READ_WORDS]];
+  for (const agent of await storage.listAgents()) {
+    if (!isSharedAnonymous(agent.owner)) continue;
+    const written: string[] = [];
+    for (const [key, words] of steps) {
+      const rec = await storage.getMemory(system, key);
+      const named = (rec?.value as { agents?: unknown } | undefined)?.agents;
+      if (Array.isArray(named) && named.includes(agent.gaii)) written.push(...words.map(w => w.word));
+    }
+    const held = agent.defaultScopes ?? [];
+    const removed = written.filter(w => held.includes(w));
+    if (!removed.length) continue;
+    await storage.updateAgent(agent.gaii, { defaultScopes: held.filter(w => !removed.includes(w)) });
+    return { id: agent.gaii, removed };
+  }
+  return null;
 }
 
 /** Created before `cutoff`; a record without a readable time is taken as existing. */
@@ -234,12 +267,59 @@ export async function migrateRestScopeKeepWorkingOnce(
   config: Pick<AimeatConfig, 'nodeId' | 'accountEventWindow'>,
   opts: KeepWorkingOptions = {},
 ): Promise<KeepWorkingResult> {
-  const result: KeepWorkingResult = { ran: false, agents: [], ecosystemApps: [] };
+  const result: KeepWorkingResult = { ran: false, agents: [], ecosystemApps: [], apps: [] };
   if (!versionAtLeast(opts.version ?? getSoftwareVersion(), REST_SCOPE_GATES_ENFORCED_IN)) return result;
   const system = `system@${config.nodeId}`;
-  if (await storage.getMemory(system, REST_SCOPE_KEEP_WORKING_KEY)) return result;
+  const principalsDue = !(await storage.getMemory(system, REST_SCOPE_KEEP_WORKING_KEY));
+  const appsDue = !(await storage.getMemory(system, APP_SCOPE_KEEP_WORKING_KEY));
+  if (!principalsDue && !appsDue) return result;
   const cutoff = Date.parse(opts.existedBefore ?? new Date().toISOString());
 
+  if (principalsDue) await keepPrincipals(storage, cutoff, result);
+  const anonymous = principalsDue ? await takeBackFromSharedAnonymous(storage, system) : null;
+  // The apps, under their own record, so a node that ran the principals' half before apps were part
+  // of this step still runs the apps' half once.
+  if (appsDue) result.apps = await keepWorkingAppsOnce(storage, config, cutoff);
+
+  const changed = [...result.agents, ...result.ecosystemApps];
+  if (principalsDue) await tellOwners(storage, config, changed);
+  if (appsDue) await tellAppOwners(storage, config, result.apps);
+  if (changed.length + result.apps.length > 0) await tellOperator(storage, config, result);
+
+  if (principalsDue) {
+    await writeRunRecord(storage, system, REST_SCOPE_KEEP_WORKING_KEY, {
+      words: REST_SCOPE_KEEP_WORKING_WORDS.map(w => w.word),
+      agents: result.agents.map(a => ({ id: a.id, words: a.words })),
+      ecosystemApps: result.ecosystemApps.map(a => ({ id: a.id, words: a.words })),
+      sharedAnonymousTakenBack: anonymous,
+    });
+  }
+  if (appsDue) {
+    await writeRunRecord(storage, system, APP_SCOPE_KEEP_WORKING_KEY, {
+      apps: result.apps.map(a => ({ id: a.appId, words: a.words, grants: a.grants })),
+    });
+  }
+  result.ran = true;
+  if (changed.length + result.apps.length > 0) {
+    logger.info(`REST scope gates: ${result.agents.length} agent(s), ${result.ecosystemApps.length} ecosystem app(s) `
+      + `and ${result.apps.length} published app(s) kept working from 3.x with the words 4.0.0 checks`,
+    { principals: changed.map(p => `${p.id}: ${p.words.join(', ')}`), apps: result.apps.map(a => `${a.appId}: ${a.words.join(', ')}`) });
+  }
+  return result;
+}
+
+/** The record that says one half of the step ran, never swept. */
+async function writeRunRecord(storage: Storage, system: string, key: string, value: Record<string, unknown>): Promise<void> {
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key, ownerGaii: system, value: { at: now, ...value }, visibility: 'private', tags: ['migration'],
+    // Never swept: a record that expired would run the step again at the next start.
+    ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+  });
+}
+
+/** The agents and ecosystem apps half: each missing word onto each principal that existed before. */
+async function keepPrincipals(storage: Storage, cutoff: number, result: KeepWorkingResult): Promise<void> {
   for (const listed of await storage.listAgents()) {
     if (!existed(listed.createdAt, cutoff) || isSharedAnonymous(listed.owner)) continue;
     // Read again just before the write, because the write replaces the whole list.
@@ -263,35 +343,27 @@ export async function migrateRestScopeKeepWorkingOnce(
       result.ecosystemApps.push({ id: app.geai, owner: app.owner, name: app.displayName || app.app, words: missing });
     }
   }
+}
 
-  const changed = [...result.agents, ...result.ecosystemApps];
-  await tellOwners(storage, config, changed);
-  if (changed.length > 0) await tellOperator(storage, config, result);
-
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key: REST_SCOPE_KEEP_WORKING_KEY,
-    ownerGaii: system,
-    value: {
-      at: now,
-      words: REST_SCOPE_KEEP_WORKING_WORDS.map(w => w.word),
-      agents: result.agents.map(a => ({ id: a.id, words: a.words })),
-      ecosystemApps: result.ecosystemApps.map(a => ({ id: a.id, words: a.words })),
-    },
-    visibility: 'private',
-    tags: ['migration'],
-    // Never swept: a record that expired would run the step again at the next start.
-    ttlHours: null,
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-  });
-  result.ran = true;
-  if (changed.length > 0) {
-    logger.info(`REST scope gates: ${result.agents.length} agent(s) and ${result.ecosystemApps.length} ecosystem app(s) `
-      + 'kept working from 3.x with the words 4.0.0 checks', { principals: changed.map(p => `${p.id}: ${p.words.join(', ')}`) });
+/** One feed line per app owner: the published apps that kept words, and the words. */
+async function tellAppOwners(
+  storage: Storage, config: Pick<AimeatConfig, 'nodeId' | 'accountEventWindow'>, apps: KeptApp[],
+): Promise<void> {
+  const byOwner = new Map<string, KeptApp[]>();
+  for (const a of apps) byOwner.set(a.owner, [...(byOwner.get(a.owner) ?? []), a]);
+  for (const [owner, kept] of byOwner) {
+    await recordAccountEvent(storage, {
+      ownerGhii: owner.includes('@') ? owner : `${owner}@${config.nodeId}`,
+      kind: 'app_scope_words_kept',
+      subject: APP_SCOPE_KEEP_WORKING_KEY,
+      // The App Catalog, where each app's change log names the words and why it got them.
+      link: '/v1/appcat',
+      data: {
+        names: kept.map(a => a.name).join(', '), count: String(kept.length),
+        words: [...new Set(kept.flatMap(a => a.words))].sort().join(', '),
+      },
+    }, config);
   }
-  return result;
 }
 
 /** One feed line per owner: the agents and apps that got words, and the words. */
@@ -315,20 +387,25 @@ async function tellOwners(
 /** One incident on the Security page with the counts, so the operator sees the whole node at once. */
 async function tellOperator(storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, result: KeepWorkingResult): Promise<void> {
   const changed = [...result.agents, ...result.ecosystemApps];
-  const perWord = new Map<string, number>();
-  for (const p of changed) for (const w of p.words) perWord.set(w, (perWord.get(w) ?? 0) + 1);
-  const owners = new Set(changed.map(p => p.owner)).size;
-  const counts = [...perWord.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([w, n]) => `${w} ${n}`).join(', ');
+  const tally = (items: Array<{ words: string[] }>) => {
+    const perWord = new Map<string, number>();
+    for (const p of items) for (const w of p.words) perWord.set(w, (perWord.get(w) ?? 0) + 1);
+    return [...perWord.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([w, n]) => `${w} ${n}`).join(', ') || 'none';
+  };
+  const owners = new Set([...changed.map(p => p.owner), ...result.apps.map(a => a.owner)]).size;
+  const grants = result.apps.reduce((n, a) => n + a.grants, 0);
   await recordSecurityIncident(storage, config, {
     type: 'scope_words_kept',
     code: 'SCOPE_WORDS_KEPT',
     actorGhii: `system@${config.nodeId}`,
     actorName: 'node',
     source: 'boot',
-    detail: `On its first start as ${REST_SCOPE_GATES_ENFORCED_IN} or later the node gave ${result.agents.length} agent(s) and `
-      + `${result.ecosystemApps.length} ecosystem app(s) of ${owners} owner(s) the permission words that version started to check, `
-      + `so each keeps working as it did on 3.x. Principals per word: ${counts}. Each owner sees one line on the activity feed `
-      + 'and can narrow an agent in its settings or with aimeat_agent_scope_narrow. Apps signed in with an app grant follow '
-      + 'their own aimeat-scopes declaration and got nothing.',
+    detail: `On its first start as ${REST_SCOPE_GATES_ENFORCED_IN} or later the node gave ${result.agents.length} agent(s), `
+      + `${result.ecosystemApps.length} ecosystem app(s) and ${result.apps.length} published app(s) of ${owners} owner(s) the `
+      + 'permission words that version started to check, so each keeps working as it did on 3.x. '
+      + `Agents and ecosystem apps per word: ${tally(changed)}. Published apps per word: ${tally(result.apps)}; `
+      + `${grants} live app grant(s) got the words. Each owner sees one line on the activity feed per kind. An agent `
+      + 'is narrowed in its settings or with aimeat_agent_scope_narrow; an app\'s kept words are removed by its owner with '
+      + 'aimeat_app_manage scope_allowance_remove, and the app\'s change log in the App Catalog says why each was kept.',
   });
 }

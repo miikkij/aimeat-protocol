@@ -42,10 +42,12 @@
  *   boot that stops half way runs it again, and an owner who later takes the word away keeps it away.
  *   A principal made after the run chose from a screen that lists the word.
  * @structure REST_SCOPE_GATES_KEY · REST_SCOPE_NEW_WORDS · AGENT_READ_GRANT_KEY · AGENT_READ_WORDS ·
- *   missingNewWords(held, words?) · migrateRestScopeGatesOnce(storage, nodeId) ·
+ *   isSharedAnonymous(owner) · missingNewWords(held, words?) · migrateRestScopeGatesOnce(storage, nodeId) ·
  *   migrateAgentReadGrantOnce(storage, nodeId)
  * @usage migrateRestScopeGatesOnce(storage, config.nodeId).then(() => migrateAgentReadGrantOnce(storage, config.nodeId))
  * @version-history
+ *   v1.2.0 — 2026-10-13 — Both steps skip anonymous mode's shared agent (isSharedAnonymous). The words they
+ *     already gave it are taken back once by the 4.0.x step (services/rest-scope-keep-working-migration.ts).
  *   v1.1.1 — 2026-10-13 — Header only: the "only new words" rule is superseded for 4.0.x by the third step,
  *     services/rest-scope-keep-working-migration.ts (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-
  *     rest-porttien-uudet-san). No code changed.
@@ -87,6 +89,15 @@ export const AGENT_READ_WORDS: ReadonlyArray<{ word: string; opens: string }> = 
   },
 ];
 
+/**
+ * The account of anonymous mode's shared agent (`shared#anonymous@<node>`, server-bootstrap/service-init.ts).
+ * Anyone may hold that identity, so its words are fixed in auth/anonymous-scopes.ts (no work, no social
+ * write, nothing granted away) and no grant step adds to them.
+ */
+export function isSharedAnonymous(owner: string): boolean {
+  return owner === 'anonymous' || owner.startsWith('anonymous@');
+}
+
 /** The new words a principal holding `held` lacks; none for a wildcard or a domain wildcard that covers them. */
 export function missingNewWords(held: readonly string[], words: ReadonlyArray<{ word: string }> = REST_SCOPE_NEW_WORDS): string[] {
   return words.map(w => w.word).filter(w => !scopeIsCovered(held, w));
@@ -119,6 +130,10 @@ async function grantWords(
   const result: RestScopeGatesMigrationResult = { ran: false, agents: [], ecosystemApps: [] };
 
   for (const agent of await storage.listAgents()) {
+    // Anonymous mode's shared agent: anyone may hold it, and its words are fixed in
+    // auth/anonymous-scopes.ts. Until 2026-10-13 these steps gave it their word too; the 4.0.x step
+    // takes those back once (services/rest-scope-keep-working-migration.ts).
+    if (isSharedAnonymous(agent.owner)) continue;
     const held = agent.defaultScopes;
     // No recorded list: the agent is minted from config.defaultAgentScopes, and writing a list here
     // would replace that fallback rather than extend it (services/scope-vocabulary-migration.ts).
@@ -130,6 +145,7 @@ async function grantWords(
   }
 
   for (const owner of await storage.listOwners()) {
+    if (isSharedAnonymous(owner.name)) continue;
     for (const app of await storage.getEcosystemAppsByOwner(owner.name)) {
       if (app.status !== 'approved' && app.status !== 'active') continue;
       const held = app.scopes;

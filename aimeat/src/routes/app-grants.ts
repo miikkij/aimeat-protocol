@@ -20,6 +20,8 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.26.0 — 2026-10-13 — An app's allowance from the move to 4.0 (services/app-scope-allowance.ts) counts as declared:
+ *     authorize and the silent bridge ask for it, and the refresh's narrowing keeps it.
  *   v1.25.0 — 2026-10-06 — SECURITY: code at an app's draft origin (`<sub>--draft.<appHost>`) is
  *     unpublished on the silent bridge whatever its page sends, so it keeps the grant the owner holds
  *     and asks for anything wider; its authorize request is not origin-bound, so the consent screen
@@ -143,6 +145,7 @@ import { PORTFOLIO_TARGET_PREFIX, appOriginHostFamily, resolveAppOriginTarget, r
 import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
+import { appAllowanceWords, withAllowance } from '../services/app-scope-allowance.js';
 import { hashGrantToken, upsertAppGrant, type GrantSpec } from '../services/app-grant-upsert.js';
 import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -305,7 +308,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
   async function narrowToDeclaration(target: string, stored: string[], ownerAdded: string[] = []): Promise<string[] | null> {
     const declared = await declaredScopesOf(storage, target);
     if (!declared) return null;
-    const kept = narrowToDeclared(stored, declared, ownerAdded);
+    const kept = narrowToDeclared(stored, declared, ownerAdded, await appAllowanceWords(storage, target));
     return kept.length === stored.length ? null : kept;
   }
 
@@ -457,7 +460,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     pendingRequests.set(requestId, {
       requestId, app, appName: appRecord.manifest?.name || app.slice(slash + 1),
       appIcon: appRecord.manifest?.icon || '', appDescription: appRecord.manifest?.description || '',
-      appOrigin: rd.origin, scopes: requested, redirectUri, state, codeChallenge,
+      appOrigin: rd.origin, scopes: withAllowance(requested, await appAllowanceWords(storage, app)), redirectUri, state, codeChallenge,
       codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage, originBound,
       packageApp, prompt: String(req.query.prompt ?? '') === 'create' ? 'create' : '',
       expiresAt: Date.now() + REQUEST_TTL_MS,
@@ -662,7 +665,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const isOwnApp = owner === grantOwner && !unpublishedBytes && !(await isPackageApp(storage, owner, grantTarget));
     const existing = await storage.getAppGrantByOwnerAndApp(owner, grantTarget);
     const fallback = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
-    const wanted = requested.length ? requested : (existing?.scopes ?? fallback);
+    const wanted = withAllowance(requested.length ? requested : (existing?.scopes ?? fallback), await appAllowanceWords(storage, grantTarget));
     const added = existing ? wanted.filter(s => !existing.scopes.includes(s)) : [];
     let scopes: string[];
     if (isOwnApp) {

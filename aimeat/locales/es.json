@@ -208,7 +208,7 @@
           "held_account_names": "Registros que la actualización dejó como estaban",
           "workspace_schema_closed": "Espacios de un espacio de trabajo que rechazan todos los registros",
           "headless_browser": "El navegador propio del servidor no arranca",
-          "scope_words_kept": "Permisos que la actualización dio a los agentes existentes"
+          "scope_words_kept": "Permisos que la actualización dio a los agentes y las apps existentes"
         },
         "source": {
           "workspace_import": "importación de espacio de trabajo",
@@ -11657,6 +11657,8 @@
       "operatorAdminGrantedMany": "{names} recibieron el permiso para administrar esta instalación porque tenían acceso total. Puedes quitárselo en la configuración de cada agente.",
       "scopeWordsKeptOne": "{name} sigue funcionando como antes tras la actualización de AIMEAT: recibió los permisos que la actualización ahora pide ({words}). Puedes quitárselos en la configuración del agente.",
       "scopeWordsKeptMany": "{names} siguen funcionando como antes tras la actualización de AIMEAT: recibieron los permisos que la actualización ahora pide ({words}). Puedes quitárselos en la configuración de cada uno.",
+      "appScopeWordsKeptOne": "Tu app {name} sigue funcionando como antes tras la actualización de AIMEAT: conservó los permisos que usa su código ({words}). El registro de cambios de la app en Apps dice por qué; puedes quitar un permiso con tu IA.",
+      "appScopeWordsKeptMany": "Tus apps {names} siguen funcionando como antes tras la actualización de AIMEAT: conservaron los permisos que usa su código ({words}). El registro de cambios de cada app en Apps dice por qué; puedes quitar un permiso con tu IA.",
       "appPublished": "Publicaste {name}.",
       "appUpdated": "Actualizaste {name}.",
       "appFixDrafted": "Te espera un borrador corregido de {app}. Tu aplicación no cambia hasta que publiques el borrador.",
@@ -20991,6 +20993,8 @@
     "audit.action.protection": "Protección contra copia",
     "audit.action.name": "Nombre cambiado",
     "audit.action.description": "Descripción cambiada",
+    "audit.action.scope_allowance.kept": "Conservó los permisos que usa su código tras la actualización de AIMEAT",
+    "audit.action.scope_allowance.removed": "Permiso conservado quitado",
     "marks.title": "Marcas y autoría",
     "marks.intro": "Lo que este servidor le agrega a la aplicación cuando la sirve, y quién responde por ella.",
     "marks.loading": "Revisando…",

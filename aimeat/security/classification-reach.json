@@ -1985,6 +1985,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The refinery config record, read for its connection id."
     },
+    "src/services/app-scope-allowance.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-13, the node's own read: an app's scope allowance record under the node's app-scope-allowance namespace (the permission words the app kept at the move to 4.0, and the code lines that need them), which the grant routes and the app's owner read. Not the owner's content."
+    },
     "src/services/rest-scope-gates-migration.ts": {
       "reads": {
         "getMemory": 2
@@ -1993,9 +1999,9 @@
     },
     "src/services/rest-scope-keep-working-migration.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 3
       },
-      "why": "Reviewed 2026-10-13, the node's own read: the run-once marker under the node's system identity that says the 4.0.x keep-working scope grant has run. No content is shown to anyone."
+      "why": "Reviewed 2026-10-13, the node's own reads: the two run-once markers under the node's system identity that say each half of the 4.0.x keep-working scope grant (principals, published apps) has run, and the earlier steps' run records, read for the agent ids they name. No content is shown to anyone."
     },
     "src/services/schedule-write.ts": {
       "reads": {

@@ -1,0 +1,241 @@
+/**
+ * @file src/services/app-scope-allowance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The scope words an app keeps from 3.x: per app, the words its code was shown to need
+ *   for a route the 4.0.0 gates check (services/app-scope-needs.ts) and its sign-in did not ask for,
+ *   recorded once at the node's first start as 4.0.x (ruling
+ *   decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san: what worked on 3.x keeps
+ *   working, and nobody edits sixty apps by hand).
+ *
+ *   ONE MEMORY RECORD PER APP, under the node's own namespace APP_SCOPE_ALLOWANCE_NS and the key
+ *   appScopeAllowanceKey(owner/filename), like the design spec (services/app-design-spec.ts). It
+ *   holds the words, the words the owner took away, and the evidence for each word.
+ *
+ *   WHAT IT DOES TO A GRANT. The words count as declared by the app (services/app-grant-scopes.ts
+ *   narrowToDeclared is called with them, routes/app-grants.ts): a refresh or a silent sign-in no
+ *   longer trims them, and the sign-in asks for them beside the app's own declaration. The step that
+ *   records an allowance also writes its words onto every live grant of the app, so each grant has
+ *   them from its next token.
+ *
+ *   ONLY APPS THAT EXISTED. An app published for the first time after the step has no allowance; the
+ *   publish answer warns about each word its code needs and does not declare
+ *   (services/app-artifact-lint.ts). An app that had one keeps it when it is published again, until
+ *   the owner takes a word away; once the app declares a word itself, the allowance word changes
+ *   nothing.
+ *
+ *   THE OWNER TAKES A WORD AWAY with aimeat_app_manage { action: "scope_allowance_remove" } or
+ *   DELETE /v1/apps/:owner/:filename/scope-allowance?words=...: the word leaves the allowance and
+ *   every live grant of the app (unless a grant's own holder added it by hand), and it is kept in
+ *   `removed`, so nothing puts it back.
+ * @structure APP_SCOPE_ALLOWANCE_NS · appScopeAllowanceKey · AppScopeAllowance · readAppScopeAllowance ·
+ *   appAllowanceWords · withAllowance · keepWorkingAppsOnce · readScopeAllowanceFor · removeScopeAllowanceFor
+ * @usage
+ *   const words = await appAllowanceWords(storage, 'alice/notes.html');
+ *   const asked = withAllowance(requested, words);
+ * @version-history
+ *   v1.0.0 — 2026-10-13 — Initial.
+ */
+import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
+import { localAccountName, resolveIdentity } from '../utils/gaii.js';
+import { logger } from '../utils/logger.js';
+import { appKeySegment, equalAppId } from './app-record-keys.js';
+import { resolveAppTarget } from './app-dev-grant.js';
+import { recordAppAudit } from './app-audit.js';
+import { resolveCortexLib } from './component-versions.js';
+import { cortexLibRefs, undeclaredScopeNeeds } from './app-scope-needs.js';
+import { heldOwnerAdded } from './app-grant-scopes.js';
+import { emitChange } from './event-bus.js';
+import { done, refuse, type AppOpCaller, type AppOpOutcome } from './app-op-outcome.js';
+
+/** The namespace the allowance records live under: the node's, not the owner's key budget. */
+export const APP_SCOPE_ALLOWANCE_NS = 'app-scope-allowance';
+const SPEC = 'aimeat.app-scope-allowance/1';
+
+/** `owner/filename` with the owner as a bare account name, as every grant and key reads it. */
+function appIdOf(target: string): string {
+  const slash = target.indexOf('/');
+  return slash <= 0 ? target : `${localAccountName(target.slice(0, slash))}/${target.slice(slash + 1)}`;
+}
+
+export const appScopeAllowanceKey = (appId: string): string => `appscopeallowance.${appKeySegment(appIdOf(appId))}`;
+
+export interface AppScopeAllowance {
+  spec: typeof SPEC;
+  appId: string;
+  /** The words in force. */
+  words: string[];
+  /** Words the owner took away; nothing adds them back. */
+  removed: string[];
+  /** Why each word was given: the code that calls the route, and where it is. */
+  evidence: Array<{ word: string; source: string; evidence: string }>;
+  at: string;
+}
+
+/** This app's allowance, or null when it has none. A portfolio target has none. */
+export async function readAppScopeAllowance(storage: Storage, target: string): Promise<AppScopeAllowance | null> {
+  if (!target.includes('/') || target.startsWith('portfolio:')) return null;
+  const appId = appIdOf(target);
+  const rec = await storage.getMemory(APP_SCOPE_ALLOWANCE_NS, appScopeAllowanceKey(appId));
+  const v = rec?.value as AppScopeAllowance | undefined;
+  return v && v.spec === SPEC && equalAppId(v.appId, appId) && Array.isArray(v.words) ? v : null;
+}
+
+/** The words this app keeps; none when it has no allowance. */
+export async function appAllowanceWords(storage: Storage, target: string): Promise<string[]> {
+  return (await readAppScopeAllowance(storage, target))?.words ?? [];
+}
+
+/** `scopes` and the allowance words it lacks, in that order. */
+export function withAllowance(scopes: readonly string[], words: readonly string[]): string[] {
+  return [...scopes, ...words.filter(w => !scopes.includes(w))];
+}
+
+async function writeAllowance(storage: Storage, value: AppScopeAllowance): Promise<void> {
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: appScopeAllowanceKey(value.appId), ownerGaii: APP_SCOPE_ALLOWANCE_NS, value,
+    visibility: 'private', tags: ['app-scope-allowance'],
+    // Never swept: an allowance that expired would cut an app the step promised would keep working.
+    ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+  });
+}
+
+/** The live grants of one app (any holder). */
+async function liveGrantsOf(storage: Storage, appId: string) {
+  return (await storage.listAppGrants()).filter(g => !g.revoked && equalAppId(appIdOf(g.app), appId));
+}
+
+/** One app the step gave an allowance. */
+export interface KeptApp { appId: string; owner: string; name: string; words: string[]; grants: number }
+
+/**
+ * For every app published before `cutoff` whose code needs a word its sign-in does not ask for:
+ * record the allowance, put the words on its live grants, and note it in the app's own change log.
+ * The caller (services/rest-scope-keep-working-migration.ts) decides that this runs once.
+ */
+export async function keepWorkingAppsOnce(storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, cutoff: number): Promise<KeptApp[]> {
+  const kept: KeptApp[] = [];
+  const libCache = new Map<string, string | null>();
+  const libText = async (name: string, file: string): Promise<string | null> => {
+    const key = `${name}/${file}`;
+    if (!libCache.has(key)) {
+      const found = await resolveCortexLib(storage, name, file).catch((err: unknown) => {
+        // The lib's calls are then not read; the app's own code still is.
+        logger.warn('app scope allowance: a cortex lib could not be read', { lib: key, error: String(err) });
+        return null;
+      });
+      libCache.set(key, found && found.ok ? found.content : null);
+    }
+    return libCache.get(key) ?? null;
+  };
+  for (let offset = 0; ; ) {
+    const { apps, total } = await storage.listAppsWithContent({ adminView: true, limit: 200, offset, sort: 'newest' });
+    for (const app of apps) {
+      if (!/html/i.test(app.mimeType ?? '') && !/\.html?$/i.test(app.filename)) continue;
+      const created = Date.parse(app.createdAt);
+      if (!Number.isNaN(created) && created >= cutoff) continue;
+      const appId = `${app.ownerName}/${app.filename}`;
+      if (await readAppScopeAllowance(storage, appId)) continue;
+      const html = Buffer.isBuffer(app.data) ? app.data.toString('utf8') : String(app.data ?? '');
+      const libs: Array<{ source: string; text: string }> = [];
+      for (const ref of cortexLibRefs(html)) {
+        const text = await libText(ref.name, ref.file);
+        if (text !== null) libs.push({ source: ref.path, text });
+      }
+      const { missing, evidence } = undeclaredScopeNeeds(html, libs);
+      if (!missing.length) continue;
+      await writeAllowance(storage, {
+        spec: SPEC, appId, words: missing, removed: [],
+        evidence: evidence.map(e => ({ word: e.word, source: e.source, evidence: e.evidence.slice(0, 240) })),
+        at: new Date().toISOString(),
+      });
+      let grants = 0;
+      for (const grant of await liveGrantsOf(storage, appId)) {
+        const add = missing.filter(w => !grant.scopes.includes(w));
+        if (!add.length) continue;
+        await storage.updateAppGrant(grant.grantId, { scopes: [...grant.scopes, ...add] });
+        grants++;
+      }
+      await recordAppAudit(storage, {
+        ownerGhii: app.ownerGaii, filename: app.filename, by: `system@${config.nodeId}`, action: 'scope_allowance.kept',
+        detail: { words: missing.join(', '), grants, reason: 'kept working from 3.x: its code calls routes that 4.0.0 checks' },
+      });
+      kept.push({ appId, owner: app.ownerName, name: app.manifest?.name || app.filename, words: missing, grants });
+    }
+    offset += apps.length;
+    if (!apps.length || offset >= total) break;
+  }
+  if (kept.length) emitChange('apps');
+  return kept;
+}
+
+const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
+
+/** The app this call names, in a bucket the caller may build in, or the refusal. */
+async function allowanceTarget(storage: Storage, config: AimeatConfig, caller: AppOpCaller, ref: { owner: string; filename: string }) {
+  if (!FILENAME_RE.test(ref.filename)) return refuse(400, 'INVALID_INPUT', 'Invalid filename.');
+  const t = await resolveAppTarget(storage, config, {
+    callerOwner: localAccountName(caller.owner), requestedOwner: ref.owner === 'me' ? '' : ref.owner,
+    filename: ref.filename, act: 'draft',
+  });
+  if (!t.ok) return refuse(t.status, t.code, t.message);
+  const app = await storage.getAppByOwnerName(t.ownerName, ref.filename);
+  if (!app) return refuse(404, 'NOT_FOUND', 'No such app.');
+  return { ok: true as const, app, appId: `${app.ownerName}/${app.filename}`, delegated: !!t.delegated };
+}
+
+const MEANING = 'These are permissions the app kept when this server moved to 4.0: its code calls routes that '
+  + '4.0 checks, and its aimeat-scopes declaration does not name them. Every person signed in to the app '
+  + 'keeps them. Remove a word you do not want the app to have; declaring the word in the app makes this '
+  + 'list unnecessary.';
+
+/** GET .../scope-allowance: the words the app keeps, the ones taken away, and why each was given. */
+export async function readScopeAllowanceFor(
+  storage: Storage, config: AimeatConfig, caller: AppOpCaller, ref: { owner: string; filename: string },
+): Promise<AppOpOutcome> {
+  const found = await allowanceTarget(storage, config, caller, ref);
+  if (!found.ok) return found;
+  const a = await readAppScopeAllowance(storage, found.appId);
+  return done({ app: found.appId, words: a?.words ?? [], removed: a?.removed ?? [], evidence: a?.evidence ?? [], at: a?.at ?? null, meaning: a ? MEANING : 'This app keeps no permissions from the move to 4.0.' });
+}
+
+/**
+ * DELETE .../scope-allowance?words=a,b: the owner takes words away. They leave the allowance and
+ * every live grant of the app (a word a grant's holder added by hand stays on that grant), and are
+ * kept as removed. Owner only: a builder is refused.
+ */
+export async function removeScopeAllowanceFor(
+  storage: Storage, config: AimeatConfig, caller: AppOpCaller, ref: { owner: string; filename: string }, rawWords: unknown,
+): Promise<AppOpOutcome> {
+  const found = await allowanceTarget(storage, config, caller, ref);
+  if (!found.ok) return found;
+  if (found.delegated) return refuse(403, 'FORBIDDEN', 'Only the app owner removes a permission the app kept.');
+  const words = (Array.isArray(rawWords) ? rawWords : String(rawWords ?? '').split(/[\s,]+/))
+    .map(w => String(w).trim()).filter(Boolean);
+  if (!words.length) return refuse(400, 'INVALID_INPUT', 'words is required: the permission words to remove, for example ext:invoke.');
+  const a = await readAppScopeAllowance(storage, found.appId);
+  const taking = a ? words.filter(w => a.words.includes(w)) : [];
+  if (!a || !taking.length) {
+    return refuse(404, 'NOT_FOUND', `The app keeps none of: ${words.join(', ')}. Read the list with scope_allowance.`);
+  }
+  await writeAllowance(storage, {
+    ...a, words: a.words.filter(w => !taking.includes(w)), removed: [...new Set([...a.removed, ...taking])],
+  });
+  let grants = 0;
+  for (const grant of await liveGrantsOf(storage, found.appId)) {
+    const own = heldOwnerAdded(grant);
+    const next = grant.scopes.filter(s => !taking.includes(s) || own.includes(s));
+    if (next.length === grant.scopes.length) continue;
+    await storage.updateAppGrant(grant.grantId, { scopes: next });
+    grants++;
+  }
+  await recordAppAudit(storage, {
+    ownerGhii: found.app.ownerGaii, filename: found.app.filename, by: resolveIdentity(caller, config.nodeId),
+    action: 'scope_allowance.removed', detail: { words: taking.join(', '), grants },
+  });
+  logger.info('app scope allowance: words removed by the owner', { app: found.appId, words: taking, grants });
+  emitChange('apps');
+  return done({ app: found.appId, removed: taking, words: a.words.filter(w => !taking.includes(w)), grants_changed: grants });
+}

@@ -41,6 +41,8 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   2026-10-13 — undeclared-scope-words: a warning naming each word the code (and the cortex libs it loads,
+ *     read from this node) needs on a 4.0 node and the sign-in does not ask for (services/app-scope-needs.ts).
  *   2026-10-02 — Classic with kit blocks is a case of its own (wish-a-classic-app-that-loads-the-
  *     atelier-kit-for-its-library-blo): `aimeat-track` classic plus the kit is silent when the page
  *     calls into AIMEAT.atelier and draws no shell. The track-mixing warning stays for a Classic
@@ -98,6 +100,7 @@ import { extractInlineScripts, moduleGoalAvailable, parseSource, selfTest } from
 import { logger } from '../utils/logger.js';
 import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
 import { registerIsOwed } from './app-build-level-meta.js';
+import { undeclaredScopeFindings } from './app-scope-needs.js';
 
 /**
  * One finding, shaped so an agent can act on it without prose parsing: a curated pitfall id, the
@@ -152,6 +155,8 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   warnings.push(...checkAgentDataReads(html));
   warnings.push(...checkDeclaredButUnused(html));
   warnings.push(...checkTrackMixing(html));
+  // A word the code needs on a 4.0 node and the sign-in does not ask for (services/app-scope-needs.ts).
+  warnings.push(...await undeclaredScopeFindings(html, (path) => readNodeLib(path, config)));
   // No served-copy check: services/app-publish.ts strips the node's serve marks before this runs and
   // names them in its own result (services/app-serve-marks-strip.ts), so there is nothing left here
   // to warn about.
@@ -573,6 +578,24 @@ async function probeNodeAssets(paths: string[], config: AimeatConfig): Promise<A
     + `${dead.join(', ')}. The app would throw before it drew anything. The SDK libraries live under `
     + '/v1/libs/ (aimeat-auth.js, aimeat-data.js, …) and the vendored packs under /lib/ — take the exact '
     + 'URLs from GET /v1/prompts/build-app rather than guessing one that looks right.')];
+}
+
+/**
+ * The text of a cortex lib this node serves at `path`, read the way probeOne reaches the node (its own
+ * port and nothing else), or null. Off with the asset probe, so a test node that does not answer its
+ * own port reads the app's own code only.
+ */
+async function readNodeLib(path: string, config: AimeatConfig): Promise<string | null> {
+  if (!config.appAssetProbe || !path.startsWith('/v1/cortex/')) return null;
+  const target = new URL(`http://127.0.0.1:${config.port}`);
+  target.pathname = path;
+  try {
+    const res = await fetch(target, { redirect: 'manual', headers: { 'User-Agent': 'aimeat-publish-asset-probe' }, signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    return res.ok ? (await res.text()).slice(0, 2_000_000) : null;
+  } catch (err) {
+    logger.warn('app artifact lint: a cortex lib could not be read for the scope check', { path, error: String(err) });
+    return null;
+  }
 }
 
 /** The status of one path, or null when the node could not get an answer at all. */

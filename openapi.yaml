@@ -33493,6 +33493,60 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/scope-allowance:
+    get:
+      operationId: appScopeAllowanceGet
+      summary: The permissions the app kept when this node moved to 4.0
+      description: >
+        On its first start as 4.0.x the node read every published app's code. An app whose code calls
+        a route that 4.0 checks (extension actions, the agent list, organism workspaces, schedules and
+        the rest) and whose `aimeat-scopes` declaration, or the default set when it declares none, did
+        not name the word kept that word: it counts as declared, every live grant of the app got it,
+        and sign-in asks for it. An app published for the first time after that start keeps nothing;
+        its publish answer warns about each word instead. Returns `{ app, words, removed, evidence, at,
+        meaning }`: `evidence` names the code that needs each word. For the owner, the owner's agents
+        and everybody holding a development right. Needs `app:write`. MCP: `aimeat_app_manage` action
+        `scope_allowance`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: appScopeAllowanceRemove
+      summary: Remove permissions the app kept
+      description: >
+        Owner-only (the owner or one of their agents); a builder holding a development right is
+        refused with 403. `words` (query, or the body's `words` array) names the permission words to
+        remove. Each leaves the app's kept list and every live grant of the app, except where a
+        grant's holder added it by hand, and is remembered as removed, so nothing gives it back.
+        Returns `{ app, removed, words, grants_changed }`; 404 when the app keeps none of the words.
+        Needs `app:manage`. MCP: `aimeat_app_manage` action `scope_allowance_remove`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: words, in: query, required: false, schema: { type: string }, description: 'Comma- or space-separated permission words, e.g. ext:invoke.' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/apps/{owner}/{filename}/dev-grants:
     get:
       operationId: appDevGrantsList

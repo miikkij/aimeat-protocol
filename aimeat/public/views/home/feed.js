@@ -13,6 +13,7 @@
  * @version-history
  *   2026-10-13: scope_words_kept, filed under access: which of your agents and apps the first start as
  *     4.0.x gave the permissions that version started to check, and which permissions.
+ *     app_scope_words_kept beside it: which of your published apps kept permissions their code uses.
  *   2026-10-08: app_fix_drafted, with the agents' news: the fixing agent wrote a corrected draft.
  *   2026-10-04: agent_task_declined, filed with the agents' news and not under trouble: the agent's
  *     refusal and its reason.
@@ -156,6 +157,12 @@ export function line(item) {
           .replace('{name}', d.names || '').replace('{words}', d.words || '')
         : tr('home.feed.scopeWordsKeptMany', '{names} keep working as before after the AIMEAT update: they got the permissions the update now asks for ({words}). You can take them away in each one\'s settings.')
           .replace('{names}', d.names || '').replace('{words}', d.words || '');
+    case 'app_scope_words_kept':
+      return d.count === '1'
+        ? tr('home.feed.appScopeWordsKeptOne', 'Your app {name} keeps working as before after the AIMEAT update: it kept the permissions its code uses ({words}). Each app\'s change log in Apps says why; you can remove a permission there with your AI.')
+          .replace('{name}', d.names || '').replace('{words}', d.words || '')
+        : tr('home.feed.appScopeWordsKeptMany', 'Your apps {names} keep working as before after the AIMEAT update: they kept the permissions their code uses ({words}). Each app\'s change log in Apps says why; you can remove a permission there with your AI.')
+          .replace('{names}', d.names || '').replace('{words}', d.words || '');
     case 'app_published':
       return tr('home.feed.appPublished', 'You published {name}.').replace('{name}', d.name || '');
     case 'app_updated':
@@ -271,7 +278,7 @@ export function kindCategory(kind) {
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
-    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept'].includes(k)) return 'access';
+    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept', 'app_scope_words_kept'].includes(k)) return 'access';
   return 'system';
 }
 

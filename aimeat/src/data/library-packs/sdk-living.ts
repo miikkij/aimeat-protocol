@@ -13,6 +13,8 @@
  * @structure LIVING_PACKS: LibraryPack[]
  * @usage Imported by ./sdk.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.5.1 — 2026-10-13 — The aiDoc says a page with triggers or sources declares ext:invoke, which node 4.0
+ *     asks on every living-hooks delivery. Additive.
  *   v1.5.0 — 2026-09-19 — aimeat-living 0.8.0: the ninth node type, `decide`, with a worked example
  *     of a support ticket moved by the decision model, and what the builder sends and declares.
  *   v1.4.0 — 2026-09-06 — The aiDoc names `{{secret:NAME}}` in a trigger's or a source's headers
@@ -184,7 +186,8 @@ export const LIVING_PACKS: LibraryPack[] = [
       'calls a third-party address itself, the owner\'s allowlist decides which hosts may be reached, and a',
       'guest sees both roads disabled with words rather than a page that quietly does nothing. Two switches',
       'are the owner\'s and both live in the record: `hooks: { enabled: false }` on the document stops every',
-      'trigger at once, and `enabled` on a trigger stops that one.',
+      'trigger at once, and `enabled` on a trigger stops that one. Each delivery is an extension action, so a',
+      'page with triggers or sources declares ext:invoke in <meta name="aimeat-scopes">; node 4.0 refuses it without.',
       'A KEY IS NAMED, NEVER WRITTEN. Both a trigger and a source take `headers: { "X-Api-Key": "{{secret:NAME}}" }`,',
       'and the node fills the placeholder from the signed-in owner\'s vault on the way out: the record',
       'holds the name, the browser never sees the value, and a name the owner has not stored fails as',

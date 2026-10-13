@@ -18,6 +18,8 @@
  *   · afterApproval(approved, existing, shown)
  * @usage import { afterApproval, heldOwnerAdded } from '../services/app-grant-scopes.js';
  * @version-history
+ *   v1.2.0 — 2026-10-13 — narrowToDeclared takes the app's allowance from the move to 4.0 and keeps its words
+ *     as declared (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
  *   v1.1.0 — 2026-10-02 — withAppPurge(): an app granted memory:delete is granted memory:purge with it.
  *   v1.0.0 — 2026-09-26 — Initial.
  */
@@ -46,9 +48,13 @@ export function heldOwnerAdded(grant: GrantWords | null | undefined): string[] {
   return [...new Set((grant?.ownerAddedScopes ?? []).filter(s => held.has(s)))];
 }
 
-/** A grant brought down to what its app declares: the stored words it declares, and the owner's own. */
-export function narrowToDeclared(stored: string[], declared: string[], ownerAdded: string[]): string[] {
-  return stored.filter(s => declared.includes(s) || ownerAdded.includes(s));
+/**
+ * A grant brought down to what its app declares: the stored words it declares, the owner's own, and
+ * the words the app kept when the node moved to 4.0 (`allowance`, services/app-scope-allowance.ts),
+ * which count as declared, so a refresh or a silent sign-in does not trim them.
+ */
+export function narrowToDeclared(stored: string[], declared: string[], ownerAdded: string[], allowance: readonly string[] = []): string[] {
+  return stored.filter(s => declared.includes(s) || ownerAdded.includes(s) || allowance.includes(s));
 }
 
 /**

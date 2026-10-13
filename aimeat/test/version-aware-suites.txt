@@ -29,6 +29,7 @@ e2e-app-draft
 e2e-app-grants
 e2e-app-store-license
 e2e-app-template-proposals
+e2e-app-scope-allowance
 e2e-app-tool-free-mcp
 e2e-commerce
 e2e-exchange

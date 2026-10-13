@@ -109,6 +109,8 @@
  *   2026-10-05 -- registerDesignSpecRoutes takes no appTarget: the build test moved with the handlers'
  *     logic to services/app-design-spec-ops.ts; aimeat_app_manage calls the service in place of the
  *     route over loopback HTTP (secaudit 2026-10, M6).
+ *   2026-10-13 -- registerScopeAllowanceRoutes: the permissions an app kept when the node moved to 4.0
+ *     (apps/scope-allowance.ts).
  */
 import { Router } from 'express';
 import { localAccountName } from '../utils/gaii.js';
@@ -127,6 +129,7 @@ import { registerLegalRoutes } from './apps/legal.js';
 import { registerRoadmapRoutes } from './apps/roadmap.js';
 import { registerDesignSpecRoutes } from './apps/design-spec.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
+import { registerScopeAllowanceRoutes } from './apps/scope-allowance.js';
 import { registerAppConfigRoutes } from './apps/app-config.js';
 import { registerAdminSeoRoutes } from './admin-seo.js';
 
@@ -191,6 +194,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerLegalRoutes(router, config, storage, canonicalOwner);
     registerRoadmapRoutes(router, config, storage, appTarget);
     registerDesignSpecRoutes(router, config, storage);
+    registerScopeAllowanceRoutes(router, config, storage);
     registerAppAgentRoutes(router, config, storage);
     registerAppConfigRoutes(router, config, storage);
     // The operator's search-visibility surface: the node's own status, and the per-app block and

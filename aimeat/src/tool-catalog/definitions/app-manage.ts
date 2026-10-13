@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-13 — scope_allowance and scope_allowance_remove, with the `words` field: the permissions an
+ *     app kept when the node moved to 4.0, and the owner taking one away (services/app-scope-allowance.ts).
  *   2026-10-12 — settings takes `listing` (listed, community, unlisted); `parked` stays as its older
  *     two-state form.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -142,6 +144,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
     // design spec (routes/apps/design-spec.ts)
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },
+    words: { type: 'array', description: 'For scope_allowance_remove: the permission words to take away from what the app kept when this server moved to 4.0, e.g. ["ext:invoke"]. Read them first with scope_allowance.', zod: z.array(z.string()) },
     expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). When the stored revision differs the write is refused with REVISION_MISMATCH and the current document, so read again and write from that. Omit it to replace whatever is there.', zod: z.number().int().min(0) },
 };
 
@@ -221,6 +224,11 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'write the whole design spec (read it first with spec). Keep what is still true, change what is not, and write it back after every publish with what changed; the publish answer says when it has fallen behind. The same text again marks it current for the app\'s version. The owner and everybody who may build the app' },
     spec_clear: { fields: F(['filename'], ['owner']), scope: 'app:write',
         summary: 'remove the design spec. Owner only: a builder corrects it with spec_set instead' },
+    // The permissions the app kept when the node moved to 4.0 (services/app-scope-allowance.ts).
+    scope_allowance: { fields: F(['filename'], ['owner']), scope: 'app:write',
+        summary: 'the permissions the app kept when this server moved to 4.0 because its code calls routes its aimeat-scopes declaration does not name: the words, the code that needs each, and the words its owner removed. The owner and everybody who may build the app' },
+    scope_allowance_remove: { fields: F(['filename', 'words'], ['owner']), scope: 'app:manage',
+        summary: 'take kept permissions away from the app: they leave every live grant of the app and stay removed. Owner only. Declaring the word in the app\'s aimeat-scopes is the other way to end the need for the list' },
 };
 
 export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
