@@ -27,6 +27,9 @@
  *   if (refusal) { res.status(400).json(refusal); return; }
  *   const aud = mcpAudienceRefusal(verified, config); // null when the MCP endpoint takes the token
  * @version-history
+ *   v1.0.1 — 2026-10-13 — namesMcpResource and apexOf take off trailing slashes in one pass
+ *     (stripTrailingSlashes), not with a regex that runs in quadratic time on a client-supplied
+ *     `resource` (code scanning alert 1733).
  *   v1.0.0 — 2026-10-12 — Initial (wish-mcp-oauth-vaatii-pkce-n-ja-sitoo-tokenin-mcp-osoitteeseen,
  *     Core 2026-11 evidence MCP-06 and MCP-07).
  */
@@ -35,6 +38,7 @@ import type { VerifiedToken } from '../auth/jwt.js';
 import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
 import { getStats } from '../services/stats.js';
 import { logger } from '../utils/logger.js';
+import { stripTrailingSlashes } from '../utils/url-validator.js';
 
 /** The release in which PKCE, the resource indicator and the token audience stop being optional. */
 export const MCP_OAUTH_LAX_REMOVED_IN = '4.0.0';
@@ -45,7 +49,7 @@ export function mcpOAuthLaxLive(version: string = getSoftwareVersion()): boolean
 }
 
 function apexOf(config: AimeatConfig): string {
-    return config.baseUrl.replace(/\/+$/, '');
+    return stripTrailingSlashes(config.baseUrl);
 }
 
 /** The audience every MCP OAuth access token of this node carries: the canonical MCP endpoint. */
@@ -57,10 +61,14 @@ export function mcpResourceOf(config: AimeatConfig): string {
  * Does this resource identifier name this node's MCP endpoint? The canonical `/v1/mcp`, its `/mcp`
  * alias, a `/v2/mcp/<role>` surface, and the origin itself, which is the `resource` the bare
  * `/.well-known/oauth-protected-resource` document names. A trailing slash is ignored.
+ *
+ * The value comes from the client, so the trailing slashes go in one pass (stripTrailingSlashes):
+ * `replace(/\/+$/, '')` retries from every slash of a long run that has a character after it, and
+ * that is quadratic time on a request anybody can send.
  */
 export function namesMcpResource(config: AimeatConfig, value: string): boolean {
     const apex = apexOf(config);
-    const v = value.trim().replace(/\/+$/, '');
+    const v = stripTrailingSlashes(value.trim());
     if (v === apex || v === `${apex}/v1/mcp` || v === `${apex}/mcp`) return true;
     return v.startsWith(`${apex}/v2/mcp/`) && /^[a-z]+$/.test(v.slice(`${apex}/v2/mcp/`.length));
 }

@@ -11,6 +11,8 @@
  *   the running version switched per test: a 4.0.0 run and a 3.x run of the same code.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-oauth-binding.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-13 — namesMcpResource pinned directly: what it accepts, what it refuses, and the
+ *     long slash run that made its regex trim quadratic (code scanning alert 1733).
  *   v1.0.0 — 2026-10-12 — Initial (wish-mcp-oauth-vaatii-pkce-n-ja-sitoo-tokenin-mcp-osoitteeseen).
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -35,6 +37,7 @@ import { initSessionAuth } from '../../src/auth/middleware.js';
 import { getStats, initStats } from '../../src/services/stats.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import { mcpRouter } from '../../src/mcp/index.js';
+import { namesMcpResource } from '../../src/mcp/oauth-binding.js';
 
 const NODE_ID = 'aimeat-mcp-oauth-test';
 const BASE_URL = 'https://node.test';
@@ -244,5 +247,34 @@ describe('MCP OAuth on a 3.x node', () => {
         expect(r.body.resource_indicators_supported).toBe(true);
         const prm = await call('GET', '/.well-known/oauth-protected-resource/v1/mcp');
         expect(prm.body.resource).toBe(MCP_RESOURCE);
+    });
+});
+
+describe('namesMcpResource', () => {
+    const cfg = { baseUrl: `${BASE_URL}/` } as AimeatConfig;
+
+    it('names the MCP endpoint, its aliases and the origin, with any run of trailing slashes and outer whitespace', () => {
+        for (const value of [
+            BASE_URL, `${BASE_URL}/`, `${BASE_URL}////`,
+            MCP_RESOURCE, `${MCP_RESOURCE}/`, `${MCP_RESOURCE}${'/'.repeat(50)}`, `  ${MCP_RESOURCE}//  `,
+            `${BASE_URL}/mcp`, `${BASE_URL}/mcp/`,
+            `${BASE_URL}/v2/mcp/agent`, `${BASE_URL}/v2/mcp/owner///`,
+        ]) expect(namesMcpResource(cfg, value), value).toBe(true);
+    });
+
+    it('does not name another resource, a role that is not lowercase letters, or a slash run with text after it', () => {
+        for (const value of [
+            '', '/', 'https://other.example/v1/mcp', `${BASE_URL}/v1/mcpx`, `${BASE_URL}/v2/mcp`, `${BASE_URL}/v2/mcp/`,
+            `${BASE_URL}/v2/mcp/Agent`, `${BASE_URL}/v2/mcp/agent/x`, `${MCP_RESOURCE}/ /`, `${MCP_RESOURCE}//x`,
+        ]) expect(namesMcpResource(cfg, value), value).toBe(false);
+    });
+
+    it('answers in linear time on a client-supplied resource that ends in a long slash run with one character after it', () => {
+        // The input that makes `replace(/\/+$/, '')` retry from every slash before it fails: about
+        // three seconds at 100k slashes, and the value arrives from the client as `resource`.
+        const hostile = `${MCP_RESOURCE}${'/'.repeat(100_000)}x`;
+        const started = Date.now();
+        expect(namesMcpResource(cfg, hostile)).toBe(false);
+        expect(Date.now() - started).toBeLessThan(250);
     });
 });
