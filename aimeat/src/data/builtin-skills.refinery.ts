@@ -16,6 +16,8 @@
  * @structure REFINERY_SKILL_ENTRY
  * @usage import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
  * @version-history
+ *   v1.2.0 — 2026-10-13 — The definition's `keepText`, and what a row then holds: `text`, `textKept`
+ *     and each attachment's `text`.
  *   v1.1.3 — 2026-10-05 — Without all four permissions the run tool is not offered, and a batch's model
  *     calls do not count toward the account's AI call limit (secaudit 2026-10, C3 and C5).
  *   v1.1.2 — 2026-10-05 — The extraction asks the model as whoever runs the batch, and an app's
@@ -85,6 +87,7 @@ One private memory record, \`<prefix>.config\`, where \`<prefix>\` is lowercase 
 | \`rules\` | learned rules, \`[{ match: "from" \\| "domain" \\| "message", value, klass }]\` |
 | \`models\` | \`{ text, vision }\`, empty for the owner's defaults |
 | \`spaces\` | \`{ items, events }\`, default \`viesti\` and \`tapahtuma\` |
+| \`keepText\` | \`true\` keeps the mail's text on each row (below). Default \`false\`. Set it only with the person's word: it puts the content of their mail into the workspace |
 
 Start from the packs: \`aimeat_refinery_classes\` says what each kind is, whether it is processed, and
 which fields it reads. A newsletter and a personal letter are filed, not processed.
@@ -103,6 +106,13 @@ sure, and \`attachments\` names the stored PDFs. An attachment whose classificat
 it is still stored and named there, with an \`error\` that says why (\`CLASSIFIED: …\`), and its text is left
 out of what the model reads; the message itself is filed as usual. To have it read, the person lowers
 that file's classification (\`aimeat_classification\`) and you rerun the message with \`message_ids\`.
+
+A row holds a \`snippet\`, the first 280 characters of the message. With \`keepText: true\` in the
+definition it also holds \`text\`, the message's own text as the batch read it (at most 20 000
+characters), \`textKept: true\`, and on each attachment whose text layer was read, \`text\` (at most
+20 000 characters). A scanned PDF has no text layer, so its attachment has no \`text\`. Rows filed
+before the flag was set keep only the snippet: rerun a message with \`message_ids\` to give its row
+the text. A tool or an agent that checks the read fields against what the mail said needs these.
 
 ## Running
 

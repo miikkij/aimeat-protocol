@@ -33,6 +33,8 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.3.1 — 2026-10-13 — The Email row: a refinery row holds the mail's text only when the
+ *     definition says `keepText`.
  *   v1.3.0 — 2026-10-13 — "What an app cannot give": the runtime has a browser tool now, within the
  *     hostnames a definition names (crewaimeat 57b2cf0).
  *   v1.2.0 — 2026-10-13 — A calendar goes out as an ICS feed of a shared records space
@@ -141,7 +143,7 @@ free time) and \`aimeat-workflows\` (a run with a step that waits for a person).
 
 | Source | How it reaches AIMEAT | What wakes the agent |
 |---|---|---|
-| Email | The mail refinery reads a connected mailbox on a clock and writes each message as a workspace row (skill \`aimeat-refinery\`) | A clock, set a few minutes after the refinery's, or a workflow that starts on the new rows (below) |
+| Email | The mail refinery reads a connected mailbox on a clock and writes each message as a workspace row (skill \`aimeat-refinery\`). The row holds the read fields and a 280-character snippet; it holds the message's text and each PDF's text only when the definition says \`keepText\`, which a tool that checks the fields against the mail needs | A clock, set a few minutes after the refinery's, or a workflow that starts on the new rows (below) |
 | A visitor on the web | An intake form writes a record into a workspace | The new record, for an agent that holds a workspace contract |
 | An outside system | An extension fetches on a clock and writes rows | A clock, or a workflow that starts on the new rows (below) |
 | A person in an app | The app writes into a workspace, or gives the agent a task | The task or the record |

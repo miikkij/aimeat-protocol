@@ -24,6 +24,8 @@
  *   v1.6.0 — 2026-10-12 — B's two agents also hold ext:invoke, the word node 4.0.0 asks on POST
  *     /v1/ext/:name/:action (REST scope gates), so the happy path runs there and the memory:write
  *     refusal is still the SCOPE_DENIED that names memory:write.
+ *   v1.6.0 — 2026-10-13 — The surface lists readRow (proved in e2e-extension-rows.ts). The gate's
+ *     guard tier went red on the change until this line was updated.
  *   v1.5.0 — 2026-10-09 — The surface lists archiveRecords (proved in e2e-extension-workspace-batch.ts).
  *     Went red on ad003ac26 until updated, as it is meant to.
  *   v1.4.0 — 2026-10-08 — The surface lists appendRows and readRows (proved in e2e-extension-rows.ts).
@@ -214,7 +216,7 @@ await test('Install + activate: declared, undeclared, read-only and budget-cappe
     assert(none.body?.data?.extension?.workspace === null, `undeclared reads back null: ${JSON.stringify(none.body?.data?.extension?.workspace)}`);
 });
 
-await test('Declaration: without it ctx.workspace is undefined; with it the ten methods exist', async () => {
+await test('Declaration: without it ctx.workspace is undefined; with it the eleven methods exist', async () => {
     const none = await invoke(EXT_NONE, 'probe', B.token);
     assert(none.status === 200, `probe none ${none.status}: ${JSON.stringify(none.body?.error)}`);
     // GUARD, not hole: the old tree had no ctx.workspace on any extension, so this held trivially.
@@ -223,9 +225,9 @@ await test('Declaration: without it ctx.workspace is undefined; with it the ten 
     assert(some.status === 200, `probe ${some.status}: ${JSON.stringify(some.body?.error)}`);
     // HOLE: before this capability `has` was false here too.
     assert(some.body.data.has === true, 'a declared extension sees ctx.workspace');
-    // appendRows and readRows joined on 2026-10-08 (e2e-extension-rows.ts proves them); they refuse
-    // PERMISSION unless the manifest also declares workspace.rows.
-    assert(JSON.stringify(some.body.data.keys) === JSON.stringify(['appendRows', 'archiveRecords', 'deleteRecords', 'get', 'index', 'publish', 'publishRecords', 'readRows', 'write', 'writeDoc']), `surface: ${JSON.stringify(some.body.data.keys)}`);
+    // appendRows and readRows joined on 2026-10-08 and readRow on 2026-10-13 (e2e-extension-rows.ts
+    // proves them); they refuse PERMISSION unless the manifest also declares workspace.rows.
+    assert(JSON.stringify(some.body.data.keys) === JSON.stringify(['appendRows', 'archiveRecords', 'deleteRecords', 'get', 'index', 'publish', 'publishRecords', 'readRow', 'readRows', 'write', 'writeDoc']), `surface: ${JSON.stringify(some.body.data.keys)}`);
 });
 
 await test('Happy path: B\'s agent writes a claim through A\'s extension, reads it back, publishes it', async () => {

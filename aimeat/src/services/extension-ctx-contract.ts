@@ -13,6 +13,9 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   v1.9.0 — 2026-10-13 — `ctx.workspace.readRow`: one row by its id, under the same rule as
+ *     `readRows`. An extension that had a row id read pages of rows to find it. `fetch` takes
+ *     `timeoutMs`, the script's own deadline for one call.
  *   v1.8.0 — 2026-10-09 — `fetch` takes `gunzip`, and ExtensionLimits carries `fetchMaxBytes`: the
  *     manifest's `limits.fetch_max_mb`, the ceiling one answer is read under, raw and inflated.
  *   v1.7.0 — 2026-10-09 — `ctx.workspace.archiveRecords`: archive many records of one space in one
@@ -160,8 +163,12 @@ export interface ExtensionCtx {
      * compressed export); an answer that is not gzip comes back as it is. The ceiling counts the
      * bytes as they arrive and again as they inflate, and it is the extension's own
      * (`limits.fetch_max_mb` in the manifest, 4 MB when the manifest names none).
+     *
+     * `timeoutMs` is the script's own deadline for this one call, between 100 ms and 30 s and
+     * inside the run's. Past it the call throws `FETCH_TIMEOUT: …`, which the script can catch and
+     * go on from; without it an address that never answers holds the call until the run ends.
      */
-    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string; gunzip?: boolean }, host?: { signal?: AbortSignal }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
+    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string; gunzip?: boolean; timeoutMs?: number }, host?: { signal?: AbortSignal }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
     /** Stored FILES, by reference. Optional the way notify/email are: a road that cannot offer it
      *  simply does not, and the guest sees undefined.
      *
@@ -237,6 +244,8 @@ export interface ExtensionCtx {
         appendRows(organismId: string, ws: string, space: string, rows: Array<{ body: Record<string, unknown>; rowId?: string; occurredAt?: string }>): Promise<unknown>;
         /** One page of a row space that names this extension, newest first: `{ rows, cursor, indexed }`. */
         readRows(organismId: string, ws: string, space: string, opts?: { where?: Record<string, unknown>; since?: string; until?: string; changedSince?: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' }): Promise<unknown>;
+        /** One row of such a row space by its id, in the shape `readRows` gives a row; null when there is none. */
+        readRow(organismId: string, ws: string, space: string, rowId: string): Promise<unknown>;
     };
     /**
      * Who invoked this action. `member` is their standing in the app this extension gates, resolved
