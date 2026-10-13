@@ -19,6 +19,7 @@ import { describe, it, expect } from 'vitest';
 import {
     DEFAULT_TOOL_MENU, clipLine, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
     RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, recordSpacesOf, withSpaceNote,
+    BROWSER_FEATURE, browserBlock, withBrowserSites,
 } from '../../public/js/services/agent-draft-known.js';
 
 const MENU = [
@@ -386,5 +387,46 @@ describe('an agent that works when a record is published in a workspace', () => 
     it('watching a workspace asks for the word the node checks before it sends a record', () => {
         expect(extraScopes(withRecordSpaces(def('{{ctx.prompt}}', ['web']), WATCH))).toEqual(['organism:read']);
         expect(extraScopes(withRecordSpaces(def('{{ctx.prompt}}', ['workspace_write']), WATCH))).toEqual(['organism:read']);
+    });
+});
+
+describe('a browser on the agent\'s computer', () => {
+    const withBrowser = [...MENU, { id: 'browser', purpose: 'Opens the named sites and never sends a form.' }];
+    const browserDef = (domains?: unknown) => ({
+        agents: [{ name: 'filler', role: 'Filler', tools: ['browser', 'memory'] }],
+        tasks: [{ id: 't', description: '{{ctx.prompt}}', agent: 'filler' }],
+        ...(domains !== undefined ? { browser_domains: domains } : {}),
+    });
+
+    it('the prompt describes the browser only to a runtime that names the feature and offers the tool', () => {
+        expect(browserBlock(withBrowser, [BROWSER_FEATURE])).toContain('browser_domains');
+        expect(browserBlock(withBrowser, [BROWSER_FEATURE])).toContain('never sends a form');
+        expect(browserBlock(withBrowser, [RECORDS_FEATURE])).toBe('');
+        expect(browserBlock(MENU, [BROWSER_FEATURE])).toBe('');
+        expect(browserBlock(withBrowser, undefined)).toBe('');
+    });
+
+    it('a definition keeps its browser when it names plain hostnames', () => {
+        const out = withBrowserSites(browserDef(['Example.com', 'www.example.com', 'www.example.com']));
+        expect(out.browser_domains).toEqual(['example.com', 'www.example.com']);
+        expect(out.agents[0].tools).toEqual(['browser', 'memory']);
+    });
+
+    it('a definition that names no usable site loses the tool, so the proposal is not refused for it', () => {
+        for (const bad of [undefined, [], ['https://example.com/x'], ['localhost'], ['*.example.com'], 'example.com']) {
+            const out = withBrowserSites(browserDef(bad));
+            expect(out.agents[0].tools).toEqual(['memory']);
+            expect('browser_domains' in out).toBe(false);
+        }
+    });
+
+    it('a list with no member that has the tool is taken out', () => {
+        const out = withBrowserSites({ ...def('{{ctx.prompt}}', ['web']), browser_domains: ['example.com'] });
+        expect('browser_domains' in out).toBe(false);
+    });
+
+    it('a definition with no browser and no list is returned as it came', () => {
+        const d = def('{{ctx.prompt}}', ['web']);
+        expect(withBrowserSites(d)).toBe(d);
     });
 });

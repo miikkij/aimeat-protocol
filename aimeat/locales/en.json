@@ -12921,6 +12921,8 @@
       "usesApps": "Apps whose tools it uses",
       "readsPlaces": "Workspaces it reads",
       "writesPlaces": "Workspaces it reads and writes",
+      "browserSites": "Web sites its browser may open",
+      "browserLimit": "It opens these sites and no other, on the computer it runs on. It never sends a form: it stops at the button that would send it, and you send it yourself.",
       "inOrganism": "In the organism {organism}",
       "whenRecordsHint": "It gets a task each time a record is published in the spaces of a workspace that you choose.",
       "whenRecordsHintProposal": "It gets a task each time a record is published in the workspace spaces that the proposal names.",

@@ -22,6 +22,9 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.7.0 — 2026-10-13 — A draft or a proposal whose definition lets a browser open web sites
+ *     (`browser_domains`) shows the sites before the person approves, with what the browser does
+ *     not do (the October agents plan, P5; Jouni, 2026-10-13: "näytä sitten se").
  *   v1.6.0 — 2026-10-12 — An agent that works on a workspace's records is added to the agents of
  *     that workspace's organism when it is approved (POST /v1/organisms/:id/agents), and the page
  *     says so before the person approves. The organism's Agents section then lists it (Jouni,
@@ -416,6 +419,8 @@ export default function AgentNewView({ navigate }) {
   // The person's apps and workspaces the definition names, for a draft and a proposal alike.
   const definition = draft.crewDef ?? proposal?.crew_def;
   const named = namedIn(definition, known);
+  // The hostnames the definition lets its browser open; a definition without a browser names none.
+  const browserSites = (Array.isArray(definition?.browser_domains) ? definition.browser_domains : []).filter((h) => typeof h === 'string' && h);
   const writes = (proposal ? scopes.some((s) => s === '*' || s === 'organism:write' || s === 'organism:*') : draft.reach !== 'readonly')
     && (definition?.agents ?? []).some((m) => Array.isArray(m?.tools) && m.tools.includes('workspace_write'));
   const whenOptions = [
@@ -501,6 +506,15 @@ export default function AgentNewView({ navigate }) {
                 <//>`),
             },
           ]} />`}
+
+        ${/* The web sites the agent's browser may open (the definition's browser_domains), shown
+             before the person approves: the list they approve is the whole list. */''}
+        ${browserSites.length > 0 && html`
+          <${Facts} wide rows=${[{
+            k: n('browserSites', 'Web sites its browser may open'),
+            v: browserSites.map((host) => html`<${FactLine} key=${host}>${host}<//>`),
+            sub: n('browserLimit', 'It opens these sites and no other, on the computer it runs on. It never sends a form: it stops at the button that would send it, and you send it yourself.'),
+          }]} />`}
 
         ${machines.length > 1 && html`
           <${Choice} boxed cols=${2} label=${n('machine', 'On which computer')} value=${machine} onChange=${setMachine}

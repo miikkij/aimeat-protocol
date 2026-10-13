@@ -11228,6 +11228,8 @@
       "usesApps": "Aplicaciones cuyas herramientas usa",
       "readsPlaces": "Espacios de trabajo que lee",
       "writesPlaces": "Espacios de trabajo que lee y en los que escribe",
+      "browserSites": "Sitios web que su navegador puede abrir",
+      "browserLimit": "Abre estos sitios y ningún otro, en la computadora donde trabaja. Nunca envía un formulario: se detiene en el botón de envío, y lo envías tú.",
       "inOrganism": "En el organismo {organism}",
       "whenRecordsHint": "Recibe una tarea cada vez que se publica un registro en los espacios que elijas de un espacio de trabajo.",
       "whenRecordsHintProposal": "Recibe una tarea cada vez que se publica un registro en los espacios que nombra la propuesta.",
