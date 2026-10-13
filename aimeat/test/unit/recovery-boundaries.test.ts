@@ -3,7 +3,10 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Missed-event recovery and the measured limit of floating tally persistence.
- * @version-history 1.0.0 2026-09-27 Restart, refusal, replay and actual owned-process kill.
+ * @version-history
+ *   1.0.1 2026-10-13 The crash fixture gets 60 s to boot instead of 10 s: under the full unit run the
+ *     cold tsx child missed 10 s four times out of four, and the gate's unit step failed on it.
+ *   1.0.0 2026-09-27 Restart, refusal, replay and actual owned-process kill.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fork } from 'node:child_process';
@@ -124,8 +127,12 @@ describe('durability boundaries', () => {
     child.stderr?.on('data', chunk => { childError += String(chunk); });
     const exited = once(child, 'exit');
     try {
+      // The child is a cold tsx process that compiles the SQLite storage graph before it can answer.
+      // Alone that takes about a second; inside the full unit run with every worker busy, it took
+      // longer than 10 s four times out of four (pnpm gate, 2026-10-13). The window only bounds a hung
+      // child, so it is wide: a passing run waits exactly as long as the child needs.
       const message = await Promise.race([
-        once(child, 'message', { signal: AbortSignal.timeout(10_000) }),
+        once(child, 'message', { signal: AbortSignal.timeout(60_000) }),
         exited.then(() => { throw new Error(`Fixture exited: ${childError}`); }),
       ]);
       expect(message[0]).toBe('memory-committed-tally-pending');
@@ -139,7 +146,7 @@ describe('durability boundaries', () => {
       if (child.exitCode === null && child.signalCode === null) { child.kill('SIGKILL'); await exited; }
       removeDatabase(path);
     }
-  }, 15_000);
+  }, 75_000);
 });
 
 function removeDatabase(path: string) {
