@@ -33,6 +33,8 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.4.0 — 2026-10-13 — A visitor who expects an answer on the page: an intake form with `thread`,
+ *     and the signal record that wakes the agent (routes/organisms/intake-thread.ts).
  *   v1.3.1 — 2026-10-13 — The Email row: a refinery row holds the mail's text only when the
  *     definition says `keepText`.
  *   v1.3.0 — 2026-10-13 — "What an app cannot give": the runtime has a browser tool now, within the
@@ -145,6 +147,7 @@ free time) and \`aimeat-workflows\` (a run with a step that waits for a person).
 |---|---|---|
 | Email | The mail refinery reads a connected mailbox on a clock and writes each message as a workspace row (skill \`aimeat-refinery\`). The row holds the read fields and a 280-character snippet; it holds the message's text and each PDF's text only when the definition says \`keepText\`, which a tool that checks the fields against the mail needs | A clock, set a few minutes after the refinery's, or a workflow that starts on the new rows (below) |
 | A visitor on the web | An intake form writes a record into a workspace | The new record, for an agent that holds a workspace contract |
+| A visitor who expects an answer on the page | An intake form defined with \`thread\` keeps a conversation: the node writes the visitor's messages into one record, and the visitor reads the answers back with the secret the start gave them (library \`aimeat-intake\`, \`AIMEAT.intake.thread\`) | The signal record the node writes for a message an agent is to answer, for an agent that holds a contract on the signal space. The agent reads the thread record of the same id and appends its answer to the reply record of that id. The node writes no signal once a person took the conversation over or the form's agent messages for the day are spent, so the agent needs no rule for either |
 | An outside system | An extension fetches on a clock and writes rows | A clock, or a workflow that starts on the new rows (below) |
 | A person in an app | The app writes into a workspace, or gives the agent a task | The task or the record |
 | Sound | The app transcribes it (\`aimeat-ai\` in the browser, or the extension's \`ctx.ai\` for a stored file) and writes the text into a workspace | The task or the record |

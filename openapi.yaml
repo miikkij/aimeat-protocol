@@ -39956,13 +39956,31 @@ paths:
           application/json:
             schema:
               type: object
-              required: [organism_id, ws, namespace, allowed_fields]
+              required: [organism_id, ws, namespace]
               properties:
                 organism_id: { type: string }
                 ws: { type: string }
                 namespace: { type: string, description: Destination records namespace (cannot be meta.*) }
                 form_id: { type: string, description: 'Slug [a-z0-9-] 2-64 chars; omit to mint an unguessable token' }
-                allowed_fields: { type: array, items: { type: string } }
+                allowed_fields: { type: array, items: { type: string }, description: 'Required and non-empty for an ordinary form. A form with `thread` names none.' }
+                thread:
+                  type: object
+                  description: |
+                    Makes the form take a CONVERSATION instead of single submissions (see
+                    `POST /v1/intake/{org}/{ws}/{formId}/thread`). `namespace` is then the space of the
+                    thread records, written by the node only: `{ id, form_id, started_at, updated_at,
+                    turns: [{ text, at }], signalled_turn }`. The three spaces must be three different
+                    declared record spaces whose schemas hold what the node writes, or the definition
+                    is refused (400, 422 UNDECLARED_SPACE, 422 INTAKE_SCHEMA_MISMATCH). `max_per_day`
+                    then counts conversations started, 50 when the form sets none.
+                  required: [reply_namespace, signal_namespace]
+                  properties:
+                    reply_namespace: { type: string, description: 'The space the owner''s side writes. One record per conversation, with the thread record''s id: `{ id, replies: [{ text, at, role: agent | person }], handler: agent | person, closed }`. The node reads only those fields.' }
+                    signal_namespace: { type: string, description: 'The space the node writes one record into per visitor turn an agent is to answer: `{ id, thread, turn, at }`. An agent that watches this space is woken by it.' }
+                    max_turns: { type: integer, description: 'Visitor messages in one conversation. Default 20, at most 200.' }
+                    max_chars: { type: integer, description: 'Characters in one visitor message. Default 2000, at most 8000.' }
+                    ttl_days: { type: integer, description: 'Days a conversation is kept after its last visitor message. Default 30, at most 365.' }
+                    max_agent_turns_per_day: { type: integer, description: 'Visitor messages per UTC day, over all conversations of the form, that wake an agent. Past it a message is stored and no signal is written. Default 300.' }
                 required_fields: { type: array, items: { type: string } }
                 defaults: { type: object, additionalProperties: true }
                 mode: { type: string, enum: [publish, draft] }
@@ -40021,6 +40039,7 @@ paths:
         message). Never discloses the destination namespace, owner, defaults, or any submitted record.
         Each field carries key, label, type and required (true also when the form lists the key in
         required_fields), plus options for a select or radio and maxLength when the form declares them.
+        A form that takes a conversation carries `thread: { max_turns, max_chars }`.
       tags: [Public Intake]
       security: []
       parameters:
@@ -40065,6 +40084,102 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '429': { description: 'The per-IP rate limit, or INTAKE_DAILY_LIMIT: the form has taken its max_per_day submissions today. Nothing was saved.' }
+  /v1/intake/{org}/{ws}/{formId}/thread:
+    post:
+      operationId: writeIntakeThread
+      summary: Start a conversation through a form, or add the visitor's next message (NO auth)
+      description: |
+        For a form defined with `thread`. A visitor who is not signed in writes; the form owner's
+        agent, or the owner in person, answers by writing an ordinary workspace record in the
+        form's reply space; the visitor reads both sides with `…/thread/read`.
+
+        WITHOUT `token` the call STARTS a conversation and answers `thread_token` once. The token
+        opens that one conversation for writing, reading and deleting; the record id in the owner's
+        workspace is a hash of it, and the token is stored nowhere. WITH `token` the call adds the
+        visitor's next message. The token travels in the body, never in the address.
+
+        THE NODE DECIDES, before anything is written: how many conversations the form starts in a
+        UTC day (`max_per_day`, 50 when unset), how many messages one conversation takes
+        (`max_turns`), how long a message is (`max_chars`), at least two seconds between two
+        messages of one conversation, and how many messages a day wake an agent
+        (`max_agent_turns_per_day`).
+
+        WHAT WAKES AN AGENT is one record in the form's signal space per message, written by the
+        node. None is written when the reply record says `handler: person`, or when the form's agent
+        turns for the day are spent: the message is stored, the answer says `handler: person`, and
+        the thread record's `signalled_turn` stays at the last turn an agent was woken for.
+      tags: [Public Intake]
+      security: []
+      parameters:
+        - { name: org, in: path, required: true, schema: { type: string } }
+        - { name: ws, in: path, required: true, schema: { type: string } }
+        - { name: formId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              additionalProperties: true
+              properties:
+                text: { type: string, description: The visitor's message. Trimmed; control characters are removed. }
+                token: { type: string, description: The token a start answered. Absent starts a new conversation. }
+      responses:
+        '200':
+          description: 'Stored → { ok, thread_token (a start only), turn, turns_left, handler }. A filled honeypot field answers { ok: true, thread_token: null, turn: 0 } and writes nothing.'
+        '400': { description: 'INVALID_INPUT: the message is empty, not a string or longer than max_chars.' }
+        '404': { description: 'The form is unknown, switched off or takes no conversation; or THREAD_NOT_FOUND: no conversation of this form opens with the token.' }
+        '409': { description: 'THREAD_CLOSED: the owner''s side closed the conversation. THREAD_BUSY: it changed while the message arrived; send again.' }
+        '422': { description: 'UNDECLARED_SPACE, or THREAD_NOT_STORED: the form''s spaces cannot hold the record. Nothing was stored.' }
+        '429': { description: 'The per-IP rate limit; INTAKE_DAILY_LIMIT (a start past the form''s daily cap); THREAD_FULL (the conversation took max_turns messages); THREAD_TOO_FAST (under two seconds since the last message). Nothing was stored.' }
+  /v1/intake/{org}/{ws}/{formId}/thread/read:
+    post:
+      operationId: readIntakeThread
+      summary: Read the conversation a token opens (NO auth)
+      description: |
+        Both sides' turns in time order, and the conversation's state. A turn carries `role`
+        (visitor, agent or person), `text` and `at`, and nothing else that either record holds. A
+        POST because the token is in the body: an address is logged. A visitor has no live channel,
+        so a page polls this while the conversation is open.
+      tags: [Public Intake]
+      security: []
+      parameters:
+        - { name: org, in: path, required: true, schema: { type: string } }
+        - { name: ws, in: path, required: true, schema: { type: string } }
+        - { name: formId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        '200': { description: '{ turns: [{ role, text, at }], handler: agent | person, closed, turns_left }' }
+        '404': { description: 'THREAD_NOT_FOUND. One answer for an unknown form, a wrong token and a token of another form.' }
+        '429': { description: The per-IP rate limit }
+  /v1/intake/{org}/{ws}/{formId}/thread/forget:
+    post:
+      operationId: forgetIntakeThread
+      summary: Delete the conversation a token opens (NO auth)
+      description: |
+        Deletes the thread record, the reply record and the signal record with every stored version
+        of each. The token opens nothing afterwards. The node also deletes a conversation by itself
+        `ttl_days` after its last visitor message, when the form next starts a conversation.
+      tags: [Public Intake]
+      security: []
+      parameters:
+        - { name: org, in: path, required: true, schema: { type: string } }
+        - { name: ws, in: path, required: true, schema: { type: string } }
+        - { name: formId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        '200': { description: '{ forgotten: true }' }
+        '404': { description: THREAD_NOT_FOUND }
+        '429': { description: The per-IP rate limit }
   /v1/organisms/{id}/workspaces:
     post:
       operationId: createOrganismWorkspace
