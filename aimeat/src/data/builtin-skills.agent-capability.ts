@@ -33,6 +33,7 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.5.0 — 2026-10-13 — `ctx.calendar` in the table of what an extension has.
  *   v1.4.0 — 2026-10-13 — A visitor who expects an answer on the page: an intake form with `thread`,
  *     and the signal record that wakes the agent (routes/organisms/intake-thread.ts).
  *   v1.3.1 — 2026-10-13 — The Email row: a refinery row holds the mail's text only when the
@@ -132,6 +133,7 @@ This is what an agent reaches through an app tool. The extension's manifest decl
 | \`ctx.ai\` | Starts a model call that runs in the background: text, a picture, or the transcription of a stored audio file. The extension's owner pays for it. |
 | \`ctx.email\`, \`ctx.notify\` | Sends an email through the node's mail service, or a notice to the owner. |
 | \`ctx.buy\` | Buys one call of another app's tool, under a contract the extension's owner holds. |
+| \`ctx.calendar\` | Calendar arithmetic on the node, with the library the browser uses (\`aimeat-calendar\`): the occurrences of repeating events in a range, free time, a time zone's local time to an instant and back, ICS text to events and back. An extension has no time-zone data of its own, so a calendar tool ("what is booked this week", "when is free") is built on these calls and stores events in the library's event shape. |
 | A schedule | Runs an action on a clock, for example to fetch from an outside system and write rows. |
 
 The served libraries give an app the rest in the person's browser: \`aimeat-ai\` (text, pictures,

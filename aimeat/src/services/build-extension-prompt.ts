@@ -19,6 +19,7 @@
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
  *   v1.6.1 — 2026-10-12 — deleteRecords puts records in the bin and needs memory:delete (it said for good, memory:purge).
+ *   v1.6.2 — 2026-10-13 — ADDITIVE: ctx.calendar in the ctx table (five rows) and the road table.
  *   v1.6.1 — 2026-10-13 — ADDITIVE: ctx.workspace.readRow in the ctx table, and `timeoutMs` on
  *     ctx.fetch; the three sentences that named the two row calls name the three.
  *   v1.6.0 — 2026-10-11 — Selling section: an action has a money price and a pacing amount
@@ -144,6 +145,11 @@ function sandboxSection(): string {
     '| `ctx.workspace.appendRows(orgId, ws, space, [{body, rowId, occurredAt}])` | Append up to 500 rows to a ROW space that names this extension (manifest `workspace: { rows: true }`). A repeated `rowId` replaces the stored row, which is how an ingest removes duplicates. Answers `{written, rowIds, pruned}`. Works on a schedule and a workflow step too |',
     '| `ctx.workspace.readRows(orgId, ws, space, {where, since, until, changedSince, limit, cursor, order})` | One page of such a row space, newest first: `{rows, cursor, indexed}`. `where` takes only the space\'s `indexOn` fields |',
     '| `ctx.workspace.readRow(orgId, ws, space, rowId)` | One row of such a row space by its id, in the shape `readRows` gives a row; `null` when there is no such row. One call, whatever the size of the space: use it whenever you hold the id, and never page through `readRows` to find one |',
+    '| `ctx.calendar.occurrences(events, {from, to, limit})` | Calendar arithmetic, computed on the node with the code the browser library `aimeat-calendar` runs. Your script has no `Intl` and no time-zone data, so never compute a time zone, a daylight-saving change or a recurrence yourself. `events` are in the library\'s Event shape (`id`, `start` and `end` as local `YYYY-MM-DDTHH:mm:ss` or `YYYY-MM-DD` for all-day, `timeZone`, `rrule`, `rdates`, `exdates`, `overrides`, `cancelled`); `from` and `to` are instants (`2026-10-12T00:00:00Z`). Answers each occurrence with `eventId`, `localStart`, `localEnd`, `start` and `end` (instants), `timeZone`, `allDay`, `title`. At most 2000 event series and 5000 occurrences in one call |',
+    '| `ctx.calendar.freeSlots(busy, {from, to, minMinutes, windows})` | The free intervals `[{start, end}]` (instants) that the busy ones leave inside the range, or inside `windows` (working hours as instants) when you give them. `busy` takes occurrences as `occurrences` answers them; a `transparent` or `cancelled` one blocks nothing |',
+    '| `ctx.calendar.toInstant(local, timeZone)` / `fromInstant(instant, timeZone)` | A zone\'s local time to an instant and back. `toInstant` throws for a local time that does not exist in the zone (the hour a clock skips in spring) |',
+    '| `ctx.calendar.normalize(event)` | The event as the library stores it, or a throw saying what is wrong: an end before its start, a local time that does not exist, a date in the wrong form. Call it before you store an event somebody proposed |',
+    '| `ctx.calendar.fromICS(text)` / `toICS(events, {name})` | An ICS calendar text to events and back (text of at most 1 MB). Every refusal of `ctx.calendar` is thrown as `CALENDAR: <what is wrong>`: catch it and answer the person in words |',
     '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',
     '| `ctx.buy(appRef, tool, input)` | Buy one call of another owner\'s app tool, billed to this extension\'s owner. Needs a contract they already hold, else `{ok: false, code: \'NO_CONTRACT\'}` |',
     '| `ctx.wallet.consume(amount, reason)` | Debit morsels of pacing from the CALLER; `{success}`. Throws on an amount that is not positive or is over the node\'s per-call ceiling |',
@@ -197,7 +203,7 @@ function sandboxSection(): string {
     '',
     '| Member | A request (`POST /v1/ext/...`) | An agent\'s tool call (`aimeat_extension_invoke`) | A schedule or a workflow step | An `ai.start` job\'s `on_done` action |',
     '|---|---|---|---|---|',
-    '| `memory`, `fetch`, `log`, `now`, `hash`, `caller`, `config`, `extension`, `consent`, `trust`, `datapackage` | yes | yes | yes | yes |',
+    '| `memory`, `fetch`, `log`, `now`, `hash`, `caller`, `config`, `extension`, `consent`, `trust`, `datapackage`, `calendar` | yes | yes | yes | yes |',
     '| `files` | the caller\'s storage | the agent\'s storage | the installer\'s storage | the installer\'s storage |',
     '| `notify` | reaches the caller\'s owner | reaches the agent\'s owner | reaches the installer | reaches the installer |',
     '| `email` | yes | present, always returns false | yes | yes |',

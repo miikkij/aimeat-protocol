@@ -37,13 +37,12 @@
  *   - MAX_FEED_EVENTS
  * @usage import { recordsToIcs, newIcsKey, icsKeyMatches } from '../../services/calendar-feed.js';
  * @version-history
+ *   v1.1.0 — 2026-10-13 — The library loader moved to services/calendar-lib.ts unchanged, because an
+ *     extension's calendar host calls (services/extension-calendar.ts) are its second caller.
  *   v1.0.0 — 2026-10-13 — Initial (the October agents plan, P3, way 1).
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { resolveAssetDir } from '../server-bootstrap/asset-dirs.js';
-import { logger } from '../utils/logger.js';
+import { calendarLib, type CalendarLib } from './calendar-lib.js';
 
 /** How many events one feed carries. A calendar program reads the whole file on every fetch. */
 export const MAX_FEED_EVENTS = 5000;
@@ -70,27 +69,6 @@ export function icsKeyMatches(hash: string | null, key: unknown): boolean {
   const given = Buffer.from(sha256(key), 'hex');
   const kept = Buffer.from(hash, 'hex');
   return given.length === kept.length && timingSafeEqual(given, kept);
-}
-
-/** What this module uses of the calendar library. */
-interface CalendarLib {
-  normalize(event: unknown): unknown;
-  toICS(events: unknown[], options?: { name?: string; fromYear?: number; toYear?: number }): string;
-}
-
-let lib: Promise<CalendarLib> | null = null;
-/** The library's DOM-free core, loaded once from the static tree (src/static in a checkout, dist/static in a package). */
-function calendarLib(): Promise<CalendarLib> {
-  lib ??= (async () => {
-    const dir = resolveAssetDir('static', dirname(fileURLToPath(import.meta.url)), process.cwd());
-    if (!dir) throw new Error('The static tree is not on this node, so the calendar library cannot be loaded.');
-    const mod = await import(pathToFileURL(join(dir, 'sdk-libs', 'calendar', 'core.js')).href) as { calendar: CalendarLib };
-    return mod.calendar;
-  })();
-  // A failed load is tried again on the next request: a cached rejection would end every feed until
-  // a restart. The request that met the failure gets it through the returned promise.
-  lib.catch((err) => { lib = null; logger.error('calendar-feed: the calendar library did not load', { error: String(err) }); });
-  return lib;
 }
 
 const pick = (source: Record<string, unknown>, fields: readonly string[]): Record<string, unknown> =>

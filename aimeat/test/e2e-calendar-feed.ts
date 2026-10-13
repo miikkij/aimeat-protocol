@@ -12,6 +12,7 @@
  *   Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-calendar-feed
  * @version-history
+ *   v1.1.0 — 2026-10-13 — A shared event space with no event yet answers an empty calendar.
  *   v1.0.0 — 2026-10-13 — Written before the code: on the node as it stood, format=ics answered
  *     JSON and ics_key was not a field of the share.
  */
@@ -188,6 +189,25 @@ async function run() {
   await test('a signed-in member reads the feed of a password share without a key', async () => {
     const r = await call(feed('&space=event&format=ics'), { headers: B });
     assert(r.status === 200 && events(r.text) === 3, `a member: ${r.status}, ${events(r.text)} events`);
+  });
+
+  await test('a shared event space with no event yet is an empty calendar, and its access mode still applies', async () => {
+    // The other workspace's note space holds nothing. A person subscribes before their first event.
+    const s = await share(A, { spaces: { event: true, note: true }, ics_key: true }, WS2);
+    assert(s.status === 200, `share ${s.status}: ${s.text}`);
+    const key2 = s.body.data.ics_key as string;
+    const empty = await call(feed(`&space=note&format=ics&key=${key2}`, WS2));
+    // HOLE: 404 before this change, which a calendar program shows as a broken subscription.
+    assert(empty.status === 200 && empty.type.startsWith('text/calendar'), `an empty space: ${empty.status} ${empty.type} ${empty.text.slice(0, 120)}`);
+    assert(empty.text.startsWith('BEGIN:VCALENDAR') && empty.text.trimEnd().endsWith('END:VCALENDAR') && events(empty.text) === 0, `a whole calendar with no event: ${empty.text.slice(0, 200)}`);
+    const noKey = await call(feed('&space=note&format=ics', WS2));
+    assert(noKey.status === 401, `the password share still asks: expected 401, got ${noKey.status}`);
+    const asJson = await call(feed('&space=note', WS2), { headers: B });
+    assert(asJson.status === 404, `the JSON read of an empty space is unchanged: expected 404, got ${asJson.status}`);
+    const undeclared = await call(feed(`&space=nothing&format=ics&key=${key2}`, WS2));
+    assert(undeclared.status === 404, `a space the workspace does not declare: expected 404, got ${undeclared.status}`);
+    // In the first workspace the note space is not opened by the share: empty or not, it stays 404.
+    assert((await call(feed('&space=note&format=ics'), { headers: B })).status === 404, 'a space the share does not open is still 404');
   });
 
   console.log(`\n${passed} passed, ${failed} failed\n`);

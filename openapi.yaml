@@ -40909,7 +40909,9 @@ paths:
         send a share token, so for this format alone `?key=` (the share's feed key, made with
         `PUT /workspace/share { "ics_key": true }`) passes the access mode. The key opens nothing the
         share does not open and nothing in any other format. The calendar format is rate-limited per
-        client IP (120 fetches in 15 minutes).
+        client IP (120 fetches in 15 minutes). When the share opens the whole space and the space
+        holds no published record yet, the calendar format answers an empty calendar (200) where the
+        JSON read answers 404: a person subscribes before their first event.
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }

@@ -78,7 +78,11 @@ guest receives is missing from that table, so change the table in the same commi
   inflates a gzipped answer under the same ceiling (since 2026-10-09). `ctx.fetch(url, { timeoutMs })`
   gives one call its own deadline (100 ms to 30 s) and throws `FETCH_TIMEOUT` past it, which the
   script catches; a run that calls several addresses gives one, because without it a single address
-  that never answers holds the call until the whole run times out (since 2026-10-13). A host that differs
+  that never answers holds the call until the whole run times out (since 2026-10-13). The sandbox has
+  no `Intl` and no time-zone data, so calendar arithmetic is `ctx.calendar` (occurrences, freeSlots,
+  toInstant, fromInstant, normalize, fromICS, toICS): host calls into the served `aimeat-calendar`
+  library, on every code path, no capability to declare, refusals thrown as `CALENDAR: …`
+  (since 2026-10-13). A host that differs
   per install (a customer's own server) is a config field named in
   `network: { host_fields: { SERVER_HOST: required } }` (or `optional`): the package's config-needs
   asks it, its value (one hostname or IPv4, optional `:port`) joins that install's list, and the owner

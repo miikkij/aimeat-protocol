@@ -466,6 +466,9 @@ const ALL_SUITES = [
     // Its row calls: a row space that names the extension, on a call and on a schedule, and the
     // hosts a manifest names as the only ones ctx.fetch reaches (aimeat-soc core).
     'test/e2e-extension-rows.ts',
+    // ctx.calendar: the calendar library's computation as host calls, the only way a sandbox with
+    // no time-zone data expands a recurrence or converts a zone.
+    'test/e2e-extension-calendar.ts',
     // ctx.fetch with gunzip, under the ceiling a manifest declares (limits.fetch_max_mb): a 6 MB
     // guide read whole, the 4 MB default and a gzip bomb refused by name, a bad limit refused at install.
     'test/e2e-extension-fetch-gunzip.ts',

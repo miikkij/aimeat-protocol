@@ -8,6 +8,7 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.16.0 — 2026-10-13 — `ctx.calendar`, seven host calls (services/extension-calendar.ts).
  *   v2.15.0 — 2026-10-13 — `ctx.workspace.readRow`, one host call (services/extension-workspace-rows.ts).
  *   v2.14.0 — 2026-10-09 — `ctx.workspace.archiveRecords`, one host call (services/extension-workspace.ts).
  *   v2.13.0 — 2026-10-08 — `ctx.workspace.appendRows` and `readRows`, one host call each
@@ -127,6 +128,9 @@ const GUEST_CALL_NAMES: Record<string, string> = {
     __ws_archiveRecords: 'ctx.workspace.archiveRecords',
     __ws_appendRows: 'ctx.workspace.appendRows', __ws_readRows: 'ctx.workspace.readRows',
     __ws_readRow: 'ctx.workspace.readRow',
+    __cal_occurrences: 'ctx.calendar.occurrences', __cal_freeSlots: 'ctx.calendar.freeSlots',
+    __cal_toInstant: 'ctx.calendar.toInstant', __cal_fromInstant: 'ctx.calendar.fromInstant',
+    __cal_normalize: 'ctx.calendar.normalize', __cal_fromICS: 'ctx.calendar.fromICS', __cal_toICS: 'ctx.calendar.toICS',
     __wallet_consume: 'ctx.wallet.consume', __wallet_balance: 'ctx.wallet.getBalance',
     __ext_buy: 'ctx.buy', __ai_start: 'ctx.ai.start',
     __consent_check: 'ctx.consent.check', __consent_require: 'ctx.consent.require',
@@ -306,6 +310,17 @@ const __aimeatCtx = (() => {
             appendRows: async (org, ws, space, rows)  => __call(__ws_appendRows, [org, ws, space, JSON.stringify(rows ?? [])]),
             readRows:   async (org, ws, space, opts)  => __call(__ws_readRows,   [org, ws, space, JSON.stringify(opts || {})]),
             readRow:    async (org, ws, space, rowId) => __call(__ws_readRow,    [org, ws, space, rowId]),
+        } : undefined,
+        // The calendar library, computed on the host: the sandbox has no time-zone data. Every
+        // argument crosses as JSON, so a missing one is refused by the host in its own words.
+        calendar: __cal_occurrences ? {
+            occurrences: async (events, options)  => __call(__cal_occurrences, [JSON.stringify(events ?? null), JSON.stringify(options ?? null)]),
+            freeSlots:   async (busy, options)    => __call(__cal_freeSlots,   [JSON.stringify(busy ?? null), JSON.stringify(options ?? null)]),
+            toInstant:   async (local, timeZone)  => __call(__cal_toInstant,   [JSON.stringify(local ?? null), JSON.stringify(timeZone ?? null)]),
+            fromInstant: async (instant, timeZone) => __call(__cal_fromInstant, [JSON.stringify(instant ?? null), JSON.stringify(timeZone ?? null)]),
+            normalize:   async (event)            => __call(__cal_normalize,   [JSON.stringify(event ?? null)]),
+            fromICS:     async (ics, options)     => __call(__cal_fromICS,     [JSON.stringify(ics ?? null), JSON.stringify(options ?? null)]),
+            toICS:       async (events, options)  => __call(__cal_toICS,       [JSON.stringify(events ?? null), JSON.stringify(options ?? null)]),
         } : undefined,
         wallet: {
             // The reason is optional; an omitted one arrives as '' rather than being refused.
@@ -617,6 +632,18 @@ async function runInSandbox(
         registerAsyncHostFn(vm, '__ws_readRow',
             wsCap ? async (org, ws, space, rowId) => wsCap.readRow(org, ws, space, rowId) : null,
             counter, limits.maxApiCalls, inflight);
+
+        // ── Calendar computation (services/extension-calendar.ts) ──
+        // Each argument arrives as JSON text, a missing one as "null", which the capability refuses.
+        const cal = ctx.calendar;
+        const arg = (json: string): unknown => JSON.parse(json);
+        registerAsyncHostFn(vm, '__cal_occurrences', cal ? async (a, b) => cal.occurrences(arg(a), arg(b)) : null, counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__cal_freeSlots', cal ? async (a, b) => cal.freeSlots(arg(a), arg(b)) : null, counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__cal_toInstant', cal ? async (a, b) => cal.toInstant(arg(a), arg(b)) : null, counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__cal_fromInstant', cal ? async (a, b) => cal.fromInstant(arg(a), arg(b)) : null, counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__cal_normalize', cal ? async (a) => cal.normalize(arg(a)) : null, counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__cal_fromICS', cal ? async (a, b) => cal.fromICS(arg(a), arg(b)) : null, counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__cal_toICS', cal ? async (a, b) => cal.toICS(arg(a), arg(b)) : null, counter, limits.maxApiCalls, inflight);
 
         // ── Wallet API ────────────────────────────────────────
         registerAsyncHostFn(vm, '__wallet_consume',
