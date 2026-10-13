@@ -64,6 +64,7 @@ import { ownerDefaultIsNode } from './crew-menu.js';
 import { findConnector, listConnectors } from './connector-registry.js';
 import { logger } from '../utils/logger.js';
 import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
+import { offerSignalError } from './agent-default-offer.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
@@ -288,6 +289,10 @@ export async function proposeAgent(
       return fail(400, 'INVALID_CREW_DEF',
         `Task "${orphan.id}" names "${orphan.agent}", which is not one of the definition's agents.`);
     }
+    // The workflow signals of its first offer are whole and name a key the runtime can write, or
+    // there are none (agent-default-offer.ts offerSignalError).
+    const signals = offerSignalError(def, name);
+    if (signals) return fail(400, 'INVALID_CREW_DEF', signals);
   }
 
   const asked = Array.isArray(input.scopes) ? input.scopes.filter(s => typeof s === 'string') : [];

@@ -7,11 +7,12 @@
  *   wrote is completed with every key the crew runtime reads, and nothing gives the offer a price
  *   or a visibility.
  * @version-history
+ *   v1.2.0 — 2026-10-13 — offerSignalError: the workflow signals a proposer may write into the first offer.
  *   v1.1.0 — 2026-10-11 — firstRequestOf: the first offer's example, given to a new agent as its first work.
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { defaultOfferFor, withDefaultOffer, firstRequestOf } from '../../src/services/agent-default-offer.js';
+import { defaultOfferFor, withDefaultOffer, firstRequestOf, offerSignalError } from '../../src/services/agent-default-offer.js';
 
 const AGENT = { name: 'morning-news', displayName: 'Morning news', purpose: 'Reads the morning news and writes a short summary.' };
 
@@ -89,5 +90,52 @@ describe('the request a new agent is given first', () => {
     expect(firstRequestOf({ offers: ['x', null] })).toBe('');
     expect(firstRequestOf({})).toBe('');
     expect(firstRequestOf(null)).toBe('');
+  });
+});
+
+describe('the workflow signals a proposer may write into the first offer', () => {
+  const signals = {
+    required_to_function: 'none',
+    success_signal: { kind: 'deterministic', key: 'crews.morning-news.wf.{run}', op: 'nonempty' },
+    deliverable_location: { key: 'crews.morning-news.wf.{run}' },
+  };
+
+  it('none is fine: the default offer carries no workflow signals (Jouni, 2026-10-11)', () => {
+    expect(offerSignalError({ offers: [{ id: 'a', title: 'A', ask: 'ask' }] }, 'morning-news')).toBeNull();
+    expect(offerSignalError({}, 'morning-news')).toBeNull();
+    expect(offerSignalError(null, 'morning-news')).toBeNull();
+    const def = withDefaultOffer({ agents: [], tasks: [] }, AGENT);
+    const offer = (def.offers as Record<string, unknown>[])[0];
+    for (const field of Object.keys(signals)) expect(offer).not.toHaveProperty(field);
+  });
+
+  it('all three, with the result under the agent\'s own crews.<name>. keys, is accepted and kept', () => {
+    expect(offerSignalError({ offers: [{ id: 'a', ...signals }] }, 'morning-news')).toBeNull();
+    const def = withDefaultOffer({ offers: [{ id: 'a', title: 'A', ask: 'ask', ...signals }] }, AGENT);
+    const offer = (def.offers as Record<string, unknown>[])[0];
+    expect(offer.success_signal).toEqual(signals.success_signal);
+    expect(offer.deliverable_location).toEqual(signals.deliverable_location);
+    expect(offer.required_to_function).toBe('none');
+  });
+
+  it('a half set is refused, naming what is missing: the runtime would publish no offer at all', () => {
+    const { deliverable_location: _dl, ...two } = signals;
+    void _dl;
+    expect(offerSignalError({ offers: [{ id: 'a', ...two }] }, 'morning-news')).toContain('deliverable_location');
+    expect(offerSignalError({ offers: [{ id: 'a', success_signal: signals.success_signal }] }, 'morning-news')).toContain('required_to_function');
+  });
+
+  it('a result key outside the agent\'s own keys is refused: the runtime writes nowhere else', () => {
+    const elsewhere = (key: unknown) => offerSignalError({ offers: [{ id: 'a', ...signals, deliverable_location: { key } }] }, 'morning-news');
+    expect(elsewhere('agents.morning-news.offers')).toContain('crews.morning-news.');
+    expect(elsewhere('crews.other-agent.wf.{run}')).toContain('crews.morning-news.');
+    expect(elsewhere('crews.morning-news.wf {run}')).toContain('space');
+    expect(elsewhere('')).toContain('deliverable_location');
+    expect(elsewhere(undefined)).toContain('deliverable_location');
+    expect(offerSignalError({ offers: [{ id: 'a', ...signals, deliverable_location: 'crews.morning-news.wf.{run}' }] }, 'morning-news')).toContain('deliverable_location');
+  });
+
+  it('only the first offer is read, because the runtime publishes only the first', () => {
+    expect(offerSignalError({ offers: [{ id: 'a' }, { id: 'b', success_signal: signals.success_signal }] }, 'morning-news')).toBeNull();
   });
 });
