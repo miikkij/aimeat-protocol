@@ -237,6 +237,9 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         // cannot read PDFs (openrouter/free, the default, cannot).
         AIMEAT_MODEL_DEFAULT_CHAT: 'sandbox/refinery-model', AIMEAT_MODEL_DEFAULT_EXECUTION: 'sandbox/refinery-model',
         AIMEAT_MODEL_DEFAULT_VISION: 'sandbox/refinery-model', AIMEAT_MODEL_FREE_FALLBACK: 'sandbox/refinery-model',
+        // Speech to text goes to the same server's stand-in, which answers every recording with one
+        // short meeting note (scripts/lib/fake-mail-server.ts SANDBOX_TRANSCRIPT).
+        AIMEAT_MODEL_DEFAULT_STT: 'sandbox/stt-model',
         // A node key is spent from each owner's allowance; the stand-ins cost nothing, so give some.
         AIMEAT_CHAT_FREE_ALLOWANCE_USD: '5',
         AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false', AIMEAT_PORTFOLIO_HOST: '',
@@ -522,7 +525,7 @@ function report(s: SandboxState): void {
     // where it signs in as it does on aimeat.io. The label is minted on the first open.
     if (s.apps.length) console.log(`  apps          ${s.apps.map(a => `${s.baseUrl}/v1/apps/${a}?mode=inline`).join('\n                ')}\n                (each opens on its own origin, <name>.apps.localhost:${s.port}, and signs in there)`);
     if (s.agent) console.log(`  mcp           ${s.baseUrl}/v1/mcp   with the ${s.agent.name} token above`);
-    if (s.mailbox) console.log(`  mailbox       ${s.owners[0]?.name}'s connection ${s.mailbox} to the test mailbox (18 messages, 2 PDFs) on :${s.mailPort}`);
+    if (s.mailbox) console.log(`  mailbox       ${s.owners[0]?.name}'s connection ${s.mailbox} to the test mailbox (19 messages, 2 PDFs) on :${s.mailPort}`);
     console.log(`  data          ${s.dbPath}`);
     console.log(`  log           ${LOG_FILE}`);
     console.log(`  credentials   ${STATE_FILE}  (gitignored; tokens refresh on every \`pnpm sandbox\`)`);

@@ -2,12 +2,12 @@
  * @file scripts/lib/fake-mailbox.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The sandbox's test mailbox: eighteen messages a mail pipeline meets in a real inbox,
+ * @description The sandbox's test mailbox: nineteen messages a mail pipeline meets in a real inbox,
  *   each with the class a person would give it, so a run can be checked against known answers.
  *   Receipts, invoices (one as a digital PDF, one as a scanned PDF whose text is pixels only), an
  *   order, a booking, a job alert, system notices, a security notice, newsletters, ads, a support
- *   request and two personal messages. Dates are counted back from the moment the server starts,
- *   so a "since last week" batch always finds them.
+ *   request, two personal messages and a request for a quote. Dates are counted back from the
+ *   moment the server starts, so a "since last week" batch always finds them.
  *
  *   The two PDFs in ./fixtures were rendered with Chromium on 2026-09-29 (a text PDF from an HTML
  *   invoice, and the same kind of invoice screenshotted grey and slightly rotated, wrapped as a JPEG
@@ -15,6 +15,8 @@
  * @structure SAMPLE_MESSAGES · buildMailbox(now) → { messages, attachments }
  * @usage import { buildMailbox } from './fake-mailbox.js';
  * @version-history
+ *   v1.1.0 — 2026-10-13 — A nineteenth message, the oldest: a request for a quote, for an app whose
+ *     definition has a class of its own with the id "quote" (the October agents plan, brief 09).
  *   v1.0.0 — 2026-09-29 — Initial (wish sandboxiin-testipostilaatikko).
  */
 import { readFileSync } from 'node:fs';
@@ -93,6 +95,11 @@ export const SAMPLE_MESSAGES: SampleMessage[] = [
     fields: { vendor: 'Disney+', amount: 9.99, currency: 'EUR', date: '2026-09-22', reference: '51B2-9C', vat: null } },
   { id: 'm18', from: 'Liisa Korhonen <liisa@example.com>', subject: 'Kuvat viikonlopulta', hoursAgo: 170, expect: 'personal',
     body: 'Hei! Tässä vielä muutama kuva mökkiviikonlopulta. Kiitos kun tulitte!' },
+  // A request for a quote. No class pack has this kind: a definition that lists its own class with
+  // the id "quote" gets it sorted there, and every other definition files it as fitting no kind.
+  { id: 'm19', from: 'Rakennus Lahtinen Oy <ostot@rakennus-lahtinen.example>', subject: 'Tarjouspyyntö: ikkunoiden pesu, 3 kohdetta', hoursAgo: 180, expect: 'quote',
+    body: 'Hei,\n\npyydämme tarjousta ikkunoiden pesusta kolmeen toimistokohteeseen Tampereella, yhteensä noin 240 ikkunaa. Työn pitäisi olla tehty 15.11.2026 mennessä. Mitä työ maksaisi, ja milloin pääsisitte aloittamaan?\n\nTerveisin\nPekka Lahtinen\nRakennus Lahtinen Oy',
+    fields: { customer: 'Rakennus Lahtinen Oy', request: 'Window cleaning at three office sites in Tampere', quantity: 'about 240 windows', deadline: '2026-11-15' } },
 ];
 
 /** RFC 4648 base64url, which is what Gmail puts in every `data` field. */

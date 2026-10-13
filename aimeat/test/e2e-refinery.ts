@@ -8,7 +8,7 @@
  *   start the same batch.
  *
  *   WHAT IT RUNS AGAINST. The sandbox's test mailbox (scripts/lib/fake-mail-server.ts, in process):
- *   18 sample messages with the class and fields a person would give each, a PDF invoice with a text
+ *   19 sample messages with the class and fields a person would give each, a PDF invoice with a text
  *   layer and one with none, and stand-ins for the decision model and the completion model that
  *   answer from those known answers and record what arrived. So a queue a message lands in is a
  *   fact about the pipeline, not about a model's mood.

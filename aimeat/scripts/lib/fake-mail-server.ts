@@ -16,6 +16,9 @@
  * @structure startFakeMailServer(port) · decideAnswer · chatAnswer · the CLI entry (`tsx scripts/lib/fake-mail-server.ts <port>`)
  * @usage node --import tsx scripts/lib/fake-mail-server.ts 40703
  * @version-history
+ *   v1.5.0 — 2026-10-13 — A transcription stand-in at /ai/v1/audio/transcriptions: every recording
+ *     is answered with one short meeting note, so a recorder's path to text runs with no paid key
+ *     (asked for by the notes app of the October agents plan, brief 10).
  *   v1.4.0 — 2026-10-12 — The agent-draft stand-in answers with the kind "records" when the prompt
  *     describes it and the sentence says something arrives in a workspace the prompt lists.
  *   v1.3.0 — 2026-10-12 — The agent-draft stand-in names a workspace or an app tool the prompt
@@ -43,6 +46,18 @@ function readRaw(req: IncomingMessage): Promise<string> {
     req.on('end', () => resolveBody(raw));
   });
 }
+
+/** The request's body as bytes, for a multipart upload the stand-in only measures. */
+function readRawBytes(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolveBody) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c: Buffer) => { chunks.push(c); });
+    req.on('end', () => resolveBody(Buffer.concat(chunks)));
+  });
+}
+
+/** What the transcription stand-in answers for every recording: a short meeting note with a decision, an owner and a day. */
+export const SANDBOX_TRANSCRIPT = 'Palaveri maanantaina. Päätettiin, että uusi hinnasto otetaan käyttöön marraskuun alusta. Liisa lähettää hinnaston asiakkaille perjantaihin mennessä. Matti selvittää, paljonko painatus maksaa.';
 
 async function readBody(req: IncomingMessage): Promise<URLSearchParams> {
   return new URLSearchParams(await readRaw(req));
@@ -182,13 +197,13 @@ function afterOf(q: string): number {
 /** A running server: the port it bound (0 asks for any free one), what the model stand-ins received, and a stop. */
 export interface FakeMailServer {
   port: number;
-  seen: { decide: Record<string, unknown>[]; chat: Record<string, unknown>[] };
+  seen: { decide: Record<string, unknown>[]; chat: Record<string, unknown>[]; transcribe: Array<{ bytes: number; contentType: string }> };
   close(): Promise<void>;
 }
 
 export function startFakeMailServer(port: number): Promise<FakeMailServer> {
   const { messages, attachments } = buildMailbox(Date.now());
-  const seen: FakeMailServer['seen'] = { decide: [], chat: [] };
+  const seen: FakeMailServer['seen'] = { decide: [], chat: [], transcribe: [] };
   const tokens = new Set<string>();
   const issue = () => {
     const access = 'fm-at-' + randomBytes(12).toString('hex');
@@ -236,6 +251,14 @@ export function startFakeMailServer(port: number): Promise<FakeMailServer> {
       const body = await readJson(req);
       seen.chat.push(body);
       return json(res, 200, chatAnswer(body));
+    }
+    // The transcription stand-in (the OpenAI-compatible form the node posts a stored recording to).
+    // It reads nothing of the audio: every recording is answered with the same short meeting note,
+    // so an app's path from a recording to its text can be run with no paid key.
+    if (path === '/ai/v1/audio/transcriptions' && req.method === 'POST') {
+      const bytes = (await readRawBytes(req)).length;
+      seen.transcribe.push({ bytes, contentType: String(req.headers['content-type'] ?? '') });
+      return json(res, 200, { text: SANDBOX_TRANSCRIPT, language: 'fi', duration: 42, usage: { seconds: 42, cost: 0 } });
     }
     if (path === '/ai/v1/models') return json(res, 200, { data: [{ id: 'sandbox-model', name: 'Sandbox model', context_length: 32000, pricing: { prompt: '0', completion: '0' } }] });
 
