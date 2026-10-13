@@ -31,6 +31,9 @@
  *   const draft = await draftAgent('Sort my incoming mail and draft the answers', { tools, known: { apps, places } });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.6.0 — 2026-10-13 — The draft prompt describes the browser to a runtime that offers it, and a
+ *     draft keeps the tool only with the hostnames it may open (agent-draft-known.js browserBlock,
+ *     withBrowserSites).
  *   v1.5.1 — 2026-10-12 — definitionFor writes the names of the watched workspace's spaces into
  *     every task (agent-draft-known.js withSpaceNote).
  *   v1.5.0 — 2026-10-12 — An agent can work when a record is published in a workspace ("records").
@@ -67,7 +70,7 @@ import { buildTemplate } from '/views/profile/agents/crew-templates.js';
 import { SCOPE_TEMPLATES } from '/views/profile/agents/scope-model.js';
 import {
   DEFAULT_TOOL_MENU, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
-  RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, withSpaceNote,
+  RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, withSpaceNote, browserBlock, withBrowserSites,
 } from '/js/services/agent-draft-known.js';
 
 /** When an agent works, as the pages offer it. */
@@ -103,7 +106,7 @@ const menuOf = (tools) => (Array.isArray(tools) ? tools : []).map((x) => (typeof
  */
 export function draftPrompt(tools, known, features) {
   const menu = menuOf(tools);
-  return draftInstructions(menu.map((x) => x.id)) + knownBlock(menu, known) + recordsBlock(known, features);
+  return draftInstructions(menu.map((x) => x.id)) + knownBlock(menu, known) + recordsBlock(known, features) + browserBlock(menu, features);
 }
 
 function draftInstructions(tools) {
@@ -162,7 +165,8 @@ export function parseDraft(text, { known, offered, features } = {}) {
   const raw = firstObject(text);
   const written = raw?.crew_def;
   const named = namedIn(written, known);
-  const def = withNeededTools(written, named, offered instanceof Set ? offered : new Set(offered ?? []));
+  // A browser stays only with the hostnames it may open; the proposal refuses it otherwise.
+  const def = withBrowserSites(withNeededTools(written, named, offered instanceof Set ? offered : new Set(offered ?? [])));
   const agents = Array.isArray(def?.agents) ? def.agents : [];
   const tasks = Array.isArray(def?.tasks) ? def.tasks : [];
   const keys = new Set(agents.map((a) => a?.name || a?.role).filter(Boolean));

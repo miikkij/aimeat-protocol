@@ -12920,6 +12920,8 @@
       "usesApps": "Sovellukset, joiden työkaluja se käyttää",
       "readsPlaces": "Työtilat, joista se lukee",
       "writesPlaces": "Työtilat, joista se lukee ja joihin se kirjoittaa",
+      "browserSites": "Sivustot, jotka sen selain saa avata",
+      "browserLimit": "Se avaa vain nämä sivustot, sillä tietokoneella, jolla se toimii. Se ei koskaan lähetä lomaketta: se pysähtyy lähetyspainikkeen kohdalla, ja sinä lähetät lomakkeen itse.",
       "inOrganism": "Organismissa {organism}",
       "whenRecordsHint": "Se saa tehtävän aina, kun valitsemaasi työtilan tilaan julkaistaan tietue.",
       "whenRecordsHintProposal": "Se saa tehtävän aina, kun ehdotuksen nimeämiin työtilan tiloihin julkaistaan tietue.",

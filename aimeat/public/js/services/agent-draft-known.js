@@ -37,6 +37,9 @@
  *   const named = namedIn(draft.crewDef, { apps, places });
  *   const def = withRecordSpaces(draft.crewDef, { organism_id, workspace_id, spaces: ['shared.requests'] });
  * @version-history
+ *   v1.4.0 — 2026-10-13 — A browser on the agent's computer: browserBlock() (the prompt text, for a
+ *     runtime that names the feature) and withBrowserSites() (a draft keeps the tool only with plain
+ *     hostnames in `browser_domains`).
  *   v1.3.0 — 2026-10-12 — withSpaceNote(): every task of an agent that works on a workspace's
  *     records names the workspace's spaces and marks the watched ones, so a result is not written
  *     into the space it came from (seen in the production run of 2026-10-12). The prompt says the
@@ -437,4 +440,59 @@ export function withRecordSpaces(crewDef, watch) {
   const rest = Object.fromEntries(Object.entries(crewDef).filter(([key]) => key !== 'record_spaces'));
   const left = hears.filter((x) => x !== 'records');
   return { ...rest, listen_for: left.length ? left : ['tasks'] };
+}
+
+/**
+ * The name a runtime's menu carries in `features` when a member may have the tool `browser` and
+ * the definition names the hostnames it may open in `browser_domains` (crewaimeat, 2026-10-13).
+ */
+export const BROWSER_FEATURE = 'browser_domains';
+const BROWSER_TOOL = 'browser';
+
+/**
+ * A hostname the page lets a draft name: lower case, at least two labels, no address, path, port
+ * or wildcard, and not a name of the computer itself or of a private network. The node's proposal
+ * check (src/services/crew-browser-domains.ts) and the runtime make the full refusals; this is the
+ * subset that keeps a draft from being refused for a slip of the model.
+ */
+const PLAIN_HOST = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/;
+const PRIVATE_HOST = /(^localhost$|\.(localhost|local|internal|lan|home\.arpa|intranet|corp)$)/;
+
+/**
+ * The text added to the draft prompt for a browser on the agent's computer. Empty unless the
+ * runtime names the feature and offers the tool, so a model is not told about a tool the agent
+ * could not have.
+ */
+export function browserBlock(menu, features) {
+  if (!Array.isArray(features) || !features.includes(BROWSER_FEATURE)) return '';
+  if (!(menu ?? []).some((x) => (x?.id ?? x) === BROWSER_TOOL)) return '';
+  return '\n\n' + [
+    'A browser: give one agent the tool "browser" only when the person\'s sentence names a web site the agent must open and fill in or read as a person would. Then add to "crew_def", at its top level, "browser_domains": the hostnames of that site and of no other, each written out in lower case, with no address, no path and no wildcard, for example ["example.com", "www.example.com"]. The browser opens those hosts and no other.',
+    'The browser never sends a form. It fills the fields and stops at the button that would send it. Say so in "does" and in the offer\'s "ask": the agent fills the form and stops, and the person checks it and sends it.',
+    'When the sentence names no web site, give no agent the tool "browser": "web" and "article_fetch" read public pages without one.',
+  ].join('\n');
+}
+
+/**
+ * A definition whose browser use the node will take: a member with the tool `browser` keeps it
+ * when the definition names at least one plain hostname, and `browser_domains` is then those
+ * hostnames, lower-cased and each once. A definition that names none loses the tool, and a list
+ * with no member that has the tool is taken out, because the proposal refuses both. A definition
+ * with neither is returned as it came.
+ */
+export function withBrowserSites(crewDef) {
+  if (!crewDef || typeof crewDef !== 'object') return crewDef;
+  const agents = Array.isArray(crewDef.agents) ? crewDef.agents : [];
+  const hasTool = agents.some((m) => Array.isArray(m?.tools) && m.tools.includes(BROWSER_TOOL));
+  if (!hasTool && !('browser_domains' in crewDef)) return crewDef;
+  const given = Array.isArray(crewDef.browser_domains) ? crewDef.browser_domains : [];
+  const hosts = [...new Set(given.filter((h) => typeof h === 'string').map((h) => h.trim().toLowerCase()))]
+    .filter((h) => PLAIN_HOST.test(h) && !PRIVATE_HOST.test(h)).slice(0, 20);
+  const rest = Object.fromEntries(Object.entries(crewDef).filter(([key]) => key !== 'browser_domains'));
+  if (hasTool && hosts.length > 0) return { ...rest, browser_domains: hosts };
+  return {
+    ...rest,
+    agents: agents.map((m) => (Array.isArray(m?.tools) && m.tools.includes(BROWSER_TOOL)
+      ? { ...m, tools: m.tools.filter((x) => x !== BROWSER_TOOL) } : m)),
+  };
 }
