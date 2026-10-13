@@ -28,6 +28,10 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.15.0 — 2026-10-13 — ctx.fetch takes `timeoutMs`, the script's own deadline for one call
+ *     (100 ms to 30 s, inside the run's): past it the call throws FETCH_TIMEOUT, which the script
+ *     can catch. Asked for by the KIIKARI extension, which checks up to 40 source addresses in one
+ *     run and would fail the whole save on one that never answers.
  *   v1.14.2 — 2026-10-10 — ctx.fetch refuses a provider call over http before resolveOutboundSecrets,
  *     so the refused call does not bind a vault secret to its host:port (secaudit 2026-10-10 I16).
  *   v1.14.1 — 2026-10-10 — decodeBody, looksLikeUtf8 and hostOfUrl moved to
@@ -129,6 +133,8 @@ import { capabilityNotDeclared, type ExtensionCapabilitySet } from './extension-
 
 /** How long one guest-initiated outbound call may take. Same ceiling every copy used. */
 const FETCH_TIMEOUT_MS = 30_000;
+/** The shortest deadline a script may give one fetch (`timeoutMs`); a smaller number is read as this. */
+const FETCH_OWN_TIMEOUT_MIN_MS = 100;
 
 export interface ExtensionCtxDeps {
     config: AimeatConfig;
@@ -626,25 +632,43 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 }
             }
             const outbound = await resolveOutboundSecrets(deps, opts?.headers, url);
-            const resp = await safeFetch(url, {
-                method: opts?.method || 'GET',
-                headers: inject ? injectProviderHeader(inject, outbound.values) : outbound.values,
-                body: opts?.body,
-                // The headers a secret went into are dropped if a redirect leaves the origin the
-                // script aimed at. The hop is re-validated for SSRF, which says nothing about
-                // whether the new host should be handed somebody's key.
-                sensitiveHeaders: inject ? [...outbound.sensitive, inject.name] : outbound.sensitive,
-                // The caller's deadline when it has one — the sandbox road hands over the run's own
-                // timeout and its teardown signal — and this file's ceiling when it does not.
-                signal: host?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS),
-                ...(declaredHosts ? { allowHosts: declaredHosts } : {}),
-            });
-            // Opted in per extension, in its manifest config — so a feed reader keeps the forgiving
-            // default and a package producer gets a failed run instead of a mojibake version.
-            // GUARD (2026-09-26): the answer is read up to the outbound ceiling and no further, and
-            // one past it throws RESPONSE_TOO_LARGE (decodeBody above).
-            const text = await decodeBody(resp, url, deps.extConfig?.strictCharset === true,
-                { gunzip: opts?.gunzip === true, maxBytes: deps.capabilities.fetchMaxBytes });
+            // The script's own deadline for this one call (`timeoutMs`), inside the run's. Without
+            // it one address that never answers holds the call until the run's deadline, and the
+            // whole run then fails; with it the script catches FETCH_TIMEOUT and goes on.
+            const ownMs = typeof opts?.timeoutMs === 'number' && Number.isFinite(opts.timeoutMs)
+                ? Math.min(Math.max(Math.floor(opts.timeoutMs), FETCH_OWN_TIMEOUT_MIN_MS), FETCH_TIMEOUT_MS) : null;
+            const own = ownMs === null ? null : AbortSignal.timeout(ownMs);
+            // The caller's deadline when it has one — the sandbox road hands over the run's own
+            // timeout and its teardown signal — and this file's ceiling when it does not.
+            const outer = host?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS);
+            let resp: Response;
+            let text: string;
+            try {
+                resp = await safeFetch(url, {
+                    method: opts?.method || 'GET',
+                    headers: inject ? injectProviderHeader(inject, outbound.values) : outbound.values,
+                    body: opts?.body,
+                    // The headers a secret went into are dropped if a redirect leaves the origin the
+                    // script aimed at. The hop is re-validated for SSRF, which says nothing about
+                    // whether the new host should be handed somebody's key.
+                    sensitiveHeaders: inject ? [...outbound.sensitive, inject.name] : outbound.sensitive,
+                    signal: own ? AbortSignal.any([outer, own]) : outer,
+                    ...(declaredHosts ? { allowHosts: declaredHosts } : {}),
+                });
+                // Opted in per extension, in its manifest config — so a feed reader keeps the forgiving
+                // default and a package producer gets a failed run instead of a mojibake version.
+                // GUARD (2026-09-26): the answer is read up to the outbound ceiling and no further, and
+                // one past it throws RESPONSE_TOO_LARGE (decodeBody above).
+                text = await decodeBody(resp, url, deps.extConfig?.strictCharset === true,
+                    { gunzip: opts?.gunzip === true, maxBytes: deps.capabilities.fetchMaxBytes });
+            } catch (err) {
+                // The script's own deadline passed and the run's did not: said by a code the script
+                // can test for. Any other failure, the run's deadline included, is thrown as it came.
+                if (own?.aborted && !outer.aborted) {
+                    throw new Error(`FETCH_TIMEOUT: ${URL.canParse(url) ? new URL(url).host : 'the address'} did not answer within ${ownMs} ms (the timeoutMs of this call).`, { cause: err });
+                }
+                throw err;
+            }
             const headers: Record<string, string> = {};
             resp.headers.forEach((v, k) => { headers[k] = v; });
             // GUARD (2026-10-09): what the node inserted does not come back. A host that echoes the

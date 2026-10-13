@@ -19,6 +19,8 @@
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
  *   v1.6.1 — 2026-10-12 — deleteRecords puts records in the bin and needs memory:delete (it said for good, memory:purge).
+ *   v1.6.1 — 2026-10-13 — ADDITIVE: ctx.workspace.readRow in the ctx table, and `timeoutMs` on
+ *     ctx.fetch; the three sentences that named the two row calls name the three.
  *   v1.6.0 — 2026-10-11 — Selling section: an action has a money price and a pacing amount
  *     (`tollMorsels`); `commercial.payMorsels` is the deprecated 3.x name of the pacing amount until
  *     4.0.0, and ctx.wallet.consume debits pacing (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-
@@ -127,7 +129,7 @@ function sandboxSection(): string {
     '| `ctx.memory.search(prefix)` | `[{key, value}]` for every key under the prefix, private ones included |',
     '| `ctx.memory.delete(key)` | Remove one key; returns whether it existed |',
     '| `ctx.memory.getPublic(namespace, key)` | Read a PUBLIC key in another namespace (another `ext:` one, or an owner\'s), or null |',
-    `| \`ctx.fetch(url, {method, headers, body, gunzip})\` | The only way out. Returns \`{status, ok, text, headers}\`. Reads at most ${FETCH_READ_MB} MB of one answer (more with \`limits.fetch_max_mb\`, below), and throws \`RESPONSE_TOO_LARGE\` past that. \`gunzip: true\` inflates a gzipped answer (a \`.xml.gz\`, a compressed export) before it is decoded |`,
+    `| \`ctx.fetch(url, {method, headers, body, gunzip, timeoutMs})\` | The only way out. Returns \`{status, ok, text, headers}\`. Reads at most ${FETCH_READ_MB} MB of one answer (more with \`limits.fetch_max_mb\`, below), and throws \`RESPONSE_TOO_LARGE\` past that. \`gunzip: true\` inflates a gzipped answer (a \`.xml.gz\`, a compressed export) before it is decoded. \`timeoutMs\` (100 to 30000) is your own deadline for this one call: past it the call throws \`FETCH_TIMEOUT: …\`, which you catch and go on from. Give one whenever a run calls several addresses, because without it one address that never answers holds the call until the whole run times out |`,
     '| `ctx.files.read(ref)` | A stored file as `{base64, mime, size, key}`, or null. Read with the CALLER\'s rights |',
     '| `ctx.files.write(key, base64, {mime, visibility})` | Store bytes under `ext/{name}/`, private unless `visibility: \'public\'`. Returns `{key, gaii, owner, url, size}`; `owner` is whose storage it landed in |',
     '| `ctx.datapackage.publish / validate / inferSchema / open / rows / fail` | AIMEAT Data Packages, built on the node. `publish` THROWS when the quality gate refuses; `validate` looks first without throwing |',
@@ -141,6 +143,7 @@ function sandboxSection(): string {
     '| `ctx.workspace.archiveRecords(orgId, ws, namespace, ids)` | Archive up to 500 records in ONE call: they leave every read and stay restorable. The caller must be the organism\'s creator or an admin; a token needs `organism:write`. Answers `{archived: [ids], rows}`. Use it so a space that only grows (closed tickets, finished sessions) stays fast to read |',
     '| `ctx.workspace.appendRows(orgId, ws, space, [{body, rowId, occurredAt}])` | Append up to 500 rows to a ROW space that names this extension (manifest `workspace: { rows: true }`). A repeated `rowId` replaces the stored row, which is how an ingest removes duplicates. Answers `{written, rowIds, pruned}`. Works on a schedule and a workflow step too |',
     '| `ctx.workspace.readRows(orgId, ws, space, {where, since, until, changedSince, limit, cursor, order})` | One page of such a row space, newest first: `{rows, cursor, indexed}`. `where` takes only the space\'s `indexOn` fields |',
+    '| `ctx.workspace.readRow(orgId, ws, space, rowId)` | One row of such a row space by its id, in the shape `readRows` gives a row; `null` when there is no such row. One call, whatever the size of the space: use it whenever you hold the id, and never page through `readRows` to find one |',
     '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',
     '| `ctx.buy(appRef, tool, input)` | Buy one call of another owner\'s app tool, billed to this extension\'s owner. Needs a contract they already hold, else `{ok: false, code: \'NO_CONTRACT\'}` |',
     '| `ctx.wallet.consume(amount, reason)` | Debit morsels of pacing from the CALLER; `{success}`. Throws on an amount that is not positive or is over the node\'s per-call ceiling |',
@@ -201,7 +204,7 @@ function sandboxSection(): string {
     '| `wallet.consume`, `wallet.getBalance` | yes | yes | absent | absent |',
     '| `buy` | yes | absent | absent | absent |',
     '| `ai` | when the node runs background jobs | when the node runs background jobs | absent | yes |',
-    '| `workspace` | when the manifest declares it | when the manifest declares it | only `appendRows` and `readRows`, with `workspace: { rows: true }` | absent |',
+    '| `workspace` | when the manifest declares it | when the manifest declares it | only `appendRows`, `readRows` and `readRow`, with `workspace: { rows: true }` | absent |',
     '| `instance` | on the instance address | when `instance_id` is passed | when the schedule or step names one | absent |',
     '',
     '**Test the method, not the object, and THROW when it is missing.** `ctx.wallet` is always an',
@@ -229,10 +232,10 @@ function sandboxSection(): string {
     'it and answer in your own words. A scheduled run has only the two row calls below. Every call costs one API call. A',
     'record written this way carries provenance naming your extension, because a script produced it.',
     '',
-    '**Rows on a schedule.** `workspace: { rows: true }` gives `ctx.workspace.appendRows` and `readRows`',
+    '**Rows on a schedule.** `workspace: { rows: true }` gives `ctx.workspace.appendRows`, `readRows` and `readRow`',
     'on a ROW space whose manifest names your extension: `objectTypes[].extensions: [installer/your-extension-name]`,',
     'which an admin of the organism adds. Your installer must be an active member, and the space\'s',
-    '`writeRole` applies to them. These two calls do not act as the caller, so they work the same on a',
+    '`writeRole` applies to them. These calls do not act as the caller, so they work the same on a',
     'request, a schedule and a workflow step, and a row records `ext:<name>` as its writer. On a request,',
     'read `ctx.caller` yourself before you append on someone\'s behalf. Give each row a `rowId` derived',
     'from the source event (`ctx.hash` of its id), so a repeated fetch replaces instead of duplicating.',

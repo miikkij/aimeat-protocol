@@ -41,7 +41,7 @@ const PREFIX_RE = /^[a-z0-9][a-z0-9_-]{1,40}$/;
 /**
  * @typedef {{ organismId: string, workspaceId: string, provider?: string, spaces?: { items?: string, events?: string },
  *   rules?: Array<{ match: string, value: string, klass: string, at?: string }>, since?: string, query?: string,
- *   batchSize?: number, [key: string]: any }} RefineryDefinition
+ *   batchSize?: number, keepText?: boolean, [key: string]: any }} RefineryDefinition
  */
 
 /**

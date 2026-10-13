@@ -30,6 +30,11 @@
  *     The batch's decisions pass `limit: 'exempt'`: one batch is many calls, not one request each.
  *   v1.0.5 — 2026-10-08 — The row's extractor block names the provenance record the extraction call
  *     minted (provenanceId); a workspace row has no column for it.
+ *   v1.1.0 — 2026-10-13 — `keepText: true` in the definition: a row keeps the message's text
+ *     (`text`, with `textKept`) and each attachment's text layer (`attachments[i].text`), at most
+ *     20 000 characters each. A row held a 280-character snippet and a count of the attachment
+ *     characters, so an agent's tool could not check the read fields against what the mail said
+ *     (the October agents plan, brief 08; found by the aimeat-apps session).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -86,7 +91,16 @@ export interface RefineryDefinition {
   spaces: { items: string; events: string };
   /** Who the rows say processed them, and the decision records' app. */
   app: string;
+  /**
+   * Whether a row keeps the text the batch read: the message's own text, and each attachment's
+   * text layer. Off unless the definition says `keepText: true`: it puts the mail's content into
+   * the owner's workspace, which is the owner's decision, and a row then carries `textKept`.
+   */
+  keepText: boolean;
 }
+
+/** The most characters of a message's text, and of one attachment's text layer, that a row keeps. */
+export const KEPT_TEXT_MAX = 20_000;
 
 export type RunStep = 'list' | 'read' | 'classify' | 'attach' | 'extract' | 'save';
 
@@ -140,6 +154,7 @@ export async function loadDefinition(storage: Storage, ownerGhii: string, prefix
     rules: Array.isArray(c.rules) ? c.rules as RefineryRule[] : [],
     spaces: { items: String(spaces.items ?? 'viesti'), events: String(spaces.events ?? 'tapahtuma') },
     app: String(c.app ?? `${prefix}.html`),
+    keepText: c.keepText === true,
   };
   const missing = [
     !def.connectionId && 'connectionId (the mailbox)', !def.organismId && 'organismId', !def.workspaceId && 'workspaceId',
@@ -218,12 +233,16 @@ export async function readAttachments(ctx: Ctx, msg: MailMessage): Promise<{ tex
       out.stored.push({ filename: att.filename, key: stored.key, mime: stored.mime_type, size: stored.size, error: `${err.code}: ${err.message}` });
       continue;
     }
-    out.stored.push({ filename: att.filename, key: stored.key, mime: stored.mime_type, size: stored.size });
+    const kept: Json = { filename: att.filename, key: stored.key, mime: stored.mime_type, size: stored.size };
+    out.stored.push(kept);
     if (!file) continue;
     const isPdf = /pdf/i.test(stored.mime_type) || /\.pdf$/i.test(att.filename);
     const text = isPdf ? await extractFileText(file.data, stored.mime_type, att.filename) : null;
-    if (text && text.text.trim().length >= 40) out.text += `\n--- ${att.filename} ---\n${text.text}`;
-    else out.fileKeys.push(stored.key);
+    if (text && text.text.trim().length >= 40) {
+      out.text += `\n--- ${att.filename} ---\n${text.text}`;
+      // The text layer that went to the extraction, kept on the row when the definition asks for it.
+      if (ctx.def.keepText) kept.text = text.text.slice(0, KEPT_TEXT_MAX);
+    } else out.fileKeys.push(stored.key);
   }
   return out;
 }
@@ -295,6 +314,9 @@ async function processOne(ctx: Ctx, run: RunState, id: string, tick: () => void)
       scrubbed: cl.scrubbed ?? 0, redacted: cl.redacted ?? 0, costUsd: cl.costUsd ?? null, cached: !!cl.cached },
     extractor: ex ? { model: ex.model, tries: ex.tries, files: ex.files, attachmentChars: ex.attachmentChars,
       ...(ex.provenanceId ? { provenanceId: ex.provenanceId } : {}) } : null,
+    // The message's own text as the batch read it, when the owner's definition keeps it. A reader
+    // tells a row with the text from an older one by `textKept`, not by the field being empty.
+    ...(ctx.def.keepText ? { text: msg.text.slice(0, KEPT_TEXT_MAX), textKept: true } : {}),
   };
   const rc = rowCaller(ctx.caller);
   await appendRows(ctx.deps, rc, { organismId: ctx.def.organismId, wsId: ctx.def.workspaceId, space: ctx.def.spaces.items,

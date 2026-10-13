@@ -2,9 +2,9 @@
  * @file src/services/extension-workspace-rows.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description `ctx.workspace.appendRows` and `readRows`: the two calls an extension makes on an
- *   organism ROW space, and the capability a schedule or a workflow step gets, which is those two
- *   and nothing else.
+ * @description `ctx.workspace.appendRows`, `readRows` and `readRow`: the calls an extension makes
+ *   on an organism ROW space, and the capability a schedule or a workflow step gets, which is those
+ *   three and nothing else.
  *
  *   THE ROW CALLS DO NOT ACT AS THE CALLER. They take the row service's extension code path
  *   (workspace-rows/row-service.ts, authorizeExtension): the space names the extension as
@@ -22,6 +22,9 @@
  * @usage
  *   workspace: buildUnattendedExtensionWorkspace({ config, storage, ext, ownerGhii }).workspace
  * @version-history
+ *   v1.1.0 — 2026-10-13 — `readRow`: one row by its id, null when there is none. An extension that
+ *     held a row id (a tool reading one mail message) read up to five pages of rows to find it,
+ *     and found nothing past the newest 500.
  *   v1.0.1 — 2026-10-09 — archiveRecords is refused here like the other record calls: it needs a caller.
  *   v1.0.0 — 2026-10-08 — Initial (aimeat-soc core), split from extension-workspace.ts at the cycle.
  */
@@ -30,15 +33,15 @@ import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import { systemReader, type ContentReader } from './classification/reader.js';
 import { workspaceDeclarationOf, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
-import { appendRows, readRows, WorkspaceRowError, type RowCaller } from './workspace-rows/row-service.js';
+import { appendRows, readRows, readRow, WorkspaceRowError, type RowCaller } from './workspace-rows/row-service.js';
 
 /** A refusal a capability made, kept so the code path can answer with the service's status. */
 export interface ExtensionWorkspaceRefusal { status: number; code: string; message: string }
 
-/** The two row calls, the same on every code path that runs the extension. */
-export type RowCalls = Pick<NonNullable<ExtensionCtx['workspace']>, 'appendRows' | 'readRows'>;
+/** The row calls, the same on every code path that runs the extension. */
+export type RowCalls = Pick<NonNullable<ExtensionCtx['workspace']>, 'appendRows' | 'readRows' | 'readRow'>;
 
-/** appendRows and readRows through the row service's extension path. See the file header. */
+/** appendRows, readRows and readRow through the row service's extension path. See the file header. */
 export function buildRowCalls(args: {
     config: AimeatConfig; storage: Storage; extName: string; installer: string;
     declaration: WorkspaceDeclaration; reader: ContentReader;
@@ -80,6 +83,20 @@ export function buildRowCalls(args: {
                 ...(o.cursor ? { cursor: o.cursor } : {}),
                 ...(o.order ? { order: o.order } : {}),
             }));
+        },
+        // One row by its id, under the rule readRows stands on. A row that is not there, or that
+        // the reader may not see, answers null: an extension that looks a row up asks a question,
+        // and "none" is an answer to it. Every other refusal (the space, the naming) is thrown.
+        readRow: async (organismId, ws, space, rowId) => {
+            allowRows();
+            if (typeof rowId !== 'string' || !rowId) refuse(400, 'INVALID_INPUT', 'readRow() needs the row id as a string');
+            try {
+                return await readRow(deps, rowCaller, organismId, ws, space, rowId, reader);
+            } catch (err) {
+                if (err instanceof WorkspaceRowError && err.code === 'NOT_FOUND') return null;
+                if (err instanceof WorkspaceRowError) return refuse(err.statusCode, err.code, err.message);
+                throw err;
+            }
         },
     };
 }

@@ -287,6 +287,9 @@ async function row(owner: Owner, org: string, ws: string, id: string): Promise<a
     assert(r.fields?.amount === 41.57 && r.fields?.due_date === '2026-10-05', `fields ${JSON.stringify(r.fields)}`);
     assert(r.extractor?.files === 0 && r.extractor?.attachmentChars > 40, `the text layer was read here: ${JSON.stringify(r.extractor)}`);
     assert(r.attachments?.[0]?.key && r.attachments[0].mime === 'application/pdf', `the PDF was stored: ${JSON.stringify(r.attachments)}`);
+    // A definition that does not ask keeps no text: the snippet, and nothing of the PDF's text.
+    assert(!('text' in r) && !('textKept' in r) && !('text' in r.attachments[0]) && typeof r.snippet === 'string' && r.snippet.length <= 280,
+      `no text is kept unless the definition says so: ${JSON.stringify(Object.keys(r))} ${JSON.stringify(Object.keys(r.attachments[0]))}`);
   });
 
   await test('2c. a scanned invoice has no text layer, so the PDF itself went to the model as a file', async () => {
@@ -328,6 +331,26 @@ async function row(owner: Owner, org: string, ws: string, id: string): Promise<a
     const s = await startBatch(A.token, { prefix: 'mt', message_ids: ['m01'] });
     const run = await waitRun(A.token, s.body.data.run.id);
     assert(run.status === 'done' && run.n === 1 && run.counts.seen === 1 && run.counts.skipped_seen === 0, `run ${JSON.stringify(run.counts)}`);
+  });
+
+  await test('3a2. a definition with keepText keeps the message text and a PDF\'s text layer on the row, and nothing for a scanned PDF', async () => {
+    // The same mailbox and workspace under a second definition, so the first one's cursor stays.
+    await saveDefinition(A, 'mk', { ...DEF, keepText: true });
+    const s = await startBatch(A.token, { prefix: 'mk', message_ids: ['m02', 'm03'] });
+    assert(s.status === 202, `got ${s.status} ${JSON.stringify(s.body?.error)}`);
+    const run = await waitRun(A.token, s.body.data.run.id);
+    assert(run.status === 'done' && run.counts.seen === 2, `run ${run.status} ${JSON.stringify(run.counts)} ${run.error ?? ''}`);
+    const digital = await row(A, org, ws, 'm02');
+    assert(digital?.textKept === true && typeof digital.text === 'string' && digital.text.length > 20 && digital.text.length <= 20000,
+      `the message text is on the row: ${JSON.stringify({ textKept: digital?.textKept, text: String(digital?.text).slice(0, 60) })}`);
+    assert(digital.text.startsWith(digital.snippet.slice(0, 40)), 'the text is the text the snippet was cut from');
+    const pdf = digital.attachments?.[0];
+    assert(typeof pdf?.text === 'string' && pdf.text.length === digital.extractor.attachmentChars - `\n--- ${pdf.filename} ---\n`.length && pdf.text.length > 40,
+      `the PDF's text layer is on its attachment: ${String(pdf?.text).length} of ${digital.extractor?.attachmentChars}`);
+    assert(digital.fields?.amount === 41.57, 'and the read fields are what they were');
+    const scanned = await row(A, org, ws, 'm03');
+    assert(scanned?.textKept === true && typeof scanned.text === 'string' && !('text' in scanned.attachments[0]),
+      `a scanned PDF has no text layer to keep: ${JSON.stringify(Object.keys(scanned?.attachments?.[0] ?? {}))}`);
   });
 
   await test('3b. one failure among good ones is filed as Unclear with its error', async () => {

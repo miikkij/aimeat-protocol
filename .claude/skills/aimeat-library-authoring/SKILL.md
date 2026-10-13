@@ -75,7 +75,10 @@ guest receives is missing from that table, so change the table in the same commi
   redirect elsewhere included, and the approval lists them (since 2026-10-08). `ctx.fetch` reads at
   most 4 MB of one answer unless the manifest raises it with `limits: { fetch_max_mb }` (clamped to
   32 MB, stored on the record as `limits.fetchMaxBytes`), and `ctx.fetch(url, { gunzip: true })`
-  inflates a gzipped answer under the same ceiling (since 2026-10-09). A host that differs
+  inflates a gzipped answer under the same ceiling (since 2026-10-09). `ctx.fetch(url, { timeoutMs })`
+  gives one call its own deadline (100 ms to 30 s) and throws `FETCH_TIMEOUT` past it, which the
+  script catches; a run that calls several addresses gives one, because without it a single address
+  that never answers holds the call until the whole run times out (since 2026-10-13). A host that differs
   per install (a customer's own server) is a config field named in
   `network: { host_fields: { SERVER_HOST: required } }` (or `optional`): the package's config-needs
   asks it, its value (one hostname or IPv4, optional `:port`) joins that install's list, and the owner
@@ -107,7 +110,7 @@ guest receives is missing from that table, so change the table in the same commi
   run, with the same refusals (membership, the contributor grant, `memory:write` on an agent or app
   token, the locked schema, `ifVersion`, the publish gate) thrown as `CODE: message`. It is absent
   without the declaration; check `if (!ctx.workspace)`. A schedule or a workflow step gets only
-  `appendRows` and `readRows`, and only with `workspace: { rows: true }`: they reach a ROW space whose
+  `appendRows`, `readRows` and `readRow` (one row by its id, `null` when there is none), and only with `workspace: { rows: true }`: they reach a ROW space whose
   manifest names the extension as `installer/name` in `objectTypes[].extensions`, they do not act as
   the caller (a row records `ext:<name>`), and a repeated `rowId` replaces the row. Do not reach a
   workspace through `ctx.fetch` or `ctx.memory`: the first cannot reach the node and the second is

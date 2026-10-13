@@ -77,6 +77,8 @@ console.log('\n=== Extension rows (unattended) and declared hosts E2E ===\n');
 const FAR_PORT = Number(new URL(BASE).port || '40251') + 230;
 const far = http.createServer((req, res) => {
     if (req.url === '/hop') { res.writeHead(302, { Location: `http://127.0.0.1:${FAR_PORT}/ok` }); res.end(); return; }
+    // An address that answers too late for a script that gave the call its own deadline.
+    if (req.url === '/slow') { setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('far-late'); }, 2500); return; }
     res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('far-ok');
 });
 // No host: dual-stack, so `localhost` answers whether it resolves to ::1 or 127.0.0.1.
@@ -94,6 +96,7 @@ const ROW_SCRIPTS = {
         return ctx.workspace.appendRows(input.org, input.ws, input.space || 'alert', rows);
     }`,
     read: `export default async function(ctx, input){ return ctx.workspace.readRows(input.org, input.ws, 'alert', { where: { severity: 'high' } }); }`,
+    read_one: `export default async function(ctx, input){ return { row: await ctx.workspace.readRow(input.org, input.ws, input.space || 'alert', input.id) }; }`,
     write_record: `export default async function(ctx, input){ return ctx.workspace.write(input.org, input.ws, 'note', 'n1', { title: 'x' }); }`,
     // A workflow's response step: it acts only on what the person picked, and records it as a row.
     propose: `export default async function(ctx, input){ return { action: 'isolate_host', deviceId: 'dev-7' }; }`,
@@ -108,6 +111,14 @@ const FETCH_SCRIPTS = {
     fetch_listed: `export default async function(ctx, input){ var r = await ctx.fetch('http://localhost:' + input.port + '/ok'); return { status: r.status, text: r.text }; }`,
     fetch_unlisted: `export default async function(ctx, input){ var r = await ctx.fetch('http://127.0.0.1:' + input.port + '/ok'); return { status: r.status }; }`,
     fetch_hop: `export default async function(ctx, input){ var r = await ctx.fetch('http://localhost:' + input.port + '/hop'); return { status: r.status }; }`,
+    // One address that answers late and one that answers: the script gives the first its own
+    // deadline, catches the timeout and still reads the second.
+    fetch_deadline: `export default async function(ctx, input){
+        var slow = 'answered';
+        try { await ctx.fetch('http://localhost:' + input.port + '/slow', { timeoutMs: input.ms }); } catch (e) { slow = String(e && e.message || e); }
+        var ok = await ctx.fetch('http://localhost:' + input.port + '/ok', { timeoutMs: 5000 });
+        return { slow: slow, ok: ok.text };
+    }`,
 };
 const manifestFor = (name: string, scripts: Record<string, string>, extra: Record<string, unknown>) => JSON.stringify({
     metadata: { name, version: '1.0.0', description: 'extension rows e2e', author: 'e2e' },
@@ -185,6 +196,25 @@ await test('readRows filters on an indexed field of that space', async () => {
     assert((r.body.data.rows as unknown[]).length === 2, `rows: ${JSON.stringify(r.body.data).slice(0, 200)}`);
 });
 
+await test('readRow gives one row by its id in one call, and null for an id that is not there', async () => {
+    const r = await invoke(EXT, 'read_one', A.token, { id: 'a2' });
+    // HOLE: 500 EXTENSION_ERROR (readRow is not a function) before this change.
+    assert(r.status === 200, `read_one ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const row = r.body.data.row as { rowId: string; body: { note: string }; createdBy: string } | null;
+    assert(row?.rowId === 'a2' && row.body.note === 'alert a2' && row.createdBy === `ext:${EXT}`, `the row: ${JSON.stringify(row)}`);
+    const none = await invoke(EXT, 'read_one', A.token, { id: 'no-such-row' });
+    assert(none.status === 200 && none.body.data.row === null, `an absent row answers null: ${none.status} ${JSON.stringify(none.body?.data ?? none.body?.error)}`);
+});
+
+await test('readRow stands on the same naming as readRows: another installer\'s space, a non-member and no workspace.rows are refused', async () => {
+    const other = await invoke(EXT, 'read_one', A.token, { id: 'a1', space: 'other' });
+    assert(other.status === 403 && JSON.stringify(other.body).includes('ACCESS_DENIED'), `the other space: ${other.status} ${JSON.stringify(other.body?.error)}`);
+    const outsider = await invoke(EXT_X, 'read_one', X.token, { id: 'a1' });
+    assert(outsider.status === 403 && /not an active member/.test(JSON.stringify(outsider.body)), `a non-member's extension: ${outsider.status} ${JSON.stringify(outsider.body?.error)}`);
+    const undeclared = await invoke(EXT_NR, 'read_one', A.token, { id: 'a1' });
+    assert(undeclared.status === 403 && JSON.stringify(undeclared.body).includes('PERMISSION'), `without workspace.rows: ${undeclared.status} ${JSON.stringify(undeclared.body?.error)}`);
+});
+
 let scheduleId = '';
 await test('On a schedule, with nobody present: appendRows works', async () => {
     const mk = await json('/v1/schedules', {
@@ -239,6 +269,18 @@ await test('Hosts: the listed host answers', async () => {
     const r = await invoke(EXT, 'fetch_listed', A.token);
     assert(r.status === 200, `fetch ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(r.body.data.text === 'far-ok', `answer: ${JSON.stringify(r.body.data)}`);
+});
+
+await test('A fetch with its own deadline throws FETCH_TIMEOUT, which the script catches and goes on from', async () => {
+    const started = Date.now();
+    const r = await invoke(EXT, 'fetch_deadline', A.token, { ms: 300 });
+    // HOLE: before this change `timeoutMs` was ignored, so the late address answered and `slow` was "answered".
+    assert(r.status === 200, `the run still succeeds: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(/^FETCH_TIMEOUT: localhost:\d+ did not answer within 300 ms/.test(r.body.data.slow), `the late address: ${r.body.data.slow}`);
+    assert(r.body.data.ok === 'far-ok', `and the next address was read: ${JSON.stringify(r.body.data)}`);
+    assert(Date.now() - started < 2300, `the script did not wait for the late answer: ${Date.now() - started} ms`);
+    const patient = await invoke(EXT, 'fetch_deadline', A.token, { ms: 4000 });
+    assert(patient.status === 200 && patient.body.data.slow === 'answered', `a deadline the address meets changes nothing: ${JSON.stringify(patient.body?.data ?? patient.body?.error)}`);
 });
 
 await test('Hosts: an unlisted host is refused before anything is sent', async () => {
