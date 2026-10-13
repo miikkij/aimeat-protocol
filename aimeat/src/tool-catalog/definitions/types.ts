@@ -6,6 +6,8 @@
  *   ToolInputField, AimeatToolDefinition) plus the shared `agentEverywhere` visibility constant.
  *   Consumed by definitions.ts and every extracted definitions/*.ts tool-group module.
  * @version-history
+ *   v1.3.0 — 2026-10-13 — scopeEnforcedFrom may name the release per word (ToolScopeEnforcedFrom), so a
+ *     tool can defer a word it adds while the word it already had stays enforced.
  *   v1.2.0 — 2026-10-12 — connectorOnly: the visibility of a tool on both connector interfaces and not
  *     on the node MCP. Five such tools declared the node MCP, or declared the connector MCP off.
  *   v1.1.0 — 2026-10-05 — ToolInputField.zod: the exact schema of a field whose type the coarse
@@ -20,6 +22,12 @@ export type ToolCallerType = 'agent' | 'owner' | 'operator' | 'public';
 
 /** One word, or every word of a list: a tool whose route asks for several asks for all of them. */
 export type ToolScope = string | readonly string[];
+
+/**
+ * When a tool's words start to decide whether it is offered: one release for every word of `scope`,
+ * or word -> release for only the words it names (the other words of `scope` apply on every release).
+ */
+export type ToolScopeEnforcedFrom = string | Readonly<Record<string, string>>;
 
 /** The v2 MCP surfaces (../surfaces.ts). */
 export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce' | 'primitives' | 'chat' | 'full';
@@ -79,8 +87,10 @@ export interface AimeatToolDefinition {
      * without the word and a call without it is counted (GET /v1/stats deprecated_use), as its REST twin
      * behind requireRestScope is (auth/rest-scope-gate.ts). For the words added on 2026-10-12, which
      * these tools had never asked: REST_SCOPE_GATES_ENFORCED_IN (utils/rest-scope-release.ts).
+     * A map names the release per word, for a tool that adds a deferred word to one it already
+     * enforces: `{ 'ext:invoke': REST_SCOPE_GATES_ENFORCED_IN }` defers only ext:invoke.
      */
-    scopeEnforcedFrom?: string;
+    scopeEnforcedFrom?: ToolScopeEnforcedFrom;
     /**
      * The v2 surfaces that carry the tool, besides `full` (../surfaces.ts MCP_SURFACES). `full`
      * carries every catalog tool not in V2_EXCLUDED.
