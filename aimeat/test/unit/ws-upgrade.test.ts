@@ -6,6 +6,10 @@
  *   most once a day without the token or the URL. Secrets audit 2026-10-09, d3. The same rules run
  *   against a live node in e2e-realtime-rooms, e2e-personal-tunnel and e2e-connect-tunnel.
  * @version-history
+ *   v1.1.0 — 2026-10-13 — Version-aware on WS_QUERY_TOKEN_REMOVED_IN: below it an accepted ?token= is
+ *     counted and logged, as before; from it the form is refused with WS_QUERY_TOKEN_DISABLED even when
+ *     switched on, nothing is counted or logged. A token that does not verify is refused through the
+ *     Authorization header on both.
  *   v1.0.0 — 2026-10-09 — Initial.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -29,6 +33,8 @@ vi.mock('../../src/auth/middleware.js', () => ({
 }));
 
 import { authenticateUpgrade, mintSocketTicket, refuseUpgrade } from '../../src/auth/ws-upgrade.js';
+import { WS_QUERY_TOKEN_REMOVED_IN } from '../../src/config-security.js';
+import { removedFrom } from '../../src/services/deprecation.js';
 
 function req(query: string, authorization?: string): { request: IncomingMessage; url: URL } {
   const url = new URL(`http://node.test/v1/realtime/ws?${query}`);
@@ -70,8 +76,19 @@ describe('authenticateUpgrade', () => {
     expect(incrementTyped).not.toHaveBeenCalled();
   });
 
-  it('counts each accepted ?token= by socket kind, and logs once a day without the token', async () => {
+  it('counts each accepted ?token= by socket kind, and logs once a day without the token; from WS_QUERY_TOKEN_REMOVED_IN refuses it though switched on', async () => {
     const secret = 'canary-jwt-9d1e';
+    if (removedFrom(WS_QUERY_TOKEN_REMOVED_IN)) {
+      for (let i = 0; i < 3; i++) {
+        const { request, url } = req(`token=${secret}`);
+        const a = await authenticateUpgrade(request, url, 'connect-tunnel', true);
+        expect(a).toMatchObject({ outcome: 'refused', status: 401, code: 'WS_QUERY_TOKEN_DISABLED' });
+        expect(JSON.stringify(a)).toContain(`removed in ${WS_QUERY_TOKEN_REMOVED_IN}`);
+      }
+      expect(incrementTyped).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+      return;
+    }
     for (let i = 0; i < 3; i++) {
       const { request, url } = req(`token=${secret}`);
       const a = await authenticateUpgrade(request, url, 'connect-tunnel', true);
@@ -85,7 +102,10 @@ describe('authenticateUpgrade', () => {
 
   it('answers none when there is no credential, and refuses a token that does not verify', async () => {
     expect(await authenticateUpgrade(req('room=r').request, req('room=r').url, 'realtime', true)).toEqual({ outcome: 'none' });
+    // ?token= is checked before its token from WS_QUERY_TOKEN_REMOVED_IN, so there the form itself is refused.
     expect(await authenticateUpgrade(req('token=bad').request, req('token=bad').url, 'realtime', true))
+      .toMatchObject({ outcome: 'refused', code: removedFrom(WS_QUERY_TOKEN_REMOVED_IN) ? 'WS_QUERY_TOKEN_DISABLED' : 'INVALID_TOKEN' });
+    expect(await authenticateUpgrade(req('room=r', 'Bearer bad').request, req('room=r').url, 'realtime', true))
       .toMatchObject({ outcome: 'refused', code: 'INVALID_TOKEN' });
   });
 });

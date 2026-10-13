@@ -6,10 +6,14 @@
  *   handler ran, so an mp3 request came back as pcm (secaudit 2026-10 follow-up, Part B).
  * @usage pnpm test -- connector-dispatch-response-format
  * @version-history
+ *   v1.1.0 — 2026-10-13 — The agent_name routing is proven with toll_morsels on every version. The 3.x
+ *     name price_morsels is routed the same way below MORSEL_PRICE_FIELDS_REMOVED_IN, as before, and
+ *     refused with MORSEL_PRICE_REMOVED from it, with nothing sent.
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 follow-up, Part B).
  */
 import { describe, it, expect } from 'vitest';
 import { registerAllTools } from '../../src/cli/connect/mcp/tools/index.js';
+import { legacyMorselFieldsLive } from '../../src/config-pacing.js';
 
 type Sent = { method: string; path: string; body?: unknown };
 
@@ -41,7 +45,20 @@ describe('the connector dispatch path and response_format', () => {
     // handler never saw it and refused every call.
     it('aimeat_offer_price_set reads the offers of the agent it names', async () => {
         const sent: Sent[] = [];
-        await connector(sent).get('aimeat_offer_price_set')!({ agent_name: 'seller', offer_id: 'o1', price_morsels: 3 });
+        await connector(sent).get('aimeat_offer_price_set')!({ agent_name: 'seller', offer_id: 'o1', toll_morsels: 3 });
         expect(sent[0]).toEqual({ method: 'GET', path: '/v1/agents/seller/offers' });
+    });
+
+    // The 3.x name price_morsels: read the same way until MORSEL_PRICE_FIELDS_REMOVED_IN, refused from it
+    // before anything is sent.
+    it('aimeat_offer_price_set with the 3.x price_morsels: routed until its removal, refused from it', async () => {
+        const sent: Sent[] = [];
+        const out = await connector(sent).get('aimeat_offer_price_set')!({ agent_name: 'seller', offer_id: 'o1', price_morsels: 3 });
+        if (legacyMorselFieldsLive()) {
+            expect(sent[0]).toEqual({ method: 'GET', path: '/v1/agents/seller/offers' });
+        } else {
+            expect(sent).toEqual([]);
+            expect(JSON.stringify(out)).toContain('MORSEL_PRICE_REMOVED');
+        }
     });
 });

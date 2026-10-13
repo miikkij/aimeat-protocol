@@ -6,11 +6,15 @@
  *   require an audience (secaudit 2026-10 follow-up, A7).
  * @usage pnpm test -- signed-message-audience
  * @version-history
+ *   v1.1.0 — 2026-10-13 — Version-aware on unprovenFormatLive(): a message that names no node passes
+ *     while not required below UNPROVEN_FORMAT_REMOVED_IN, as before, and is refused with
+ *     AUDIENCE_REQUIRED from it.
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 follow-up, A7).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { audienceProof, audienceRefusal } from '../../src/services/signed-node-request.js';
+import { unprovenFormatLive } from '../../src/config-federation.js';
 
 describe('an older-format message names the node it is for', () => {
     let keys: { publicKey: string; privateKey: string };
@@ -40,8 +44,14 @@ describe('an older-format message names the node it is for', () => {
         expect((await check('node-b', undefined))?.code).toBe('UNAUTHORIZED');
     });
 
-    it('a message that names none passes while not required, and is AUDIENCE_REQUIRED when required', async () => {
-        expect(await check(undefined, undefined)).toBeNull();
+    it('a message that names none passes while not required (until UNPROVEN_FORMAT_REMOVED_IN, refused from it), and is AUDIENCE_REQUIRED when required', async () => {
+        if (unprovenFormatLive()) {
+            expect(await check(undefined, undefined)).toBeNull();
+        } else {
+            const r = await check(undefined, undefined);
+            expect(r?.code).toBe('AUDIENCE_REQUIRED');
+            expect(r?.status).toBe(401);
+        }
         expect((await check(undefined, undefined, true))?.code).toBe('AUDIENCE_REQUIRED');
     });
 });

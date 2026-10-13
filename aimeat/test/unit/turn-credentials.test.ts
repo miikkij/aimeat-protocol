@@ -5,6 +5,9 @@
  *   the opaque id that keeps the account name out of TURN logs, who gets no TURN entry, the
  *   deprecated static pair, and the boot warning.
  * @version-history
+ *   v1.1.0 — 2026-10-13 — The static-pair assertions are version-aware on TURN_STATIC_PAIR_REMOVED_IN:
+ *     the pair is served and called deprecated below it, as before; from it the entry carries the
+ *     address alone and the warning says the pair was removed and is not served.
  *   v1.0.0 — 2026-10-09 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -12,7 +15,8 @@ import { createHmac } from 'node:crypto';
 import {
   deriveTurnCredential, turnOpaqueId, turnEntryFor, turnDeprecationWarning, type TurnSettings,
 } from '../../src/services/turn-credentials.js';
-import { turnTtlFrom } from '../../src/config-turn.js';
+import { TURN_STATIC_PAIR_REMOVED_IN, turnTtlFrom } from '../../src/config-turn.js';
+import { removedFrom } from '../../src/services/deprecation.js';
 
 const SECRET = 'unit-turn-secret';
 const OWNER = { kind: 'owner', visitor: false, principal: 'alice@aimeat-local-001-dev' };
@@ -84,9 +88,10 @@ describe('turnEntryFor', () => {
   it('gives nothing when no TURN server is set', () => {
     expect(turnEntryFor(settings({ turnServer: null }), OWNER, NOW_MS)).toBeNull();
   });
-  it('serves the deprecated static pair when no secret is set', () => {
+  it('serves the deprecated static pair when no secret is set, until TURN_STATIC_PAIR_REMOVED_IN; from it the address alone', () => {
     const entry = turnEntryFor(settings({ turnSecret: null, turnUsername: 'u', turnCredential: 'c' }), OWNER, NOW_MS);
-    expect(entry).toEqual({ urls: 'turn:127.0.0.1:3478', username: 'u', credential: 'c' });
+    if (removedFrom(TURN_STATIC_PAIR_REMOVED_IN)) expect(entry).toEqual({ urls: 'turn:127.0.0.1:3478' });
+    else expect(entry).toEqual({ urls: 'turn:127.0.0.1:3478', username: 'u', credential: 'c' });
   });
   it('prefers the secret over a static pair that is also set', () => {
     const entry = turnEntryFor(settings({ turnUsername: 'u', turnCredential: 'c' }), OWNER, NOW_MS)!;
@@ -96,9 +101,15 @@ describe('turnEntryFor', () => {
 });
 
 describe('turnDeprecationWarning', () => {
-  it('names AIMEAT_TURN_SECRET when only the static pair is set', () => {
+  it('names AIMEAT_TURN_SECRET when only the static pair is set: deprecated before TURN_STATIC_PAIR_REMOVED_IN, removed and not served from it', () => {
     const w = turnDeprecationWarning(settings({ turnSecret: null, turnUsername: 'u', turnCredential: 'c' }));
-    expect(w).toContain('deprecated');
+    if (removedFrom(TURN_STATIC_PAIR_REMOVED_IN)) {
+      expect(w).toContain(`removed in ${TURN_STATIC_PAIR_REMOVED_IN}`);
+      expect(w).toContain('not served');
+      expect(w).not.toContain('deprecated');
+    } else {
+      expect(w).toContain('deprecated');
+    }
     expect(w).toContain('AIMEAT_TURN_SECRET');
   });
   it('says the pair is ignored when the secret is set too', () => {
