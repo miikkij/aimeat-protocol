@@ -13,6 +13,8 @@
  *   Money is 6-decimal micro-units; morsels are whole units of pacing, never a price. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   2026-10-13 — aimeat_app_tool_invoke declares ext:invoke beside exchange:write, enforced from 4.0.0 like
+ *     the extension action route it reaches (wish-aimeat-app-tool-invoke-ilmoittaa-vain-exchange-write-vaikka-).
  *   2026-10-12 — The six act-on-EXCHANGE tools declare all three interfaces (agentEverywhere) and have a
  *     CLI dispatch definition. The 2026-09-03 decision to keep them off `/local/call` ended; the comment
  *     above the tool list says why its ground did not hold.
@@ -36,6 +38,7 @@
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 /**
@@ -217,11 +220,15 @@ export const exchangeTools = [
     },
     {
         name: 'aimeat_app_tool_invoke',
-        description: 'CALL a published app tool (a method like getCompanyBrief). A tool with no money price needs no contract and is charged its pacing (toll_morsels) per use; a tool with a money price requires your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Read inputSchema with aimeat_app_tools_get first: invalid input is refused before charging, with every missing field named.',
+        description: 'CALL a published app tool (a method like getCompanyBrief). A tool with no money price needs no contract and is charged its pacing (toll_morsels) per use; a tool with a money price requires your contract for this app-tool (accept its offering with aimeat_exchange_accept). Contracted calls are metered and charged to your budget at the provider price (+ platform rake), using the pinned interface version\'s backing capability. A backing action\'s own price still applies to an unpriced tool. The provider\'s upstream API keys stay server-side. Returns the tool\'s result; a failed contracted invocation is refunded. Read inputSchema with aimeat_app_tools_get first: invalid input is refused before charging, with every missing field named. Needs two scopes: exchange:write for the call, and ext:invoke because the tool runs its backing extension action with your token.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Invoke App Tool', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        scope: 'exchange:write',
+        // ext:invoke: the call runs the backing extension action with the caller's token, and
+        // POST /v1/ext/... asks that word from 4.0.0 (routes/extensions/actions.ts). Before 4.0.0 a
+        // call without it is allowed and counted, as on that route; exchange:write applies on every release.
+        scope: ['exchange:write', 'ext:invoke'],
+        scopeEnforcedFrom: { 'ext:invoke': REST_SCOPE_GATES_ENFORCED_IN },
         // On `service`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
         // On `agent`: Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
         surfaces: ['agent', 'service'],

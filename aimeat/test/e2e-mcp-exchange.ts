@@ -27,6 +27,8 @@
  *   - Phase 5: the provider side (consumers) and the refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-exchange
  * @version-history
+ *   v1.2.1 — 2026-10-13 — The provider's agent holds ext:invoke: aimeat_app_tool_invoke declares it beside
+ *     exchange:write, and from 4.0.0 the tool is not offered without it (tests 28 and 29).
  *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
  *     fixtures use the 4.0.0 form, which 3.x accepts too: the extension actions and the app tool state
  *     `tollMorsels`, and both needs carry a money budget. Morsel-rail offerings and contracts are read
@@ -239,7 +241,9 @@ const APP_ID = 'mcpbriefapp';
 const provider = await makeOwner('xcprov');
 const consumer = await makeOwner('xccons');
 
-const providerAgent = await makeAgent(provider, ['exchange:read', 'exchange:write']);
+// ext:invoke: tests 28 and 29 call aimeat_app_tool_invoke, which runs the tool's extension action and
+// from 4.0.0 is offered only to an agent holding that word as well.
+const providerAgent = await makeAgent(provider, ['exchange:read', 'exchange:write', 'ext:invoke']);
 const consumerAgent = await makeAgent(consumer, ['exchange:read', 'exchange:write']);
 const readOnlyAgent = await makeAgent(consumer, ['exchange:read']);
 const narrowAgent = await makeAgent(consumer, ['memory:read']);

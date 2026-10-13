@@ -25,6 +25,9 @@
  *   import { scopeAllowsTool } from './scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.52.0 -- 2026-10-13 -- `scopeEnforcedFrom` may name the release per word: deferredScopesForTool and
+ *     enforcedScopesForTool decide word by word. aimeat_app_tool_invoke adds ext:invoke from 4.0.0 and
+ *     keeps exchange:write on every release (wish-aimeat-app-tool-invoke-ilmoittaa-vain-exchange-write-vaikka-).
  *   v1.51.0 -- 2026-10-12 -- TOOL_SCOPE_ENFORCED_FROM, deferredScopesForTool, enforcedScopesForTool: a
  *     catalog entry's `scopeEnforcedFrom` names the release from which its word decides whether the tool
  *     is offered (the REST scope gates of 4.0.0, auth/rest-scope-gate.ts). scopeAllowsTool asks the
@@ -162,7 +165,7 @@
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
-import type { ToolScope } from './definitions/types.js';
+import type { ToolScope, ToolScopeEnforcedFrom } from './definitions/types.js';
 
 /**
  * Tool -> required scope, mirroring the REST requireScope() gate for the SAME operation.
@@ -205,25 +208,37 @@ export function requiredScopesForTool(toolName: string): string[] {
     return toolScopeWords(TOOL_SCOPES[toolName]);
 }
 
-/** Tool -> the release from which its words decide whether it is offered (catalog `scopeEnforcedFrom`). */
-export const TOOL_SCOPE_ENFORCED_FROM: Record<string, string> = Object.fromEntries(
+/**
+ * Tool -> the release from which its words decide whether it is offered (catalog `scopeEnforcedFrom`):
+ * one release for every word, or word -> release for the words it names.
+ */
+export const TOOL_SCOPE_ENFORCED_FROM: Record<string, ToolScopeEnforcedFrom> = Object.fromEntries(
     CLI_FALLBACK_TOOL_DEFINITIONS.filter(d => d.scope !== undefined && d.scopeEnforcedFrom !== undefined)
         .map(d => [d.name, d.scopeEnforcedFrom!]),
 );
 
+/** The release from which one word of a tool is enforced; undefined when it is enforced on every release. */
+function wordEnforcedFrom(toolName: string, word: string): string | undefined {
+    const from = TOOL_SCOPE_ENFORCED_FROM[toolName];
+    return from === undefined || typeof from === 'string' ? from : from[word];
+}
+
 /**
- * The words a tool names but does not yet enforce on the running version: before its
- * `scopeEnforcedFrom` release, all of them; from it, none. The MCP surface counts a call made without
+ * The words a tool names but does not yet enforce on the running version: each word whose
+ * `scopeEnforcedFrom` release is later than the running one. The MCP surface counts a call made without
  * one of these (mcp/deferred-scope-notice.ts), the way its REST twin counts it (auth/rest-scope-gate.ts).
  */
 export function deferredScopesForTool(toolName: string, version: string = getSoftwareVersion()): string[] {
-    const from = TOOL_SCOPE_ENFORCED_FROM[toolName];
-    return from !== undefined && !versionAtLeast(version, from) ? requiredScopesForTool(toolName) : [];
+    return requiredScopesForTool(toolName).filter((word) => {
+        const from = wordEnforcedFrom(toolName, word);
+        return from !== undefined && !versionAtLeast(version, from);
+    });
 }
 
 /** The words that decide whether the tool is offered on the running version. */
 export function enforcedScopesForTool(toolName: string, version: string = getSoftwareVersion()): string[] {
-    return deferredScopesForTool(toolName, version).length > 0 ? [] : requiredScopesForTool(toolName);
+    const deferred = new Set(deferredScopesForTool(toolName, version));
+    return requiredScopesForTool(toolName).filter((word) => !deferred.has(word));
 }
 
 /**
