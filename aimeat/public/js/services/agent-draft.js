@@ -31,6 +31,11 @@
  *   const draft = await draftAgent('Sort my incoming mail and draft the answers', { tools, known: { apps, places } });
  *   const out = await startAgent(draft, { when: 'clock', cron: '0 7 * * 1-5', connector: id });
  * @version-history
+ *   v1.7.0 — 2026-10-13 — The model the person picks goes with the approval. runtimeMenu() carries
+ *     `llm`, the model profiles and models the answering computer reaches; `choice.llm` of
+ *     startAgent and approveProposal is sent as `llm_choice`, which the node stores before the
+ *     agent's first run (agent-draft-known.js llmChoiceOf builds it from the pick). Measured on aimeat.io the same day:
+ *     an agent made here ran on its computer's cheapest default, which no page had shown.
  *   v1.6.0 — 2026-10-13 — The draft prompt describes the browser to a runtime that offers it, and a
  *     draft keeps the tool only with the hostnames it may open (agent-draft-known.js browserBlock,
  *     withBrowserSites).
@@ -320,11 +325,12 @@ export function definitionFor(draft, when, watch) {
 
 /**
  * Approve a proposal for the chosen machine, and add its schedule when it works on a clock.
- * `choice`: { when, cron, connector }. Returns the approve answer's data with `schedule_problem`
+ * `choice`: { when, cron, connector, llm }, where `llm` is the model choice the node stores for the
+ * agent before its first run (agent-draft-known.js llmChoiceOf), or nothing. Returns the approve answer's data with `schedule_problem`
  * when the agent was made and its schedule was not.
  */
 export async function approveProposal(id, name, draft, choice) {
-  const body = choice.connector ? { install_id: choice.connector } : {};
+  const body = { ...(choice.connector ? { install_id: choice.connector } : {}), ...(choice.llm ? { llm_choice: choice.llm } : {}) };
   const approved = await apiPost(`/v1/agents/v2/agent-proposals/${encodeURIComponent(id)}/approve`, body);
   const data = { ...(approved?.data ?? {}) };
   if (choice.when === 'clock' && choice.cron) {
@@ -386,11 +392,18 @@ export async function runtimeMenu(agentNames) {
         .filter((x) => typeof x?.id === 'string' && !x.id.includes(':') && !x.id.startsWith('exchange_'))
         .map((x) => ({ id: x.id, purpose: typeof x.purpose === 'string' ? x.purpose : '' }));
       if (resp?.data?.source === 'runtime' && rows.length) {
-        return { tools: rows, features: (resp.data.features ?? []).filter((f) => typeof f === 'string') };
+        return {
+          tools: rows,
+          features: (resp.data.features ?? []).filter((f) => typeof f === 'string'),
+          llm: {
+            profiles: (resp.data.profiles ?? []).filter((p) => typeof p === 'string' && p),
+            models: (resp.data.models ?? []).filter((m) => typeof m?.label === 'string' && m.label),
+          },
+        };
       }
     } catch (err) { swallowed('agent-draft: runtime menu', err); }
   }
-  return { tools: DEFAULT_TOOL_MENU, features: [] };
+  return { tools: DEFAULT_TOOL_MENU, features: [], llm: { profiles: [], models: [] } };
 }
 
 /** The tools of runtimeMenu(), for a caller that asks nothing else. */

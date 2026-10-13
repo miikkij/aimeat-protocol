@@ -22,6 +22,11 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.8.0 — 2026-10-13 — "Which model it thinks with", before the agent starts: the models the
+ *     chosen computer reaches, and the person's pick, which goes with the approval so the first
+ *     work already uses it. With no pick the page says the computer uses its own setting and that
+ *     this can be a small model (Jouni, 2026-10-13: "miksi se käyttää heikkoa mallia"; on aimeat.io
+ *     that day a new agent's first work ran on gpt-oss-120b and saved three invented findings).
  *   v1.7.0 — 2026-10-13 — A draft or a proposal whose definition lets a browser open web sites
  *     (`browser_domains`) shows the sites before the person approves, with what the browser does
  *     not do (the October agents plan, P5; Jouni, 2026-10-13: "näytä sitten se").
@@ -80,6 +85,7 @@ import { Note } from '/components/Note.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Choice } from '/components/Choice.js';
+import { Select } from '/components/Select.js';
 import { Facts, FactLine } from '/components/Facts.js';
 import { Action, Loud } from '/components/Action.js';
 import { PromptCard } from '/components/PromptCard.js';
@@ -90,7 +96,7 @@ import { timeOfCron } from '/views/profile/scheduler/cron-words.js';
 import {
   draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeMenu, readHomeAgents, offerShown, scopesFor,
 } from '/js/services/agent-draft.js';
-import { namedIn, recordSpacesOf, RECORDS_FEATURE, BACKFILL_FEATURE } from '/js/services/agent-draft-known.js';
+import { namedIn, recordSpacesOf, RECORDS_FEATURE, BACKFILL_FEATURE, llmChoiceOf } from '/js/services/agent-draft-known.js';
 import { decodeEntities } from '/js/utils.js';
 import { readTieChoices, setWorkplace } from '/js/services/agent-ties.js';
 import { activateEngagement, attachAgent } from '/js/services/organisms.js';
@@ -146,6 +152,10 @@ export default function AgentNewView({ navigate }) {
   // them. Asked from a connected agent on that computer; nobody to ask means no feature.
   const [features, setFeatures] = useState([]);
   const menuRead = useRef(null);
+  // The models the chosen computer reaches, as an agent on it says, and the person's pick among
+  // them ('model:<label>', or '' for none: the computer then uses the model in its own settings).
+  const [llm, setLlm] = useState({ profiles: [], models: [] });
+  const [model, setModel] = useState('');
   // For an agent that works when something new arrives in a workspace: the workspace it watches
   // ('<organism id>/<workspace id>') and the namespaces of the spaces the person ticked.
   const [watchPlace, setWatchPlace] = useState('');
@@ -206,11 +216,18 @@ export default function AgentNewView({ navigate }) {
     let live = true;
     menuRead.current = runtimeMenu(names).then((menu) => {
       const offered = Array.isArray(said) ? said : here.length ? menu.features : [];
-      if (live) setFeatures(offered);
+      if (live) {
+        setFeatures(offered);
+        // Only an agent on the chosen computer can say which models that computer reaches.
+        setLlm(here.length ? menu.llm : { profiles: [], models: [] });
+      }
       return { tools: menu.tools, features: offered };
     });
     return () => { live = false; };
   }, [home, machine]);
+
+  // A pick belongs to the computer it was made for: another computer reaches other models.
+  useEffect(() => { setModel(''); }, [machine]);
 
   const takeDraft = useCallback((d) => {
     setDraft(d);
@@ -286,7 +303,7 @@ export default function AgentNewView({ navigate }) {
     setProblem('');
     setBusy(true);
     try {
-      const choice = { when, cron, connector: machine || undefined, watch };
+      const choice = { when, cron, connector: machine || undefined, watch, llm: llmChoiceOf(model, llm) || undefined };
       const made = { ...draft, name, purpose: draft.purpose.trim(), displayName: String(draft.displayName || '').trim() || name };
       const out = proposal
         ? await approveProposal(proposal.id, name, made, choice)
@@ -533,6 +550,21 @@ export default function AgentNewView({ navigate }) {
             ${' '}${n('noMachine', 'You can start it now: it is made, and it begins working when a computer is connected.')}
             ${' '}<${Action} tone="more" href="/v1/home?computers=1">${tr('home.agents.noMachineDoor', 'Add a computer →')}<//>
           <//>`}
+
+        ${/* Which model the agent thinks with, shown before it starts (Jouni, 2026-10-13: "miksi se
+             käyttää heikkoa mallia"). The list is the chosen computer's own; with no pick the
+             computer uses the model in its own settings, and the page says what that can mean. */''}
+        ${machines.length > 0 && (llm.models.length > 0
+          ? html`<${Select} label=${n('model', 'Which model it thinks with')} help="crew.agent_model" value=${model} onChange=${setModel}
+              placeholder=${n('modelUnset', 'Not chosen: the computer picks')}
+              hint=${model
+                ? n('modelHintSet', 'The agent uses this model from its first work. It is paid with the key that is on the computer. You can change it later on the agent\'s page.')
+                : n('modelHintUnset', 'With no choice, the computer uses the model in its own settings. That can be a small, cheap model whose work you need to check. Choose a model here when the work needs a strong one.')}
+              options=${llm.models.map((m) => ({ value: `model:${m.label}`, label: m.label }))} />`
+          : html`<${Facts} wide rows=${[{
+              k: n('model', 'Which model it thinks with'), v: n('modelComputer', 'The computer picks'),
+              sub: n('modelNoList', 'No agent on this computer is connected to say which models it reaches, so the computer uses the model in its own settings. You can choose a model on the agent\'s page after it has started.'),
+            }]} />`)}
 
         ${/* What the agent offers, as it will read on the Offerings page once the agent has started.
              The node writes one from the name and the purpose when the definition has none. */''}

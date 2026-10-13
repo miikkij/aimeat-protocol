@@ -34,9 +34,11 @@
  *   should hold that for a list of model names. A forged catalogue there is read only for the agent
  *   that wrote it, which already decides what its own runtime calls. It also gives each agent its own
  *   copy, where one owner key had agents on different machines overwrite each other's list.
- * @structure CrewMenu · crewMenu() · readLlmChoice() · ownerDefaultIsNode() · effectiveLlmChoice() · writeLlmChoice()
+ * @structure CrewMenu · crewMenu() · readLlmChoice() · ownerDefaultIsNode() · effectiveLlmChoice() · checkLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
+ *   v1.7.0 — 2026-10-13 — checkLlmChoice(): the check writeLlmChoice applies, on its own, for the
+ *     approval of a proposed agent, which refuses a bad choice before it creates the agent.
  *   v1.6.0 — 2026-10-12 — The menu carries `features`, the names the runtime says it honours beyond
  *     its tools (crewaimeat sends `record_spaces`). The home's new-agent page offers "when something
  *     new arrives in a workspace" only for a runtime that names it
@@ -240,6 +242,30 @@ export async function effectiveLlmChoice(deps: Deps, agent: AgentRecord): Promis
 }
 
 /**
+ * Whether a model choice can be stored, and the choice in its stored shape. Writes nothing, so a
+ * caller that creates something else in the same request (approving a proposed agent with the
+ * model the owner picked) can refuse a bad choice before its first write. writeLlmChoice applies
+ * the same check.
+ */
+export async function checkLlmChoice(choice: unknown): Promise<{ ok: true; choice: Record<string, unknown> } | CrewRefusal> {
+  const valid = validChoice(choice);
+  if (!valid) {
+    return {
+      ok: false, status: 400, code: 'INVALID_CHOICE',
+      message: "A choice is {kind:'node', role?:'<AI role id>'} (think through this node, which picks the model and the key), {kind:'profile', profile:'<name>'} or {kind:'model', label, provider}.",
+    };
+  }
+  if (valid.kind === 'model') {
+    const problem = looksLikeASecret(valid.provider as Record<string, unknown>);
+    if (problem) return { ok: false, status: 400, code: 'SECRET_IN_CHOICE', message: problem };
+    // Which variable the crew sends as its key, and where (crew-llm-guard.ts).
+    const unsafe = await crewChoiceProblem(valid.provider);
+    if (unsafe) return { ok: false, status: 400, code: 'UNSAFE_CHOICE', message: unsafe };
+  }
+  return { ok: true, choice: valid };
+}
+
+/**
  * Set (or clear, with `null`) the model choice for one agent, or for every agent when `agentName` is
  * null. Written through writeMemoryRecord so it carries the same provenance and limits as every
  * other record in the owner's namespace.
@@ -255,20 +281,9 @@ export async function writeLlmChoice(
     return { ok: true, key, cleared: true };
   }
 
-  const valid = validChoice(choice);
-  if (!valid) {
-    return {
-      ok: false, status: 400, code: 'INVALID_CHOICE',
-      message: "A choice is {kind:'node', role?:'<AI role id>'} (think through this node, which picks the model and the key), {kind:'profile', profile:'<name>'} or {kind:'model', label, provider}.",
-    };
-  }
-  if (valid.kind === 'model') {
-    const problem = looksLikeASecret(valid.provider as Record<string, unknown>);
-    if (problem) return { ok: false, status: 400, code: 'SECRET_IN_CHOICE', message: problem };
-    // Refuse before writing: which variable the crew sends as its key, and where (crew-llm-guard.ts).
-    const unsafe = await crewChoiceProblem(valid.provider);
-    if (unsafe) return { ok: false, status: 400, code: 'UNSAFE_CHOICE', message: unsafe };
-  }
+  const checked = await checkLlmChoice(choice);
+  if (!checked.ok) return checked;
+  const valid = checked.choice;
 
   const ownerGhii = `${caller.owner}@${deps.config.nodeId}`;
   const out = await writeMemoryRecord({ storage: deps.storage, config: deps.config }, {

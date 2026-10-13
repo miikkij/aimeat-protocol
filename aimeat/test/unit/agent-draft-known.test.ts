@@ -10,6 +10,7 @@
  *   another one.
  * @usage pnpm test -- agent-draft-known
  * @version-history
+ *   v1.2.0 — 2026-10-13 — The model a person picks for a new agent (llmChoiceOf).
  *   v1.1.0 — 2026-10-12 — An agent that works on a workspace's records: the prompt text, the
  *     workspace a draft names, and the definition's `record_spaces`
  *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
@@ -19,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 import {
     DEFAULT_TOOL_MENU, clipLine, knownBlock, namedIn, withNeededTools, readOnlyTools, extraScopes,
     RECORDS_FEATURE, recordsBlock, watchedPlace, withRecordSpaces, recordSpacesOf, withSpaceNote,
-    BROWSER_FEATURE, browserBlock, withBrowserSites,
+    BROWSER_FEATURE, browserBlock, withBrowserSites, llmChoiceOf,
 } from '../../public/js/services/agent-draft-known.js';
 
 const MENU = [
@@ -428,5 +429,31 @@ describe('a browser on the agent\'s computer', () => {
     it('a definition with no browser and no list is returned as it came', () => {
         const d = def('{{ctx.prompt}}', ['web']);
         expect(withBrowserSites(d)).toBe(d);
+    });
+});
+
+describe('the model a person picks for a new agent', () => {
+    // The shape a crew runtime sends a model in (measured on aimeat.io 2026-10-13): the provider's
+    // fields at the top level beside the display label, and the same block again under `provider`.
+    const provider = { type: 'openrouter', name: 'openrouter-paid', models: [{ id: 'deepseek/deepseek-v4-pro', context: 1048576 }], base_url: 'https://openrouter.ai/api/v1', api_key_env: 'OPENROUTER_API_KEY' };
+    const llm = { profiles: ['content'], models: [{ label: 'openrouter-paid:deepseek/deepseek-v4-pro', id: 'deepseek/deepseek-v4-pro', ...provider, provider }] };
+
+    it('a picked model is the choice the node stores: its label, and the provider block as the computer built it', () => {
+        expect(llmChoiceOf('model:openrouter-paid:deepseek/deepseek-v4-pro', llm))
+            .toEqual({ kind: 'model', label: 'openrouter-paid:deepseek/deepseek-v4-pro', provider });
+    });
+
+    it('a model entry with no provider block of its own gives its own fields, without the display label', () => {
+        const flat = { models: [{ label: 'local:qwen', type: 'ollama', name: 'local', models: [{ id: 'qwen' }] }] };
+        expect(llmChoiceOf('model:local:qwen', flat)).toEqual({ kind: 'model', label: 'local:qwen', provider: { type: 'ollama', name: 'local', models: [{ id: 'qwen' }] } });
+    });
+
+    it('no pick, and a model the computer no longer lists, store nothing', () => {
+        for (const pick of ['', undefined, null, 'model:', 'model:gone', 'deepseek', 'profile:']) expect(llmChoiceOf(pick, llm)).toBe(null);
+        expect(llmChoiceOf('model:openrouter-paid:deepseek/deepseek-v4-pro', undefined)).toBe(null);
+    });
+
+    it('a picked profile is named and nothing else', () => {
+        expect(llmChoiceOf('profile:content', llm)).toEqual({ kind: 'profile', profile: 'content' });
     });
 });

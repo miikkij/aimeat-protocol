@@ -28,6 +28,9 @@
  * @usage
  *   cd aimeat && pnpm sandbox && pnpm sandbox:machines     # leave it running; Ctrl+C stops the machine
  * @version-history
+ *   v1.3.0 — 2026-10-13 — A stand-in computer answers `crew.menu` with one model profile and two
+ *     models, so the new-agent page's "Which model it thinks with" can be looked at and a pick
+ *     stored with the approval.
  *   v1.2.0 — 2026-10-12 — The stand-in computers name the features `record_spaces` and
  *     `record_backfill`, in the answer to `crew.menu` and in the X-AIMEAT-Features header a
  *     connector presents at connect.
@@ -74,7 +77,15 @@ const MENU = {
     { id: 'workspace_write', purpose: 'everything "workspace" reads, and create or update a record and append rows' },
   ],
   features: ['record_spaces', 'record_backfill'],
-  llm: { profiles: [], models: [] },
+  // Two models in the shape a crew runtime sends them, so the page's model choice can be looked
+  // at and a pick stored. Nothing here calls a model.
+  llm: {
+    profiles: ['content'],
+    models: ['deepseek/deepseek-v4-pro', 'openai/gpt-oss-120b'].map((id) => {
+      const provider = { type: 'openrouter', name: 'openrouter-paid', models: [{ id, context: 131072 }], base_url: 'https://openrouter.ai/api/v1', api_key_env: 'OPENROUTER_API_KEY' };
+      return { label: `openrouter-paid:${id}`, id, ...provider, provider };
+    }),
+  },
 };
 
 const HOME = { id: 'sandbox-home', name: 'Kotikone' };

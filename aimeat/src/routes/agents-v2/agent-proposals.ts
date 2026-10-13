@@ -23,6 +23,11 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   v1.9.0 — 2026-10-13 — Approval takes `llm_choice`, the model the owner picked for this agent:
+ *     checked before anything is created, stored before the agent is offered to its connector, so
+ *     the first run already uses it, and answered as `llm_choice`. Measured on aimeat.io the same
+ *     day: an agent made on the home ran its first work on the computer's cheapest default, which
+ *     the page had neither shown nor asked about, and saved three invented findings.
  *   v1.8.0 — 2026-10-11 — Approval seeds the definition with one offer in it
  *     (services/agent-default-offer.ts): the proposer's own, completed, or one made from the
  *     agent's name and purpose. The crew runtime publishes it when the agent starts.
@@ -66,6 +71,7 @@ import { recordAccountEvent } from '../../services/account-events.js';
 import { giveFirstRun } from '../../services/agent-first-run.js';
 import { withDefaultOffer, firstRequestOf } from '../../services/agent-default-offer.js';
 import { readerFor } from '../../services/classification/reader.js';
+import { checkLlmChoice, writeLlmChoice } from '../../services/crew-menu.js';
 import {
   proposeAgent, listProposals, readProposal, settleProposal, proposalApprovalUrl, proposalNextStep,
   proposalRunModeFor, proposalScopesFor, type ProposerPrincipal,
@@ -195,6 +201,20 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       target = hit;
     }
 
+    // WHICH MODEL, when the owner picked one for this agent on the approval (`llm_choice`). Checked
+    // before any write, as the connector is: a choice the node would not store is refused with
+    // nothing created. `null` or absent means no choice, and the owner's default or the agent's
+    // computer decides, as before.
+    let llmChoice: Record<string, unknown> | null = null;
+    if (req.body?.llm_choice !== undefined && req.body.llm_choice !== null) {
+      const checked = await checkLlmChoice(req.body.llm_choice);
+      if (!checked.ok) {
+        res.status(checked.status).json(error(config.nodeId, checked.code, `${checked.message} Nothing was created.`));
+        return;
+      }
+      llmChoice = checked.choice;
+    }
+
     const now = new Date().toISOString();
     const gaii = buildGAII(proposal.name, owner, config.nodeId);
     // What any crew agent needs to start, whatever the proposer wrote (services/agent-proposals.ts
@@ -275,6 +295,24 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       }
     }
 
+    // ── The model the owner picked, stored before anything can run the agent ──
+    // The agent's computer reads the choice when it starts the agent, and the first run starts
+    // within seconds of the enrolment below, so a choice written after this answer would miss it.
+    // A choice that could not be saved is reported in the answer and undoes nothing: the agent
+    // runs on the default, and the owner can set the model on the agent's page.
+    let llmProblem: { code: string; message: string } | null = null;
+    if (llmChoice) {
+      const saved = await writeLlmChoice({ storage, config }, {
+        principal: `${owner}@${config.nodeId}`, owner, scopes: ['memory:write'], roles: ['owner'], pipeline: 'rest.agent-proposal.llm',
+      }, proposal.name, llmChoice);
+      if (!saved.ok) {
+        llmProblem = { code: saved.code, message: saved.message };
+        logger.warn('Agent proposal: the model choice could not be saved', {
+          event: 'agent_v2.proposal_llm_failed', owner, name: proposal.name, reason: saved.code,
+        });
+      }
+    }
+
     // ── Credentials, so something actually runs it ──
     //
     // WHY THIS IS HERE AND NOT LEFT TO A RESTART. Until 2026-09-08 this route stopped at the seed
@@ -348,6 +386,11 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       // The connector the agent was ordered to, or null when none was chosen. With a choice, a
       // waiting agent waits for THIS connector, and no other one of the owner's is offered it.
       connector: target ? { id: target.id, name: target.name } : null,
+      // The model the owner picked on this approval: whether it was stored for the agent; null
+      // when none was picked; `problem` when it was picked and could not be saved.
+      llm_choice: llmChoice === null ? null
+        : llmProblem ? { saved: false, problem: llmProblem }
+          : { saved: true, kind: llmChoice.kind, label: llmChoice.label ?? llmChoice.profile ?? null },
       // The agent's work given once now: the task's id and whether it started at once; null when
       // the caller asked for none or the agent has nothing to run; `problem` when it was not made.
       first_run: firstRun === null ? null

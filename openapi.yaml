@@ -71,7 +71,7 @@ info:
     `mcp_token_on_rest`; the MCP endpoints keep taking it). Also from 4.0.0: a consent made
     without a reach is `local`, a public node takes only `https://` peer addresses, and a public node
     records AI provenance whatever `AIMEAT_AI_PROVENANCE` says.
-  version: 3.26.1
+  version: 3.27.0
   x-aimeat-protocol: '2026-11'
   contact:
     name: Jouni Miikki
@@ -9587,6 +9587,17 @@ paths:
                 first_run:
                   type: boolean
                   description: False asks for no first run. Default true.
+                llm_choice:
+                  type: object
+                  nullable: true
+                  additionalProperties: true
+                  description: |
+                    The model the owner picked for this agent, in the shape `PUT /v1/agents/{name}/crew/llm`
+                    takes as `choice`: `{kind:'node', role?}`, `{kind:'profile', profile}` or
+                    `{kind:'model', label, provider}`. Checked before anything is created (400
+                    INVALID_CHOICE, SECRET_IN_CHOICE or UNSAFE_CHOICE, nothing created) and stored
+                    before the agent is offered to its connector, so the first run uses it. Absent or
+                    null: no choice is stored, and the owner's default or the agent's computer decides.
       responses:
         '200':
           description: The agent exists, with its definition
@@ -9622,6 +9633,19 @@ paths:
                             properties:
                               id: { type: string }
                               name: { type: string, nullable: true }
+                          llm_choice:
+                            type: object
+                            nullable: true
+                            description: The model picked on this approval. Null when none was picked. `saved` false with `problem` when it was picked and could not be stored; the agent is made either way and runs on the default.
+                            properties:
+                              saved: { type: boolean }
+                              kind: { type: string, description: 'node, profile or model' }
+                              label: { type: string, nullable: true, description: The profile name or the model label; null for a node choice without one. }
+                              problem:
+                                type: object
+                                properties:
+                                  code: { type: string }
+                                  message: { type: string }
                           first_run:
                             type: object
                             nullable: true
@@ -9646,6 +9670,7 @@ paths:
                             properties:
                               asked: { type: string }
                               reason: { type: string }
+        '400': { description: 'A model choice the node does not store (INVALID_CHOICE, SECRET_IN_CHOICE, UNSAFE_CHOICE). Nothing was created.' }
         '403': { description: Not the account holder in person }
         '404': { description: No such proposal on this account }
         '409': { description: 'Already settled, the name has been taken since, or a connector the account does not have (UNKNOWN_CONNECTOR)' }
