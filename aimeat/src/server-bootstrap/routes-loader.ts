@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.22.1 — 2026-10-13 — test.money registers whenever AIMEAT_TEST_MONEY_HANDLER is on, on any node
+ *     (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v1.22.0 — 2026-10-02 — The `package` sellable kind (services/packages/sale/package-sale-checkout.ts).
  *   v1.21.1 — 2026-09-30 — robotsHeader() moved to server.ts, ahead of the static files.
  *   v1.21.0 — 2026-09-29 — Mounts refineryRouter (/v1/refinery/classes, /v1/refinery/runs). The
@@ -75,6 +77,7 @@ import { stripePaymentHandler } from '../commerce/stripe-handler.js';
 import { invoicePaymentHandler } from '../commerce/invoice-handler.js';
 import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
 import { setOutboundRequestSigner } from '../utils/url-validator.js';
+import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver, pacingPackSellableResolver } from '../commerce/sellable-resolvers.js';
 import { packageSellableResolver } from '../services/packages/sale/package-sale-checkout.js';
 import { commerceRouter } from '../routes/commerce.js';
@@ -424,11 +427,8 @@ export async function mountRoutes(
   registerSellableResolver(extCallSellableResolver());   // priced raw-call money channel (rm-commercial-raw-calls)
   registerSellableResolver(packageSellableResolver(peers));   // a package this node sells, priced from its catalogue
   registerSellableResolver(pacingPackSellableResolver());   // pacing capacity the operator sells for money
-  // TEST ONLY: a fake EUR/USD rail so the money chain is E2E-provable without a real PSP. Off in prod.
-  if (config.testMoneyHandler) {
-    const { testMoneyPaymentHandler, testMoneyHandlerActive } = await import('../commerce/test-money-handler.js');
-    if (testMoneyHandlerActive(config)) registerPaymentHandler(testMoneyPaymentHandler());   // loopback test nodes only
-  }
+  // A fake EUR/USD rail with no real PSP, on any node while the flag is on; a public node warns (utils/test-money-guard.ts).
+  if (testMoneyHandlerActive(config)) registerPaymentHandler((await import('../commerce/test-money-handler.js')).testMoneyPaymentHandler());
   // x402 stablecoin settlement (TARGET-042): the NON-CUSTODIAL USDC handler for money (USD) sessions.
   // The facilitator is a parameter — an off-chain double in E2E (AIMEAT_X402_TEST_FACILITATOR), the
   // real safeFetch client against config.x402FacilitatorUrl in prod. OFF unless AIMEAT_X402_ENABLED.

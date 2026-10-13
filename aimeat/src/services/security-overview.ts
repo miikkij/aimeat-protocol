@@ -27,6 +27,10 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *   v1.3.0 -- 2026-10-13 -- `now.test_money_handler` follows the ruling
+ *     decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s: the flag is in force on any
+ *     node; critical, with the sentence that any buyer can complete a money checkout without paying,
+ *     on a node whose base URL is not loopback; healthy with no message on a loopback test node.
  *   v1.2.0 -- 2026-10-11 -- `now.test_money_handler`: AIMEAT_TEST_MONEY_HANDLER is a critical finding
  *     whenever it is set, with whether it is in force (loopback test node) or refused
  *     (utils/test-money-guard.ts). aimeat.io had run with it on.
@@ -45,7 +49,7 @@ import { isOperatorAccount } from '../utils/operator-account.js';
 import { listSecurityIncidents, type SecurityIncidentValue } from './security-incident.js';
 import { getStats } from './stats.js';
 import { appIsolationStatus, type AppIsolationStatus } from './app-isolation-status.js';
-import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
+import { testMoneyHandlerActive, testMoneyHandlerOnPublicNode } from '../utils/test-money-guard.js';
 
 /** The rolling window the headline counts cover. */
 export const REFUSAL_WINDOW_HOURS = 24;
@@ -106,7 +110,7 @@ export interface SecurityOverview {
     counters_since: string | null;
     uptime_seconds: number | null;
     log: { enabled: boolean; path: string; bytes: number; max_bytes: number; rotated_bytes: number };
-    /** AIMEAT_TEST_MONEY_HANDLER: critical whenever it is set, in force only on a loopback test node. */
+    /** AIMEAT_TEST_MONEY_HANDLER: in force whenever it is set; critical on a node whose base URL is not loopback. */
     test_money_handler: { requested: boolean; active: boolean; zone: Zone; message: string | null };
   };
   refusals: RefusalSummary;
@@ -254,12 +258,12 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
     rateLimit: counterZone(rateLimitHits),
     scope: counterZone(scopeDenials),
     open: (incidents.open > 0 ? 'critical' : 'healthy') as Zone,
-    testMoney: (config.testMoneyHandler ? 'critical' : 'healthy') as Zone,
+    testMoney: (testMoneyHandlerOnPublicNode(config) ? 'critical' : 'healthy') as Zone,
   };
   const testMoneyActive = testMoneyHandlerActive(config);
-  const testMoneyMessage = !config.testMoneyHandler ? null : testMoneyActive
-    ? 'AIMEAT_TEST_MONEY_HANDLER=true: the test-only money handler is in force, and EUR and USD settle with no real payment. This is a loopback test node; never set it on a node people use.'
-    : `AIMEAT_TEST_MONEY_HANDLER=true is set and REFUSED: ${config.baseUrl} is not a loopback address, so test.money is not registered. Remove the variable from this node's environment.`;
+  // A loopback test node (the E2E runner, `pnpm sandbox`) runs with the flag as a matter of course: no warning there.
+  const testMoneyMessage = !testMoneyHandlerOnPublicNode(config) ? null
+    : `AIMEAT_TEST_MONEY_HANDLER=true is active on a public node (${config.baseUrl}): while it is on, any buyer can complete a EUR or USD checkout without paying, through the test-only money handler test.money. To turn it off, remove the variable from this node's environment and restart the node.`;
 
   return {
     generated_at: now.toISOString(),

@@ -14,6 +14,9 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   v3.4.2 — 2026-10-13 — The status sentence starts with AIMEAT_TEST_MONEY_HANDLER only on a public
+ *     node, where it is in force and any buyer can complete a money checkout without paying; a
+ *     loopback test node gets no line (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v3.4.1 — 2026-10-11 — The status sentence starts with AIMEAT_TEST_MONEY_HANDLER when it is set:
  *     refused on a node others reach, or in force on a loopback test node.
  *   v3.4.0 — 2026-09-29 — The node's classification has a section before "Ask your AI" (TARGET-082
@@ -66,8 +69,9 @@ const S = (key, params) => t('admin.security.' + key, params);
 export function alertLine(ov) {
   const parts = [];
   // A test-only setting that moves no real money comes first: it is the one thing here that is never right on a live node.
+  // Only on a public node: on a loopback test node (E2E, sandbox) the flag is ordinary and the server marks it healthy.
   const tm = ov.now.test_money_handler;
-  if (tm?.requested) parts.push(S(tm.active ? 'now.lineTestMoneyOn' : 'now.lineTestMoneyRefused'));
+  if (tm?.zone === 'critical') parts.push(S('now.lineTestMoneyPublic'));
   const open = ov.now.open_incidents.value;
   if (open === 1) parts.push(S('now.lineOpenOne'));
   else if (open > 1) parts.push(S('now.lineOpenMany', { n: num(open) }));

@@ -8,9 +8,13 @@
  *   simulates the PSP charging the buyer's instrument and paying the seller's connected account —
  *   it moves NO morsel balances. Holds keep module-local state so capture-over-amount and
  *   double-capture fail exactly like the real rail. Registered ONLY when
- *   `config.testMoneyHandler` (env AIMEAT_TEST_MONEY_HANDLER='true'); NEVER in production, where
- *   the Stripe handler (`com.stripe.spt`) is the real money rail.
+ *   `config.testMoneyHandler` (env AIMEAT_TEST_MONEY_HANDLER='true'). A production node may run it
+ *   on purpose, to test the money path before the flag is turned off; the start log and the Security
+ *   page then say any buyer can complete a money checkout without paying. The Stripe handler
+ *   (`com.stripe.spt`) is the real money rail.
  * @version-history
+ *   v1.3.1 — 2026-10-13 — Registered on any node while the flag is on (ruling
+ *     decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v1.3.0 — 2026-10-11 — Registered only when testMoneyHandlerActive() says so: the flag AND a
  *     loopback public URL (utils/test-money-guard.ts). aimeat.io had run with the flag on.
  *   v1.2.0 — 2026-10-02 — saveForLater and chargeSaved: a saved method named after the instrument, and

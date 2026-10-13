@@ -63101,9 +63101,10 @@ paths:
                                 type: object
                                 description: >-
                                   AIMEAT_TEST_MONEY_HANDLER, which registers a payment handler that completes EUR and
-                                  USD payments with no real money. Zone critical whenever it is set. In force (active)
-                                  only when the node's public URL is a loopback address; on any other node it is
-                                  refused and test.money is not registered.
+                                  USD payments with no real money. In force (active) on any node while it is set. Zone
+                                  critical, with a message, when the node's public URL is not a loopback address: any
+                                  buyer can then complete a money checkout without paying. Healthy, with no message,
+                                  on a loopback test node.
                                 properties:
                                   requested: { type: boolean }
                                   active: { type: boolean }

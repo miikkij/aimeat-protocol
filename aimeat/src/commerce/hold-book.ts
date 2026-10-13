@@ -14,6 +14,8 @@
  * @structure HoldRecord · createHold · getHold · listHolds · captureHold · releaseHold
  * @usage import { createHold, captureHold, releaseHold } from '../commerce/hold-book.js';
  * @version-history
+ *   v1.2.2 — 2026-10-13 — A money hold picks test.money whenever AIMEAT_TEST_MONEY_HANDLER is on, on
+ *     any node (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v1.2.1 — 2026-10-11 — A money hold picks test.money only on a loopback test node
  *     (utils/test-money-guard.ts); on any other node the flag no longer routes a hold to it.
  *   v1.2.0 — 2026-10-05 — The limit is checked and the amount counted in one compare-and-swap before the
