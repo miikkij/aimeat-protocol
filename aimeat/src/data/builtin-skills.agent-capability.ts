@@ -33,6 +33,8 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.3.0 — 2026-10-13 — "What an app cannot give": the runtime has a browser tool now, within the
+ *     hostnames a definition names (crewaimeat 57b2cf0).
  *   v1.2.0 — 2026-10-13 — A calendar goes out as an ICS feed of a shared records space
  *     (services/calendar-feed.ts, routes/organisms/workspace-ops.ts): the table and the example.
  *   v1.1.0 — 2026-10-13 — A row still wakes no agent by itself, and a workflow now starts on it: the
@@ -274,7 +276,10 @@ definition is not that approval.
   goes from the app through their connected account.
 - An extension reads no mailbox. Mail reaches a workspace through the refinery.
 - \`ctx.ai\` is a background call. Live speech and a live conversation do not go through it.
-- A browser and other work on the agent's computer. That is the case where the runtime grows.
+- Other work on the agent's computer (ffmpeg, a local file). That is the case where the runtime
+  grows. A browser is such work and the runtime has it: the tool \`browser\`, which opens only the
+  hostnames the agent's definition names in \`browser_domains\` and never sends a form (skill
+  \`add-a-crew-agent\`, "A browser on the agent's computer").
 
 ## When you propose the agent
 

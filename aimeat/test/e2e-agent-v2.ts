@@ -1186,6 +1186,38 @@ async function run() {
         assert(gone.status === 200, `decline ${gone.status}`);
     });
 
+    await test('a member with the tool browser needs the hostnames it may open: refused without them, with an address or a private name, taken with a public hostname', async () => {
+        // The crew runtime opens only the hostnames a definition names and checks them when the agent
+        // starts, after the owner approved. The proposal makes the same refusals, so the owner is never
+        // shown an agent with a browser and no limit (services/crew-browser-domains.ts).
+        const propose = (name: string, extra: Record<string, unknown>) => json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({
+                name, purpose: 'Fills in a contact form on one named site and stops before sending it.',
+                scopes: ['memory:read'],
+                crew_def: {
+                    readme_md: '# x', tags: [], process: 'sequential', listen_for: ['tasks'],
+                    agents: [{ role: 'Reader', goal: 'g', backstory: 'b', allow_delegation: false, tools: ['browser'] }],
+                    tasks: [{ id: 't', description: 'do {{ctx.prompt}}', expected_output: 'e', agent: 'Reader' }],
+                    ...extra,
+                },
+            }),
+        });
+        const none = await propose('br-none', {});
+        assert(none.status === 400 && none.body?.error?.code === 'INVALID_CREW_DEF' && String(none.body?.error?.message).includes('browser_domains'),
+            `no list: got ${none.status} ${none.body?.error?.message}`);
+        const address = await propose('br-address', { browser_domains: ['https://example.com/contact'] });
+        assert(address.status === 400 && String(address.body?.error?.message).includes('web address'), `an address: got ${address.status} ${address.body?.error?.message}`);
+        const inside = await propose('br-inside', { browser_domains: ['router.local'] });
+        assert(inside.status === 400 && String(inside.body?.error?.message).includes('private network'), `a private name: got ${inside.status} ${inside.body?.error?.message}`);
+        const ok = await propose('br-ok', { browser_domains: ['example.com'] });
+        assert(ok.status === 201, `a public hostname: expected 201, got ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+        const kept = ok.body.data.proposal?.crew_def?.browser_domains ?? ok.body.data.crew_def?.browser_domains;
+        assert(JSON.stringify(kept) === '["example.com"]', `the proposal keeps the list, got ${JSON.stringify(kept)}`);
+        const gone = await json(`/v1/agents/v2/agent-proposals/${ok.body.data.proposal?.id ?? ok.body.data.id}/decline`, { method: 'POST', headers: authA });
+        assert(gone.status === 200, `decline ${gone.status}`);
+    });
+
     // ── 8a. Approving credentials the agent, or says why it could not ────────
     //
     // Until 2026-09-08 approval stopped at the seed and told the owner to start their connector. A
