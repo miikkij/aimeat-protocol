@@ -46542,6 +46542,13 @@ paths:
         (`provenance:write`, owners always); else the node's stamp when an agent imports. A block
         that does not parse is 400; an explicit declaration the caller may not make is 403
         SCOPE_DENIED before anything is stored.
+
+        `package.sharing.toll_morsels` is the pacing amount in morsels (always 0 today), never a price.
+        Its 3.x name `sharing.morsel_price` is still accepted: the response then carries
+        `Deprecation: true` and `X-AIMEAT-Removed-In: 5.0.0`, the use is counted in GET /v1/stats
+        (`deprecated_use_by_type.knowledge_morsel_price`), and the manifest is stored with
+        `toll_morsels`. Both names with different amounts are 400 TOLL_MORSELS_MISMATCH. From node
+        5.0.0 the old name is 400 MORSEL_PRICE_REMOVED.
       tags: [Knowledge]
       security:
         - BearerAuth: []
@@ -46552,7 +46559,18 @@ paths:
             schema:
               type: object
               properties:
-                package: { type: object, description: The knowledge package (manifest plus entries) }
+                package:
+                  type: object
+                  description: The knowledge package (manifest plus entries)
+                  properties:
+                    sharing:
+                      type: object
+                      properties:
+                        catalog_listed: { type: boolean }
+                        allow_clone: { type: boolean }
+                        license: { type: string }
+                        toll_morsels: { type: number, minimum: 0, description: The pacing amount in morsels. Required unless the deprecated morsel_price is sent. }
+                        morsel_price: { type: number, minimum: 0, deprecated: true, description: Deprecated name of toll_morsels; refused from node 5.0.0. }
                 overrides: { type: object }
                 entry_data: { type: object }
                 ai_provenance:
@@ -52539,6 +52557,18 @@ paths:
                 visibility: { type: string, enum: [private, owner, group, public] }
                 webhookUrl: { type: string }
                 tags: { type: array, items: { type: string } }
+                cost:
+                  type: object
+                  description: >-
+                    The pacing amount per use, never a price. `morsels` is its deprecated 3.x name:
+                    accepted with `Deprecation: true` and `X-AIMEAT-Removed-In: 5.0.0`, counted in
+                    `deprecated_use_by_type.capability_cost_morsels`, and stored as `toll_morsels`.
+                    Both names with different amounts are 400 TOLL_MORSELS_MISMATCH; from node 5.0.0
+                    the old name is 400 MORSEL_PRICE_REMOVED. The same rule holds on PUT.
+                  properties:
+                    toll_morsels: { type: number, minimum: 0 }
+                    morsels: { type: number, minimum: 0, deprecated: true }
+                    perUnit: { type: string }
       responses:
         '201':
           description: Capability created

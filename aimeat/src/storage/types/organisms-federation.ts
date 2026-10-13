@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-13 — KnowledgeSharing.toll_morsels; morsel_price is its optional deprecated name
+ *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.10.0 — 2026-10-11 — Comments only: an extension action's tollMorsels is pacing (burn share plus
  *     provider credit), commercial.payMorsels and KnowledgeSharing.morsel_price are deprecated morsel
  *     prices read as pacing (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -719,11 +721,16 @@ export interface KnowledgeSharing {
   allow_clone: boolean;
   license?: string;
   /**
-   * DEPRECATED, always 0 and never charged: a morsel is pacing, not a price (ruling
-   * decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Kept because the package schema
-   * (schemas/knowledge-package.ts) requires it; removed with MORSEL_PRICE_FIELDS_REMOVED_IN.
+   * The pacing amount in morsels; always 0 and never charged. A morsel is pacing, not a price
+   * (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
    */
-  morsel_price: number;
+  toll_morsels: number;
+  /**
+   * DEPRECATED name of toll_morsels, accepted on a write with the Deprecation headers and stored as
+   * toll_morsels; refused from MORSEL_PRICE_NAMES_REMOVED_IN (services/toll-morsels-names.ts). A
+   * manifest stored before 4.0.0 may still hold it, and the knowledge routes answer it as toll_morsels.
+   */
+  morsel_price?: number;
 }
 
 export interface KnowledgeManifest {

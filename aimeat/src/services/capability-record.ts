@@ -43,11 +43,16 @@
  *     the caller's own `source`, so a body with a webhookUrl and no `source` skipped WEBHOOKS_DISABLED
  *     and the domain allowlist and was stored as the manual webhook capability the gate would have
  *     refused. Both doors were affected: the gate lives here, and the tools reach the same function.
+ *   v1.3.0 — 2026-10-13 — create and update store the pacing amount as cost.toll_morsels; the 3.x name
+ *     cost.morsels is accepted with the Deprecation headers and counted (capability_cost_morsels), a
+ *     mismatch of the two is 400 TOLL_MORSELS_MISMATCH, and MORSEL_PRICE_NAMES_REMOVED_IN refuses the
+ *     old name (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  */
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { normalizeCapabilityCost } from './toll-morsels-names.js';
 
 /** The fields a caller may set. Everything absent takes the shape's own default. */
 export interface CapabilityInput {
@@ -229,6 +234,11 @@ export async function createCapability(
     const source = normaliseSource(input.source);
     if (!source.ok) return source;
 
+    // The pacing amount is cost.toll_morsels; the 3.x name cost.morsels is taken, counted and
+    // stored under the new name (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
+    const cost = normalizeCapabilityCost(input.cost);
+    if (!cost.ok) return cost;
+
     // Webhook policy, on the source the record will actually carry.
     if (input.webhookUrl && source.value.type === 'manual') {
         if (config.capabilityWebhooks === 'disabled') {
@@ -261,7 +271,7 @@ export async function createCapability(
             // there. The moderation rule can still override an 'active' request.
             status: moderatedStatus(config, input.visibility, caller.isOperator, input.status || 'draft'),
         },
-        { ...input, source: source.value },
+        { ...input, source: source.value, cost: cost.value },
     );
 
     try {
@@ -299,6 +309,13 @@ export async function updateCapability(
     delete updates.id;
     delete updates.ownerGhii;
     delete updates.createdAt;
+
+    // The same rename as at create: a patched cost is stored as cost.toll_morsels.
+    if ('cost' in updates) {
+        const cost = normalizeCapabilityCost(updates.cost);
+        if (!cost.ok) return cost;
+        updates.cost = cost.value;
+    }
 
     // Going ACTIVE with a public capability on a moderated node is the same decision as at create,
     // and it was enforced on the tool door only: the HTTP door published past the review. Only a

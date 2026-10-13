@@ -5,6 +5,8 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.7.0 - 2026-10-13 - The pacing amount is written as `cost.toll_morsels`, its 4.0.0 name
+ *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.6.0 - 2026-10-13 - aggregateExtensionCapabilities and aggregateExtensionNow: the extension
  *     part of the scan for ONE extension, which a package install and an activation run before they
  *     answer. The scan's own extension loop calls the same function, so the rows are made one way.
@@ -203,8 +205,8 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           whenToUse: '', whenNotToUse: '',
           examples: [], dependencies: [], schemaHash,
           webhookUrl: null,
-          // `cost.morsels` holds the action's PACING amount per use, not a price.
-          cost: action.pricing ? { morsels: action.pricing.tollMorsels || 0 } : null,
+          // `cost.toll_morsels` holds the action's PACING amount per use, not a price.
+          cost: action.pricing ? { toll_morsels: action.pricing.tollMorsels || 0 } : null,
           trustRequired: null,
           trust: makeDefaultTrust(), redactedFields: [],
           operatorOverride: null, stats: makeDefaultStats(),
@@ -350,7 +352,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
             inputSchema: (tool.inputSchema as Record<string, unknown> | undefined) ?? null,
             outputSchema: (tool.outputSchema as Record<string, unknown> | undefined) ?? null,
             usage: `aimeat_app_tool_invoke { app_id: '${appId}', tool: '${tool.name}', input: {...} } under a contract for this app tool (aimeat_exchange_offerings → aimeat_exchange_accept), or the owner's own apps free of charge`,
-            cost: morsels ? { morsels } : null,
+            cost: morsels ? { toll_morsels: morsels } : null,
             schemaHash,
           };
           if (!existing) {
@@ -403,7 +405,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           usage: offer.exchange === true
             ? `Listed on EXCHANGE: contract it (aimeat_exchange_offerings → aimeat_exchange_accept) and start the task with aimeat_exchange_work; the agent delivers later.`
             : `Ask the agent's owner for this work: aimeat_dm_send to ${agent.name}#${agent.owner}, or a work request naming offer '${offer.id}'.`,
-          cost: morsels ? { morsels } : null,
+          cost: morsels ? { toll_morsels: morsels } : null,
           schemaHash,
           tags: (offer.tags ?? []) as string[],
         };

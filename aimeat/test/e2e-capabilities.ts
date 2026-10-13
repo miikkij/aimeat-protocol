@@ -6,6 +6,10 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   v1.2.0 — 2026-10-13 — The pacing amount is cost.toll_morsels: the new name is taken as it is, the
+ *     old cost.morsels is taken on POST and PUT with the Deprecation headers, counted and stored under
+ *     the new name, and two names that disagree are 400 TOLL_MORSELS_MISMATCH. The app tool's discovery
+ *     entry carries cost.toll_morsels (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.1.3 — 2026-10-13 — The app tool manifest carries tollMorsels: from 4.0.0 POST /v1/memory refuses
  *     price.morsels on a tool manifest (MORSEL_PRICE_REMOVED). The discovery entry's cost stays 2.
  *   v1.1.2 — 2026-10-08 — The allowlist node listens on 31000 + lane % 100 (suitePort): the port the
@@ -170,6 +174,49 @@ await test('POST /v1/capabilities — a bad source is a 400, not a 500', async (
         assert(body.error?.code === 'INVALID_INPUT', `expected INVALID_INPUT, got ${body.error?.code}`);
         assert((body.error?.message ?? '').includes(fragment), `expected message to mention "${fragment}", got ${body.error?.message}`);
     }
+});
+
+// The pacing amount is cost.toll_morsels; cost.morsels is its deprecated name (ruling
+// decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll). The same on 3.x and 4.0.0.
+const costMorselsUses = async (): Promise<number> => {
+    const { body } = await json('/v1/stats', { headers: { 'Authorization': `Bearer ${ownerToken}` } });
+    return Number(body?.data?.deprecated_use_by_type?.capability_cost_morsels ?? 0);
+};
+const createWithCost = (cost: Record<string, unknown>) => json('/v1/capabilities', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${ownerToken}` },
+    body: JSON.stringify({ id: 'toll-' + Math.random().toString(36).slice(2, 8), name: 'Toll name', summary: 'pacing name', visibility: 'private', cost }),
+});
+
+await test('POST /v1/capabilities — cost.toll_morsels is taken as it is, with no Deprecation header', async () => {
+    const before = await costMorselsUses();
+    const { status, body, headers } = await createWithCost({ toll_morsels: 3 });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body.error ?? body)}`);
+    assert(JSON.stringify(body.data.cost) === '{"toll_morsels":3}', `cost: ${JSON.stringify(body.data.cost)}`);
+    assert(headers.get('deprecation') === null, `no Deprecation header expected, got ${headers.get('deprecation')}`);
+    assert(await costMorselsUses() === before, 'the new name must not be counted');
+});
+
+await test('POST and PUT /v1/capabilities — cost.morsels is taken with the Deprecation headers, counted, and stored as cost.toll_morsels', async () => {
+    const before = await costMorselsUses();
+    const created = await createWithCost({ morsels: 4 });
+    assert(created.status === 201, `status ${created.status}: ${JSON.stringify(created.body.error ?? created.body)}`);
+    assert(created.headers.get('deprecation') === 'true', `Deprecation: ${created.headers.get('deprecation')}`);
+    assert(created.headers.get('x-aimeat-removed-in') === '5.0.0', `X-AIMEAT-Removed-In: ${created.headers.get('x-aimeat-removed-in')}`);
+    const id = created.body.data.id;
+    const back = await json(`/v1/capabilities/${id}`, { headers: { 'Authorization': `Bearer ${ownerToken}` } });
+    assert(JSON.stringify(back.body.data.cost) === '{"toll_morsels":4}', `stored cost: ${JSON.stringify(back.body.data.cost)}`);
+    const put = await json(`/v1/capabilities/${id}`, {
+        method: 'PUT', headers: { 'Authorization': `Bearer ${ownerToken}` }, body: JSON.stringify({ cost: { morsels: 6 } }),
+    });
+    assert(put.status === 200 && JSON.stringify(put.body.data.cost) === '{"toll_morsels":6}', `PUT ${put.status}: ${JSON.stringify(put.body.data?.cost ?? put.body)}`);
+    assert(put.headers.get('deprecation') === 'true', `PUT Deprecation: ${put.headers.get('deprecation')}`);
+    assert(await costMorselsUses() === before + 2, 'capability_cost_morsels should count two uses');
+});
+
+await test('POST /v1/capabilities — cost.toll_morsels and cost.morsels that disagree are 400 TOLL_MORSELS_MISMATCH', async () => {
+    const { status, body } = await createWithCost({ toll_morsels: 1, morsels: 2 });
+    assert(status === 400 && body.error?.code === 'TOLL_MORSELS_MISMATCH', `${status}: ${JSON.stringify(body.error ?? body)}`);
 });
 
 await test('GET /v1/capabilities/:id — retrieve', async () => {
@@ -540,7 +587,7 @@ await test('The app tool is a discovery entry: app-tool source, not callable, us
     const cap = body.data;
     assert(cap.source.type === 'app-tool' && cap.callable === false, `source/callable: ${cap.source.type}/${cap.callable}`);
     assert(/aimeat_app_tool_invoke/.test(cap.usage), `usage should name the tool door: ${cap.usage}`);
-    assert(cap.cost && cap.cost.morsels === 2, `cost: ${JSON.stringify(cap.cost)}`);
+    assert(cap.cost && cap.cost.toll_morsels === 2 && !('morsels' in cap.cost), `cost: ${JSON.stringify(cap.cost)}`);
     assert(cap.summary === 'Looks a thing up for the caller.', `summary: ${cap.summary}`);
     const { body: list } = await json('/v1/capabilities?source_type=app-tool');
     assert(list.data.capabilities.some((c: any) => c.id === id), 'app-tool filter does not list it');

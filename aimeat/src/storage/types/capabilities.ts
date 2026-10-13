@@ -15,6 +15,8 @@
  *   v1.0.0 — 2026-08-01 — Extracted from types/agents-messaging.ts (max-file-lines).
  *   v1.1.0 — 2026-09-03 — Source types 'app-tool' and 'offering': the registry is a projection of
  *     every source an agent can find by name here (wish-kyvykkyydet-rekisteri-ja-sivu).
+ *   v1.2.0 — 2026-10-13 — CapabilityRecord.cost.toll_morsels; `cost.morsels` is its deprecated name
+ *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  */
 // ── Capability Layer ────────────────────────────────────────────────
 
@@ -97,7 +99,12 @@ export interface CapabilityRecord {
   dependencies: CapabilityDependency[];
   schemaHash: string;
   webhookUrl: string | null;
-  cost: { morsels: number; perUnit?: string } | null;
+  /**
+   * The pacing amount in morsels per use, never a price. `morsels` was its name until 4.0.0: a write
+   * may still send it (services/toll-morsels-names.ts) and a row stored with it reads as toll_morsels
+   * (utils/toll-name.ts).
+   */
+  cost: { toll_morsels: number; perUnit?: string } | null;
   trustRequired: number | null;
   trust: CapabilityTrust;
   redactedFields: string[];

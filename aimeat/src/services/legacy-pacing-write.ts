@@ -17,16 +17,24 @@
  * @usage
  *   const legacy = legacyPacingWriteRefusal(key, value);
  *   if (legacy) return res.status(legacy.status).json(error(config.nodeId, legacy.code, legacy.message));
+ *
+ *   A knowledge package manifest (`packages/{id}/manifest`) is checked here too: its
+ *   `sharing.morsel_price` is the deprecated name of `sharing.toll_morsels` (counted, refused only on a
+ *   mismatch or from MORSEL_PRICE_NAMES_REMOVED_IN; services/toll-morsels-names.ts).
  * @version-history
+ *   v1.1.0 — 2026-10-13 — A knowledge package manifest's sharing.morsel_price is counted as a deprecated
+ *     use and a mismatch with sharing.toll_morsels is refused
+ *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.0.0 — 2026-10-12 — Initial (the 4.0.0 sweep).
  */
 import { MORSEL_PRICE_FIELDS_REMOVED_IN, legacyMorselFieldsLive } from '../config-pacing.js';
 import { legacyToolPriceRefusal } from '../models/app-tool-schemas.js';
+import { normalizeKnowledgeSharing, type TollNameRefusal } from './toll-morsels-names.js';
 
 export interface LegacyPacingWriteRefusal {
   ok: false;
   status: 400;
-  code: 'MORSEL_PRICE_REMOVED';
+  code: 'MORSEL_PRICE_REMOVED' | TollNameRefusal['code'];
   message: string;
 }
 
@@ -35,9 +43,18 @@ const record = (v: unknown): Record<string, unknown> | null =>
 
 /**
  * The refusal for writing `value` under `key` when it carries the old morsel price on a node that no
- * longer takes it, or null. Any key other than the two listing sources returns null at once.
+ * longer takes it, or null. Any key other than the two listing sources and a knowledge package
+ * manifest returns null at once.
  */
 export function legacyPacingWriteRefusal(key: string, value: unknown): LegacyPacingWriteRefusal | null {
+  // A knowledge package manifest written as plain memory (the MCP packager prompt writes it with
+  // aimeat_memory_write): its sharing.morsel_price is the deprecated name of sharing.toll_morsels.
+  // The value is stored as the person wrote it; the use is counted with the Deprecation headers, two
+  // names that disagree are refused, and MORSEL_PRICE_NAMES_REMOVED_IN refuses the old name.
+  if (/^packages\/[^/]+\/manifest$/.test(key)) {
+    const sharing = normalizeKnowledgeSharing(record(value)?.sharing);
+    return sharing.ok ? null : sharing;
+  }
   const isTools = /^apps\..+\.tools$/.test(key);
   const isOffers = /^agents\..+\.offers$/.test(key);
   if ((!isTools && !isOffers) || legacyMorselFieldsLive()) return null;

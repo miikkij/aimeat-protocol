@@ -6,6 +6,10 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-13 — POST /v1/knowledge/import stores the pacing amount as sharing.toll_morsels; the 3.x
+ *     name sharing.morsel_price is accepted with the Deprecation headers and counted, and a mismatch
+ *     of the two is 400 TOLL_MORSELS_MISMATCH. GET /v1/knowledge/:id answers the new name
+ *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:write on POST /v1/knowledge/:id/link, DELETE /v1/knowledge/:id/link; memory:read on GET /v1/knowledge/:id/broken-links. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   2026-10-12 — The organism-share consent's reach is `local`, the name `private` now has (Core 2026-11 AUTHZ-18).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
@@ -45,6 +49,7 @@ import { logger } from '../../utils/logger.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { presentMemory, classificationWarningOf } from '../../services/classification/present-memory.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
 
 // The validator is shared with the operator's import, which used to write a manifest nothing
 // checked. → ./manifest-validator.ts
@@ -83,9 +88,17 @@ export function registerPackagesCoreRoutes(
       pkg.sharing = {
         catalog_listed: catalogListed,
         allow_clone: catalogListed,
-        morsel_price: 0,
+        toll_morsels: 0,
       };
     }
+    // The pacing amount is sharing.toll_morsels; the 3.x name morsel_price is taken with the
+    // Deprecation headers, counted, and stored under the new name. Two names that disagree are 400.
+    const sharing = normalizeKnowledgeSharing(pkg.sharing);
+    if (!sharing.ok) {
+      res.status(sharing.status).json(error(config.nodeId, sharing.code, sharing.message));
+      return;
+    }
+    pkg.sharing = sharing.value;
     if (!pkg.tags) pkg.tags = [];
     if (!pkg.language) pkg.language = 'en';
     // Normalize entries: ensure each has title, default visibility
@@ -318,7 +331,8 @@ export function registerPackagesCoreRoutes(
     const warning = classificationWarningOf(manifest);
     res.json(success(config.nodeId, {
       package_id: packageId,
-      manifest: manifest.value,
+      // A manifest stored before 4.0.0 answers its sharing.morsel_price as sharing.toll_morsels.
+      manifest: presentKnowledgeManifest(manifest.value),
       ...(warning ? { classificationWarning: warning } : {}),
       tags: manifest.tags,
       created_at: manifest.createdAt,

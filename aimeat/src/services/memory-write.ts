@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.14.0 — 2026-10-13 — A knowledge package manifest's sharing.morsel_price is counted as a
+ *     deprecated use, and a mismatch with sharing.toll_morsels is refused (TOLL_MORSELS_MISMATCH,
+ *     services/legacy-pacing-write.ts).
  *   v1.13.0 — 2026-10-12 — An app tool manifest or an agent's offers document carrying the old morsel
  *     price is refused with 400 MORSEL_PRICE_REMOVED from 4.0.0 (services/legacy-pacing-write.ts), as
  *     the dedicated routes already refused it.
@@ -239,7 +242,10 @@ export type MemoryWriteResult =
             // An EXCHANGE listing source whose changed text would break an ODPS length cap.
             | 'ODPS_FIELD_TOO_LONG'
             // The same source carrying the old morsel price on a node at 4.0.0 or later.
-            | 'MORSEL_PRICE_REMOVED';
+            | 'MORSEL_PRICE_REMOVED'
+            // A knowledge package manifest whose sharing.toll_morsels and deprecated
+            // sharing.morsel_price disagree, or whose amount is not a number of at least 0.
+            | 'TOLL_MORSELS_MISMATCH' | 'INVALID_INPUT';
         message: string;
         details?: unknown;
     };

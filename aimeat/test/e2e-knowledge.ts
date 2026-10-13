@@ -626,6 +626,65 @@ await test('Non-member cannot read the contributed package manifest → 403', as
   assert(status === 403, `Expected 403, got ${status}`);
 });
 
+// ─── The pacing amount's name: sharing.toll_morsels, sharing.morsel_price deprecated ───
+// Ruling decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll: the same on 3.x and
+// 4.0.0 (only 5.0.0 refuses the old name, which the unit test toll-morsels-names.test.ts covers).
+console.log('\nPacing amount name (toll_morsels)');
+
+const tollPackage = (name: string, sharing: Record<string, unknown>) => JSON.stringify({
+  package: {
+    type: 'knowledge-package', name, version: '1.0.0', author: ownerName, content_type: 'document',
+    tags: ['toll'], language: 'en', maturity: 'draft',
+    synthesis: { level: 'original', description: 'pacing name test' },
+    entries: [{ key: 'body', title: 'Body', visibility: 'private', value: { title: 'Body', body: 'text' } }],
+    sharing,
+  },
+});
+const knowledgeMorselPriceUses = async (): Promise<number> => {
+  const { body } = await json('/v1/stats', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  return Number(body?.data?.deprecated_use_by_type?.knowledge_morsel_price ?? 0);
+};
+const sharingOf = async (packageId: string): Promise<Record<string, unknown>> => {
+  const { status, body } = await json(`/v1/knowledge/${packageId}`, { headers: { Authorization: `Bearer ${agentToken}` } });
+  assert(status === 200, `GET manifest ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+  return body.data.manifest.sharing;
+};
+
+await test('sharing.toll_morsels is taken without a Deprecation header and read back under the same name', async () => {
+  const before = await knowledgeMorselPriceUses();
+  const res = await json('/v1/knowledge/import', {
+    method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+    body: tollPackage('Toll new name', { catalog_listed: false, allow_clone: false, toll_morsels: 0 }),
+  });
+  assert(res.status === 201, `status ${res.status}: ${JSON.stringify(res.body).slice(0, 300)}`);
+  assert(res.headers.get('deprecation') === null, `no Deprecation header expected, got ${res.headers.get('deprecation')}`);
+  const sharing = await sharingOf(res.body.data.package_id);
+  assert(sharing.toll_morsels === 0 && !('morsel_price' in sharing), `sharing: ${JSON.stringify(sharing)}`);
+  assert(await knowledgeMorselPriceUses() === before, 'the new name must not be counted as a deprecated use');
+});
+
+await test('sharing.morsel_price is still taken, with Deprecation and X-AIMEAT-Removed-In 5.0.0, counted, and stored as toll_morsels', async () => {
+  const before = await knowledgeMorselPriceUses();
+  const res = await json('/v1/knowledge/import', {
+    method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+    body: tollPackage('Toll old name', { catalog_listed: false, allow_clone: false, morsel_price: 0 }),
+  });
+  assert(res.status === 201, `status ${res.status}: ${JSON.stringify(res.body).slice(0, 300)}`);
+  assert(res.headers.get('deprecation') === 'true', `Deprecation: ${res.headers.get('deprecation')}`);
+  assert(res.headers.get('x-aimeat-removed-in') === '5.0.0', `X-AIMEAT-Removed-In: ${res.headers.get('x-aimeat-removed-in')}`);
+  const sharing = await sharingOf(res.body.data.package_id);
+  assert(sharing.toll_morsels === 0 && !('morsel_price' in sharing), `sharing: ${JSON.stringify(sharing)}`);
+  assert(await knowledgeMorselPriceUses() === before + 1, 'knowledge_morsel_price should count one use');
+});
+
+await test('sharing.toll_morsels and sharing.morsel_price that disagree are 400 TOLL_MORSELS_MISMATCH', async () => {
+  const res = await json('/v1/knowledge/import', {
+    method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+    body: tollPackage('Toll mismatch', { catalog_listed: false, allow_clone: false, toll_morsels: 0, morsel_price: 5 }),
+  });
+  assert(res.status === 400 && res.body?.error?.code === 'TOLL_MORSELS_MISMATCH', `${res.status}: ${JSON.stringify(res.body).slice(0, 300)}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await json(`/v1/owners/${ownerName}?cascade=true`, {
