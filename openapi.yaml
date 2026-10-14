@@ -9694,6 +9694,11 @@ paths:
         reported name, else null. `waiting` lists the agents that were ordered to this connector and
         have no key yet.
 
+        `tunnel_enabled` says whether this node takes connectors at all. It is the operator's
+        `connect_tunnel.enabled` (`AIMEAT_CONNECT_TUNNEL_ENABLED`), read when the node starts. When it
+        is false, a connector's tunnel upgrade is refused and no connector is ever listed, so a client
+        asks the operator to turn it on and restart the node instead of showing the install commands.
+
         For the account holder and their own agents holding `memory:read`. An app grant and an
         ecosystem app are refused. The install id and the reported name are unsigned: they tell an
         owner's own machines apart and authenticate nothing.
@@ -9714,6 +9719,7 @@ paths:
                         type: object
                         properties:
                           online: { type: integer, description: How many are connected right now }
+                          tunnel_enabled: { type: boolean, description: 'Whether this node takes connectors at all (connect_tunnel.enabled, read at start)' }
                           connectors:
                             type: array
                             items:

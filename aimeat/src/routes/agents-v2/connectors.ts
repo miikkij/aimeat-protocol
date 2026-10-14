@@ -27,6 +27,8 @@
  * @structure registerConnectorRoutes(router, config, storage)
  * @usage registerConnectorRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-14 — The list answers `tunnel_enabled` too (connectorListAnswer), so the page
+ *     asks the operator when this node takes no connectors.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
  */
 import type { Router } from 'express';
@@ -35,7 +37,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { callerOf } from '../../middleware/caller.js';
-import { listConnectors, renameConnector, forgetConnector } from '../../services/connector-registry.js';
+import { connectorListAnswer, renameConnector, forgetConnector } from '../../services/connector-registry.js';
 import { emitChange } from '../../services/event-bus.js';
 
 export function registerConnectorRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -50,8 +52,7 @@ export function registerConnectorRoutes(router: Router, config: AimeatConfig, st
         'This is for the account holder and their own agents. An app cannot read how your agents are set up.'));
       return;
     }
-    const connectors = await listConnectors(ctx, caller.owner);
-    res.json(success(config.nodeId, { connectors, online: connectors.filter(c => c.online).length }, [
+    res.json(success(config.nodeId, await connectorListAnswer(ctx, caller.owner), [
       { description: 'Order a new agent to one of them', method: 'POST', url: '/v1/agents/v2/agent-proposals' },
     ]));
   });

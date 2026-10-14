@@ -17,6 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-14 — aimeat_connector_list answers `tunnel_enabled` too, through connectorListAnswer, the
+ *     function GET /v1/agents/v2/connectors calls.
  *   2026-10-10 — aimeat_connector_list and aimeat_connector_rename: the machines the owner's agents
  *     run on, through services/connector-registry.ts, the same functions the REST routes call.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -61,7 +63,7 @@ import { toolError } from './tool-error.js';
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
-import { listConnectors, renameConnector } from '../services/connector-registry.js';
+import { connectorListAnswer, renameConnector } from '../services/connector-registry.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -297,8 +299,8 @@ export function registerAgentManagementTools(
         zodShapeFor('aimeat_connector_list'),
         annotationsFor('aimeat_connector_list'),
         async () => {
-            const connectors = await listConnectors({ config, storage }, caller().owner);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ connectors, online: connectors.filter(c => c.online).length }, null, 2) }] };
+            const answer = await connectorListAnswer({ config, storage }, caller().owner);
+            return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
         },
     );
 

@@ -17779,6 +17779,9 @@
         "machineDoor": "Make an agent",
         "nodeResult": "A scheduled AI job on this AIMEAT. It runs here with your own AI key, so you install nothing and your computer can be off. Each run does one prompt, at the times you set.",
         "placesDoor": "Where agents run",
+        "noTunnel": "This service does not take computers yet. Whoever runs it must turn on computer connections and restart the service. Ask them to do it, and then add your computer here.",
+        "noTunnelOperator": "You run this service. Turn on the setting connect_tunnel.enabled, or set AIMEAT_CONNECT_TUNNEL_ENABLED=true, and restart the service. It reads the setting only when it starts.",
+        "noTunnelSettings": "Open the settings",
         "places": {
           "chat": {
             "title": "Your chat AI",

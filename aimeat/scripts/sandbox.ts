@@ -48,6 +48,7 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.6.1 — 2026-10-14 — AIMEAT_SANDBOX_TUNNEL=false starts the node with the connector tunnel off.
  *   v1.6.0 — 2026-10-12 — Owners are registered with POST /v1/ghii and a password and signed in with
  *     POST /v1/ghii/login, on the first run and on every refresh. The owner-key sign-in this used is
  *     removed in node 4.0.0 (OWNER_KEY_LOGIN_REMOVED_IN), and the password sign-in's access token
@@ -185,7 +186,8 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         AIMEAT_TEST_MONEY_HANDLER: 'true',
         // The connector tunnel, which the agent pages need: a machine exists on a node only through
         // it. `pnpm sandbox:machines` stands two stand-in machines up on it.
-        AIMEAT_CONNECT_TUNNEL_ENABLED: 'true',
+        // AIMEAT_SANDBOX_TUNNEL=false starts it off, to look at the pages of a node that takes no computers.
+        AIMEAT_CONNECT_TUNNEL_ENABLED: process.env.AIMEAT_SANDBOX_TUNNEL ?? 'true',
         // A store address, so every control that leads to the store is drawn. It is a stand-in and
         // sells nothing: a node without one hides those controls, and a hidden control cannot be looked at.
         AIMEAT_SITE_STORE_URL: 'https://store.example/',

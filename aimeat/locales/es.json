@@ -15829,6 +15829,9 @@
         "machineDoor": "Crear un agente",
         "nodeResult": "Un trabajo de IA programado en este AIMEAT. Funciona aquí con tu propia clave de IA, así que no instalas nada y tu computadora puede estar apagada. Cada ejecución hace un prompt, en los horarios que defines.",
         "placesDoor": "Dónde funcionan los agentes",
+        "noTunnel": "Este servicio todavía no acepta computadoras. Quien gestiona este servicio debe activar las conexiones de computadoras y reiniciarlo. Pídeselo y después añade tu computadora aquí.",
+        "noTunnelOperator": "Tú gestionas este servicio. Activa el ajuste connect_tunnel.enabled, o define AIMEAT_CONNECT_TUNNEL_ENABLED=true, y reinicia el servicio. El servicio lee el ajuste solo al arrancar.",
+        "noTunnelSettings": "Abrir los ajustes",
         "places": {
           "chat": {
             "title": "Tu IA de chat",

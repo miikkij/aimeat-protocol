@@ -289,6 +289,8 @@ async function run() {
         assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(Array.isArray(r.body.data.connectors) && r.body.data.connectors.length === 0,
             `expected no connectors, got ${JSON.stringify(r.body.data.connectors)}`);
+        // The runner starts the node with the tunnel on, so the list says this node takes computers.
+        assert(r.body.data.tunnel_enabled === true, `expected tunnel_enabled true, got ${JSON.stringify(r.body.data.tunnel_enabled)}`);
     });
 
     // ── 2. Two machines connect ───────────────────────────────────────────────
