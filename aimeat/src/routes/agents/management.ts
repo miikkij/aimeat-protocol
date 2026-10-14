@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 -- 2026-10-14 -- POST /v1/agents/import writes the bundle's memory through
+ *     writeMemoryRecord (services/memory-write.ts), the writer POST /v1/memory uses, and names each
+ *     refused record in imported.memories_failed. It wrote with storage.setMemory, past every memory
+ *     write rule (QA audit 2026-10-14, K5).
  *   v1.13.0 -- 2026-10-11 -- Export and import carry an action's pacing amount as pricing.tollMorsels
  *     (a morsel is pacing, not a price); export mirrors it as the deprecated baseMorsels until 4.0.0,
  *     and import reads a 3.x bundle's baseMorsels as tollMorsels.
@@ -52,6 +56,8 @@ import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requ
 import { narrowAgent } from '../../services/scope-narrowing.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
+import { writeMemoryRecord } from '../../services/memory-write.js';
+import { callerOf } from '../../middleware/caller.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { forgetAgentAccess } from '../../services/agent-refusals.js';
 import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
@@ -208,23 +214,32 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       lastSeen: now,
     });
 
-    // Import memories
+    // Import memories through the shared memory writer, the one POST /v1/memory uses: server-written
+    // and secret keys, schema locks, the organism rule, the value and key ceilings and the quota all
+    // apply. This wrote with storage.setMemory, past every one of them (QA audit 2026-10-14, K5).
+    // A refused record is named in the answer and the rest of the bundle still lands.
     let memoriesImported = 0;
+    const memoriesFailed: Array<{ key: string; reason: string }> = [];
     if (Array.isArray(memoryData)) {
+      const caller = callerOf(req, config.nodeId, storage);
       for (const m of memoryData) {
-        if (!m.key) continue;
-        await storage.setMemory({
+        if (!m?.key || typeof m.key !== 'string') continue;
+        const written = await writeMemoryRecord({ storage, config }, {
+          principal: caller.principal,
+          targetGaii: newGaii,
+          scopes: [...caller.scopes],
+          roles: [...caller.roles],
+          federated: caller.visitor,
+        }, {
           key: m.key,
-          ownerGaii: newGaii,
           value: m.value,
-          visibility: m.visibility ?? 'private',
-          tags: m.tags ?? [],
-          ttlHours: m.ttl_hours ?? null,
-          version: 1,
-          createdAt: now,
-          updatedAt: now,
+          visibility: (['private', 'owner', 'group', 'members', 'public'].includes(m.visibility) ? m.visibility : 'private'),
+          tags: Array.isArray(m.tags) ? m.tags : [],
+          ttlHours: typeof m.ttl_hours === 'number' ? m.ttl_hours : null,
+          pipeline: 'rest.agent_import',
         });
-        memoriesImported++;
+        if (written.ok) memoriesImported++;
+        else memoriesFailed.push({ key: m.key, reason: `${written.code}: ${written.message}` });
       }
     }
 
@@ -265,6 +280,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       },
       imported: {
         memories: memoriesImported,
+        memories_failed: memoriesFailed,
         actions: actionsImported,
       },
       private_key: keyPair.privateKey,

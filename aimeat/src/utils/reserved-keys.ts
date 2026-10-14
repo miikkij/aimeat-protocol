@@ -20,6 +20,9 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.23.0 — 2026-10-14 — `commerce.session.` is service-owned: no memory route writes, restores
+ *     or deletes an open checkout, for the buyer in person either. Completion charged from a record
+ *     the buyer could write (QA audit 2026-10-14, K4).
  *   v1.22.0 — 2026-10-11 — `agent-workplace.` is reserved: where one agent's finished work is
  *     shared, which the node acts on when a task completes. A new key, so nothing wrote it through
  *     the memory API before this.
@@ -306,8 +309,15 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * active member of the organism and that the workspace exists; a record written past it, by an
  * owner PAT, an agent or a granted app, would skip both. The owner sets and clears it through
  * /v1/agents/{name}/workplace.
+ *
+ * `commerce.session.` (2026-10-14, QA audit K4) is an open checkout: its line items, quoted prices
+ * and status. Completion charges the buyer from it. The buyer's own session wrote it through the
+ * memory routes, because an owner in person passes the reserved-prefix rule, so a buyer could change
+ * what completion charged. The checkout services (commerce/session-service.ts and
+ * commerce/ucp-guest-checkout.ts) are its writers, straight to storage, and the buyer reads and
+ * changes a session through /v1/commerce/checkout-sessions.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'commerce.session.'];
 
 /** True iff `key` is owned by one service and no memory route writes, restores or deletes it. */
 export function isServiceOwnedKey(key: unknown): boolean {

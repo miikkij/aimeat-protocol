@@ -20,6 +20,10 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.11.0 — 2026-10-14 — mayActOnAgent: the one answer to "may this caller act on the agent a
+ *     route's `:name` names": the agent itself, or its own owner in person. Eight route files said yes
+ *     to any owner in person, so an owner who named another account's agent by its whole GAII read
+ *     and changed it (QA audit 2026-10-14, K1).
  *   v1.10.2 — 2026-10-10 — 'startup' is a reserved name (secaudit 2026-10-10, I18).
  *   v1.10.1 — 2026-10-05 — isValidAgentName: validateAgentName as a yes or no (secaudit 2026-10, M2).
  *   v1.10.0 — 2026-10-05 — isOwnerInPerson moves here from auth/effective-scopes.ts, the one test for
@@ -237,11 +241,36 @@ export function isValidGHII(id: string): boolean {
  * apart to put it back together, when it was already there. An identifier that carries a `#` is
  * already an identity; nothing needs assembling.
  *
- * It does NOT check that the identity belongs to the caller. That is each route's own check, and
- * each route has one — which is why the broken cases refused rather than leaked.
+ * It does NOT check that the identity belongs to the caller. Ask mayActOnAgent for that: eight routes
+ * that skipped the check for an owner in person let an owner act on another account's agent by
+ * naming its whole GAII (QA audit 2026-10-14, K1).
  */
 export function agentGaiiFromIdentifier(identifier: string, owner: string, nodeId: string): string {
     return identifier.includes('#') ? identifier : buildGAII(identifier, owner, nodeId);
+}
+
+/**
+ * May this caller act on the agent `agentGaii`, the identity a route resolved from its `:name`?
+ *
+ * Two callers may: the agent itself (an agent session of this node whose own GAII it is), and the
+ * agent's own owner signed in as themselves (the GAII names their account on this node). Nobody else,
+ * whatever their role: an owner in person naming another account's agent by its whole GAII is
+ * refused, and so are an app grant, an ecosystem app and a visitor from another node.
+ */
+export function mayActOnAgent(
+    auth: { sub?: string; owner?: string; roles?: readonly string[] | null; federated?: boolean } | null | undefined,
+    agentGaii: string,
+    nodeId: string,
+): boolean {
+    if (!auth) return false;
+    if (isOwnerInPerson(auth)) {
+        const parsed = parseGAII(agentGaii);
+        return !!parsed && parsed.owner === auth.owner && parsed.node === nodeId;
+    }
+    const roles = auth.roles ?? [];
+    if (!roles.includes('agent') || roles.includes('app') || roles.includes('ecosystem')) return false;
+    if (isForeignPrincipal(auth)) return false;
+    return auth.sub === agentGaii;
 }
 
 /**

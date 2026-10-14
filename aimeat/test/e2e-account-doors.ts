@@ -410,6 +410,33 @@ await test('18. Importing the same name again → 409 NAME_TAKEN', async () => {
     assert(r.status === 409 && r.body.error?.code === 'NAME_TAKEN', `expected 409 NAME_TAKEN, got ${r.status} ${r.body.error?.code}`);
 });
 
+// QA audit 2026-10-14, K5 (F03b-05): the import wrote memory with storage.setMemory, past every
+// memory write rule. It writes through the shared writer now, so a key no memory route may write is
+// refused by name and the rest of the bundle still lands.
+await test('18b. Import writes memory through the memory write rules: a node-written key is refused, the rest lands', async () => {
+    const name = `k5imp${Date.now().toString(36)}`;
+    const body = {
+        agent: { name, owner: A.name, display_name: 'K5 import' },
+        memory: [
+            { key: 'notif.k5-import-probe', value: { title: 'not from the node' } },
+            { key: 'k5.import.ok', value: { kept: true } },
+        ],
+    };
+    const r = await json('/v1/agents/import', { method: 'POST', headers: auth(A.token), body: JSON.stringify(body) });
+    assert(r.status === 201, `import ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const d = r.body.data;
+    assert(d.imported.memories === 1, `only the allowed record is imported, got ${d.imported.memories}`);
+    const refused = (d.imported.memories_failed ?? []) as Array<{ key: string; reason: string }>;
+    assert(refused.some(f => f.key === 'notif.k5-import-probe'), `the refused key is named: ${JSON.stringify(d.imported)}`);
+    // What the agent now holds, read by its owner through the export.
+    const gaii = d.agent.gaii as string;
+    const exp = await json(`/v1/agents/${encodeURIComponent(gaii)}/export`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(exp.status === 200, `export ${exp.status}: ${JSON.stringify(exp.body.error)}`);
+    const keys = ((exp.body.data?.memory ?? []) as Array<{ key: string }>).map(m => m.key);
+    assert(!keys.includes('notif.k5-import-probe'), `the refused key must not be stored: ${JSON.stringify(keys)}`);
+    assert(keys.includes('k5.import.ok'), `the allowed record is stored: ${JSON.stringify(keys)}`);
+});
+
 // ─── Phase 4 — rekey ───
 console.log('Phase 4 — rekey');
 
@@ -1491,6 +1518,58 @@ await test('64. When an account is deleted, its app grants and access tokens go 
     await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
 
     assert(found.length === 0, found.join('; '));
+});
+
+// ─── Phase 13 — an owner reaches only their own agents through /v1/agents/<GAII>/… ───
+// QA audit 2026-10-14, K1 (S2-01, S3-01). Eight route files answered `true` for any owner signed
+// in as themselves and then resolved the agent from the path, so an owner who put another
+// account's full GAII in the path read and changed that agent. The cross-owner tests above send a
+// bare name, which resolves under the caller's own account, so they could not see it.
+console.log('Phase 13 — another owner\'s agent, named by its whole identity');
+
+await test('65. Every /v1/agents/<GAII>/… route refuses an owner who names another account\'s agent', async () => {
+    const g = encodeURIComponent(agentA.gaii);
+    const h = auth(B.token);
+    const calls: Array<[string, string, unknown?]> = [
+        ['GET', `/v1/agents/${g}/activity`], ['GET', `/v1/agents/${g}/activity/log`],
+        ['GET', `/v1/agents/${g}/activity/overview`], ['GET', `/v1/agents/${g}/refusals`],
+        ['GET', `/v1/agents/${g}/statistics`], ['GET', `/v1/agents/${g}/quality/overview`],
+        ['GET', `/v1/agents/${g}/capabilities`],
+        ['PUT', `/v1/agents/${g}/capabilities`, { capabilities: [{ type: 'tool', name: 'intruder' }] }],
+        ['GET', `/v1/agents/${g}/data-access/overview`], ['GET', `/v1/agents/${g}/directives`],
+        ['PUT', `/v1/agents/${g}/directives`, { directives: { memory: { allow: ['intruder.*'] } } }],
+        ['DELETE', `/v1/agents/${g}/directives`],
+        ['GET', `/v1/agents/${g}/inbox`], ['GET', `/v1/agents/${g}/integration-kit`],
+        ['POST', `/v1/agents/${g}/messages`, { content: 'from another account' }],
+        ['GET', `/v1/agents/${g}/messages/inbox`], ['GET', `/v1/agents/${g}/messages/overview`],
+        ['GET', `/v1/agents/${g}/messages/threads`], ['GET', `/v1/agents/${g}/messages`],
+        ['GET', `/v1/agents/${g}/onboarding`], ['POST', `/v1/agents/${g}/onboarding/start`, {}],
+        ['PUT', `/v1/agents/${g}/onboarding/override`, { status: 'completed' }],
+        ['DELETE', `/v1/agents/${g}/onboarding/override`], ['DELETE', `/v1/agents/${g}/onboarding`],
+        ['POST', `/v1/agents/${g}/telemetry`, { metrics: { tokens_used: 1 } }],
+        ['GET', `/v1/agents/${g}/telemetry`], ['GET', `/v1/agents/${g}/integration/overview`],
+        ['PUT', `/v1/agents/${g}/webhook`, { url: 'https://example.com/intruder-hook' }],
+        ['GET', `/v1/agents/${g}/webhook`], ['DELETE', `/v1/agents/${g}/webhook`],
+        ['POST', `/v1/agents/${g}/webhook/test`, {}], ['GET', `/v1/agents/${g}/webhook/log`],
+    ];
+    const open: string[] = [];
+    for (const [method, path, body] of calls) {
+        const r = await json(path, { method, headers: h, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+        if (r.status !== 403 && r.status !== 404) open.push(`${method} ${path.replace(g, '<A\'s agent>')} → ${r.status}`);
+    }
+    assert(open.length === 0, `another owner reached A's agent: ${open.join('; ')}`);
+    // And nothing was changed on A's agent by the attempts above.
+    const hook = await json(`/v1/agents/${g}/webhook`, { headers: auth(A.token) });
+    assert(!String(hook.body?.data?.url ?? '').includes('intruder'), `A's webhook was set by another owner: ${JSON.stringify(hook.body?.data)}`);
+});
+
+await test('66. The owner still reaches their own agent by its whole identity', async () => {
+    const g = encodeURIComponent(agentA.gaii);
+    for (const path of [`/v1/agents/${g}/directives`, `/v1/agents/${g}/webhook`, `/v1/agents/${g}/capabilities`, `/v1/agents/${g}/onboarding`]) {
+        const r = await json(path, { headers: auth(A.token) });
+        assert(r.status === 200 || (r.status === 404 && path.endsWith('/onboarding')),
+            `A reading its own agent at ${path.replace(g, '<GAII>')}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

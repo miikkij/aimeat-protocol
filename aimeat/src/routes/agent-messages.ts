@@ -10,6 +10,7 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.8.0 -- 2026-10-11 -- A stopped agent's own GET .../messages/inbox answers no message and `agent_stopped`.
  *   v1.7.0 -- 2026-10-08 -- POST /v1/agents/:name/messages takes ai_provenance and ai_provenance_id,
  *     as aimeat_message_send does, with the session's scopes: 400 INVALID_PROVENANCE for a malformed
@@ -48,7 +49,7 @@ import type { Storage, AgentMessageRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
-import { resolveIdentity, agentGaiiFromIdentifier, isSameOwner, isOwnerInPerson } from '../utils/gaii.js';
+import { resolveIdentity, agentGaiiFromIdentifier, isSameOwner, isOwnerInPerson, mayActOnAgent } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
@@ -94,14 +95,8 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
 
   /** Check if current session can access an agent's messages */
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
-    if (isOwnerInPerson(req.auth)) return true;
-    const roles = req.auth!.roles as string[];
-    // Agent can access own messages
-    if (roles.includes('agent')) {
-      const gaii = resolveAgentGaii(req, agentName);
-      return req.auth!.sub === gaii;
-    }
-    return false;
+    // The agent itself, or its own owner in person (QA audit 2026-10-14, K1).
+    return mayActOnAgent(req.auth, resolveAgentGaii(req, agentName), config.nodeId);
   }
 
   /* ── POST /v1/agents/:name/messages -- Send a message ── */

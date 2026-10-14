@@ -16,6 +16,7 @@
  *   - GET /v1/agents/:name/inbox            -- Consolidated inbox
  *   - GET /v1/agents/:name/integration-kit  -- Full integration kit JSON
  * @version-history
+ *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.3.0 -- 2026-10-11 -- GET /v1/agents/:name/tasks/wait removed: unreachable since it was added, and
  *     the inbox answer no longer points at it.
  *   v1.2.0 -- 2026-10-11 -- A stopped agent's own /inbox carries only active tasks and says
@@ -31,7 +32,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier, isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, resolveIdentity, mayActOnAgent } from '../utils/gaii.js';
 import { isStopped } from '../services/agent-stop-rules.js';
 
 /* ── Cursor helpers for inbox pagination ── */
@@ -70,10 +71,9 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
 
   /** Check if the caller is allowed to access this agent's data */
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
-    if (isOwnerInPerson(req.auth)) return true; // Owners can access all their agents
-    // Agent session -- must be the named agent
-    const expectedGaii = resolveAgentGaii(req, agentName);
-    return req.auth!.sub === expectedGaii;
+    // The named agent itself, or its own owner in person: "all their agents" was all agents for an
+    // owner who named another account's agent by its whole GAII (QA audit 2026-10-14, K1).
+    return mayActOnAgent(req.auth, resolveAgentGaii(req, agentName), config.nodeId);
   }
 
   /* ── GET /v1/agents/:name/inbox -- Consolidated inbox ── */

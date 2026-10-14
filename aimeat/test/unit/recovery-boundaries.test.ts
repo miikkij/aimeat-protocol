@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Missed-event recovery and the measured limit of floating tally persistence.
  * @version-history
+ *   1.0.2 2026-10-14 The tracked-response setup stores the message the contract replies to in the
+ *     owner's mailbox: a contract acts only on a message of the account that stores it (QA audit K2).
  *   1.0.1 2026-10-13 The crash fixture gets 60 s to boot instead of 10 s: under the full unit run the
  *     cold tsx child missed 10 s four times out of four, and the gate's unit step failed on it.
  *   1.0.0 2026-09-27 Restart, refusal, replay and actual owned-process kill.
@@ -31,6 +33,11 @@ afterEach(() => vi.restoreAllMocks());
 async function setup(storage: SqliteStorage) {
   const owner = 'owner@recovery-test', key = `recovery.${randomUUID()}`;
   const ctx = { storage, config, peers: new Map() };
+  // The message the contract replies to, in the owner's own mailbox: a contract acts only on a message
+  // of the account that stores it (QA audit 2026-10-14, K2).
+  await storage.createDirectMessage({ id: 'source', ownerGhii: owner, conversationId: 'thread', senderGhii: 'peer@recovery-test',
+    recipientGhii: owner, body: 'report', direction: 'inbound', status: 'delivered', origin: 'local',
+    originNodeId: config.nodeId, createdAt: new Date().toISOString() });
   const contract = await createTrackedResponse(ctx, owner, {
     title: 'Recovery test', source: { kind: 'message', messageId: 'source', conversationId: 'thread',
       peerGhii: 'peer@recovery-test', ownerGhii: owner, originNodeId: config.nodeId },

@@ -10,6 +10,8 @@
  *   stays behind; a tracked response leaves an organism's value out of the reply and says so in its
  *   ledger; a datapackage step publishes nothing from an organism's record.
  * @version-history
+ *   v1.1.1 — 2026-10-14 — The tracked-reply case stores the message it replies to in Alice's mailbox:
+ *     a contract acts only on a message of the account that stores it (QA audit 2026-10-14, K2).
  *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
  *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
@@ -150,6 +152,11 @@ describe('the classification check at the exit sites', () => {
     const ctx = { config, storage, peers: new Map() };
     await storage.setMemory(mem(ALICE, 'organism.o1.task.done', { status: 'done', result: 'the organism secret' }));
     await storage.setMemory(mem(ALICE, 'own.task.done', { status: 'done', result: 'my own words' }));
+    // The message the contract replies to, in Alice's own mailbox: a contract acts only on a message
+    // of the account that stores it (QA audit 2026-10-14, K2).
+    await storage.createDirectMessage({ id: 'm1', ownerGhii: ALICE, conversationId: 'c1', senderGhii: 'bob@other',
+      recipientGhii: ALICE, body: 'report', direction: 'inbound', status: 'delivered', origin: 'local',
+      originNodeId: 'other', createdAt: new Date().toISOString() } as Parameters<typeof storage.createDirectMessage>[0]);
     const make = (key: string) => createTrackedResponse(ctx, ALICE, {
       title: 't',
       source: { kind: 'message', messageId: 'm1', conversationId: 'c1', peerGhii: 'bob@other', ownerGhii: ALICE, originNodeId: 'other' },

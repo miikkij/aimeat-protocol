@@ -19,6 +19,10 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.5.0 — 2026-10-14 — A contract acts for the account whose memory holds it (bindToStore): the
+ *     account and the sender are the stored row's owner, the recipient comes from that account's own
+ *     stored message, and the watched key is read only from that account. The node took all three
+ *     from the record's value (QA audit 2026-10-14, K2; trusted-key-exemptions entry reviewed).
  *   v1.4.1 — 2026-10-11 — The served spec's `doc` is /v1/specs/tracked-response-contract.md, the address
  *     the node serves the contract at; it was the repository path.
  *   v1.4.0 — 2026-10-08 — An approve-mode draft is stamped when it is built, like the auto reply
@@ -47,6 +51,7 @@ import type { DeliveryCtx } from './message-delivery.js';
 import { stampAutonomousOutput } from './ai-provenance.js';
 import { systemReader } from './classification/reader.js';
 import { memoryTarget } from './classification/labels.js';
+import { isSameOwner } from '../utils/gaii.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 export type TrackedResponseState =
@@ -149,11 +154,32 @@ function ledger(c: TrackedResponse, event: string, extra?: Record<string, unknow
   c.ledger.push({ at: new Date().toISOString(), event, ...(extra || {}) });
 }
 
-/** Read the current value of an arbitrary watched memory key without knowing its owner GAII. The
- *  memory key is unique per (owner, key); a prefix scan on the exact key resolves it cross-owner. */
-async function readWatched(storage: Storage, key: string): Promise<{ ownerGaii: string; key: string; value: unknown } | undefined> {
-  const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-  return items.find(i => i.key === key);
+/** Read the watched key from the contract's own account: the owner's record first, then one stored by
+ *  an agent of the same owner. A record of any other account is never read (QA audit 2026-10-14, K2). */
+async function readWatched(storage: Storage, key: string, ownerGhii: string): Promise<{ ownerGaii: string; key: string; value: unknown } | undefined> {
+  const own = await storage.getMemory(ownerGhii, key);
+  if (own) return own;
+  const { items } = await storage.listAllMemory({ prefix: key, limit: 200 });
+  return items.find(i => i.key === key && isSameOwner(i.ownerGaii, ownerGhii));
+}
+
+/**
+ * A contract acts for the account whose memory holds it, never for what its own fields say (QA audit
+ * 2026-10-14, K2). The spec lets the owner edit any field of the record, so three things come from
+ * where it is stored instead: the account (the stored row's owner, which must be a person's GHII),
+ * the sender (that account), and the recipient (the other side of the message the contract names,
+ * read from that account's own mailbox). False, with the record left alone, when the row is not a
+ * person's or names no message of theirs.
+ */
+async function bindToStore(storage: Storage, c: TrackedResponse, storedOwner: string): Promise<boolean> {
+  if (!storedOwner || storedOwner.includes('#') || storedOwner.startsWith('eco:')) return false;
+  const msg = c.source?.messageId ? await storage.getDirectMessage(c.source.messageId, storedOwner) : null;
+  if (!msg) return false;
+  c.ownerGaii = storedOwner;
+  c.source.ownerGhii = storedOwner;
+  c.source.peerGhii = msg.direction === 'inbound' ? msg.senderGhii : msg.recipientGhii;
+  c.source.conversationId = msg.conversationId;
+  return true;
 }
 
 /**
@@ -229,7 +255,7 @@ export async function createTrackedResponse(
   await persist(ctx.storage, c);
   trackKey(c.watch.key);
   // The condition may already hold (work done before the contract was created) — evaluate immediately.
-  await evaluateContract(ctx, c).catch(err =>
+  await evaluateContract(ctx, c, ownerGaii).catch(err =>
     logger.warn(`tracked-response initial evaluate failed for ${id}: ${String((err as Error).message || err)}`));
   return c;
 }
@@ -237,14 +263,18 @@ export async function createTrackedResponse(
 // ── Evaluate + fire ───────────────────────────────────────────────────────────
 /** Evaluate one contract: if its watched condition is met, fire the reply (auto) or draft it (approve).
  *  Idempotent + locked. Mutates + persists the passed contract object. */
-async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse): Promise<void> {
+async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse, storedOwner: string): Promise<void> {
   if (c.state !== 'watching' && c.state !== 'error') return;
   if (c.state === 'error' && c.tracking.attempts >= MAX_ATTEMPTS) return;   // gave up
   if (inFlight.has(c.id)) return;
   inFlight.add(c.id);
   try {
     const { storage } = ctx;
-    const watched = await readWatched(storage, c.watch.key);
+    if (!(await bindToStore(storage, c, storedOwner))) {
+      logger.warn('tracked-response: a contract that names no message of the account storing it is skipped', { id: c.id, storedOwner });
+      return;
+    }
+    const watched = await readWatched(storage, c.watch.key, c.ownerGaii);
     if (watched !== undefined) c.tracking.lastUpdatedAt = new Date().toISOString();
     if (!watched || !conditionMet(watched.value, c.watch.condition)) return;   // not yet — stay watching
 
@@ -316,7 +346,7 @@ export async function evaluateTrackedKey(ctx: DeliveryCtx, key: string): Promise
     const c = rec.value as TrackedResponse | null;
     if (!c || c.type !== 'tracked-response' || c.watch?.key !== key) continue;
     if (c.state !== 'watching' && c.state !== 'error') continue;
-    try { await evaluateContract(ctx, c); }
+    try { await evaluateContract(ctx, c, rec.ownerGaii); }
     catch (err) { logger.warn(`tracked-response evaluate failed for ${c.id}: ${String((err as Error).message || err)}`); }
   }
 }
@@ -331,6 +361,9 @@ export async function reconcileTrackedResponses(ctx: DeliveryCtx): Promise<{ eva
     if (evaluated >= MAX_PER_SCAN) break;
     const c = rec.value as TrackedResponse | null;
     if (!c || c.type !== 'tracked-response') continue;
+    // Bound to its storing account before anything is persisted, so a write goes back to that row
+    // and never to an account its fields name (QA audit 2026-10-14, K2).
+    if (!(await bindToStore(storage, c, rec.ownerGaii))) continue;
 
     // Recover a stale in-flight 'sent' marker (process died between marker + send result).
     if (c.state === 'sent' && !c.delivery.sentMessageId) {
@@ -340,7 +373,7 @@ export async function reconcileTrackedResponses(ctx: DeliveryCtx): Promise<{ eva
 
     if (c.state === 'watching' || c.state === 'error') {
       if (c.state === 'error' && c.tracking.attempts >= MAX_ATTEMPTS) continue;
-      try { await evaluateContract(ctx, c); evaluated++; }
+      try { await evaluateContract(ctx, c, rec.ownerGaii); evaluated++; }
       catch (err) { logger.warn(`tracked-response reconcile failed for ${c.id}: ${String((err as Error).message || err)}`); }
     }
   }
@@ -355,7 +388,7 @@ export async function evaluateOwnerTrackedResponses(ctx: DeliveryCtx, ownerGaii:
     const c = rec.value as TrackedResponse | null;
     if (!c || c.type !== 'tracked-response') continue;
     if (c.state !== 'watching' && c.state !== 'error') continue;
-    try { await evaluateContract(ctx, c); evaluated++; }
+    try { await evaluateContract(ctx, c, rec.ownerGaii); evaluated++; }
     catch (err) { logger.warn(`tracked-response owner-eval failed for ${c.id}: ${String((err as Error).message || err)}`); }
   }
   return { evaluated };

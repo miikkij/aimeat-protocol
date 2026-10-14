@@ -36,6 +36,9 @@
  *   - deleteOwnerCascade(db, name) — agents + GHIIs through the cascade, then the owner-level tables
  * @usage Called by identityMethods.deleteOwner inside one db.transaction().
  * @version-history
+ *   v1.18.0 — 2026-10-14 — deleteOwnerCascade runs the 28 identity columns left undecided through
+ *     eraseAccountRecordsDb (account-records-erasure.ts): deleted with the account, or kept under the
+ *     erasure's pseudonym (QA audit 2026-10-14, K3).
  *   v1.17.0 — 2026-10-10 — deleteOwnerCascade deletes the OTK rows stored under the bare account name
  *     (secaudit 2026-10-10 C0).
  *   v1.16.0 — 2026-10-05 — deleteOwner gives the classification audit rows where the person was the
@@ -97,6 +100,7 @@ import type { DB } from '../db-types.js';
 import { pseudonymiseTallyWriterDb } from './memory-tally.js';
 import { erasedPartyPseudonym, partyIdentities, erasedAccountParty } from '../../../erased-party.js';
 import { pseudonymiseLedgerPartyDb, settleErasedPartyWorkDb } from './work-ledger-erasure.js';
+import { eraseAccountRecordsDb } from './account-records-erasure.js';
 import {
   cascadeDeleteIdentityData, deleteInstalledCortexesDb, deleteEcosystemAppsDb, deleteAccountCredentialsDb,
 } from './identity-erasure.js';
@@ -244,6 +248,10 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
   // So do the other side's ledger lines: the person's own went with the passes above, and the lines
   // in other people's ledgers name them by the same pseudonym.
   await pseudonymiseLedgerPartyDb(db, erasedAccountParty(name, ghiis.map(g => g.ghii), pseudonym, actors));
+  // The 28 identity columns the cascade left as they were: the person's own rows go, and the rows
+  // somebody else or the law keeps name them by the same pseudonym (../../../erased-account-records.ts;
+  // QA audit 2026-10-14, K3).
+  await eraseAccountRecordsDb(db, name, ghiis.map(g => g.ghii), actors, pseudonym);
 
   await db.deleteFrom('Ghii').where('ownerName', '=', name).execute();
 

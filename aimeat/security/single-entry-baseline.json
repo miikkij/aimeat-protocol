@@ -356,18 +356,10 @@
         "why": "UNREVIEWED"
       },
       "src/routes/agent-messages.ts": {
-        "count": 2,
+        "count": 1,
         "why": "UNREVIEWED"
       },
       "src/routes/agent-skill-bundle.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/agent-telemetry.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/agent-webhook.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

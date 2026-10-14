@@ -13024,6 +13024,16 @@ paths:
                             properties:
                               memories:
                                 type: integer
+                              memories_failed:
+                                type: array
+                                description: Records the memory write rules refused (the same rules POST /v1/memory applies), each with the reason. The rest of the bundle is imported.
+                                items:
+                                  type: object
+                                  properties:
+                                    key:
+                                      type: string
+                                    reason:
+                                      type: string
                               actions:
                                 type: integer
                           private_key:

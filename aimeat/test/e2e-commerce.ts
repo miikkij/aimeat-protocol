@@ -189,6 +189,26 @@ await test('4. PATCH items → quantity 1, pacing re-quoted', async () => {
     assert(r.status === 200 && r.body.data.session.pacingMorsels === PRICE, `patch ${r.status}: ${JSON.stringify(r.body.data?.session)}`);
 });
 
+// QA audit 2026-10-14, K4 (S8-01): the session record is what completion charges from, so no memory
+// route writes it, for the buyer in person either. It was a key the buyer's own session could write.
+await test('4b. The checkout session record is the node\'s own: the buyer cannot write it through the memory routes', async () => {
+    const key = `commerce.session.${sessionId}`;
+    const post = await json('/v1/memory', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ key, value: { id: sessionId, status: 'open', items: [] }, visibility: 'owner' }),
+    });
+    assert(post.status >= 400 && post.body.error?.code === 'RESERVED_KEY', `POST: ${post.status} ${post.body.error?.code}`);
+    const put = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+        method: 'PUT', headers: auth(buyer.token), body: JSON.stringify({ value: { id: sessionId, items: [] }, version: 1 }),
+    });
+    assert(put.status >= 400, `PUT: ${put.status} ${put.body.error?.code}`);
+    const del = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: auth(buyer.token) });
+    assert(del.status >= 400, `DELETE: ${del.status} ${del.body.error?.code}`);
+    const still = await json(`/v1/commerce/checkout-sessions/${sessionId}`, { headers: auth(buyer.token) });
+    assert(still.status === 200 && still.body.data.session.pacingMorsels === PRICE && still.body.data.session.items.length === 1,
+        `the session is unchanged: ${JSON.stringify(still.body.data?.session)}`);
+});
+
 await test('5. Complete → pacing charged and split, fulfillment TASK queued for the seller agent', async () => {
     const buyerBefore = await balance(buyer.token);
     const sellerBefore = await balance(seller.token);
@@ -233,6 +253,29 @@ await test('7. Not enough morsels for the pacing → 402, session stays open for
     assert(await balance(buyer.token) === before, 'a refused use moves no morsels');
     const back = await json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyer.token) });
     assert(back.body.data.session.status === 'open', 'session still open after a failed charge');
+});
+
+// QA audit 2026-10-14, K4: completion compares the quote with the live price before it charges.
+await test('7b. A price the seller changed after the quote is refused (409 PRICE_CHANGED), nothing is charged, the session stays open', async () => {
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc', quantity: 1 }] }),
+    });
+    assert(create.status === 201, `create ${create.status}`);
+    const id = create.body.data.session.id;
+    const raised = BASE_OFFERS.map(o => o.id === 'translate-doc' ? { ...o, tollMorsels: (o.tollMorsels ?? 0) + 1 } : o);
+    const pub = await json('/v1/agents/vendor/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ offers: raised }) });
+    assert(pub.status === 200, `raise the price ${pub.status}`);
+    try {
+        const before = await balance(buyer.token);
+        const r = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+        assert(r.status === 409 && r.body.error?.code === 'PRICE_CHANGED', `expected 409 PRICE_CHANGED, got ${r.status} ${r.body.error?.code}`);
+        assert(await balance(buyer.token) === before, 'a refused completion moves no morsels');
+        const back = await json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyer.token) });
+        assert(back.body.data.session.status === 'open', 'the session stays open for a new quote');
+    } finally {
+        await json('/v1/agents/vendor/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ offers: BASE_OFFERS }) });
+    }
 });
 
 await test('8. Unknown offer → 404; private offer cross-owner → 403; unpriced → 422', async () => {
