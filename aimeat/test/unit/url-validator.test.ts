@@ -44,6 +44,26 @@ describe('validateOutboundUrl — blocked literal addresses', () => {
         });
     }
 
+    // An IPv6 literal is refused by the literal check, before any name lookup, so the answer is the
+    // same on every operating system. URL.hostname keeps the brackets, the check compared the bracketed
+    // string, and the lookup then decided: Windows resolved it ("Resolved to IPv6 loopback"), Linux
+    // refused it ("DNS resolution failed"), and a test pinning one wording was red in CI only
+    // (QA audit 2026-10-14, CI1).
+    const literal: Array<[string, string]> = [
+        ['http://[::1]/', 'IPv6 loopback'],
+        ['http://[fe80::1]/', 'IPv6 link-local (fe80::/10)'],
+        ['http://[fd00::1]/', 'IPv6 unique-local (fc00::/7)'],
+        ['http://[::ffff:127.0.0.1]/', 'Loopback address'],
+        ['http://[::ffff:192.168.1.1]/', 'Private (192.168/16) address'],
+    ];
+    for (const [url, reason] of literal) {
+        it(`refuses ${url} by its literal address, not by a lookup`, async () => {
+            const r = await validateOutboundUrl(url);
+            expect(r.valid).toBe(false);
+            expect(r.reason).toBe(reason);
+        });
+    }
+
     it('blocks non-http(s) protocols', async () => {
         expect((await validateOutboundUrl('file:///etc/passwd')).valid).toBe(false);
         expect((await validateOutboundUrl('gopher://127.0.0.1/')).valid).toBe(false);
