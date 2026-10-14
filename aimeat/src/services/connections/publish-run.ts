@@ -172,6 +172,8 @@ export async function runOwnPublish(
     caption: input.caption,
     params: gate.params,
     file,
+    // Instagram fetches the file from an address; the node's own is where it serves it.
+    publicBase: ctx.config.baseUrl,
   });
 
   if (outcome.ok) {

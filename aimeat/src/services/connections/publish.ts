@@ -20,6 +20,10 @@
  * @structure PublishRecipe · publishToProvider · mastodonPublish · blueskyPost · youtubeUpload · linkedinPost
  * @usage import { publishToProvider } from './publish.js';
  * @version-history
+ *   v1.3.0 — 2026-10-15 — Mastodon posts text with no file (it refused one until now). Facebook Page,
+ *     Instagram and Reddit recipes join from publish-social.ts, and X takes `params.format` 'article'
+ *     or 'thread' (publish-x-long.ts). PublishInput carries `publicBase` for a provider that fetches
+ *     the file from an address (Instagram).
  *   v1.0.0 — 2026-08-02 — TARGET-057 phase 7b. Mastodon video, Bluesky text, YouTube resumable.
  *   v1.2.0 — 2026-08-02 — X text posts. Billing refusal is kept distinct from content refusal.
  *   v1.1.0 — 2026-08-02 — LinkedIn text + image. Escapes their little-text markup; a video is
@@ -28,33 +32,13 @@
 
 import { safeFetch } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';
-import type { ConnectionCredential, ConnectionRecord } from '../../models/connection-schemas.js';
-import type { OutboundProvider } from './providers.js';
+import { SOCIAL_RECIPES } from './publish-social.js';
+import { xLongForm } from './publish-x-long.js';
+import type { PublishInput, PublishOutcome, PublishRecipe } from './publish-types.js';
 
-/** What a recipe is handed. `params` already has the delegation's fixed values layered on top. */
-export interface PublishInput {
-  /** The provider descriptor, so a recipe reads its own endpoints instead of being handed them. */
-  provider: OutboundProvider;
-  connection: ConnectionRecord;
-  credential: ConnectionCredential;
-  caption: string;
-  params: Record<string, unknown>;
-  file: { bytes: Buffer; mimeType: string; name: string } | null;
-}
-
-export type PublishOutcome =
-  | { ok: true; externalRef: string }
-  | {
-    ok: false;
-    /**
-     * True when the provider refused the CONTENT or the grant — retrying changes nothing and the
-     * owner has to act. False for anything transport-shaped, which is worth another attempt.
-     */
-    permanent: boolean;
-    reason: string;
-  };
-
-export type PublishRecipe = (input: PublishInput) => Promise<PublishOutcome>;
+// The recipe interface lives in publish-types.ts since 2026-10-15; re-exported so every import of
+// it from this file keeps working.
+export type { PublishInput, PublishOutcome, PublishRecipe };
 
 /** Read a param the app or the delegation supplied, as a string. */
 function str(params: Record<string, unknown>, key: string, fallback = ''): string {
@@ -83,8 +67,13 @@ async function providerSaid(res: Response): Promise<string> {
 const mastodonPublish: PublishRecipe = async (input) => {
   const base = input.connection.instance;
   if (!base) return { ok: false, permanent: true, reason: 'this Mastodon connection has no instance' };
-  if (!input.file) return { ok: false, permanent: true, reason: 'Mastodon needs a file to attach' };
   const auth = { Authorization: `Bearer ${input.credential.accessToken}` };
+  // A text post is a status with no media. Until 2026-10-15 this refused one, so a Mastodon channel
+  // could carry a video and never a sentence, which is most of what a social desk sends.
+  if (!input.file) {
+    if (!input.caption.trim()) return { ok: false, permanent: true, reason: 'Mastodon will not take an empty post' };
+    return mastodonStatus(base, auth, input.caption, input.params, null);
+  }
 
   let mediaId: string;
   try {
@@ -120,15 +109,22 @@ const mastodonPublish: PublishRecipe = async (input) => {
   } catch (err) {
     return { ok: false, permanent: false, reason: `could not reach the instance: ${(err as Error).message}` };
   }
+  return mastodonStatus(base, auth, input.caption, input.params, mediaId);
+};
 
+/** Post the status itself, with the uploaded medium when there is one. */
+async function mastodonStatus(
+  base: string, auth: Record<string, string>, caption: string, params: Record<string, unknown>,
+  mediaId: string | null,
+): Promise<PublishOutcome> {
   try {
     const body = new URLSearchParams({
-      status: input.caption,
+      status: caption,
       // The delegation's fixed value wins; `unlisted` is the safer default for something posted by
       // machinery rather than by a person sitting there.
-      visibility: str(input.params, 'visibility', 'unlisted'),
+      visibility: str(params, 'visibility', 'unlisted'),
     });
-    body.append('media_ids[]', mediaId);
+    if (mediaId) body.append('media_ids[]', mediaId);
     const res = await safeFetch(`${base}/api/v1/statuses`, {
       method: 'POST',
       headers: { ...auth, 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -139,13 +135,13 @@ const mastodonPublish: PublishRecipe = async (input) => {
       return { ok: false, permanent: res.status === 422 || res.status === 401, reason: `posting failed (HTTP ${res.status}): ${await providerSaid(res)}` };
     }
     const j = await res.json() as { url?: unknown; id?: unknown };
-    return { ok: true, externalRef: typeof j.url === 'string' ? j.url : String(j.id ?? mediaId) };
+    return { ok: true, externalRef: typeof j.url === 'string' ? j.url : String(j.id ?? mediaId ?? '') };
   } catch (err) {
     // The MEDIA is uploaded at this point and the status is not. Temporary, so a retry re-posts —
     // and the idempotency key is what stops that retry becoming a second post.
     return { ok: false, permanent: false, reason: `could not post the status: ${(err as Error).message}` };
   }
-};
+}
 
 /**
  * Bluesky: a text post.
@@ -502,6 +498,9 @@ const xPost: PublishRecipe = async (input) => {
   const { credential, connection, caption } = input;
   const token = credential.accessToken;
   if (!token) return { ok: false, permanent: true, reason: 'no access token on this connection' };
+  // An article or a thread is the long form, in publish-x-long.ts.
+  const format = str(input.params, 'format');
+  if (format === 'article' || format === 'thread') return xLongForm(input, format);
   if (input.file) {
     return {
       ok: false,
@@ -557,6 +556,7 @@ const RECIPES: Record<string, PublishRecipe> = {
   youtube: youtubeUpload,
   linkedin: linkedinPost,
   x: xPost,
+  ...SOCIAL_RECIPES,
   fake: fakePublish,
   'fake-static': fakePublish,
 };

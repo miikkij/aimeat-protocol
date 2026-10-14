@@ -25,6 +25,8 @@
  *   to who may publish at all
  * @usage cd aimeat && node --import tsx test/e2e-publish-upstreams.ts
  * @version-history
+ *   v1.0.2 — 2026-10-15 — Mastodon with no file now posts the text (the source was the gap: a text
+ *     status was refused); the refusal case became a publish case.
  *   v1.0.1 — 2026-10-09 — A round starts as the owner's browser does and finishes with its cookie
  *     (secrets audit 2026-10-09, chapter 2).
  *   v1.0.0 — 2026-09-08 — Initial.
@@ -440,13 +442,16 @@ try {
       body: { connection_id: mastoConn, storage_key: 'pub/clip.mp4' },
       code: 'PUBLISH_FAILED', says: /posting failed \(HTTP 500\)/,
     },
-    {
-      name: 'Mastodon with no file at all says what it needs',
-      arm: () => { /* nothing to arm: the absence IS the case */ },
-      body: { connection_id: mastoConn },
-      code: 'REJECTED', says: /needs a file to attach/,
-    },
   ]);
+  // Until 2026-10-15 a Mastodon publish with no file was refused ("needs a file to attach"), so a
+  // channel could carry a video and never a sentence. A text status is a status with no media; the
+  // text-only publish and its refusal for an EMPTY text are in e2e-connections-social.ts phase 8.
+  await test('Mastodon with no file posts the text as a status with no media', async () => {
+    const r = await publish({ connection_id: mastoConn, caption: caption('mastodon words only') });
+    assert(r.status === 200 && r.data.data.attempt.status === 'done', `${r.status} ${JSON.stringify(r.data?.error)}`);
+    const form = new URLSearchParams(lastUpstream((c) => c.path === '/api/v1/statuses').body);
+    assert(!form.has('media_ids[]'), `a medium was named: ${form.get('media_ids[]')}`);
+  });
 
   console.log('\nPhase 4 — Mastodon: reading the numbers back');
   await test("the instance's own counts become a sample, and impressions stay null", async () => {

@@ -38,6 +38,8 @@
  *     tone its meaning names: more for "show all" and more of a list, back, text for a plain grey
  *     word, quiet (Jouni's decisions "Action link", "Panel action", "Dismiss", "Small link", "Step
  *     button").
+ *   2026-10-15 -- Facebook, Instagram and Reddit get their before-you-connect notes, and Facebook a
+ *     page-name field that becomes the start's `account` (which page, when the person manages several).
  *   2026-09-25 -- The lines that say a list is empty (or has nothing to show yet) are the quiet sentence (.poster-quiet, QuietNote), a unification: Jouni's decision "Empty line".
  *   v1.0.0 — 2026-08-02 — Initial (TARGET-057 phase 3).
  *   v1.1.0 — 2026-08-02 — Bring your own app, per service. Closed by default: it is the
@@ -65,7 +67,13 @@ const NOTES = {
   bluesky: ['cxNoteBlueskyNeeds', 'cxNoteBlueskyWhere', 'cxNoteBlueskyBefore'],
   linkedin: ['cxNoteLinkedinBefore'],
   x: ['cxNoteXBefore'],
+  facebook: ['cxNoteFacebookBefore'],
+  instagram: ['cxNoteInstagramBefore'],
+  reddit: ['cxNoteRedditBefore'],
 };
+
+/** Providers whose one sign-in reaches several accounts, so the person names the one they mean. */
+const NAMES_AN_ACCOUNT = new Set(['facebook']);
 
 /**
  * @param {{ showToast: Function, inRow?: boolean }} props `inRow`: the section stands inside a page
@@ -181,7 +189,9 @@ export function ConnectionsSection({ showToast, inRow }) {
     try {
       const res = await apiPost('/v1/connections/start', {
         provider: provider.id,
-        instance: instances[provider.id] || undefined,
+        instance: provider.instanceScoped ? (instances[provider.id] || undefined) : undefined,
+        // Which page, for a provider whose sign-in reaches several (Facebook). Same field, other meaning.
+        account: NAMES_AN_ACCOUNT.has(provider.id) ? (instances[provider.id] || undefined) : undefined,
         mode: 'personal',
         return_url: '/connection-done.html',
       });
@@ -384,6 +394,13 @@ export function ConnectionsSection({ showToast, inRow }) {
           <${TextField}
             placeholder=${t('profile.access.cxInstance') || 'instance address, e.g. mastodon.social'}
             ariaLabel=${t('profile.access.cxInstance') || 'instance address, e.g. mastodon.social'}
+            value=${instances[p.id] || ''}
+            onInput=${v => setInstances({ ...instances, [p.id]: v })} />
+        `}
+        ${NAMES_AN_ACCOUNT.has(p.id) && html`
+          <${TextField}
+            placeholder=${t('profile.access.cxPage') || 'page name (optional)'}
+            ariaLabel=${t('profile.access.cxPage') || 'page name (optional)'}
             value=${instances[p.id] || ''}
             onInput=${v => setInstances({ ...instances, [p.id]: v })} />
         `}

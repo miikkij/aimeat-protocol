@@ -23,6 +23,9 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.6.0 — 2026-10-15 — aimeat_connection_history (services/connections/history.ts
+ *     listPublishHistory) and aimeat_connection_replies (repliesForAttempt, failures through toolError);
+ *     aimeat_connection_start passes account (which Facebook Page) to startAuthorization.
  *   v1.5.0 — 2026-10-09 — aimeat_connection_start hands back the node's confirmation page, where the
  *     owner confirms the round in their own browser, never the provider's address (secrets audit
  *     2026-10-09, chapter 2).
@@ -58,6 +61,8 @@ import { listSendAsAliases } from '../services/connections/send-mail.js';
 import { listOwnConnections, requireOwnConnection } from '../services/connections/access.js';
 import { sendOutbound, OutboundError } from '../services/outbound/outbound-service.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { listPublishHistory, repliesForAttempt } from '../services/connections/history.js';
+import { toolError } from './tool-error.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -89,9 +94,8 @@ export function registerConnectionTools(
         return { config, storage, providers, key };
     };
 
-    const capabilityOff = (): string | null => config.connectionsEnabled
-        ? null
-        : 'Connecting outside accounts is switched off on this node (AIMEAT_CONNECTIONS_ENABLED). Whoever runs it can turn it on.';
+    const connectionsOffReason = 'Connecting outside accounts is switched off on this node (AIMEAT_CONNECTIONS_ENABLED). Whoever runs it can turn it on.';
+    const capabilityOff = (): string | null => config.connectionsEnabled ? null : connectionsOffReason;
 
     // ── Discovery ───────────────────────────────────────────────────────────────────────────────
 
@@ -121,7 +125,7 @@ export function registerConnectionTools(
     mcp.tool('aimeat_connection_start', descriptionFor('aimeat_connection_start'),
         zodShapeFor('aimeat_connection_start'),
         annotationsFor('aimeat_connection_start'),
-        async ({ provider, instance, return_url }): Promise<TextResult> => {
+        async ({ provider, instance, return_url, account }): Promise<TextResult> => {
             const off = capabilityOff();
             if (off) return fail(off);
             const c = ctx();
@@ -130,6 +134,9 @@ export function registerConnectionTools(
                 principal: principal(),
                 provider,
                 ...(instance ? { instance } : {}),
+                // Which Facebook Page, when the sign-in reaches several; the service only chooses
+                // among the pages the provider lists for this person.
+                ...(account ? { account } : {}),
                 // Personal: this account is the agent's own, not a channel shared with an app.
                 mode: 'personal',
                 returnUrl: return_url ?? '',
@@ -146,6 +153,40 @@ export function registerConnectionTools(
                 // by fetching the URL. A PERSON opens it, sees exactly what is being asked for, and
                 // approves it. The connection appears in aimeat_connection_list afterwards.
                 next: 'Give this address to your owner and ask them to open it. They sign in to this node, confirm, and approve it at the provider; nothing here can approve it for them. When they have, the connection shows up in aimeat_connection_list.',
+            });
+        });
+
+    // ── What was published, and what came back ──────────────────────────────────────────────────
+    //
+    // Both call services/connections/history.ts, the functions GET /v1/connections/attempts and
+    // POST /v1/connections/attempts/:id/replies call, so the ownership check is the same on every
+    // interface: an item of somebody else's answers NOT_FOUND like one that never existed.
+
+    mcp.tool('aimeat_connection_history', descriptionFor('aimeat_connection_history'),
+        zodShapeFor('aimeat_connection_history'),
+        annotationsFor('aimeat_connection_history'),
+        async ({ limit }): Promise<TextResult> => {
+            if (!config.connectionsEnabled) return toolError('CONNECTIONS_DISABLED', connectionsOffReason);
+            return ok({ attempts: await listPublishHistory(storage, principal(), limit ?? 50) });
+        });
+
+    mcp.tool('aimeat_connection_replies', descriptionFor('aimeat_connection_replies'),
+        zodShapeFor('aimeat_connection_replies'),
+        annotationsFor('aimeat_connection_replies'),
+        async ({ attempt_id, limit }): Promise<TextResult> => {
+            if (!config.connectionsEnabled) return toolError('CONNECTIONS_DISABLED', connectionsOffReason);
+            const c = ctx();
+            if ('error' in c) return toolError('NO_ENCRYPTION_KEY', c.error);
+            // Read from the provider now; nothing is stored. The route's 409 NOT_READABLE and 502
+            // REPLIES_UNAVAILABLE arrive here as the same codes.
+            const out = await repliesForAttempt(c, principal(), attempt_id, limit);
+            if (!out.ok) return toolError(out.code, out.reason);
+            // The same fields the REST route answers in `data`.
+            return ok({
+                attemptId: out.attemptId, provider: out.provider, url: out.url,
+                replies: out.replies, truncated: out.truncated,
+                ...(out.note ? { note: out.note } : {}),
+                fetchedAt: out.fetchedAt,
             });
         });
 

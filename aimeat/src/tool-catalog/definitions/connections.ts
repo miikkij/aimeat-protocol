@@ -6,6 +6,8 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-15 — aimeat_connection_history and aimeat_connection_replies; aimeat_connection_start takes
+ *     account (which Facebook Page).
  *   2026-10-09 — aimeat_connection_start says the address is the node's confirmation page (secrets audit 2026-10-09).
  *   2026-10-08 — aimeat_mail_send takes ai_provenance_id (aiprov D9).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -73,6 +75,38 @@ export const connectionTools = [
             provider: { type: 'string', required: true, description: "Which service, exactly as aimeat_connection_providers names it (e.g. 'google-mail')." },
             instance: { type: 'string', description: 'Only for a federated provider such as Mastodon: the server address.' },
             return_url: { type: 'string', description: 'Where the browser lands after the person approves.' },
+            account: { type: 'string', description: 'Only for Facebook: which Page, by its name or id, when you manage several; without it the only or first page is used.' },
+        },
+    },
+    {
+        name: 'aimeat_connection_history',
+        description: "What YOU have published through your connected accounts, newest first. Each item says its status (done, failed, rejected, held, queued or in_flight), where it landed (externalRef, the post's address at the provider), the account it went out through, and the latest metric sample this node took of it, or null when nobody has asked yet. The item id is what aimeat_connection_replies takes. Only your own publishes are listed, the same as aimeat_connection_list lists only your own accounts.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'What I Have Published', readOnlyHint: true },
+        // GET /v1/connections/attempts accepts connections:read or connections:use. A catalog scope list
+        // means EVERY word (types.ts ToolScope), so the any-of cannot be stated here; the read word is
+        // the one that names knowing what you have, as on aimeat_connection_list.
+        scope: 'connections:read',
+        surfaces: ['agent'],
+        input: {
+            limit: { type: 'number', description: 'How many, newest first. Default 50, max 200.', zod: z.number().int().min(1).max(200) },
+        },
+    },
+    {
+        name: 'aimeat_connection_replies',
+        description: "Read what people answered to one item you published, from aimeat_connection_history (its id is attempt_id). Works for Mastodon, Bluesky, YouTube, X, a Facebook Page, Instagram and Reddit; LinkedIn refuses by design, because it lets only select partners read the comments on a member's post. It reads from the provider NOW and stores nothing, so every call spends a request against the account's own rate limit. On X every read costs money, and X search reaches back only seven days. Call it when someone asks what people said, never on a loop or a schedule. Then judge the replies and tell the person what matters: the questions that need an answer, the criticism worth taking seriously, the overall tone. Do not paste them all back. NOT_READABLE means the platform will never allow it (LinkedIn, comments turned off, a deleted post); REPLIES_UNAVAILABLE means it may work later.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Read Replies to a Published Item', readOnlyHint: true, openWorldHint: true },
+        // POST /v1/connections/attempts/:id/replies accepts connections:use or connections:read-through.
+        // A catalog scope list means EVERY word, so the read-through word is named: reading what came
+        // back through a connection is what it governs.
+        scope: 'connections:read-through',
+        surfaces: ['agent'],
+        input: {
+            attempt_id: { type: 'string', required: true, description: 'The published item, the id from aimeat_connection_history.' },
+            limit: { type: 'number', description: 'How many replies at most. Default 100, max 200.', zod: z.number().int().min(1).max(200) },
         },
     },
     {

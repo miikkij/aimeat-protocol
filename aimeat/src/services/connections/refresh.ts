@@ -18,6 +18,9 @@
  * @structure ensureFreshCredential · revokeConnection
  * @usage import { ensureFreshCredential } from './refresh.js';
  * @version-history
+ *   v1.1.0 — 2026-10-15 — A provider may renew further ahead than five minutes (refreshSkewMs), and
+ *     Instagram renews by its own GET on the current token. Revocation sends the client in a Basic
+ *     header for a provider whose token endpoint wants it there (Reddit, X).
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1c.
  */
 
@@ -27,6 +30,7 @@ import { sealCredential, openCredential } from './credential.js';
 import { findProvider, tokenRequest } from './providers.js';
 import type { OutboundProvider } from './providers.js';
 import { mintSession } from './attach.js';
+import { renewInstagram } from './social-finish.js';
 import type { ConnectContext } from './oauth.js';
 import type { ConnectionCredential, ConnectionRecord } from '../../models/connection-schemas.js';
 
@@ -44,11 +48,13 @@ export type FreshResult =
   | { ok: true; credential: ConnectionCredential; connection: ConnectionRecord }
   | { ok: false; code: string; reason: string };
 
-function needsRefresh(c: ConnectionRecord): boolean {
+function needsRefresh(c: ConnectionRecord, providers: OutboundProvider[]): boolean {
   // null expiry is a provider that does not expire tokens, not an unknown. Treating it as expired
   // would refresh a Mastodon connection forever, using a refresh token it does not have.
   if (!c.expiresAt) return false;
-  return new Date(c.expiresAt).getTime() - Date.now() < REFRESH_SKEW_MS;
+  // A provider may renew further ahead than the default (Instagram: a week before its 60 days end).
+  const skew = findProvider(providers, c.provider)?.refreshSkewMs ?? REFRESH_SKEW_MS;
+  return new Date(c.expiresAt).getTime() - Date.now() < skew;
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -67,7 +73,7 @@ export async function ensureFreshCredential(
   if (!conn) return { ok: false, code: 'NOT_FOUND', reason: 'no such connection' };
   if (conn.status === 'revoked') return { ok: false, code: 'REVOKED', reason: 'this connection was revoked' };
 
-  if (!needsRefresh(conn)) {
+  if (!needsRefresh(conn, ctx.providers)) {
     const credential = openCredential(conn.credential, ctx.key);
     if (!credential) {
       // Unreadable ciphertext is a rotated key or a restored backup. The honest thing to tell the
@@ -89,7 +95,7 @@ export async function ensureFreshCredential(
       if (latest.status === 'needs_reauth') {
         return { ok: false, code: 'NEEDS_REAUTH', reason: latest.lastError ?? 'this account needs to be reconnected' };
       }
-      if (!needsRefresh(latest)) {
+      if (!needsRefresh(latest, ctx.providers)) {
         const credential = openCredential(latest.credential, ctx.key);
         if (!credential) return { ok: false, code: 'UNREADABLE', reason: 'stored credential cannot be read' };
         return { ok: true, credential, connection: latest };
@@ -102,7 +108,7 @@ export async function ensureFreshCredential(
     // Re-read under the claim: the winner may have been queued behind a refresh that already
     // finished, and refreshing again would burn a token that was just issued.
     conn = (await ctx.storage.getConnection(conn.id)) ?? conn;
-    if (!needsRefresh(conn)) {
+    if (!needsRefresh(conn, ctx.providers)) {
       const credential = openCredential(conn.credential, ctx.key);
       if (!credential) return { ok: false, code: 'UNREADABLE', reason: 'stored credential cannot be read' };
       return { ok: true, credential, connection: conn };
@@ -173,6 +179,11 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
   // credential whose refresh token is gone can still be re-minted from the stored secret, and
   // checking for a refresh token first would park exactly the connection that has a second chance.
   if (current.shape === 'session') return refreshSession(ctx, conn, current);
+
+  // Instagram renews by presenting the CURRENT token to its own GET; there is no refresh token.
+  // Before the guard below for the same reason as the session branch: it has a way to renew that
+  // the refresh-token check would not see.
+  if (provider.id === 'instagram') return refreshInstagram(ctx, conn, current);
 
   if (!current.refreshToken) {
     // An expiring token with no way to renew it. Google does this when access_type=offline was
@@ -320,6 +331,42 @@ async function refreshSession(
 }
 
 /**
+ * Renew an Instagram connection's 60-day token. A refused renewal is a reconnect only when Meta
+ * refused the token itself (4xx); a network failure leaves the connection alone, so the next use
+ * tries again while the old token is still valid.
+ */
+async function refreshInstagram(
+  ctx: ConnectContext, conn: ConnectionRecord, current: ConnectionCredential,
+): Promise<FreshResult> {
+  let out: Awaited<ReturnType<typeof renewInstagram>>;
+  try {
+    out = await renewInstagram(current.accessToken);
+  } catch (err) {
+    return { ok: false, code: 'REFRESH_UNREACHABLE', reason: `could not reach Instagram: ${(err as Error).message}` };
+  }
+  if (!out.ok) {
+    // An expired token cannot be renewed at all; one still inside its 60 days keeps working, so a
+    // refusal while it is valid is reported without parking the connection.
+    const expired = conn.expiresAt ? new Date(conn.expiresAt).getTime() <= Date.now() : false;
+    if (out.status >= 400 && out.status < 500 && expired) {
+      await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', out.reason);
+      return { ok: false, code: 'NEEDS_REAUTH', reason: 'this Instagram account needs to be connected again' };
+    }
+    if (!expired) {
+      logger.warn('connections: Instagram renewal refused; the current token is still valid', {
+        connectionId: conn.id, reason: out.reason,
+      });
+      return { ok: true, credential: current, connection: conn };
+    }
+    return { ok: false, code: 'REFRESH_FAILED', reason: out.reason };
+  }
+  const next: ConnectionCredential = { ...current, accessToken: out.accessToken };
+  await ctx.storage.updateConnectionCredential(conn.id, sealCredential(next, ctx.key), out.expiresAt);
+  const updated = await ctx.storage.getConnection(conn.id);
+  return { ok: true, credential: next, connection: updated ?? conn };
+}
+
+/**
  * Revoke: tell the provider first where it offers a way to be told, then drop the credential.
  *
  * The provider call is best-effort and its failure does NOT stop the local removal. An owner who
@@ -351,9 +398,18 @@ export async function revokeConnection(
         body.set('client_id', provider.client.id);
         body.set('client_secret', provider.client.secret);
       }
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/x-www-form-urlencoded', ...(provider?.tokenHeaders ?? {}),
+      };
+      // A provider that wants its secret in a Basic header at the token endpoint wants it there at
+      // the revocation endpoint too (Reddit, X); in the body it is a 401 and the token stays live.
+      if (provider?.tokenAuth === 'basic' && provider.client) {
+        headers.Authorization = `Basic ${Buffer.from(`${provider.client.id}:${provider.client.secret}`).toString('base64')}`;
+        if (credential.refreshToken) body.set('token_type_hint', 'refresh_token');
+      }
       const r = await safeFetch(revokeUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers,
         body: body.toString(),
         signal: AbortSignal.timeout(10_000),
       });

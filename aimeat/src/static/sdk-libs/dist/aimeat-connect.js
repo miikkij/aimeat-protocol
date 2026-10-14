@@ -276,7 +276,7 @@
         new Error(res.error && (res.error.message || res.error.code) || fallback)
       );
       err.code = code;
-      err.permanent = code === "NOT_MEASURABLE" || code === "REJECTED";
+      err.permanent = code === "NOT_MEASURABLE" || code === "NOT_READABLE" || code === "REJECTED";
       err.envelope = res;
       throw err;
     }
@@ -323,10 +323,12 @@
       provider: id,
       readMail: has("read-mail"),
       sendMail: has("send-mail"),
-      publish: has("publish-post") || has("publish-video"),
+      publish: has("publish-post") || has("publish-image") || has("publish-video"),
       publishPost: has("publish-post"),
+      publishImage: has("publish-image"),
       publishVideo: has("publish-video"),
       readMetrics: has("read-metrics"),
+      readReplies: has("read-replies"),
       readItems: has("read-items"),
       names: names.slice()
     };
@@ -364,6 +366,22 @@
   async function series(attemptId) {
     const res = await authFetch2(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`);
     return must(res, "could not read the series").samples ?? [];
+  }
+  async function replies(attemptId, opts = {}) {
+    const res = await authFetch2(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/replies`, {
+      method: "POST",
+      body: JSON.stringify(opts.limit ? { limit: opts.limit } : {})
+    });
+    const d = must(res, "the replies could not be read");
+    return {
+      attemptId: d.attemptId ?? attemptId,
+      provider: d.provider ?? "",
+      url: d.url ?? "",
+      replies: d.replies ?? [],
+      truncated: Boolean(d.truncated),
+      ...d.note ? { note: d.note } : {},
+      fetchedAt: d.fetchedAt ?? ""
+    };
   }
   async function clients() {
     return must(await authFetch2("/v1/connections/clients"), "could not read your apps").clients ?? [];
@@ -480,6 +498,7 @@
     history,
     measure,
     series,
+    replies,
     /** Per-provider things a user must be told BEFORE they try. See notes.js. */
     notes: PROVIDER_NOTES,
     /** Mount the ready-made panel. See panel.js. */

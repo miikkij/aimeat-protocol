@@ -29,6 +29,8 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.9.0 — 2026-10-15 — POST /start takes `account` (which Facebook Page), and the delegated
+ *     publish hands the recipe the node's public address for a provider that fetches the file.
  *   v1.8.0 — 2026-10-09 — POST /start binds the round to the owner's browser when the owner starts it
  *     from a page of this node (an httpOnly SameSite=Lax cookie on the callback path); any other
  *     caller gets the node's confirmation page as authorize_url, with owner_confirms: true. The
@@ -85,6 +87,7 @@ import { quotaStatus, openPublish } from '../services/connections/publish-gate.j
 import { publishToProvider } from '../services/connections/publish.js';
 import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
 import { runOwnPublish } from '../services/connections/publish-run.js';
+import { listPublishHistory } from '../services/connections/history.js';
 import { readerFor } from '../services/classification/reader.js';
 import { fileTarget } from '../services/classification/labels.js';
 import type { ConnectionMode, ModerationMode } from '../models/connection-schemas.js';
@@ -150,34 +153,8 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
     const limit = Math.min(Number(req.query.limit) || 50, 200);
-
-    const attempts = (await storage.listPublishAttempts({ publisher: principal })).slice(0, limit);
-    // One lookup for every row on the page rather than one per row: an N+1 here is a history view
-    // that takes a second to open and gets blamed on the network.
-    const [metrics, connections] = await Promise.all([
-      storage.latestPublishMetrics(attempts.map(a => a.id)),
-      storage.listConnections({ principal }),
-    ]);
-    const byId = new Map(connections.map(c => [c.id, c]));
-
-    const items = attempts.map(a => {
-      const c = byId.get(a.connectionId);
-      return {
-        id: a.id,
-        connectionId: a.connectionId,
-        // A connection that has since been disconnected leaves its history behind. Saying
-        // "(disconnected)" beats a blank where an account name should be.
-        provider: c?.provider ?? 'unknown',
-        accountLabel: c?.accountLabel ?? '(disconnected)',
-        status: a.status,
-        externalRef: a.externalRef,
-        storageKey: a.storageKey,
-        error: a.error,
-        createdAt: a.createdAt,
-        latest: metrics.get(a.id) ?? null,
-      };
-    });
-    res.json(success(config.nodeId, { attempts: items }));
+    // services/connections/history.ts, which the MCP door calls too (2026-10-15).
+    res.json(success(config.nodeId, { attempts: await listPublishHistory(storage, principal, limit) }));
   });
 
   /** One item's whole series, oldest first, so a curve can be drawn rather than a single number. */
@@ -396,6 +373,8 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       principal: resolve(req),
       provider,
       instance: str(req.body?.instance) || undefined,
+      // Which page, for a provider whose one sign-in reaches several (Facebook).
+      account: str(req.body?.account) || undefined,
       mode,
       returnUrl: str(req.body?.return_url),
       ...(inBrowser ? { bindBrowser: (state: string, ttl: number) => issueRoundBinding(req, res, state, connectCallbackPath(config), ttl) } : {}),
@@ -576,6 +555,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       caption,
       params: gate.params,
       file,
+      publicBase: config.baseUrl,
     });
 
     if (outcome.ok) {

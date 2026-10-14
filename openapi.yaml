@@ -5235,6 +5235,43 @@ components:
             - $ref: '#/components/schemas/PublishMetricSample'
           nullable: true
           description: Null means nobody has asked for a reading. It does not mean zero engagement.
+    ConnectionReply:
+      type: object
+      description: >
+        One answer somebody wrote to a published item, in one shape for every network (Mastodon,
+        Bluesky, YouTube, X, a Facebook Page, Instagram, Reddit). Read from the provider when asked
+        and never stored on this node.
+      required: [id, author, authorHandle, text, createdAt, url, parentId, likes]
+      properties:
+        id:
+          type: string
+          description: The provider's own id for the reply.
+        author:
+          type: string
+          description: The name the writer shows.
+        authorHandle:
+          type: string
+          nullable: true
+          description: The writer's handle where the network has one (`@name@instance`, `name.bsky.social`, `u/name`).
+        text:
+          type: string
+          description: Plain text. HTML is stripped and entities are decoded.
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        url:
+          type: string
+          nullable: true
+          description: Where a person opens the reply.
+        parentId:
+          type: string
+          nullable: true
+          description: The reply this one answers. Null for a reply to the post itself.
+        likes:
+          type: integer
+          nullable: true
+          description: Likes, favourites or score as the network reports it. Null when it does not report one.
     PublicConnection:
       type: object
       description: >
@@ -59173,8 +59210,14 @@ paths:
                                 capabilities:
                                   type: array
                                   description: >
-                                    The vocabulary an app may ask in: publish-post, publish-video,
-                                    read-metrics. read-metrics is present only where a reader can
+                                    The vocabulary an app may ask in: publish-post, publish-image,
+                                    publish-video, read-metrics, read-replies, and read-mail and
+                                    send-mail for a mailbox. publish-image is Instagram's, which
+                                    takes no text-only post. read-replies is present where
+                                    POST /v1/connections/attempts/{id}/replies can return what
+                                    people answered (Mastodon, Bluesky, YouTube, X, Facebook,
+                                    Instagram, Reddit), and absent on LinkedIn, which lets only
+                                    select partners read comments. read-metrics is present only where a reader can
                                     actually return numbers - LinkedIn publishes and cannot report at
                                     the Consumer tier, so it carries publish-post alone. An app that
                                     cannot ask this has to find out by calling, which spends a request
@@ -59941,6 +59984,13 @@ paths:
                 return_url:
                   type: string
                   description: Same-origin path to return to. An absolute URL is ignored.
+                account:
+                  type: string
+                  maxLength: 200
+                  description: >
+                    Only for Facebook: which Page, by its name or id, when the person manages
+                    several. Without it the only or first page is used. It only chooses among the
+                    pages the provider lists for this person and is never trusted as an identity.
       responses:
         '200':
           description: Authorization started
@@ -60392,7 +60442,8 @@ paths:
 
 
         Accepts `connections:use` as well as `connections:read`, because an app that may publish has
-        to be able to see what it published.
+        to be able to see what it published. The MCP tool is aimeat_connection_history; an item's id
+        is what POST /v1/connections/attempts/{id}/replies takes.
       tags: [Connections]
       security:
         - BearerAuth: []
@@ -60658,6 +60709,152 @@ paths:
         '502':
           description: >
             METRICS_UNAVAILABLE. Transport-shaped, or a spent credit balance. Worth trying again.
+  /v1/connections/attempts/{id}/replies:
+    post:
+      operationId: readPublishReplies
+      summary: Read what people answered to an item you published, now
+      description: >
+        Reads the replies from the provider at the moment of the call, in one shape for every
+        network (ConnectionReply). Nothing is stored on this node. A POST because it has effects:
+        it spends a request against the account's rate limit, and on X every read costs money and
+        search reaches back only seven days. Nothing on this node schedules it.
+
+
+        Works where the provider lists `read-replies` (Mastodon, Bluesky, YouTube, X, a Facebook
+        Page, Instagram, Reddit). LinkedIn answers 409 NOT_READABLE by design.
+
+
+        Accepts `connections:use` or `connections:read-through`. The MCP tool is
+        aimeat_connection_replies.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The published item, an id from GET /v1/connections/attempts.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: How many replies at most. The body field wins when both are given.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit:
+                  type: integer
+                  minimum: 1
+                  maximum: 200
+                  default: 100
+                  description: How many replies at most.
+      responses:
+        '200':
+          description: The replies as the provider holds them now.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [attemptId, provider, url, replies, truncated, fetchedAt]
+                        properties:
+                          attemptId:
+                            type: string
+                          provider:
+                            type: string
+                            example: mastodon
+                          url:
+                            type: string
+                            description: The item's own address at the provider (its externalRef).
+                          replies:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ConnectionReply'
+                          truncated:
+                            type: boolean
+                            description: True when the provider held more replies than were read.
+                          note:
+                            type: string
+                            description: What the caller should know about this read, such as X's seven-day search window.
+                          fetchedAt:
+                            type: string
+                            format: date-time
+                            description: When this node asked.
+        '400':
+          description: >
+            NOT_PUBLISHED (the item was never published, so nobody could answer it), PROVIDER_GONE,
+            or a credential that needs reconnecting.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The token holds neither connections:use nor connections:read-through.
+        '404':
+          description: >
+            NOT_FOUND. No such published item of yours, or the account it went to is gone. Someone
+            else's item is this same 404.
+        '409':
+          description: >
+            NOT_READABLE. The platform will never allow this read: LinkedIn, comments turned off, or
+            a deleted post. Retrying will not help.
+        '502':
+          description: >
+            REPLIES_UNAVAILABLE. The provider could not be read now. Worth trying again later.
+        '503':
+          description: >
+            CONNECTIONS_DISABLED (outbound connections are off on this node) or NO_ENCRYPTION_KEY
+            (the node cannot open a stored credential).
+  /v1/connections/media/{token}/{name}:
+    get:
+      operationId: getHandedOffMedia
+      summary: The bytes of a file a publish is handing to a provider
+      description: >
+        Serves the file a publish is passing to a provider that FETCHES media from an address
+        rather than taking an upload (Instagram). It answers for fifteen minutes under a random
+        256-bit token, and stops answering when the publish ends. Unauthenticated by necessity,
+        because the provider's servers make the request. The file is one about to be published to
+        the world and has passed the classification check already. Never cached.
+      tags: [Connections]
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          required: true
+          description: The file name, so the provider sees a familiar extension.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The file's bytes, with its own content type.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: NOT_FOUND. Nothing is held at this address, or the fifteen minutes have passed.
   /v1/connections/callback:
     get:
       operationId: connectionCallback
