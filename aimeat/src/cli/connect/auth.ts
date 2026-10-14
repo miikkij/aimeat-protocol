@@ -24,6 +24,7 @@
  * @version-history v1.9.20 -- 2026-05-28 -- Move Hello Integration instruction into shared onboarding-prompt.ts to remove duplication with skill-bundle.ts.
  * @version-history v2.0.0 -- 2026-05-29 -- Write per-agent config alongside token + token table; mark first agent as primary so multi-agent serve has a sensible default.
  * @version-history v2.1.0 -- 2026-09-30 -- `--scopes a,b,c`: the permissions the agent asks for go into the device authorization request.
+ * @version-history v2.1.1 -- 2026-10-14 -- Print the approval address with the user code (approvalUrl); the bare verification_uri opened the consent page on "Missing code parameter".
  */
 import { AimeatClient } from './api-client.js';
 import { storeToken, getToken, listAllTokens } from './keychain.js';
@@ -75,6 +76,18 @@ export function ownerHandleFrom(tokenData: DeviceTokenResponse, cliOwner: string
   if (fromGaii) return fromGaii[1];
   if (typeof tokenData.owner === 'string' && tokenData.owner && !tokenData.owner.includes('@')) return tokenData.owner;
   return cliOwner.includes('@') ? cliOwner.split('@')[0] : cliOwner;
+}
+
+/**
+ * The address the owner opens to approve the agent. The consent page at /v1/agents/verify reads the
+ * user code from `?code=` and shows only an error without it, so the bare `verification_uri` is never
+ * printed. The node sends `verification_uri_complete`; when it does not, the code is added here.
+ */
+export function approvalUrl(d: { user_code: string; verification_uri: string; verification_uri_complete?: string }): string {
+  if (d.verification_uri_complete) return d.verification_uri_complete;
+  const url = new URL(d.verification_uri);
+  url.searchParams.set('code', d.user_code);
+  return url.toString();
 }
 
 interface OAuthErrorResponse {
@@ -295,11 +308,12 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     device_code: string;
     user_code: string;
     verification_uri: string;
+    verification_uri_complete?: string;
     interval: number;
   };
 
   s.stop(`Verification code: ${authData.user_code}`);
-  info(`Open ${authData.verification_uri} to approve.`);
+  info(`Open ${approvalUrl(authData)} to approve.`);
 
   s.start('Polling for approval (every 5s)...');
   const interval = (authData.interval ?? 5) * 1000;
