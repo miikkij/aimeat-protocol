@@ -19,6 +19,8 @@
  * @usage
  *   import { NEW_AGENT_MD } from './new-agent.js';
  * @version-history
+ *   v1.3.0 — 2026-10-14 — The ideas the home offers, for a person who does not yet know what to ask
+ *     for: tier "home-ideas", the same list the home reads (services/home-ideas.ts). Additive.
  *   v1.2.0 — 2026-10-11 — Step 4, after the agent is made: its first run, where its work goes
  *     (aimeat_agent_workplace_set), and an app of its work (tier "build-app/agent/<name>",
  *     aimeat_app_agent_tie, aimeat_app_agent_untie).
@@ -54,4 +56,9 @@ runs it on the person's own connector.
    work, read \`aimeat_handbook_get { tier: "build-app/agent/<name>" }\` (the agent, how to read its
    work, the structure of its latest result, and the data map row that ties the app to it) and
    then the build specification, tier "build-app". \`aimeat_app_agent_tie\` ties an app that
-   already exists to an agent, and \`aimeat_app_agent_untie\` takes the tie away.`;
+   already exists to an agent, and \`aimeat_app_agent_untie\` takes the tie away.
+
+When the person does not yet know what agent or app to ask for, \`aimeat_handbook_get { tier: "home-ideas" }\`
+gives the ideas their home page shows: agents made from one sentence and run for real, and apps
+paired with the agent that works through them. Offer the two or three that fit what they do, in
+their language, and start from the sentence they choose.`;
