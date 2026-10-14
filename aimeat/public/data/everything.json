@@ -4060,6 +4060,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 407
+  "rows": 408
  }
 }
