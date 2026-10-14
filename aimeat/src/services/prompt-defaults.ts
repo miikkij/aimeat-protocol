@@ -13,6 +13,8 @@
  *   element / renderToString / renderRich), aimeat-organism and aimeat-editor.
  * @version-history v1.2.0 -- 2026-08-30 -- The workflows group (./prompt-defaults/workflows.ts): the
  *   three prompts the Workflows page hands to the owner's own AI.
+ * @version-history v1.3.0 -- 2026-10-14 -- home-ideas (./prompt-defaults/home-ideas.ts): the ideas the
+ *   home offers, one JSON document per language.
  *
  * Variable reference:
  *   {{node_url}}           -- config.baseUrl or req.protocol://req.get('host')
@@ -61,6 +63,7 @@ import { KNOWLEDGE_SEEDS } from './prompt-defaults/knowledge.js';
 import { PLATFORM_SEEDS } from './prompt-defaults/platform.js';
 import { MANIFEST_ARCHITECT_SEEDS } from './prompt-defaults/manifest-architect.js';
 import { PLAYBOOK_SEEDS } from './prompt-defaults/playbooks.js';
+import { HOME_IDEAS_SEEDS } from './prompt-defaults/home-ideas.js';
 import { PROACTIVE_SEEDS } from './prompt-defaults/proactive.js';
 import { WORKFLOW_SEEDS } from './prompt-defaults/workflows.js';
 import { CONTACT_SEEDS } from './prompt-defaults/contacts.js';
@@ -81,5 +84,6 @@ export const PROMPT_SEEDS: PromptSeedEntry[] = [
   ...PLATFORM_SEEDS,
   ...MANIFEST_ARCHITECT_SEEDS,
   ...PLAYBOOK_SEEDS,
+  ...HOME_IDEAS_SEEDS,
   ...PROACTIVE_SEEDS,
 ];

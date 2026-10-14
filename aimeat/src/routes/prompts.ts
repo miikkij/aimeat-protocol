@@ -6,6 +6,7 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   v1.16.0 -- 2026-10-14 -- Mounts GET /v1/prompts/home-ideas, the ideas the home offers (prompts-home-ideas.ts).
  *   v1.15.1 -- 2026-10-11 -- The openclaw prompt's integration_guide is the Hello Integration walkthrough
  *     this node serves; it named the OpenClaw setup page of the repository, which no route served.
  *   v1.15.0 -- 2026-10-11 -- Mounts the build instructions for an app that shows one agent's work
@@ -57,6 +58,7 @@ import { registerBuildCortexPrompt } from './prompts-cortex.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
 import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
+import { registerHomeIdeasPrompt } from './prompts-home-ideas.js';
 import { registerOpenItemsPrompt } from './prompts-open-items.js';
 import { registerAtelierPrompt } from './prompts-atelier.js';
 import { registerFeaturesPrompt } from './prompts-features.js';
@@ -237,6 +239,8 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   // the aimeat-extension-builder skill and llms.txt cannot drift apart. Public: build guidance, not
   // a secret. ?lang, ?owner, ?idea, ?format=txt. MUST be registered before /v1/prompts/:tier.
   registerIntentPoolPrompt(router, config);
+  // The ideas the home offers (routes/prompts-home-ideas.ts). MUST be registered before /v1/prompts/:tier.
+  registerHomeIdeasPrompt(router, config, storage);
   // The Atelier track's build spec (TARGET-074) — its own module and route so the two tracks'
   // guides never mix. MUST be registered before /v1/prompts/:tier.
   registerAtelierPrompt(router, config, storage);

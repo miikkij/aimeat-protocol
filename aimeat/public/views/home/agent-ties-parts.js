@@ -25,6 +25,9 @@
  *   placeWords(place)
  * @usage html`<${AgentApps} name=${name} owner=${owner} worker=${worker} navigate=${navigate} onChanged=${load} />`
  * @version-history
+ *   v1.2.0 — 2026-10-14 — The offer opens the ideas dialog on its app tab ("Ideas: what an app could
+ *     show"); an app idea chosen there is written into "What do you want to see?" (ideas-dialog.js,
+ *     wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  *   v1.1.0 — 2026-10-11 — At production size: WorkplaceChoice, the one place that draws the choice of
  *     a workspace, is a grouped drop-down past eight workspaces (an account had 85), and the app to
  *     tie is found by typing past eight apps (the same account had 183). Workspace and organism names
@@ -52,6 +55,7 @@ import { PageSection } from '/components/PageSection.js';
 import { Spinner } from '/components/Spinner.js';
 import { Space } from '/components/Layout.js';
 import { tieApp, untieApp, setWorkplace, clearWorkplace, readTieChoices } from '/js/services/agent-ties.js';
+import { IdeasDialog } from './ideas-dialog.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const p = (key, fallback) => tr('home.agentTies.' + key, fallback);
@@ -107,6 +111,7 @@ function isPutAway(name) { try { return localStorage.getItem(laterKey(name)) ===
 /** The offer to make an app of this agent's work. `fresh`: the agent was just made, so it shows again. */
 export function AppOffer({ name, fresh, navigate }) {
   const [say, setSay] = useState('');
+  const [ideasOpen, setIdeasOpen] = useState(false);
   const [hidden, setHidden] = useState(() => !fresh && isPutAway(name));
   if (hidden) return null;
   const go = (e) => { e?.preventDefault?.(); navigate(appPage(name, say.trim())); };
@@ -122,8 +127,11 @@ export function AppOffer({ name, fresh, navigate }) {
         <${FormActions}>
           <${Loud} control onClick=${go}>${say.trim() ? p('offerShow', 'Show the options') : p('offerSuggest', 'Suggest some to me')}<//>
           <${Action} onClick=${() => { putAway(name); setHidden(true); }}>${p('offerLater', 'Not now')}<//>
+          <${Action} onClick=${() => setIdeasOpen(true)}>${tr('home.ideas.offerIdeas', 'Ideas: what an app could show')} →<//>
         <//>
       <//>
+      <${IdeasDialog} open=${ideasOpen} onClose=${() => setIdeasOpen(false)}
+        onPickApp=${(idea) => setSay(idea.name + '. ' + idea.app_shows)} />
       <${Note} kind="quiet">${p('offerAfter', 'You can do this later from Apps on this page, or by saying the same to your own AI.')}<//>
     <//>
     <//>`;

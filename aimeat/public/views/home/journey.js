@@ -6,6 +6,10 @@
  *   work for their AI: the profile first (an interview that becomes their business card), then a
  *   shared place, an agent, a schedule or an app, with the result shown at home.
  * @version-history
+ *   v1.5.0 — 2026-10-14 — "Make an agent" and "Make an app" open the ideas dialog (ideas-dialog.js).
+ *     An agent example goes into the prompt the person copies to their own AI, beside a link that
+ *     makes it on the new-agent page instead; an app idea's "Make its agent" moves to "Make an
+ *     agent" with that example (wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  *   v1.4.0 — 2026-10-03 — The first task is "Make your profile" (Jouni's ruling: a newcomer's first
  *     result is their profile, made in an interview by their AI), with the prompt buildJourneyPrompt
  *     ('profile') and its result the person's page; it is chosen until the path's first result is
@@ -35,7 +39,8 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
+import { IdeasDialog } from './ideas-dialog.js';
 import { useSession } from '/js/use-session.js';
 import { useShared, invalidateShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
@@ -77,6 +82,8 @@ export function HomeJourney() {
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState('');
+  const [ideasOpen, setIdeasOpen] = useState(false);
+  const [idea, setIdea] = useState(null);
   const { data: orgs, ready } = useShared('organisms', organismsPath(session?.owner), ['organisms'], pickOrganisms);
   const { data: chat } = useShared('chat-status', '/v1/chat/status', ['chat']);
   const { data: connection } = useShared('home-connection-proof', '/v1/memory/onboarding.hello_mcp?soft=1', ['memory']);
@@ -86,7 +93,10 @@ export function HomeJourney() {
   // Connected means the same thing as the path's tick: any AI of theirs has reached this node.
   const connected = state.initialized || !!journey?.stages?.find(s => s.id === 'connect')?.done;
   const chosenRoad = road ?? journey?.road ?? null;
-  const prompt = buildJourneyPrompt(action, window.location.origin, session.owner);
+  // An example chosen in the ideas dialog goes into the prompt the person copies to their own AI.
+  const withIdea = idea && action === 'agent';
+  const prompt = buildJourneyPrompt(action, window.location.origin, session.owner)
+    + (withIdea ? '\n\n' + tOr('home.ideas.promptLead', 'What I want the agent to do:') + ' ' + idea.say : '');
   // The newest five: the list grows with the account, and "Open shared places" holds all of them.
   const places = (Array.isArray(orgs) ? [...orgs] : [])
     .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))).slice(0, 5);
@@ -110,6 +120,14 @@ export function HomeJourney() {
       <//>
       <${ChooserPanel}>
       <${Hint}>${t(hintKey(action))}<//>
+      ${(action === 'agent' || action === 'app') && html`<${ChooserLinks}>
+        <${Action} onClick=${() => setIdeasOpen(true)}>${tOr(action === 'agent' ? 'home.ideas.homeAgents' : 'home.ideas.homeApps',
+          action === 'agent' ? 'Ideas: agents that were made and run' : 'Ideas: apps and the agents that use them')} →<//>
+        ${idea && action === 'agent' && html`<${Action} href=${'/v1/home?new-agent=1&idea=' + idea.id}>${tOr('home.ideas.makeHere', 'Or make it here, on this page')} →<//>`}
+      <//>`}
+      ${withIdea && html`<${Hint}>${tOr('home.ideas.inPrompt', 'The example is in the prompt below:')} ${idea.name}.<//>`}
+      <${IdeasDialog} open=${ideasOpen} onClose=${() => setIdeasOpen(false)} tab=${action === 'app' ? 'apps' : 'agents'}
+        onPick=${(i) => { setIdea(i); if (action === 'app') setAction('agent'); setCopied(false); }} />
       <${ChooserStatus}>
         <span>${t(connected ? 'homeJourney.connected' : 'homeJourney.notConnected')}</span>
         ${connected && html`<${Action} expanded=${connecting} onClick=${() => setConnecting(v => !v)}>

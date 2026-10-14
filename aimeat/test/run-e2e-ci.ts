@@ -10,6 +10,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-14 -- e2e-home-ideas.ts joins the list (not the guard tier): the ideas the home offers,
+ *     in three languages, and an operator's broken edit.
  *   2026-10-13 -- e2e-workspace-fenced-space.ts joins the list (not the guard tier): a record space
  *     that names extensions refuses an agent's direct write on every code path and takes it through
  *     a named extension.
@@ -1163,6 +1165,8 @@ const ALL_SUITES = [
     // The prompt arms beside them: the per-role surface handbook, the offerings page, the tier1
     // 301, draft-offer, the ?format=txt doors, the anonymous share text and the openclaw tier.
     'test/e2e-prompt-arms.ts',
+    // The ideas the home offers: the seeded list in three languages, and an operator's broken edit.
+    'test/e2e-home-ideas.ts',
     'test/e2e-integration-kit.ts',
     'test/e2e-inbox-cursor.ts',
     'test/e2e-unfurl.ts',

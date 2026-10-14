@@ -8,8 +8,8 @@
  *
  *   THREE WAYS IN, ONE PAGE. From the home's field with a sentence (`say`), which the person's own
  *   model here turns into a draft; from a proposal that waits for them (`proposal`), written by
- *   their AI or an app; or with nothing, where the page asks for the sentence or offers the three
- *   ready definitions. All three end in the same four choices and the same press.
+ *   their AI or an app; or with nothing, where the page asks for the sentence and offers examples
+ *   from the node's list of ideas. All three end in the same four choices and the same press.
  *
  *   THE FOUR CHOICES are what the person decides: what it is called and does, when it works, how
  *   far it reaches, and on which machine. A machine is asked only when the person has more than
@@ -22,6 +22,12 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.9.0 — 2026-10-14 — "Not sure what to ask? Start from an example": three examples from the
+ *     node's list of ideas under the box and the ideas dialog behind "All ideas, also for apps"
+ *     (ideas-dialog.js). An example only fills the box, and says when it works through an app; an
+ *     example chosen on the home arrives as ?idea=<id>. The three ready definitions (Researcher,
+ *     Writer and editor, Scheduled watch) are gone from this page: the examples cover them (Jouni,
+ *     2026-10-14, wish-esimerkit-agenteista-ja-sovelluksista-kotiruudulle-mielikuvi).
  *   v1.8.3 — 2026-10-14 — While the model writes the agent, the page shows the spinner, as the
  *     agent's app page does; the line alone read as a page that had stopped.
  *   v1.8.2 — 2026-10-13 — The permissions shown before approval count the tool the page adds for
@@ -83,7 +89,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { swallowed } from '/js/swallowed.js';
@@ -98,14 +104,13 @@ import { TextField, TextArea } from '/components/TextField.js';
 import { Choice } from '/components/Choice.js';
 import { Select } from '/components/Select.js';
 import { Facts, FactLine } from '/components/Facts.js';
-import { Action, Loud } from '/components/Action.js';
+import { Action, Actions, Loud } from '/components/Action.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { Stack } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
-import { CREW_TEMPLATES } from '/views/profile/agents/crew-templates.js';
 import { timeOfCron } from '/views/profile/scheduler/cron-words.js';
 import {
-  draftAgent, templateDraft, ownAiRequest, cronFor, startAgent, approveProposal, runtimeMenu, readHomeAgents, offerShown, scopesFor,
+  draftAgent, ownAiRequest, cronFor, startAgent, approveProposal, runtimeMenu, readHomeAgents, offerShown, scopesFor,
 } from '/js/services/agent-draft.js';
 import { namedIn, recordSpacesOf, RECORDS_FEATURE, BACKFILL_FEATURE, llmChoiceOf, joinsAgentList } from '/js/services/agent-draft-known.js';
 import { decodeEntities } from '/js/utils.js';
@@ -114,6 +119,9 @@ import { activateEngagement, attachAgent, getOrganism } from '/js/services/organ
 import { WorkplaceChoice } from '/views/home/agent-ties-parts.js';
 import { WatchChoice, WatchedFacts } from '/views/home/agent-watch-parts.js';
 import { machineName } from '/views/home/agents-band.js';
+import { Card, CardGrid } from '/components/Card.js';
+import { useHomeIdeas, STRIP_IDEAS } from './ideas-data.js';
+import { IdeasDialog } from './ideas-dialog.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const n = (key, fallback) => tr('home.agentNew.' + key, fallback);
@@ -139,11 +147,22 @@ export default function AgentNewView({ navigate }) {
   const query = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
   const proposalId = query.get('proposal') || '';
   const said = query.get('say') || '';
+  // An example chosen on the home arrives as ?idea=<id> and fills the box, nothing more.
+  const ideaId = query.get('idea') || '';
+  const ideas = useHomeIdeas();
 
   const [home, setHome] = useState(null);
   const [proposal, setProposal] = useState(null);
   const [draft, setDraft] = useState(null);
   const [sentence, setSentence] = useState(said);
+  const [ideasOpen, setIdeasOpen] = useState(false);
+  const [picked, setPicked] = useState(null);
+  const takeIdea = (idea) => { setSentence(idea.say); setPicked(idea); };
+  // The example named in the address, once the node's list has been read; never over a sentence.
+  useEffect(() => {
+    const idea = ideaId && ideas?.agents.find((i) => i.id === ideaId);
+    if (idea && !said) takeIdea(idea);
+  }, [ideas, ideaId, said]);
   // ask: the sentence or a ready definition · drafting: the model writes · form: the choices ·
   // ownAi: no model here, the request to copy · gone: the proposal is not waiting any more
   const [phase, setPhase] = useState(proposalId ? 'loading' : said ? 'drafting' : 'ask');
@@ -414,7 +433,7 @@ export default function AgentNewView({ navigate }) {
         <${PromptCard} label=${n('ownAiLabel', 'What to say to your AI')} prompt=${ownAiRequest(sentence.trim(), chosen && machines.length > 1 ? machineName(chosen) : '')}
           loud copyLabel=${tr('common.copyPrompt', 'Copy the prompt')} copiedLabel=${tr('common.copied', 'Copied')} />
         <${FormActions}>
-          <${Action} onClick=${() => setPhase('ask')}>${n('startReady', 'Or start from a ready one')}<//>
+          <${Action} onClick=${() => setPhase('ask')}>${tOr('home.ideas.startExample', 'Or start from an example')}<//>
         <//>
       <//>`;
   }
@@ -429,17 +448,26 @@ export default function AgentNewView({ navigate }) {
           <${TextArea} label=${tr('home.agents.askLabel', 'What should the agent do?')} rows=${3}
             placeholder=${tr('home.agents.askPlaceholder', 'For example: gather the industry news every weekday morning and write a summary')}
             value=${sentence} onInput=${setSentence} onSend=${() => write(sentence)} />
+          ${picked?.app && html`<${Note} kind="message">${tOr('home.ideas.needsApp', 'This example works through the app')} ${picked.app}. ${tOr('home.ideas.needsAppTail', 'Open the app once first, so the agent finds its workspace.')}<//>`}
           ${problem && html`<${Note} kind="message" error>${problem}<//>`}
           <${FormActions}>
             <${Loud} control onClick=${() => write(sentence)}>${n('show', 'Show the agent')}<//>
           <//>
         <//>
-        <${SubHeading} level=${2} desc=${n('readyDesc', 'A ready definition that you name and give its job.')}>
-          ${n('readyTitle', 'Or start from a ready one')}
+        <${SubHeading} level=${2} desc=${tOr('home.ideas.stripDesc', 'Agents other people made from one sentence. Choose one, change the words, and see the agent before anything is made.')}>
+          ${tOr('home.ideas.stripTitle', 'Not sure what to ask? Start from an example')}
         <//>
-        <${Choice} boxed cols=${3} ariaLabel=${n('readyTitle', 'Or start from a ready one')} value=${''}
-          onChange=${(id) => takeDraft(templateDraft(id))}
-          options=${CREW_TEMPLATES.map((s) => ({ value: s.id, label: t(s.nameKey), hint: t(s.descKey) }))} />
+        ${!ideas ? html`<${Spinner} />` : html`<${CardGrid} cols="three">
+          ${ideas.agents.filter((i) => STRIP_IDEAS.includes(i.id)).map((idea) => html`<${Card} key=${idea.id} tone="framed"
+            kicker=${idea.app ? tOr('home.ideas.uses', 'Uses') + ' ' + idea.app : tOr('home.ideas.noApp', 'Needs no app')}
+            name=${idea.name} text=${idea.gets} clamp
+            onOpen=${() => takeIdea(idea)}
+            openLabel=${tOr('home.ideas.useThis', 'Use this')} />`)}
+        <//>`}
+        <${Actions} apart>
+          <${Action} onClick=${() => setIdeasOpen(true)}>${tOr('home.ideas.all', 'All ideas, also for apps')} →<//>
+        <//>
+        <${IdeasDialog} open=${ideasOpen} onClose=${() => setIdeasOpen(false)} tab="agents" onPick=${takeIdea} />
       <//>`;
   }
 

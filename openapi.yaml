@@ -72296,6 +72296,69 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /v1/prompts/home-ideas:
+    get:
+      operationId: getHomeIdeas
+      summary: The ideas the home offers when a person makes an agent or an app
+      description: >-
+        Agent ideas (each made from its one-sentence `say` and run for real) filed under groups, and
+        app ideas (what the person does, what the agent does with the app's tools, what the app shows
+        of the agent's work). Read from the managed prompt `home-ideas`, which the operator edits on
+        the Prompts page, in the asked language and in English where that language has none. An
+        entry the page cannot show is left out and named in `problems`; a document that is not JSON
+        gives empty lists and one problem. Public: guidance the node gives everyone. A connected AI
+        reads the same document with aimeat_handbook_get { tier: "home-ideas" }.
+      tags: [Discovery]
+      parameters:
+        - name: lang
+          in: query
+          required: false
+          schema: { type: string }
+          description: Language tag (en, fi, es). Without it the Accept-Language header decides.
+      responses:
+        '200':
+          description: The ideas, in the language served
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      lang: { type: string, description: The language the text is in. }
+                      about: { type: string, description: How an AI uses the list. }
+                      groups:
+                        type: array
+                        items:
+                          type: object
+                          properties: { id: { type: string }, name: { type: string } }
+                      agents:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            group: { type: string }
+                            name: { type: string }
+                            gets: { type: string, description: What the person gets. }
+                            say: { type: string, description: The sentence the agent is made from. }
+                            when: { type: string, enum: [ask, clock, talk, records] }
+                            app: { type: string, nullable: true, description: The app the agent works through. }
+                      apps:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            name: { type: string }
+                            ready_app: { type: string, nullable: true, description: An app on this node that does it; null for an idea. }
+                            agent: { type: string, nullable: true, description: The id of the agent idea that goes with it. }
+                            you: { type: string }
+                            agent_uses: { type: string }
+                            app_shows: { type: string }
+                      problems: { type: array, items: { type: string }, description: Entries left out, and why. }
   /v1/prompts/intent-pool:
     get:
       operationId: getIntentPoolPrompt
