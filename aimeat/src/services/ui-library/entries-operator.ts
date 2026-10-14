@@ -9,6 +9,7 @@
  * @structure OPERATOR_ENTRIES
  * @usage import { OPERATOR_ENTRIES } from './entries-operator.js';
  * @version-history
+ *   v1.2.0 — 2026-10-14 — menu-find: the find field at the top of a side menu.
  *   v1.1.0 — 2026-09-27 — The seventeen new parts of the admin pages and the inner pages: readings,
  *     operator-menu, operator-frame, ask-page, solo-window, quick-find, pick-field, status-page-preview,
  *     search-preview, save-bar, move-buttons, day-chart, trend-line, count-bars, print-page,
@@ -176,6 +177,36 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
         ],
         example: { value: 'ferr', hint: '↑ ↓ to move, Enter to open', groups: [{ key: 'orgs', label: 'Organisms', items: [{ key: 'nf', label: 'Nordic Ferries', sub: 'organism' }] }] },
         note: 'Replaced the command palette\'s list (views/command-palette.js, .cmdk*) with its keys and its choice. The field is SearchBar, a group\'s name the row label (Mark.js Label).',
+    },
+    {
+        id: 'menu-find', name: 'MenuFind', kind: 'component', status: 'active',
+        summary: 'The find field at the top of a side menu, and the narrowed menu under it. At rest it is the field (a small coral label, a glass, one heavy underline that turns coral while you are in it, and the / key as a chip) with the whole menu under it. Typing narrows the menu to the places whose name, other words or group match, in the menu\'s own order: the matched part underlined in coral, a place found by another word with that word in grey typewriter letters under it, the sections inside a page under their page with their number, the other side\'s places last under an ink slab, and the best fit chosen on the sun with ↩. ↑ and ↓ move the choice, Enter opens it, Escape clears; the / key anywhere outside a field moves into it. With nothing found it says so in a dashed coral aside and offers the content search.',
+        module: '/components/MenuFind.js', sheet: '/css/components/menu-find.css',
+        data: {
+            shape: 'MenuFind({ tone, label, placeholder, groups, other, otherTitle, hiddenNote, onOpen, onWake, onContentSearch, initialQuery, children })',
+            fields: {
+                tone: 'settings (the paper side menu, default) | operator (the admin menu\'s ink)',
+                label: 'the small coral label over the field', placeholder: 'the field\'s grey words (two short examples)',
+                groups: 'the menu\'s own groups, in its order: [{ key, title, items: [{ id, label, words, hidden, tail, sections: [{ id, num, label, words, tail }] }] }]; `words` are the other words a place is found by, `hidden` a place the short menu does not show',
+                other: 'the other side\'s places, shown last under otherTitle; their sections are not searched',
+                otherTitle: 'the title over the other side\'s places',
+                hiddenNote: 'the sentence added to the count when a found place is one the short menu hides',
+                onOpen: 'onOpen(row, words): a place, a section or the "more on the page" row was taken; row.place, row.section and row.kind say which',
+                onWake: 'called before the / key moves into the field (a phone opens the drawer the menu is in)',
+                onContentSearch: 'onContentSearch(words): the person asked to search the content when no place matched',
+                initialQuery: 'words already in the field when it appears (the design lab\'s demos)',
+                children: 'the menu as it is drawn while nothing is typed',
+            },
+        },
+        useFor: ['The top of a long side menu: Settings & Controls and the admin pages.'],
+        variants: [
+            { name: 'at rest', prop: 'children', when: 'nothing is typed: the field and the whole menu' },
+            { name: 'found', class: 'menu-find-row', prop: 'groups', when: 'the menu narrowed to the places and sections that match, the best fit chosen' },
+            { name: 'nothing found', class: 'menu-find-none', prop: 'onContentSearch', when: 'no place in the menus matches' },
+            { name: 'operator', class: 'menu-find--operator', prop: 'tone', when: 'on the admin menu\'s ink ground' },
+        ],
+        example: { label: 'Find a place', placeholder: 'agents, key…', groups: [{ key: 'auto', title: 'Automation', items: [{ id: 'agents', label: 'Agents', words: ['bots'] }] }] },
+        note: 'New for the menus (wish-pikahaku-settings-controls-ja-admin-sivuille, design claude.ai/artifact/ExfoqqeSCQuguJVRdcfWuA approved by Jouni 2026-10-14). The matching is js/menu-find.js; the places, their sections and other words come from public/data/places.json through js/services/places.js, which an AI reads too (aimeat_handbook_get { tier: "places" }). The rows take the side menu\'s and the operator menu\'s values; the clear button is the small icon button, the / key a chip, the nothing-found box the small aside.',
     },
     {
         id: 'pick-field', name: 'PickField', kind: 'component', status: 'active',

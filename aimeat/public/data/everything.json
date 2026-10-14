@@ -774,6 +774,15 @@
      "plain": "Librarian One ranked natural-language search across your personal memory and every organism you belong to. /v1/librarian"
     },
     {
+     "slug": "g-5-find-a-place-in-the-menus",
+     "cells": [
+      "<strong>Find a place in the menus</strong>",
+      "A field at the top of the Settings &amp; Controls menu and of the admin menu. Type a word and the menu narrows to the pages that match, the sections inside a page and, on the admin side, the Config settings, by name or by another word in English, Finnish or Spanish. Enter opens the page at that section; the / key moves into the field. An AI asked where something is reads the same list, with a link to each page and section.",
+      "<code>aimeat_handbook_get { tier: &quot;places&quot; }</code>, <code>/v1/prompts/places/sections</code>"
+     ],
+     "plain": "Find a place in the menus A field at the top of the Settings & Controls menu and of the admin menu. Type a word and the menu narrows to the pages that match, the sections inside a page and, on the admin side, the Config settings, by name or by another word in English, Finnish or Spanish. Enter opens the page at that section; the / key moves into the field. An AI asked where something is reads the same list, with a link to each page and section. aimeat_handbook_get { tier: \"places\" }, /v1/prompts/places/sections"
+    },
+    {
      "slug": "g-5-files",
      "cells": [
       "<strong>Files</strong>",
@@ -4042,6 +4051,6 @@
  "outro": "AIMEAT Feature List, reviewed 2026-10-12 against node 3.26.1. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 406
+  "rows": 407
  }
 }

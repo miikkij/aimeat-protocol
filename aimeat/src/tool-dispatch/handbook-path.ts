@@ -14,6 +14,7 @@
  * @version-history
  *   2026-10-11 — "build-app/agent/<name>" maps to the agent section route (prompts-build-app-agent.ts).
  *   2026-10-02 — "settings" and "settings/<term>" map to the setting explanations' parts route.
+ *   2026-10-14 — "places" and "places/<id>" map to the list of places' parts route.
  *   2026-10-01 — "features" and "features/<id>" map to the feature map's parts route.
  *   2026-09-19 — "build-app-atelier" and "build-app-atelier/<id>" map to the Atelier parts route,
  *     as the Classic tiers map to theirs.
@@ -30,6 +31,11 @@ export function handbookTierPath(tier: string): string {
   if (tier === 'features') return '/v1/prompts/features/sections/start';
   if (tier.startsWith('features/')) {
     return '/v1/prompts/features/sections/' + encodeURIComponent(tier.slice('features/'.length));
+  }
+  // "places/" with nothing after it is the first part, as on the node's own MCP tool.
+  if (tier === 'places' || tier === 'places/') return '/v1/prompts/places/sections/start';
+  if (tier.startsWith('places/')) {
+    return '/v1/prompts/places/sections/' + encodeURIComponent(tier.slice('places/'.length));
   }
   if (tier === 'settings') return '/v1/prompts/settings/sections/start';
   if (tier.startsWith('settings/')) {

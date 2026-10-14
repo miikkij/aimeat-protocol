@@ -8,11 +8,13 @@
  * @structure
  *   - loadTranslations(): fetches en.json as fallback + the active locale, version-cache-busted
  *   - t(key, vars) / tOr(key, fallbackText, vars): dot-key lookup with {var} interpolation
+ *   - tEn(key): a key's English text, whatever the active locale
  *   - switchLocale() / onLocaleChange(): change locale and notify subscribed listeners
  *   - flatten(): internal — collapses nested translation objects to dot-notation keys
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-10-14 — tEn(): a key's English text, for the menu find's English words.
  */
 import { detectLocale, persistLocale } from './utils.js';
 import { swallowed } from '/js/swallowed.js';
@@ -83,6 +85,13 @@ export function t(key, vars) {
 export function tOr(key, fallbackText, vars) {
   const val = t(key, vars);
   return val === key ? (fallbackText ?? key) : val;
+}
+
+/** A key's English text whatever the page's language, or the key itself when English has none (the
+ *  menu find matches a place by its English words too). */
+export function tEn(key) {
+  const str = fallback[key];
+  return typeof str === 'string' ? str : key;
 }
 
 /** Get current locale. */

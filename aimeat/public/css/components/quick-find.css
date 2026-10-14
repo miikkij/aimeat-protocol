@@ -6,16 +6,21 @@
  *   keys, and the places in named groups, the chosen one on the dim ground inside a hairline. Colours
  *   from the style, the corner from the theme; a group's name is the row label (poster.css).
  * @version-history
+ *   v1.0.1 — 2026-10-15 — The finder takes the width of the box it stands in instead of a 40rem
+ *     minimum, which made the "Search everything" dialog scroll sideways.
  *   v1.0.0 — 2026-09-27 — Initial: the values of profile.css .cmdk* (the command palette), under the
  *     component's own names; the corner reads the theme's control corner, the group name is the row
  *     label (page group G9).
  */
 
+/* As wide as the box it stands in, never wider: a fixed minimum of 40rem (from the old palette)
+   was wider than the dialog's body, and the dialog scrolled sideways (Jouni, 2026-10-15). */
 .quick-find {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  min-width: min(92vw, 40rem);
+  width: 100%;
+  min-width: 0;
 }
 
 .quick-find-hint {

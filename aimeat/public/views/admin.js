@@ -6,6 +6,9 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.13.0 — 2026-10-14 — The menu find under the node id (components/MenuFind.js): typing narrows the
+ *     operator menu to the pages, the Config settings and the Settings & Controls pages that match; a
+ *     chosen setting opens Config searched for it (wish-pikahaku-settings-controls-ja-admin-sivuille).
  *   v1.12.0 — 2026-09-27 — The frame and the side menu are components (OperatorFrame, OperatorMenu):
  *     the menu keeps its look and gains the heading "Operator menu" (Jouni, 2026-09-27); the page
  *     writes no class.
@@ -35,6 +38,8 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { OperatorFrame } from '/components/OperatorFrame.js';
 import { OperatorMenu } from '/components/OperatorMenu.js';
+import { MenuFind } from '/components/MenuFind.js';
+import { loadPlaces, placeWords, indexGroups } from '/js/services/places.js';
 import { ErrorNote } from '/components/ErrorNote.js';
 import { Note } from '/components/Note.js';
 import { getSession, onAuthChange } from '/js/services/auth.js';
@@ -44,7 +49,7 @@ import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 // ── Tab components (loaded eagerly — admin pages are lightweight) ──
 import OverviewTab     from './admin/overview-tab.js';
 import EconomyTab      from './admin/economy-tab.js';
-import ConfigTab       from './admin/config-tab.js';
+import ConfigTab, { configLabel, configGroupLabel } from './admin/config-tab.js';
 import SecurityTab     from './admin/security-tab.js';
 import ComplianceTab   from './admin/compliance-tab.js';
 import CorsTab         from './admin/cors-tab.js';
@@ -185,6 +190,11 @@ export default function Admin({ navigate, locale }) {
   const mountRef = useRef(true);
   const retriedRef = useRef(false);
   const reloadTimerRef = useRef(null);
+  // The menu find: the index of places (public/data/places.json) for the Settings & Controls pages,
+  // and the words a chosen Config setting puts into that page's search.
+  const [placesIndex, setPlacesIndex] = useState(null);
+  const [configFind, setConfigFind] = useState(null);
+  useEffect(() => { loadPlaces().then(setPlacesIndex); }, []);
 
   // Auth listener
   useEffect(() => {
@@ -421,7 +431,7 @@ export default function Admin({ navigate, locale }) {
   const ActiveComponent = activeItem.component;
   const pageInfo = PAGE_TITLES[activePage] || { key: '' };
 
-  const tabProps = { data, reload: loadAll, session, navigate, locale, switchPage };
+  const tabProps = { data, reload: loadAll, session, navigate, locale, switchPage, configFind };
 
   // The operator menu: every group with its items, and a count beside the items that carry one.
   const menuGroups = NAV_GROUPS.map(group => ({
@@ -434,10 +444,40 @@ export default function Admin({ navigate, locale }) {
     })),
   }));
 
+  // The menu find (components/MenuFind.js): every page by its name and other words, the Config
+  // page's settings under it by name and key, and the Settings & Controls pages last.
+  const schema = data?.configSchema?.schema || {};
+  // A setting is found by its name, its key and its group's name; the narrow menu shows the name only.
+  const configSettings = Object.keys(schema).map(path => ({
+    id: path, label: configLabel(path), words: [path, configGroupLabel(path.split('.')[0])],
+  }));
+  const findGroups = NAV_GROUPS.map(group => ({
+    key: group.key,
+    title: t(group.key),
+    items: group.items.map(item => ({
+      id: item.id, label: t(item.key), words: placeWords('admin', item.id, item.key),
+      sections: item.id === 'config' ? configSettings : [],
+    })),
+  }));
+  const findOther = placesIndex
+    ? indexGroups(placesIndex, 'settings').map(g => ({ ...g, items: g.items.map(it => ({ ...it, tail: t('menuFind.tailSettings') })) }))
+    : [];
+  const openFound = (row, words) => {
+    if (row.place.data?.side === 'settings') { window.location.assign(`/v1/profile?tab=${encodeURIComponent(row.place.id)}`); return; }
+    if (row.place.id === 'config' && row.kind !== 'place') setConfigFind({ q: row.section ? row.section.id : words, n: Date.now() });
+    switchPage(row.place.id);
+  };
+  const find = (items) => html`
+    <${MenuFind} tone="operator" label=${t('menuFind.labelAdmin')} placeholder=${t('menuFind.placeholderAdmin')}
+      groups=${findGroups} other=${findOther} otherTitle=${t('menuFind.otherSettings')} onOpen=${openFound}
+      onContentSearch=${(words) => window.dispatchEvent(new CustomEvent('aimeat-command-palette', { detail: { q: words } }))}>
+      ${items}
+    <//>`;
+
   return html`
     <${OperatorFrame}
       menu=${html`<${OperatorMenu} title=${t('dashboard.operatorMenu')} nodeId=${data?.dash?.node_id || ''}
-        groups=${menuGroups} active=${activePage} onPick=${switchPage} />`}
+        groups=${menuGroups} active=${activePage} onPick=${switchPage} find=${find} />`}
       title=${t(pageInfo.key)}
       onRefresh=${loadAll} refreshing=${loading}
       refreshLabel=${t('dashboard.refresh')} busyLabel=${t('dashboard.loading')}

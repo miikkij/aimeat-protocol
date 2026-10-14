@@ -9,6 +9,8 @@
  * @structure OPERATOR_DEMOS — { [id]: { variants: [{ name, render() }] } } · admin(title, part) · menu(active)
  * @usage import { OPERATOR_DEMOS } from './demos-operator.js';
  * @version-history
+ *   v1.4.0 — 2026-10-14 — menu-find: at rest, found, found by another word, nothing found, and on the
+ *     operator menu.
  *   v1.3.0 — 2026-10-06 — store-door's discount code: the control to press and the code shown;
  *     own-aimeat with a code.
  *   v1.2.0 — 2026-10-06 — store-door (open, opens soon, a door opening soon) and own-aimeat's "store
@@ -27,6 +29,8 @@ import { OperatorFrame } from '/components/OperatorFrame.js';
 import { AskPage } from '/components/AskPage.js';
 import { SoloWindow } from '/components/SoloWindow.js';
 import { QuickFind } from '/components/QuickFind.js';
+import { MenuFind } from '/components/MenuFind.js';
+import { SideMenuItem, SideMenuGroup } from '/components/SideMenu.js';
 import { OwnAimeat } from '/components/OwnAimeat.js';
 import { StoreDoor, StoreSoonNote, StoreSoonCode } from '/components/StoreDoor.js';
 import { PickField } from '/components/PickField.js';
@@ -56,6 +60,21 @@ const noop = () => {};
 const admin = (title, part) => html`<${OperatorFrame} title=${title}>${part}<//>`;
 
 const LONG = 'A name long enough to wrap on a phone, because the operator named this measured thing in full';
+/** The menu find's sample menus: a part of Settings & Controls, a part of the admin menu. */
+const FIND_MENU = [{ key: 'auto', title: 'Automation', items: [
+  { id: 'fleet', label: 'Agent status', words: ['running agents'] },
+  { id: 'agents', label: 'Agents', words: ['bots'], sections: [
+    { id: 'agp-new', num: '03', label: 'An agent of your own' },
+    { id: 'agp-connect', num: '04', label: 'Connect the AI you already use' }] },
+  { id: 'mcp', label: 'Connect your AI', words: ['MCP', 'Claude', 'ChatGPT'], hidden: true },
+] }];
+const FIND_OTHER = [{ key: 'adm', title: 'Identity', items: [{ id: 'agents', label: 'Agents', tail: 'admin →' }, { id: 'agent-tasks', label: 'Agent Tasks', tail: 'admin →' }] }];
+const FIND_ADMIN = [
+  { key: 'node', title: 'Node', items: [{ id: 'config', label: 'Config', sections: [
+    { id: 'email.enabled', label: 'Email Enabled', tail: 'Email' },
+    { id: 'email.smtp_host', label: 'SMTP Host', words: ['email.smtp_host'], tail: 'Email' }] }] },
+  { key: 'infra', title: 'Infrastructure', items: [{ id: 'email', label: 'Email', words: ['mail', 'SMTP'] }] },
+];
 
 const status = (tone, word) => html`<${Mark} kind="status" tone=${tone}>${word}<//>`;
 
@@ -183,6 +202,20 @@ export const OPERATOR_DEMOS = {
     { name: 'searching', render: () => html`<${QuickFind} value="seat" onInput=${noop} placeholder="Find…" busy busyLabel="Searching…" groups=${[]} onPick=${noop} />` },
     { name: 'nothing found', render: () => html`<${QuickFind} value="zzz" onInput=${noop} placeholder="Find…" emptyLabel="No matches." groups=${[]} onPick=${noop} />` },
     { name: 'long', render: () => html`<${QuickFind} value="a" onInput=${noop} groups=${[{ key: 'l', label: 'Documents', items: [{ key: 'x', label: LONG, sub: 'Harbour Studio · a workspace with a long name', snippet: '…a snippet of the text that is long enough to be cut at the end of the row on a narrow screen…' }] }]} onPick=${noop} />` },
+  ] },
+
+  'menu-find': { variants: [
+    { name: 'at rest', render: () => html`<${MenuFind} label="Find a place" placeholder="agents, key…" groups=${FIND_MENU} onOpen=${noop}>
+      <${SideMenuItem} active onClick=${noop}>Overview<//>
+      <${SideMenuGroup} title="Automation">${FIND_MENU[0].items.map((it) => html`<${SideMenuItem} key=${it.id} onClick=${noop}>${it.label}<//>`)}<//>
+    <//>` },
+    { name: 'found', render: () => html`<${MenuFind} label="Find a place" initialQuery="agent" groups=${FIND_MENU}
+      other=${FIND_OTHER} otherTitle="On the operator side" hiddenNote="Also the tools your short menu hides." onOpen=${noop} />` },
+    { name: 'by another word', render: () => html`<${MenuFind} label="Find a place" initialQuery="claude" groups=${FIND_MENU} onOpen=${noop} />` },
+    { name: 'nothing found', render: () => html`<${MenuFind} label="Find a place" initialQuery="vpn" groups=${FIND_MENU} onOpen=${noop} onContentSearch=${noop} />` },
+    { name: 'operator', render: () => html`<${OperatorMenu} title="Operator menu" nodeId="aimeat-finland-001" groups=${[]} onPick=${noop}
+      find=${(items) => html`<${MenuFind} tone="operator" label="Find a page" initialQuery="mail" groups=${FIND_ADMIN}
+        other=${[{ key: 's', title: '', items: [{ id: 'email', label: 'Email', words: ['mail'], tail: 'settings →' }] }]} otherTitle="In Settings & Controls" onOpen=${noop}>${items}<//>`} />` },
   ] },
 
   'own-aimeat': { variants: [

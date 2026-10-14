@@ -13,6 +13,8 @@
  * @structure CommandPalette({ navigate })
  * @usage import { CommandPalette } from '/views/command-palette.js';  html`<${CommandPalette} navigate=${navigate} />`
  * @version-history
+ *   v1.2.0 — 2026-10-14 — The window event `aimeat-command-palette` ({ q }) opens it with the words
+ *     already typed: the menu find's way on when no place in a menu matched.
  *   v1.1.0 — 2026-09-27 — The list is the QuickFind component (components/QuickFind.js), which owns
  *     the field's focus, ↑↓ and Enter, the pointer's choice and the groups; the palette passes the
  *     places and what taking one does, and writes no class. A group's name is the row label
@@ -71,6 +73,14 @@ export function CommandPalette({ navigate }) {
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Opened with words already in it: the menu find's "Search your content for …" when no place in a
+  // menu matched (components/MenuFind.js).
+  useEffect(() => {
+    const onAsk = (e) => { setQ(String(e.detail?.q || '')); setOpen(true); };
+    window.addEventListener('aimeat-command-palette', onAsk);
+    return () => window.removeEventListener('aimeat-command-palette', onAsk);
   }, []);
 
   // On open: load recents + the caller's organisms (for name matching). The finder focuses its own
