@@ -64,6 +64,27 @@ export interface ConnectionsConfig {
   connectXClientId: string;
   connectXClientSecret: string;
 
+  /**
+   * Meta app for publishing to a Facebook PAGE (Facebook Login for Business). Free; serves the pages
+   * of people who hold a role on the app without App Review.
+   */
+  connectFacebookClientId: string;
+  connectFacebookClientSecret: string;
+  /** Facebook Login for Business configuration id; empty sends the scopes alone. */
+  connectFacebookConfigId: string;
+
+  /**
+   * The INSTAGRAM app id and secret of the same or another Meta app (Instagram API with Instagram
+   * Login). They are NOT the Meta app id: the dashboard shows a separate pair under Instagram, and
+   * the Meta one answers "Invalid platform app" at Instagram's consent screen.
+   */
+  connectInstagramClientId: string;
+  connectInstagramClientSecret: string;
+
+  /** Reddit "web app" client, for posting to a subreddit and reading its comments. */
+  connectRedditClientId: string;
+  connectRedditClientSecret: string;
+
   /** Empty = derive from baseUrl. It must match every provider registration byte for byte. */
   connectRedirectUri: string;
 

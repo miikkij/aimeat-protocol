@@ -24,6 +24,7 @@
  *   linkedinMetrics · xMetrics
  * @usage import { readMetrics } from './metrics.js';
  * @version-history
+ *   v1.2.0 — 2026-10-15 — Facebook Page, Instagram and Reddit readers join from metrics-social.ts.
  *   v1.1.0 — 2026-08-02 — Mastodon's 403 is a PERMANENT refusal, not a retry: it is what a token
  *     without `read:statuses` gets, and every connection made before that scope was requested has one.
  *   v1.0.0 — 2026-08-02 — TARGET-057. Reach for Mastodon, Bluesky, YouTube and X; LinkedIn refuses
@@ -35,6 +36,7 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';
 import type { ConnectionCredential, ConnectionRecord, PublishMetricSample } from '../../models/connection-schemas.js';
 import type { OutboundProvider } from './providers.js';
+import { SOCIAL_METRIC_READERS } from './metrics-social.js';
 
 export interface MetricInput {
   provider: OutboundProvider;
@@ -282,6 +284,8 @@ const READERS: Record<string, MetricReader> = {
   youtube: youtubeMetrics,
   linkedin: linkedinMetrics,
   x: xMetrics,
+  // Facebook Page, Instagram and Reddit (2026-10-15).
+  ...SOCIAL_METRIC_READERS,
 };
 
 /**

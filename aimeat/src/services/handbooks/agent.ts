@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.30.0 -- 2026-10-15 -- Connected accounts: aimeat_connection_history and aimeat_connection_replies.
  *   v1.29.0 -- 2026-10-13 -- Workflows: the three events, the event_* variables and coalesce.
  *   v1.28.1 -- 2026-10-11 -- The agent guide is named by its GitHub address; a repository path does not
  *            open from a node.
@@ -219,6 +220,12 @@ gate, which is off until the owner turns it on; (6) read the decisions and tune 
 a key is missing, the refusal says what to set and where: pass it to your owner as it is. No tool
 ever returns a key; \`aimeat_decide_settings\` names the environment variable that holds yours, when
 your owner set one.
+
+**Connected accounts — what you published and what came back.** \`aimeat_connection_history\` lists
+what you published through your own connected accounts, newest first, with where each item landed and
+its latest numbers, and \`aimeat_connection_replies { attempt_id }\` reads what people answered to one of
+them from the provider now (nothing is stored, and on X every read costs money), so call it only when
+someone asks and tell them what matters rather than pasting every reply.
 
 **Mail refinery — a mailbox into records.** A refinery definition (the owner's memory record
 \`<prefix>.config\`: a mailbox from \`aimeat_connection_list\`, an organism workspace, a start date, the

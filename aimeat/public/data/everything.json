@@ -2498,10 +2498,19 @@
      "slug": "g-12-connected-social-accounts",
      "cells": [
       "<strong>Connected social accounts</strong>",
-      "Connect Mastodon, YouTube, Bluesky, LinkedIn and X; apps you allow publish to them and read how a post is doing over time. Where a service reports nothing, it says so instead of showing zero.",
+      "Connect Mastodon, YouTube, Bluesky, LinkedIn, X, a Facebook Page, an Instagram professional account and Reddit; apps you allow publish to them and read how a post is doing over time. Where a service reports nothing, it says so instead of showing zero. On X you can also publish an article or a thread.",
       "<code>/v1/connections</code>"
      ],
-     "plain": "Connected social accounts Connect Mastodon, YouTube, Bluesky, LinkedIn and X; apps you allow publish to them and read how a post is doing over time. Where a service reports nothing, it says so instead of showing zero. /v1/connections"
+     "plain": "Connected social accounts Connect Mastodon, YouTube, Bluesky, LinkedIn, X, a Facebook Page, an Instagram professional account and Reddit; apps you allow publish to them and read how a post is doing over time. Where a service reports nothing, it says so instead of showing zero. On X you can also publish an article or a thread. /v1/connections"
+    },
+    {
+     "slug": "g-12-replies-to-what-you-published",
+     "cells": [
+      "<strong>Replies to what you published</strong>",
+      "Read what people answered to a post, in one shape for every network: comments on Facebook, Instagram, YouTube and Reddit, replies on Mastodon, Bluesky and X. Your AI reads them when you ask, judges them and tells you what matters; nothing is stored. LinkedIn does not allow it and says so.",
+      "<code>POST /v1/connections/attempts/{id}/replies</code>, MCP <code>aimeat_connection_replies</code>"
+     ],
+     "plain": "Replies to what you published Read what people answered to a post, in one shape for every network: comments on Facebook, Instagram, YouTube and Reddit, replies on Mastodon, Bluesky and X. Your AI reads them when you ask, judges them and tells you what matters; nothing is stored. LinkedIn does not allow it and says so. POST /v1/connections/attempts/{id}/replies, MCP aimeat_connection_replies"
     },
     {
      "slug": "g-12-outside-accounts-your-agents-connect",

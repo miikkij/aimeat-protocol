@@ -10,6 +10,8 @@
  *   resource allowlist and the whole outbound policy chain are the node's answer here too. Nothing
  *   in this file decides anything.
  * @version-history
+ *   2026-10-15 — aimeat_connection_history (GET /v1/connections/attempts) and aimeat_connection_replies
+ *     (POST /v1/connections/attempts/:id/replies); aimeat_connection_start forwards account.
  *   2026-10-08 — aimeat_mail_send sends ai_provenance_id inside ai_disclosure (aiprov D9).
  *   2026-10-05 — read() makes the call with the path written in it, so check:field-reach's CodeQL query
  *     sees the route; the connector MCP serves these tools through here now (secaudit 2026-10, M3).
@@ -27,7 +29,7 @@
 import type { ConnectCliToolDefinition, ToolCallContext } from './tool-call-helpers.js';
 
 type ConnectCliToolContextClient = ToolCallContext['client'];
-import { requiredString, optionalString, optionalNumber, optionalBoolean } from './tool-call-helpers.js';
+import { requiredString, optionalString, optionalNumber, optionalBoolean, query } from './tool-call-helpers.js';
 import type { ApiResponse } from './api-client.js';
 
 /**
@@ -104,7 +106,24 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
             mode: 'personal',
             ...(optionalString(input, 'instance') ? { instance: optionalString(input, 'instance') } : {}),
             ...(optionalString(input, 'return_url') ? { return_url: optionalString(input, 'return_url') } : {}),
+            ...(optionalString(input, 'account') ? { account: optionalString(input, 'account') } : {}),
         }),
+    },
+    {
+        // → GET /v1/connections/attempts — the caller's own publishes, newest first.
+        name: 'aimeat_connection_history',
+        handler: ({ client }, input) => client.get(`/v1/connections/attempts${query({ limit: optionalNumber(input, 'limit') })}`),
+    },
+    {
+        // → POST /v1/connections/attempts/:id/replies — read from the provider now, nothing stored.
+        name: 'aimeat_connection_replies',
+        handler: ({ client }, input) => {
+            const limit = optionalNumber(input, 'limit');
+            return client.post(
+                `/v1/connections/attempts/${encodeURIComponent(requiredString(input, 'attempt_id'))}/replies`,
+                limit !== undefined ? { limit } : {},
+            );
+        },
     },
     {
         // → POST /v1/connections/:id/read/messages

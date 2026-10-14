@@ -27,6 +27,11 @@
  * @structure startAuthorization · completeAuthorization · resolveClient · fetchAccountIdentity
  * @usage import { startAuthorization, completeAuthorization } from './oauth.js';
  * @version-history
+ *   v1.3.0 — 2026-10-15 — Facebook, Instagram and Reddit: the scopes join with the provider's own
+ *     separator, its extra authorize parameters ride along, a token answer wrapped in `data` is read,
+ *     and the round ends in social-finish.ts, which turns the exchanged token into the publishing
+ *     credential (a Page token, a 60-day Instagram token). The start takes an `account` hint that
+ *     chooses among the pages the provider lists for this person.
  *   v1.2.0 — 2026-10-09 — A round is bound to one browser: the start stores the hash of a cookie
  *     (bindBrowser) and the completion refuses a callback without it (NOT_THIS_BROWSER) before the
  *     code is exchanged. The PKCE verifier is sealed to the round, and the provider address is kept
@@ -48,6 +53,7 @@ import { sealCredential, openCredential } from './credential.js';
 import { bindingMatches, roundApprovalUrl, sealRoundSecret, openRoundSecret } from '../oauth-round-secrets.js';
 import { normalizeInstance, registerAtInstance, type InstanceClient } from './instance.js';
 import { findProvider, type OutboundProvider, tokenRequest } from './providers.js';
+import { finishSocialToken, SOCIAL_FINISH_PROVIDERS } from './social-finish.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ConnectionMode, ConnectionRecord } from '../../models/connection-schemas.js';
@@ -74,6 +80,12 @@ interface StatePayload {
   bind?: string;
   /** The provider's authorize address, kept so the confirmation step can hand it to the owner. */
   authorizeUrl?: string;
+  /**
+   * Which of the person's accounts at the provider they mean, when the provider offers several
+   * behind one sign-in (a Facebook Page, by name or id). It only chooses among what the provider
+   * lists for this person; social-finish.ts never trusts it as an identity.
+   */
+  account?: string;
 }
 
 export type StartResult =
@@ -160,6 +172,8 @@ export async function startAuthorization(
   ctx: ConnectContext,
   input: {
     principal: string; provider: string; instance?: string; mode: ConnectionMode; returnUrl: string;
+    /** Which account behind the sign-in, for a provider that offers several (a Facebook Page). */
+    account?: string;
     /**
      * Makes the binding for this browser and returns its hash, when the start comes from the owner's
      * own browser (middleware/oauth-round-cookie.ts). Called once the state exists. Absent for every
@@ -210,8 +224,11 @@ export async function startAuthorization(
     response_type: 'code',
     client_id: client.clientId,
     redirect_uri: callbackUrl(ctx.config),
-    scope: provider.scopes.join(' '),
+    scope: provider.scopes.join(provider.scopeSeparator ?? ' '),
     state,
+    // Provider-specific parameters (Reddit's duration=permanent) go in before PKCE and offline
+    // access, which they can never name.
+    ...(provider.authorizeParams ?? {}),
   });
   if (provider.pkce) {
     q.set('code_challenge', b64url(createHash('sha256').update(verifier).digest()));
@@ -233,8 +250,10 @@ export async function startAuthorization(
   // may finish it. Without the second, whoever approved this address at the provider connected
   // THEIR account to the starter (secrets audit 2026-10-09, chapter 2).
   const bind = input.bindBrowser?.(state, STATE_TTL_MS);
+  const account = typeof input.account === 'string' ? input.account.trim().slice(0, 200) : '';
   const payload: StatePayload = {
-    provider: provider.id, instance, mode: input.mode, authorizeUrl, ...(bind ? { bind } : {}),
+    provider: provider.id, instance, mode: input.mode, authorizeUrl,
+    ...(bind ? { bind } : {}), ...(account ? { account } : {}),
   };
 
   await ctx.storage.createVerificationNonce({
@@ -493,26 +512,58 @@ export async function completeAuthorization(
       signal: AbortSignal.timeout(20_000),
     });
     if (!r.ok) return { ok: false, code: 'EXCHANGE_FAILED', reason: `the provider refused the code (HTTP ${r.status})` };
-    token = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as TokenResponse;
+    const raw = await readJson(r, OAUTH_ANSWER_MAX_BYTES) as TokenResponse & { data?: unknown };
+    // Instagram's token endpoint has been documented answering both bare and wrapped in a `data`
+    // array. Reading only one of the two is a connection that fails at the last step for half the
+    // people, depending on which shape their app was given.
+    token = Array.isArray(raw.data) && raw.data[0] && typeof raw.data[0] === 'object'
+      ? raw.data[0] as TokenResponse
+      : raw;
   } catch (err) {
     return { ok: false, code: 'EXCHANGE_FAILED', reason: `could not reach the provider: ${(err as Error).message}` };
   }
 
-  const accessToken = typeof token.access_token === 'string' ? token.access_token : '';
+  let accessToken = typeof token.access_token === 'string' ? token.access_token : '';
   if (!accessToken) return { ok: false, code: 'EXCHANGE_FAILED', reason: 'the provider returned no access token' };
-  const refreshToken = typeof token.refresh_token === 'string' ? token.refresh_token : undefined;
-  const expiresAt = typeof token.expires_in === 'number'
+  let refreshToken = typeof token.refresh_token === 'string' ? token.refresh_token : undefined;
+  let expiresAt = typeof token.expires_in === 'number'
     ? new Date(Date.now() + token.expires_in * 1000).toISOString()
     // NOT an error and NOT zero: some providers issue tokens that never expire, and treating the
     // absence as "expired" would park a working connection on its first refresh check.
     : null;
-  const scopes = typeof token.scope === 'string' ? token.scope.split(/[\s,]+/).filter(Boolean) : provider.scopes;
+  const scopes = typeof token.scope === 'string'
+    ? token.scope.split(/[\s,]+/).filter(Boolean)
+    : typeof (token as { permissions?: unknown }).permissions === 'string'
+      ? String((token as { permissions?: unknown }).permissions).split(/[\s,]+/).filter(Boolean)
+      : provider.scopes;
 
-  const identity = await fetchAccountIdentity(provider, payload.instance, accessToken);
+  // Facebook, Instagram and Reddit turn the exchanged token into the publishing credential and learn
+  // the account in one step (services/connections/social-finish.ts); every other provider's token
+  // already is the credential and only the identity is asked.
+  let identity: AccountIdentity | { error: string };
+  let extra: Record<string, string> | undefined;
+  if (SOCIAL_FINISH_PROVIDERS.has(provider.id)) {
+    const userId = (token as { user_id?: unknown }).user_id;
+    const finished = await finishSocialToken(provider, client, {
+      accessToken, refreshToken, expiresAt,
+      userId: typeof userId === 'string' || typeof userId === 'number' ? String(userId) : '',
+    }, payload.account ?? '');
+    if ('error' in finished) return { ok: false, code: 'IDENTITY_FAILED', reason: finished.error };
+    accessToken = finished.accessToken;
+    refreshToken = finished.refreshToken;
+    expiresAt = finished.expiresAt;
+    extra = finished.extra;
+    identity = { externalId: finished.externalId, accountLabel: finished.accountLabel };
+  } else {
+    identity = await fetchAccountIdentity(provider, payload.instance, accessToken);
+  }
   if ('error' in identity) return { ok: false, code: 'IDENTITY_FAILED', reason: identity.error };
 
   const credential = sealCredential(
-    { shape: provider.credentialShape, accessToken, ...(refreshToken ? { refreshToken } : {}) },
+    {
+      shape: provider.credentialShape, accessToken,
+      ...(refreshToken ? { refreshToken } : {}), ...(extra ? { extra } : {}),
+    },
     ctx.key,
   );
   const now = new Date().toISOString();

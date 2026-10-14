@@ -37,6 +37,8 @@
  *     price and a pacing amount, and a morsel is never a price.
  *   2026-10-11 -- e2e-model-suite.ts joins the list (not the guard tier): the suite
  *     docs/coding-guidelines/testing-requirements.md names as the model, signed in with a password.
+ *   2026-10-15 -- e2e-connections-social.ts joins the list (not the guard tier): Facebook, Instagram
+ *     and Reddit publishing, X long form, and reading the replies to a published item.
  *   2026-10-11 -- e2e-test-money-guard.ts joins the list (not the guard tier): a node others can reach
  *     never registers the test-only money handler.
  *   2026-10-11 -- e2e-record-spec-pointers.ts joins the list (not the guard tier): every `spec` a
@@ -459,6 +461,9 @@ const ALL_SUITES = [
     // The three publish recipes and five metrics readers against the same fake upstreams, on an
     // own in-process node (40317): Mastodon's transcode poll, YouTube's resumable chunks, Bluesky.
     'test/e2e-publish-upstreams.ts',
+    // Facebook Page, Instagram, Reddit, X articles and threads, and the replies reader on every
+    // network, against fake upstreams on an own in-process node (40327). Not in the guard tier.
+    'test/e2e-connections-social.ts',
     'test/e2e-disputes.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
     // credentials configured to actually send email. Re-enable once a test mail

@@ -23,6 +23,13 @@
  *   - findProvider(list, id) / listProviderMeta(list) — lookup + the safe public projection
  * @usage const providers = buildOutboundProviders(config);
  * @version-history
+ *   v1.6.0 — 2026-10-15 — Facebook Page, Instagram and Reddit join from ./providers-social.ts, with
+ *     four optional descriptor fields they need (scopeSeparator, authorizeParams, tokenHeaders,
+ *     refreshSkewMs). `read-replies` and `publish-image` join the capability vocabulary: the first is
+ *     reading what people answered to a published item (services/connections/replies.ts), carried by
+ *     every provider whose replies reader can succeed; the second is Instagram's, which publishes a
+ *     picture or a video and never text alone. The descriptor types moved to providers-types.ts
+ *     unchanged and are re-exported here.
  *   v1.5.0 — 2026-09-29 — `fake-mail` joins the test providers behind AIMEAT_CONNECT_FAKE_BASE_URL:
  *     a Gmail-shaped mailbox for the sandbox and the refinery's end-to-end runs.
  *   v1.4.0 — 2026-08-26 — Mail grows from one provider to four, in READ/SEND pairs: `google-mail-send`
@@ -47,173 +54,15 @@
  */
 
 import type { AimeatConfig } from '../../config.js';
-import type { CredentialShape } from '../../models/connection-schemas.js';
 import { googleMail, googleMailSend, microsoftMail, microsoftMailSend, fakeMail } from './providers-mail.js';
+import { facebook, instagram, reddit } from './providers-social.js';
 
-/** Stable provider identifiers. Also the value stored in `Connection.provider`. */
-export type OutboundProviderId =
-  | 'mastodon' | 'youtube' | 'linkedin' | 'x' | 'bluesky'
-  // Mail comes in READ/SEND pairs rather than as one provider with both scopes. Reading somebody's
-  // mail and writing in their name are different consent, and a permission that is never requested
-  // cannot be misused, leaked, or need explaining to a person who only wanted one of the two.
-  | 'google-mail' | 'google-mail-send'
-  | 'microsoft-mail' | 'microsoft-mail-send'
-  | 'fake' | 'fake-static' | 'fake-mail';
-
-/**
- * What a user must supply for a provider that has NO authorization round.
- *
- * Declared here rather than hardcoded in a form so the panel renders whatever a provider needs
- * without knowing about that provider. A provider with `attachFields: null` uses the OAuth round
- * instead, and the two paths never overlap.
- */
-export interface AttachField {
-  name: string;
-  label: string;
-  /** Rendered as a password input, and never echoed back in any response. */
-  secret: boolean;
-  placeholder?: string;
-}
-
-/** OAuth2 endpoints. Derived from the instance origin for an instance-scoped provider. */
-export interface OAuthEndpoints {
-  authorize: string;
-  token: string;
-  /** Null when the provider offers no revocation endpoint — revoking is then local-only. */
-  revoke: string | null;
-}
-
-/**
- * One thing that may be READ from a connected account.
- *
- * A caller names a resource and supplies parameters; this builds the URL. The direction of that
- * arrow is the security property: the moment a caller can name the host, a connection stops being
- * "read my mail" and becomes an open proxy standing behind somebody's Google account.
- *
- * `requiresScopes` is checked against what the connection was actually granted BEFORE the request
- * goes out, because a provider answering 403 tells the person nothing they can act on, while
- * "this connection was made without permission to read mail" names the fix.
- */
-export interface ProviderResource {
-  /** What it is, in words a person reads in a refusal. */
-  label: string;
-  /** Provider scopes this resource cannot work without. */
-  requiresScopes: string[];
-  /** Build the URL from caller parameters. Throws with a plain sentence on a bad parameter. */
-  url(params: Record<string, unknown>, instance: string | null): string;
-}
-
-export interface OutboundProvider {
-  id: OutboundProviderId;
-  /** Fallback English label; the SDK lib overrides it from i18n. */
-  label: string;
-  credentialShape: CredentialShape;
-  /**
-   * True when the provider is a FEDERATION rather than one endpoint. Client credentials are then
-   * per instance and acquired at runtime; `client` is null and `endpoints()` needs the instance.
-   */
-  instanceScoped: boolean;
-  /**
-   * Config-gated: this node can serve the provider itself. False = the node holds no client.
-   *
-   * NOT the same as unavailable. A principal who brings their own app can still use a provider the
-   * node never registered, which is exactly what bringing one is for.
-   */
-  enabled: boolean;
-  /**
-   * The capability master switch (AIMEAT_CONNECTIONS_ENABLED). False means the whole feature is off
-   * and NOTHING is offered, whoever brought what.
-   *
-   * This used to be encoded only in `disabledReason` as a string, which meant the difference
-   * between "off" and "no client" was a substring match away from being wrong. It is a field now
-   * because the two answers differ: one hides the provider, the other invites you to bring an app.
-   */
-  capabilityOn: boolean;
-  /** Why it is disabled, in words an operator can act on. Null when enabled. */
-  disabledReason: string | null;
-  /** Fixed-endpoint client credentials from config. Null for an instance-scoped provider. */
-  client: { id: string; secret: string } | null;
-  /** Scopes requested at authorize time. Empty for a `static` credential. */
-  scopes: string[];
-  /** Whether to send a PKCE challenge. Always true where the provider supports it. */
-  pkce: boolean;
-  /**
-   * WHERE THE CLIENT SECRET GOES at the token endpoint.
-   *
-   * 'body' is the common case and the default. 'basic' is HTTP Basic authentication, which X
-   * REQUIRES for a confidential client: sending its secret in the form body is a 401 with a message
-   * that does not name the cause. This is a field rather than a check on the provider id because
-   * two places mint tokens (the first exchange and every refresh), and a rule that lives in one of
-   * them is a connection that authorises and then cannot renew.
-   */
-  tokenAuth: 'body' | 'basic';
-  /**
-   * Ask for a token that outlives the browser session.
-   *
-   * A PROPERTY OF THE PROVIDER'S OAUTH SERVER, not of what the connection is for, which is why it
-   * is a field. Google returns no refresh token at all unless `access_type=offline` and
-   * `prompt=consent` are sent, and the failure is silent: the connection authorises, works for an
-   * hour, and then cannot renew. That rule lived as a check on one provider id until 2026-08-18,
-   * when a SECOND Google provider was added and inherited a one-hour lifetime nobody would have
-   * seen until the second day.
-   */
-  offlineAccess: boolean;
-  /**
-   * What an app may ASK about a connection at this provider (decision K1). An app never reads the
-   * provider's own scope vocabulary — it cannot know what those names mean — so it asks a question
-   * in AIMEAT's vocabulary and gets a yes or no.
-   *
-   * The vocabulary: `publish-post`, `publish-video`, `read-metrics`. `read-metrics` is here because
-   * an app that cannot ask it has to FIND OUT by calling — which costs a provider request and, on
-   * X, money, to be told what the registry already knew. It also renders a "read the numbers"
-   * button on LinkedIn, where the answer is a permanent refusal: a control that can never work.
-   * A provider carries it exactly when metrics.ts has a reader that can succeed for it.
-   */
-  capabilities: string[];
-  /**
-   * What may be read from this connection, by name. Absent on a publish-only provider, which is
-   * every provider that existed before the read direction did.
-   */
-  resources?: Record<string, ProviderResource>;
-  /**
-   * The provider's own daily ceiling on publishes, when it has one that is shared rather than
-   * per-user. YouTube's allowance is per Google PROJECT, so ten publishers on one shared channel
-   * close it before lunch unless somebody counts.
-   *
-   * null means "no known shared ceiling", which is the honest value until the real number has been
-   * READ from the provider's console rather than guessed. The counting mechanism does not wait for
-   * it — publish-gate measures usage either way, so the number can be filled in with evidence.
-   */
-  sharedDailyLimit: number | null;
-  /**
-   * Non-null when this provider is connected by SUPPLYING a credential rather than by an
-   * authorization round. Null for an OAuth provider. Advertising a provider without one of the two
-   * is how a "Connect" button appears that cannot work.
-   */
-  attachFields: AttachField[] | null;
-  /**
-   * Endpoints. `instance` is required exactly when `instanceScoped` is true.
-   *
-   * `tenant` is Microsoft's alone and is a SECOND axis, not a rename of the first: an instance is a
-   * different SERVER (Mastodon), while a tenant is a different directory on the same one. It arrives
-   * from the client credentials rather than from the connection, because it is a property of the app
-   * registration: a principal who brings a single-tenant Entra app brings its tenant with it, and
-   * the node's own app uses the configured one. Every other provider ignores it.
-   */
-  endpoints(instance: string | null, tenant?: string | null): OAuthEndpoints | null;
-}
-
-/** What discovery may show. Deliberately free of anything an app could not act on. */
-export interface OutboundProviderMeta {
-  id: OutboundProviderId;
-  /** False when the node holds no client for it; a principal's own app still works. */
-  nodeConfigured?: boolean;
-  label: string;
-  instanceScoped: boolean;
-  credentialShape: CredentialShape;
-  capabilities: string[];
-  attachFields: AttachField[] | null;
-}
+// The descriptor types live in providers-types.ts since 2026-10-15; re-exported so every import
+// of them from this file keeps working.
+export type {
+  OutboundProviderId, AttachField, OAuthEndpoints, ProviderResource, OutboundProvider, OutboundProviderMeta,
+} from './providers-types.js';
+import type { OutboundProvider, OutboundProviderMeta } from './providers-types.js';
 
 /**
  * Mastodon. The awkward one, and the reason the store carries an `instance` column at all: the same
@@ -241,7 +90,8 @@ function mastodon(capabilityOn: boolean): OutboundProvider {
     pkce: true,
     tokenAuth: 'body',
     offlineAccess: false,
-    capabilities: ['publish-post', 'publish-video', 'read-metrics'],
+    // read-replies rides on read:statuses too: a status's context (its descendants) is a status read.
+    capabilities: ['publish-post', 'publish-video', 'read-metrics', 'read-replies'],
     attachFields: null,
     // Instances rate-limit, but there is no single daily publish ceiling to state, and inventing
     // one would be a guess wearing a number.
@@ -288,14 +138,21 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
     // contradiction that shows up at the very last step of a user's first connection attempt.
     // The channel identity is what the dedupe key and the account label are built from, so this is
     // the narrowest pair that actually works rather than a convenience.
+    // The third one, youtube.force-ssl, is what commentThreads.list takes with an OAuth token; the
+    // readonly scope is NOT enough for reading comments, by Google's own discovery document (checked
+    // 2026-10-15). It is broader than the other two, and it is the only scope that lets the replies
+    // reader see what viewers wrote. A connection made before it was asked for still publishes and
+    // reads numbers; its replies read is refused with "connect again".
     scopes: [
       'https://www.googleapis.com/auth/youtube.upload',
       'https://www.googleapis.com/auth/youtube.readonly',
+      'https://www.googleapis.com/auth/youtube.force-ssl',
     ],
     pkce: true,
     tokenAuth: 'body',
     offlineAccess: true,
-    capabilities: ['publish-video', 'read-metrics'],
+    // read-replies: commentThreads.list, one quota unit, with the youtube.force-ssl scope above.
+    capabilities: ['publish-video', 'read-metrics', 'read-replies'],
     attachFields: null,
     // SIX. Read from the project's own quota page on 2026-08-02, not guessed:
     //
@@ -441,7 +298,8 @@ function x(clientId: string, clientSecret: string, capabilityOn: boolean): Outbo
     // wait, and claiming video before that exists is the failure the recipe guard now catches.
     // read-metrics is real here and it BILLS: public_metrics is charged per read, which is why
     // nothing on this node reads it on a timer.
-    capabilities: ['publish-post', 'read-metrics'],
+    // read-replies is a recent search on the conversation, and it BILLS like every other read.
+    capabilities: ['publish-post', 'read-metrics', 'read-replies'],
     // Pay-per-use has no daily ceiling to model; the limit is a spend cap set at X.
     sharedDailyLimit: null,
     attachFields: null,
@@ -485,7 +343,7 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
     // separate video service with its own job queue and limits, which is not built. Listing a
     // capability the recipe cannot perform is the same "advertised but unconnectable" mistake the
     // attach route was just fixed for, one field over.
-    capabilities: ['publish-post', 'read-metrics'],
+    capabilities: ['publish-post', 'read-metrics', 'read-replies'],
     sharedDailyLimit: null,
     // The one provider a user hands us a secret for, so it is the one that needs a form.
     attachFields: [
@@ -524,7 +382,7 @@ function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     pkce: true,
     tokenAuth: 'body',
     offlineAccess: false,
-    capabilities: ['publish-video', 'publish-post', 'read-metrics', 'read-items'],
+    capabilities: ['publish-video', 'publish-post', 'read-metrics', 'read-items', 'read-replies'],
     sharedDailyLimit: null,
     attachFields: null,
     // A readable resource, so the read direction can be driven against a real HTTP round rather
@@ -606,6 +464,7 @@ export function tokenRequest(
   const headers: Record<string, string> = {
     'Content-Type': 'application/x-www-form-urlencoded',
     Accept: 'application/json',
+    ...(provider.tokenHeaders ?? {}),
   };
   if (provider.tokenAuth === 'basic') {
     const pair = Buffer.from(`${client.clientId}:${client.clientSecret}`).toString('base64');
@@ -637,6 +496,9 @@ export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[]
     microsoftMail(config.connectMicrosoftClientId, config.connectMicrosoftClientSecret, config.connectMicrosoftTenant, on),
     microsoftMailSend(config.connectMicrosoftClientId, config.connectMicrosoftClientSecret, config.connectMicrosoftTenant, on),
     bluesky(on),
+    facebook(config.connectFacebookClientId, config.connectFacebookClientSecret, on, config.connectFacebookConfigId),
+    instagram(config.connectInstagramClientId, config.connectInstagramClientSecret, on),
+    reddit(config.connectRedditClientId, config.connectRedditClientSecret, on),
   ];
   // Appended only when configured, so a production node's list is exactly the three above.
   if (config.connectFakeBaseUrl) {

@@ -15,6 +15,8 @@
  *   concludes the product is broken.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connections-mcp-surface.test.ts
  * @version-history
+ *   2026-10-15 — aimeat_connection_history and aimeat_connection_replies join the set; one scope word
+ *     each, so the generic filter gates them like the other read tools.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 
@@ -54,12 +56,14 @@ function surfaceFor(scopes: string[]): string[] {
     return names;
 }
 
-describe('the seven tools', () => {
+describe('the nine tools', () => {
     it('registers all of them for a session holding both words', () => {
         const names = surfaceFor(['connections:read', 'connections:write', 'connections:use', 'outbound:send']);
         expect(names.sort()).toEqual([
+            'aimeat_connection_history',
             'aimeat_connection_list',
             'aimeat_connection_providers',
+            'aimeat_connection_replies',
             'aimeat_connection_start',
             'aimeat_mail_aliases',
             'aimeat_mail_read',
@@ -95,7 +99,7 @@ describe('sending needs both words, and is absent without them', () => {
     });
 });
 
-describe('the other six do not depend on that condition', () => {
+describe('the other eight do not depend on that condition', () => {
     it('registers regardless of scopes, because the generic filter is what gates them', () => {
         // They carry ONE word each in the scope map, and the surface filter applies it above this
         // function. Registering them here unconditionally is correct; duplicating the filter would
@@ -103,6 +107,7 @@ describe('the other six do not depend on that condition', () => {
         const bare = surfaceFor([]);
         for (const name of [
             'aimeat_connection_providers', 'aimeat_connection_list', 'aimeat_connection_start',
+            'aimeat_connection_history', 'aimeat_connection_replies',
             'aimeat_mail_search', 'aimeat_mail_read', 'aimeat_mail_aliases',
         ]) {
             expect(bare).toContain(name);

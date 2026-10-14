@@ -40,6 +40,13 @@ export function loadConnectionsConfig(): ConnectionsConfig & McpProxyConfig {
     connectLinkedinClientSecret: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET ?? '',
     connectXClientId: process.env.AIMEAT_CONNECT_X_CLIENT_ID ?? '',
     connectXClientSecret: process.env.AIMEAT_CONNECT_X_CLIENT_SECRET ?? '',
+    connectFacebookClientId: process.env.AIMEAT_CONNECT_FACEBOOK_CLIENT_ID ?? '',
+    connectFacebookClientSecret: process.env.AIMEAT_CONNECT_FACEBOOK_CLIENT_SECRET ?? '',
+    connectFacebookConfigId: process.env.AIMEAT_CONNECT_FACEBOOK_CONFIG_ID ?? '',
+    connectInstagramClientId: process.env.AIMEAT_CONNECT_INSTAGRAM_CLIENT_ID ?? '',
+    connectInstagramClientSecret: process.env.AIMEAT_CONNECT_INSTAGRAM_CLIENT_SECRET ?? '',
+    connectRedditClientId: process.env.AIMEAT_CONNECT_REDDIT_CLIENT_ID ?? '',
+    connectRedditClientSecret: process.env.AIMEAT_CONNECT_REDDIT_CLIENT_SECRET ?? '',
     connectRedirectUri: process.env.AIMEAT_CONNECT_REDIRECT_URI ?? '',
     connectFakeBaseUrl: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? '',
 

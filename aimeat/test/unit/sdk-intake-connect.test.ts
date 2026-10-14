@@ -5,6 +5,8 @@
  *   (err.field), and what a provider can do (capabilities()) read from the provider list rather
  *   than from the provider's name.
  * @version-history
+ *   v1.1.0 - 2026-10-15 - connect capabilities() publishImage and readReplies; replies() posts the
+ *     limit, answers one shape, and throws NOT_READABLE as permanent. The session stub records the body.
  *   v1.0.0 - 2026-10-01 - Initial: intake fields() and the refusal's field, connect capabilities().
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -22,7 +24,7 @@ let publicCalls: Array<{ url: string; method: string; body: any }>;
 /** The public node: "METHOD url" to [status, envelope]. */
 let publicRoutes: Record<string, [number, any]>;
 /** Calls the session's fetch received (the signed-in routes). */
-let sessionCalls: Array<{ path: string; method: string }>;
+let sessionCalls: Array<{ path: string; method: string; body?: any }>;
 let sessionRoutes: Record<string, () => any>;
 
 beforeAll(async () => {
@@ -39,7 +41,7 @@ beforeAll(async () => {
     jwt: 'test',
     fetch: async (path: string, opts: any = {}) => {
       const method = (opts.method || 'GET').toUpperCase();
-      sessionCalls.push({ path, method });
+      sessionCalls.push({ path, method, body: opts.body ? JSON.parse(opts.body) : undefined });
       const handler = sessionRoutes[method + ' ' + path];
       if (!handler) return { ok: false, error: { code: 'NOT_FOUND', message: 'no route ' + method + ' ' + path } };
       return handler();
@@ -186,6 +188,7 @@ describe('AIMEAT.connect.capabilities()', () => {
     { id: 'google-mail-send', label: 'Gmail (send)', capabilities: ['send-mail'] },
     { id: 'youtube', label: 'YouTube', capabilities: ['publish-video', 'read-metrics'] },
     { id: 'linkedin', label: 'LinkedIn', capabilities: ['publish-post'] },
+    { id: 'instagram', label: 'Instagram', capabilities: ['publish-image', 'publish-video', 'read-metrics', 'read-replies'] },
   ];
 
   it('throws the refusal of the provider list and reads it again on the next call', async () => {
@@ -205,7 +208,8 @@ describe('AIMEAT.connect.capabilities()', () => {
     const read = await connect.capabilities({ id: 'c-1', provider: 'google-mail', accountLabel: 'a@b.fi', status: 'active' });
     expect(send).toEqual({
       provider: 'google-mail-send', readMail: false, sendMail: true, publish: false, publishPost: false,
-      publishVideo: false, readMetrics: false, readItems: false, names: ['send-mail'],
+      publishImage: false, publishVideo: false, readMetrics: false, readReplies: false, readItems: false,
+      names: ['send-mail'],
     });
     expect(read.provider).toBe('google-mail');
     expect(read.readMail).toBe(true);
@@ -224,5 +228,51 @@ describe('AIMEAT.connect.capabilities()', () => {
     expect(none.names).toEqual([]);
     expect(none.publish || none.readMail || none.sendMail).toBe(false);
     expect(sessionCalls.length).toBe(0);
+  });
+
+  it('counts publish-image as publishing, and reads read-replies', async () => {
+    // Instagram has no publish-post: an app that asked only publishPost || publishVideo for an
+    // image would draw no publish control for it.
+    const ig = await connect.capabilities(PROVIDERS[4]);
+    expect(ig.publish).toBe(true);
+    expect(ig.publishImage).toBe(true);
+    expect(ig.publishPost).toBe(false);
+    expect(ig.readReplies).toBe(true);
+    const li = await connect.capabilities(PROVIDERS[3]);
+    expect(li.readReplies).toBe(false);
+    expect(sessionCalls.length).toBe(0);
+  });
+});
+
+describe('AIMEAT.connect.replies()', () => {
+  const PATH = '/v1/connections/attempts/att%201/replies';
+
+  it('posts the limit and answers the replies in one shape', async () => {
+    const reply = { id: 'r1', author: 'Ann', authorHandle: '@ann@m.social', text: 'Nice', createdAt: null, url: null, parentId: null, likes: 2 };
+    sessionRoutes['POST ' + PATH] = () => ({
+      ok: true,
+      data: { attemptId: 'att 1', provider: 'mastodon', url: 'https://m.social/@me/1', replies: [reply], truncated: false, fetchedAt: '2026-10-15T00:00:00.000Z' },
+    });
+    const out = await connect.replies('att 1', { limit: 5 });
+    expect(sessionCalls).toEqual([{ path: PATH, method: 'POST', body: { limit: 5 } }]);
+    expect(out).toEqual({
+      attemptId: 'att 1', provider: 'mastodon', url: 'https://m.social/@me/1', replies: [reply],
+      truncated: false, fetchedAt: '2026-10-15T00:00:00.000Z',
+    });
+  });
+
+  it('throws NOT_READABLE as permanent and REPLIES_UNAVAILABLE as worth a retry', async () => {
+    sessionRoutes['POST ' + PATH] = () => ({ ok: false, error: { code: 'NOT_READABLE', message: 'LinkedIn does not allow it' } });
+    let err: any = null;
+    try { await connect.replies('att 1'); } catch (e) { err = e; }
+    expect(err && err.code).toBe('NOT_READABLE');
+    expect(err.permanent).toBe(true);
+    expect(sessionCalls[0].body).toEqual({});
+
+    sessionRoutes['POST ' + PATH] = () => ({ ok: false, error: { code: 'REPLIES_UNAVAILABLE', message: 'try later' } });
+    err = null;
+    try { await connect.replies('att 1'); } catch (e) { err = e; }
+    expect(err && err.code).toBe('REPLIES_UNAVAILABLE');
+    expect(err.permanent).toBe(false);
   });
 });

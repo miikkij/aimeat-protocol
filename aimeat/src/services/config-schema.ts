@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.33.0 — 2026-10-15 — connections.facebook_*, instagram_* and reddit_* client settings; the provider
+ *     client rows moved to config-schema-connections.ts (max-file-lines), in the same place in the list.
  *   v1.32.1 — 2026-10-14 — work.otk_grace_ms removed: the connectivity-key routes it timed are gone (feature-list audit row 202).
  *   v1.32.0 — 2026-10-12 — federation.relay_claim, federation.audience_required, security.ws_query_token and security.owner_key_login refuse the value that kept a 4.0.0 removal alive, from that release (config-schema-validators.ts; Core 2026-11 HTTP-08), and their descriptions say so.
  *   v1.31.1 — 2026-10-11 — geoHeaders names its guide by the GitHub address; docs/visitor-geography.md
@@ -107,6 +109,7 @@ import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
 import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
 import { RATE_LIMIT_CONFIG_FIELDS } from './config-schema-rate-limits.js';
+import { CONNECT_CLIENT_CONFIG_FIELDS } from './config-schema-connections.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -434,20 +437,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // values, and the second one is already writable. It changes at a restart, deliberately.
   { key: 'mcpStdioEnabled', dotPath: 'mcp.stdio_enabled', envVar: 'AIMEAT_MCP_STDIO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Allow local MCP server PROCESSES on this host. Off by default, because it runs code that is not ours.' },
   { key: 'mcpStdioAllowedCommands', dotPath: 'mcp.stdio_allowed_commands', envVar: 'AIMEAT_MCP_STDIO_ALLOWED_COMMANDS', type: 'object', validate: v => Array.isArray(v) && (v as unknown[]).every(c => typeof c === 'string'), immutable: true, description: 'The exact commands a stdio server may name, compared whole. Empty means nothing runs.' },
-  { key: 'connectGoogleClientId', dotPath: 'connections.google_client_id', envVar: 'AIMEAT_CONNECT_GOOGLE_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'Google app for YouTube and both halves of Gmail (NOT the sign-in client)' },
-  { key: 'connectGoogleClientSecret', dotPath: 'connections.google_client_secret', envVar: 'AIMEAT_CONNECT_GOOGLE_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'Google app secret (secret)', adminDisplay: 'configured' },
-  { key: 'connectMicrosoftClientId', dotPath: 'connections.microsoft_client_id', envVar: 'AIMEAT_CONNECT_MICROSOFT_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'Microsoft (Entra) app for reading and sending Outlook mail (NOT the sign-in app)' },
-  { key: 'connectMicrosoftClientSecret', dotPath: 'connections.microsoft_client_secret', envVar: 'AIMEAT_CONNECT_MICROSOFT_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'Microsoft app secret (secret)', adminDisplay: 'configured' },
-  // Goes into the authorize and token URL PATHS, so a wrong value fails at Microsoft rather than
-  // here. Validated to the same shape the route accepts from a user.
-  { key: 'connectMicrosoftTenant', dotPath: 'connections.microsoft_tenant', envVar: 'AIMEAT_CONNECT_MICROSOFT_TENANT', type: 'string', validate: v => typeof v === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(v), immutable: false, description: 'Entra directory: common | organizations | consumers | a directory id' },
-  { key: 'connectLinkedinClientId', dotPath: 'connections.linkedin_client_id', envVar: 'AIMEAT_CONNECT_LINKEDIN_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'LinkedIn app client id' },
-  { key: 'connectLinkedinClientSecret', dotPath: 'connections.linkedin_client_secret', envVar: 'AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'LinkedIn app secret (secret)', adminDisplay: 'configured' },
-  { key: 'connectXClientId', dotPath: 'connections.x_client_id', envVar: 'AIMEAT_CONNECT_X_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'X app client id (pay-per-use: every post is a charge)' },
-  { key: 'connectXClientSecret', dotPath: 'connections.x_client_secret', envVar: 'AIMEAT_CONNECT_X_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'X app secret (secret)', adminDisplay: 'configured' },
-  // Must match every provider registration byte for byte. A mismatch surfaces only at the
-  // provider's own consent screen, as redirect_uri_mismatch, so it is worth being able to read.
-  { key: 'connectRedirectUri', dotPath: 'connections.redirect_uri', envVar: 'AIMEAT_CONNECT_REDIRECT_URI', type: 'string', validate: () => true, immutable: false, description: 'OAuth callback URL; empty derives it from baseUrl' },
+  // The provider client rows and the callback address: config-schema-connections.ts.
+  ...CONNECT_CLIENT_CONFIG_FIELDS,
 
   // Workspace row spaces. Charged to the workspace and the organism, never to the member who wrote
   // the row — that asymmetry is the reason the row store exists at all, so it is visible here

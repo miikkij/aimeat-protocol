@@ -14,15 +14,21 @@
  *   act on rather than a red error, telling a Bluesky user where an app password comes from BEFORE
  *   they go looking, and warning an Instagram user about the Business-account requirement BEFORE
  *   the attempt rather than after it fails for a reason nobody can read.
- * @structure list() · providers() · capabilities() · start() · attach() · revoke() · on()/off() · panel()
+ * @structure list() · providers() · capabilities() · start() · attach() · revoke() · history() ·
+ *   measure() · series() · replies() · on()/off() · panel()
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-connect.js"></script>
  *   const accounts = await AIMEAT.connect.list();
- *   const can = await AIMEAT.connect.capabilities(accounts[0]);   // { sendMail, readMail, publish, … }
+ *   const can = await AIMEAT.connect.capabilities(accounts[0]);   // { sendMail, readMail, publish, readReplies, … }
  *   await AIMEAT.connect.start('mastodon', { instance: 'mastodon.social' });
  *   await AIMEAT.connect.publish({ connectionId: accounts[0].id, caption: 'hello' });
  *   const sent = await AIMEAT.connect.history({ limit: 50 });
  *   await AIMEAT.connect.measure(sent[0].id);   // costs a provider request, and money on X
+ *   const said = await AIMEAT.connect.replies(sent[0].id, { limit: 50 });   // read now, nothing stored; money on X
  * @version-history
+ *   v1.4.0 — 2026-10-15 — replies(attemptId, opts): what people answered to a published item, read
+ *     from the provider now (POST /v1/connections/attempts/:id/replies); NOT_READABLE throws with
+ *     permanent: true. capabilities() answers publishImage and readReplies, and publish is true for
+ *     publish-image too (Instagram has no publish-post).
  *   v1.3.1 — 2026-10-02 — start() raises the node's refusal with its code, as attach() and revoke()
  *     do, so an app holding no connections:write sees SCOPE_DENIED instead of "no authorization URL".
  *     settingsUrl(): the owner's accounts page on the node, so a page (the kit's connections block)
@@ -71,7 +77,8 @@ function must(res, fallback) {
     const err = /** @type {Error & { code?: string, permanent?: boolean, envelope?: unknown }} */ (
       new Error((res.error && (res.error.message || res.error.code)) || fallback));
     err.code = code;
-    err.permanent = code === 'NOT_MEASURABLE' || code === 'REJECTED';
+    // NOT_READABLE is the replies read's 409, the same "the platform will never allow this".
+    err.permanent = code === 'NOT_MEASURABLE' || code === 'NOT_READABLE' || code === 'REJECTED';
     err.envelope = res;
     throw err;
   }
@@ -123,10 +130,12 @@ async function providers() {
  * @property {string} provider     The provider id the answer is for ('' when none could be named).
  * @property {boolean} readMail    `read-mail`: the connection reads the account's mail.
  * @property {boolean} sendMail    `send-mail`: the connection sends mail as the account.
- * @property {boolean} publish     `publish-post` or `publish-video`: publish() can post to it.
+ * @property {boolean} publish     `publish-post`, `publish-image` or `publish-video`: publish() can post to it.
  * @property {boolean} publishPost `publish-post`.
+ * @property {boolean} publishImage `publish-image`: an image post (Instagram, which takes no text-only post).
  * @property {boolean} publishVideo `publish-video`.
  * @property {boolean} readMetrics `read-metrics`: measure() can succeed for it.
+ * @property {boolean} readReplies `read-replies`: replies() can return what people answered.
  * @property {boolean} readItems   `read-items`: its items can be read back.
  * @property {string[]} names      The node's own capability names, unchanged.
  */
@@ -164,10 +173,12 @@ async function capabilities(provider) {
     provider: id,
     readMail: has('read-mail'),
     sendMail: has('send-mail'),
-    publish: has('publish-post') || has('publish-video'),
+    publish: has('publish-post') || has('publish-image') || has('publish-video'),
     publishPost: has('publish-post'),
+    publishImage: has('publish-image'),
     publishVideo: has('publish-video'),
     readMetrics: has('read-metrics'),
+    readReplies: has('read-replies'),
     readItems: has('read-items'),
     names: names.slice(),
   };
@@ -266,6 +277,43 @@ async function measure(attemptId) {
 async function series(attemptId) {
   const res = await authFetch(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`);
   return must(res, 'could not read the series').samples ?? [];
+}
+
+/**
+ * What people answered to one published item, read from the provider now.
+ *
+ * NOTHING IS STORED, AND EVERY CALL SPENDS A REQUEST. The node reads the provider at the moment of
+ * the call and keeps nothing, so a second call is a second request against the account's rate
+ * limit, and on X every read costs money and search reaches back only seven days. Call it when a
+ * person asks, never on a timer or on render.
+ *
+ * A refusal THROWS, as measure() does. `permanent: true` (code NOT_READABLE) is the platform saying
+ * it will never allow this read: LinkedIn, comments turned off, a deleted post. Show it as a fact and
+ * offer no retry. REPLIES_UNAVAILABLE is not permanent and may pass later.
+ *
+ * Each reply is { id, author, authorHandle, text, createdAt, url, parentId, likes }; the nullable
+ * fields are null when the network does not report them.
+ *
+ * @param {string} attemptId  An item's id from history().
+ * @param {{limit?: number}} [opts]  At most this many, default 100, max 200.
+ * @returns {Promise<{attemptId: string, provider: string, url: string, replies: Array<Object>,
+ *   truncated: boolean, note?: string, fetchedAt: string}>}
+ */
+async function replies(attemptId, opts = {}) {
+  const res = await authFetch(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/replies`, {
+    method: 'POST',
+    body: JSON.stringify(opts.limit ? { limit: opts.limit } : {}),
+  });
+  const d = must(res, 'the replies could not be read');
+  return {
+    attemptId: d.attemptId ?? attemptId,
+    provider: d.provider ?? '',
+    url: d.url ?? '',
+    replies: d.replies ?? [],
+    truncated: Boolean(d.truncated),
+    ...(d.note ? { note: d.note } : {}),
+    fetchedAt: d.fetchedAt ?? '',
+  };
 }
 
 /**
@@ -459,7 +507,7 @@ function settingsUrl() {
 const connect = {
   list, providers, capabilities, start, attach: attachAccount, revoke, publish, on, off, settingsUrl,
   clients, setClient, removeClient,
-  history, measure, series,
+  history, measure, series, replies,
   /** Per-provider things a user must be told BEFORE they try. See notes.js. */
   notes: PROVIDER_NOTES,
   /** Mount the ready-made panel. See panel.js. */
