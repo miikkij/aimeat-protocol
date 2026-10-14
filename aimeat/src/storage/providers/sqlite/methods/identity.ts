@@ -8,6 +8,9 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.3.0 — 2026-10-14 — deleteOwner runs the 28 identity columns left undecided through
+ *     eraseAccountRecords (repos/account-records-erasure.ts): deleted with the account, or kept under
+ *     the erasure's pseudonym (QA audit 2026-10-14, K3).
  *   v1.2.0 — 2026-10-11 — stoppedAt and stoppedBy on create, update and read (migration 0101).
  *   v1.1.0 — 2026-10-10 — deleteOwner also deletes the OTK rows stored under the bare account name
  *     (secaudit 2026-10-10 C0).
@@ -21,6 +24,7 @@ import type { OwnerRecord, AgentRecord, GHIIRecord, GHIIPatch } from '../../../i
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
 import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
+import { eraseAccountRecords } from '../repos/account-records-erasure.js';
 import { settleErasedPartyWork, settleDeletedAgentWork } from '../repos/work-erasure.js';
 import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
 import { deleteInstalledCortexes } from '../repos/cortex-erasure.js';
@@ -165,6 +169,10 @@ export const identityMethods = {
       // So do the other side's ledger lines: the person's own went with the passes above, and the
       // lines in other people's ledgers name them by the same pseudonym (repos/ledger-erasure.ts).
       pseudonymiseLedgerParty(this.db, erasedAccountParty(name, ghiiRows.map(r => r.ghii), pseudonym, actors));
+      // The 28 identity columns the cascade left as they were: the person's own rows go, and the rows
+      // somebody else or the law keeps name them by the same pseudonym (repos/account-records-erasure.ts;
+      // QA audit 2026-10-14, K3).
+      eraseAccountRecords(this.db, name, ghiiRows.map(r => r.ghii), actors, pseudonym);
 
       // 4. Delete GHII records for this owner
       this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);

@@ -10,6 +10,7 @@
  *   - GET    /v1/owner/agent-defaults         -- Get owner-level defaults
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
+ *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.8.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.8.0 -- 2026-09-04 -- An APP principal needs task:read to read an agent's directives, and only
  *     an app principal does. Same shape and same word as GET /v1/agents/:name/tasks: a conditional
@@ -43,7 +44,7 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../middleware/refusals.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, mayActOnAgent, isOwnerInPerson, isForeignPrincipal, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
@@ -92,7 +93,8 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
 
   /** Owner-session or the agent itself may read this agent's data-access view (owner-or-self). */
   function canAccessAgent(req: Express.Request, agentGaii: string): boolean {
-    return isOwnerInPerson(req.auth) || req.auth!.sub === agentGaii;
+    // The agent itself, or its own owner in person (QA audit 2026-10-14, K1).
+    return mayActOnAgent(req.auth, agentGaii, config.nodeId);
   }
 
   /* ── GET /v1/agents/:name/data-access/overview -- Data Access subtab composite (mount fold) ──
@@ -133,6 +135,14 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
     // token budget, on whatever single word the consent screen showed.
     if (req.auth!.roles.includes('app') && !scopeIsCovered(req.auth!.scopes, 'task:read')) {
       res.status(403).json(refuseNeedsPermission(config, { want: "read an agent's directives", scope: 'task:read' }));
+      return;
+    }
+    // Only the account the agent belongs to reads its directives: the agent itself, its owner in
+    // person, or another principal of the same account. Any signed-in caller of any account read
+    // them by naming the agent's whole GAII (QA audit 2026-10-14, K1).
+    if (!mayActOnAgent(req.auth, agentGaii, config.nodeId)
+      && (isForeignPrincipal(req.auth) || !isSameOwner(agentGaii, `${req.auth!.owner}@${config.nodeId}`))) {
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -200,6 +210,11 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
   router.put('/v1/agents/:name/directives', requireAuth(), requireRole('owner'), async (req, res) => {
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
+    // The agent's own owner in person, and nobody else (QA audit 2026-10-14, K1).
+    if (!mayActOnAgent(req.auth, agentGaii, config.nodeId) || !isOwnerInPerson(req.auth)) {
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'change', listUrl: '/v1/agents' }));
+      return;
+    }
 
     // Verify agent exists
     const agent = await storage.getAgent(agentGaii);
@@ -307,6 +322,11 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
   router.delete('/v1/agents/:name/directives', requireAuth(), requireRole('owner'), async (req, res) => {
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
+    // The agent's own owner in person, and nobody else (QA audit 2026-10-14, K1).
+    if (!mayActOnAgent(req.auth, agentGaii, config.nodeId) || !isOwnerInPerson(req.auth)) {
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'change', listUrl: '/v1/agents' }));
+      return;
+    }
 
     // Verify agent exists
     const agent = await storage.getAgent(agentGaii);

@@ -2159,11 +2159,11 @@
     },
     "src/services/tracked-response.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 3,
         "listAllMemory": 3,
         "listMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The watched value passes leave (external, to the peer) before it goes into a reply; the contract records are the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The watched value passes leave (external, to the peer) before it goes into a reply; the contract records are the node's own. Reviewed 2026-10-14 (QA audit K2): the third getMemory is the watched key read from the contract owner's own namespace (readWatched); it passes the same leave before it reaches a reply."
     },
     "src/services/visibility/behaviour-counter.ts": {
       "reads": {

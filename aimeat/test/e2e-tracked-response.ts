@@ -275,5 +275,38 @@ await test('12. List returns the owner contracts', async () => {
     assert(ids.includes(autoTrId) && ids.includes(apprTrId), 'both contracts listed');
 });
 
+// QA audit 2026-10-14, K2 (P3-01, S10-01): a contract acts only for the account whose memory holds
+// it. Its own fields do not choose the sender, the recipient or another account's record.
+await test('13. A contract record stored by one account acts for no other account', async () => {
+    const dana = await registerOwner(`trdana${stamp}`);
+    const watched = `tr-k2.${stamp}.latest`;
+    const marker = `k2-marker-${stamp}`;
+    await writeMemory(alice.token, watched, { status: 'open', note: marker });
+    const id = `tr_k2${stamp}`;
+    const stored = await writeMemory(dana.token, `tracked-response.${id}.latest`, {
+        type: 'tracked-response', spec: '/v1/tracked-responses/spec', specVersion: 1, id,
+        ownerGaii: alice.ghii, title: 'k2', state: 'watching',
+        source: { kind: 'message', messageId: `k2-${stamp}`, conversationId: `k2-${stamp}`, peerGhii: dana.ghii, ownerGhii: alice.ghii, originNodeId: NODE_ID },
+        watch: { key: watched, condition: { field: 'status', equals: 'done' } },
+        response: { channel: 'message.reply', mode: 'auto', template: '{{result}}', inject: { field: 'note' } },
+        tracking: { lastUpdatedAt: null, lastTriggeredAt: null, attempts: 0, lastError: null },
+        delivery: { sentMessageId: null, sentAt: null, draftKey: null },
+        ledger: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    });
+    assert(stored.status === 200 || stored.status === 201, `storing the record: ${stored.status}`);
+    await writeMemory(alice.token, watched, { status: 'done', note: marker });
+    // The write hook wakes only keys the node registered; the storing account's own evaluate-due
+    // (and the ten-minute reconciler) reach this row.
+    await json('/v1/tracked-responses/evaluate-due', { method: 'POST', headers: { Authorization: `Bearer ${dana.token}` } });
+    await sleep(500);
+    // The node's welcome message may sit in this account's list (the first account on a test node is
+    // the operator), so the check is the watched value, which only the contract could have carried.
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${dana.token}` } });
+    const seen = JSON.stringify(convs.body?.data ?? {});
+    assert(!seen.includes(marker), `the watched value reached the other account: ${seen.slice(0, 300)}`);
+    const sent = await json(`/v1/messages/conversations`, { headers: authA() });
+    assert(!JSON.stringify(sent.body?.data ?? {}).includes(marker), 'no message carrying the watched value left the first account');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

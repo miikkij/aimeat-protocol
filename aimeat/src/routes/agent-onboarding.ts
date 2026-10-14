@@ -12,6 +12,7 @@
  *   - DELETE /v1/agents/:name/onboarding/override    -- Clear readiness override
  *   - DELETE /v1/agents/:name/onboarding           -- Cancel onboarding
  * @version-history
+ *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.9.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.9.0 -- 2026-08-28 -- hints.test_task_status and hints.test_task_has_plan say the state a driver
  *                            acts on; POST /start removes the previous smoke test when it is still
@@ -63,7 +64,7 @@ import type { Storage } from '../storage/interface.js';
 import { LIVE_TASK_STATUSES } from '../storage/types/agents-messaging.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
-import { agentGaiiFromIdentifier, isOwnerInPerson } from '../utils/gaii.js';
+import { agentGaiiFromIdentifier, mayActOnAgent } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
@@ -135,9 +136,8 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
   }
 
   function canAccessAgent(req: Express.Request, agentName: string): boolean {
-    if (isOwnerInPerson(req.auth)) return true;
-    const expectedGaii = resolveAgentGaii(req, agentName);
-    return req.auth!.sub === expectedGaii;
+    // The agent itself, or its own owner in person (QA audit 2026-10-14, K1).
+    return mayActOnAgent(req.auth, resolveAgentGaii(req, agentName), config.nodeId);
   }
 
   /* -- GET /v1/agents/:name/onboarding -- */
@@ -437,6 +437,11 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
   router.put('/v1/agents/:name/onboarding/override', requireAuth(), requireRole('owner'), async (req, res) => {
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
+    // The override is the owner's judgement about their own agent (QA audit 2026-10-14, K1).
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', t(req, 'agentOnboarding.errors.accessDenied')));
+      return;
+    }
 
     const onboarding = await storage.getOnboarding(agentGaii);
     if (!onboarding) {
@@ -474,6 +479,10 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
   router.delete('/v1/agents/:name/onboarding/override', requireAuth(), requireRole('owner'), async (req, res) => {
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', t(req, 'agentOnboarding.errors.accessDenied')));
+      return;
+    }
 
     const onboarding = await storage.getOnboarding(agentGaii);
     if (!onboarding) {

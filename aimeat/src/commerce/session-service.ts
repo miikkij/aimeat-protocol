@@ -16,6 +16,10 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v3.1.0 — 2026-10-14 — Completion compares each line's quote with the live price and the session
+ *     total with the sum of its lines before charging, and refuses a difference with 409
+ *     PRICE_CHANGED (the session stays open). The record itself is service-owned now
+ *     (utils/reserved-keys.ts), so no memory route writes it (QA audit 2026-10-14, K4).
  *   v3.0.0 — 2026-10-11 — Money price and pacing amount (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa): a session is always in a money currency (0 = free) and carries `pacingMorsels`; completion charges the pacing first (chargePacing: burn share, operator share, provider credit), needs a money handler only for a money total, and puts `pacing` on the receipt. No morsel handler; an open 'morsel' session from before is refused with SESSION_REPRICED.
  *   v2.10.0 — 2026-10-09 — The seller's order copy carries each line's sellerResult where a fulfilment
  *     gives one, so an ext-call's one-time pay token stays with the buyer (secrets audit 2026-10-09, S-3).
@@ -559,8 +563,20 @@ async function completeSessionInner(
       currency: session.currency,
     }, session.buyerOwner));
   }
+  // The quote is compared with the live price before anything is charged: a price the seller changed
+  // since the quote, or a session total that is not the sum of its lines, is refused and the session
+  // stays open for the buyer to re-quote (PATCH items). Completion charged whatever the record said
+  // (QA audit 2026-10-14, K4).
+  const quotedTotal = session.items.reduce((n, item) => n + item.unitPrice * item.quantity, 0);
+  const changed = session.items.findIndex((item, i) =>
+    sellables[i].unitPrice !== item.unitPrice || sellables[i].tollMorsels !== (item.tollMorsels ?? sellables[i].tollMorsels));
+  if (changed >= 0 || quotedTotal !== session.total) {
+    throw new CommerceError('PRICE_CHANGED', 409, changed >= 0
+      ? `The price of "${session.items[changed].title}" changed after this checkout was opened. Update the items to get a new quote, then complete again.`
+      : 'This checkout\'s total does not match its lines. Update the items to get a new quote, then complete again.');
+  }
 
-  // Per-item money math on the QUOTED prices the session carries.
+  // Per-item money math on the QUOTED prices the session carries, which equal the live prices above.
   const feePct = commerceFeePercent(config);
   const lines = session.items.map((item) => {
     const gross = item.unitPrice * item.quantity;
