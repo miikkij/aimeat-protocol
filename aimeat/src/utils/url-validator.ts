@@ -10,6 +10,10 @@
  *   the request to an internal target.
  * @usage const resp = await safeFetch(url, { method, headers, body });
  * @version-history
+ *   v2.8.0 — 2026-10-14 — An IPv6 literal is checked and looked up without its brackets, so it is
+ *     refused by the literal check on every operating system. The bracketed form reached the lookup,
+ *     which Windows resolved and Linux refused: the address was refused on both, with two wordings,
+ *     and a unit test pinning one was red in CI since 2026-10-02 (QA audit 2026-10-14, CI1).
  *   v2.7.0 — 2026-10-08 — `allowHosts`: exact hostnames one call may reach, checked on every hop, so
  *     an extension that declares `network: { hosts }` cannot be redirected off its list.
  *   v2.6.0 — 2026-09-23 — `allowOrigins`: the exact origins (scheme, host, port) ONE caller may reach
@@ -117,6 +121,10 @@ export async function validateOutboundUrl(
   }
 
   const hostname = parsed.hostname.toLowerCase();
+  // URL.hostname keeps an IPv6 literal's brackets ("[::1]"). The literal check and the lookup take the
+  // address without them, so a literal is decided here on every operating system: the bracketed form
+  // went to the lookup, which Windows resolved and Linux refused (QA audit 2026-10-14, CI1).
+  const host = hostname.replace(/^\[|\]$/g, '');
 
   // An origin the operator named for this one caller: exact scheme, host and port, never a range.
   // The host is the operator's own word, so neither the private-range check nor DNS applies to it.
@@ -129,7 +137,7 @@ export async function validateOutboundUrl(
   // node can reach a local Ollama / webhook; `public` default false); AIMEAT_DEV_MODE stays a
   // back-compat alias. RFC1918/link-local/cloud-metadata remain blocked below regardless.
   const allowPrivate = process.env.AIMEAT_ALLOW_PRIVATE_EGRESS === 'true' || process.env.AIMEAT_DEV_MODE === 'true';
-  if (allowPrivate && (hostname === 'localhost' || hostname === '::1' || /^127\./.test(hostname))) {
+  if (allowPrivate && (hostname === 'localhost' || host === '::1' || /^127\./.test(hostname))) {
     return { valid: true };
   }
 
@@ -139,14 +147,14 @@ export async function validateOutboundUrl(
   }
 
   // If the host is a literal IP, check it directly (covers ::ffff: forms etc.).
-  const literalReason = blockedIpReason(hostname);
+  const literalReason = blockedIpReason(host);
   if (literalReason) return { valid: false, reason: literalReason };
 
   // Resolve via DNS and reject if ANY resolved address is blocked. Using
   // { all: true } defeats round-robin records where only some entries are
   // private. (getaddrinfo also normalises decimal/octal/hex IPv4 encodings.)
   try {
-    const records = await lookup(hostname, { all: true });
+    const records = await lookup(host, { all: true });
     if (records.length === 0) return { valid: false, reason: 'DNS resolution returned no records' };
     for (const { address } of records) {
       const reason = blockedIpReason(address);
