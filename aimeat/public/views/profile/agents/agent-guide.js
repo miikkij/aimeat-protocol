@@ -16,17 +16,26 @@
  *   THE CONNECTOR IS SAID, NOT ASSUMED. Until 2026-10-01 the basic agents' section said "You do not
  *   have to set anything up" and kept its button disabled until a connector ran. ConnectorSteps is the
  *   install, inline, wherever a worker on the person's computer is offered.
- * @structure AgentGuide({ session, onConnect, onNew }) · ConnectorSteps({ session }) ·
- *   PlacesPicture() · NoAgentsYet({ onPick })
+ *
+ *   A NODE THAT TAKES NO COMPUTERS SAYS SO. With the connector tunnel off, `aimeat connect serve`
+ *   is refused (an nginx 502 on innokas.aimeat.io, 2026-10-14) and no computer ever appears, so the
+ *   steps ask the operator to turn it on and restart instead of showing commands that cannot work.
+ * @structure AgentGuide({ session, onConnect, onNew }) · ConnectorSteps({ session, accepting? }) ·
+ *   NoComputersHere({ session }) · nodeTakesComputers() · PlacesPicture() · NoAgentsYet({ onPick })
  * @usage <${AgentGuide} session=${session} onConnect=${openConnect} onNew=${openNew} first />
  * @version-history
+ *   v1.1.0 — 2026-10-14 — ConnectorSteps shows NoComputersHere when the node's connector tunnel is
+ *     off (GET /v1/agents/v2/connectors tunnel_enabled), with the setting for the operator (Jouni,
+ *     2026-10-14: "ei saisi näyttää lisää tietokone jos 502 ja enable tunnel ei ole laitettu true:ksi").
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { Section } from '/components/Section.js';
 import { Note } from '/components/Note.js';
@@ -40,8 +49,57 @@ import { PLACES } from './agent-facts.js';
 
 const g = (key, vars) => t('profile.agents.guide.' + key, vars);
 
-/** The connector's two commands, with the copy button, as section 03's developer fold shows them. */
-export function ConnectorSteps({ session }) {
+let takesComputers = null;
+/**
+ * Whether this node takes computers at all: `tunnel_enabled` of GET /v1/agents/v2/connectors, asked
+ * once per page load. A failed read answers yes, so the commands show as they did before.
+ * @returns {Promise<boolean>}
+ */
+export function nodeTakesComputers() {
+  takesComputers ??= apiGet('/v1/agents/v2/connectors')
+    .then((r) => r?.data?.tunnel_enabled !== false)
+    .catch((err) => { swallowed('agent-guide: tunnel state', err); return true; });
+  return takesComputers;
+}
+
+/**
+ * nodeTakesComputers() as a hook: null until the node answered, then true or false.
+ * @returns {boolean | null}
+ */
+export function useTakesComputers() {
+  const [takes, setTakes] = useState(/** @type {boolean | null} */ (null));
+  useEffect(() => {
+    let live = true;
+    nodeTakesComputers().then((v) => { if (live) setTakes(v); });
+    return () => { live = false; };
+  }, []);
+  return takes;
+}
+
+/**
+ * What a person reads in place of the commands when this node takes no computers: the operator
+ * must turn the tunnel on and restart, so the commands would only end in a refused connection.
+ * The operator is told the setting and given the way to it.
+ */
+export function NoComputersHere({ session }) {
+  const operator = (session?.roles || []).includes('operator');
+  return html`
+    <${Stack} gap="small">
+      <${Note} kind="aside">${g('noTunnel')}<//>
+      ${operator && html`
+        <${Note} kind="lead">${g('noTunnelOperator')}<//>
+        <${Actions}><${Action} small href="/v1/admin?tab=config">${g('noTunnelSettings')} →<//><//>`}
+    <//>
+  `;
+}
+
+/**
+ * The connector's two commands, with the copy button, as section 03's developer fold shows them.
+ * `accepting` is the node's answer when the caller already has it; without it the steps ask.
+ */
+export function ConnectorSteps({ session, accepting }) {
+  const asked = useTakesComputers();
+  if ((accepting ?? asked) === false) return html`<${NoComputersHere} session=${session} />`;
   const install = `npx aimeat connect --url ${getNodeUrl()} --owner ${session?.owner ?? ''}`;
   return html`
     <${Code} block>${install}<//>
@@ -61,6 +119,7 @@ const ANSWERS = ['ask', 'away', 'timetable', 'app'];
 
 /** What each answer leads to: its sentence and the one door it opens. */
 function Result({ answer, where, setWhere, session, onConnect, onNew }) {
+  const takes = useTakesComputers();
   if (answer === 'ask') {
     return html`<${Note} kind="lead">${g('askResult')}<//>
       <${Actions}><${Loud} onClick=${onConnect}>${g('askDoor')}<//><//>`;
@@ -77,8 +136,8 @@ function Result({ answer, where, setWhere, session, onConnect, onNew }) {
     <${Choice} label=${g('whereTitle')} value=${where} onChange=${setWhere} boxed cols=${2}
       options=${['machine', 'node'].map(id => ({ value: id, label: g(`where.${id}`), hint: g(`where.${id}Hint`) }))} />
     ${where === 'machine' && html`
-      <${Note} kind="lead">${g('machineResult')}<//>
-      <${ConnectorSteps} session=${session} />
+      ${takes !== false && html`<${Note} kind="lead">${g('machineResult')}<//>`}
+      <${ConnectorSteps} session=${session} accepting=${takes ?? undefined} />
       <${Actions}><${Action} small onClick=${onNew}>${g('machineDoor')} →<//><//>`}
     ${where === 'node' && html`
       <${Note} kind="lead">${g('nodeResult')}<//>

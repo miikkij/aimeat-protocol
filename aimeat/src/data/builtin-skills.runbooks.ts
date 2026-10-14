@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   v1.13.0 — 2026-10-14 — manage-my-agents: `tunnel_enabled: false` from aimeat_connector_list means
+ *     this node takes no computers; the agent says the operators must turn it on and restart.
  *   v1.12.0 — 2026-10-12 — manage-my-agents: listing agents needs agent:read from node 4.0.0.
  *   v1.11.0 — 2026-10-11 — manage-my-agents: stop an agent and start it again (aimeat_agent_stop,
  *     aimeat_agent_start), and what a stop does, in the words to say to the owner.
@@ -152,7 +154,10 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
     never the answer. When they have more than one connector (a home computer and a server, say),
     \`aimeat_connector_list\` names the computers and says which are connected; pass the one they
     mean as \`connector\`, and say its name to them, never its id. \`aimeat_connector_rename\` gives
-    a computer the name they use for it. With its model choice set to this node (\`aimeat_crew_llm_set\` with
+    a computer the name they use for it. When \`aimeat_connector_list\` answers
+    \`tunnel_enabled: false\`, this AIMEAT takes no computers yet and theirs is not at fault: say that
+    the people who run it must turn on computer connections and restart it, and offer to ask them at
+    \`support@operators\`. With its model choice set to this node (\`aimeat_crew_llm_set\` with
     \`{kind: "node"}\`, and the agent holding \`ai:use\`), it thinks with the model in their settings
     and their own AI key pays; otherwise it uses the key on the computer it runs on.
   - On this AIMEAT: a scheduled AI job (\`aimeat_schedule_create\`). Nothing to install, it runs

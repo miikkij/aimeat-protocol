@@ -107,7 +107,7 @@ import type {
   TunnelFrame, TunnelIdentity, TunnelStartOutcome, TunnelStatus,
 } from './tunnel-client-types.js';
 import {
-  ATTACH_REFUSAL_CODES, MAX_TIMER_CHUNK_MS, RE_AUTH_GUIDANCE, handlersFor, wsUrl,
+  ATTACH_REFUSAL_CODES, MAX_TIMER_CHUNK_MS, RE_AUTH_GUIDANCE, TUNNEL_OFF_GUIDANCE, handlersFor, wsUrl,
 } from './tunnel-client-types.js';
 import { CredentialRecovery, errorCodeOf, errorFrameAnswer, isCredentialVerdict } from './tunnel-credential-verdict.js';
 
@@ -477,7 +477,7 @@ export class ConnectTunnelClient {
           settle('auth_failed');
         } else {
           // 404 / anything else: node too old or tunnel disabled.
-          console.error(`[${this.label}] Tunnel not available on this node (upgrade ${code}).`);
+          console.error(`[${this.label}] Tunnel not available on this node (upgrade ${code}). ${TUNNEL_OFF_GUIDANCE}`);
           settle('unsupported');
         }
       });

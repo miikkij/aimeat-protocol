@@ -28,6 +28,9 @@
  *   every sentence on the page says computer.
  * @usage routed at /v1/home?computers=1 by spa.html (the older /v1/home?machines=1 opens it too)
  * @version-history
+ *   v1.2.0 — 2026-10-14 — A node whose connector tunnel is off (tunnel_enabled false) shows no "Add a
+ *     computer" and no commands: it asks the operator to turn computer connections on and restart,
+ *     and tells an operator the setting (Jouni, 2026-10-14, after innokas.aimeat.io answered 502).
  *   v1.1.1 — 2026-10-11 — The page opens the live stream itself (lib/live-updates.js
  *     relayLiveUpdates), so a computer that connects or goes away shows without a reload.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
@@ -60,7 +63,7 @@ import { Mark, Marks } from '/components/Mark.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Stack } from '/components/Layout.js';
 import { useConfirm } from '/components/Modal.js';
-import { ConnectorSteps } from '/views/profile/agents/agent-guide.js';
+import { ConnectorSteps, NoComputersHere } from '/views/profile/agents/agent-guide.js';
 import { moveAgent } from '/js/services/agent-draft.js';
 import { machineName } from '/views/home/agents-band.js';
 import { storeHref, storeOpensSoon } from '/js/site.js';
@@ -213,6 +216,7 @@ function Machine({ c, others, onChanged, confirm }) {
 export default function MachinesView({ navigate }) {
   const session = useSession();
   const [machines, setMachines] = useState(null);
+  const [accepting, setAccepting] = useState(true);
   const [loadError, setLoadError] = useState('');
   const { confirm, ConfirmUI } = useConfirm();
 
@@ -220,6 +224,7 @@ export default function MachinesView({ navigate }) {
     try {
       const resp = await apiGet('/v1/agents/v2/connectors');
       setMachines(resp?.data?.connectors ?? []);
+      setAccepting(resp?.data?.tunnel_enabled !== false);
       setLoadError('');
     } catch (err) { setLoadError(err?.message || String(err)); }
   }, []);
@@ -249,27 +254,31 @@ export default function MachinesView({ navigate }) {
   if (loadError && !machines) return html`<${PageFrame} width="narrow">${back}<${ErrorNote} text=${loadError} /><//>`;
   if (!machines) return html`<${PageFrame} width="narrow" loading=${true}><${Spinner} /><//>`;
 
+  const have = machines.length === 0
+    ? html`<${Note} kind="aside">
+        <b>${tr('home.agents.noMachineTitle', 'An agent needs a computer to run on. You have none yet.')}</b>
+        ${accepting && html`${' '}${m('noneText', 'Add one below. An agent you already made starts on it by itself.')}`}
+      <//>`
+    : html`<${Stack} gap="medium">
+        ${machines.map((c) => html`
+          <${Machine} key=${c.id} c=${c} others=${machines.filter((o) => o.id !== c.id)} onChanged=${load} confirm=${confirm} />`)}
+      <//>`;
+
   return html`
     <${PageFrame} width="narrow">
       ${back}
       <${PageIntro} title=${m('title', 'Your computers')}
         sub=${m('sub', 'A computer is where your agents run: your laptop, a server, a computer in the cloud, or an AIMEAT instance from the store. An agent can use only what its computer can do and what you allowed it.')} />
 
-      ${machines.length === 0
-        ? html`<${Note} kind="aside">
-            <b>${tr('home.agents.noMachineTitle', 'An agent needs a computer to run on. You have none yet.')}</b>
-            ${' '}${m('noneText', 'Add one below. An agent you already made starts on it by itself.')}
-          <//>`
-        : html`<${Stack} gap="medium">
-            ${machines.map((c) => html`
-              <${Machine} key=${c.id} c=${c} others=${machines.filter((o) => o.id !== c.id)} onChanged=${load} confirm=${confirm} />`)}
-          <//>`}
-
-      <${SubHeading} level=${2} desc=${m('addDesc', 'Your own laptop, computer or server. Agents run on it and can use the models it reaches. Run these two commands on it, approve the code it shows, and the computer appears on this page, where you give it a name.')}>
-        ${m('addTitle', 'Add a computer')}
-      <//>
-      <${ConnectorSteps} session=${session} />
-      <${Note} kind="quiet">${m('addNote', 'The computer does work only while it is switched on.')}<//>
+      ${accepting
+        ? html`
+          ${have}
+          <${SubHeading} level=${2} desc=${m('addDesc', 'Your own laptop, computer or server. Agents run on it and can use the models it reaches. Run these two commands on it, approve the code it shows, and the computer appears on this page, where you give it a name.')}>
+            ${m('addTitle', 'Add a computer')}
+          <//>
+          <${ConnectorSteps} session=${session} accepting=${true} />
+          <${Note} kind="quiet">${m('addNote', 'The computer does work only while it is switched on.')}<//>`
+        : html`<${Stack} gap="medium">${have}<${NoComputersHere} session=${session} /><//>`}
 
       ${storeHref() && html`
         <${SubHeading} level=${2} desc=${m('hostedDesc', 'Your own AIMEAT in the cloud. We keep it switched on, it runs your agents, and you install nothing. You buy it in the store.')}>

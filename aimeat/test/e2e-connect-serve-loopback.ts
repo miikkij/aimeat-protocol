@@ -1114,6 +1114,11 @@ await test('Start a second node with AIMEAT_CONNECT_TUNNEL_ENABLED=false', async
 
 await test('Daemon degrades to direct transport and still serves the proxy', async () => {
   const acc2 = await registerOwnerAndAgent(NODE2_BASE, NODE_ID, `degowner${stamp}`, 'degbot');
+  // The connector list tells a page that this node takes no computers, so it asks the operator
+  // instead of showing install commands that end in a refused upgrade.
+  const listed = await json(NODE2_BASE, '/v1/agents/v2/connectors', { headers: { Authorization: `Bearer ${acc2.agentToken}` } });
+  assert(listed.status === 200 && listed.body.data?.tunnel_enabled === false,
+    `tunnel off: expected tunnel_enabled false, got ${listed.status} ${JSON.stringify(listed.body?.data ?? listed.body?.error)}`);
   writeConnectorHome(home2, 'degbot', acc2.ownerName, NODE2_BASE, acc2.agentToken);
   daemon2 = spawnDaemon(home2);
   const disc = await waitForDiscovery(home2).catch((err) => {

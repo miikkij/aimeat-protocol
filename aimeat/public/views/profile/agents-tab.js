@@ -7,6 +7,7 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.19.1 -- 2026-10-14 -- On a node that takes no computers the developer fold shows NoComputersHere in place of the connector commands, its recommendation and its Node.js help.
  *   v4.19.0 -- 2026-10-03 -- The page's start (components/PageStart.js, New agent as its button) and the title's question mark, concept.agent (guidance part B).
  *   v4.18.0 -- 2026-10-02 -- The agents list names the agents whose `*` holds their tasks until narrowed.
  *   v4.17.0 -- 2026-10-01 -- "What should an agent do?" is section 01 (agents/agent-guide.js); the others
@@ -161,7 +162,7 @@ import ScopesModal from './agents/scopes-modal.js';
 import { hasRefusals } from './agents/agent-card-access.js';
 import BasicAgentsPanel from './agents/basic-agents-panel.js';
 import NewAgentPanel from './agents/new-agent-panel.js';
-import { AgentGuide, NoAgentsYet } from './agents/agent-guide.js';
+import { AgentGuide, NoAgentsYet, NoComputersHere, useTakesComputers } from './agents/agent-guide.js';
 import { swallowed } from '/js/swallowed.js';
 
 const p = (key, vars) => t('profile.agents.page.' + key, vars);
@@ -188,6 +189,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [newDraft, setNewDraft] = useState(null);
   const [waitingCount, setWaitingCount] = useState(0);
   const [cliExpanded, setCliExpanded] = useState(false);
+  const takesComputers = useTakesComputers();
   const [pasteExpanded, setPasteExpanded] = useState(false);
   const [taskRunnerExpanded, setTaskRunnerExpanded] = useState(false);
   const [taskRunnerName, setTaskRunnerName] = useState('');
@@ -680,9 +682,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
               <${Split} heavy above="section" pad="none">
                 <${Section} fold inner id="agp-connect-cli" num="" title=${t('profile.agents.connectDeveloperTitle')} open=${cliExpanded} onToggle=${() => setCliExpanded(v => !v)}>
                   <${Stack} gap="small">
-                    <${Note}><strong>${t('profile.agents.connectOptionConnectorTitle')}</strong> ${t('profile.agents.connectOptionConnectorDesc')}<//>
+                    ${takesComputers !== false && html`<${Note}><strong>${t('profile.agents.connectOptionConnectorTitle')}</strong> ${t('profile.agents.connectOptionConnectorDesc')}<//>`}
                     <${Note}><strong>${t('profile.agents.connectOptionFallbackTitle')}</strong> ${t('profile.agents.connectOptionFallbackDesc')}<//>
 
+                    ${takesComputers === false ? html`<${NoComputersHere} session=${session} />` : html`
                     <${SubHeading}>${t('profile.agents.cliInstall')}<//>
                     <${Code} block>npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}<//>
                     <${Actions}><${Loud} copy=${`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`}>${t('profile.agents.copyCommand')}<//><//>
@@ -690,7 +693,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                     <${SubHeading}>${t('profile.agents.cliServe')}<//>
                     <${Code} block>npx aimeat connect serve<//>
 
-                    <${Note}>${t('profile.agents.cliDesc')}<//>
+                    <${Note}>${t('profile.agents.cliDesc')}<//>`}
 
                     <${SubHeading}>${t('profile.agents.agentInstructionTitle')}<//>
                     <${Note}>${t('profile.agents.agentInstructionDesc')}<//>
@@ -698,7 +701,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                     <${Actions}><${Loud} copy=${helloPrompt}>${t('profile.agents.copyAgentInstruction')}<//><//>
                   <//>
 
-                  <${Split} above="large" pad="large">
+                  ${takesComputers !== false && html`<${Split} above="large" pad="large">
                     <${Action} small expanded=${platExpand} onClick=${() => setPlatExpand(!platExpand)}>
                       ${t('profile.agents.noNodejs')} ${platExpand ? '▲' : '▼'}
                     <//>
@@ -708,7 +711,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                       ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
                       <${TabPanel} value=${activePlat}><${HowTo} html=${PLATFORMS[activePlat]} /><//>
                     `}
-                  <//>
+                  <//>`}
                 <//>
 
                 <${Section} fold inner id="agp-connect-paste" num="" title=${t('profile.agents.pasteAlt')} open=${pasteExpanded} onToggle=${() => setPasteExpanded(v => !v)}>

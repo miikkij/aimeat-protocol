@@ -28,13 +28,17 @@
  *
  *   A CONNECTOR WITH NO INSTALL ID is one older than 2026-09-01. It cannot be addressed, so it is
  *   not recorded; the routes that take no connector choice serve it as before.
- * @structure CONNECTORS_KEY · StoredConnector · ConnectorView · listConnectors() · findConnector() ·
+ * @structure CONNECTORS_KEY · StoredConnector · ConnectorView · listConnectors() · connectorListAnswer() · findConnector() ·
  *   syncConnectors() · renameConnector() · forgetConnector() · setWanted() · clearWanted() ·
  *   wantedInstalls() · recordPlacement() · startConnectorRegistry()
  * @usage
  *   const rows = await listConnectors({ config, storage }, owner);
  *   const hit = await findConnector({ config, storage }, owner, 'Kotikone');
  * @version-history
+ *   v1.2.0 — 2026-10-14 — connectorListAnswer(): the list with `tunnel_enabled`, so a page and an
+ *     AI can tell a node that takes no connectors from an owner who has none (innokas.aimeat.io,
+ *     2026-10-14: the tunnel was off, the upgrade answered 502, and the page still offered the
+ *     install commands).
  *   v1.1.0 — 2026-10-12 — A connector's row keeps what its crew runtime honours beyond its tools
  *     (`features`, from X-AIMEAT-Features), as it keeps the run modes
  *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
@@ -43,6 +47,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { connectedDaemons } from './basic-agents.js';
+import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { onTunnelSocketOpened, onTunnelSocketClosed, type TunnelSocketOpened } from './connect-tunnel-hooks.js';
 import { INSTALL_NAME_MAX } from './connect-tunnel-roster.js';
 import { emitChange } from './event-bus.js';
@@ -250,6 +255,21 @@ export async function listConnectors(ctx: RegistryContext, owner: string): Promi
     };
   });
   return rows.sort((x, y) => Number(y.online) - Number(x.online) || (x.name ?? x.id).localeCompare(y.name ?? y.id));
+}
+
+/**
+ * The answer GET /v1/agents/v2/connectors and aimeat_connector_list give. `tunnel_enabled` says
+ * whether this node takes connectors at all: with the forward tunnel off a connector's tunnel
+ * upgrade is refused, no connector is ever listed, and the page must ask the operator instead of
+ * showing the install commands. It is read from the running tunnel, not from the setting: the
+ * setting (connect_tunnel.enabled) can be changed while the node runs, and the tunnel follows it
+ * only at the next start.
+ */
+export async function connectorListAnswer(ctx: RegistryContext, owner: string): Promise<{
+  connectors: ConnectorView[]; online: number; tunnel_enabled: boolean;
+}> {
+  const connectors = await listConnectors(ctx, owner);
+  return { connectors, online: connectors.filter(c => c.online).length, tunnel_enabled: getActiveConnectTunnelManager() !== null };
 }
 
 /**

@@ -17774,6 +17774,9 @@
         "machineDoor": "Tee agentti",
         "nodeResult": "Ajastettu tekoälytyö tässä AIMEATissa. Se toimii täällä omalla tekoälyavaimellasi, joten et asenna mitään ja tietokoneesi voi olla kiinni. Jokainen ajo tekee yhden kehotteen asettamanasi aikana.",
         "placesDoor": "Missä agentit toimivat",
+        "noTunnel": "Tämä palvelu ei vielä ota tietokoneita vastaan. Palvelun ylläpitäjän pitää ottaa tietokoneyhteydet käyttöön ja käynnistää palvelu uudelleen. Pyydä sitä ylläpitäjältä. Sen jälkeen lisäät tietokoneesi tällä sivulla.",
+        "noTunnelOperator": "Sinä ylläpidät tätä palvelua. Ota käyttöön asetus connect_tunnel.enabled tai aseta AIMEAT_CONNECT_TUNNEL_ENABLED=true, ja käynnistä palvelu uudelleen. Palvelu lukee asetuksen vain käynnistyessään.",
+        "noTunnelSettings": "Avaa asetukset",
         "places": {
           "chat": {
             "title": "Keskustelutekoälysi",

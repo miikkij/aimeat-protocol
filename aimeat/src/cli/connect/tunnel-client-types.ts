@@ -13,6 +13,8 @@
  *   decide whether a failure is a verdict or a hiccup, and the one pure function. What does not:
  *   anything that reads `this`. That line is what keeps the split a move rather than a rewrite.
  * @version-history
+ *   v1.4.0 -- 2026-10-14 -- TUNNEL_OFF_GUIDANCE: tunnel-client.ts prints it after a refused upgrade, so the
+ *     person reads what the operator must set and that the computer is not listed until then.
  *   v1.3.0 -- 2026-10-11 -- `reason` on the frame and on onAuthFailure: the node says when an identity was
  *     detached because the agent moved to another connector, and the serve daemon acts on it.
  *   v1.2.0 -- 2026-10-07 -- `forgetToken` on an identity: one that can mint is re-attached with a new
@@ -194,6 +196,10 @@ export const TOKEN_DEAD_CODES = new Set(['UNAUTHORIZED', 'INVALID_TOKEN', 'TOKEN
 export const ATTACH_REFUSAL_CODES = new Set(['ATTACH_UNAUTHORIZED', 'ATTACH_FORBIDDEN']);
 
 export const RE_AUTH_GUIDANCE = 'Run: aimeat connect';
+/** What a refused upgrade means for the person: the operator's switch, and what works meanwhile. */
+export const TUNNEL_OFF_GUIDANCE = 'The node takes no computers until its operator sets AIMEAT_CONNECT_TUNNEL_ENABLED=true '
+  + '(connect_tunnel.enabled) and restarts it. Until then this computer is not listed on the node, and the '
+  + 'agent fetches its tasks over plain HTTP.';
 /** Cap a single token-refresh timer chunk; the chain re-evaluates each firing. */
 export const MAX_TIMER_CHUNK_MS = 24 * 60 * 60 * 1000;
 
