@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.17.2 — 2026-10-14 — otkGraceMs removed with the connectivity-key routes (feature-list audit row 202).
  *   v1.17.1 — 2026-10-10 — federationAudienceRequired names the two versions and the per-peer pin (secaudit 2026-10-10 I21, I22).
  *   v1.17.0 — 2026-10-09 — DocsignConfig mixed in (config-docsign.ts); ExtensionHooks and HookName
  *     moved to config-types-hooks.ts unchanged and re-exported here.
@@ -409,7 +410,6 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   appAnnouncementBoardId: string;
   webhookMaxRetries: number;
   workQueueMaxPending: number;
-  otkGraceMs: number;
   indexNowKey: string | null;
   extensionHooks: ExtensionHooks;
   rateLimits: RateLimitsConfig;

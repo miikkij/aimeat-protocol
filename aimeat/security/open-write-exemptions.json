@@ -9,7 +9,6 @@
     "POST /v1/admin/setup/auth": "NO SESSION CAN EXIST YET — this IS the admin-password login. The password is compared timing-safely and the door carries the admin auth rate limit.",
     "POST /v1/admin/setup/register": "GATED IN THE HANDLER — the bootstrap door for a node with no accounts: the admin session cookie or the timing-safe admin password, which is why every owner it creates is granted the operator role.",
     "POST /v1/admin/setup/token": "GATED IN THE HANDLER — two proofs: the admin password or session, plus possession of the owner's private key checked against the stored public key before any JWT is issued.",
-    "POST /v1/agents/connect": "THE CREDENTIAL IS IN THE BODY — a one-time connectivity key (OTK), consumed with a grace window. An agent presenting it has been authorized by the owner already; there is no session because this is where one is established.",
     "POST /v1/agents/device-authorize": "RFC 8628 — the device-authorization request. optionalAuth resolves an identity and refuses nobody (invariant 6), which is correct here: the flow exists so that a device with no credential can ask for one, and the owner approves it on a second screen.",
     "POST /v1/agents/device-token": "RFC 8628 — the credential is the `device_code` issued by the step above, and a wrong grant_type is a 400. A session cannot exist: this is the exchange that produces one.",
     "POST /v1/agents/v2/token": "THE CREDENTIAL IS IN THE BODY — the v2 agent token exchange, bounded by the login rate limit. Same shape as every other token endpoint here.",

@@ -2,17 +2,18 @@
  * @file connectivity-key-erasure.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description secaudit 2026-10-10 C0: a connectivity key does not outlive the account that minted
- *   it, against real in-memory SQLite.
+ * @description Connectivity-key rows after the routes that used them were removed, against real
+ *   in-memory SQLite.
  *
- *   Keys minted before 2026-10-10 were stored under the bare account name, which the erasure cascade
- *   did not delete. A deleted username is released for reuse, so POST /v1/agents/connect created an
- *   agent under whoever registered the name next. Two of the three fixes are pinned here: deleteOwner
- *   deletes the rows under the bare name as well as under the GHII, and the connect route refuses a
- *   key older than the owner record it names (the rows already in databases). The mint storing the
- *   GHII and the whole path over HTTP are in test/e2e-account-doors.ts (49, 49b), on both backends.
+ *   POST /v1/auth/connectivity-key and POST /v1/agents/connect were removed on 2026-10-14
+ *   (feature-list audit row 202). The OTK table stays, so rows minted before the removal can still
+ *   sit in a database. Two things are pinned here: a stored key creates no agent through the
+ *   registration router, and deleteOwner still deletes an account's rows under the bare name as
+ *   well as under the GHII (secaudit 2026-10-10 C0), so an erased account leaves none behind.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connectivity-key-erasure.test.ts
  * @version-history
+ *   v2.0.0 — 2026-10-14 — The connect route is gone: the two cases that drove it are replaced by one
+ *     that asserts a stored, valid key answers 404 and creates no agent. The erasure case stays.
  *   v1.0.0 — 2026-10-10 — Initial (secaudit 2026-10-10 C0).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -51,15 +52,7 @@ async function createKey(key: string, ownerGaii: string, owner: string, createdA
   await storage.createOtk(otk);
 }
 
-async function connect(key: string, agentName: string): Promise<{ status: number; body: { error?: { code?: string }; data?: { private_key?: string } } }> {
-  const res = await fetch(`${base}/v1/agents/connect`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ connectivity_key: key, agent_name: agentName }),
-  });
-  return { status: res.status, body: await res.json() as never };
-}
-
-describe('connectivity keys and owner erasure (secaudit 2026-10-10 C0)', () => {
+describe('connectivity-key rows after the routes were removed', () => {
   beforeAll(async () => {
     const config = { ...loadConfig().config, nodeId: NODE_ID } as AimeatConfig;
     const app = express();
@@ -78,24 +71,17 @@ describe('connectivity keys and owner erasure (secaudit 2026-10-10 C0)', () => {
     await new Promise<void>(resolve => server.close(() => resolve()));
   });
 
-  it('refuses a key minted before the owner record it names was created', async () => {
-    await createOwner('alice', iso(0));
-    // A row left by the previous holder of the name, stored under the bare name as before the fix.
-    await createKey('otk-old-holder', 'alice', 'alice', iso(-HOUR));
-    const r = await connect('otk-old-holder', 'inherited');
-    expect(r.status).toBe(404);
-    expect(r.body.error?.code).toBe('INVALID_KEY');
-    expect(r.body.data?.private_key).toBeUndefined();
-    expect(await storage.getAgent(`inherited#alice@${NODE_ID}`)).toBeNull();
-  });
-
-  it('accepts a key minted after the owner record was created', async () => {
+  it('a stored, valid key creates no agent: POST /v1/agents/connect is not served', async () => {
     await createOwner('dave', iso(-HOUR));
     await createKey('otk-current', `dave@${NODE_ID}`, 'dave', iso(0));
-    const r = await connect('otk-current', 'fresh');
-    expect(r.status).toBe(201);
-    expect(typeof r.body.data?.private_key).toBe('string');
-    expect(await storage.getAgent(`fresh#dave@${NODE_ID}`)).not.toBeNull();
+    const res = await fetch(`${base}/v1/agents/connect`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ connectivity_key: 'otk-current', agent_name: 'fresh' }),
+    });
+    expect(res.status).toBe(404);
+    expect(await storage.getAgent(`fresh#dave@${NODE_ID}`)).toBeNull();
+    // Nothing consumed the row either: the route that burned it is gone.
+    expect((await storage.getOtk('otk-current'))?.used).toBe(false);
   });
 
   it('deleteOwner deletes the keys stored under the bare account name and under the GHII', async () => {

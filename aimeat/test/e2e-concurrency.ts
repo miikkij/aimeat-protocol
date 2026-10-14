@@ -6,6 +6,8 @@
  *   parallel settlement, and the wallet balances after each round, asserted exactly.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-concurrency
  * @version-history
+ *   v1.0.2 — 2026-10-14 — 32: the connectivity-key mint is removed (feature-list audit row 202), so
+ *     it answers 404 like the other OTK routes.
  *   v1.0.1 — 2026-10-12 — The two actions are published with their pacing amount as
  *     pricing.toll_morsels; node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the
  *     new field means the same on 3.x. Every balance assertion is unchanged.
@@ -668,14 +670,13 @@ await test('31. POST /v1/auth/initial-otk is gone (404)', async () => {
     assert(status === 404, `removed initial mint answered ${status}`);
 });
 
-await test('32. Connectivity-key mint still works (same file, kept on purpose)', async () => {
+await test('32. POST /v1/auth/connectivity-key is gone too (404, removed 2026-10-14)', async () => {
     const { status, body } = await json('/v1/auth/connectivity-key', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({}),
     });
-    assert(status === 201, `connectivity-key mint broke with the OTK removal (${status}): ${JSON.stringify(body).slice(0, 200)}`);
-    assert(typeof body.data?.connectivity_key === 'string', 'has connectivity_key');
+    assert(status === 404, `removed connectivity-key mint answered ${status}: ${JSON.stringify(body).slice(0, 200)}`);
 });
 
 await test('33. Authorization holds under parallel load: five agent PUTs on an operator door, five 403s', async () => {

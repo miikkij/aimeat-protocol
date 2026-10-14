@@ -2,8 +2,11 @@
  * @file src/routes/agents/registration.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
+ * @description Agent registration routes (owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-14 — POST /v1/agents/connect is removed with the connectivity-key mint that fed
+ *     it (Jouni, feature-list audit row 202). Device authorization and MCP connect an agent; key rows
+ *     already stored stay in the table and are deleted with their account.
  *   v1.6.0 — 2026-10-10 — POST /v1/agents/connect refuses a key minted before the owner record it
  *     names was created: an earlier holder of a released name minted it (secaudit 2026-10-10 C0).
  *   v1.5.1 — 2026-10-05 — The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
@@ -47,133 +50,6 @@ import { exceedsCeiling } from '../../utils/scope-coverage.js';
 export function registerRegistrationRoutes(
   router: Router, config: AimeatConfig, storage: Storage, dirnameAgents: string,
 ): void {
-  // POST /v1/agents/connect — register an agent via connectivity key (no auth required)
-  router.post('/v1/agents/connect', async (req, res) => {
-    const { connectivity_key, agent_name, display_name } = req.body ?? {};
-
-    if (!connectivity_key) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'connectivity_key is required'));
-      return;
-    }
-
-    const otk = await storage.consumeOtk(connectivity_key, config.otkGraceMs);
-    if (!otk || otk.action !== 'register_agent') {
-      res.status(404).json(error(config.nodeId, 'INVALID_KEY', 'Connectivity key not found, already used, or invalid'));
-      return;
-    }
-
-    const owner = otk.params.owner as string;
-    const finalName = agent_name ?? (otk.params.agent_name as string | null);
-
-    if (!finalName) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'agent_name is required (either in the connectivity key or in the request body)'));
-      return;
-    }
-
-    const nameError = validateAgentName(finalName);
-    if (nameError) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameError));
-      return;
-    }
-
-    const ownerRecord = await storage.getOwner(owner);
-    if (!ownerRecord) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner "${owner}" not found`));
-      return;
-    }
-    // A key older than the account it names was minted by an earlier holder of the name. A deleted
-    // username is released for reuse, and keys minted before 2026-10-10 were stored under the bare
-    // name, which the erasure cascade did not delete, so such a row can still sit in a database. It
-    // gets the same answer as a key that does not exist (secaudit 2026-10-10 C0).
-    if (Date.parse(ownerRecord.createdAt) > Date.parse(otk.createdAt)) {
-      res.status(404).json(error(config.nodeId, 'INVALID_KEY', 'Connectivity key not found, already used, or invalid'));
-      return;
-    }
-
-    const gaii = buildGAII(finalName, owner, config.nodeId);
-
-    const existing = await storage.getAgent(gaii);
-    if (existing) {
-      res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Agent "${finalName}" already exists under owner "${owner}"`));
-      return;
-    }
-
-    const keyPair = await generateKeyPair();
-    const now = new Date().toISOString();
-    const description = (otk.params.description as string | null) ?? undefined;
-    const requestedScopes = config.defaultAgentScopes;
-
-    await storage.createAgent({
-      name: finalName,
-      owner,
-      gaii,
-      displayName: display_name ?? finalName,
-      description,
-      capabilities: [],
-      defaultScopes: requestedScopes,
-      publicKey: keyPair.publicKey,
-      trustScore: 50,
-      morselBalance: 0,
-      createdAt: now,
-      lastSeen: now,
-    });
-
-    fireHook(config, storage, 'post_agent_registration', { gaii, owner });
-
-    // Auto-start Hello Integration onboarding
-    const connectSteps = createDefaultSteps();
-    connectSteps[0].status = 'passed';
-    connectSteps[0].validatedAt = now;
-    connectSteps[0].validationMethod = 'automatic';
-    connectSteps[0].details = { createdAt: now };
-
-    const connectDetected = detectPlatform(req.headers['user-agent'] as string | undefined);
-    if (connectDetected) {
-      connectSteps[1].status = 'passed';
-      connectSteps[1].validatedAt = now;
-      connectSteps[1].validationMethod = 'automatic';
-      connectSteps[1].details = { platform: connectDetected.id, version: connectDetected.version };
-      await storage.updateAgent(gaii, {
-        platform: connectDetected.id,
-        platformVersion: connectDetected.version,
-        platformDetectedBy: connectDetected.detectedBy,
-      });
-    }
-
-    // Step 9 (accept_test_task) is required in this flow, so the task it accepts must exist NOW.
-    // Until 2026-08-24 only the device-auth and onboarding/start paths created it, and an agent
-    // registered here sat at step 9 with an empty queue and no explanation.
-    await createOnboardingTestTask(storage, gaii, `${owner}@${config.nodeId}`, connectSteps);
-    await storage.createOnboarding({
-      agentGaii: gaii,
-      status: 'in_progress',
-      startedAt: now,
-      steps: connectSteps,
-      detectedPlatform: connectDetected?.id,
-    });
-    emitChange('agent-onboarding');
-
-    res.set('Cache-Control', 'no-store');
-    res.set('Pragma', 'no-cache');
-    res.status(201).json(success(config.nodeId, {
-      agent: {
-        gaii,
-        display_name: display_name ?? finalName,
-        description,
-        scopes: requestedScopes,
-      },
-      private_key: keyPair.privateKey,
-      public_key: keyPair.publicKey,
-    }, [
-      {
-        description: 'Authenticate as this agent to get a JWT',
-        method: 'POST',
-        url: '/v1/auth/token',
-      },
-    ]));
-    emitChange('agents');
-  });
-
   // POST /v1/agents — register a new agent (requires owner JWT, local session only)
   router.post('/v1/agents', requireAuth(), requireLocalSession(), requireRole('owner'), validateBody(AgentRegistrationSchema, config.nodeId), async (req, res) => {
     const { name, owner, display_name, description, capabilities, scopes, mode } = req.body ?? {};
@@ -250,9 +126,9 @@ export function registerRegistrationRoutes(
     // Extension hook: post_agent_registration (fire-and-forget)
     fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
 
-    // The platform the User-Agent names belongs to the agent from the moment it exists. The
-    // connect path above writes it before it answers; this one wrote it AFTER, in the onboarding
-    // block below, so a caller that registered and read the agent straight back could find the
+    // The platform the User-Agent names belongs to the agent from the moment it exists. This route
+    // wrote it AFTER the response, in the onboarding block below, so a caller that registered and
+    // read the agent straight back could find the
     // field still empty. It did, on the slower backend: e2e-account-doors 41 went red on
     // postgres-kysely and green on sqlite, which is the shape of a write racing its own response
     // rather than a flake.
@@ -324,8 +200,8 @@ export function registerRegistrationRoutes(
       regOnboardingSteps[1].details = { platform: regDetected.id, version: regDetected.version };
     }
 
-    // Same reason as the connect path above: a required accept_test_task step with no task to
-    // accept strands the agent at step 9.
+    // Step 9 (accept_test_task) is required, so the task it accepts must exist now: a required
+    // step with no task to accept strands the agent at step 9.
     await createOnboardingTestTask(storage, gaii, `${owner}@${config.nodeId}`, regOnboardingSteps);
     await storage.createOnboarding({
       agentGaii: gaii,

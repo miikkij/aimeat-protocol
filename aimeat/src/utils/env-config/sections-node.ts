@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Node identity, storage, security, modes, economy, features, quota config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.0.1 — 2026-10-14 — AIMEAT_OTK_GRACE_MS removed with the connectivity-key routes.
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
  */
 
@@ -106,12 +107,6 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
           envVar: 'AIMEAT_REFRESH_GRACE_MS',
           description: 'Refresh-rotation grace window (in milliseconds)',
           value: String(config.refreshGraceMs),
-          defaultVal: '60000',
-        },
-        {
-          envVar: 'AIMEAT_OTK_GRACE_MS',
-          description: 'Grace period for expired one-time keys (in milliseconds)',
-          value: String(config.otkGraceMs),
           defaultVal: '60000',
         },
       ],

@@ -18,6 +18,8 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.6.2 — 2026-10-14 — The connectivity-key case is gone with the route (feature-list audit row
+ *     202): POST /v1/auth/connectivity-key answers 404 to everyone, asserted in e2e-account-doors 44.
  *   v1.6.1 — 2026-10-12 — The probe action of "the visitor's sent work is their own" is published with
  *     pricing.toll_morsels; node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the
  *     new field means the same on 3.x.
@@ -642,15 +644,6 @@ spec:
         // And the account is still there, which is the assertion that matters.
         const still = await json('/v1/messages/overview', as(alice.token));
         assert(still.status === 200, `the namesake's account did not survive: ${still.status}`);
-    });
-
-    await test('The visitor cannot mint a key that creates an agent under the local account', async () => {
-        // The key records `params.owner` from the caller's name, and the unauthenticated
-        // /v1/agents/connect door then builds an agent under whatever account that names.
-        const r = await json('/v1/auth/connectivity-key', as(fedToken, {
-            method: 'POST', body: JSON.stringify({ agent_name: `fedns-intruder-${stamp}` }),
-        }));
-        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
     });
 
     await test("The visitor's file list is their own, never the local namesake's", async () => {

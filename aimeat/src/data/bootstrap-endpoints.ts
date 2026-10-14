@@ -14,6 +14,8 @@
  *   import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
  *   res.json(success(nodeId, { ...rest, ...BOOTSTRAP_ENDPOINT_CATALOGUE }));
  * @version-history
+ *   v1.2.0 — 2026-10-14 — connect_agent and connectivity_key are gone with their routes (feature-list
+ *     audit row 202); device_authorize is how an agent joins.
  *   v1.1.0 — 2026-10-03 — help_prompt_person: /v1/help/prompt/person.
  *   v1.0.0 — 2026-09-18 — Extracted verbatim from src/routes/bootstrap.ts, which had reached the
  *     800-line limit. A pure move: the JSON the route answers is byte-identical.
@@ -44,8 +46,6 @@ export const BOOTSTRAP_ENDPOINT_CATALOGUE = {
       register_agent: { method: 'POST', url: '/v1/agents', description: 'Register an agent under an owner (requires owner JWT)', tier: 1 },
       registration_invite: { method: 'POST', url: '/v1/registration-invites', description: 'Ask us to email someone a link that ends in an account. Give their email and say which model you are; they choose the username. No auth.', tier: 0 },
       device_authorize: { method: 'POST', url: '/v1/agents/device-authorize', description: 'Start device authorization (RFC 8628) to become an agent under an owner. The owner approves and picks your scopes.', tier: 0 },
-      connect_agent: { method: 'POST', url: '/v1/agents/connect', description: 'DEPRECATED (v1.1.0): connectivity-key registration. Use device_authorize instead — nothing generates keys any more.', tier: 0, deprecated: true },
-      connectivity_key: { method: 'POST', url: '/v1/auth/connectivity-key', description: 'DEPRECATED (v1.1.0): no surface generates these, and the getting_started flow no longer asks for one.', tier: 1, deprecated: true },
       consent: { method: 'CRUD', url: '/v1/consent', description: 'Fine-grained data access consent rules with audit trail', tier: 1 },
       consent_audit: { method: 'GET', url: '/v1/consent/audit', description: 'Audit log of consent changes', tier: 1 },
       permissions: { method: 'GET', url: '/v1/permissions/*', description: 'Check permission summaries and per-key access', tier: 1 },
