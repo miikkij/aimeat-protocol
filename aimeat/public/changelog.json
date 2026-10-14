@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-15",
+      "kind": "feature",
+      "title": {
+        "en": "Find a place in Settings & Controls and on the admin pages by typing",
+        "fi": "Löydä kohta Asetukset ja hallinta -sivuilta ja ylläpidosta kirjoittamalla"
+      },
+      "body": {
+        "en": "A find field is now at the top of the Settings & Controls menu and of the admin menu. Type a word, and the menu shows only the places that match: pages, sections inside a page and, on the admin pages, the Config settings. A place is found by its name or by another word for it, in English, Finnish or Spanish. Enter opens the page at the right section. The / key moves you into the field from anywhere on the page. When nothing in the menus matches, the field offers to search your content instead. Your AI can answer \"where do I find this?\" the same way, with a link to the page. The Search everything dialog no longer scrolls sideways.",
+        "fi": "Asetukset ja hallinta -valikon ja ylläpidon valikon yläosassa on nyt hakukenttä. Kun kirjoitat sanan, valikko näyttää vain ne kohdat, jotka vastaavat sitä: sivut, sivujen osiot ja ylläpidossa myös Config-sivun asetukset. Haku löytää kohdan sen nimellä tai muulla sanalla suomeksi, englanniksi tai espanjaksi. Enter avaa sivun oikeasta osiosta. /-näppäimellä pääset kenttään mistä kohtaa sivua tahansa. Jos mikään valikon kohta ei vastaa hakua, kenttä tarjoaa hakua sisällöstäsi. Tekoälysi osaa vastata samalla tavalla kysymykseen \"mistä löydän tämän?\" ja antaa linkin sivulle. Hae kaikkea -ikkuna ei enää vieri sivusuunnassa."
+      }
+    },
+    {
       "date": "2026-10-13",
       "version": "4.0.1",
       "kind": "fix",

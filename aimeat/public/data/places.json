@@ -1,0 +1,293 @@
+{
+  "about": "Every place a person can open in Settings & Controls and on the admin pages, with the sections inside a page. Read by the menu find (public/components/MenuFind.js) and by an AI through aimeat_handbook_get { tier: \"places\" } (src/services/places.ts). The groups and labels follow the menus (SIDEBAR_GROUPS in views/profile/landing-page.cards.js, NAV_GROUPS in views/admin.js), and test/unit/places-index.test.ts holds them to each other. A place's other words are the locale keys places.kw.<side>.<id>.",
+  "settings": {
+    "path": "/v1/profile",
+    "top": [
+      { "id": "messages", "labelKey": "profile.tabs.inbox" }
+    ],
+    "groups": [
+      { "titleKey": "profile.landing.menuInformation", "items": [
+        { "id": "discover", "labelKey": "discover.tabLabel", "sections": [
+          { "id": "dv-kinds", "num": "01", "labelKey": "discover.cover.secKinds" },
+          { "id": "dv-recent", "num": "02", "labelKey": "discover.cover.secRecent" },
+          { "id": "dv-places", "num": "03", "labelKey": "discover.cover.secPlaces" },
+          { "id": "dv-book", "num": "04", "labelKey": "discover.cover.secBook" }
+        ] },
+        { "id": "organisms", "labelKey": "profile.tabs.organisms", "sections": [
+          { "id": "og-workspaces", "num": "01", "labelKey": "organisms.tabWorkspaces" },
+          { "id": "og-members", "num": "02", "labelKey": "organisms.tabMembers" },
+          { "id": "og-agents", "num": "03", "labelKey": "organisms.tabAgents" },
+          { "id": "og-board", "num": "04", "labelKey": "organisms.tabBoard" },
+          { "id": "og-history", "num": "05", "labelKey": "organisms.happened" },
+          { "id": "og-readme", "num": "06", "labelKey": "organisms.readmeFold" },
+          { "id": "og-map", "num": "07", "labelKey": "organisms.mapAndToc" },
+          { "id": "og-ai", "num": "08", "labelKey": "organisms.forAi" }
+        ] },
+        { "id": "memory", "labelKey": "profile.tabs.memory" },
+        { "id": "notebook", "labelKey": "profile.tabs.notebook" },
+        { "id": "living", "labelKey": "profile.tabs.living" },
+        { "id": "knowledge", "labelKey": "knowledge.tabLabel", "sections": [
+          { "id": "kp-packages", "num": "01", "labelKey": "knowledge.cover.secPackages" },
+          { "id": "kp-make", "num": "02", "labelKey": "knowledge.cover.make" },
+          { "id": "kp-orgs", "num": "03", "labelKey": "knowledge.cover.secOrganisms" },
+          { "id": "kp-library", "num": "04", "labelKey": "knowledge.cover.secLibrary" }
+        ] },
+        { "id": "boards", "labelKey": "profile.tabs.boards", "sections": [
+          { "id": "bp-followed", "num": "01", "labelKey": "profile.boards.cover.secFollowed" },
+          { "id": "bp-recent", "num": "02", "labelKey": "profile.boards.cover.secRecent" },
+          { "id": "bp-public", "num": "03", "labelKey": "profile.boards.cover.secPublic" },
+          { "id": "bp-own", "num": "04", "labelKey": "profile.boards.cover.secOwn" },
+          { "id": "bp-app", "num": "05", "labelKey": "profile.boards.cover.secApp" }
+        ] }
+      ] },
+      { "titleKey": "profile.landing.menuAutomation", "items": [
+        { "id": "fleet", "labelKey": "profile.tabs.fleet" },
+        { "id": "agents", "labelKey": "profile.tabs.agents", "sections": [
+          { "id": "agp-guide", "num": "01", "labelKey": "profile.agents.guide.title" },
+          { "id": "agp-basic", "num": "02", "labelKey": "profile.agents.basic.title" },
+          { "id": "agp-new", "num": "03", "labelKey": "profile.agents.new.title" },
+          { "id": "agp-connect", "num": "04", "labelKey": "profile.agents.page.secConnect" },
+          { "id": "agp-list", "num": "05", "labelKey": "profile.agents.page.secAgents" }
+        ] },
+        { "id": "ecosystem", "labelKey": "profile.tabs.ecosystem" },
+        { "id": "offers", "labelKey": "profile.tabs.offers", "sections": [
+          { "id": "op-back", "num": "01", "labelKey": "profile.offers.cover.secBack" },
+          { "id": "op-auto", "num": "02", "labelKey": "profile.offers.cover.secAuto" },
+          { "id": "op-ask", "num": "03", "labelKey": "profile.offers.cover.secAsk" },
+          { "id": "op-offline", "num": "04", "labelKey": "profile.offers.cover.secOffline" },
+          { "id": "op-selling", "num": "05", "labelKey": "profile.offers.cover.secSelling" }
+        ] },
+        { "id": "scheduler", "labelKey": "profile.tabs.scheduler", "sections": [
+          { "id": "sc-next", "num": "01", "labelKey": "profile.scheduler.cover.secNext" },
+          { "id": "sc-rhythm", "num": "02", "labelKey": "profile.scheduler.cover.secRhythm" },
+          { "id": "sc-cont", "num": "03", "labelKey": "profile.scheduler.cover.secCont" },
+          { "id": "sc-rare", "num": "04", "labelKey": "profile.scheduler.cover.secRare" },
+          { "id": "sc-all", "num": "05", "labelKey": "profile.scheduler.cover.secAll" },
+          { "id": "sc-agents", "num": "06", "labelKey": "profile.scheduler.cover.secAgents" }
+        ] },
+        { "id": "workflows", "labelKey": "profile.tabs.workflows", "sections": [
+          { "id": "wp-list", "num": "01", "labelKey": "profile.workflows.title" },
+          { "id": "wp-waiting", "num": "02", "labelKey": "profile.workflows.cover.secWaiting" },
+          { "id": "wp-new", "num": "03", "labelKey": "profile.workflows.cover.secNew" },
+          { "id": "wp-how", "num": "04", "labelKey": "profile.workflows.cover.howTitle" }
+        ] },
+        { "id": "actions", "labelKey": "profile.tabs.services" },
+        { "id": "mcp", "labelKey": "profile.tabs.mcp", "sections": [
+          { "id": "mcp-rows", "num": "01", "labelKey": "mcppage.secRows" },
+          { "id": "mcp-connect", "num": "02", "labelKey": "mcppage.secConnect" },
+          { "id": "mcp-instr", "num": "03", "labelKey": "mcppage.secInstructions" },
+          { "id": "mcp-suggest", "num": "04", "labelKey": "mcppage.secSuggest" }
+        ] }
+      ] },
+      { "titleKey": "profile.landing.menuActivity", "items": [
+        { "id": "contacts", "labelKey": "contacts.tabLabel", "sections": [
+          { "id": "ct-people", "num": "01", "labelKey": "contacts.cover.secPeople" },
+          { "id": "ct-noaccount", "num": "02", "labelKey": "contacts.cover.secNoAccount" },
+          { "id": "ct-agents", "num": "03", "labelKey": "contacts.cover.secAgents" },
+          { "id": "ct-add", "num": "04", "labelKey": "contacts.cover.add" },
+          { "id": "ct-where", "num": "05", "labelKey": "contacts.cover.whereTitle" }
+        ] },
+        { "id": "notifications", "labelKey": "profile.tabs.notifications", "sections": [
+          { "id": "nt-inbox", "num": "01", "labelKey": "notifpage.secInbox" },
+          { "id": "nt-senders", "num": "02", "labelKey": "notifpage.secSenders" },
+          { "id": "nt-devices", "num": "03", "labelKey": "notifpage.secDevices" },
+          { "id": "nt-quiet", "num": "04", "labelKey": "notifpage.quietTitle" },
+          { "id": "nt-how", "num": "05", "labelKey": "notifpage.howTitle" }
+        ] },
+        { "id": "email", "labelKey": "profile.tabs.email", "sections": [
+          { "id": "em-address", "num": "01", "labelKey": "emailpage.secAddress" },
+          { "id": "em-mailboxes", "num": "02", "labelKey": "emailpage.secMailboxes" },
+          { "id": "em-sent", "num": "03", "labelKey": "emailpage.secSent" },
+          { "id": "em-letters", "num": "04", "labelKey": "emailpage.lettersTitle" },
+          { "id": "em-chat", "num": "05", "labelKey": "emailpage.chatTitle" }
+        ] },
+        { "id": "chatsessions", "labelKey": "profile.tabs.chatSessions" }
+      ] },
+      { "titleKey": "profile.landing.menuBusiness", "items": [
+        { "id": "companies", "labelKey": "profile.tabs.companies", "sections": [
+          { "id": "co-rows", "num": "01", "labelKey": "companypage.secRows" },
+          { "id": "co-create", "num": "02", "labelKey": "companypage.secCreate" }
+        ] },
+        { "id": "pnl", "labelKey": "profile.tabs.pnl" },
+        { "id": "usage", "labelKey": "profile.tabs.usage" },
+        { "id": "visibility", "labelKey": "profile.tabs.visibility" }
+      ] },
+      { "titleKey": "profile.landing.menuBuildShare", "items": [
+        { "id": "apps", "labelKey": "profile.tabs.apps", "sections": [
+          { "id": "ap-waiting", "num": "", "labelKey": "appspage.secWaiting" },
+          { "id": "ap-kunto", "num": "", "labelKey": "appspage.secKunto" },
+          { "id": "ap-newest", "num": "", "labelKey": "appspage.secNewest" },
+          { "id": "ap-agents", "num": "", "labelKey": "appspage.secAgents" },
+          { "id": "ap-build", "num": "", "labelKey": "appspage.secBuild" },
+          { "id": "ap-builders", "num": "", "labelKey": "appspage.secBuilders" }
+        ] },
+        { "id": "packages", "labelKey": "profile.tabs.getApps", "sections": [
+          { "id": "pk-installed", "num": "01", "labelKey": "pkpage.secInstalled" },
+          { "id": "pk-offers", "num": "02", "labelKey": "pkpage.secOffers" },
+          { "id": "pk-own", "num": "03", "labelKey": "pkpage.secOwn" },
+          { "id": "pk-new", "num": "04", "labelKey": "pkpage.secNew" },
+          { "id": "pk-ai", "num": "05", "labelKey": "pkpage.secAi" }
+        ] },
+        { "id": "appdev", "labelKey": "profile.tabs.appDev", "sections": [
+          { "id": "ad-start", "num": "01", "labelKey": "appdevpage.secStart" },
+          { "id": "ad-learned", "num": "02", "labelKey": "appdevpage.secLearned" },
+          { "id": "ad-proposals", "num": "03", "labelKey": "appdevpage.secProposals" },
+          { "id": "ad-curated", "num": "04", "labelKey": "appdevpage.secCurated" },
+          { "id": "ad-how", "num": "05", "labelKey": "appdevpage.secHow" }
+        ] },
+        { "id": "extensions", "labelKey": "profile.tabs.extensions", "sections": [
+          { "id": "ex-ext", "num": "", "labelKey": "extpage.secExt" },
+          { "id": "ex-cortex", "num": "", "labelKey": "extpage.secCortex" },
+          { "id": "ex-new", "num": "", "labelKey": "extpage.secNew" }
+        ] },
+        { "id": "libraries", "labelKey": "librariesTab.tabLabel", "sections": [
+          { "id": "lb-base", "num": "01", "labelKey": "libspage.secBase" },
+          { "id": "lb-ui", "num": "02", "labelKey": "libspage.secUi" },
+          { "id": "lb-third", "num": "03", "labelKey": "libspage.secThird" },
+          { "id": "lb-faces", "num": "04", "labelKey": "libspage.secFaces" },
+          { "id": "lb-ai", "num": "05", "labelKey": "libspage.secAi" }
+        ] },
+        { "id": "capabilities", "labelKey": "capabilities.tabLabel", "sections": [
+          { "id": "cp-ext", "num": "01", "labelKey": "capspage.secExt" },
+          { "id": "cp-app", "num": "02", "labelKey": "capspage.secApp" },
+          { "id": "cp-agent", "num": "03", "labelKey": "capspage.secAgent" },
+          { "id": "cp-other", "num": "04", "labelKey": "capspage.secOther" },
+          { "id": "cp-ai", "num": "05", "labelKey": "capspage.secAi" }
+        ] },
+        { "id": "skills", "labelKey": "skills.tabLabel", "sections": [
+          { "id": "sk-own", "num": "01", "labelKey": "skpage.secOwn" },
+          { "id": "sk-node", "num": "02", "labelKey": "skpage.secNode" },
+          { "id": "sk-ws", "num": "03", "labelKey": "skpage.secWs" },
+          { "id": "sk-new", "num": "04", "labelKey": "skpage.secNew" },
+          { "id": "sk-ai", "num": "05", "labelKey": "skpage.secAi" }
+        ] },
+        { "id": "portfolio", "labelKey": "portfolio.tabLabel", "sections": [
+          { "id": "pf-addresses", "num": "01", "labelKey": "pfpage.secAddresses" },
+          { "id": "pf-visibility", "num": "02", "labelKey": "pfpage.secVisibility" },
+          { "id": "pf-page", "num": "03", "labelKey": "pfpage.secPage" },
+          { "id": "pf-change", "num": "04", "labelKey": "pfpage.secChange" },
+          { "id": "pf-ai", "num": "05", "labelKey": "pfpage.secAi" }
+        ] },
+        { "id": "ai", "labelKey": "profile.generator.openrouter.title", "sections": [
+          { "id": "ai-connection", "num": "01", "labelKey": "aipage.secConnection" },
+          { "id": "ai-providers", "num": "02", "labelKey": "aipage.pv.title" },
+          { "id": "ai-routing", "num": "03", "labelKey": "aipage.rt.title" },
+          { "id": "ai-roles", "num": "04", "labelKey": "aipage.rl.title" },
+          { "id": "ai-policy", "num": "05", "labelKey": "aipage.pol.title" },
+          { "id": "ai-budget", "num": "06", "labelKey": "aipage.secBudget" },
+          { "id": "ai-consumers", "num": "07", "labelKey": "aipage.secConsumers" }
+        ] },
+        { "id": "calibrator", "labelKey": "profile.calibrator.tabLabel", "sections": [
+          { "id": "cal-runs", "num": "01", "labelKey": "calpage.secRuns" },
+          { "id": "cal-prompt", "num": "02", "labelKey": "calpage.secPrompt" },
+          { "id": "cal-models", "num": "03", "labelKey": "calpage.secModels" },
+          { "id": "cal-templates", "num": "04", "labelKey": "calpage.secTemplates" },
+          { "id": "cal-roads", "num": "05", "labelKey": "calpage.secRoads" }
+        ] },
+        { "id": "work", "labelKey": "profile.tabs.work" }
+      ] },
+      { "titleKey": "profile.landing.menuAccount", "items": [
+        { "id": "wallet", "labelKey": "profile.tabs.wallet", "sections": [
+          { "id": "wal-sources", "num": "01", "labelKey": "walpage.secSources" },
+          { "id": "wal-ledger", "num": "02", "labelKey": "walpage.secLedger" },
+          { "id": "wal-money", "num": "03", "labelKey": "walpage.secMoney" },
+          { "id": "wal-rails", "num": "04", "labelKey": "walpage.secRails" },
+          { "id": "wal-roads", "num": "05", "labelKey": "walpage.secRoads" }
+        ] },
+        { "id": "dataWallet", "labelKey": "profile.tabs.dataWallet", "sections": [
+          { "id": "dw-targets", "num": "01", "labelKey": "dwpage.secTargets" },
+          { "id": "dw-trail", "num": "02", "labelKey": "dwpage.secTrail" },
+          { "id": "dw-grant", "num": "03", "labelKey": "dwpage.secGrant" },
+          { "id": "dw-export", "num": "04", "labelKey": "dwpage.secExport" },
+          { "id": "dw-class", "num": "05", "labelKey": "dwpage.cls.title" },
+          { "id": "dw-roads", "num": "06", "labelKey": "dwpage.secRoads" }
+        ] },
+        { "id": "access", "labelKey": "profile.tabs.access", "sections": [
+          { "id": "ac-signin", "num": "01", "labelKey": "accesspage.secSignIn" },
+          { "id": "ac-keys", "num": "02", "labelKey": "accesspage.secKeys" },
+          { "id": "ac-accounts", "num": "03", "labelKey": "accesspage.secAccounts" },
+          { "id": "ac-mcp", "num": "04", "labelKey": "accesspage.secMcp" },
+          { "id": "ac-secrets", "num": "05", "labelKey": "accesspage.secSecrets" },
+          { "id": "ac-groups", "num": "06", "labelKey": "accesspage.secGroups" },
+          { "id": "ac-addresses", "num": "07", "labelKey": "accesspage.secAddresses" },
+          { "id": "ac-roads", "num": "08", "labelKey": "accesspage.secRoads" }
+        ] }
+      ] },
+      { "titleKey": "profile.landing.menuInfra", "operator": true, "items": [
+        { "id": "federation", "labelKey": "profile.tabs.federation" },
+        { "id": "nodes", "labelKey": "profile.tabs.nodes" },
+        { "id": "security", "labelKey": "profile.tabs.security" }
+      ] }
+    ]
+  },
+  "admin": {
+    "path": "/v1/admin",
+    "groups": [
+      { "titleKey": "dashboard.navNode", "items": [
+        { "id": "overview", "labelKey": "dashboard.overview" },
+        { "id": "economy", "labelKey": "dashboard.economy" },
+        { "id": "config", "labelKey": "dashboard.config" },
+        { "id": "security", "labelKey": "admin.security.title" },
+        { "id": "compliance", "labelKey": "admin.compliance.title" },
+        { "id": "cors", "labelKey": "dashboard.cors" },
+        { "id": "maintenance", "labelKey": "dashboard.maintenance" },
+        { "id": "hooks", "labelKey": "dashboard.hooks" },
+        { "id": "portal", "labelKey": "dashboard.portal" },
+        { "id": "discovery", "labelKey": "dashboard.seo.tab" },
+        { "id": "subdomains", "labelKey": "admin.subdomains.title" },
+        { "id": "stats", "labelKey": "dashboard.stats" },
+        { "id": "database", "labelKey": "dashboard.database" },
+        { "id": "metrics", "labelKey": "dashboard.metrics" },
+        { "id": "usage", "labelKey": "dashboard.usage" },
+        { "id": "prompts", "labelKey": "dashboard.promptsTab" }
+      ] },
+      { "titleKey": "dashboard.navIdentity", "items": [
+        { "id": "owners", "labelKey": "dashboard.owners" },
+        { "id": "agents", "labelKey": "dashboard.agents" },
+        { "id": "ghii", "labelKey": "dashboard.ghii" },
+        { "id": "agent-integration", "labelKey": "admin.tabs.agentIntegration" },
+        { "id": "org-ownership", "labelKey": "admin.tabs.orgOwnership" },
+        { "id": "sso", "labelKey": "dashboard.ssoTab" }
+      ] },
+      { "titleKey": "dashboard.navData", "items": [
+        { "id": "actions", "labelKey": "dashboard.actions" },
+        { "id": "boards", "labelKey": "dashboard.boards" },
+        { "id": "chatInstances", "labelKey": "dashboard.chatInstances" },
+        { "id": "realtime", "labelKey": "dashboard.realtime" },
+        { "id": "work", "labelKey": "dashboard.work" },
+        { "id": "messages", "labelKey": "admin.messages.title" },
+        { "id": "memory-admin", "labelKey": "dashboard.memoryAdmin" },
+        { "id": "agent-tasks", "labelKey": "dashboard.agentTasksTab" },
+        { "id": "sharing-groups", "labelKey": "dashboard.sharingGroupsTab" },
+        { "id": "capabilities", "labelKey": "capabilities.adminTitle" },
+        { "id": "apps", "labelKey": "admin.apps.title" }
+      ] },
+      { "titleKey": "dashboard.navInfrastructure", "items": [
+        { "id": "email", "labelKey": "dashboard.email" },
+        { "id": "push", "labelKey": "dashboard.push" },
+        { "id": "consul", "labelKey": "dashboard.consul" },
+        { "id": "scheduler", "labelKey": "dashboard.scheduler" }
+      ] },
+      { "titleKey": "dashboard.navServices", "items": [
+        { "id": "directory", "labelKey": "dashboard.directory" },
+        { "id": "extensions", "labelKey": "dashboard.extensionsTab" },
+        { "id": "cortex", "labelKey": "dashboard.cortexTab" },
+        { "id": "csm", "labelKey": "dashboard.csmManagement" },
+        { "id": "knowledge", "labelKey": "knowledge.operator.tabLabel" },
+        { "id": "skills", "labelKey": "dashboard.skills.tabLabel" },
+        { "id": "packages", "labelKey": "dashboard.packagesTab" }
+      ] },
+      { "titleKey": "dashboard.navIntegrations", "items": [
+        { "id": "msm", "labelKey": "dashboard.msmManagement" }
+      ] },
+      { "titleKey": "dashboard.navFederation", "items": [
+        { "id": "federation", "labelKey": "dashboard.federation" },
+        { "id": "genesis", "labelKey": "dashboard.genesis" }
+      ] },
+      { "titleKey": "dashboard.navDesign", "items": [
+        { "id": "design-lab", "labelKey": "dashboard.designLab" },
+        { "id": "themes", "labelKey": "dashboard.themes" }
+      ] }
+    ]
+  }
+}

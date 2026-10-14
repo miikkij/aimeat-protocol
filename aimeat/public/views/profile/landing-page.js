@@ -17,6 +17,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.19.0 — 2026-10-14 — The menu find at the top of the side menu (components/MenuFind.js): typing
+ *     narrows the menu to the places, the sections inside a page and, for an operator, the admin pages
+ *     that match; ?section= in a link scrolls to that section (wish-pikahaku-settings-controls-ja-admin-sivuille).
  *   2026-10-03 — NextSteps reads the person's path itself; the extensions promo gets the app count and
  *     decides on its own when to show (after the apps stage, guidance A2).
  *   2026-09-26 — The open tab's crumb is SettingsFrameHead's `crumb`, the overview's panels stand in the
@@ -131,6 +134,8 @@ import { StartPageSetting } from '/components/StartPageSetting.js';
 import { CardGrid } from '/components/Card.js';
 import { SettingsFrame, SettingsFrameHead, SettingsFrameBody } from '/components/SettingsFrame.js';
 import { SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuMore } from '/components/SideMenu.js';
+import { MenuFind } from '/components/MenuFind.js';
+import { loadPlaces, placeWords, sectionsOf, indexGroups, scrollToSectionSoon } from '/js/services/places.js';
 import {
   ProfileCard, WaitingForYou, NextSteps, UsageCard, AiSpendCard, AgentLedgerCard,
   CommerceCard, ContinueCard, AgentsCard, CortexSection, InboxNavButton,
@@ -278,6 +283,41 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     setOpenView(next);
   }, [isOperator]);
 
+  /* ── The menu find (components/MenuFind.js): the menu's own places with their other words and
+     the sections inside a page (public/data/places.json), and for an operator the admin pages.
+     A found place opens even when it is the tab already open (open() would close it), a section
+     is scrolled to once its page has drawn it, and an admin page loads the admin side. ── */
+  const [placesIndex, setPlacesIndex] = useState(null);
+  useEffect(() => { loadPlaces().then(setPlacesIndex); }, []);
+  // A link into a section (?tab=agents&section=agp-connect, the address an AI gives from
+  // aimeat_handbook_get { tier: "places" }): read before the first history sync rewrites the URL.
+  const sectionAsked = useRef(new URLSearchParams(window.location.search).get('section'));
+  useEffect(() => { if (sectionAsked.current) scrollToSectionSoon(sectionAsked.current); }, []);
+  const findGroups = [
+    { key: 'top', title: '', items: [{ id: 'messages', label: t('profile.tabs.inbox'), words: placeWords('settings', 'messages', 'profile.tabs.inbox') }] },
+    ...SIDEBAR_GROUPS.filter(g => !g.adminOnly || isOperator).map(g => ({
+      key: g.titleKey, title: t(g.titleKey),
+      items: g.items.map(it => ({
+        id: it.id, label: t(it.labelKey), words: placeWords('settings', it.id, it.labelKey),
+        hidden: !showAllTools && !BASIC_TAB_IDS.has(it.id), sections: sectionsOf(placesIndex, 'settings', it.id),
+      })),
+    })),
+  ];
+  const findOther = isOperator && placesIndex
+    ? indexGroups(placesIndex, 'admin').map(g => ({ ...g, items: g.items.map(it => ({ ...it, tail: t('menuFind.tailAdmin') })) }))
+    : [];
+  const openFound = useCallback((row) => {
+    if (row.place.data?.side === 'admin') { window.location.assign(`/v1/admin?tab=${encodeURIComponent(row.place.id)}`); return; }
+    if (openViewRef.current?.tabId !== row.place.id) open(row.place.id, 'main');
+    setDrawerOpen(false);
+    if (row.section) scrollToSectionSoon(row.section.id);
+  }, [open]);
+  // The / key on a phone opens the drawer the find sits in.
+  const wakeFind = useCallback(() => {
+    if (window.matchMedia?.('(max-width: 900px)').matches) setDrawerOpen(true);
+  }, []);
+  const searchContent = (words) => window.dispatchEvent(new CustomEvent('aimeat-command-palette', { detail: { q: words } }));
+
   /* ── Pinned items: 3–5 favourites under Home, persisted per user (memory key
      `sidebar.pins`, same pattern as organisms.ui). Defaults for new users. ── */
   const [pins, setPins] = useState(DEFAULT_PINS);
@@ -384,6 +424,10 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
               overview's masthead is the name at full size, so a third copy in the index was the
               one Jouni counted out loud (2026-08-29). */''}
 
+        <${MenuFind} label=${t('menuFind.labelSettings')} placeholder=${t('menuFind.placeholderSettings')}
+          groups=${findGroups} other=${findOther} otherTitle=${t('menuFind.otherOperator')}
+          hiddenNote=${t('menuFind.hiddenNote')} onOpen=${openFound} onWake=${wakeFind} onContentSearch=${searchContent}>
+
         <${SideMenuItem} active=${!openView} onClick=${() => { close(); setDrawerOpen(false); }}>
           ${t('profile.landing.home')}
         <//>
@@ -434,7 +478,8 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
                 : tOr('profile.landing.showAllTools', 'Show all tools')}
             <//>
           `;
-        })()}`;
+        })()}
+        <//>`;
 
   return html`
     <${SettingsFrame} open=${drawerOpen} onToggle=${() => setDrawerOpen(o => !o)} onClose=${() => setDrawerOpen(false)}

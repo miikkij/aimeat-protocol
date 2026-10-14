@@ -14221,6 +14221,82 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
 
+  /v1/prompts/places/sections:
+    get:
+      operationId: listPlacesParts
+      summary: The parts of the list of places
+      description: >-
+        Where things are on this node's own pages, for an AI asked "where do I find X": `start` is every
+        page of Settings & Controls with the sections inside it, and `admin` every admin page, each with
+        its link, its name in English, Finnish and Spanish and the other words a person may use for it.
+        Read from public/data/places.json, the index the menu find on those pages reads. The MCP tool
+        aimeat_handbook_get serves the same parts for tier "places" and "places/admin". Public.
+      tags:
+        - Discovery
+      responses:
+        '200':
+          description: The parts, with their size
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          parts:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string, example: start }
+                                what: { type: string }
+                                chars: { type: integer }
+
+  /v1/prompts/places/sections/{id}:
+    get:
+      operationId: getPlacesPart
+      summary: One part of the list of places
+      description: >-
+        `start` (Settings & Controls) or `admin` (the admin pages). A section's link adds `&section=<id>` to its
+        page's link; a Config setting's link is /v1/admin?tab=config&q=<setting key>. Plain text with
+        ?format=txt. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, enum: [start, admin] }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the part as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The part
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string, example: places/admin }
+                          kind: { type: string, enum: [part] }
+                          prompt: { type: string }
+        '404':
+          description: The list has no part by that id; the message lists the ids it has
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+
   /v1/prompts/settings/sections:
     get:
       operationId: listSettingsExplainParts

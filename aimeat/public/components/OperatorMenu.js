@@ -17,10 +17,14 @@
  *     number (0 included, as main showed it).
  *   - active: the chosen item's id. onPick(id): an item was chosen.
  *   - label: the navigation's name for a screen reader (defaults to the title).
+ *   - find: (items) => markup. The menu find under the node id, given the groups' markup to show
+ *     while nothing is typed (components/MenuFind.js, tone "operator").
  * @structure OperatorMenu(props)
  * @usage html`<${OperatorMenu} title=${t('dashboard.operatorMenu')} nodeId=${nodeId} groups=${groups}
- *          active=${activePage} onPick=${switchPage} />`
+ *          active=${activePage} onPick=${switchPage} find=${(items) => html`<${MenuFind} tone="operator" …>${items}<//>`} />`
  * @version-history
+ *   v1.1.0 — 2026-10-14 — `find`: the menu find under the node id, wrapping the groups (additive; with
+ *     no `find` the menu draws what it drew).
  *   v1.0.0 — 2026-09-27 — Initial: moved out of views/admin.js (.adm-sidebar, .adm-nav-group,
  *     .adm-nav-item, .cnt, .node-id) with its look unchanged, plus the heading Jouni asked for: "minusta
  *     olisi hyvä mainita vielä siinä että tämä on operator menu, eli operaattorin valikko".
@@ -31,14 +35,10 @@ import htm from 'htm';
 const html = htm.bind(h);
 
 /**
- * @param {{ title?: any, nodeId?: string, groups: Array<{ key?: string, title: any, items: Array<{ id: string, label: any, count?: number|null }> }>, active?: string, onPick: (id: string) => void, label?: string }} props
+ * @param {{ title?: any, nodeId?: string, groups: Array<{ key?: string, title: any, items: Array<{ id: string, label: any, count?: number|null }> }>, active?: string, onPick: (id: string) => void, label?: string, find?: (items: any) => any }} props
  */
-export function OperatorMenu({ title, nodeId, groups = [], active, onPick, label }) {
-  return html`
-    <nav class="operator-menu" aria-label=${label || (typeof title === 'string' ? title : undefined)}>
-      ${title ? html`<div class="operator-menu-title">${title}</div>` : null}
-      <div class="operator-menu-node">${nodeId || ''}</div>
-      ${groups.map((group) => html`
+export function OperatorMenu({ title, nodeId, groups = [], active, onPick, label, find }) {
+  const items = groups.map((group) => html`
         <div class="operator-menu-group" key=${group.key || String(group.title)}>${group.title}</div>
         ${group.items.map((item) => html`
           <button type="button" key=${item.id}
@@ -48,7 +48,12 @@ export function OperatorMenu({ title, nodeId, groups = [], active, onPick, label
             <span class="operator-menu-label">${item.label}</span>
             ${typeof item.count === 'number' ? html`<span class="operator-menu-count">${item.count}</span>` : null}
           </button>`)}
-      `)}
+      `);
+  return html`
+    <nav class="operator-menu" aria-label=${label || (typeof title === 'string' ? title : undefined)}>
+      ${title ? html`<div class="operator-menu-title">${title}</div>` : null}
+      <div class="operator-menu-node">${nodeId || ''}</div>
+      ${find ? find(items) : items}
     </nav>`;
 }
 

@@ -10,6 +10,8 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.12.0 -- 2026-10-14 -- tier "places" and "places/admin": where things are on this node's own
+ *     pages, with links (services/places.ts), for "where do I find X".
  *   v1.11.0 -- 2026-10-11 -- tier "build-app/agent/<name>": the build instructions' section about
  *     one of the caller's own agents, for an app that shows that agent's work.
  *   v1.10.1 -- 2026-10-03 -- The `tier` description says "settings" also holds the system's words in
@@ -73,6 +75,7 @@ import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { V2_ROLES, toolsForSurface, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { featureMapPiece, featureMapPieceIds } from '../services/feature-map.js';
 import { settingsExplainPiece, settingsExplainPieceIds } from '../services/settings-explain.js';
+import { placesPiece, placesPieceIds } from '../services/places.js';
 
 export function registerPromptsTools(
     mcp: McpServer,
@@ -92,7 +95,7 @@ export function registerPromptsTools(
         'aimeat_handbook_get',
         descriptionFor('aimeat_handbook_get'),
         {
-            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "settings" lists, first, the words this system uses (organism, agent, morsel and others), each in plain language, then the settings the pages explain behind a question mark, by area. "settings/<term>" is one of them in English, Finnish and Spanish. "settings/concept.<id>" is a word, for example "settings/concept.organism": read it before you use the word with the person or when they ask what it is, and give the word that meaning, which every page and tool uses too. Any other term is a setting: read it when the person asks what it means or which value to pick.'),
+            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "places" says where each page of Settings & Controls is, with the sections inside it and a link to each, and "places/admin" does the same for the admin pages: read it when the person asks where to find something on the pages of this AIMEAT. "settings" lists, first, the words this system uses (organism, agent, morsel and others), each in plain language, then the settings the pages explain behind a question mark, by area. "settings/<term>" is one of them in English, Finnish and Spanish. "settings/concept.<id>" is a word, for example "settings/concept.organism": read it before you use the word with the person or when they ask what it is, and give the word that meaning, which every page and tool uses too. Any other term is a setting: read it when the person asks what it means or which value to pick.'),
             surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.'),
         },
         annotationsFor('aimeat_handbook_get'),
@@ -170,6 +173,14 @@ export function registerPromptsTools(
                 const piece = featureMapPiece(id);
                 if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
                 return toolError('NOT_FOUND', `The feature map has no part "${id}". It has: ${featureMapPieceIds().join(', ')}. Ask for "features" to read the list of areas.`);
+            }
+            // Where things are on this node's own pages, with links (services/places.ts): read when
+            // the person asks where to find something in Settings & Controls or on the admin pages.
+            if (tierKey === 'places' || tierKey.startsWith('places/')) {
+                const id = tierKey.slice('places/'.length) || 'start';
+                const piece = placesPiece(id, config.baseUrl);
+                if (piece) return { content: [{ type: 'text' as const, text: piece.text }] };
+                return toolError('NOT_FOUND', `The list of places has no part "${id}". It has: ${placesPieceIds().map(p => p === 'start' ? 'places' : 'places/' + p).join(', ')}.`);
             }
             // The setting explanations the pages show behind a question mark, in parts
             // (services/settings-explain.ts): read when the person asks what a setting means.

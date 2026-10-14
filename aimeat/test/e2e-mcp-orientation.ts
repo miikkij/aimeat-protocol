@@ -17,6 +17,8 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-10-14 — 17n, 17o: tier "places" and "places/admin", where things are on the node's own
+ *     pages, the same on MCP and REST, and a part that does not exist on both.
  *   2026-10-10 — 17j: an area longer than one part is split, and each part names the next (the
  *     Automation area had reached 28 292 characters and failed the size bound in the nightly sweep).
  *   2026-10-03 — Test 2 bounds the END of the agent surface line by the measured cut (2 052); the
@@ -633,6 +635,33 @@ async function main() {
             assert(body.result?.isError === true && /NOT_FOUND/.test(toolText(body)) && /start, ai\.temperature/.test(toolText(body)), `MCP: ${toolText(body).slice(0, 160)}`);
             const r = await json('/v1/prompts/settings/sections/ai.no_such_setting');
             assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND' && /ai\.temperature/.test(r.body.error?.message ?? ''), `REST: ${r.status}`);
+        });
+
+        // Where things are on the node's own pages (services/places.ts, public/data/places.json, the
+        // index the menu find reads): an AI asked "where is X" answers with the link.
+        await test('17n. tier "places" gives every Settings page and its sections with links, and "places/admin" the admin pages; MCP equals REST', async () => {
+            const start = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'places' } }, 470)).body);
+            const rest = await fetch(`${BASE}/v1/prompts/places/sections/start?format=txt`).then(r => r.text());
+            assert(start === rest, `MCP equals REST: ${start.slice(0, 120)}`);
+            assert(start.includes(`${BASE}/v1/profile?tab=agents`) && start.includes('`section=agp-connect`') && start.includes('Connect the AI you already use'),
+                `a page with its link and a section with its id: ${start.slice(0, 200)}`);
+            assert(start.includes('**Shared places** (fi: Yhteiset paikat, es: Lugares compartidos)'), 'a place is named in the three languages');
+            assert(start.includes('(also: MCP, Claude'), 'with the other words it is found by');
+            const admin = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'places/admin' } }, 471)).body);
+            assert(admin.includes(`${BASE}/v1/admin?tab=config`) && admin.includes('q=email.smtp_host'), `the admin part names Config and a setting's link: ${admin.slice(0, 200)}`);
+            const list = await json('/v1/prompts/places/sections');
+            const parts = list.body.data.parts as Array<{ id: string; chars: number }>;
+            assert(parts.map(p => p.id).join(',') === 'start,admin', `the parts: ${parts.map(p => p.id)}`);
+            for (const p of parts) assert(p.chars > 0 && p.chars < 24_000, `${p.id} fits one tool result: ${p.chars}`);
+            const handbook = toolText((await v1('tools/call', { name: 'aimeat_handbook_get', arguments: {} }, 472)).body);
+            assert(handbook.includes('"places"'), 'the handbook says where the list of places is');
+        });
+
+        await test('17o. FAILURE: a part of the list of places that does not exist is an error that lists the parts, on both doors', async () => {
+            const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'places/nowhere' } }, 473);
+            assert(body.result?.isError === true && /NOT_FOUND/.test(toolText(body)) && /places, places\/admin/.test(toolText(body)), `MCP: ${toolText(body).slice(0, 160)}`);
+            const r = await json('/v1/prompts/places/sections/nowhere');
+            assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND' && /start, admin/.test(r.body.error?.message ?? ''), `REST: ${r.status}`);
         });
 
         await test('17e. the Classic first part says it is Classic and where a new app is built', async () => {

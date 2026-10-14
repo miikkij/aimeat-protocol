@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Which route the connector's two doors ask when aimeat_handbook_get carries a `tier`.
  * @version-history
+ *   2026-10-14 — "places" and "places/admin" go to the list of places' parts route.
  *   2026-10-02 — "settings" and "settings/<term>" go to the setting explanations' parts route.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
@@ -25,6 +26,12 @@ describe('handbookTierPath', () => {
     expect(handbookTierPath('settings')).toBe('/v1/prompts/settings/sections/start');
     expect(handbookTierPath('settings/ai.temperature')).toBe('/v1/prompts/settings/sections/ai.temperature');
     expect(handbookTierPath('settings/config.morsel_policy.burn_rate')).toBe('/v1/prompts/settings/sections/config.morsel_policy.burn_rate');
+  });
+
+  it('sends "places" to the Settings & Controls part and "places/admin" to the admin pages', () => {
+    expect(handbookTierPath('places')).toBe('/v1/prompts/places/sections/start');
+    expect(handbookTierPath('places/admin')).toBe('/v1/prompts/places/sections/admin');
+    expect(handbookTierPath('places/')).toBe('/v1/prompts/places/sections/start');
   });
 
   it('sends any other tier to the prompt of that id', () => {

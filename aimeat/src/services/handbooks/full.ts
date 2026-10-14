@@ -8,6 +8,7 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.8.0 — 2026-10-14 — Says where the list of places is (tier "places"), for "where do I find X".
  *   v1.7.0 — 2026-10-02 — Says where the setting explanations are (tier "settings"), for when the
  *     person asks what a setting means.
  *   v1.6.0 — 2026-10-02 — When the person asks for a new agent (new-agent.ts), between the grounds and
@@ -98,6 +99,10 @@ not in what you tell them.
 **What this node can do**, once you know what the person needs: \`aimeat_handbook_get { tier:
 "features" }\` lists the areas, and \`"features/<id>"\` is one of them. Offer the one thing that
 fits; do not recite the list.
+
+**Where something is**, when the person asks where to find a page or a setting on this node:
+\`aimeat_handbook_get { tier: "places" }\` lists every page of Settings & Controls with the
+sections inside it and a link to each, and \`"places/admin"\` the admin pages. Give the link.
 
 **What a setting means**, when the person asks what a setting does or which value to pick:
 \`aimeat_handbook_get { tier: "settings" }\` lists the settings the pages explain behind a question

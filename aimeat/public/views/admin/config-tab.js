@@ -29,8 +29,11 @@
  *   - rangeWords — a number's range as "recommended …" or "allowed …"
  *   - rangeMin / refusalWords — why the node did not save a value, in the page's language
  *   - fieldEditor — one field's editor by its type (a Select when the field has choices)
+ *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   v3.6.0 -- 2026-10-14 -- The admin menu find opens a setting here: the `configFind` prop
+ *     ({ q, n }) puts its words into the search; configLabel and configGroupLabel are exported for it.
  *   v3.5.1 -- 2026-10-11 -- The quota section sits under limits, beside the rate limits: the list
  *     named it `quotas`, its settings are `quota.*`, so it had been landing in Other (Jouni).
  *   v3.5.0 -- 2026-10-11 -- A refused save says which setting and why, where the operator is: on the
@@ -82,7 +85,7 @@
  *   v1.1.0 -- 2026-05-31 -- Array-of-strings editor (one item per line).
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -166,6 +169,7 @@ function groupLabel(g) {
   const val = t(key);
   return val !== key ? val : g.charAt(0).toUpperCase() + g.slice(1).replace(/_/g, ' ');
 }
+export { label as configLabel, groupLabel as configGroupLabel };
 function domainLabel(id) {
   return tr('dashboard.cfgDomain_' + id, id.charAt(0).toUpperCase() + id.slice(1));
 }
@@ -284,14 +288,17 @@ function fieldEditor(p, e, val, editable, pending, onChange, bad) {
   return html`<${Code}>${String(e.value)}<//>`;
 }
 
-export default function ConfigTab({ data, reload }) {
+export default function ConfigTab({ data, reload, configFind }) {
   // Hooks must run unconditionally before any early return (Rules of Hooks).
   const [pending, setPending] = useState({});
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   // `?q=` opens the page already searched: a link to one setting (the new-version notice's
   // "Open the setting") lands on that setting rather than on the whole index.
-  const [q, setQ] = useState(() => new URLSearchParams(location.search).get('q') || '');
+  const [q, setQ] = useState(() => configFind?.q || new URLSearchParams(location.search).get('q') || '');
+  // The admin menu find chose a setting (or "more on the page") while this page was already open:
+  // its words go into the search, and the edits in progress stay.
+  useEffect(() => { if (configFind) setQ(configFind.q); }, [configFind]);
   const [onlyChanged, setOnlyChanged] = useState(false);
   const [showChanges, setShowChanges] = useState(false);
   // The settings the node did not save, path → why, in words. A refused setting stays unsaved and

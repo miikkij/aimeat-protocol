@@ -6,6 +6,8 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   v1.17.0 -- 2026-10-15 -- Mounts /v1/prompts/places/sections (where things are on this node's own
+ *     pages, routes/prompts-places.ts).
  *   v1.16.0 -- 2026-10-14 -- Mounts GET /v1/prompts/home-ideas, the ideas the home offers (prompts-home-ideas.ts).
  *   v1.15.1 -- 2026-10-11 -- The openclaw prompt's integration_guide is the Hello Integration walkthrough
  *     this node serves; it named the OpenClaw setup page of the repository, which no route served.
@@ -62,6 +64,7 @@ import { registerHomeIdeasPrompt } from './prompts-home-ideas.js';
 import { registerOpenItemsPrompt } from './prompts-open-items.js';
 import { registerAtelierPrompt } from './prompts-atelier.js';
 import { registerFeaturesPrompt } from './prompts-features.js';
+import { registerPlacesPrompt } from './prompts-places.js';
 import { registerSettingsPrompt } from './prompts-settings.js';
 import { registerHelloIntegrationPrompt } from './prompts-hello-integration.js';
 import { registerBuildAppLayerPrompts } from './prompts-build-app-layers.js';
@@ -245,6 +248,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   // guides never mix. MUST be registered before /v1/prompts/:tier.
   registerAtelierPrompt(router, config, storage);
   registerFeaturesPrompt(router, config);
+  registerPlacesPrompt(router, config);
   registerSettingsPrompt(router, config);
 
   router.get('/v1/prompts/build-extension', (req, res) => {
