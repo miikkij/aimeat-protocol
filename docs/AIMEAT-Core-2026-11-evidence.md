@@ -365,7 +365,7 @@ The list was written as the work for node 4.0.0; a gap still open in the release
 | The anonymous token is minted without the `anonymous` claim, although the route asks for it | `aimeat/src/routes/auth.ts:130`; `aimeat/src/auth/jwt.ts:159-177` |
 | The owner-key challenge is issued and never read | `aimeat/src/routes/auth.ts:144-170,305,693` |
 | Records written in bulk with visibility `workspace` are bound to no workspace | `aimeat/src/routes/memory/bulk.ts:156` |
-| The connectivity-key agent connect route still exists, although v4.0 said the flow was removed | `aimeat/src/routes/agents/registration.ts:51-119` |
+| The connectivity-key agent connect route still existed, although v4.0 said the flow was removed. Fixed 2026-10-14: `POST /v1/auth/connectivity-key` and `POST /v1/agents/connect` are removed | `aimeat/src/routes/agents/registration.ts` |
 | The peer key cache has no periodic refresh; keys refresh on introduce, activate and recovery | `aimeat/src/services/federation-helpers.ts:138-151`; `aimeat/src/server-bootstrap/service-init.ts:571-590` |
 | `openapi.yaml` lists three record specifications; the node serves five | `openapi.yaml` `/v1/specs/{name}`; `aimeat/src/services/contract-docs.ts:30` |
 | MCP `serverInfo.version` was `1.2.0`, a fourth version number. Fixed 2026-10-12: it is the node's software version, as `openapi.yaml` `info.version` is | `aimeat/src/mcp/index.ts` |

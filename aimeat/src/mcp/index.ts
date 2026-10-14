@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-14 — An unknown agent is told to connect through device authorization; the message named
+ *     POST /v1/agents/connect, which is removed (feature-list audit row 202).
  *   2026-10-12 — Every tool is registered through withDeferredScopeNotice: a call made without a word
  *     the tool names for 4.0.0 (catalog scopeEnforcedFrom) is counted like its REST twin's.
  *   2026-10-12 — The MCP serverInfo.version is the node's software version (getSoftwareVersion), where
@@ -553,7 +555,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             if (!agent) {
                 res.status(401).json({
                     jsonrpc: '2.0',
-                    error: { code: -32001, message: 'Agent not found. Register via /v1/agents/connect first.' },
+                    error: { code: -32001, message: 'Agent not found. Connect it first through device authorization (POST /v1/agents/device-authorize), which your owner approves.' },
                     id: req.body?.id ?? null,
                 });
                 return;

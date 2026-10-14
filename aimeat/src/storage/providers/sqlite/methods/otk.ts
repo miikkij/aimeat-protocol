@@ -8,6 +8,8 @@
  * @structure otkMethods
  * @usage Object.assign(SqliteStorage.prototype, otkMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-14 — consumeOtk removed with POST /v1/agents/connect, its only caller
+ *     (feature-list audit row 202).
  *   v1.0.0 — 2026-10-05 — createOtk, getOtk, consumeOtk, deserializeOtk moved here from work.ts so the file
  *     mirrors postgres-kysely/methods/otk.ts (secaudit 2026-10, M8).
  */
@@ -36,40 +38,6 @@ export const otkMethods = {
   async getOtk(this: SqliteStorage, key: string): Promise<OtkRecord | null> {
     const row = this.db.prepare('SELECT * FROM otks WHERE key = ?').get(key) as Record<string, unknown> | undefined;
     return row ? this.deserializeOtk(row) : null;
-  },
-
-  async consumeOtk(this: SqliteStorage, key: string, graceMs: number = 60_000): Promise<OtkRecord | null> {
-    const otk = await this.getOtk(key);
-    if (!otk) return null;
-
-    // Initial OTK: timer hasn't started yet -- activate on first use
-    if (otk.initial && !otk.used) {
-      otk.used = true;
-      otk.usedAt = new Date().toISOString();
-      otk.expiresAt = new Date(Date.now() + graceMs).toISOString();
-      this.db.prepare('UPDATE otks SET used = 1, usedAt = ?, expiresAt = ? WHERE key = ?').run(otk.usedAt, otk.expiresAt, key);
-      return otk;
-    }
-
-    if (new Date(otk.expiresAt) < new Date()) {
-      this.db.prepare('DELETE FROM otks WHERE key = ?').run(key);
-      return null;
-    }
-
-    // Configurable post-use window: allow re-use within graceMs of first use
-    if (otk.used && otk.usedAt) {
-      const usedAt = new Date(otk.usedAt).getTime();
-      if (Date.now() - usedAt > graceMs) {
-        this.db.prepare('DELETE FROM otks WHERE key = ?').run(key);
-        return null;
-      }
-      return otk; // still within grace window
-    }
-
-    otk.used = true;
-    otk.usedAt = new Date().toISOString();
-    this.db.prepare('UPDATE otks SET used = 1, usedAt = ? WHERE key = ?').run(otk.usedAt, key);
-    return otk;
   },
 
   deserializeOtk(this: SqliteStorage, row: Record<string, unknown>): OtkRecord {

@@ -659,7 +659,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | <a id="g-23-generator"></a> **Generator** | Removed 2026-07-18 | The node-served build spec, used from any AI chat, the app catalog or OpenHands. |
 | <a id="g-23-foundry"></a> **Foundry** | Removed 2026-07-13 | Same as Generator. |
 | <a id="g-23-micro-memory"></a> **Micro-memory** | Removed 2026-08-23 | Memory records and MCP. |
-| <a id="g-23-one-time-keys-otk-and-tier-0-5"></a> **One-time keys (OTK) and Tier 0.5** | Removed 2026-08-23 | Device authorization and MCP. |
+| <a id="g-23-one-time-keys-otk-and-tier-0-5"></a> **One-time keys (OTK) and Tier 0.5** | Removed 2026-08-23; the last key of the kind, the connectivity key (`POST /v1/auth/connectivity-key` and `POST /v1/agents/connect`), removed 2026-10-14 | Device authorization and MCP. |
 | <a id="g-23-secretary-agent"></a> **Secretary agent** | Removed | The owner's own agents, schedules and workflows. |
 | <a id="g-23-feedback-channel"></a> **Feedback channel** | Removed 2026-08-12 | `support@operators`. |
 | <a id="g-23-pricing-page"></a> **Pricing page** | Removed 2026-08-28 | Prices live in the store. |

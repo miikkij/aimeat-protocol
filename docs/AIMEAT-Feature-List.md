@@ -613,7 +613,7 @@ The operator dashboard is the one place with server-built screens. Everything on
 | **Generator** | Removed 2026-07-18 | The node-served build spec, used from any AI chat, the app catalog or OpenHands. |
 | **Foundry** | Removed 2026-07-13 | Same as Generator. |
 | **Micro-memory** | Removed 2026-08-23 | Memory records and MCP. |
-| **One-time keys (OTK) and Tier 0.5** | Removed 2026-08-23 | Device authorization and MCP. |
+| **One-time keys (OTK) and Tier 0.5** | Removed 2026-08-23; the last key of the kind, the connectivity key (`POST /v1/auth/connectivity-key` and `POST /v1/agents/connect`), removed 2026-10-14 | Device authorization and MCP. |
 | **Secretary agent** | Removed | The owner's own agents, schedules and workflows. |
 | **Feedback channel** | Removed 2026-08-12 | `support@operators`. |
 | **Pricing page** | Removed 2026-08-28 | Prices live in the store. |

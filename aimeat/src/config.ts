@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.28.1 — 2026-10-14 — otkGraceMs (AIMEAT_OTK_GRACE_MS) removed: the connectivity-key routes it timed are gone (feature-list audit row 202).
  *   v1.28.0 — 2026-10-12 — SHIPPED_DEFAULT_AGENT_SCOPES carries agent:read, the word of the owner's agent list.
  *   v1.27.0 — 2026-10-12 — aiProvenance comes from aiProvenanceFromEnv (config-ai-label.ts): from 4.0.0 a public node records provenance whatever AIMEAT_AI_PROVENANCE says (Core 2026-11 PROV-07).
  *   v1.26.0 — 2026-10-11 — The pacing pack (AIMEAT_PACING_PACK_MORSELS, _PRICE, _CURRENCY): pacing capacity the operator sells for money. The extensionMaxPayMorsels comment says the field it bounds is pacing now.
@@ -369,7 +370,6 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     appAnnouncementBoardId: process.env.AIMEAT_APP_ANNOUNCEMENT_BOARD_ID ?? 'app-announcements',
     webhookMaxRetries: parseInt(process.env.AIMEAT_WEBHOOK_MAX_RETRIES ?? '5', 10),
     workQueueMaxPending: parseInt(process.env.AIMEAT_WORK_QUEUE_MAX_PENDING ?? '10', 10),
-    otkGraceMs: parseInt(process.env.AIMEAT_OTK_GRACE_MS ?? '60000', 10),
     indexNowKey: process.env.AIMEAT_INDEXNOW_KEY ?? null,
     extensionHooks: {
       pre_owner_registration: [],

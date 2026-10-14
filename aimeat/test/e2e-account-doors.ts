@@ -6,11 +6,12 @@
  *   validators (src/routes/ghii/register-login.ts), the whole agent lifecycle surface
  *   (src/routes/agents/management.ts — export, import, rekey, port, scopes, federate, delete, CORS)
  *   and the agent registration doors (src/routes/agents/registration.ts — the owner-authed create,
- *   the connectivity-key connect, the User-Agent platform arm and the consent page). Every refusal
+ *   the User-Agent platform arm and the consent page), and the removal of the connectivity-key
+ *   routes. Every refusal
  *   is asserted by its status AND its error code, because two of these doors answer 400 for four
  *   different reasons.
  * @structure
- *   Phase 0  setup: an operator, four owners, one agent
+ *   Phase 0  setup: an operator, three owners, one agent
  *   Phase 1  POST /v1/ghii validators
  *   Phase 2  POST /v1/ghii/login validators
  *   Phase 3  export + import
@@ -20,12 +21,17 @@
  *   Phase 7  delete
  *   Phase 8  per-agent CORS
  *   Phase 9  POST /v1/agents refusals, platform detection, GET /v1/agents/verify
- *   Phase 10 POST /v1/agents/connect (connectivity key)
+ *   Phase 10 POST /v1/auth/connectivity-key and POST /v1/agents/connect answer 404 (removed)
  *   Phase 11 401 and 403 on every door
  *   Phase 12 erasure: a name registered again inherits no action published in person, no work, no
  *            line in the other side's ledger, no cortex and no ecosystem app
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.13.0 — 2026-10-14 — Phase 10: the connectivity-key mint and POST /v1/agents/connect are
+ *     removed (Jouni, feature-list audit row 202), so 44 and 45 assert 404, no key, no private key
+ *     and no agent; 46 to 51 and the erasure cases 49 and 49b went with the routes (the erasure of
+ *     stored key rows stays pinned in test/unit/connectivity-key-erasure.test.ts). 52 and 53 no
+ *     longer list the mint. Owner D, kept only for 49, is gone.
  *   v1.12.1 — 2026-10-12 — 55-59 publish their actions with the pacing amount as pricing.toll_morsels;
  *     node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the
  *     same on 3.x.
@@ -150,7 +156,7 @@ console.log('\n=== AIMEAT Account Doors E2E ===\n');
 console.log('Phase 0 — setup');
 
 let OP: Owner;                                     // operator (the node's first owner may already exist)
-let A: Owner, B: Owner, P: Owner, D: Owner;        // primary, cross-owner, porting, and one to erase
+let A: Owner, B: Owner, P: Owner;                  // primary, cross-owner, porting
 let agentA: Awaited<ReturnType<typeof setupAgent>>;
 
 await test('Setup: an operator through the admin setup door', async () => {
@@ -166,11 +172,10 @@ await test('Setup: an operator through the admin setup door', async () => {
     OP = { name, token: tok.body.data.token as string, privateKey };
 });
 
-await test('Setup: four owners and one agent', async () => {
+await test('Setup: three owners and one agent', async () => {
     A = await setupOwner('a');
     B = await setupOwner('b');
     P = await setupOwner('p');
-    D = await setupOwner('d');
     agentA = await setupAgent(A, 'lifecycle', ['memory:read', 'memory:write', 'agent:delete']);
     assert(agentA.gaii === `lifecycle#${A.name}@${NODE_ID}`, `the agent's GAII: ${agentA.gaii}`);
 });
@@ -773,115 +778,32 @@ await test('43. GET /v1/agents/verify serves the consent page as HTML', async ()
     assert(html.length > 200, `the page has content, got ${html.length} bytes`);
 });
 
-// ─── Phase 10 — POST /v1/agents/connect (connectivity key) ───
-console.log('Phase 10 — the connectivity-key door');
+// ─── Phase 10 — the connectivity-key routes are gone ───
+// POST /v1/auth/connectivity-key and the unauthenticated POST /v1/agents/connect were removed on
+// 2026-10-14 (Jouni, feature-list audit row 202). Device authorization and MCP connect an agent.
+// Anything but 404 here means one of them came back.
+console.log('Phase 10 — the connectivity-key routes are removed');
 
-/** Mint a connectivity key as `owner`. `agentName` may be null so the body must supply one. */
-async function mintKey(owner: Owner, agentName: string | null): Promise<string> {
+await test('44. POST /v1/auth/connectivity-key is gone: 404 for a signed-in owner, and no key is issued', async () => {
     const r = await json('/v1/auth/connectivity-key', {
-        method: 'POST', headers: auth(owner.token),
-        body: JSON.stringify(agentName ? { agent_name: agentName, description: 'connect probe' } : {}),
+        method: 'POST', headers: auth(A.token), body: JSON.stringify({ agent_name: 'nokey' }),
     });
-    assert(r.status === 201, `connectivity-key ${r.status}: ${JSON.stringify(r.body?.error)}`);
-    return r.body.data.connectivity_key as string;
-}
-
-await test('44. Connect with no connectivity_key → 400 INVALID_INPUT', async () => {
-    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ agent_name: 'x' }) });
-    assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${r.status} ${r.body.error?.code}`);
+    assert(r.status === 404, `removed mint answered ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    assert(r.body?.data?.connectivity_key === undefined, 'a removed mint must issue no key');
 });
 
-await test('45. Connect with a key that was never minted → 404 INVALID_KEY', async () => {
-    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: 'otk-no-such-key-at-all', agent_name: 'x' }) });
-    assert(r.status === 404 && r.body.error?.code === 'INVALID_KEY', `expected 404 INVALID_KEY, got ${r.status} ${r.body.error?.code}`);
-});
-
-await test('46. Connect with a key that names no agent, and a body that names none either → 400', async () => {
-    const key = await mintKey(A, null);
-    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: key }) });
-    assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${r.status} ${r.body.error?.code}`);
-    assert(/agent_name/.test(r.body.error?.message ?? ''), `message names agent_name: ${r.body.error?.message}`);
-});
-
-await test('47. Connect with a name the grammar refuses → 400 INVALID_INPUT', async () => {
-    const key = await mintKey(A, null);
-    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: key, agent_name: 'registry' }) });
-    assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT', `expected 400 INVALID_INPUT, got ${r.status} ${r.body.error?.code}`);
-    assert(/reserved/i.test(r.body.error?.message ?? ''), `message names the reservation: ${r.body.error?.message}`);
-});
-
-await test('48. Connect naming an agent that already exists → 409 NAME_TAKEN', async () => {
-    const key = await mintKey(A, null);
-    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: key, agent_name: agentA.name }) });
-    assert(r.status === 409 && r.body.error?.code === 'NAME_TAKEN', `expected 409 NAME_TAKEN, got ${r.status} ${r.body.error?.code}`);
-});
-
-await test('49. Connect on a key whose owner has since been erased → 404 INVALID_KEY', async () => {
-    const key = await mintKey(D, 'orphaned');
-    const erase = await json(`/v1/owners/${D.name}`, { method: 'DELETE', headers: auth(D.token) });
-    assert(erase.status === 200 && erase.body.data.deleted === true, `erase owner ${erase.status}: ${JSON.stringify(erase.body.error)}`);
-    // The erasure deletes the key with the account (secaudit 2026-10-10 C0). Until then the key was
-    // stored under the bare account name, which the cascade did not walk, and the door refused it
-    // only at its owner lookup (404 NOT_FOUND) for as long as nobody registered the name again.
-    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: key }) });
-    assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body)}`);
-    assert(r.body.error?.code === 'INVALID_KEY', `the key must be gone with the account, got ${r.body.error?.code}`);
-});
-
-// secaudit 2026-10-10 C0. A deleted username is released for reuse. A connectivity key minted by
-// the previous holder outlived the erasure for up to 365 days, and once the name was registered
-// again, POST /v1/agents/connect created an agent under the NEW account from it and returned the
-// agent's private key to whoever held the old key.
-await test('49b. A key minted by an erased account creates no agent under the next holder of the name', async () => {
-    const first = await setupOwner('otkgone');
-    const key = await mintKey(first, 'inherited');
-    const erase = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
-    assert(erase.status === 200 && erase.body.data.deleted === true, `erase owner ${erase.status}: ${JSON.stringify(erase.body.error)}`);
-    const again = await registerAgain(first.name);
-    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: key }) });
-    const list = await json('/v1/agents', { headers: auth(again.token) });
-    await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
-
-    assert(r.status === 404 && r.body.error?.code === 'INVALID_KEY',
-        `the old key must be refused, got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.agent)}`);
-    assert(typeof r.body.data?.private_key !== 'string', 'no private key may be issued from the old key');
-    const inherited = (list.body.data?.agents ?? []).filter((a: any) => a.gaii === `inherited#${first.name}@${NODE_ID}`);
-    assert(inherited.length === 0, `the new account holds an agent made from the old key: ${JSON.stringify(inherited)}`);
-});
-
-await test('50. Connect with a valid key and a recognisable User-Agent → 201, keys, scopes, platform', async () => {
-    const key = await mintKey(A, 'connected');
+await test('45. POST /v1/agents/connect is gone: 404, no private key, and no agent is created', async () => {
     const r = await json('/v1/agents/connect', {
-        method: 'POST',
-        headers: { 'User-Agent': 'codex/9.9.9' },
-        body: JSON.stringify({ connectivity_key: key, display_name: 'Connected Agent' }),
+        method: 'POST', body: JSON.stringify({ connectivity_key: 'otk-0123456789abcdef0123456789abcdef', agent_name: 'connected' }),
     });
-    assert(r.status === 201, `connect ${r.status}: ${JSON.stringify(r.body.error)}`);
-    const d = r.body.data;
-    assert(d.agent.gaii === `connected#${A.name}@${NODE_ID}`, `gaii: ${d.agent.gaii}`);
-    assert(d.agent.display_name === 'Connected Agent', `display_name: ${d.agent.display_name}`);
-    assert(d.agent.description === 'connect probe', `the key's description is carried onto the agent: ${d.agent.description}`);
-    assert(Array.isArray(d.agent.scopes) && d.agent.scopes.length > 0, `default scopes granted: ${JSON.stringify(d.agent.scopes)}`);
-    assert(typeof d.private_key === 'string' && typeof d.public_key === 'string', 'a keypair is issued');
-    assert(r.headers.get('cache-control') === 'no-store', `the private key must not be cached: ${r.headers.get('cache-control')}`);
-
+    assert(r.status === 404, `removed connect answered ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    // INVALID_KEY is the removed handler's own answer to an unknown key, so a 404 carrying it means
+    // the handler still runs. A removed route reaches the node's unknown-route answer instead.
+    assert(r.body?.error?.code !== 'INVALID_KEY', `the connect handler still answers: ${JSON.stringify(r.body?.error)}`);
+    assert(typeof r.body?.data?.private_key !== 'string', 'a removed connect must issue no private key');
     const list = await json('/v1/agents', { headers: auth(A.token) });
-    const row = (list.body.data.agents || []).find((a: any) => a.gaii === d.agent.gaii);
-    assert(row?.platform === 'codex', `platform detected on the connect path too: ${row?.platform}`);
-    assert(row?.platform_version === '9.9.9', `platform version: ${row?.platform_version}`);
-});
-
-await test('51. The minted key mints an agent token that works', async () => {
-    const key = await mintKey(A, 'connected2');
-    const r = await json('/v1/agents/connect', { method: 'POST', body: JSON.stringify({ connectivity_key: key }) });
-    assert(r.status === 201, `connect ${r.status}: ${JSON.stringify(r.body.error)}`);
-    const gaii = r.body.data.agent.gaii as string;
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(r.body.data.private_key, gaii + ts) }),
-    });
-    assert(tok.status === 200 && typeof tok.body.data?.token === 'string', `token ${tok.status}: ${JSON.stringify(tok.body.error)}`);
+    const made = (list.body.data?.agents ?? []).filter((a: any) => a.gaii === `connected#${A.name}@${NODE_ID}`);
+    assert(made.length === 0, `an agent was created through the removed route: ${JSON.stringify(made)}`);
 });
 
 // ─── Phase 11 — the doors with no credential, and with the wrong one ───
@@ -901,7 +823,6 @@ await test('52. Every management door refuses an unauthenticated caller with 401
         [`/v1/agents/${agentA.name}/cors`, { method: 'PUT', body: JSON.stringify({ allowed_origins: null }) }],
         ['/v1/agents', { method: 'POST', body: JSON.stringify({ name: 'anon', owner: A.name }) }],
         ['/v1/agents/device-authorize/pending', {}],
-        ['/v1/auth/connectivity-key', { method: 'POST', body: '{}' }],
     ];
     for (const [path, opts] of calls) {
         const r = await json(path, opts);
@@ -923,7 +844,6 @@ await test('53. An AGENT token is refused on the owner-only doors with 403', asy
         [`/v1/agents/${agentA.name}/cors`, { method: 'PUT', headers: h, body: JSON.stringify({ allowed_origins: null }) }],
         ['/v1/agents', { method: 'POST', headers: h, body: JSON.stringify({ name: 'byagent', owner: A.name }) }],
         ['/v1/agents/device-authorize/pending', { headers: h }],
-        ['/v1/auth/connectivity-key', { method: 'POST', headers: h, body: '{}' }],
     ];
     for (const [path, opts] of calls) {
         const r = await json(path, opts);

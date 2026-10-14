@@ -7,6 +7,8 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.9.1 -- 2026-10-14 -- AIMEAT_OTK_GRACE_MS is gone with the setting (the connectivity-key
+ *            routes it timed were removed).
  *   v1.9.0 -- 2026-10-10 -- Wallet signing on (AIMEAT_DOCSIGN_EUDI_ENABLED) with the test-only access
  *            certificate test/fixtures/docsign/eudi-rp-test.txt, and signature checks offline
  *            (AIMEAT_DOCSIGN_ONLINE_CHECKS false), so e2e-docsign can play the wallet.
@@ -480,7 +482,6 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         AIMEAT_EXT_MAX_MEMORY_MB: process.env.AIMEAT_EXT_MAX_MEMORY_MB ?? '192',
         AIMEAT_EXT_TIMEOUT_MS: process.env.AIMEAT_EXT_TIMEOUT_MS ?? '60000',
         AIMEAT_JWT_TTL: process.env.AIMEAT_JWT_TTL ?? '3600',
-        AIMEAT_OTK_GRACE_MS: process.env.AIMEAT_OTK_GRACE_MS ?? '60000',
     };
 }
 

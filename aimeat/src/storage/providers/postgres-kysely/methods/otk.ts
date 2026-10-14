@@ -2,17 +2,18 @@
  * @file src/storage/providers/postgres-kysely/methods/otk.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description One-Time-Key domain for the Postgres+Kysely backend (Otk table). Backs the OTK auth flow
- *   with the initial-key (timer-on-first-use) + post-use grace window semantics. Translated 1:1 from the
- *   Prisma provider (migration 0004 added the `initial` column the canonical PG schema was missing).
+ * @description One-Time-Key domain for the Postgres+Kysely backend (Otk table): create and read. No
+ *   route mints or redeems a key any more; stored rows are deleted with their account (owner cascade).
  * @version-history
+ *   v1.1.0 — 2026-10-14 — consumeOtk removed with POST /v1/agents/connect, its only caller
+ *     (feature-list audit row 202).
  *   v1.0.0 — 2026-07-15 — Phase 5: OTK on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
 import type { OtkRecord } from '../../../interface.js';
 import type { Otk } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb, dbError } from '../helpers.js';
+import { jsonb } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
@@ -37,29 +38,5 @@ export const otkMethods = {
   async getOtk(this: PostgresKyselyStorage, key: string): Promise<OtkRecord | null> {
     const r = await this.db.selectFrom('Otk').selectAll().where('key', '=', key).executeTakeFirst();
     return r ? toOtk(r) : null;
-  },
-  async consumeOtk(this: PostgresKyselyStorage, key: string, graceMs = 60_000): Promise<OtkRecord | null> {
-    try {
-      const row = await this.db.selectFrom('Otk').selectAll().where('key', '=', key).executeTakeFirst();
-      if (!row) return null;
-      // Initial OTK: timer hasn't started — activate on first use (start the grace window now).
-      if (row.initial && !row.used) {
-        const [u] = await this.db.updateTable('Otk').set({ used: true, usedAt: new Date(), expiresAt: new Date(Date.now() + graceMs) }).where('key', '=', key).returningAll().execute();
-        return toOtk(u);
-      }
-      if (new Date(iso(row.expiresAt)) < new Date()) {
-        await this.db.deleteFrom('Otk').where('key', '=', key).execute();
-        return null;
-      }
-      if (row.used && row.usedAt) {
-        if (Date.now() - new Date(iso(row.usedAt)).getTime() > graceMs) {
-          await this.db.deleteFrom('Otk').where('key', '=', key).execute();
-          return null;
-        }
-        return toOtk(row);
-      }
-      const [u] = await this.db.updateTable('Otk').set({ used: true, usedAt: new Date() }).where('key', '=', key).returningAll().execute();
-      return toOtk(u);
-    } catch (err) { throw dbError('consumeOtk', err); }
   },
 };

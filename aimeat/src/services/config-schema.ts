@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.32.1 — 2026-10-14 — work.otk_grace_ms removed: the connectivity-key routes it timed are gone (feature-list audit row 202).
  *   v1.32.0 — 2026-10-12 — federation.relay_claim, federation.audience_required, security.ws_query_token and security.owner_key_login refuse the value that kept a 4.0.0 removal alive, from that release (config-schema-validators.ts; Core 2026-11 HTTP-08), and their descriptions say so.
  *   v1.31.1 — 2026-10-11 — geoHeaders names its guide by the GitHub address; docs/visitor-geography.md
  *     is not a path the node serves.
@@ -468,7 +469,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Work (mutable, additional) ──
   { key: 'appAnnouncementBoardId', dotPath: 'work.app_announcement_board_id', envVar: 'AIMEAT_APP_ANNOUNCEMENT_BOARD_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Board ID for app announcements' },
-  { key: 'otkGraceMs', dotPath: 'work.otk_grace_ms', envVar: 'AIMEAT_OTK_GRACE_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'One-time-key grace period in milliseconds', range: '0-600000' },
 
   // ── Indexing (immutable) ──
   { key: 'indexNowKey', dotPath: 'indexing.indexnow_key', envVar: 'AIMEAT_INDEXNOW_KEY', type: 'string', validate: () => true, immutable: true, description: 'IndexNow API key for SEO', adminDisplay: 'configured' },

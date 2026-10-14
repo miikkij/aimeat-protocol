@@ -12,6 +12,7 @@
  *   - buildStandaloneSnippetJs suite + extractRunConfig: asserts IIFE shape and always-on "necessary" category
  *
  * @version-history
+ *   v1.1.1 — 2026-10-14 — The config fixture drops otkGraceMs, a setting that no longer exists.
  *   v1.1.0 — 2026-10-11 — The switch read per request, a page that already has the banner, the
  *     category list typed as text (one category per letter before the fix), the three languages, the
  *     named analytics services, cookies removed on a taken-back consent, and the start script.
@@ -59,7 +60,6 @@ function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
     boardPostCostPerKb: 2,
     webhookMaxRetries: 5,
     workQueueMaxPending: 10,
-    otkGraceMs: 60000,
     indexNowKey: null,
     extensionHooks: {
       pre_owner_registration: [],

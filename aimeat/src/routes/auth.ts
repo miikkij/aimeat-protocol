@@ -3,13 +3,15 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Authentication routes for challenge signing, JWT issuance,
- *   refresh, revocation, and session OTK flows.
+ *   refresh and revocation.
  * @structure
  *   - authRouter() -- Express router for authentication endpoints
  *   - Challenge/session stores for interactive auth flows
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.14.0 -- 2026-10-14 -- The connectivity-key mint (routes/auth-otk.ts) is removed with the
+ *     unauthenticated POST /v1/agents/connect it fed (Jouni, feature-list audit row 202).
  *   v1.13.0 -- 2026-10-12 -- The owner-key branch of POST /v1/auth/token is a version gate: from
  *     OWNER_KEY_LOGIN_REMOVED_IN (4.0.0) it answers 410 OWNER_KEY_LOGIN_OFF whatever
  *     AIMEAT_OWNER_KEY_LOGIN says; before it, every answer carries the Deprecation headers and each
@@ -89,7 +91,6 @@ import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
-import { registerOtkRoutes } from './auth-otk.js';
 import { success, error } from '../middleware/envelope.js';
 import { loginTarpit } from '../middleware/login-tarpit.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
@@ -713,8 +714,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Get a new token', method: 'POST', url: '/v1/auth/token' },
     ]));
   });
-  // Connectivity-key mint — the Tier 0.5 OTK routes beside it were removed 2026-08-23 (RFC v4.0).
-  registerOtkRoutes(router, config, storage);
+  // The OTK routes are gone: the Tier 0.5 pair on 2026-08-23 (RFC v4.0) and the connectivity-key
+  // mint on 2026-10-14 (feature-list audit row 202). Device authorization connects an agent.
 
 
   // Cleanup expired challenges periodically
