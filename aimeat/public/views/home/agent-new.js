@@ -22,6 +22,8 @@
  * @structure default AgentNewView({ navigate })
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
  * @version-history
+ *   v1.8.3 — 2026-10-14 — While the model writes the agent, the page shows the spinner, as the
+ *     agent's app page does; the line alone read as a page that had stopped.
  *   v1.8.2 — 2026-10-13 — The permissions shown before approval count the tool the page adds for
  *     a watched workspace whose space is written only through an app's tool (scopesFor is given
  *     the workspace's spaces).
@@ -399,7 +401,7 @@ export default function AgentNewView({ navigate }) {
         ${back}
         <${PageIntro} title=${n('title', 'This is how it would work')}
           sub=${n('asked', 'You asked: "{sentence}"').replace('{sentence}', sentence.trim())} />
-        <${Note} kind="loading">${n('writing', 'Your AI model is writing the agent. This takes a moment.')}<//>
+        <${Spinner} text=${n('writing', 'Your AI model is writing the agent. This takes a moment.')} />
       <//>`;
   }
 
