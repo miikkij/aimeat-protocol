@@ -5,6 +5,7 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — POST /v1/federation/route and POST /v1/federation/cross-node/work answer a refusal from the far node with an error envelope (PEER_REFUSED, its status, its answer in details) instead of ok: true (peerRefusal).
  *   v1.8.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): work:request on POST /v1/federation/cross-node/work. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.7.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.6.0 — 2026-10-05 — POST /v1/federation/cross-node/work goes only to a peer with routing on
@@ -50,6 +51,19 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { routingFee } from '../../services/morsel.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+
+/**
+ * The answer when the far node refused what this node forwarded: an error envelope with the far
+ * node's status, and its own answer in `details`. Both forwarding routes answered the far node's
+ * 401 or 500 inside a success envelope, `ok: true` beside an error status, so a caller reading `ok`
+ * took a refusal for a delivery.
+ */
+function peerRefusal(nodeId: string, target: string, status: number, data: unknown) {
+  const peerError = (data && typeof data === 'object' && 'error' in data) ? (data as { error: unknown }).error : data;
+  return error(nodeId, 'PEER_REFUSED',
+    'The other node refused the request, so nothing was done there. Its own answer is in details; the routing fee was given back.',
+    status, { routed_to: target, peer_status: status, peer_error: peerError ?? null });
+}
 
 /**
  * Who may drive POST /v1/federation/route: this node's own account holder, or a peer relaying a hop.
@@ -224,8 +238,12 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 }
 
                 const data = response.json ?? null;
-                // An error answer is no route made, so the fee goes back.
-                if (response.status < 200 || response.status >= 300) await fee.giveBack();
+                // An error answer is no route made, so the fee goes back and the answer is an error.
+                if (response.status < 200 || response.status >= 300) {
+                    await fee.giveBack();
+                    res.status(response.status).json(peerRefusal(config.nodeId, target_node, response.status, data));
+                    return;
+                }
 
                 // F.2: Add hop signing for direct peer routing
                 const hop = await buildLocalHop(target_node, inboundManifest.hops.length > 0 ? inboundManifest.hops[inboundManifest.hops.length - 1].signature : '');
@@ -479,8 +497,12 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             }
 
             const data = response.json ?? null;
-            // An error answer is no route made, so the fee goes back.
-            if (response.status < 200 || response.status >= 300) await fee.giveBack();
+            // An error answer is no route made, so the fee goes back and the answer is an error.
+            if (response.status < 200 || response.status >= 300) {
+                await fee.giveBack();
+                res.status(response.status).json(peerRefusal(config.nodeId, target_node, response.status, data));
+                return;
+            }
 
             res.status(response.status).json(success(config.nodeId, {
                 routed_to: target_node,

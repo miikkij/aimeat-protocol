@@ -44,6 +44,7 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   2026-10-15 — A refusal from the far node answers ok: false with PEER_REFUSED and the far node's status, on POST /v1/federation/route and /v1/federation/cross-node/work.
  *   2026-10-15 — The fake peer refuses /v1/work/request without a credential, as a real node does: cross-node
  *     work is refused today and the routing fee goes back (feature-list audit 165).
  *   v1.7.0 -- 2026-10-12 -- The positive memory-inventory request carries the audience proof for B.
@@ -568,7 +569,8 @@ async function run(): Promise<void> {
             body: JSON.stringify({ target_node: FAKE_ID, action_id: 'act-1', provider_gaii: 'provider@elsewhere', input: { q: 'hello' } }),
         });
         assert(status === 401, `the far node's refusal is passed on: ${status} ${JSON.stringify(body)}`);
-        assert(body.data.routed_to === FAKE_ID, `routed_to: ${JSON.stringify(body.data)}`);
+        assert(body.ok === false && body.error?.code === 'PEER_REFUSED' && body.error?.details?.routed_to === FAKE_ID,
+            `a refusal is an error envelope naming the node, not ok: true: ${JSON.stringify(body)}`);
         const arrived = seen.filter(s => s.path === '/v1/work/request').pop();
         assert(arrived?.body?.origin_node === A_ID && arrived?.body?.cross_node_requester === agentGaii,
             `the peer is told who asked: ${JSON.stringify(arrived?.body)}`);
@@ -684,11 +686,15 @@ async function run(): Promise<void> {
                 body: JSON.stringify({ target_node: FAKE_ID, method: 'POST', path: '/v1/work/request', body: { q: 'route' } }),
             });
             assert(routed.status === 500, `the target's error is passed on: ${routed.status} ${JSON.stringify(routed.body)}`);
+            assert(routed.body.ok === false && routed.body.error?.code === 'PEER_REFUSED' && routed.body.error?.details?.peer_status === routed.status,
+                `a refusal from the far node is an error, not ok: true: ${JSON.stringify(routed.body)}`);
             const submitted = await A.json('/v1/federation/cross-node/work', {
                 method: 'POST', headers: auth(agentToken),
                 body: JSON.stringify({ target_node: FAKE_ID, action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'cross' } }),
             });
             assert(submitted.status === 500, `the peer's error is passed on: ${submitted.status} ${JSON.stringify(submitted.body)}`);
+            assert(submitted.body.ok === false && submitted.body.error?.code === 'PEER_REFUSED' && submitted.body.error?.details?.peer_status === submitted.status,
+                `a refusal from the far node is an error, not ok: true: ${JSON.stringify(submitted.body)}`);
         } finally { modes.work = 'ok'; }
         const after = await walletOf(A.ownerToken);
         assert(after === before, `an error answer was charged: ${before} → ${after}`);

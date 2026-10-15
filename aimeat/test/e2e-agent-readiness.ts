@@ -10,6 +10,7 @@
  *   The suite grows with the programme in docs/internal/agentscanner/ — sitemap.md, AGENTS.md,
  *   llms.txt structure and llms-full.txt land here as their phases ship.
  * @version-history
+ *   2026-10-15 — visibleText decodes the HTML entities a reader sees decoded: the newest change log title holds "&", which the page sends as &amp;, and the test failed on a correct page.
  *   v0.5.0 - 2026-10-03 - Glossary plain layer: ?lang=fi gives Finnish plain sentences, an unknown lang is English.
  *   v0.4.0 - 2026-10-03 - The person help prompt at /v1/help/prompt/person, and 404 for an unknown one.
  *   v0.3.0 - 2026-09-15 - Full Everything guide across JSON, Markdown and initial HTML.
@@ -133,6 +134,9 @@ function locs(xml: string): string[] {
             .replace(/<style[\s\S]*?<\/style>/gi, '')
             .replace(/<!--[\s\S]*?-->/g, '')
             .replace(/<[^>]+>/g, ' ')
+            // What a reader sees: the page escapes &, <, > and quotes, so a title with "&" in it
+            // arrives as &amp;. Decoded last, so a decoded "<" cannot be read as a tag.
+            .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, '&')
             .replace(/\s+/g, ' ')
             .trim();
     }

@@ -48926,6 +48926,9 @@ paths:
       description: |
         Forward a request to a peer node, directly or through one more relay.
 
+        When the target answers with an error, its status is passed on in an error envelope with the
+        code PEER_REFUSED and the target's answer in `details.peer_error`, and the routing fee goes back.
+
         TWO POLICIES, BOTH ENFORCED, AND NEITHER REPLACED THE OTHER. This node's own
         `allow_routing` on the TARGET peer decides what it is willing to relay outward, and refuses
         with 403 POLICY_DENIED. What the RECEIVING node is willing to accept is its decision, and
@@ -49015,7 +49018,10 @@ paths:
         fee is taken from that identity's owner as the call goes out, after the address check: a
         balance that cannot cover it is refused with 402 INSUFFICIENT_MORSELS and nothing is sent.
         The fee goes back, with a `federation_routing_return` line, when the peer cannot be reached
-        (502) or answers with an error (its status is passed on).
+        (502) or answers with an error: its status is passed on, in an error envelope with the code
+        PEER_REFUSED and the far node's own answer in `details.peer_error` (until 2026-10-15 this was
+        a success envelope, `ok: true`, beside the error status). Work requests do not cross nodes yet:
+        the receiving node asks for a signed-in caller, so a real node answers 401.
       tags: [Federation]
       security:
         - BearerAuth: []
