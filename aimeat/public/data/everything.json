@@ -42,10 +42,10 @@
      "slug": "g-1-purpose-sized-mcp-surfaces",
      "cells": [
       "<strong>Purpose-sized MCP surfaces</strong>",
-      "Seven opt-in tool sets, so an agent sees only the tools its job needs: <code>appdev</code>, <code>agent</code>, <code>service</code>, <code>admin</code>, <code>commerce</code>, <code>primitives</code> (12 tools, everything else through discover and invoke) and <code>full</code>. <code>/v1/mcp</code> stays the complete, frozen set.",
+      "Eight opt-in tool sets, so an agent sees only the tools its job needs: <code>appdev</code>, <code>agent</code>, <code>service</code>, <code>admin</code>, <code>commerce</code>, <code>primitives</code> (13 tools, everything else through discover and invoke), <code>chat</code> (the node's own chat: about twenty tools at the start, the rest switched on when a job needs them) and <code>full</code>. <code>/v1/mcp</code> stays the complete, frozen set.",
       "<code>/v2/mcp/&lt;surface&gt;</code>"
      ],
-     "plain": "Purpose-sized MCP surfaces Seven opt-in tool sets, so an agent sees only the tools its job needs: appdev, agent, service, admin, commerce, primitives (12 tools, everything else through discover and invoke) and full. /v1/mcp stays the complete, frozen set. /v2/mcp/<surface>"
+     "plain": "Purpose-sized MCP surfaces Eight opt-in tool sets, so an agent sees only the tools its job needs: appdev, agent, service, admin, commerce, primitives (13 tools, everything else through discover and invoke), chat (the node's own chat: about twenty tools at the start, the rest switched on when a job needs them) and full. /v1/mcp stays the complete, frozen set. /v2/mcp/<surface>"
     },
     {
      "slug": "g-1-choose-permissions-when-you-connect",
@@ -69,10 +69,10 @@
      "slug": "g-1-handbook",
      "cells": [
       "<strong>Handbook</strong>",
-      "The first thing a connected AI reads: what this node is and which few tools matter for the job in front of it. It ends with what you do on the screen and why, with the links, so your AI hands you the right page before it meets a refusal: signing-in security, payment keys and payout accounts, giving an agent or an app its rights and letting an agent read mail, AI keys and decision rules, and exporting or deleting the account. Everything else is done from the chat.",
+      "The first thing a connected AI reads: what this node is and which few tools matter for the job in front of it. The whole-node handbook (on <code>/v1/mcp</code> and <code>/v2/mcp/full</code>) ends with what you do on the screen and why, with the links, so your AI hands you the right page before it meets a refusal: signing-in security, payment keys and payout accounts, giving an agent or an app its rights and letting an agent read mail, AI keys and decision rules, and exporting or deleting the account. Everything else is done from the chat. Limits: the handbooks of the smaller tool sets do not carry that list; the skill <code>aimeat-guided-journey</code> does.",
       "<code>aimeat_handbook_get</code>"
      ],
-     "plain": "Handbook The first thing a connected AI reads: what this node is and which few tools matter for the job in front of it. It ends with what you do on the screen and why, with the links, so your AI hands you the right page before it meets a refusal: signing-in security, payment keys and payout accounts, giving an agent or an app its rights and letting an agent read mail, AI keys and decision rules, and exporting or deleting the account. Everything else is done from the chat. aimeat_handbook_get"
+     "plain": "Handbook The first thing a connected AI reads: what this node is and which few tools matter for the job in front of it. The whole-node handbook (on /v1/mcp and /v2/mcp/full) ends with what you do on the screen and why, with the links, so your AI hands you the right page before it meets a refusal: signing-in security, payment keys and payout accounts, giving an agent or an app its rights and letting an agent read mail, AI keys and decision rules, and exporting or deleting the account. Everything else is done from the chat. Limits: the handbooks of the smaller tool sets do not carry that list; the skill aimeat-guided-journey does. aimeat_handbook_get"
     },
     {
      "slug": "g-1-what-this-node-can-do-for-your-ai",
@@ -150,10 +150,10 @@
      "slug": "g-1-prompt-driven-road",
      "cells": [
       "<strong>Prompt-driven road</strong>",
-      "For AIs that cannot connect over MCP (a consumer Gemini app outside the United States, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, &quot;My AI can't connect&quot; gives the first note as a prompt and saves the pasted answer.",
+      "For AIs that cannot connect over MCP (a consumer Gemini app outside the United States, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, &quot;My AI can't connect&quot; gives the profile interview as a prompt and turns the pasted answer into your profile card, keeping your answers private.",
       "Contacts, Email, Workflows, Portfolio, front page and home layout pages"
      ],
-     "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app outside the United States, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, \"My AI can't connect\" gives the first note as a prompt and saves the pasted answer. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
+     "plain": "Prompt-driven road For AIs that cannot connect over MCP (a consumer Gemini app outside the United States, Copilot without Copilot Studio), the pages compose a ready prompt, you run it in your chat and paste the result back. Free and vendor-neutral. A name two apps share (Gemini, Microsoft Copilot) raises one question, which of the two you use, and your answer picks the road. On the home, \"My AI can't connect\" gives the profile interview as a prompt and turns the pasted answer into your profile card, keeping your answers private. Contacts, Email, Workflows, Portfolio, front page and home layout pages"
     },
     {
      "slug": "g-1-attach-another-mcp-server",
@@ -186,10 +186,10 @@
      "slug": "g-1-manage-attached-mcp-servers",
      "cells": [
       "<strong>Manage attached MCP servers</strong>",
-      "See server status and tools beside Connected accounts on the Access page. Switch a server off without deleting its setup, turn it back on, change its display title or description, or remove it and its stored credential. Removing a server does not revoke a token you created at the outside service; revoke that there too when ending access.",
+      "See server status and tools beside Connected accounts on the Access page. Switch a server off without deleting its setup, turn it back on, or remove it and its stored credential. Your AI or REST also changes its display title or description; the page does not. Removing a server does not revoke a token you created at the outside service; revoke that there too when ending access.",
       "<a href=\"/spa.html#access\">Access &gt; MCP servers</a> · <code>PATCH /v1/mcp-servers/{id}</code> · <code>DELETE /v1/mcp-servers/{id}</code> · <code>aimeat_mcp_update</code> · <code>aimeat_mcp_detach</code>"
      ],
-     "plain": "Manage attached MCP servers See server status and tools beside Connected accounts on the Access page. Switch a server off without deleting its setup, turn it back on, change its display title or description, or remove it and its stored credential. Removing a server does not revoke a token you created at the outside service; revoke that there too when ending access. Access > MCP servers · PATCH /v1/mcp-servers/{id} · DELETE /v1/mcp-servers/{id} · aimeat_mcp_update · aimeat_mcp_detach"
+     "plain": "Manage attached MCP servers See server status and tools beside Connected accounts on the Access page. Switch a server off without deleting its setup, turn it back on, or remove it and its stored credential. Your AI or REST also changes its display title or description; the page does not. Removing a server does not revoke a token you created at the outside service; revoke that there too when ending access. Access > MCP servers · PATCH /v1/mcp-servers/{id} · DELETE /v1/mcp-servers/{id} · aimeat_mcp_update · aimeat_mcp_detach"
     },
     {
      "slug": "g-1-narrow-one-agent-to-named-tools",
@@ -231,10 +231,10 @@
      "slug": "g-1-the-node-s-own-mcp-registry",
      "cells": [
       "<strong>The node's own MCP registry</strong>",
-      "The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Node-wide attachment requires the operator in person.",
+      "The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Only the operator attaches a server node-wide: in person, or through their own agent holding <code>operator:admin</code>.",
       "<code>POST /v1/mcp-servers/node</code> · <code>PATCH /v1/mcp-servers/node/{id}</code> · <code>aimeat_mcp_registry_list</code> · <code>aimeat_mcp_registry_set</code>"
      ],
-     "plain": "The node's own MCP registry The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Node-wide attachment requires the operator in person. POST /v1/mcp-servers/node · PATCH /v1/mcp-servers/node/{id} · aimeat_mcp_registry_list · aimeat_mcp_registry_set"
+     "plain": "The node's own MCP registry The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Only the operator attaches a server node-wide: in person, or through their own agent holding operator:admin. POST /v1/mcp-servers/node · PATCH /v1/mcp-servers/node/{id} · aimeat_mcp_registry_list · aimeat_mcp_registry_set"
     },
     {
      "slug": "g-1-a-server-that-belongs-to-a-team",
@@ -249,10 +249,10 @@
      "slug": "g-1-workspace-mcp-access",
      "cells": [
       "<strong>Workspace MCP access</strong>",
-      "Bind a group's server to one workspace to use that workspace's roles. The access policy allows contributors to call, lets viewers see the server, and excludes group members with no workspace role. This binding shares the group call-path limitation above.",
+      "Bind a group's server to one workspace to use that workspace's roles. The access policy allows contributors to call, lets viewers see the server, and excludes group members with no workspace role. Limits: the workspace id is not checked when you attach, so a wrong id lets nobody in; this binding shares the group call-path limitation above.",
       "<code>POST /v1/mcp-servers/organism</code> · <code>aimeat_mcp_attach</code> with <code>organism_id</code> and <code>ws</code>"
      ],
-     "plain": "Workspace MCP access Bind a group's server to one workspace to use that workspace's roles. The access policy allows contributors to call, lets viewers see the server, and excludes group members with no workspace role. This binding shares the group call-path limitation above. POST /v1/mcp-servers/organism · aimeat_mcp_attach with organism_id and ws"
+     "plain": "Workspace MCP access Bind a group's server to one workspace to use that workspace's roles. The access policy allows contributors to call, lets viewers see the server, and excludes group members with no workspace role. Limits: the workspace id is not checked when you attach, so a wrong id lets nobody in; this binding shares the group call-path limitation above. POST /v1/mcp-servers/organism · aimeat_mcp_attach with organism_id and ws"
     },
     {
      "slug": "g-1-attached-tools-are-findable",
@@ -267,10 +267,10 @@
      "slug": "g-1-publish-an-attached-tool-as-a-capability",
      "cells": [
       "<strong>Publish an attached tool as a capability</strong>",
-      "Give an attached tool a reusable capability description that apps and agents can discover and invoke. Invocation uses the caller's accessible server and credential, with its call restrictions and price. Publishing your Jira capability does not give other people access to your Jira account.",
-      "<code>/v1/capabilities</code> · <code>aimeat_capabilities_create</code> · <code>aimeat_capabilities_invoke</code> · source type <code>mcp</code>, reference <code>server/tool</code>"
+      "Give an attached tool a reusable capability description that apps and agents can discover and invoke. Invocation uses the caller's accessible server and credential, with its call restrictions and price. Publishing your Jira capability does not give other people access to your Jira account. Limits: you publish one over REST; <code>aimeat_capabilities_create</code> makes only manual capabilities, so your AI cannot publish an attached tool from the chat.",
+      "<code>POST /v1/capabilities</code> with source type <code>mcp</code>, reference <code>server/tool</code> · <code>aimeat_capabilities_invoke</code>"
      ],
-     "plain": "Publish an attached tool as a capability Give an attached tool a reusable capability description that apps and agents can discover and invoke. Invocation uses the caller's accessible server and credential, with its call restrictions and price. Publishing your Jira capability does not give other people access to your Jira account. /v1/capabilities · aimeat_capabilities_create · aimeat_capabilities_invoke · source type mcp, reference server/tool"
+     "plain": "Publish an attached tool as a capability Give an attached tool a reusable capability description that apps and agents can discover and invoke. Invocation uses the caller's accessible server and credential, with its call restrictions and price. Publishing your Jira capability does not give other people access to your Jira account. Limits: you publish one over REST; aimeat_capabilities_create makes only manual capabilities, so your AI cannot publish an attached tool from the chat. POST /v1/capabilities with source type mcp, reference server/tool · aimeat_capabilities_invoke"
     },
     {
      "slug": "g-1-mcp-usage-and-refusals",
@@ -353,10 +353,10 @@
      "slug": "g-2-two-step-sign-in-totp",
      "cells": [
       "<strong>Two-step sign-in (TOTP)</strong>",
-      "QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it. Once it is on, every way in asks for the code: an emailed sign-in link opens a code step before you are signed in, and the account's signing key no longer signs in on its own. A password reset or change also replaces that signing key.",
+      "QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it. Once it is on, every way in asks for the code: an emailed sign-in link opens a code step before you are signed in.",
       "<code>/v1/ghii/totp/*</code>, <code>/v1/ghii/magic-link/second-factor</code>, <code>aimeat_admin_totp_reset</code>"
      ],
-     "plain": "Two-step sign-in (TOTP) QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it. Once it is on, every way in asks for the code: an emailed sign-in link opens a code step before you are signed in, and the account's signing key no longer signs in on its own. A password reset or change also replaces that signing key. /v1/ghii/totp/*, /v1/ghii/magic-link/second-factor, aimeat_admin_totp_reset"
+     "plain": "Two-step sign-in (TOTP) QR code for an authenticator app, ten backup codes. An operator can remove it if you lose both, and you are told on your account feed who did it. Once it is on, every way in asks for the code: an emailed sign-in link opens a code step before you are signed in. /v1/ghii/totp/*, /v1/ghii/magic-link/second-factor, aimeat_admin_totp_reset"
     },
     {
      "slug": "g-2-sign-in-with-google-microsoft-entra-id-or-casdoor",
@@ -389,10 +389,10 @@
      "slug": "g-2-signed-in-devices",
      "cells": [
       "<strong>Signed-in devices</strong>",
-      "See every session grouped by device and by agent, end one, or sign out everywhere else.",
-      "<code>/v1/auth/sessions</code>"
+      "See your open sessions grouped by device, and your agents' sessions grouped by agent, on the Access page. End one of your sessions, sign out everywhere else, or sign out everywhere. You do this yourself: an agent ends no sign-in unless you give it <code>account:security</code>, and an agent's sessions end on the Agents page.",
+      "<code>GET /v1/access/overview</code> (<code>sessions</code>), <code>GET /v1/auth/sessions</code>, <code>DELETE /v1/auth/sessions/{id}</code>, <code>DELETE /v1/auth/sessions/others</code>, <code>DELETE /v1/auth/sessions</code>"
      ],
-     "plain": "Signed-in devices See every session grouped by device and by agent, end one, or sign out everywhere else. /v1/auth/sessions"
+     "plain": "Signed-in devices See your open sessions grouped by device, and your agents' sessions grouped by agent, on the Access page. End one of your sessions, sign out everywhere else, or sign out everywhere. You do this yourself: an agent ends no sign-in unless you give it account:security, and an agent's sessions end on the Agents page. GET /v1/access/overview (sessions), GET /v1/auth/sessions, DELETE /v1/auth/sessions/{id}, DELETE /v1/auth/sessions/others, DELETE /v1/auth/sessions"
     },
     {
      "slug": "g-2-the-access-page",
@@ -425,10 +425,10 @@
      "slug": "g-2-verifiable-credential",
      "cells": [
       "<strong>Verifiable credential</strong>",
-      "The node issues a W3C identity credential for an account, as JSON or a signed JWT.",
-      "<code>GET /v1/ghii/:ghii/credential</code>"
+      "The node issues a W3C identity credential for your own account: as a JWT signed with the node's key, valid for a year, or as plain JSON with no proof. Limits: until the operator sets the issuer's DID, the issuer is a placeholder (<code>did:web:&lt;node&gt;.aimeat.example</code>) that nobody outside can resolve.",
+      "<code>GET /v1/ghii/:ghii/credential</code> (<code>?format=jwt</code>), <code>eudiw.vc_issuer_did</code> (<code>AIMEAT_VC_ISSUER_DID</code>)"
      ],
-     "plain": "Verifiable credential The node issues a W3C identity credential for an account, as JSON or a signed JWT. GET /v1/ghii/:ghii/credential"
+     "plain": "Verifiable credential The node issues a W3C identity credential for your own account: as a JWT signed with the node's key, valid for a year, or as plain JSON with no proof. Limits: until the operator sets the issuer's DID, the issuer is a placeholder (did:web:<node>.aimeat.example) that nobody outside can resolve. GET /v1/ghii/:ghii/credential (?format=jwt), eudiw.vc_issuer_did (AIMEAT_VC_ISSUER_DID)"
     },
     {
      "slug": "g-2-start-page",
@@ -443,10 +443,10 @@
      "slug": "g-2-display-preferences",
      "cells": [
       "<strong>Display preferences</strong>",
-      "Choose the display language, regional date and number formats, and time zone independently. Unset preferences fall back to the browser.",
+      "Choose the display language, regional date and number formats, and time zone independently. Unset preferences fall back to the browser. The node refuses a regional format or a time zone it does not know; the display language is stored as given, without a check.",
       "Settings &amp; Controls &gt; Account, <code>PUT /v1/ghii</code>"
      ],
-     "plain": "Display preferences Choose the display language, regional date and number formats, and time zone independently. Unset preferences fall back to the browser. Settings & Controls > Account, PUT /v1/ghii"
+     "plain": "Display preferences Choose the display language, regional date and number formats, and time zone independently. Unset preferences fall back to the browser. The node refuses a regional format or a time zone it does not know; the display language is stored as given, without a check. Settings & Controls > Account, PUT /v1/ghii"
     }
    ]
   },
@@ -468,19 +468,19 @@
      "slug": "g-3-agent-identity-gaii",
      "cells": [
       "<strong>Agent identity (GAII)</strong>",
-      "Every agent has <code>agent#owner@node-id</code>, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name. The outside accounts the agent connected are removed with it, so a new agent given the same name sees none of them.",
+      "Every agent has <code>agent#owner@node-id</code>, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name. The outside accounts the agent connected are removed with it, so a new agent given the same name sees none of them. The trust score is worked out again and stored each time the agent's profile is read over REST; your AI's <code>aimeat_agent_profile</code> shows the stored score, which can be older.",
       "<code>/v1/agents</code>, <code>/v1/agents/:name</code>, <code>aimeat_agents_list</code>, <code>aimeat_agent_profile</code>"
      ],
-     "plain": "Agent identity (GAII) Every agent has agent#owner@node-id, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name. The outside accounts the agent connected are removed with it, so a new agent given the same name sees none of them. /v1/agents, /v1/agents/:name, aimeat_agents_list, aimeat_agent_profile"
+     "plain": "Agent identity (GAII) Every agent has agent#owner@node-id, its own scoped permissions and trust score, and acts in the owner's name. Owners can organise agents with tags, change their granted access and delete an agent identity. Deleting an agent cancels its open work, and the morsels held for it go back to whoever asked; its finished work stays in the other side's records under the agent's name. The outside accounts the agent connected are removed with it, so a new agent given the same name sees none of them. The trust score is worked out again and stored each time the agent's profile is read over REST; your AI's aimeat_agent_profile shows the stored score, which can be older. /v1/agents, /v1/agents/:name, aimeat_agents_list, aimeat_agent_profile"
     },
     {
      "slug": "g-3-device-authorization-rfc-8628",
      "cells": [
       "<strong>Device authorization (RFC 8628)</strong>",
-      "The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read and write your memory, read the catalogue, read the workspaces of your organisms and see your other agents; the &quot;standard&quot; choice on the approval page also lets it write and publish there.",
+      "The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read, write and delete your memory, read the catalogue, read the workspaces of your organisms and see your other agents; the &quot;standard&quot; choice on the approval page also lets it write and publish there. One of your agents that holds the permission to make agents (<code>agent:write</code>) can approve another of yours without you, and gives it only permissions it holds itself.",
       "<code>/v1/agents</code> device flow, <code>scopes.default_agent_scopes</code> (<code>AIMEAT_DEFAULT_AGENT_SCOPES</code>)"
      ],
-     "plain": "Device authorization (RFC 8628) The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read and write your memory, read the catalogue, read the workspaces of your organisms and see your other agents; the \"standard\" choice on the approval page also lets it write and publish there. /v1/agents device flow, scopes.default_agent_scopes (AIMEAT_DEFAULT_AGENT_SCOPES)"
+     "plain": "Device authorization (RFC 8628) The agent shows a code; you approve it in the browser and pick its scopes. The standard agent path. When nobody picks any, the agent may read, write and delete your memory, read the catalogue, read the workspaces of your organisms and see your other agents; the \"standard\" choice on the approval page also lets it write and publish there. One of your agents that holds the permission to make agents (agent:write) can approve another of yours without you, and gives it only permissions it holds itself. /v1/agents device flow, scopes.default_agent_scopes (AIMEAT_DEFAULT_AGENT_SCOPES)"
     },
     {
      "slug": "g-3-what-an-agent-was-refused",
@@ -504,19 +504,19 @@
      "slug": "g-3-personal-access-tokens",
      "cells": [
       "<strong>Personal access tokens</strong>",
-      "Revocable tokens with chosen scopes, exchanged for a short-lived token.",
+      "Revocable tokens with chosen scopes, or a token that acts as you in full, with an optional expiry, exchanged for a short-lived token. Limits: the <code>read_owner_data</code> field is accepted and stored, but nothing reads it, so it gives the token nothing.",
       "<code>/v1/access/tokens</code>, <code>POST /v1/auth/token/exchange</code>"
      ],
-     "plain": "Personal access tokens Revocable tokens with chosen scopes, exchanged for a short-lived token. /v1/access/tokens, POST /v1/auth/token/exchange"
+     "plain": "Personal access tokens Revocable tokens with chosen scopes, or a token that acts as you in full, with an optional expiry, exchanged for a short-lived token. Limits: the read_owner_data field is accepted and stored, but nothing reads it, so it gives the token nothing. /v1/access/tokens, POST /v1/auth/token/exchange"
     },
     {
      "slug": "g-3-ecosystem-apps-geai",
      "cells": [
       "<strong>Ecosystem apps (GEAI)</strong>",
-      "A third kind of principal, <code>eco:app#owner@node-id</code>, for outside applications: onboarded through hello, approve and token with key pinning, limited to approved scopes and data areas, revocable like an agent. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md\" target=\"_blank\" rel=\"noopener\">building-an-aimeat-compatible-ecosystem-app.md</a>.",
-      "<code>/v1/ecosystem/*</code>, <code>aimeat_action_execute</code>"
+      "A third kind of principal, <code>eco:app#owner@node-id</code>, for outside applications: onboarded through hello, approve and token with key pinning, limited to approved scopes and data areas, revocable like an agent. Managed over REST; no MCP tool covers ecosystem apps. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md\" target=\"_blank\" rel=\"noopener\">building-an-aimeat-compatible-ecosystem-app.md</a>.",
+      "<code>/v1/ecosystem-apps/*</code> (hello, approve, token, list, revoke), <code>/v1/ecosystem/*</code> (events, subscriptions, read-through)"
      ],
-     "plain": "Ecosystem apps (GEAI) A third kind of principal, eco:app#owner@node-id, for outside applications: onboarded through hello, approve and token with key pinning, limited to approved scopes and data areas, revocable like an agent. See building-an-aimeat-compatible-ecosystem-app.md. /v1/ecosystem/*, aimeat_action_execute"
+     "plain": "Ecosystem apps (GEAI) A third kind of principal, eco:app#owner@node-id, for outside applications: onboarded through hello, approve and token with key pinning, limited to approved scopes and data areas, revocable like an agent. Managed over REST; no MCP tool covers ecosystem apps. See building-an-aimeat-compatible-ecosystem-app.md. /v1/ecosystem-apps/* (hello, approve, token, list, revoke), /v1/ecosystem/* (events, subscriptions, read-through)"
     },
     {
      "slug": "g-3-signed-challenge-sign-in",
@@ -549,10 +549,10 @@
      "slug": "g-3-identity-attestations",
      "cells": [
       "<strong>Identity attestations</strong>",
-      "Two parties co-sign a statement with their existing keys, and anyone can verify it.",
+      "Two to four parties co-sign a statement with the keys they already hold on this node. Anyone can read it, and the node checks every signature again each time it is read. Limits: the check is this node's answer; the attestation carries no public keys, so a reader who does not trust the node cannot check it alone.",
       "<code>/v1/attestations</code>"
      ],
-     "plain": "Identity attestations Two parties co-sign a statement with their existing keys, and anyone can verify it. /v1/attestations"
+     "plain": "Identity attestations Two to four parties co-sign a statement with the keys they already hold on this node. Anyone can read it, and the node checks every signature again each time it is read. Limits: the check is this node's answer; the attestation carries no public keys, so a reader who does not trust the node cannot check it alone. /v1/attestations"
     },
     {
      "slug": "g-3-document-signing",
@@ -599,10 +599,10 @@
      "slug": "g-4-scopes-and-roles",
      "cells": [
       "<strong>Scopes and roles</strong>",
-      "Every agent, app and token carries named permissions (<code>memory:read</code>, <code>ai:use</code>, <code>workflow:write</code> and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited. Every signed-in route asks a word of an agent or an app, unless the caller acts on its own record; the 70 routes that asked none before (organism membership, tasks for another agent, schedules, extension actions, cortex reads, installs and more) ask theirs from 4.0.0, and until then answer a call without it with a Deprecation header and count it.",
+      "Every agent, app and token carries named permissions (<code>memory:read</code>, <code>ai:use</code>, <code>workflow:write</code> and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited. Every signed-in route asks a word of an agent or an app, unless the caller acts on its own record; the 73 routes that asked none before (organism membership, tasks for another agent, schedules, extension actions, cortex reads, installs and more) ask theirs from 4.0.0 and refuse a call without it. The agents and ecosystem apps that existed before were given those words when the node first started as 4.0, so what worked keeps working until you narrow it.",
       "<code>/v1/permissions/*</code>, <code>x-aimeat-scope</code> in <code>openapi.yaml</code>"
      ],
-     "plain": "Scopes and roles Every agent, app and token carries named permissions (memory:read, ai:use, workflow:write and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited. Every signed-in route asks a word of an agent or an app, unless the caller acts on its own record; the 70 routes that asked none before (organism membership, tasks for another agent, schedules, extension actions, cortex reads, installs and more) ask theirs from 4.0.0, and until then answer a call without it with a Deprecation header and count it. /v1/permissions/*, x-aimeat-scope in openapi.yaml"
+     "plain": "Scopes and roles Every agent, app and token carries named permissions (memory:read, ai:use, workflow:write and so on). A permission word is enforced on every door, REST and MCP alike. Operator rights are granted on purpose, never inherited. Every signed-in route asks a word of an agent or an app, unless the caller acts on its own record; the 73 routes that asked none before (organism membership, tasks for another agent, schedules, extension actions, cortex reads, installs and more) ask theirs from 4.0.0 and refuse a call without it. The agents and ecosystem apps that existed before were given those words when the node first started as 4.0, so what worked keeps working until you narrow it. /v1/permissions/*, x-aimeat-scope in openapi.yaml"
     },
     {
      "slug": "g-4-consent",
@@ -617,10 +617,10 @@
      "slug": "g-4-app-grants",
      "cells": [
       "<strong>App grants</strong>",
-      "A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap what it spends, or revoke it. The change reaches the app when its current token runs out.",
+      "A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap the morsels it may use, or revoke it. A revoke ends its access at once; a narrowing reaches the app when its current token runs out (15 minutes by default).",
       "<code>/v1/app-grants/*</code>"
      ],
-     "plain": "App grants A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap what it spends, or revoke it. The change reaches the app when its current token runs out. /v1/app-grants/*"
+     "plain": "App grants A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap the morsels it may use, or revoke it. A revoke ends its access at once; a narrowing reaches the app when its current token runs out (15 minutes by default). /v1/app-grants/*"
     },
     {
      "slug": "g-4-sharing-groups-and-key-space-shares",
@@ -696,46 +696,46 @@
      "slug": "g-5-memory-records",
      "cells": [
       "<strong>Memory records</strong>",
-      "A JSON store per identity with visibility (private, owner, public, group, workspace), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default.",
+      "A JSON store per identity with visibility (private; owner, for your agents; group; members, for anyone signed in on this node; public), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default.",
       "<code>/v1/memory</code>, <code>aimeat_memory_*</code>"
      ],
-     "plain": "Memory records A JSON store per identity with visibility (private, owner, public, group, workspace), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default. /v1/memory, aimeat_memory_*"
+     "plain": "Memory records A JSON store per identity with visibility (private; owner, for your agents; group; members, for anyone signed in on this node; public), tags, TTL and versions. Up to 1024 kB per value and 1000 keys per identity by default. /v1/memory, aimeat_memory_*"
     },
     {
      "slug": "g-5-optimistic-locking",
      "cells": [
       "<strong>Optimistic locking</strong>",
-      "A write names the version it read; if someone changed it since, the write is refused rather than lost.",
-      "<code>expected_version</code>"
+      "A write names the version it read; if someone changed it since, the write is refused rather than lost. Replacing a key over REST always names the version. A write through <code>POST /v1/memory</code> or your AI is checked only when it names one, where 0 means the key must not exist yet, and so is a partial update.",
+      "<code>version</code> on <code>PUT /v1/memory/{key}</code>, <code>expected_version</code> on <code>POST /v1/memory</code> and <code>aimeat_memory_write</code>, <code>if_version</code> on <code>PATCH /v1/memory/{key}</code>"
      ],
-     "plain": "Optimistic locking A write names the version it read; if someone changed it since, the write is refused rather than lost. expected_version"
+     "plain": "Optimistic locking A write names the version it read; if someone changed it since, the write is refused rather than lost. Replacing a key over REST always names the version. A write through POST /v1/memory or your AI is checked only when it names one, where 0 means the key must not exist yet, and so is a partial update. version on PUT /v1/memory/{key}, expected_version on POST /v1/memory and aimeat_memory_write, if_version on PATCH /v1/memory/{key}"
     },
     {
      "slug": "g-5-memory-bulk-writes",
      "cells": [
       "<strong>Memory bulk writes</strong>",
-      "Write many records in one call. Valid entries are saved; the response lists created, updated, skipped and failed entries. One failed entry does not cancel the others.",
+      "Write many records in one call. Valid entries are saved; the response counts the created, updated and skipped entries and lists each failed one with its reason. One failed entry does not cancel the others.",
       "<code>POST /v1/memory/bulk</code>"
      ],
-     "plain": "Memory bulk writes Write many records in one call. Valid entries are saved; the response lists created, updated, skipped and failed entries. One failed entry does not cancel the others. POST /v1/memory/bulk"
+     "plain": "Memory bulk writes Write many records in one call. Valid entries are saved; the response counts the created, updated and skipped entries and lists each failed one with its reason. One failed entry does not cancel the others. POST /v1/memory/bulk"
     },
     {
      "slug": "g-5-memory-export-import-and-copy",
      "cells": [
       "<strong>Memory export, import and copy</strong>",
-      "Export records as JSON, import them with skip or overwrite choices, bundle selected records and files into a ZIP, or copy readable records under your agent's identity. Access checks still apply.",
+      "Export records as JSON, import them with skip or overwrite choices, bundle selected records and files into a ZIP, or, as an agent, copy another identity's public record under your own, one key at a time. Access checks still apply.",
       "<code>/v1/memory/export</code>, <code>/v1/memory/import</code>, <code>/v1/memory/bundle</code>, <code>/v1/memory/copy</code>"
      ],
-     "plain": "Memory export, import and copy Export records as JSON, import them with skip or overwrite choices, bundle selected records and files into a ZIP, or copy readable records under your agent's identity. Access checks still apply. /v1/memory/export, /v1/memory/import, /v1/memory/bundle, /v1/memory/copy"
+     "plain": "Memory export, import and copy Export records as JSON, import them with skip or overwrite choices, bundle selected records and files into a ZIP, or, as an agent, copy another identity's public record under your own, one key at a time. Access checks still apply. /v1/memory/export, /v1/memory/import, /v1/memory/bundle, /v1/memory/copy"
     },
     {
      "slug": "g-5-delete-and-restore",
      "cells": [
       "<strong>Delete and restore</strong>",
-      "A deleted record leaves every list and search at once and comes back whole for seven days. The operator sets the window.",
-      "<code>aimeat_memory_delete</code>, <code>aimeat_memory_restore</code>"
+      "A deleted record leaves every list and search at once and comes back whole for seven days. The operator sets the window. Limits: writing the same key again in that time replaces the deleted copy, which then cannot be restored.",
+      "<code>DELETE /v1/memory/{key}</code>, <code>POST /v1/memory/{key}/restore</code>, <code>GET /v1/memory/deleted</code>, <code>aimeat_memory_delete</code>, <code>aimeat_memory_restore</code>, <code>quota.memory_delete_grace_days</code>"
      ],
-     "plain": "Delete and restore A deleted record leaves every list and search at once and comes back whole for seven days. The operator sets the window. aimeat_memory_delete, aimeat_memory_restore"
+     "plain": "Delete and restore A deleted record leaves every list and search at once and comes back whole for seven days. The operator sets the window. Limits: writing the same key again in that time replaces the deleted copy, which then cannot be restored. DELETE /v1/memory/{key}, POST /v1/memory/{key}/restore, GET /v1/memory/deleted, aimeat_memory_delete, aimeat_memory_restore, quota.memory_delete_grace_days"
     },
     {
      "slug": "g-5-who-wrote-this",
@@ -768,10 +768,10 @@
      "slug": "g-5-librarian",
      "cells": [
       "<strong>Librarian</strong>",
-      "One ranked natural-language search across your personal memory and every organism you belong to.",
-      "<code>/v1/librarian</code>"
+      "One ranked natural-language search across everything you and your agents wrote, including what you put in organisms, with the organism and workspace each hit belongs to. A public scope searches what anyone has made public. Limits: what other members wrote in your organisms is not searched.",
+      "<code>GET /v1/librarian/search</code> (<code>scope</code>, <code>prefix</code>)"
      ],
-     "plain": "Librarian One ranked natural-language search across your personal memory and every organism you belong to. /v1/librarian"
+     "plain": "Librarian One ranked natural-language search across everything you and your agents wrote, including what you put in organisms, with the organism and workspace each hit belongs to. A public scope searches what anyone has made public. Limits: what other members wrote in your organisms is not searched. GET /v1/librarian/search (scope, prefix)"
     },
     {
      "slug": "g-5-find-a-place-in-the-menus",
@@ -786,10 +786,10 @@
      "slug": "g-5-files",
      "cells": [
       "<strong>Files</strong>",
-      "Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (<code>AIMEAT.storage</code>) or an AI (<code>aimeat_storage_upload</code>). A file you download cannot run as a page on the node's address.",
+      "Upload in one go or in chunks, resume downloads, set visibility per file. Every file stops at the per-file size the operator sets, 10 MB by default, also when it arrives in chunks: the chunked upload (up to 5 GB) carries a large file only after the operator raises that size. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (<code>AIMEAT.storage</code>) or an AI (<code>aimeat_storage_upload</code>). A file you download cannot run as a page on the node's address.",
       "<code>/v1/storage</code>, <code>aimeat_storage_*</code>"
      ],
-     "plain": "Files Upload up to 10 MB in one go or 5 GB in chunks (both set by the operator), resume downloads, set visibility per file. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (AIMEAT.storage) or an AI (aimeat_storage_upload). A file you download cannot run as a page on the node's address. /v1/storage, aimeat_storage_*"
+     "plain": "Files Upload in one go or in chunks, resume downloads, set visibility per file. Every file stops at the per-file size the operator sets, 10 MB by default, also when it arrives in chunks: the chunked upload (up to 5 GB) carries a large file only after the operator raises that size. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (AIMEAT.storage) or an AI (aimeat_storage_upload). A file you download cannot run as a page on the node's address. /v1/storage, aimeat_storage_*"
     },
     {
      "slug": "g-5-a-file-says-how-it-was-made",
@@ -813,10 +813,10 @@
      "slug": "g-5-data-map",
      "cells": [
       "<strong>Data map</strong>",
-      "Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24).",
+      "Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. Anyone can read the map of any app on the node, signed in or not; only the app's owner also gets the findings, such as personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24).",
       "<code>/v1/datamap/apps/:owner/:filename</code>, <code>aimeat_datamap_get</code>, <code>aimeat_datamap_set</code>"
      ],
-     "plain": "Data map Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. The map identifies personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24). /v1/datamap/apps/:owner/:filename, aimeat_datamap_get, aimeat_datamap_set"
+     "plain": "Data map Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. Anyone can read the map of any app on the node, signed in or not; only the app's owner also gets the findings, such as personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24). /v1/datamap/apps/:owner/:filename, aimeat_datamap_get, aimeat_datamap_set"
     },
     {
      "slug": "g-5-open-items",
@@ -982,10 +982,10 @@
      "slug": "g-6-approval-controls",
      "cells": [
       "<strong>Approval controls</strong>",
-      "Request approval for an action, read pending requests and resolve them under the organism's policy. A request about one workspace follows that workspace's own autonomy level when it has one. The workspace's list of actions that always need approval adds to the organism's list and never removes from it. Publishing can require approval; a record can be returned to a draft.",
-      "<code>/v1/organisms/:id/approvals</code> (<code>arguments.ws</code>)"
+      "Request approval for an action, read pending requests and resolve them under the organism's policy. A request about one workspace follows that workspace's own autonomy level when it has one. The workspace's list of actions that always need approval adds to the organism's list and never removes from it. Publishing can require approval; a record can be returned to a draft. A person resolves a request, on the workspace page or over REST, never an agent. Limits: no MCP tool covers approvals, so your AI cannot file a request or list the pending ones from the chat.",
+      "<code>/v1/organisms/:id/approvals</code> (<code>arguments.ws</code>), <code>POST /v1/organisms/:id/approvals/:aid</code>"
      ],
-     "plain": "Approval controls Request approval for an action, read pending requests and resolve them under the organism's policy. A request about one workspace follows that workspace's own autonomy level when it has one. The workspace's list of actions that always need approval adds to the organism's list and never removes from it. Publishing can require approval; a record can be returned to a draft. /v1/organisms/:id/approvals (arguments.ws)"
+     "plain": "Approval controls Request approval for an action, read pending requests and resolve them under the organism's policy. A request about one workspace follows that workspace's own autonomy level when it has one. The workspace's list of actions that always need approval adds to the organism's list and never removes from it. Publishing can require approval; a record can be returned to a draft. A person resolves a request, on the workspace page or over REST, never an agent. Limits: no MCP tool covers approvals, so your AI cannot file a request or list the pending ones from the chat. /v1/organisms/:id/approvals (arguments.ws), POST /v1/organisms/:id/approvals/:aid"
     },
     {
      "slug": "g-6-public-intake-forms",
@@ -1009,19 +1009,19 @@
      "slug": "g-6-live-documents",
      "cells": [
       "<strong>Live documents</strong>",
-      "A document can embed a mermaid diagram or a live view of a memory key, which shows the current value on every open.",
-      "workspace markdown"
+      "A document can embed a mermaid diagram or a live view of a memory key (a table, a list, fields or the value), read again on every open with the reader's own access; a key the reader may not read shows a placeholder. It draws on the node's own pages and in an app that renders with the markdown library (<code>AIMEAT.md.renderRich</code>).",
+      "workspace markdown, an <code>aimeat-memory</code> fenced block"
      ],
-     "plain": "Live documents A document can embed a mermaid diagram or a live view of a memory key, which shows the current value on every open. workspace markdown"
+     "plain": "Live documents A document can embed a mermaid diagram or a live view of a memory key (a table, a list, fields or the value), read again on every open with the reader's own access; a key the reader may not read shows a placeholder. It draws on the node's own pages and in an app that renders with the markdown library (AIMEAT.md.renderRich). workspace markdown, an aimeat-memory fenced block"
     },
     {
      "slug": "g-6-rows",
      "cells": [
       "<strong>Rows</strong>",
-      "Store typed tabular events in a workspace. Read pages with indexed field filters, event-time ranges and an update-time filter for incremental sync. Inspect row counts, size and date ranges without downloading the rows.",
+      "Store typed tabular events in a workspace. Read pages with indexed field filters, event-time ranges and an update-time filter for incremental sync. Inspect row counts, size and date ranges without downloading the rows. Limits, each set by the operator: 50 000 rows per workspace, 100 MB of rows per organism and 256 kB per row by default; a space with a retention window (<code>maxRows</code>, <code>maxDays</code>) keeps itself under them.",
       "<code>/v1/organisms/:id/workspace/rows/:space</code>, <code>aimeat_workspace_rows_*</code>"
      ],
-     "plain": "Rows Store typed tabular events in a workspace. Read pages with indexed field filters, event-time ranges and an update-time filter for incremental sync. Inspect row counts, size and date ranges without downloading the rows. /v1/organisms/:id/workspace/rows/:space, aimeat_workspace_rows_*"
+     "plain": "Rows Store typed tabular events in a workspace. Read pages with indexed field filters, event-time ranges and an update-time filter for incremental sync. Inspect row counts, size and date ranges without downloading the rows. Limits, each set by the operator: 50 000 rows per workspace, 100 MB of rows per organism and 256 kB per row by default; a space with a retention window (maxRows, maxDays) keeps itself under them. /v1/organisms/:id/workspace/rows/:space, aimeat_workspace_rows_*"
     },
     {
      "slug": "g-6-row-retention-and-deletion",
@@ -1036,10 +1036,10 @@
      "slug": "g-6-extensions-in-a-workspace",
      "cells": [
       "<strong>Extensions in a workspace</strong>",
-      "An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. Your AI can bring hundreds of records at once through an app's own tool: the extension behind it publishes up to 1000 records in one step, first as a dry run that shows what is new, what is already there and what is invalid, and takes an import back out in one step. Each record is checked against the space's locked structure on its own. An extension can also archive up to 500 records in one step, so a space that only grows, such as closed tickets, stays fast to read: archived records leave every read and can be restored. Limits: when the organism reviews every publish, a batch is refused and the records go in as drafts for a reviewer; removing records asks the agent for the permission to remove for good; only the organism's creator or an admin may archive.",
+      "An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. Your AI can bring hundreds of records at once through an app's own tool: the extension behind it publishes up to 1000 records in one step, first as a dry run that shows what is new, what is already there and what is invalid, and takes an import back out in one step. Each record is checked against the space's locked structure on its own. An extension can also archive up to 500 records in one step, so a space that only grows, such as closed tickets, stays fast to read: archived records leave every read and can be restored. Limits: when the organism reviews every publish, a batch is refused and the records go in as drafts for a reviewer; removed records (up to 2000 in one step) go to the bin, where each can be restored for the node's grace period, and removing asks an agent or app for the permission to delete (<code>memory:delete</code>); only the organism's creator or an admin may archive.",
       "extension manifest, <code>ctx.workspace.publishRecords</code>, <code>ctx.workspace.deleteRecords</code>, <code>ctx.workspace.archiveRecords</code>, <code>POST /v1/organisms/:id/workspace/records/publish</code> (<code>dry_run</code>, <code>create_only</code>)"
      ],
-     "plain": "Extensions in a workspace An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. Your AI can bring hundreds of records at once through an app's own tool: the extension behind it publishes up to 1000 records in one step, first as a dry run that shows what is new, what is already there and what is invalid, and takes an import back out in one step. Each record is checked against the space's locked structure on its own. An extension can also archive up to 500 records in one step, so a space that only grows, such as closed tickets, stays fast to read: archived records leave every read and can be restored. Limits: when the organism reviews every publish, a batch is refused and the records go in as drafts for a reviewer; removing records asks the agent for the permission to remove for good; only the organism's creator or an admin may archive. extension manifest, ctx.workspace.publishRecords, ctx.workspace.deleteRecords, ctx.workspace.archiveRecords, POST /v1/organisms/:id/workspace/records/publish (dry_run, create_only)"
+     "plain": "Extensions in a workspace An extension that declares it may read and write a workspace on behalf of whoever called it, under that person's rights, so rules live on the node. Your AI can bring hundreds of records at once through an app's own tool: the extension behind it publishes up to 1000 records in one step, first as a dry run that shows what is new, what is already there and what is invalid, and takes an import back out in one step. Each record is checked against the space's locked structure on its own. An extension can also archive up to 500 records in one step, so a space that only grows, such as closed tickets, stays fast to read: archived records leave every read and can be restored. Limits: when the organism reviews every publish, a batch is refused and the records go in as drafts for a reviewer; removed records (up to 2000 in one step) go to the bin, where each can be restored for the node's grace period, and removing asks an agent or app for the permission to delete (memory:delete); only the organism's creator or an admin may archive. extension manifest, ctx.workspace.publishRecords, ctx.workspace.deleteRecords, ctx.workspace.archiveRecords, POST /v1/organisms/:id/workspace/records/publish (dry_run, create_only)"
     },
     {
      "slug": "g-6-rows-from-an-extension-on-a-schedule",
@@ -1063,10 +1063,10 @@
      "slug": "g-6-knowledge-packages",
      "cells": [
       "<strong>Knowledge packages</strong>",
-      "Structured knowledge with content blocks and links between packages, shared, cloned, contributed to an organism, reviewed, with a reputation per package.",
+      "Structured knowledge as a package of entries, with links between packages: import one, share it or set each entry's visibility, clone and export it, contribute it to an organism, and read its reputation and the operator's reviews.",
       "<code>/v1/knowledge/*</code>, <code>aimeat_knowledge_*</code>"
      ],
-     "plain": "Knowledge packages Structured knowledge with content blocks and links between packages, shared, cloned, contributed to an organism, reviewed, with a reputation per package. /v1/knowledge/*, aimeat_knowledge_*"
+     "plain": "Knowledge packages Structured knowledge as a package of entries, with links between packages: import one, share it or set each entry's visibility, clone and export it, contribute it to an organism, and read its reputation and the operator's reviews. /v1/knowledge/*, aimeat_knowledge_*"
     },
     {
      "slug": "g-6-skills",
@@ -1205,10 +1205,10 @@
      "slug": "g-7-stop-an-agent-and-start-it-again",
      "cells": [
       "<strong>Stop an agent, and start it again</strong>",
-      "You can stop one of your agents for a time without removing it: on its page on your home, with the &quot;Takes new work&quot; switch on its card in Settings &amp; Controls, or by telling your AI &quot;stop the news agent&quot;. A stopped agent finishes the work it has and starts nothing new. Tasks and messages you give it are stored and wait, a scheduled run is skipped (the schedule's next run happens at its time), and its computer is not woken for new work. Its key and permissions stay, so starting it is one press and nothing is set up again. When you start it, the tasks and messages that waited go to it: a task that starts by itself starts then, and one that needs your OK goes on waiting for it. Only you, or another of your agents that may change agents, can stop or start an agent; an agent cannot do it to itself. Limits: a scheduled run that was skipped is not made up; a single task that is already running is ended by cancelling that task, not by the stop; an agent built outside AIMEAT that starts work by its own timer has to read the stopped state itself, and the CrewAI package does so from 0.33.0.",
+      "You can stop one of your agents for a time without removing it: on its page on your home, with the &quot;Takes new work&quot; switch on its card in Settings &amp; Controls, or by telling your AI &quot;stop the news agent&quot;. A stopped agent finishes the work it has and starts nothing new. Tasks and messages you give it are stored and wait, a scheduled run is skipped (the schedule's next run happens at its time), and its computer is not woken for new work. Its key and permissions stay, so starting it is one press and nothing is set up again. When you start it, the tasks and messages that waited go to it: a task that starts by itself starts then, and one that needs your OK goes on waiting for it. Only you, or another of your agents that may change agents, can stop or start an agent; an agent cannot do it to itself. Limits: a task sent through the agent-to-agent task interface (<code>/v1/agents/v2/tasks</code>, <code>aimeat_v2_task_create</code>) is refused while the agent is stopped, not kept; a scheduled run that was skipped is not made up; a single task that is already running is ended by cancelling that task, not by the stop; an agent built outside AIMEAT that starts work by its own timer has to read the stopped state itself, and the CrewAI package does so from 0.33.0.",
       "<code>POST /v1/agents/{name}/stop</code>, <code>POST /v1/agents/{name}/start</code>, <code>aimeat_agent_stop</code>, <code>aimeat_agent_start</code>; <code>stopped</code> on <code>GET /v1/agents</code>"
      ],
-     "plain": "Stop an agent, and start it again You can stop one of your agents for a time without removing it: on its page on your home, with the \"Takes new work\" switch on its card in Settings & Controls, or by telling your AI \"stop the news agent\". A stopped agent finishes the work it has and starts nothing new. Tasks and messages you give it are stored and wait, a scheduled run is skipped (the schedule's next run happens at its time), and its computer is not woken for new work. Its key and permissions stay, so starting it is one press and nothing is set up again. When you start it, the tasks and messages that waited go to it: a task that starts by itself starts then, and one that needs your OK goes on waiting for it. Only you, or another of your agents that may change agents, can stop or start an agent; an agent cannot do it to itself. Limits: a scheduled run that was skipped is not made up; a single task that is already running is ended by cancelling that task, not by the stop; an agent built outside AIMEAT that starts work by its own timer has to read the stopped state itself, and the CrewAI package does so from 0.33.0. POST /v1/agents/{name}/stop, POST /v1/agents/{name}/start, aimeat_agent_stop, aimeat_agent_start; stopped on GET /v1/agents"
+     "plain": "Stop an agent, and start it again You can stop one of your agents for a time without removing it: on its page on your home, with the \"Takes new work\" switch on its card in Settings & Controls, or by telling your AI \"stop the news agent\". A stopped agent finishes the work it has and starts nothing new. Tasks and messages you give it are stored and wait, a scheduled run is skipped (the schedule's next run happens at its time), and its computer is not woken for new work. Its key and permissions stay, so starting it is one press and nothing is set up again. When you start it, the tasks and messages that waited go to it: a task that starts by itself starts then, and one that needs your OK goes on waiting for it. Only you, or another of your agents that may change agents, can stop or start an agent; an agent cannot do it to itself. Limits: a task sent through the agent-to-agent task interface (/v1/agents/v2/tasks, aimeat_v2_task_create) is refused while the agent is stopped, not kept; a scheduled run that was skipped is not made up; a single task that is already running is ended by cancelling that task, not by the stop; an agent built outside AIMEAT that starts work by its own timer has to read the stopped state itself, and the CrewAI package does so from 0.33.0. POST /v1/agents/{name}/stop, POST /v1/agents/{name}/start, aimeat_agent_stop, aimeat_agent_start; stopped on GET /v1/agents"
     },
     {
      "slug": "g-7-reachability",
@@ -1241,28 +1241,28 @@
      "slug": "g-7-directives",
      "cells": [
       "<strong>Directives</strong>",
-      "Set an agent's purpose and behavioural rules, with owner-wide defaults for shared rules, token budgets and suggested memory areas. Inspect the combined node, owner and agent instructions it receives.",
+      "Set an agent's purpose, behavioural rules, memory areas and token budget, and owner-wide defaults for all your agents. Inspect the combined instructions it receives: the node's rules, then your owner-wide rules, then the agent's own. Limits: of the owner-wide defaults only the rules reach an agent; the default token budget and the default memory areas are stored and shown, but no agent receives them.",
       "<code>/v1/agents/:name/directives</code>, <code>/v1/owner/agent-defaults</code>"
      ],
-     "plain": "Directives Set an agent's purpose and behavioural rules, with owner-wide defaults for shared rules, token budgets and suggested memory areas. Inspect the combined node, owner and agent instructions it receives. /v1/agents/:name/directives, /v1/owner/agent-defaults"
+     "plain": "Directives Set an agent's purpose, behavioural rules, memory areas and token budget, and owner-wide defaults for all your agents. Inspect the combined instructions it receives: the node's rules, then your owner-wide rules, then the agent's own. Limits: of the owner-wide defaults only the rules reach an agent; the default token budget and the default memory areas are stored and shown, but no agent receives them. /v1/agents/:name/directives, /v1/owner/agent-defaults"
     },
     {
      "slug": "g-7-telemetry-and-activity",
      "cells": [
       "<strong>Telemetry and activity</strong>",
-      "Agents report their model calls, which feed the usage ledger; the owner sees what each agent did.",
-      "<code>aimeat_agent_telemetry_report</code>, <code>aimeat_agent_activity</code>"
+      "Agents report their model calls, which feed the usage ledger. You see what each agent did on its Activity tab and over REST; an agent reads its own figures with <code>aimeat_agent_activity</code>, and only its own.",
+      "<code>aimeat_agent_telemetry_report</code>, <code>aimeat_agent_activity</code>, <code>/v1/agents/:name/activity</code>, <code>/v1/agents/:name/telemetry</code>"
      ],
-     "plain": "Telemetry and activity Agents report their model calls, which feed the usage ledger; the owner sees what each agent did. aimeat_agent_telemetry_report, aimeat_agent_activity"
+     "plain": "Telemetry and activity Agents report their model calls, which feed the usage ledger. You see what each agent did on its Activity tab and over REST; an agent reads its own figures with aimeat_agent_activity, and only its own. aimeat_agent_telemetry_report, aimeat_agent_activity, /v1/agents/:name/activity, /v1/agents/:name/telemetry"
     },
     {
      "slug": "g-7-agent-quality-and-reviews",
      "cells": [
       "<strong>Agent quality and reviews</strong>",
-      "Review completed tasks with a rating, work context, comment and source-grounding assessment. Compare task success and completion times, ratings by context and agent-published custom metrics. Small rating samples are flagged; these are observations and reviews, not service promises.",
-      "Agents &gt; Quality, <code>/v1/agents/:name/statistics</code>, <code>/v1/agents/:name/tasks/:id/rate</code>, <code>aimeat_agent_statistics</code>"
+      "Review completed tasks with a rating, work context, comment and source-grounding assessment. Compare task success and completion times, ratings by context and agent-published custom metrics. Small rating samples are flagged; these are observations and reviews, not service promises. You rate a task on the Quality tab or over REST; no MCP tool rates one. An agent reads its own statistics with <code>aimeat_agent_statistics</code>, which only the <code>aimeat connect</code> connector offers.",
+      "Agents &gt; Quality, <code>/v1/agents/:name/statistics</code>, <code>/v1/agents/:name/tasks/:id/rate</code>, <code>aimeat_agent_statistics</code> (connector)"
      ],
-     "plain": "Agent quality and reviews Review completed tasks with a rating, work context, comment and source-grounding assessment. Compare task success and completion times, ratings by context and agent-published custom metrics. Small rating samples are flagged; these are observations and reviews, not service promises. Agents > Quality, /v1/agents/:name/statistics, /v1/agents/:name/tasks/:id/rate, aimeat_agent_statistics"
+     "plain": "Agent quality and reviews Review completed tasks with a rating, work context, comment and source-grounding assessment. Compare task success and completion times, ratings by context and agent-published custom metrics. Small rating samples are flagged; these are observations and reviews, not service promises. You rate a task on the Quality tab or over REST; no MCP tool rates one. An agent reads its own statistics with aimeat_agent_statistics, which only the aimeat connect connector offers. Agents > Quality, /v1/agents/:name/statistics, /v1/agents/:name/tasks/:id/rate, aimeat_agent_statistics (connector)"
     },
     {
      "slug": "g-7-agent-usage-by-model-and-run",
@@ -1376,10 +1376,10 @@
      "slug": "g-7-built-in-chat",
      "cells": [
       "<strong>Built-in chat</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs, one per person, and its model calls go through your own AI providers under your model policy and budget. Within two seconds the chat says in your language what it is doing, and the agent writes a sentence between its steps. A turn that runs long answers with what it has: past 12 tool calls, 3 rounds of them or 100 seconds the agent is asked once to answer from what it found (asked for a new agent, it files the proposal and gives you the approval address), and when that also runs out, the chat ends the turn and says so. Stop and leaving the page stop the agent. The chat starts each message with about twenty tools, the ones most jobs need, and adds any other tool it may use when a job needs it (<code>aimeat_tools_find</code>), so a short question does not pay for the description of every tool on the server; any MCP client can connect to the same set at <code>/v2/mcp/chat</code>. Limits: an operator's shared chat key skips the per-person metering; a conversation idle for 15 minutes starts fresh.",
+      "Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs, one per person (one for everybody when the operator sets a shared chat key), and its model calls go through your own AI providers under your model policy and budget. Within two seconds the chat says in your language what it is doing, and the agent writes a sentence between its steps. A turn that runs long answers with what it has: past 12 tool calls, 3 rounds of them or 100 seconds the agent is asked once to answer from what it found (asked for a new agent, it files the proposal and gives you the approval address), and when that also runs out, the chat ends the turn and says so. Stop and leaving the page stop the agent. The chat starts each message with about twenty tools, the ones most jobs need, and adds any other tool it may use when a job needs it (<code>aimeat_tools_find</code>), so a short question does not pay for the description of every tool on the server; any MCP client can connect to the same set at <code>/v2/mcp/chat</code>. Limits: at most 20 people's chat processes run at once, so a new one closes the one idle longest, and when all 20 are in a turn your turn is refused with the reason; a conversation idle for 15 minutes starts fresh; an operator's shared chat key skips the per-person metering, and its one process is not closed when idle.",
       "<code>/v1/chat</code>, <code>AIMEAT_GOOSE_BIN</code>, <code>AIMEAT_GOOSE_PROVIDER_API_KEY</code>"
      ],
-     "plain": "Built-in chat off Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs, one per person, and its model calls go through your own AI providers under your model policy and budget. Within two seconds the chat says in your language what it is doing, and the agent writes a sentence between its steps. A turn that runs long answers with what it has: past 12 tool calls, 3 rounds of them or 100 seconds the agent is asked once to answer from what it found (asked for a new agent, it files the proposal and gives you the approval address), and when that also runs out, the chat ends the turn and says so. Stop and leaving the page stop the agent. The chat starts each message with about twenty tools, the ones most jobs need, and adds any other tool it may use when a job needs it (aimeat_tools_find), so a short question does not pay for the description of every tool on the server; any MCP client can connect to the same set at /v2/mcp/chat. Limits: an operator's shared chat key skips the per-person metering; a conversation idle for 15 minutes starts fresh. /v1/chat, AIMEAT_GOOSE_BIN, AIMEAT_GOOSE_PROVIDER_API_KEY"
+     "plain": "Built-in chat off Chat with your own agent in the browser, with tool calls shown as they happen and file attachments. Runs a Goose process the operator installs, one per person (one for everybody when the operator sets a shared chat key), and its model calls go through your own AI providers under your model policy and budget. Within two seconds the chat says in your language what it is doing, and the agent writes a sentence between its steps. A turn that runs long answers with what it has: past 12 tool calls, 3 rounds of them or 100 seconds the agent is asked once to answer from what it found (asked for a new agent, it files the proposal and gives you the approval address), and when that also runs out, the chat ends the turn and says so. Stop and leaving the page stop the agent. The chat starts each message with about twenty tools, the ones most jobs need, and adds any other tool it may use when a job needs it (aimeat_tools_find), so a short question does not pay for the description of every tool on the server; any MCP client can connect to the same set at /v2/mcp/chat. Limits: at most 20 people's chat processes run at once, so a new one closes the one idle longest, and when all 20 are in a turn your turn is refused with the reason; a conversation idle for 15 minutes starts fresh; an operator's shared chat key skips the per-person metering, and its one process is not closed when idle. /v1/chat, AIMEAT_GOOSE_BIN, AIMEAT_GOOSE_PROVIDER_API_KEY"
     }
    ]
   },
