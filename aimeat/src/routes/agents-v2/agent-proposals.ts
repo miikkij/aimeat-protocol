@@ -23,6 +23,7 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   2026-10-15 — The approval runs pre_agent_registration before any write and post_agent_registration after (feature-list audit 89).
  *   v1.9.0 — 2026-10-13 — Approval takes `llm_choice`, the model the owner picked for this agent:
  *     checked before anything is created, stored before the agent is offered to its connector, so
  *     the first run already uses it, and answered as `llm_choice`. Measured on aimeat.io the same
@@ -67,6 +68,8 @@ import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
 import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
 import { findConnector, setWanted, clearWanted, type ConnectorView } from '../../services/connector-registry.js';
 import { emitChange } from '../../services/event-bus.js';
+import { executeHooks } from '../../services/hooks.js';
+import { fireHook } from '../../utils/fire-hook.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { giveFirstRun } from '../../services/agent-first-run.js';
 import { withDefaultOffer, firstRequestOf } from '../../services/agent-default-offer.js';
@@ -215,6 +218,18 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       llmChoice = checked.choice;
     }
 
+    // Extension hook: pre_agent_registration, before any write, as on every agent-creating route
+    // (feature-list audit 89). The proposal stays open, so the owner can approve it later.
+    const hookResult = await executeHooks(config, storage, 'pre_agent_registration',
+      { name: proposal.name, owner, display_name: proposal.display_name, via: 'proposal' });
+    if (!hookResult.allowed) {
+      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED',
+        `${hookResult.reason ?? 'An extension on this node refused the new agent.'} Nothing was created, and the proposal is still open, so you can approve it later.`,
+        403, { hook: 'pre_agent_registration' },
+        [{ description: 'See the agent proposals waiting for you', method: 'GET', url: '/v1/agents/v2/agent-proposals' }]));
+      return;
+    }
+
     const now = new Date().toISOString();
     const gaii = buildGAII(proposal.name, owner, config.nodeId);
     // What any crew agent needs to start, whatever the proposer wrote (services/agent-proposals.ts
@@ -357,6 +372,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
         })
       : null;
 
+    fireHook(config, storage, 'post_agent_registration', { gaii, owner, via: 'proposal' });
     void recordAccountEvent(storage, {
       ownerGhii: `${owner}@${config.nodeId}`,
       kind: 'agent_connected',

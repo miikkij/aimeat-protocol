@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.2 — 2026-10-15 — POST /v1/agents/import runs pre_agent_registration and post_agent_registration
+ *     (feature-list audit 89).
  *   v1.15.1 -- 2026-10-15 -- POST /v1/agents/import gives the imported agent ['*'] on both backends, as
  *     Postgres did; SQLite left the list empty and the agent held no scope (Jouni: Postgres is the reference).
  *   v1.15.0 -- 2026-10-15 -- POST /v1/agents/:gaii/rekey revokes the agent's sessions, so a token
@@ -67,6 +69,7 @@ import { forgetAgentAccess } from '../../services/agent-refusals.js';
 import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
+import { executeHooks } from '../../services/hooks.js';
 import { emitChange } from '../../services/event-bus.js';
 import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
 import { emitToolListChanged } from '../../mcp/index.js';
@@ -197,6 +200,15 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
+    // Extension hook: pre_agent_registration. An imported agent is a new agent on this node, and the
+    // hook ran only on POST /v1/agents and the device flow (feature-list audit 89).
+    const hookResult = await executeHooks(config, storage, 'pre_agent_registration',
+      { name: agentData.name, owner: agentData.owner, display_name: agentData.display_name, via: 'import' });
+    if (!hookResult.allowed) {
+      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookResult.reason ?? 'Agent registration denied by extension hook'));
+      return;
+    }
+
     const keyPair = await generateKeyPair();
     const now = new Date().toISOString();
 
@@ -298,6 +310,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       note: 'Agent imported with new keys. Store the private key securely.',
     }));
     emitChange('agents');
+    fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner, via: 'import' });
   });
 
   // POST /v1/agents/:gaii/rekey — Rotate agent keys (owner auth)

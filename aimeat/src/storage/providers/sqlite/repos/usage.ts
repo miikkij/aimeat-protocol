@@ -17,6 +17,8 @@
  *   - getUsageCursor / setUsageCursor / advanceUsageRollup
  *   - queryUsageRollup / clearUsageRollupRange
  * @version-history
+ *   2026-10-15 — countUsageCalls: how many calls match, counted by the database, optionally under a
+ *     coordinate prefix; the MCP grant call cap counted a list capped at 200 rows (feature-list audit 13).
  *   v1.1.0 — 2026-09-25 — foldNamedAppVisits: after thirteen months an app open keeps its count and
  *     loses the visitor's account, in the hot table, the archive and the rollups.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
@@ -187,6 +189,24 @@ export function listUsageCalls(db: Database.Database, filter: UsageCallFilter): 
   const rows = db.prepare(`SELECT * FROM usage_calls ${where} ORDER BY ts DESC LIMIT ?`)
     .all(...params, limit) as Row[];
   return rows.map(toCall);
+}
+
+/** How many stored calls match, counted here rather than over a capped list (feature-list audit 13). */
+export function countUsageCalls(db: Database.Database, filter: UsageCallFilter, coordinatePrefix?: string): number {
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  if (filter.ownerGhii) { clauses.push('ownerGhii = ?'); params.push(filter.ownerGhii); }
+  if (filter.actorGaii) { clauses.push('actorGaii = ?'); params.push(filter.actorGaii); }
+  if (filter.surface) { clauses.push('surface = ?'); params.push(filter.surface); }
+  if (filter.appId) { clauses.push('appId = ?'); params.push(filter.appId); }
+  if (filter.outcome) { clauses.push('outcome = ?'); params.push(filter.outcome); }
+  if (filter.from) { clauses.push('ts >= ?'); params.push(filter.from); }
+  if (filter.to) { clauses.push('ts <= ?'); params.push(filter.to); }
+  // substr rather than LIKE, so a '_' or '%' in the prefix is not a wildcard.
+  if (coordinatePrefix) { clauses.push('substr(coordinate, 1, ?) = ?'); params.push(coordinatePrefix.length, coordinatePrefix); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const row = db.prepare(`SELECT COUNT(*) AS n FROM usage_calls ${where}`).get(...params) as { n: number };
+  return Number(row.n);
 }
 
 /** Strictly after (lastTs, lastId) in the stream's total order. */

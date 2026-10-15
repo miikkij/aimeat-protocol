@@ -39,6 +39,7 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   2026-10-15 — A grant's end date that is not a date is refused with 400 (feature-list audit 13).
  *   v1.5.0 — 2026-10-09 — POST /:id/authorize binds the round to the owner's browser when the owner
  *     starts it from a page of this node; an agent gets the node's confirmation page as authorize_url
  *     (owner_confirms: true). The callback refuses a browser the round was not bound to with 403
@@ -418,6 +419,15 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(400).json(error(
           config.nodeId, 'BAD_REQUEST',
           'Say which tools this may use: a list of names, or "*" for all of them.',
+        ));
+      }
+
+      // An end date that is not a date was stored as given and never ran out (feature-list audit 13).
+      if (b.expires !== undefined && b.expires !== null
+        && (typeof b.expires !== 'string' || !Number.isFinite(Date.parse(b.expires)))) {
+        return res.status(400).json(error(
+          config.nodeId, 'BAD_REQUEST',
+          'The end date is not a date. Give it as a date such as 2026-12-31, or leave it out for a permission that does not end.',
         ));
       }
 

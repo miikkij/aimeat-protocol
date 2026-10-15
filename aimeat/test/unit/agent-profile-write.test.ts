@@ -10,9 +10,15 @@
  *   write nothing at all.
  * @usage cd aimeat && pnpm exec vitest run test/unit/agent-profile-write.test.ts
  * @version-history
+ *   2026-10-15 -- An mcp capability naming a server the node does not know stays unverified (feature-list audit 74).
  *   v1.0.0 -- 2026-08-11 -- Initial, with services/agent-profile-write.ts.
  */
 import { describe, it, expect, vi } from 'vitest';
+
+// The servers the node knows for the owner: only "playwright" here (feature-list audit 74).
+vi.mock('../../src/services/mcp-client/registry.js', () => ({
+    requireUsableServer: vi.fn(async (_s: unknown, _o: string, name: string) => (name === 'playwright' ? { slug: 'playwright' } : null)),
+}));
 import {
     setAgentTags, setAgentMode, setAgentCapabilities,
 } from '../../src/services/agent-profile-write.js';
@@ -113,12 +119,12 @@ describe('setAgentCapabilities', () => {
         expect(patch.domainCapabilities).toEqual(['web development']);
     });
 
-    it('marks an mcp capability verified only when the session proves the connection', async () => {
+    it('marks an mcp capability verified only when the session proves the connection and the node knows the server', async () => {
         const live = fakeStorage();
         await setAgentCapabilities(deps(live), 'crew#alice@node-1',
-            { technical: [{ name: 'playwright', type: 'mcp' }, { name: 'git', type: 'tool' }] }, { liveMcpSession: true });
+            { technical: [{ name: 'playwright', type: 'mcp' }, { name: 'filesystem', type: 'mcp' }, { name: 'git', type: 'tool' }] }, { liveMcpSession: true });
         expect((live.updateAgent.mock.calls[0][1] as { technicalCapabilities: Array<{ verified: boolean }> }).technicalCapabilities)
-            .toEqual([{ name: 'playwright', type: 'mcp', verified: true }, { name: 'git', type: 'tool', verified: false }]);
+            .toEqual([{ name: 'playwright', type: 'mcp', verified: true }, { name: 'filesystem', type: 'mcp', verified: false }, { name: 'git', type: 'tool', verified: false }]);
 
         const owner = fakeStorage();
         await setAgentCapabilities(deps(owner), 'crew#alice@node-1',

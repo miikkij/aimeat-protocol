@@ -705,6 +705,25 @@ await test('24. creator upgrades B to CONTRIBUTOR → B reads and writes; member
     assert((list.body.data.members || []).some((m: any) => m.owner === B.ownerName && m.role === 'contributor'), `members list shows B as contributor: ${JSON.stringify(list.body.data?.members)}`);
 });
 
+// Feature-list audit row 61: the draft write asked the write rule for a stand-in key, so the
+// workspace's meta rule (keys under `.meta`) never fired and a contributor's draft landed in a
+// declared meta space that POST /v1/memory refuses. Each item's real key is asked now.
+await test('24b. a contributor\'s draft into a declared meta space is refused, as POST /v1/memory refuses it', async () => {
+    const root = `organism.${bootOrgId}.w.${bootWs.id}`;
+    const cur = await json(`/v1/memory/${encodeURIComponent(`${root}.meta.manifest`)}`, { headers: aOwner() });
+    assert(cur.status === 200, `read manifest ${cur.status}`);
+    const manifest = cur.body.data.value;
+    if (!(manifest.objectTypes ?? []).some((t: any) => t.namespace === 'meta.extra')) {
+        manifest.objectTypes = [...(manifest.objectTypes ?? []), { mode: 'records', name: 'metaextra', schemaRef: 'schema:note@1', namespace: 'meta.extra', backing: 'memory', writeRole: 'member' }];
+        const put = await json(`/v1/memory/${encodeURIComponent(`${root}.meta.manifest`)}`, { method: 'PUT', headers: aOwner(), body: JSON.stringify({ value: manifest, version: cur.body.data.version }) });
+        assert(put.status === 200, `declare the meta space ${put.status}: ${JSON.stringify(put.body?.error)}`);
+    }
+    const rest = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${B.ownerToken}` }, body: JSON.stringify({ key: `${root}.meta.extra.x1.draft`, value: { title: 'x' }, visibility: 'private' }) });
+    assert(rest.status === 403, `POST /v1/memory refuses the meta key to a contributor: ${rest.status}`);
+    const r = await B.client.call('aimeat_workspace_write', { organism_id: bootOrgId, ws: bootWs.id, space: 'metaextra', id: 'x1', value: { title: 'x' } }, 1241);
+    assert(r.result?.isError === true, `the draft into the meta space was written: ${r.result?.content?.[0]?.text?.slice(0, 200)}`);
+});
+
 await test("25. workspace is SHARED — the creator sees a contributor's write (cross-owner content visible)", async () => {
     // B (contributor) wrote 'b-contrib' under B's own identity in test 24. The workspace read is at the
     // workspace level: anyone who can read the workspace sees ALL content, whoever wrote it — so the

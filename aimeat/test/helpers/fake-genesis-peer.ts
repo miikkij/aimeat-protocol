@@ -27,6 +27,8 @@
  *   ... drive the node ...
  *   await peer.close();
  * @version-history
+ *   v1.2.0 — 2026-10-15 — memoryReadHeaders(): a genesis memory read is signed for the node it asks,
+ *     and the answering route refuses an unsigned one (feature-list audit 166).
  *   v1.1.0 — 2026-10-06 — replicateStatus: the replicate door can refuse, as a real receiver does.
  *   v1.0.0 — 2026-09-08 — Written for test/e2e-genesis-federation.ts.
  */
@@ -34,6 +36,7 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { genesisReadHeaders } from './genesis-read-headers.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -72,6 +75,9 @@ export interface FakeGenesisPeer {
     seen(method: string, path: string): RecordedRequest[];
     /** Sign a message with this federation's private key, the way the real far end would. */
     sign(message: string): Promise<string>;
+    /** The headers a genesis memory read from this federation to `audience` carries, signed the way
+     *  signNodeRequest signs it (src/services/signed-node-request.ts). */
+    memoryReadHeaders(audience: string, query: { gaii?: string; key?: string; prefix?: string }): Promise<Record<string, string>>;
     close(): Promise<void>;
 }
 
@@ -191,6 +197,9 @@ export async function startFakeGenesisPeer(nodeId: string): Promise<FakeGenesisP
         async sign(message) {
             const sig = await ed.signAsync(new TextEncoder().encode(message), Buffer.from(state.privateKey, 'base64'));
             return Buffer.from(sig).toString('base64');
+        },
+        memoryReadHeaders(audience, query) {
+            return genesisReadHeaders(state.privateKey, state.nodeId, audience, query);
         },
         close() {
             return new Promise<void>((resolve) => { server.close(() => resolve()); });

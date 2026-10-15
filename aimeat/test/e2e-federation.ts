@@ -4,6 +4,7 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   2026-10-15 — Phase 7 reads the genesis memory door as an approved genesis peer, signed for this node, and an unsigned read is refused (feature-list audit 166).
  *   v1.5.0 -- 2026-10-12 -- Node 4.0.0 refuses a federation message without the audience or delivery
  *     proof (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN). The direct peer's heartbeat (11),
  *     replicate (12) and catalogue syncs (13, 14, 14b) carry the proof a node of this version sends,
@@ -67,6 +68,7 @@ import { createHash } from 'node:crypto';
 import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
 import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config-federation.js';
 import { removedOn } from './helpers/node-release.js';
+import { genesisReadHeaders } from './helpers/genesis-read-headers.js';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
@@ -1122,6 +1124,31 @@ console.log('\nPhase 7 — The genesis memory-read door, as it stands today');
 
 const GEN_PREFIX = `genesisprobe${Date.now()}`;
 
+// Since 2026-10-15 the door answers only an approved genesis peer, on a request it signed for this
+// node (feature-list audit 166), so the reads below come from a genesis peering the operator approved.
+const genesisPeerNodeId = `aimeat-genesisprobe-${Date.now() % 100000}`;
+const genesisPeerPriv = ed.utils.randomSecretKey();
+const genesisPeerPrivB64 = Buffer.from(genesisPeerPriv).toString('base64');
+const genesisPeerPubB64 = Buffer.from(await ed.getPublicKeyAsync(genesisPeerPriv)).toString('base64');
+const genesisRead = async (q: { gaii?: string; key?: string; prefix?: string }) => {
+    const qs = new URLSearchParams();
+    if (q.gaii) qs.set('gaii', q.gaii);
+    if (q.key) qs.set('key', q.key);
+    if (q.prefix) qs.set('prefix', q.prefix);
+    return json(`/v1/federation/genesis-memory-read?${qs}`, { headers: await genesisReadHeaders(genesisPeerPrivB64, genesisPeerNodeId, NODE_ID, q) });
+};
+
+await test('22b. Setup: the operator approves a genesis peering whose key signs the reads', async () => {
+    const made = await json('/v1/federation/genesis-peer', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ genesisNodeId: genesisPeerNodeId, genesisUrl: 'http://127.0.0.1:9', publicKey: genesisPeerPubB64 }),
+    });
+    assert(made.status === 201, `genesis peering: ${made.status} ${JSON.stringify(made.body?.error)}`);
+    const id = made.body.data.peer?.id ?? made.body.data.id;
+    const ok = await json(`/v1/federation/genesis-peer/${id}/approve`, { method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(ok.status === 200, `approve: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+});
+
 await test('23. Setup: the agent writes one public and one private key under the same prefix', async () => {
     const pub = await json('/v1/memory', {
         method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
@@ -1136,12 +1163,12 @@ await test('23. Setup: the agent writes one public and one private key under the
 });
 
 await test('24. WITHOUT a federation consent the door returns nothing — the consent is the gate', async () => {
-    const r = await json(`/v1/federation/genesis-memory-read?prefix=${GEN_PREFIX}`);
+    const r = await genesisRead({ prefix: GEN_PREFIX });
     assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body)}`);
     assert(r.body.data.total === 0, `expected nothing before the consent, got ${JSON.stringify(r.body.data.results)}`);
 });
 
-await test('25. WITH the consent the public key is served — to a caller carrying no credential at all', async () => {
+await test('25. WITH the consent the public key is served to the approved genesis peer, and an unsigned read is refused', async () => {
     const consent = await json('/v1/consent', {
         method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
         body: JSON.stringify({
@@ -1150,8 +1177,10 @@ await test('25. WITH the consent the public key is served — to a caller carryi
     });
     assert(consent.status === 200 || consent.status === 201, `consent: ${consent.status} ${JSON.stringify(consent.body)}`);
 
-    // No Authorization header, no signature, no peer id. That IS the current contract.
-    const r = await json(`/v1/federation/genesis-memory-read?prefix=${GEN_PREFIX}`);
+    // Until 2026-10-15 a caller with no credential at all was answered here (feature-list audit 166).
+    const unsigned = await json(`/v1/federation/genesis-memory-read?prefix=${GEN_PREFIX}`);
+    assert(unsigned.status === 401, `an unsigned read is refused, got ${unsigned.status} ${JSON.stringify(unsigned.body)}`);
+    const r = await genesisRead({ prefix: GEN_PREFIX });
     assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body)}`);
     const keys = (r.body.data.results as any[]).map(x => x.key);
     assert(keys.includes(`${GEN_PREFIX}.open`), `the public key must be served: ${JSON.stringify(keys)}`);
@@ -1159,7 +1188,7 @@ await test('25. WITH the consent the public key is served — to a caller carryi
 });
 
 await test('26. A direct lookup of the PRIVATE key returns nothing even with the consent in place', async () => {
-    const r = await json(`/v1/federation/genesis-memory-read?gaii=${encodeURIComponent(agentGaii)}&key=${GEN_PREFIX}.closed`);
+    const r = await genesisRead({ gaii: agentGaii, key: `${GEN_PREFIX}.closed` });
     assert(r.status === 200, `status ${r.status}`);
     assert(r.body.data.total === 0, `private direct read must be empty: ${JSON.stringify(r.body.data.results)}`);
 });
@@ -1176,7 +1205,7 @@ await test('27. replica:, genesis: and expiring: keys are excluded even when pub
             body: JSON.stringify({ data_pattern: `${reserved}:*`, recipient: '*', purpose: 'reserved probe', scope: 'federation' }),
         });
         assert(c.status === 200 || c.status === 201, `${reserved} consent: ${c.status}`);
-        const r = await json(`/v1/federation/genesis-memory-read?prefix=${reserved}:`);
+        const r = await genesisRead({ prefix: `${reserved}:` });
         const keys = (r.body.data.results as any[]).map(x => x.key);
         assert(!keys.some(k => k.startsWith(`${reserved}:`)), `${reserved}: keys must be excluded: ${JSON.stringify(keys)}`);
     }

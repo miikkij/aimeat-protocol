@@ -86,6 +86,19 @@ export async function isEligibleForReplication(
 }
 
 /**
+ * Whether one of an identity's active federation consents covers this key: the same rule
+ * isEligibleForReplication applies, for a reader that holds the consents already. The genesis memory
+ * read asked only that SOME federation consent existed, so a consent for one key opened every public
+ * key of the identity (feature-list audit 166).
+ */
+export function federationConsentCovers(
+  consents: ReadonlyArray<{ status: string; scope: string; dataPattern: string }>,
+  key: string,
+): boolean {
+  return consents.some(c => c.status === 'active' && c.scope === 'federation' && matchesPattern(key, c.dataPattern));
+}
+
+/**
  * Simple glob pattern matching for consent data patterns.
  * Supports: exact match, * (single segment), ** (multi-segment)
  */

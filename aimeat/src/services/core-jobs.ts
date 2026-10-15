@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-15 — The daily allowance credits each person once, with a ledger row (runDailyAllowance); it
+ *     credited once per agent (feature-list audit 135).
  *   v1.15.0 — 2026-10-09 — nonce-cleanup is registered on every node, not only with FTN or EUDIW on:
  *     an abandoned connection or MCP sign-in round is swept too (secrets audit 2026-10-09, chapter 2).
  *   v1.14.0 — 2026-10-09 — device-auth-cleanup: expired device authorizations are deleted on a clock
@@ -216,11 +218,10 @@ export async function runStorageStatsSnapshotJob(storage: Storage): Promise<void
 // ── Core Job Handlers (pure async, no setInterval) ─────────────────
 
 async function runDailyAllowanceJob(config: AimeatConfig, storage: Storage): Promise<void> {
-  const agents = await storage.listAgents();
-  for (const agent of agents) {
-    await storage.creditBalanceCapped(agent.gaii, config.dailyAllowance, config.dailyAllowanceCap);
-  }
-  logger.info(`Daily allowance credited to ${agents.length} agents`);
+  // Once per person, with a ledger row; it credited once per agent (feature-list audit 135).
+  const { runDailyAllowance } = await import('./daily-allowance.js');
+  const out = await runDailyAllowance(storage, config);
+  logger.info(`Daily allowance credited to ${out.people} people, ${out.credited} morsels in all`);
 }
 
 async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage): Promise<void> {

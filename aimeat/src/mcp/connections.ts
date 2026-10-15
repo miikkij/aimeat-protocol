@@ -19,10 +19,16 @@
  *   starts its own authorization, a human completes the consent screen in a browser, and the
  *   resulting connection is the agent's. That is more friction than inheriting, and it is the right
  *   amount: a mailbox is the most private thing on this node, and "every agent this person ever
- *   connects can read their mail" is not a permission anyone knowingly grants.
+ *   connects can read their mail" is not a permission anyone knowingly grants. So reading the OWNER's
+ *   connected mailbox is a word of its own, connections:read-as-owner, outside every wildcard; naming
+ *   the owner's connections and sending through them ride connections:use, as on REST
+ *   (services/connections/access.ts connectionHoldersOf; feature-list audit 128).
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-15 — The owner's connections: aimeat_connection_list names them on connections:use, the read
+ *     tools read them on connections:read-as-owner (connectionHoldersOf), and aimeat_mail_send sends from
+ *     the owner's address book and mailbox as POST /v1/outbound/send does (feature-list audit 128-130).
  *   v1.6.0 — 2026-10-15 — aimeat_connection_history (services/connections/history.ts
  *     listPublishHistory) and aimeat_connection_replies (repliesForAttempt, failures through toolError);
  *     aimeat_connection_start passes account (which Facebook Page) to startAuthorization.
@@ -58,7 +64,8 @@ import { readResource } from '../services/connections/read.js';
 import { storeMailAttachment, type StoreAttachmentInput } from '../services/connections/attachment-store.js';
 import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
 import { listSendAsAliases } from '../services/connections/send-mail.js';
-import { listOwnConnections, requireOwnConnection } from '../services/connections/access.js';
+import { connectionHoldersOf, listUsableConnections, requireUsableConnection, mailboxHolderFor } from '../services/connections/access.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 import { sendOutbound, OutboundError } from '../services/outbound/outbound-service.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { listPublishHistory, repliesForAttempt } from '../services/connections/history.js';
@@ -79,6 +86,10 @@ export function registerConnectionTools(
     const providers = buildOutboundProviders(config);
     /** An agent's connections are its OWN. resolveIdentity returns `sub` for an agent session. */
     const principal = (): string => getAgentGaii();
+    /** Whose connections this session may name or read: its own, and its owner's on the words for it
+     *  (services/connections/access.ts connectionHoldersOf; feature-list audit 128). */
+    const holders = (purpose: 'name' | 'read'): string[] =>
+        connectionHoldersOf(principal(), ownerGhiiOf(principal()), scopes, purpose);
 
     /**
      * The service context, or the reason there is none.
@@ -117,7 +128,7 @@ export function registerConnectionTools(
             const off = capabilityOff();
             if (off) return fail(off);
             // The same service the REST door calls, so neither can list what the other would not.
-            return ok({ connections: await listOwnConnections(storage, principal()) });
+            return ok({ connections: await listUsableConnections(storage, holders('name')) });
         });
 
     // ── Connecting ──────────────────────────────────────────────────────────────────────────────
@@ -203,7 +214,7 @@ export function registerConnectionTools(
         // Absent and not-yours answer alike, as everywhere else in this feature: naming another
         // principal's connection must not confirm that it exists. The rule is the service's, not
         // this door's.
-        const conn = await requireOwnConnection(storage, principal(), connectionId);
+        const conn = await requireUsableConnection(storage, holders('read'), connectionId);
         if (!conn) return fail('NOT_FOUND: no such connection of yours.');
         const out = await readResource(c, conn.id, resource, params);
         if (!out.ok) return fail(`${out.code}: ${out.message}`);
@@ -219,7 +230,7 @@ export function registerConnectionTools(
         }
         const c = ctx();
         if ('error' in c) return fail(c.error);
-        const conn = await requireOwnConnection(storage, principal(), connectionId);
+        const conn = await requireUsableConnection(storage, holders('read'), connectionId);
         if (!conn) return fail('NOT_FOUND: no such connection of yours.');
         const out = await storeMailAttachment(c, { storage, config, emitResourceUpdated, emitResourceListChanged },
             principal(), conn.id, input);
@@ -259,7 +270,10 @@ export function registerConnectionTools(
             if (off) return fail(off);
             const c = ctx();
             if ('error' in c) return fail(c.error);
-            const res = await listSendAsAliases(c, principal(), connection_id);
+            // The aliases are read from the mailbox, so the reading holders decide which one it may be.
+            const conn = await requireUsableConnection(storage, holders('read'), connection_id);
+            if (!conn) return fail('NO_SUCH_MAILBOX: No connected mailbox with that id.');
+            const res = await listSendAsAliases(c, conn.principal, connection_id);
             if ('code' in res) return fail(`${res.code}: ${res.message}`);
             return ok(res);
         });
@@ -283,7 +297,13 @@ export function registerConnectionTools(
                     // Only a send that went out comes back from here. One the channel refused, or one
                     // with no transport, is thrown as SEND_FAILED with the send-log row in details,
                     // the same error the REST route answers with 502 or 503.
-                    const result = await sendOutbound(config, storage, principal(), {
+                    // The owner's address book and the owner's mailbox, as POST /v1/outbound/send uses
+                    // them on the same two words; the agent's own mailbox when it names one of its own.
+                    // This used the agent's own book, so a contact the owner saved was not found
+                    // (feature-list audit 129).
+                    const result = await sendOutbound(config, storage, ownerGhiiOf(principal()), {
+                        principal: principal(),
+                        ...(connection_id ? { mailboxHolder: await mailboxHolderFor(storage, principal(), ownerGhiiOf(principal()), connection_id) } : {}),
                         contactId: contact_id,
                         kind: kind ?? 'transactional',
                         subject, body,

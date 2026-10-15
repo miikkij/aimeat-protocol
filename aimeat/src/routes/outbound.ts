@@ -13,6 +13,8 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-15 — POST /v1/outbound/send sends through an agent's own mailbox when it names one, as the
+ *     MCP tool does (feature-list audit 129).
  *   2026-10-08 — POST /v1/outbound/send answers with the message's ai_provenance_id (aiprov D9).
  *   2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   2026-10-05 — The per-minute send limit moves from this route into sendOutbound, counted per
@@ -57,6 +59,7 @@ import {
 import { resolveCompanyScope } from '../services/finance/company-scope.js';
 import { FinanceError } from '../services/finance/errors.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { mailboxHolderFor } from '../services/connections/access.js';
 
 const ContactSchema = z.object({
   name: z.string().min(1).max(140),
@@ -312,6 +315,8 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       }
       const result = await sendOutbound(config, storage, resolve(req), {
         principal: resolveIdentity(req.auth!, config.nodeId),
+        // An agent's own mailbox when it names one of its own; the owner's otherwise (feature-list audit 129).
+        ...(b.connection_id ? { mailboxHolder: await mailboxHolderFor(storage, resolveIdentity(req.auth!, config.nodeId), resolve(req), b.connection_id) } : {}),
         contactId: b.contact_id, kind: b.kind,
         subject: b.subject, body: b.body,
         templateId: b.template_id, variables: b.variables,

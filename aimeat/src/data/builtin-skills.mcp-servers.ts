@@ -24,6 +24,7 @@
  * @structure MCP_SERVERS_SKILL_ENTRY
  * @usage import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
  * @version-history
+ *   2026-10-15 — aimeat-mcp-servers: an expires value that is not a date is refused when the grant is written (feature-list audit 13).
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5a).
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -115,7 +116,8 @@ person's servers. A **grant narrows that for one agent or app, never widens it.*
 - \`read_only: true\`: only tools the server itself marks as read-only (its \`readOnlyHint\`
   annotation) may be called. A tool without that mark is refused, whatever its name says.
 - \`call_cap: { count, windowHours }\`: at most that many successful calls in the window.
-- \`expires\`: an ISO date; after it, every call under the grant is refused.
+- \`expires\`: an ISO date; after it, every call under the grant is refused. A value that is not a
+  date is refused when the grant is written.
 - \`locked_input\`: values merged over what the caller sends, and they win. Use it to pin a project,
   a repository or a tenant so the agent cannot reach another one.
 

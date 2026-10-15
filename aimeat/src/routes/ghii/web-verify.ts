@@ -6,6 +6,10 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — The registration hooks run here too (ownerRegistrationRefusal before any row,
+ *     announceOwnerRegistered after); only POST /v1/owners ran them (feature-list audit 89).
+ *   2026-10-15 — register-web asks createdAccountIsOperator, the rule POST /v1/ghii asks, and writes the
+ *     account_created feed row it lacked (feature-list audit 19).
  *   v1.15.0 — 2026-10-12 — The "app" agent both mailbox proofs create holds the node's default agent scopes
  *     (appAgentWithFreshKey), so its token can act; it had none and every scope gate refused it
  *     (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 10).
@@ -67,7 +71,7 @@ import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
-import { registrationRefusal, creditWelcomeBonus } from '../../services/owner-provisioning.js';
+import { registrationRefusal, creditWelcomeBonus, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../../services/owner-provisioning.js';
 
 /**
  * The agent credential both mailbox proofs hand out (a verified e-mail code, a clicked sign-in link):
@@ -229,15 +233,19 @@ export function registerWebVerifyRoutes(
         }
 
         // Generate keypair for the owner account
+        // The operator's registration gate, before any row exists (feature-list audit 89).
+        const hookRefusal = await ownerRegistrationRefusal(storage, config, { name: username, displayName: display_name, via: 'direct' });
+        if (hookRefusal) {
+            res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookRefusal));
+            return;
+        }
+
         const keyPair = await generateKeyPair();
 
-        // First real owner gets operator role (same logic as /v1/owners)
-        const allOwners = await storage.listOwners();
-        const realOwners = allOwners.filter(o => o.name !== 'anonymous');
+        // Who becomes operator is the one rule every account-creating route asks (feature-list
+        // audit 19): this route asked "first owner only" while POST /v1/ghii also self-healed.
         const roles: string[] = ['owner'];
-        if (realOwners.length === 0) {
-            roles.push('operator');
-        }
+        if (await createdAccountIsOperator(storage)) roles.push('operator');
 
         // Create owner with role=['owner'] (+ 'operator' if first)
         const owner = await storage.createOwner({
@@ -270,6 +278,7 @@ export function registerWebVerifyRoutes(
 
         // The welcome bonus, decided in one place for every door that creates an account.
         await creditWelcomeBonus(storage, config, ghii, now);
+        announceOwnerRegistered(storage, config, owner, 'direct');
 
         // Store interest profile in memory if interests provided
         if (Array.isArray(interests) && interests.length > 0) {
@@ -314,6 +323,14 @@ export function registerWebVerifyRoutes(
         void import('../../services/onboarding-funnel.js')
             .then(m => m.recordTrack(storage, config, username))
             .catch(err => logger.warn('ghii register-web: track marker failed', { error: String(err) }));
+
+        // The first row in this person's record, as POST /v1/ghii writes it: this route wrote none, so
+        // an account made here started with an empty feed (feature-list audit 19).
+        void import('../../services/account-events.js')
+            .then(m => m.recordAccountEvent(storage, {
+                ownerGhii: ghii, kind: 'account_created', actorGaii: ghii, link: '/v1/home',
+            }, config))
+            .catch(err => logger.warn('ghii register-web: first feed row failed', { error: String(err) }));
 
         // The operator's welcome into the new mailbox. Fire-and-forget: a greeting must never be
         // able to turn a signup into a 500.

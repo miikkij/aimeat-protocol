@@ -25,6 +25,8 @@
  *   const out = await crewPublish({ storage, config }, caller, 'json-demo', doc);
  *   if (!out.ok) return renderRefusal(out);
  * @version-history
+ *   2026-10-15 — Every publishing path (publish, seed, restore) checks the browser site list: its shape, and
+ *     a changed list only from the owner in person (browserListRefusal; feature-list audit 73).
  *   v1.3.0 — 2026-10-15 — A trial and a validation refuse an app grant (refuseAppRun), as every change
  *     to the definition does (feature-list audit 81).
  *   v1.2.0 — 2026-10-11 — A trial on a stopped agent is refused, AGENT_STOPPED (agent-stop-rules.ts).
@@ -35,7 +37,8 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
-import { buildGAII } from '../utils/gaii.js';
+import { buildGAII, isOwnerInPerson } from '../utils/gaii.js';
+import { browserDomainsError } from './crew-browser-domains.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import {
   readCrewState, saveCrewDraft, discardCrewDraft, publishCrewDef, readCrewRevision, crewKeysFor,
@@ -311,9 +314,31 @@ export async function crewDraftDiscard(deps: CrewDeps, caller: CrewCaller, ident
 }
 
 /** The shared publish gate: the runtime validates first, and only a clean verdict is written. */
+/**
+ * The sites a crew's browser may open are the owner's to approve. The node checked the list only when
+ * an agent was proposed, so a later publish, seed or restore by the agent itself, or by a sibling,
+ * changed it with nobody asked (feature-list audit 73). Every publishing path asks this: the list has
+ * the shape a proposal asks for, and a list that differs from the live definition's is published only
+ * by the owner in person.
+ */
+async function browserListRefusal(deps: CrewDeps, caller: CrewCaller, agent: AgentRecord, doc: Doc, live?: CrewState): Promise<CrewRefusal | null> {
+  const shape = browserDomainsError(doc);
+  if (shape) return { ok: false, status: 400, code: 'INVALID_CREW_DEF', message: shape };
+  const sites = (d: unknown) => JSON.stringify([...(((d as { browser_domains?: unknown } | null)?.browser_domains as string[] | undefined) ?? [])].sort());
+  const state = live ?? await readCrewState(deps.storage, agent);
+  if (sites(doc) === sites(state.published?.doc ?? null)) return null;
+  if (isOwnerInPerson({ roles: caller.roles })) return null;
+  return {
+    ok: false, status: 403, code: 'OWNER_APPROVES_SITES',
+    message: `This changes the sites ${agent.displayName ?? agent.name}'s browser may open, and the owner approves that list. Ask your owner to publish it from the Crew tab in Profile → Agents.`,
+  };
+}
+
 async function validateThenPublish(deps: CrewDeps, caller: CrewCaller, agent: AgentRecord, doc: Doc): Promise<
   { ok: true; published: true; revision: number; publishedAt: string; key: string; warnings: CrewDefWarning[] } | CrewRefusal
 > {
+  const sitesRefusal = await browserListRefusal(deps, caller, agent, doc);
+  if (sitesRefusal) return sitesRefusal;
   const asked = await askCrew(deps.config, agent, 'crew.validate', { doc }, caller.principal, deps.config.connectTunnelRequestTimeoutMs);
   if (!asked.ok) return asked;
   const errors = errorsOf(asked.result);
@@ -378,6 +403,8 @@ export async function crewSeed(
       message: `${agent.name} already has a definition, so this is not a first one. Change it with publish, which asks ${agent.name}'s own runtime first.`,
     };
   }
+  const sitesRefusal = await browserListRefusal(deps, caller, agent, doc, state);
+  if (sitesRefusal) return sitesRefusal;
 
   const chosen = await chooseSeedValidator(deps, caller, agent, validateWith);
   if (!chosen.ok) return chosen;

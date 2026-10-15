@@ -48,8 +48,9 @@ export function registerAgentCapabilityTools(
         zodShapeFor('aimeat_agent_capabilities_report'),
         annotationsFor('aimeat_agent_capabilities_report'),
         async ({ technical, domain, languages }) => {
-            // The caller reached this tool over an authenticated agent session, so the connection
-            // itself is the proof behind an mcp-type capability being marked verified.
+            // The caller reached this tool over an authenticated agent session. An mcp-type capability
+            // is marked verified only when it also names a server the node knows for the owner
+            // (setAgentCapabilities, feature-list audit 74).
             const outcome = await setAgentCapabilities({ storage, config }, agentGaii,
                 { technical, domain, languages }, { liveMcpSession: true });
 

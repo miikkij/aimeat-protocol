@@ -59,6 +59,10 @@
       "count": 3,
       "why": "Peer app search for an operator: active peers only, url checked with validateOutboundUrl first; reads public app listings and sends nothing private."
     },
+    "src/routes/federation-genesis-memory-read.ts": {
+      "count": 2,
+      "why": "GET /v1/federation/genesis-memory-read reads the public key pinned on an ACTIVE genesis peering, and only to verify a request signed for this node (checkNodeRequest: audience, one-time nonce, five-minute window); an unknown, inactive or keyless peer is refused 403 before any memory is read (feature-list audit 166)."
+    },
     "src/routes/federation-genesis.ts": {
       "count": 3,
       "why": "Verifies a genesis node's signed message against the key pinned for the genesis peer, refusing when there is no key or no signature. The catalogue ingest reads the same pinned key again, after the message's own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."

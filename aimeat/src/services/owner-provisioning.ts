@@ -10,6 +10,11 @@
  * @structure emailHashOf; ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.8.0 — 2026-10-15 — ownerRegistrationRefusal / announceOwnerRegistered: the registration hooks run
+ *     on every account-creating route, provisionOwner included, and a refusal throws
+ *     RegistrationHookRefusedError before any row exists (feature-list audit 89).
+ *   v1.7.0 — 2026-10-15 — createdAccountIsOperator: the one operator rule for every account-creating
+ *     route; provisionOwner asks it too (feature-list audit 19).
  *   v1.6.1 — 2026-10-05 — Whether an operator exists is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.6.0 — 2026-10-01 — An account created with an already-proven address takes up the open app
  *     roster invitations of that address (services/app-member-invites.ts), beside the contact promotion.
@@ -40,6 +45,8 @@ import { logger } from '../utils/logger.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { promoteContactsForVerifiedEmail } from './contacts.js';
 import { applyAppInvitesForVerifiedEmail } from './app-member-invites.js';
+import { executeHooks } from './hooks.js';
+import { fireHook } from '../utils/fire-hook.js';
 
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
 export function emailHashOf(email: string): string {
@@ -69,8 +76,44 @@ export type RegistrationVia = 'direct' | 'oauth' | 'invitation' | 'provisioning'
  *  visitor gets the answer before any work happens; this throw is the backstop that makes a
  *  forgotten door impossible. */
 export class RegistrationClosedError extends Error {
-  readonly code = 'REGISTRATION_CLOSED';
+  readonly code: string = 'REGISTRATION_CLOSED';
   constructor(message: string) { super(message); this.name = 'RegistrationClosedError'; }
+}
+
+/** Thrown by provisionOwner when an extension action bound to pre_owner_registration refuses the
+ *  account. It is a RegistrationClosedError, so every caller that maps that one to a 403 maps this one
+ *  too, with the code HOOK_REJECTED that POST /v1/owners answers. */
+export class RegistrationHookRefusedError extends RegistrationClosedError {
+  override readonly code: string = 'HOOK_REJECTED';
+  constructor(message: string) { super(message); this.name = 'RegistrationHookRefusedError'; }
+}
+
+/**
+ * Whether an extension bound to pre_owner_registration refuses this account. Returns the refusal
+ * message, or null when the creation may proceed. Every account-creating route asks it before any row
+ * exists: the hook ran only on POST /v1/owners, and an account made through POST /v1/ghii,
+ * register-web, an identity provider, an invitation, SCIM or an install set skipped it, although the
+ * operator binds the hook to stop account creation (feature-list audit 89).
+ */
+export async function ownerRegistrationRefusal(
+  storage: Storage,
+  config: AimeatConfig,
+  ctx: { name: string; displayName?: string; via: RegistrationVia },
+): Promise<string | null> {
+  const result = await executeHooks(config, storage, 'pre_owner_registration',
+    { name: ctx.name, display_name: ctx.displayName, via: ctx.via });
+  if (result.allowed) return null;
+  return result.reason ?? 'An extension on this node refused the registration.';
+}
+
+/** Tell the extensions bound to post_owner_registration that the account exists. Fire-and-forget. */
+export function announceOwnerRegistered(
+  storage: Storage,
+  config: AimeatConfig,
+  owner: { name: string; roles: string[] },
+  via: RegistrationVia,
+): void {
+  fireHook(config, storage, 'post_owner_registration', { name: owner.name, roles: owner.roles, via });
 }
 
 /**
@@ -151,6 +194,18 @@ export interface ProvisionedOwner {
 }
 
 /**
+ * Whether an account created now becomes the node's operator: it is the first real owner, or no
+ * operator exists anywhere (the self-heal registration and sign-in already apply). The one answer
+ * every account-creating route asks. POST /v1/ghii/register-web and POST /v1/owners asked "first
+ * owner only", so who became operator depended on the route (feature-list audit 19).
+ */
+export async function createdAccountIsOperator(storage: Storage): Promise<boolean> {
+  const allOwners = await storage.listOwners();
+  const realOwners = allOwners.filter(o => o.name !== 'anonymous');
+  return realOwners.length === 0 || !allOwners.some(isOperatorAccount);
+}
+
+/**
  * Create a fresh owner + GHII with the welcome bonus. The caller MUST have already validated that
  * `username` is a valid, free owner name. Promotes the account to operator when it is the first real
  * owner or when no operator exists anywhere (self-heal — identical to registration).
@@ -179,16 +234,17 @@ export async function provisionOwner(
     }
   }
 
+  // The operator's registration gate, before any row exists (feature-list audit 89).
+  const hookRefusal = await ownerRegistrationRefusal(storage, config, { name: username, displayName, via: opts.via });
+  if (hookRefusal) throw new RegistrationHookRefusedError(hookRefusal);
+
   const keyPair = await generateKeyPair();
 
   // First real owner becomes operator (self-heal: also promote if no operator exists anywhere) —
   // EXCEPT over SCIM (BR-04 R13's flip side): a directory sync is nobody's decision to run this
   // node, so the first Entra-provisioned user on a fresh node must not be crowned its operator.
-  const allOwners = await storage.listOwners();
-  const realOwners = allOwners.filter(o => o.name !== 'anonymous');
-  const hasOperator = allOwners.some(isOperatorAccount);
   const roles: string[] = ['owner'];
-  if (opts.via !== 'provisioning' && (realOwners.length === 0 || !hasOperator)) roles.push('operator');
+  if (opts.via !== 'provisioning' && await createdAccountIsOperator(storage)) roles.push('operator');
 
   const owner = await storage.createOwner({
     name: username,
@@ -251,6 +307,8 @@ export async function provisionOwner(
   void import('./welcome-message.js')
     .then(m => m.sendOperatorWelcome(storage, config, owner.name))
     .catch(err => logger.warn('provisionOwner: welcome message failed', { error: String(err) }));
+
+  announceOwnerRegistered(storage, config, owner, opts.via);
 
   return { owner, ghii: ghiiRecord };
 }

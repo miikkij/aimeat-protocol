@@ -10,6 +10,8 @@
  *   - addTransaction / getTransactions(gaii) / listAllTransactions: append + per-gaii / global reads
  *
  * @version-history
+ *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
+ *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
  *   v1.2.0 — 2026-09-09 — deleteTransactions deleted: no caller.
  *   v1.1.0 — 2026-08-10 — findTransactionByTrackingCode for the settlement replay guard (audit June H-4).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -24,4 +26,6 @@ export interface WalletRepository {
    *  like a new one (audit: the June H-4 finding). */
   findTransactionByTrackingCode(gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null>;
   listAllTransactions(limit?: number): Promise<WalletTransaction[]>;
+  /** The sum of the positive amounts of these transaction types since `since` (ISO), by the database. */
+  sumTransactionsSince(types: readonly string[], since: string): Promise<number>;
 }

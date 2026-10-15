@@ -1079,6 +1079,15 @@ await test('an attached tool is findable in the directory, one entry per TOOL', 
   assert(hit.tags.includes('server:upstream'), `tags were ${JSON.stringify(hit.tags)}`);
 });
 
+// Feature-list audit row 16: the directory looked the servers up under the agent's own GAII, which
+// owns none, so the owner's agent found nothing its owner had attached.
+await test("the owner's agent finds the owner's attached tool in the directory too", async () => {
+  const { status, body } = await json('/v1/discover?scope=own&q=echo', { headers: agentAuth() });
+  assert(status === 200, `status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+  const hit = (body.data.entries as any[]).find(e => e.id === 'upstream__echo');
+  assert(hit, `the agent found no upstream__echo: ${JSON.stringify((body.data.entries as any[]).map(e => e.id))}`);
+});
+
 await test('and the directory entry does not carry the far side address', async () => {
   const { body } = await json('/v1/discover?scope=own&q=echo', { headers: ownerAuth() });
   const hit = (body.data.entries as any[]).find(e => e.id === 'upstream__echo');

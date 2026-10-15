@@ -31,6 +31,8 @@
  *   the 404s and the denials
  * @usage cd aimeat && node --import tsx test/e2e-genesis-federation.ts
  * @version-history
+ *   2026-10-15 — Phase 7 reads as the approved fake federation, signed for this node; an unsigned read is
+ *     refused, and a consent covers only the keys its pattern names (feature-list audit 166).
  *   v1.3.0 -- 2026-10-12 -- Two fixtures move to the 4.0.0 form, neither of them this suite's subject:
  *     the federated-tagged action is published with pricing.toll_morsels (4.0.0 refuses
  *     pricing.base_morsels, 400 MORSEL_PRICE_REMOVED), and the cross-catalogue reads the pacing amount
@@ -619,13 +621,32 @@ async function run(): Promise<void> {
     // ─── Phase 7: The same door, answering a peer ───
     console.log('\nPhase 7 — Cross-genesis memory read (answering)');
 
+    /** A genesis memory read as the approved fake federation sends it: signed for this node. */
+    const peerRead = async (q: { gaii?: string; key?: string; prefix?: string }) => {
+        const qs = new URLSearchParams();
+        if (q.gaii) qs.set('gaii', q.gaii);
+        if (q.key) qs.set('key', q.key);
+        if (q.prefix) qs.set('prefix', q.prefix);
+        return json(`/v1/federation/genesis-memory-read?${qs}`, { headers: await peer!.memoryReadHeaders(NODE_ID, q) });
+    };
+
+    // Feature-list audit 166: the route answered anyone. Only an approved genesis peer is answered now,
+    // on a request it signed for this node, and a signature for other query values does not pass.
+    await test('an unsigned read, or one signed for other query values, is refused', async () => {
+        const unsigned = await json(`/v1/federation/genesis-memory-read?prefix=note.`);
+        assert(unsigned.status === 401, `unsigned: ${unsigned.status} ${JSON.stringify(unsigned.body?.error)}`);
+        const headers = await peer!.memoryReadHeaders(NODE_ID, { prefix: 'other.' });
+        const swapped = await json(`/v1/federation/genesis-memory-read?prefix=note.`, { headers });
+        assert(swapped.status === 401, `signed for another prefix: ${swapped.status} ${JSON.stringify(swapped.body?.error)}`);
+    });
+
     await test('a public record with no federation consent is NOT handed to a peer', async () => {
         const write = await json('/v1/memory', {
             method: 'POST', headers: auth(agentToken),
             body: JSON.stringify({ key: AGENT_KEY, value: { kelp: 'notes', n: 3 }, visibility: 'public' }),
         });
         assert(write.status === 201, `write: ${write.status} ${JSON.stringify(write.body?.error)}`);
-        const { status, body } = await json(`/v1/federation/genesis-memory-read?gaii=${encodeURIComponent(agentGaii)}&key=${encodeURIComponent(AGENT_KEY)}`);
+        const { status, body } = await peerRead({ gaii: agentGaii, key: AGENT_KEY });
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
         assert(body.data.total === 0,
             `without a federation consent the record stays home, got ${JSON.stringify(body.data.results)}`);
@@ -638,7 +659,7 @@ async function run(): Promise<void> {
         });
         assert(grant.status === 201, `consent: ${grant.status} ${JSON.stringify(grant.body?.error)}`);
 
-        const { body } = await json(`/v1/federation/genesis-memory-read?gaii=${encodeURIComponent(agentGaii)}&key=${encodeURIComponent(AGENT_KEY)}`);
+        const { body } = await peerRead({ gaii: agentGaii, key: AGENT_KEY });
         assert(body.data.total === 1, `the consented record is returned, got ${JSON.stringify(body.data)}`);
         const row = body.data.results[0];
         assert(row.key === AGENT_KEY && row.gaii === agentGaii && row.visibility === 'public', `shape: ${JSON.stringify(row)}`);
@@ -647,10 +668,10 @@ async function run(): Promise<void> {
     });
 
     await test('a prefix read for one identity, and one across every identity, both answer', async () => {
-        const one = await json(`/v1/federation/genesis-memory-read?gaii=${encodeURIComponent(agentGaii)}&prefix=note.`);
+        const one = await peerRead({ gaii: agentGaii, prefix: 'note.' });
         assert(one.body.data.total === 1 && one.body.data.results[0].key === AGENT_KEY,
             `prefix for one identity: ${JSON.stringify(one.body.data)}`);
-        const all = await json('/v1/federation/genesis-memory-read?prefix=note.');
+        const all = await peerRead({ prefix: 'note.' });
         assert(all.body.data.results.some((r: any) => r.key === AGENT_KEY),
             `prefix across every identity: ${JSON.stringify(all.body.data)}`);
         assert(all.body.data.results.every((r: any) => !r.key.startsWith('genesis:')),
@@ -663,13 +684,28 @@ async function run(): Promise<void> {
             body: JSON.stringify({ key: 'note.private', value: { secret: true }, visibility: 'private' }),
         });
         assert(priv.status === 201, `private write: ${priv.status}`);
-        const keyed = await json(`/v1/federation/genesis-memory-read?gaii=${encodeURIComponent(agentGaii)}&key=note.private`);
+        const keyed = await peerRead({ gaii: agentGaii, key: 'note.private' });
         assert(keyed.body.data.total === 0, `a private record must not cross: ${JSON.stringify(keyed.body.data)}`);
-        const prefixed = await json(`/v1/federation/genesis-memory-read?gaii=${encodeURIComponent(agentGaii)}&prefix=note.`);
+        const prefixed = await peerRead({ gaii: agentGaii, prefix: 'note.' });
         assert(prefixed.body.data.results.every((r: any) => r.key !== 'note.private'),
             `nor through a prefix: ${JSON.stringify(prefixed.body.data.results.map((r: any) => r.key))}`);
         const empty = await json('/v1/federation/genesis-memory-read');
         assert(empty.status === 400 && empty.body.error?.code === 'INVALID_INPUT', `no argument: ${empty.status} ${JSON.stringify(empty.body.error)}`);
+    });
+
+    await test('a federation consent covers only the keys its pattern names (feature-list audit 166)', async () => {
+        const other = await json('/v1/memory', {
+            method: 'POST', headers: auth(agentToken),
+            body: JSON.stringify({ key: 'diary.today', value: { mood: 'fine' }, visibility: 'public' }),
+        });
+        assert(other.status === 201, `public write outside the pattern: ${other.status}`);
+        const keyed = await peerRead({ gaii: agentGaii, key: 'diary.today' });
+        assert(keyed.status === 200 && keyed.body.data.total === 0,
+            `a public key the consent pattern does not cover stays home: ${JSON.stringify(keyed.body.data)}`);
+        const prefixed = await peerRead({ gaii: agentGaii, prefix: 'diary.' });
+        assert(prefixed.body.data.total === 0, `nor through a prefix: ${JSON.stringify(prefixed.body.data)}`);
+        const all = await peerRead({ prefix: 'diary.' });
+        assert(all.body.data.total === 0, `nor across every identity: ${JSON.stringify(all.body.data)}`);
     });
 
     // ─── Phase 8: Stats and reputation ───

@@ -24,6 +24,8 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-10-15 — A refusal from an extension bound to pre_owner_registration answers 403 and leaves the invitation
+ *     usable (feature-list audit 89).
  *   v1.4.0 — 2026-10-05 — An account made from an invitation link starts with its email unverified,
  *     and the address gets the usual verification code. Opening the link had marked the address
  *     verified, and the inviter is handed the link when the mail does not go out, so the inviter
@@ -56,7 +58,7 @@ import { emitChange } from '../services/event-bus.js';
 import { notify } from '../services/notify.js';
 import { hashPassword } from '../services/password.js';
 import { validatePasswordStrength } from '../utils/password-validation.js';
-import { provisionOwner, ProvisionEmailTakenError, registrationRefusal } from '../services/owner-provisioning.js';
+import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError, registrationRefusal } from '../services/owner-provisioning.js';
 import { establishOwnerSession } from '../services/owner-session.js';
 import { hashInviteToken, applyInvitationWorkspaceGrants, resolveInvitationReturnTarget } from '../services/invitations.js';
 import { appInviteMeta, type AppInviteMeta } from '../services/app-invite-link.js';
@@ -252,6 +254,11 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
           // being found by it) waits for that.
         }));
       } catch (e) {
+        // An extension bound to pre_owner_registration refused the account (feature-list audit 89).
+        if (e instanceof RegistrationClosedError) {
+          res.status(403).json(error(config.nodeId, e.code, e.message));
+          return; // do NOT consume the invite
+        }
         // The invited email already backs an account — accept from THAT account, don't fork it.
         if (!(e instanceof ProvisionEmailTakenError)) throw e;
         res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN',

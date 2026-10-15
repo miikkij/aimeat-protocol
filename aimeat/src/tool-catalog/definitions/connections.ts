@@ -6,6 +6,8 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-15 — aimeat_connection_list names the owner's connections too, the mail tools read them on
+ *     connections:read-as-owner, and aimeat_mail_send reads the owner's address book (feature-list audit 128-130).
  *   2026-10-15 — aimeat_connection_history and aimeat_connection_replies; aimeat_connection_start takes
  *     account (which Facebook Page).
  *   2026-10-09 — aimeat_connection_start says the address is the node's confirmation page (secrets audit 2026-10-09).
@@ -44,7 +46,7 @@ export const connectionTools = [
     },
     {
         name: 'aimeat_connection_list',
-        description: "The outside accounts YOU have connected, with the id every other tool here takes. A connection belongs to the exact principal that made it, so this is yours and not your owner's: an account they connected in their own browser does not appear here, and that is deliberate — a mailbox is the most private thing on this node, and inheriting one silently is not a permission anybody knowingly grants. A connection that has stopped working carries what would repair it.",
+        description: "The outside accounts you may use, with the id every other tool here takes. Your own connections are marked holder 'own'. The accounts your owner connected appear too, marked holder 'owner', when you hold connections:use (to send through them) or connections:read-as-owner (to read what is in them); reading an owner's mailbox takes connections:read-as-owner as well as connections:read-through, because a mailbox is the most private thing on this node. A connection that has stopped working carries what would repair it.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'My Connected Accounts', readOnlyHint: true },
@@ -111,7 +113,7 @@ export const connectionTools = [
     },
     {
         name: 'aimeat_mail_search',
-        description: "Search a connected mailbox. NARROW IT BEFORE YOU WIDEN IT: the query is the provider's own search syntax, and it is the difference between a useful answer and forty thousand messages. Start with something you expect to return a handful, look at what came back, and tell the person what you found before reading hundreds of messages on their allowance. A search that returns nothing is a fact worth reporting, not a reason to re-run it wider without asking. Do NOT read a whole mailbox to see what is in it — ask what they are looking for. Gmail examples: 'from:lasku@example.com has:attachment newer_than:90d', 'subject:(kuitti OR receipt)'. Returns ids and headers; open one with aimeat_mail_read.",
+        description: "Search a connected mailbox. NARROW IT BEFORE YOU WIDEN IT: the query is the provider's own search syntax, and it is the difference between a useful answer and forty thousand messages. Start with something you expect to return a handful, look at what came back, and tell the person what you found before reading hundreds of messages on their allowance. A search that returns nothing is a fact worth reporting, not a reason to re-run it wider without asking. Do NOT read a whole mailbox to see what is in it — ask what they are looking for. Your owner's own mailbox is readable when they gave you connections:read-as-owner. Gmail examples: 'from:lasku@example.com has:attachment newer_than:90d', 'subject:(kuitti OR receipt)'. Returns ids and headers; open one with aimeat_mail_read.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Search a Connected Mailbox', readOnlyHint: true, openWorldHint: true },
@@ -156,7 +158,7 @@ export const connectionTools = [
     },
     {
         name: 'aimeat_mail_send',
-        description: "Send a message to a SAVED recipient (aimeat_contact_list / aimeat_contact_add), never to a free address — that is the structural anti-spam device, not a formality. Pass connection_id to send through your own connected mailbox, so it leaves from your own address with your domain's SPF and DKIM and lands in your own Sent Items; without one it goes through the node's shared sender. Everything is gated on the way out: a suppressed address, an opt-out on a 'marketing' message, and a rolling daily allowance each refuse with a reason. A send the provider refused, or one this node had no way to make, comes back as an ERROR carrying the provider's reason and the send-log id, so tell the person it was not sent. A success says the message was handed over; that is still not a delivery, and a bounce shows up on the contact afterwards. Requires both outbound:send and connections:use, and is absent without them rather than present and refusing.",
+        description: "Send a message to a SAVED recipient (aimeat_contact_list / aimeat_contact_add), never to a free address — that is the structural anti-spam device, not a formality. The recipient comes from your owner's address book. Pass connection_id to send through a connected mailbox (your own, or one your owner connected; aimeat_connection_list names both), so it leaves from that address with your domain's SPF and DKIM and lands in your own Sent Items; without one it goes through the node's shared sender. Everything is gated on the way out: a suppressed address, an opt-out on a 'marketing' message, and a rolling daily allowance each refuse with a reason. A send the provider refused, or one this node had no way to make, comes back as an ERROR carrying the provider's reason and the send-log id, so tell the person it was not sent. A success says the message was handed over; that is still not a delivery, and a bounce shows up on the contact afterwards. Requires both outbound:send and connections:use, and is absent without them rather than present and refusing.",
         caller: 'agent',
         visibility: agentEverywhere,
         // NOT idempotent, and that is the whole point: a blind retry sends the message twice, which is

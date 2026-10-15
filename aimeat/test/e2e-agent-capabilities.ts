@@ -145,9 +145,11 @@ await test('1. PUT capabilities with technical + domain + languages', async () =
     assert(tech.length === 3, `expected 3 technical caps, got ${tech.length}`);
     assert(tech[0].name === 'filesystem', `first tech name: ${tech[0].name}`);
     assert(tech[0].type === 'mcp', `first tech type: ${tech[0].type}`);
-    // Agent session + MCP type = verified: true
+    // An mcp-type capability naming a server the node does not know is reported, not verified: the
+    // node cannot check a server on the agent's own computer (feature-list audit 74). Until
+    // 2026-10-15 this asserted true, and the name alone was the proof.
     const mcpCap = tech.find((c: any) => c.type === 'mcp');
-    assert(mcpCap.verified === true, `MCP cap should be verified when reported by agent, got ${mcpCap.verified}`);
+    assert(mcpCap.verified === false, `an unknown MCP server should not be verified, got ${mcpCap.verified}`);
     // Non-MCP types stay unverified
     const toolCap = tech.find((c: any) => c.type === 'tool');
     assert(toolCap.verified === false, `tool cap should not be verified, got ${toolCap.verified}`);

@@ -20,6 +20,8 @@
  * @usage
  *   import type { UsageRepository } from './repositories/usage.repository.js';
  * @version-history
+ *   2026-10-15 — countUsageCalls: how many calls match, counted by the database, optionally under a
+ *     coordinate prefix; the MCP grant call cap counted a list capped at 200 rows (feature-list audit 13).
  *   v1.1.0 — 2026-09-25 — foldNamedAppVisits: the visitor's account leaves an app-open record
  *     after thirteen months, and the count stays.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
@@ -53,6 +55,9 @@ export interface UsageRepository {
    * gate it on the operator role and record its own inspection (design: the audit rule).
    */
   listUsageCalls(filter: UsageCallFilter): Promise<UsageCallRecord[]>;
+  /** How many stored calls match, counted by the database; `limit` is ignored. With `coordinatePrefix`,
+   *  only calls whose coordinate starts with it. */
+  countUsageCalls(filter: UsageCallFilter, coordinatePrefix?: string): Promise<number>;
 
   // ── The fold's raw reads: strictly ordered by (ts, id), strictly after the cursor ──
   listUsageCallsForFold(cursor: UsageFoldCursor): Promise<UsageCallRecord[]>;
