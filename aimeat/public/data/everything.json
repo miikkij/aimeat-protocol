@@ -2,10 +2,10 @@
  "title": "AIMEAT Feature List",
  "stamp": {
   "version": "4.0.3",
-  "date": "2026-10-12"
+  "date": "2026-10-16"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 4.0.3, checked against the code on 2026-10-12.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 4.0.3, checked against the code on 2026-10-16.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-Core-2026-11.md</a>, normative since node 4.0.0; before it, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a> with its errata.",
@@ -416,10 +416,10 @@
      "slug": "g-2-identity-verification",
      "cells": [
       "<strong>Identity verification</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "EU Digital Identity Wallet (OpenID4VP, SD-JWT) and Finnish Trust Network through Suomi.fi.",
+      "Finnish Trust Network: the bank sign-in through Suomi.fi raises the account's verification level, when the operator has configured it. EU Digital Identity Wallet verification (OpenID4VP, SD-JWT) is not available: the node refuses to start with it switched on, because its sign-in can be replayed.",
       "<code>/v1/ghii/verify/eudiw/*</code>, <code>/v1/ghii/verify/ftn/*</code>"
      ],
-     "plain": "Identity verification off EU Digital Identity Wallet (OpenID4VP, SD-JWT) and Finnish Trust Network through Suomi.fi. /v1/ghii/verify/eudiw/*, /v1/ghii/verify/ftn/*"
+     "plain": "Identity verification off Finnish Trust Network: the bank sign-in through Suomi.fi raises the account's verification level, when the operator has configured it. EU Digital Identity Wallet verification (OpenID4VP, SD-JWT) is not available: the node refuses to start with it switched on, because its sign-in can be replayed. /v1/ghii/verify/eudiw/*, /v1/ghii/verify/ftn/*"
     },
     {
      "slug": "g-2-verifiable-credential",
@@ -2189,10 +2189,10 @@
      "slug": "g-10-app-store",
      "cells": [
       "<strong>App store</strong>",
-      "Take a single or lifetime licence to an app, with an immutable receipt and a licence check. A lifetime licence opens every version; a single licence opens the version you took, and a later version needs an update service (not offered yet). The licence takes the app's pacing amount in morsels once (<code>tollMorsels</code>); part burns, the operator keeps its share and the seller gets the rest. Limits: no money price yet on this path; the old <code>priceMorsels</code> is read as pacing until release 4.0.0.",
+      "Take a single or lifetime licence to an app, with an immutable receipt and a licence check. A lifetime licence opens every version; a single licence opens the version you took, and a later version needs an update service (not offered yet). The licence takes the app's pacing amount in morsels once (<code>tollMorsels</code>); part burns, the operator keeps its share and the seller gets the rest. Limits: no money price yet on this path; an app stored before 4.0.0 with the old <code>priceMorsels</code> keeps that value as its pacing amount, and a write that sends <code>priceMorsels</code> is refused since 4.0.0.",
       "<code>/v1/app-store/*</code>"
      ],
-     "plain": "App store Take a single or lifetime licence to an app, with an immutable receipt and a licence check. A lifetime licence opens every version; a single licence opens the version you took, and a later version needs an update service (not offered yet). The licence takes the app's pacing amount in morsels once (tollMorsels); part burns, the operator keeps its share and the seller gets the rest. Limits: no money price yet on this path; the old priceMorsels is read as pacing until release 4.0.0. /v1/app-store/*"
+     "plain": "App store Take a single or lifetime licence to an app, with an immutable receipt and a licence check. A lifetime licence opens every version; a single licence opens the version you took, and a later version needs an update service (not offered yet). The licence takes the app's pacing amount in morsels once (tollMorsels); part burns, the operator keeps its share and the seller gets the rest. Limits: no money price yet on this path; an app stored before 4.0.0 with the old priceMorsels keeps that value as its pacing amount, and a write that sends priceMorsels is refused since 4.0.0. /v1/app-store/*"
     },
     {
      "slug": "g-10-the-app-wall",
