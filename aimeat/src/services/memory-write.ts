@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-16 — A write of an agent's live crew definition that changes its browser site list is
+ *     refused unless the owner writes it in person (403 OWNER_APPROVES_SITES, crewSitesWriteRefusal;
+ *     QA audit F07b-02).
  *   v1.15.0 — 2026-10-13 — The organism namespace rule is asked with the session's scopes and with
  *     the value being written, for the fenced-space rule: a session that covers organism:direct
  *     writes a record space that names extensions directly, and a write to a workspace's manifest
@@ -116,7 +119,7 @@ import { runAutomationRecipesForWrite } from './ecosystem-automation.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
-import { misdirectedCrewKey } from './crew-def-store.js';
+import { misdirectedCrewKey, crewSitesWriteRefusal } from './crew-def-store.js';
 import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
@@ -251,7 +254,10 @@ export type MemoryWriteResult =
             | 'MORSEL_PRICE_REMOVED'
             // A knowledge package manifest whose sharing.toll_morsels and deprecated
             // sharing.morsel_price disagree, or whose amount is not a number of at least 0.
-            | 'TOLL_MORSELS_MISMATCH' | 'INVALID_INPUT';
+            | 'TOLL_MORSELS_MISMATCH' | 'INVALID_INPUT'
+            // A write of an agent's live crew definition that changes its browser site list, not by
+            // the owner in person (QA audit F07b-02).
+            | 'OWNER_APPROVES_SITES';
         message: string;
         details?: unknown;
     };
@@ -355,6 +361,13 @@ export async function writeMemoryRecord(
     const misdirected = misdirectedCrewKey(input.key, caller.targetGaii, input.visibility);
     if (misdirected) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: misdirected };
+    }
+    // 1e. The live crew definition's browser site list is the owner's to change, in person, on this
+    //     door as on the crew routes: an agent could otherwise widen its own list with a plain memory
+    //     write (QA audit F07b-02).
+    const sitesRefusal = await crewSitesWriteRefusal(storage, input.key, caller.targetGaii, input.value, caller);
+    if (sitesRefusal) {
+        return { ok: false, status: 403, code: 'OWNER_APPROVES_SITES', message: sitesRefusal };
     }
     // 2. Schema locks apply on EVERY write surface. MCP used to call setMemory directly, so a write
     //    that REST answered with 422 sailed through there.

@@ -12,6 +12,8 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   2026-10-16 — CheckoutSessionRecord: status `completing` and collectedTrackingCode (QA audit S8-04);
+ *     Sellable.fulfillsAsTask (QA audit S8-03).
  *   v1.6.0 — 2026-10-11 — A morsel is pacing, never a price: Sellable.priceMorsels is unitPrice (it
  *     always carried money micro-units), and a sellable, a line, a session and a receipt carry their
  *     pacing in morsels beside the money (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -80,6 +82,12 @@ export interface Sellable {
    * collect and leaves the session open for retry — exactly like the default path.
    */
   fulfill?: (ctx: PaymentContext, args: FulfillArgs) => Promise<FulfillOutcome>;
+  /**
+   * True when `fulfill` only queues an agent task (an app-tool with no backing capability), so the
+   * line is delivered later and the seller can still decline it. A line with a fulfil step and no
+   * such flag is delivered while the checkout completes (commerce/session-claim.ts).
+   */
+  fulfillsAsTask?: boolean;
 }
 
 /**
@@ -168,7 +176,14 @@ export interface CheckoutAttribution {
 
 export interface CheckoutSessionRecord {
   id: string;
-  status: 'open' | 'completed' | 'cancelled' | 'expired';
+  /**
+   * `completing`: one completion has claimed the session (commerce/session-claim.ts) and no other
+   * may charge it; it ends `completed`, or back at `open` when the completion was refused before any
+   * money stayed moved.
+   */
+  status: 'open' | 'completing' | 'completed' | 'cancelled' | 'expired';
+  /** The collected payment's tracking code, written before fulfilment while the session is `completing`. */
+  collectedTrackingCode?: string;
   /** Buyer: bare owner name + owner GHII (the balance holder) + the acting principal for attribution. */
   buyerOwner: string;
   buyerGhii: string;

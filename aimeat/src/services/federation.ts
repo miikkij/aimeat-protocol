@@ -11,6 +11,8 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   2026-10-16 — The service summary fetch is signed as this node for the peer (signedGetHeaders; QA
+ *     audit S6-09).
  *   v1.8.1 — 2026-10-10 — PeerInfo.deliveryProofAt: the delivery-proof pin (secaudit 2026-10-10 I21).
  *   v1.8.0 — 2026-10-06 — The heartbeat ping names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.7.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -37,7 +39,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { sign } from '../auth/keypair.js';
-import { audienceProof } from './signed-node-request.js';
+import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from './signed-node-request.js';
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { recordHeartbeatOutcome } from './federation-availability.js';
 import { getSoftwareVersion } from '../utils/version.js';
@@ -360,12 +362,14 @@ export function startHeartbeatJob(
                                     // Hash changed or first time -- fetch full summary
                                     logger.info(`Service summary hash changed for peer ${peer.nodeId}, fetching summary`);
                                     try {
+                                        // Signed as this node, for that peer, once (QA audit S6-09).
+                                        if (!nodeKey) throw new Error('This node has no signing key');
                                         const summaryResp = await peerFetch(
                                             `${peer.url}/v1/federation/service-summary`,
                                             {
                                                 headers: {
                                                     'Accept': 'application/json',
-                                                    'x-source-node': config.nodeId,
+                                                    ...await signedGetHeaders(nodeKey.privateKey, config.nodeId, peer.nodeId, { purpose: SERVICE_SUMMARY_PURPOSE }),
                                                 },
                                             },
                                             { timeoutMs: TIMEOUT_MS },

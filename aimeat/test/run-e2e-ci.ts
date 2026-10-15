@@ -10,6 +10,11 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-16 -- e2e-federation-peer-limits.ts joins the list and GUARD_SUITES (140 → 141), measured
+ *     alone three times on each backend: a member peer's replicate namespaces, broadcast sender, key
+ *     exchange roster, signed service summary and resolve, and the package repository doors refusing
+ *     unsigned, misaddressed and repeated requests, on its own node on 40393 (QA audit S6-02, S6-03,
+ *     S6-04, S6-09, S10-02).
  *   2026-10-14 -- e2e-home-ideas.ts joins the list (not the guard tier): the ideas the home offers,
  *     in three languages, and an operator's broken edit.
  *   2026-10-13 -- e2e-workspace-fenced-space.ts joins the list (not the guard tier): a record space
@@ -616,6 +621,9 @@ const ALL_SUITES = [
     'test/e2e-presence.ts',
     'test/e2e-federation-visiting.ts',
     'test/e2e-federation-contact-link.ts',
+    // What an admitted member peer still may not do (replicate namespaces, broadcast sender, key
+    // exchange roster, signed service summary, resolve), and the package repository doors' refusals.
+    'test/e2e-federation-peer-limits.ts',
     'test/federation-support.ts',
     'test/e2e-federation-policy.ts',
     'test/e2e-federation-relay-claim.ts',
@@ -1261,6 +1269,7 @@ const GUARD_SUITES = [
     'test/e2e-money-audit.ts',              // no path mints, double-spends or bills the wrong account
     'test/e2e-zip-security.ts',             // an uploaded archive cannot write outside where it was unpacked
     'test/e2e-federation-contact-link.ts',  // a contact link carries messages and refuses every other door
+    'test/e2e-federation-peer-limits.ts',   // a member peer's limits, and the package repository doors' refusals (QA audit 2026-10-16)
     'test/e2e-federation-relay-claim.ts',   // a receiving node refuses a relay from a peer it demoted
     'test/e2e-static-hardening.ts',         // a dotfile (.env, .env~, .git/) is refused before any static handler
     'test/e2e-owner-deactivation.ts',       // deactivating an account ends every credential family, now (BR-04)

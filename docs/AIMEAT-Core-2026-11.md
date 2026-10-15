@@ -684,6 +684,8 @@ A request signed in headers carries the sending node, a timestamp, the audience 
 
 A message signed in its body (replication, catalogue synchronisation, a read receipt) carries a delivery proof beside its own signature: the audience, the send time, and a second signature over both.
 
+Two exchanges between nodes are not messages in this sense. The key exchange publishes the sending node's own public key, which its discovery document already publishes, and carries no other key: an unchanged key is taken without a signature, and a changed key is governed by FED-14. A trust advisory is a request by an operator to their own node, made with that operator's credential, not a message from a peer.
+
 - **FED-08** A receiving node MUST verify the signature with the key it holds for the sending peer, MUST refuse a message whose audience is not its own node id, MUST refuse a message whose send time is more than five minutes from its clock, and MUST accept each one-time value or delivery proof once. It MUST record a value as used only after the signature verified.
 - **FED-09** A node MUST refuse a peer message that carries no audience or delivery proof. (The v4.0 format without this proof is removed in this edition.)
 - **FED-10** A request that a node relays on behalf of another MUST carry a relay claim signed by the relaying node, naming the relay, the audience, the method, the path, the original caller, an expiry no more than five minutes after issue and a unique id. The receiver MUST verify it and MUST accept each claim id once.

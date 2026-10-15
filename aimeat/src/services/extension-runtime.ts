@@ -8,6 +8,11 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   2026-10-16 — Every run has a wall-clock deadline (extensionWallClockMs: limits.wallClockMs, or
+ *     twelve times the CPU limit, at least a minute). The run rejects with EXTENSION_RUN_TIMED_OUT and
+ *     the sandbox is torn down, also when the guest awaits a promise that never settles; the CPU
+ *     limit alone stopped a busy loop only, and a waiting run held the scheduler's slot for ever
+ *     (QA audit S7-02).
  *   v2.16.0 — 2026-10-13 — `ctx.calendar`, seven host calls (services/extension-calendar.ts).
  *   v2.15.0 — 2026-10-13 — `ctx.workspace.readRow`, one host call (services/extension-workspace-rows.ts).
  *   v2.14.0 — 2026-10-09 — `ctx.workspace.archiveRecords`, one host call (services/extension-workspace.ts).
@@ -94,6 +99,9 @@ export type { MemoryWriteResult, ExtensionCtx, ExtensionLimits } from './extensi
 export { EXT_HASH_REFERENCE_JS } from './extension-ctx-contract.js';
 import type { ExtensionCtx, ExtensionLimits } from './extension-ctx-contract.js';
 import { EXT_HASH_REFERENCE_JS } from './extension-ctx-contract.js';
+import { EXTENSION_RUN_TIMED_OUT, extensionWallClockMs, untilAborted } from './extension-run-deadline.js';
+
+export { EXTENSION_RUN_TIMED_OUT, extensionWallClockMs } from './extension-run-deadline.js';
 
 // ── Internal helpers ─────────────────────────────────────────
 
@@ -426,20 +434,29 @@ export async function executeExtensionAction(
     limits: ExtensionLimits,
     opts?: { signal?: AbortSignal },
 ): Promise<Record<string, unknown>> {
-    const signal = opts?.signal;
-    if (signal?.aborted) throw new Error(EXTENSION_RUN_ABORTED);
+    const callerSignal = opts?.signal;
+    if (callerSignal?.aborted) throw new Error(EXTENSION_RUN_ABORTED);
+    // The wall-clock deadline of the whole run (QA audit S7-02). The CPU limit is an interrupt
+    // handler, which the engine calls only while guest code runs, so a script that awaits a promise
+    // that never settles ran for ever: the scheduler's slot was never released and two such
+    // schedules stopped every owner's scheduled extensions. Every entry point gets this deadline.
+    const wallMs = extensionWallClockMs(limits);
+    const deadline = AbortSignal.timeout(wallMs);
+    const signal = callerSignal ? AbortSignal.any([callerSignal, deadline]) : deadline;
     // Aborted on teardown to cancel any in-flight host I/O (e.g. slow fetches)
     // so cleanup doesn't block on the network. Also aborted when the caller's signal aborts.
     const teardown = new AbortController();
     const run = runInSandbox(scriptContent, ctx, input, limits, teardown, signal);
-    if (!signal) return run;
 
     // The rejection is not held back until the teardown finishes: a host call that ignores the
     // abort (a slow database read) would otherwise decide how long the caller waits. Promise.race
     // attaches a handler to `run`, so its own later rejection ('interrupted') is not unhandled.
+    const stopReason = (): Error => new Error(callerSignal?.aborted
+        ? EXTENSION_RUN_ABORTED
+        : `${EXTENSION_RUN_TIMED_OUT}: it did not finish within ${wallMs} ms.`);
     let onAbort: () => void = () => {};
     const aborted = new Promise<never>((_, reject) => {
-        onAbort = () => { teardown.abort(); reject(new Error(EXTENSION_RUN_ABORTED)); };
+        onAbort = () => { teardown.abort(); reject(stopReason()); };
         signal.addEventListener('abort', onAbort, { once: true });
     });
     try {
@@ -729,7 +746,16 @@ async function runInSandbox(
         const resolveP = vm.resolvePromise(promiseHandle);
         runtime.executePendingJobs();
 
-        const resolvedResult = await resolveP;
+        // Raced against the run's signal (the caller's abort or the wall-clock deadline), so a guest
+        // promise that never settles does not hold this function, and with it the finally below that
+        // tears the sandbox down (QA audit S7-02).
+        let resolvedResult: Awaited<typeof resolveP>;
+        try {
+            resolvedResult = signal ? await untilAborted(resolveP, signal, () => new Error(EXTENSION_RUN_ABORTED)) : await resolveP;
+        } catch (stopped) {
+            if (promiseHandle.alive) promiseHandle.dispose();
+            throw stopped;
+        }
         promiseHandle.dispose();
 
         const resultHandle = vm.unwrapResult(resolvedResult);

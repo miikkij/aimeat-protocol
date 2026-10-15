@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — PUT /:key refuses a change of an agent's live crew definition's browser site list
+ *     unless the owner writes it in person (403 OWNER_APPROVES_SITES; QA audit F07b-02).
  *   2026-10-15 — GET /:key with owner_scope or ?agent= naming a sibling: an agent without
  *     memory:read-as-owner gets another identity's record only when its visibility admits a same-owner
  *     reader, and 404 otherwise (feature-list audit #42).
@@ -95,6 +97,7 @@ import { rolesWithOperator } from '../../services/operator-override.js';
 import { recordOperatorAccess } from '../../services/operator-access-audit.js';
 import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
+import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
@@ -446,6 +449,13 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
         `Expected version ${version} but current is ${existing.version}`,
         409, { current_version: existing.version, your_version: version }));
       return;
+    }
+
+    // The live crew definition's browser site list is the owner's to change, in person, here as on
+    // POST /v1/memory and the crew routes (QA audit F07b-02).
+    if (value !== undefined) {
+      const sites = await crewSitesWriteRefusal(storage, key, effectiveGaii, value, req.auth!);
+      if (sites) { res.status(403).json(error(config.nodeId, 'OWNER_APPROVES_SITES', sites)); return; }
     }
 
     // A workspace record whose space the workspace manifest does not declare is refused before the

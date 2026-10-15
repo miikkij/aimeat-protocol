@@ -4,6 +4,9 @@
  *   federate flag, policy update persistence, and network directory (service summary,
  *   ping hash, cross-catalogue filtering).
  * @version-history
+ *   2026-10-16 — The service summary is read as the peer signs it (signedGetHeaders), and an active
+ *     peer that does not sign is refused 401 (QA audit S6-09). The old unsigned reads asserted the
+ *     behaviour the audit found wrong.
  *   v1.7.0 -- 2026-10-12 -- Fixtures move to the 4.0.0 form, none of them this suite's subject: the two
  *     actions are published with pricing.toll_morsels (4.0.0 refuses pricing.base_morsels, 400
  *     MORSEL_PRICE_REMOVED); the signed ping and every signed auth/verify request carry the audience
@@ -38,7 +41,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
-import { audienceProof } from '../src/services/signed-node-request.js';
+import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from '../src/services/signed-node-request.js';
 
 // ─── Boot embedded server ───
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40253', 10);
@@ -578,9 +581,17 @@ await test('PUT /v1/federation/peers/:nodeId -- activate peer for service-summar
     assert(body.data.status === 'active', `peer status: ${body.data.status}`);
 });
 
+/** The headers the peer signs a service summary request with (QA audit S6-09). */
+const summaryHeaders = async () => signedGetHeaders(fakePeerPrivKey, fakePeerNodeId, await thisNodeId(), { purpose: SERVICE_SUMMARY_PURPOSE });
+
+await test('GET /v1/federation/service-summary -- an active peer that does not sign is refused (401)', async () => {
+    const { status, body } = await json('/v1/federation/service-summary', { headers: { 'x-source-node': fakePeerNodeId } });
+    assert(status === 401 && body.error?.code === 'UNAUTHORIZED', `expected 401 UNAUTHORIZED, got ${status}: ${JSON.stringify(body)}`);
+});
+
 await test('GET /v1/federation/service-summary -- returns correct data', async () => {
     const { status, body } = await json('/v1/federation/service-summary', {
-        headers: { 'x-source-node': fakePeerNodeId },
+        headers: await summaryHeaders(),
     });
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
@@ -594,7 +605,7 @@ await test('GET /v1/federation/service-summary -- returns correct data', async (
 
 await test('GET /v1/federation/service-summary -- includes only federated items', async () => {
     const { status, body } = await json('/v1/federation/service-summary', {
-        headers: { 'x-source-node': fakePeerNodeId },
+        headers: await summaryHeaders(),
     });
     assert(status === 200, `expected 200, got ${status}`);
 
@@ -608,7 +619,7 @@ await test('GET /v1/federation/service-summary -- includes only federated items'
 // summary is computed fresh on every request (no cache), so flipping a flag and re-reading is an
 // honest measurement rather than a stale one.
 await test('GET /v1/federation/service-summary -- an AGENT appears only while its federate flag is on', async () => {
-    const summary = () => json('/v1/federation/service-summary', { headers: { 'x-source-node': fakePeerNodeId } });
+    const summary = async () => json('/v1/federation/service-summary', { headers: await summaryHeaders() });
 
     // The suite turned this agent's federation back off above, so it must be absent right now.
     const off = await summary();

@@ -7,6 +7,8 @@
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors
  *   MCP_SURFACES.commerce.
  * @version-history
+ *   2026-10-16 — The invoice rail says when it is refused: an item delivered at once, unless the seller
+ *     takes invoice credit for it (QA audit S8-03).
  *   v2.6.0 — 2026-10-11 — Two values per item: a money price and a pacing amount in morsels, which is
  *     never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). No morsel rail;
  *     the pacing pack item and what to do on INSUFFICIENT_MORSELS.
@@ -104,7 +106,11 @@ Every rail settles to the SELLER directly; this node holds no funds and no platf
 - **Card (com.stripe.spt)** — charges run on your owner's OWN Stripe secret. They are the merchant
   of record and Stripe did their KYC, so nothing here gates on a verification status.
 - **Invoice (io.aimeat.invoice)** — captures nothing; the order completes and the obligation is
-  booked as a payable for your owner to bill offline. No credentials needed.
+  booked as a payable for your owner to bill offline. No credentials needed. A buyer may choose it
+  for a task your owner can still decline; for an item delivered as soon as the checkout completes (a
+  callable tool, a package, a pacing pack) only when your owner turned on invoice credit for that
+  (PUT /v1/commerce/payout/invoice, accept_immediate), otherwise completion is refused with
+  INVOICE_NOT_ACCEPTED.
 - **Stablecoin (com.coinbase.x402)** — settles on-chain to the payout address your owner set.
 
 Morsels are not a rail: there is no morsel payment handler. The pacing of a sale moves on this

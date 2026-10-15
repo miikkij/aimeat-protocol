@@ -5,6 +5,8 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — key-exchange answers no agent roster to any tier (agent_keys is an empty list) and
+ *     keeps none it receives (QA audit S6-04).
  *   v1.9.0 — 2026-10-12 — A re-admission asks peerUrlRefusal for the address it admits: a public node
  *     takes an https:// address only from 4.0.0 (Core 2026-11 FED-13).
  *   v1.8.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is refused a
@@ -146,7 +148,7 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
 
     // POST /v1/federation/key-exchange — Exchange public keys with a peer node
     router.post('/v1/federation/key-exchange', async (req, res) => {
-        const { node_id, node_url, node_public_key, agent_keys, timestamp } = req.body ?? {};
+        const { node_id, node_url, node_public_key, timestamp } = req.body ?? {};
 
         if (!node_id || !node_public_key) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -273,20 +275,11 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             }
         }
 
-        // Store the peer's keys with TTL
+        // Store the peer's node key with TTL. Agent keys an older peer sends are not kept: nothing
+        // reads them, and this branch takes no signature when the key is unchanged (QA audit S6-04).
         const ttlMs = config.keyCacheRefreshMinutes * 60_000;
-        const peerAgentKeys = new Map<string, string>();
-        if (Array.isArray(agent_keys)) {
-            for (const ak of agent_keys) {
-                if (ak.gaii && ak.public_key) {
-                    peerAgentKeys.set(ak.gaii, ak.public_key);
-                }
-            }
-        }
-
         peerKeyCache.set(node_id, {
             publicKey: node_public_key,
-            agentKeys: peerAgentKeys,
             expiresAt: Date.now() + ttlMs,
         });
 
@@ -296,29 +289,24 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             await storage.saveFederationPeer(peer);
         }
 
-        logger.info(`Received key exchange from peer ${node_id}`, {
-            agentKeysReceived: peerAgentKeys.size,
-            timestamp,
-        });
+        logger.info(`Received key exchange from peer ${node_id}`, { timestamp });
 
-        // Return our own keys.
+        // Return our own NODE key, which the node's well-known card publishes anyway.
         //
-        // The AGENT keys are a roster: every agent's GAII and public key on this node, which names
+        // The AGENT keys were a roster: every agent's GAII and public key on this node, which names
         // every person here and how many AIs each of them runs. Cross-node delivery signs with the
-        // NODE key alone (services/message-delivery.ts), so a link that only carries messages needs
-        // none of it. Sent only where routing or replication makes it useful.
+        // NODE key alone (services/message-delivery.ts), nothing on the receiving side reads agent
+        // keys, and this branch answers a caller that signed nothing when the key is unchanged. So no
+        // tier gets the roster; agent_keys stays in the answer as an empty list for older peers that
+        // read the field (QA audit S6-04).
         const nodeKey = await storage.getNodeKey();
-        const sharesAgentKeys = peer.allowRouting || peer.replicateMemory;
-        const ourAgentKeys = sharesAgentKeys
-            ? (await storage.listAgents()).filter(a => a.publicKey).map(a => ({ gaii: a.gaii, public_key: a.publicKey }))
-            : [];
 
         res.json(success(config.nodeId, {
             node_id: config.nodeId,
             node_public_key: nodeKey?.publicKey ?? '',
             accepted: true,
             capabilities: req.body?.capabilities ?? [],
-            agent_keys: ourAgentKeys,
+            agent_keys: [],
             timestamp: new Date().toISOString(),
         }));
         emitChange('federation');

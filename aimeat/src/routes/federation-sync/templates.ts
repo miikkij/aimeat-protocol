@@ -5,6 +5,9 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The template listing names this node as its audience in headers (x-audience,
+ *     x-audience-signature) and passes once inside five minutes (signedGetRefusal); the sync sends the
+ *     headers (QA audit S6-09).
  *   v1.4.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is refused a
  *     memory-list request without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal;
  *     secaudit 2026-10-10 I21).
@@ -30,7 +33,9 @@ import type { PeerInfo } from '../../services/federation.js';
 import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { sign, verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
+import {
+    signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal, audienceHeaders,
+} from '../../services/signed-node-request.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */
@@ -80,10 +85,19 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
             res.status(400).json(error(config.nodeId, 'STALE_TIMESTAMP', 'Timestamp is missing, invalid, or outside the 5-minute window'));
             return;
         }
-        if (!await verify(gate.peer.publicKey, JSON.stringify({ source_node: sourceNode, timestamp }), signature)) {
+        const listSigned = JSON.stringify({ source_node: sourceNode, timestamp });
+        if (!await verify(gate.peer.publicKey, listSigned, signature)) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on template listing request'));
             return;
         }
+        // The node it is for (x-audience) and one use inside the window, as every other signed
+        // federation message (Core 2026-11 FED-08; QA audit S6-09). It had the window only.
+        const listRefusal = await signedGetRefusal({
+            pin: await federationPeerProofPin(storage, gate.peer), headers: req.headers, signed: listSigned,
+            sourceNode, timestamp, signature, publicKey: gate.peer.publicKey, thisNodeId: config.nodeId,
+            required: config.federationAudienceRequired,
+        });
+        if (listRefusal) { res.status(listRefusal.status).json(error(config.nodeId, listRefusal.code, listRefusal.message)); return; }
 
         const category = req.query.category as string | undefined;
         const tagsRaw = req.query.tags as string | undefined;
@@ -163,7 +177,10 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
 
                 // Prove we are the node the header names — the receiving half requires it now.
                 const timestamp = new Date().toISOString();
-                const listSignature = await sign(nodeKey.privateKey, JSON.stringify({ source_node: config.nodeId, timestamp }));
+                const listSigned = JSON.stringify({ source_node: config.nodeId, timestamp });
+                const listSignature = await sign(nodeKey.privateKey, listSigned);
+                // The node this listing request is for; a peer on an older version ignores the headers.
+                const listAudience = await audienceHeaders(nodeKey.privateKey, listSigned, peer.nodeId);
 
                 // safeFetch, not fetch. The check above looks at the URL we are about to request and
                 // nothing else, so a peer answering 302 sent this node wherever it liked — including
@@ -175,6 +192,7 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
                         'x-source-node': config.nodeId,
                         'x-timestamp': timestamp,
                         'x-signature': listSignature,
+                        ...listAudience,
                     },
                     signal: AbortSignal.timeout(30_000),
                 });

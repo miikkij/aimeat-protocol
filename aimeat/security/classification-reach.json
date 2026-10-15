@@ -84,6 +84,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's offers, tool manifests and payment settings, read to work out price and payment rail."
     },
+    "src/commerce/session-claim.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-16 (QA audit S8-04), the node's own read: the stored checkout session record, read to claim it with a compare-and-swap on its version before a completion charges; nothing is returned to the caller."
+    },
     "src/commerce/session-service.ts": {
       "reads": {
         "getMemory": 1,
@@ -1172,10 +1178,10 @@
     },
     "src/services/crew-def-store.ts": {
       "reads": {
-        "getMemory": 6,
+        "getMemory": 7,
         "getMemoryByKeys": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's own crew configuration envelopes."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The agent's own crew configuration envelopes. Reviewed 2026-10-16 (QA audit F07b-02): crewSitesWriteRefusal reads the stored live definition's browser site list to compare it with a write; nothing is returned to the caller."
     },
     "src/services/crew-menu.ts": {
       "reads": {

@@ -5,6 +5,10 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — Replicate stores only under a principal of the signing node or an existing person or
+ *     agent of this node (403 NAMESPACE_NOT_ALLOWED), and keeps the conflict copy under the replica
+ *     prefix (QA audit S6-02). The broadcast refuses a sender that is not on the signing node, as the
+ *     message route does (403 SENDER_NOT_OF_PEER; QA audit S6-03).
  *   v1.9.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is held to
  *     it: replicate, the receipt, the message, the broadcast and the storage grant without the proof
  *     are refused from it whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal; secaudit
@@ -128,6 +132,29 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         return !!refusal;
     };
 
+    /**
+     * The namespaces a replicate may write into, or the sentence that refuses it (QA audit S6-02).
+     * Two senders exist: memory-replication.ts and genesis-sync.ts send the signing node's own
+     * principals (`agent#owner@<source>`), and push-home (routes/memory/federation.ts) sends a
+     * visitor's record to their home account on this node. So the namespace is a principal of the
+     * signing node, or a person or agent that exists on this node. Anything else, a system namespace
+     * such as package-entitlements or a third node's principal, is refused.
+     */
+    const replicaNamespaceRefusal = async (gaii: string, sourceNode: string): Promise<string | null> => {
+        const parsed = parseGaiiLoose(gaii);
+        const notAnIdentity = `A replicate is stored under a person or agent of the node that signed it or of this node, and "${gaii}" is neither. Send the record under its owner's identity.`;
+        if (!parsed.owner || !parsed.node) return notAnIdentity;
+        if (parsed.node === sourceNode) return null;
+        if (parsed.node !== config.nodeId) {
+            return `A node replicates its own people's records only, and ${gaii} is on ${parsed.node}, not on ${sourceNode}, the node that signed this replicate.`;
+        }
+        if (gaii.startsWith('eco:')) return notAnIdentity;
+        const exists = parsed.agent
+            ? !!(await storage.getAgent(gaii))
+            : !!(await storage.getOwner(localAccountName(gaii)));
+        return exists ? null : `${gaii} is not a person or agent on this node, so no replica is stored for it.`;
+    };
+
     // POST /v1/federation/replicate — Receive replicated memory from a peer node
     router.post('/v1/federation/replicate', async (req, res) => {
         const { source_node, gaii, key, value, visibility, version, timestamp, signature } = req.body ?? {};
@@ -159,6 +186,15 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // The signed timestamp is the record's own update time, so the send time comes in the proof.
         if (await refuseUndelivered(res, source_node, replicatePayload, req.body, peer)) return;
 
+        // The namespace the replica lands in. Refused before anything is read or written: a body
+        // field that only had to be non-empty let a member peer write into a system namespace
+        // (package-entitlements, app-member) or any other string (QA audit S6-02).
+        const namespaceRefusal = await replicaNamespaceRefusal(String(gaii), String(source_node));
+        if (namespaceRefusal) {
+            res.status(403).json(error(config.nodeId, 'NAMESPACE_NOT_ALLOWED', namespaceRefusal, 403, { gaii: String(gaii), source_node }));
+            return;
+        }
+
         // Store replicated memory with cross-node prefix
         const replicaKey = `replica:${source_node}:${key}`;
         const incomingUpdatedAt = timestamp ?? new Date().toISOString();
@@ -183,8 +219,11 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 return;
             }
 
-            // Incoming is newer — preserve losing version as conflict backup
-            const conflictKey = `${key}._conflict_${Date.now()}`;
+            // Incoming is newer — preserve losing version as conflict backup. The copy stays under
+            // the replica prefix: `<key>._conflict_<ms>` put a value the peer chose under any key
+            // family of the namespace, where a prefix scan (tracked-response., appmember.) read it
+            // as this node's own record (QA audit S6-02).
+            const conflictKey = `${replicaKey}._conflict_${Date.now()}`;
             await storage.setMemory({
                 ...existing,
                 key: conflictKey,
@@ -486,6 +525,15 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: payload, body: req.body ?? {}, peer })) return;
 
         const senderGhii: string = broadcast.senderGhii;
+        // The same rule as the message route above: a node speaks for its own people only. The
+        // signature proves which node sent the broadcast, and the sender name is that node's word, so
+        // a name on another node (this node's operator, a person on a third node) is refused before
+        // any contact row or inbox copy is written (QA audit S6-03).
+        if (parseGaiiLoose(senderGhii).node !== source_node) {
+            res.status(403).json(error(config.nodeId, 'SENDER_NOT_OF_PEER',
+                `The sender ${senderGhii} is not on ${String(source_node)}, the node that signed this broadcast.`, 403, { sender: senderGhii, source_node }));
+            return;
+        }
         // The title a peer sent, bounded here rather than trusted. Everything else on this frame is
         // already shaped by the fields we read; a subject is new, it is a principal-supplied string on
         // the other side of a trust boundary, and it lands in a row every human on this node sees.

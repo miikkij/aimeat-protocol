@@ -68,8 +68,8 @@
       "why": "Verifies a genesis node's signed message against the key pinned for the genesis peer, refusing when there is no key or no signature. The catalogue ingest reads the same pinned key again, after the message's own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
     "src/routes/federation-peer/introduce.ts": {
-      "count": 4,
-      "why": "Compares the key an introduction presents with the key of the peer already holding that node id, to refuse or to record a held id. No outbound use."
+      "count": 7,
+      "why": "Compares the key an introduction presents with the key of the peer already holding that node id, to refuse or to record a held id. No outbound use. The service summary reads the pinned key of the active, catalogue-sharing peer the x-source-node header names, to verify the request's signature and then its audience proof and single use (signedGetRefusal; QA audit S6-09, 2026-10-16)."
     },
     "src/routes/federation-peer/lifecycle.ts": {
       "count": 12,
@@ -92,16 +92,16 @@
       "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue'). The catalogue sync reads the same pinned key again, after its own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
     "src/routes/federation-sync/messaging.ts": {
-      "count": 10,
-      "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's sender must be on the signing node (2026-10-01). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7). Replicate and the receipt read it once more for the delivery proof, which names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
+      "count": 7,
+      "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's or a broadcast's sender must be on the signing node (2026-10-01; broadcast QA audit S6-03, 2026-10-16), and a replicate lands only under a principal of the signing node or an existing one of this node (QA audit S6-02). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7). Replicate and the receipt read it once more for the delivery proof, which names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
     "src/routes/federation-sync/routing.ts": {
       "count": 7,
       "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off."
     },
     "src/routes/federation-sync/templates.ts": {
-      "count": 5,
-      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); outbound only to active peers sharing the catalogue. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
+      "count": 6,
+      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); outbound only to active peers sharing the catalogue. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7). The listing reads it once more for the audience headers and single use of a signed GET (signedGetRefusal; QA audit S6-09, 2026-10-16)."
     },
     "src/routes/ghii/register-login.ts": {
       "count": 8,

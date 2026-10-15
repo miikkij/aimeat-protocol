@@ -22,14 +22,21 @@
  *   verify calls and is entirely correct — so the unit is the door.
  * @structure
  *   - VERIFIERS: the functions that count as proving a peer signed this
- *   - collectFederationWrites(): every non-GET door under src/routes/federation*, with its guards
- *     and whether its own handler body verifies
+ *   - collectFederationWrites(): every non-GET door in the given files, with its guards and whether
+ *     its handler verifies, directly or through a function of its own file (localFunctions,
+ *     callsVerifier)
+ *   - isFederationDoor() / federationDoors(): the population, by PATH (/v1/federation*) over every
+ *     route file, plus every door of a src/routes/federation* file
  *   - ALLOWED: the doors that have neither, each with the sentence that makes it safe
  *   - main(): report; --strict exits 1 on a door that is in none of those three states
  * @usage
  *   cd aimeat && pnpm check:federation-signatures            # report
  *   cd aimeat && pnpm check:federation-signatures --strict   # the hook/CI gate
  * @version-history
+ *   2026-10-16 — The population is every write door whose path starts /v1/federation, in any route
+ *     file, plus the src/routes/federation* files as before; the signed-node-request verifiers count,
+ *     also when a handler reaches them through a function of its own file. The four package
+ *     repository doors in routes/package-sales.ts were read by no gate (QA audit S10-02).
  *   v1.1.0 — 2026-09-17 — POST /v1/federation/route listed: a multi-hop hop authenticates with the
  *     relay claim the global relay gate verified, which a chain-reading script cannot see.
  *   v1.0.0 — 2026-09-04 — Initial. The door inventory counted 300 REST doors reachable with no
@@ -52,7 +59,16 @@ const AIMEAT = resolve(HERE, '..');
  * sites), and a second way of doing the same thing is the drift this gate exists to notice. Adding a
  * name here is a decision, not a formality.
  */
-const VERIFIERS = ['verify', 'verifyDetached', 'verifyPeerSignature'];
+const VERIFIERS = [
+    'verify', 'verifyDetached', 'verifyPeerSignature',
+    // The signed node request (services/signed-node-request.ts) and the two verifiers built on it,
+    // each of which calls verify() itself: the package repository doors in routes/package-sales.ts
+    // and routes/package-entitlements.ts sign this way (QA audit S10-02).
+    'checkNodeRequest', 'verifySaleRequest', 'verifyRequestWithKey', 'verifyPackageNode',
+];
+
+/** How many calls deep a handler is followed into functions of its own file (sellerAct → verifySaleRequest). */
+const LOCAL_CALL_DEPTH = 3;
 
 /** A door with neither an owner gate nor a signature check, and the sentence that makes it safe. */
 const ALLOWED: Record<string, string> = {
@@ -118,10 +134,62 @@ function gatedArrayNames(source: ts.SourceFile): Set<string> {
     return names;
 }
 
+/**
+ * The functions a file declares, by name: `function sellerAct() {}` and `const sellerAct = () => {}`,
+ * at any depth (a helper inside the router factory is the usual place). A handler that calls one of
+ * them is followed into its body, because a verifier called through a helper verifies as surely as
+ * one called inline.
+ */
+function localFunctions(source: ts.SourceFile): Map<string, ts.Node> {
+    const out = new Map<string, ts.Node>();
+    const visit = (n: ts.Node): void => {
+        if (ts.isFunctionDeclaration(n) && n.name && n.body) out.set(n.name.text, n.body);
+        else if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer
+            && (ts.isArrowFunction(n.initializer) || ts.isFunctionExpression(n.initializer))) {
+            out.set(n.name.text, n.initializer.body);
+        }
+        ts.forEachChild(n, visit);
+    };
+    visit(source);
+    return out;
+}
+
+/** Whether `node` calls a verifier, directly or through functions of its own file. */
+function callsVerifier(node: ts.Node, locals: Map<string, ts.Node>, depth = LOCAL_CALL_DEPTH, seen = new Set<string>()): boolean {
+    const calls = callsInside(node);
+    if (VERIFIERS.some(v => calls.has(v))) return true;
+    if (depth <= 0) return false;
+    for (const name of calls) {
+        const body = locals.get(name);
+        if (!body || seen.has(name)) continue;
+        seen.add(name);
+        if (callsVerifier(body, locals, depth - 1, seen)) return true;
+    }
+    return false;
+}
+
+/**
+ * Is this door in the population? Every write door whose path starts /v1/federation, wherever its
+ * file lives, plus every write door in a src/routes/federation* file (which also holds the operator's
+ * /v1/admin/peering doors). The population was the file name alone, so four writing federation doors
+ * in routes/package-sales.ts were read by no gate while the report said every one was covered (QA
+ * audit S10-02).
+ */
+export function isFederationDoor(door: Pick<Door, 'id' | 'file'>): boolean {
+    const path = door.id.slice(door.id.indexOf(' ') + 1);
+    return path.startsWith('/v1/federation') || /(^|\/)src\/routes\/federation/.test(door.file);
+}
+
+/** The write doors of `files` that are federation doors (isFederationDoor). */
+export function federationDoors(files: ts.SourceFile[]): Door[] {
+    return collectFederationWrites(files).filter(isFederationDoor);
+}
+
 export function collectFederationWrites(files: ts.SourceFile[]): Door[] {
     const doors: Door[] = [];
     for (const source of files) {
         const arrays = gatedArrayNames(source);
+        const locals = localFunctions(source);
         const visit = (node: ts.Node): void => {
             if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
                 const verb = node.expression.name.text;
@@ -137,7 +205,7 @@ export function collectFederationWrites(files: ts.SourceFile[]): Door[] {
                         // A guard-array constant authorizes as surely as the calls it holds, which is
                         // why `arrays` is resolved for the whole file before any door is read.
                         gated: guards.some(g => GATES.includes(g) || arrays.has(g)),
-                        verifies: VERIFIERS.some(v => callsInside(handler).has(v)),
+                        verifies: callsVerifier(handler, locals),
                     });
                 }
             }
@@ -151,7 +219,7 @@ export function collectFederationWrites(files: ts.SourceFile[]): Door[] {
 const softKey = (d: Door): string => `${d.file}:${d.id.replace(' ', ':')}`;
 
 export function main(): boolean {
-    const doors = collectFederationWrites(srcProgram(/[/\\]src[/\\]routes[/\\]federation/).files);
+    const doors = federationDoors(srcProgram(/[/\\]src[/\\]routes[/\\]/).files);
 
     const owned = doors.filter(d => d.gated);
     const signed = doors.filter(d => !d.gated && d.verifies);

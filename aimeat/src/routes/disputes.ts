@@ -3,14 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Work dispute routes — opening disputes, counter-disputes, partial offers, and
- *   operator rulings, backed by a hash-chained tamper-evident audit log and morsel escrow
- *   settlement/return on resolution.
+ *   operator rulings, backed by a hash-chained tamper-evident audit log. Delivery settles the escrow;
+ *   a resolution re-divides the toll delivery paid the provider (services/morsel.ts takeBackFromProvider).
  *
  * @structure
  *   - computeAuditHash/appendAuditEntry: build the SHA-256 hash-chained dispute audit log
  *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints
  *
  * @version-history
+ *   2026-10-16 — A dispute re-divides what delivery paid the provider (the toll) and nothing more:
+ *     accept-fault and an accepted partial refund take the requester's share back from the provider,
+ *     withdraw and accept-redelivery move no money, and a ruling takes the requester's and the burned
+ *     share from the provider, who keeps the rest. Each resolution paid out the escrow a second time
+ *     after delivery had settled it, creating morsels. A provider whose balance holds less is refused
+ *     409 PROVIDER_BALANCE_SHORT with nothing written (QA audit S8-02).
  *   2026-10-15 — The operator ruling takes only requester_wins, provider_wins or split (OperatorRulingSchema, 400 VALIDATION_ERROR otherwise) (feature-list audit #143). Accept-fault records a requester_wins ruling, and every resolution stores the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   v2.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v2.2.0 — 2026-09-26 — Every door names the caller by its resolved identity (resolveIdentity): a
@@ -51,13 +57,13 @@
  *     its own dispute.
  */
 import { Router } from 'express';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DisputeAuditEntry } from '../storage/interface.js';
 import { requireAuth, requireOperator, requireExternalPrincipal, requireAnyScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { returnEscrow, settlePayment } from '../services/morsel.js';
+import { disputedAmount, takeBackFromProvider } from '../services/morsel.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { refreshTrustScore } from '../services/trust.js';
@@ -288,21 +294,30 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
 
-        // Return escrow to requester
-        await returnEscrow(storage, work);
+        // The requester gets back what delivery paid the provider, taken from the provider. It
+        // returned the whole escrow while the provider kept the toll, which created the toll out of
+        // nothing on every accepted fault (QA audit S8-02). The network fee was burned or split at
+        // delivery and is not the provider's to return. Refuse before you write.
+        const refund = disputedAmount(work);
+        if (!await takeBackFromProvider(storage, work, { toRequester: refund })) {
+            res.status(409).json(error(config.nodeId, 'PROVIDER_BALANCE_SHORT',
+                `Your balance holds fewer than the ${refund} morsels this work paid you, so nothing changed. Offer a smaller partial refund instead.`,
+                409, { refund_morsels: refund, tracking_code: tc }));
+            return;
+        }
 
         // Recorded as the verdict it is, so the trust score reads it as a dispute the provider lost.
         // Without a ruling this outcome was invisible to the score (feature-list audit #144).
         await storage.updateDispute(dispute.id, {
             status: 'resolved',
-            ruling: { ruling: 'requester_wins', distribution: { toRequester: work.cost.total, toProvider: 0, burned: 0 }, reason: 'The provider accepted fault.' },
+            ruling: { ruling: 'requester_wins', distribution: { toRequester: refund, toProvider: 0, burned: 0 }, reason: 'The provider accepted fault.' },
             updatedAt: new Date().toISOString(),
         });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
         await refreshTrustScore(storage, work.providerGaii);
-        await appendAuditEntry(storage, dispute.id, 'accept_fault', me, { full_refund: true });
+        await appendAuditEntry(storage, dispute.id, 'accept_fault', me, { full_refund: true, refund_morsels: refund });
 
-        res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'requester_refunded' }));
+        res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'requester_refunded', refund_morsels: refund }));
         emitChange('disputes');
     });
 
@@ -322,11 +337,14 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         // SECURITY (C-3): the offer names an amount that `accept-partial` later credits with an
         // unconditional creditBalance. The schema bounds it to a positive integer and nothing bounds
         // it above, so an offer larger than the escrow mints the difference out of nothing — and both
-        // sides of a dispute are cheap for one person to control. The escrow is the ceiling.
-        const escrowed = work.cost.inEscrow;
-        if (typeof refund_morsels === 'number' && refund_morsels > escrowed) {
+        // sides of a dispute are cheap for one person to control. What delivery paid the provider is
+        // the ceiling: cost.inEscrow still read the whole escrow after delivery had shared it out
+        // (QA audit S8-02).
+        const paid = disputedAmount(work);
+        if (typeof refund_morsels === 'number' && refund_morsels > paid) {
             res.status(400).json(error(config.nodeId, 'REFUND_EXCEEDS_ESCROW',
-                `You can refund at most ${escrowed} morsels, which is what is being held for this work. Choose a smaller amount.`));
+                `You can refund at most ${paid} morsels, which is what this work paid you. Choose a smaller amount.`,
+                400, { max_refund_morsels: paid }));
             return;
         }
 
@@ -350,8 +368,8 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
 
-        // Settle: pay provider
-        await settlePayment(storage, config, work);
+        // No money moves: delivery already paid the provider. This paid them a second time, which
+        // created the toll out of nothing (QA audit S8-02).
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
@@ -378,28 +396,17 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const lastOffer = [...auditLog].reverse().find(e => e.event === 'partial_offer');
         const offered = lastOffer ? Number(lastOffer.data.refund_morsels) : 0;
         // SECURITY (C-3): clamped again on the way out of the audit log, not only on the way in. The
-        // offer route refuses an over-escrow amount, but this reads a value stored earlier — including
-        // rows written before that gate existed — and it is the line that actually moves the money.
-        const refundAmount = Number.isFinite(offered) ? Math.max(0, Math.min(offered, work.cost.inEscrow)) : 0;
+        // offer route refuses an amount over what delivery paid, but this reads a value stored earlier
+        // — including rows written before that gate existed — and it is the line that moves the money.
+        const refundAmount = Number.isFinite(offered) ? Math.max(0, Math.min(offered, disputedAmount(work))) : 0;
 
-        if (refundAmount > 0) {
-            await returnEscrow(storage, work, refundAmount);
-            // Pay remaining to provider (atomic credit)
-            const remaining = work.cost.total - refundAmount;
-            if (remaining > 0) {
-                const credited = await storage.creditBalance(work.providerGaii, remaining);
-                if (credited) {
-                    await storage.addTransaction({
-                        id: `tx-${randomUUID()}`,
-                        gaii: work.providerGaii,
-                        type: 'earned',
-                        amount: remaining,
-                        counterpartyGaii: work.requesterGaii,
-                        trackingCode: tc,
-                        timestamp: new Date().toISOString(),
-                    });
-                }
-            }
+        // The refund comes out of what delivery paid the provider, who keeps the rest. It returned
+        // the refund from nowhere and paid the provider the remainder again (QA audit S8-02).
+        if (!await takeBackFromProvider(storage, work, { toRequester: refundAmount })) {
+            res.status(409).json(error(config.nodeId, 'PROVIDER_BALANCE_SHORT',
+                `The provider's balance holds less than the ${refundAmount} morsels offered, so nothing changed. Try again later, or escalate the dispute.`,
+                409, { refund_morsels: refundAmount, tracking_code: tc }));
+            return;
         }
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
@@ -441,8 +448,8 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
 
-        // Settle normally — provider gets paid
-        await settlePayment(storage, config, work);
+        // No money moves: delivery already paid the provider, and a withdrawn dispute leaves it so.
+        // This paid them a second time (QA audit S8-02).
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
@@ -504,56 +511,41 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         // config.maxOperatorMintPerDay. A door that creates morsels with no cap at all is not the
         // same authority just because the same person holds it, and nothing here writes the audit
         // trail that door writes. Refuse before you write: this sits above every credit below.
-        const escrowed = work.cost.inEscrow;
-        if (to_requester + to_provider + burned > escrowed) {
+        //
+        // What is shared out is what delivery paid the provider: a dispute opens only on delivered
+        // work, so the escrow was already settled. cost.inEscrow still read the whole escrow, and the
+        // ruling paid the requester and the provider on top of that settlement (QA audit S8-02).
+        const paid = disputedAmount(work);
+        if (to_requester + to_provider + burned > paid) {
             res.status(400).json(error(config.nodeId, 'RULING_EXCEEDS_ESCROW',
-                `A ruling shares out the ${escrowed} morsels being held for this work. Choose how they split; `
-                + `${to_requester + to_provider + burned} were named. Nothing was written.`));
+                `A ruling shares out the ${paid} morsels this work paid its provider. Choose how they split; `
+                + `${to_requester + to_provider + burned} were named. Nothing was written.`, 400, { paid_morsels: paid }));
             return;
         }
 
-        // Distribute funds
-        if (to_requester > 0) {
-            await returnEscrow(storage, work, to_requester);
+        // The requester's share and the burned share come back from the provider in one debit; the
+        // provider keeps the rest of what delivery paid.
+        if (!await takeBackFromProvider(storage, work, { toRequester: to_requester, burned })) {
+            res.status(409).json(error(config.nodeId, 'PROVIDER_BALANCE_SHORT',
+                `The provider's balance holds less than the ${to_requester + burned} morsels this ruling takes back, so nothing was written. Rule a smaller share instead.`,
+                409, { take_back_morsels: to_requester + burned, dispute_id: dispute.id }));
+            return;
         }
-        if (to_provider > 0) {
-            const credited = await storage.creditBalance(work.providerGaii, to_provider);
-            if (credited) {
-                await storage.addTransaction({
-                    id: `tx-${randomUUID()}`,
-                    gaii: work.providerGaii,
-                    type: 'earned',
-                    amount: to_provider,
-                    counterpartyGaii: work.requesterGaii,
-                    trackingCode: dispute.trackingCode,
-                    timestamp: new Date().toISOString(),
-                });
-            }
-        }
-        if (burned > 0) {
-            await storage.addTransaction({
-                id: `tx-${randomUUID()}`,
-                gaii: work.requesterGaii,
-                type: 'burn',
-                amount: -burned,
-                trackingCode: dispute.trackingCode,
-                timestamp: new Date().toISOString(),
-            });
-        }
+        const keptByProvider = paid - to_requester - burned;
 
         await storage.updateDispute(dispute.id, {
             status: 'resolved',
-            ruling: { ruling, distribution: { toRequester: to_requester, toProvider: to_provider, burned }, reason },
+            ruling: { ruling, distribution: { toRequester: to_requester, toProvider: keptByProvider, burned }, reason },
             updatedAt: new Date().toISOString(),
         });
         await storage.updateWork(dispute.trackingCode, { status: 'settled', updatedAt: new Date().toISOString() });
         await refreshTrustScore(storage, work.providerGaii);
-        await appendAuditEntry(storage, dispute.id, 'operator_ruled', me, { ruling, distribution, reason });
+        await appendAuditEntry(storage, dispute.id, 'operator_ruled', me, { ruling, distribution: { to_requester, to_provider: keptByProvider, burned }, reason });
 
         res.json(success(config.nodeId, {
             dispute_id: dispute.id,
             status: 'resolved',
-            ruling: { ruling, distribution: { to_requester, to_provider, burned }, reason },
+            ruling: { ruling, distribution: { to_requester, to_provider: keptByProvider, burned }, reason },
         }));
         emitChange('disputes');
     });

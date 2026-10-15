@@ -11,6 +11,9 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   2026-10-16 — POST /v1/federation/settle refuses a settlement whose signed timestamp is missing or
+ *     more than five minutes from this node's clock (400 STALE_TIMESTAMP), after the signature and
+ *     before anything is read or credited (QA audit S6-09).
  *   v1.4.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.2.0 — 2026-09-09 — The relay-share credit loop is gone: it looked a node id up with
@@ -38,6 +41,7 @@ import type { RouteManifest } from '../types/route-manifest.js';
 import { buildHopSigningMessage, computeRelayFeeDistribution } from '../types/route-manifest.js';
 import type { RelayFeeDistribution } from '../types/route-manifest.js';
 import { emitChange } from '../services/event-bus.js';
+import { NONCE_WINDOW_MS } from '../services/request-nonce.js';
 
 export function federationSettlementsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -106,6 +110,17 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
             logger.warn(`Invalid settlement signature from node ${from_node} for tracking code ${tracking_code}`);
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED',
                 'Invalid signature on settlement request'));
+            return;
+        }
+
+        // The signed send time inside five minutes (Core 2026-11 FED-08; QA audit S6-09). The sender
+        // signs a fresh timestamp each time (outbound route below), so a settlement signed long ago
+        // with a tracking code not used yet is refused here rather than credited. The tracking code
+        // stays the single-use value.
+        const settledAt = Date.parse(String(settlementTimestamp ?? ''));
+        if (!Number.isFinite(settledAt) || Math.abs(Date.now() - settledAt) > NONCE_WINDOW_MS) {
+            res.status(400).json(error(config.nodeId, 'STALE_TIMESTAMP',
+                'The settlement\'s timestamp is missing, invalid, or more than five minutes from this node\'s clock. The sending node signs it again with the current time.'));
             return;
         }
 

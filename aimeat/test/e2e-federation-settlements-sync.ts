@@ -44,6 +44,10 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   2026-10-16 — B's template listing is read with the audience headers for B; the same request again
+ *     is refused (401 REPLAYED) and one signed for another node too (401 WRONG_AUDIENCE). A settlement
+ *     whose signed time is more than five minutes off is refused (400 STALE_TIMESTAMP) and credits
+ *     nothing (QA audit S6-09).
  *   2026-10-15 — A refusal from the far node answers ok: false with PEER_REFUSED and the far node's status, on POST /v1/federation/route and /v1/federation/cross-node/work.
  *   2026-10-15 — The fake peer refuses /v1/work/request without a credential, as a real node does: cross-node
  *     work is refused today and the routing fee goes back (feature-list audit 165).
@@ -69,7 +73,7 @@ import * as ed from '@noble/ed25519';
 import { createHash, randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
-import { audienceProof } from '../src/services/signed-node-request.js';
+import { audienceProof, audienceHeaders } from '../src/services/signed-node-request.js';
 import { buildHopSigningMessage } from '../src/types/route-manifest.js';
 import type { RouteHop } from '../src/types/route-manifest.js';
 import type { PeerInfo } from '../src/services/federation.js';
@@ -301,6 +305,16 @@ async function run(): Promise<void> {
         assert(status === 401 && res.error?.code === 'UNAUTHORIZED', `expected 401, got ${status}: ${JSON.stringify(res)}`);
         const after = await A.json('/v1/wallet', { headers: auth(A.ownerToken) });
         assert(after.body.data.balance === balanceBefore + 250, `a refused signature must credit nothing, balance is ${after.body.data.balance}`);
+    });
+
+    // QA audit S6-09: the settlement checked the signature, the audience (to_node) and the tracking
+    // code, and never its signed time, so a settlement signed days ago with a fresh tracking code passed.
+    await test('a settlement signed more than five minutes ago is a 400 STALE_TIMESTAMP, and credits nothing', async () => {
+        const body = { from_node: FAKE_ID, to_node: A_ID, gaii: A.ownerGhii, amount: 10, tracking_code: `tc-stale-${stamp}`, reason: 'x', timestamp: new Date(Date.now() - 10 * 60_000).toISOString() };
+        const { status, body: res } = await A.json('/v1/federation/settle', { method: 'POST', body: await signedSettlement(body) });
+        assert(status === 400 && res.error?.code === 'STALE_TIMESTAMP', `expected 400 STALE_TIMESTAMP, got ${status}: ${JSON.stringify(res)}`);
+        const after = await A.json('/v1/wallet', { headers: auth(A.ownerToken) });
+        assert(after.body.data.balance === balanceBefore + 250, `a stale settlement must credit nothing, balance is ${after.body.data.balance}`);
     });
 
     await test('a GAII this node does not host is a 404', async () => {
@@ -801,15 +815,28 @@ async function run(): Promise<void> {
         assert(stranger.status === 403, `a node that is not a peer: ${stranger.status} ${JSON.stringify(stranger.body)}`);
     });
 
-    await test('…and serves the listing to a peer that proves who it is', async () => {
+    await test('…and serves the listing to a peer that proves who it is and names B as its audience, once', async () => {
         const ts = new Date().toISOString();
-        const { status, body } = await B.json('/v1/federation/templates?limit=5&category=tools&tags=test&offset=0', {
-            headers: {
-                'x-source-node': A_ID, 'x-timestamp': ts,
-                'x-signature': await sign(A.nodeKey.privateKey, JSON.stringify({ source_node: A_ID, timestamp: ts })),
-            },
-        });
+        const signed = JSON.stringify({ source_node: A_ID, timestamp: ts });
+        const headers = {
+            'x-source-node': A_ID, 'x-timestamp': ts,
+            'x-signature': await sign(A.nodeKey.privateKey, signed),
+            ...await audienceHeaders(A.nodeKey.privateKey, signed, B_ID),
+        };
+        const url = '/v1/federation/templates?limit=5&category=tools&tags=test&offset=0';
+        const { status, body } = await B.json(url, { headers });
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+        // QA audit S6-09: the listing had the window only, so a captured request could be sent again
+        // inside it, and one signed for another node passed here too.
+        const again = await B.json(url, { headers });
+        assert(again.status === 401 && again.body.error?.code === 'REPLAYED', `the same request again: ${again.status} ${JSON.stringify(again.body)}`);
+        const ts2 = new Date(Date.now() + 1).toISOString();
+        const signed2 = JSON.stringify({ source_node: A_ID, timestamp: ts2 });
+        const elsewhere = await B.json(url, { headers: {
+            'x-source-node': A_ID, 'x-timestamp': ts2, 'x-signature': await sign(A.nodeKey.privateKey, signed2),
+            ...await audienceHeaders(A.nodeKey.privateKey, signed2, 'aimeat-test-001-elsewhere'),
+        } });
+        assert(elsewhere.status === 401 && elsewhere.body.error?.code === 'WRONG_AUDIENCE', `signed for another node: ${elsewhere.status} ${JSON.stringify(elsewhere.body)}`);
         const t = body.data.templates.find((x: any) => x.title === listingTitle);
         assert(!!t, `the listing must be served: ${JSON.stringify(body.data.templates)}`);
         assert(t.sourceNode === B_ID && t.category === 'tools', `enrichment: ${JSON.stringify(t)}`);

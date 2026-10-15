@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-16 — PATCH refuses a merge that changes an agent's live crew definition's browser site list
+ *     unless the owner writes it in person (403 OWNER_APPROVES_SITES; QA audit F07b-02).
  *   v1.5.5 — 2026-10-12 — PATCH refuses a merged app tool manifest or offers document carrying the old
  *     morsel price with 400 MORSEL_PRICE_REMOVED from 4.0.0 (services/legacy-pacing-write.ts).
  *   v1.5.4 — 2026-10-11 — An `agents.` key that carries an identity where the agent's name belongs
@@ -71,6 +73,7 @@ import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey, isServerWrittenKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
@@ -262,6 +265,9 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
       const legacyPacing = legacyPacingWriteRefusal(key, merged);
       if (legacyPacing) { res.status(legacyPacing.status).json(error(config.nodeId, legacyPacing.code, legacyPacing.message)); return; }
+      // The live crew definition's browser site list is the owner's to change, in person (QA audit F07b-02).
+      const sites = await crewSitesWriteRefusal(storage, key, gaii, merged, req.auth!);
+      if (sites) { res.status(403).json(error(config.nodeId, 'OWNER_APPROVES_SITES', sites)); return; }
 
       // Provenance is stamped against the MERGED bytes, because those are the bytes that end up
       // stored. A statement about only the patch would be a statement about something nobody can read
