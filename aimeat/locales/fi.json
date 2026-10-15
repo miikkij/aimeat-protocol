@@ -4462,7 +4462,8 @@
       "company": "yrityksesi",
       "signals": "viestiesi ja sivujesi tavoittavuus",
       "secrets": "täällä pitämäsi avaimet",
-      "ext": "tilillesi asennetut laajennukset"
+      "ext": "tilillesi asennetut laajennukset",
+      "mcp": "liittämäsi MCP-palvelimet"
     },
     "scopeText": {
       "push": {
@@ -4489,6 +4490,9 @@
       },
       "ext": {
         "invoke": "Ajaa tilillesi asennettujen laajennusten toimintoja, myös automaatioidesi askeleina. Se ei voi asentaa eikä poistaa laajennuksia."
+      },
+      "mcp": {
+        "use": "Kutsuu työkaluja liittämilläsi MCP-palvelimilla. Tämä AIMEAT pitää kirjautumistiedot ja käyttää niitä puolestasi. Sovellus ei näe niitä, eikä se voi liittää tai irrottaa palvelimia."
       }
     }
   },
@@ -16635,6 +16639,7 @@
             "purge": "Poista jaetun työtilan tietueita lopullisesti. Niitä ei voi palauttaa, joten sen tehtävät odottavat aina lupaasi.",
             "read": "Lue tilillesi tallennetut muistiinpanot, tietueet ja data.",
             "write": "Tallenna ja päivitä muistiinpanoja, tietueita ja dataa tilillesi.",
+            "read-as-owner": "Lue kaikki, mitä sinä ja muut agenttisi olette tallentaneet, myös yksityiset tietueet, samoin kuin itse luet ne. Ilman tätä agentti lukee vain sen, mikä on jaettu sille.",
             "write-as-owner": "Tallenna tietueita sinun nimissäsi oman nimensä sijaan, jolloin ne näkyvät sinun tietueinasi.",
             "write-reserved": "Sinuna kirjoittamisen lisäksi: muuta myös AI-palveluavaintasi, kulukattoasi ja julkista profiiliasi. Vaikuttaa vain yhdessä yllä olevan rivin kanssa."
           },

@@ -7,6 +7,7 @@
  *   reading it from there.
  * @structure SCOPE_EXEMPT_TOOLS
  * @version-history
+ *   2026-10-15 — aimeat_task_request_changes leaves with the tool, which no surface offers any more (feature-list audit #79).
  *   v1.4.0 — 2026-10-12 — aimeat_organism_invitation_respond leaves: accepting puts the owner's account into
  *     an organism, and from 4.0.0 it asks organism:write like POST /v1/organisms/:id/invitations/accept.
  *   v1.3.0 — 2026-10-04 — aimeat_task_decline: its own task only (isOwnTask), like aimeat_task_fail.
@@ -67,6 +68,5 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_task_fail',                              // isOwnTask() at agent-tasks
     'aimeat_task_decline',                           // isOwnTask() at agent-tasks
     'aimeat_task_propose_todos',                     // Authorization is isOwnTask(), defined at agent-tasks
-    'aimeat_task_request_changes',                   // It is never registered on the server /v1/mcp: it sits in V2_EXCLUDED (src/tool-catalog/surfaces
     'aimeat_task_todo',                              // isOwnTask() at agent-tasks
 ]);

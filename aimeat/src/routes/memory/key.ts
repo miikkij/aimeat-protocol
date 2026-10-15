@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — GET /:key with owner_scope or ?agent= naming a sibling: an agent without
+ *     memory:read-as-owner gets another identity's record only when its visibility admits a same-owner
+ *     reader, and 404 otherwise (feature-list audit #42).
  *   v1.11.7 — 2026-10-12 — PUT refuses an app tool manifest or offers document carrying the old morsel
  *     price with 400 MORSEL_PRICE_REMOVED from 4.0.0 (services/legacy-pacing-write.ts).
  *   v1.11.6 — 2026-10-11 — PUT refuses an `agents.` key that carries an identity where the agent's
@@ -90,6 +93,8 @@ import { logger } from '../../utils/logger.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { rolesWithOperator } from '../../services/operator-override.js';
 import { recordOperatorAccess } from '../../services/operator-access-audit.js';
+import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
+import { callerOf } from '../../middleware/caller.js';
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
@@ -174,6 +179,14 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let record = ownerScopeRead
       ? await memoryDb.getOwnerScope(req.auth!.owner, key)
       : await storage.getMemory(gaii, key);
+    // Another same-owner identity's record (owner_scope, or ?agent= naming a sibling): a caller that
+    // does not read as the owner sees it only when its visibility admits a same-owner reader, and a
+    // hidden one answers as an absent one (memory:read-as-owner, feature-list audit #42).
+    if (record && (ownerScopeRead || agentParam)
+      && !ownerScopeView([record], resolve(req), readsAsOwner(callerOf(req, config.nodeId, storage))).length) {
+      // A hidden owner copy shadowed the caller's own record of the same key: the caller still reads its own.
+      record = ownerScopeRead ? await storage.getMemory(resolve(req), key) : null;
+    }
     // On-read TTL check: if TTL has expired, treat as not found and delete
     if (record && record.ttlHours && record.ttlHours > 0) {
       const expiresAt = new Date(record.createdAt).getTime() + record.ttlHours * 3_600_000;

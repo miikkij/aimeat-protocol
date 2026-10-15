@@ -19,6 +19,7 @@
  * @structure applyStartupInstallSet(deps)
  * @usage await applyStartupInstallSet({ storage, config, peers, scheduler });
  * @version-history
+ *   2026-10-15 — The startup log counts the agents waiting for the owner's approval (feature-list audit #90).
  *   v1.3.1 — 2026-10-10 — The apply is marked `startup: true`, so its record carries `via: 'startup'`,
  *     which install-set-trust.ts reads instead of `applied_by` (secaudit 2026-10-10, I18).
  *   v1.3.0 — 2026-10-08 — BUNDLE_UNAVAILABLE is tried every 30 s for the first ten minutes, then on
@@ -94,9 +95,11 @@ export async function applyStartupInstallSet(deps: ApplyDeps, attempt = 0, start
         if (out.ok) {
             if (out.dry_run) return;
             const pending = Object.values(out.record.agents).filter(a => a.result === 'pending').length;
+            const proposed = Object.values(out.record.agents).filter(a => a.result === 'proposed').length;
             logger.info(`[install-set] applied for ${out.record.owner} (run ${out.record.runs}): `
                 + `${Object.keys(out.record.packages).length} package(s), ${Object.keys(out.record.organisms).length} organism(s), `
-                + `${Object.keys(out.record.members).length} user(s)${pending ? `, ${pending} crew agent(s) waiting for a runner` : ''}`);
+                + `${Object.keys(out.record.members).length} user(s)${pending ? `, ${pending} crew agent(s) waiting for a runner` : ''}`
+                + `${proposed ? `, ${proposed} crew agent(s) waiting for the owner's approval` : ''}`);
             // What the install left out (a skill the owner already has of their own) is said, not dropped.
             for (const w of out.warnings) logger.warn(`[install-set] ${w}`);
             return;

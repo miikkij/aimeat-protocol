@@ -6,6 +6,7 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — Gate 2 of the fork asks the licence for the version it copies (feature-list audit #110).
  *   v1.10.0 — 2026-10-12 — PATCH takes `listing` (listed, community, unlisted) beside `parked`, and
  *     answers with it (services/app-settings.ts).
  *   v1.9.2 — 2026-10-11 — The fork gate reads the app's pacing amount (`tollMorsels`, services/app-pacing.ts):
@@ -209,7 +210,8 @@ export function registerForkManageRoutes(
         // debited — not the raw `sub`, which on an owner session is a bare name that no receipt holds
         // (audit AI-triage 2026-08-23, invariant 1).
         if (paidSource && !sameOwner && !isOperator) {
-            const hasLicense = await storage.hasValidLicense(ownerGhiiOf(callerGaii), source.ownerGaii, sourceFilename);
+            // The version copied: a single licence covers the version bought (feature-list audit #110).
+            const hasLicense = await storage.hasValidLicense(ownerGhiiOf(callerGaii), source.ownerGaii, sourceFilename, undefined, source.versionNumber);
             if (!hasLicense) {
                 res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app has ${appToll(source.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase, then fork it.`));
                 return;

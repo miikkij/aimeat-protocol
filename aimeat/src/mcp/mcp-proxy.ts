@@ -30,6 +30,8 @@
  * @structure registerMcpProxyTools(mcp, storage, config, agentGaii, scopes)
  * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-15 — aimeat_mcp_grant_set refuses GRANT_NOT_APPLICABLE on a server whose grants nobody
+ *     reads (a node-wide one), as PUT /v1/mcp-servers/:id/grants does (feature-list audit #12).
  *   v1.4.0 — 2026-10-09 — aimeat_mcp_authorize hands back the node's confirmation page, where the
  *     owner confirms the sign-in in their own browser, never the far side's address (secrets audit
  *     2026-10-09, chapter 2).
@@ -61,7 +63,7 @@ import {
 import { callRemoteTool, listRemoteTools } from '../services/mcp-client/invoke.js';
 import { startMcpOAuth } from '../services/mcp-client/oauth.js';
 import {
-  listMcpGrants, putMcpGrant, removeMcpGrant, type McpGrant,
+  listMcpGrants, putMcpGrant, removeMcpGrant, grantCannotNarrow, type McpGrant,
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
@@ -320,6 +322,9 @@ export function registerMcpProxyTools(
     async ({ server, grantee, tools, locked_input, call_cap, expires, read_only }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
       if (!row) return notFound(server);
+      // The REST twin's refusal: a node-wide server's grants are read by nobody (feature-list audit #12).
+      const cannot = grantCannotNarrow(row, ownerGhii());
+      if (cannot) return toolError('GRANT_NOT_APPLICABLE', cannot);
 
       const grant: McpGrant = {
         type: 'aimeat:McpGrant',

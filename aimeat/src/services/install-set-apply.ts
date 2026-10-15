@@ -34,6 +34,7 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   2026-10-15 — deployAgents gives the owner as the proposer: a bundled agent with no runner becomes a proposal on the owner's open items (result proposed, proposal_id) instead of pending with nothing to approve (feature-list audit #90).
  *   v1.10.0 — 2026-10-10 — A real apply runs the plan first and links the repository and pulls only
  *     when the plan found nothing to refuse (I17); the plan checks a package's expects before it is
  *     pulled. The start-up apply marks its record `via: 'startup'`, and reach() passes `installSet` to
@@ -86,6 +87,7 @@ import { expectsMissingMessage, missingExpects, type PackageExpects } from './pa
 import { createOrganismRecord } from './organism-lifecycle.js';
 import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInput } from './workspace-provision.js';
 import { deployAppAgent } from './app-agent-deploy.js';
+import { readProposal, settleProposal } from './agent-proposals.js';
 import { deriveTierFlags } from './federation-tiers.js';
 import { proveNodeCard } from './packages/peer/package-peer-register.js';
 import { recordPeerOrigin } from './peer-origin.js';
@@ -123,7 +125,13 @@ export interface PackageStep {
     /** What the install left out and why (a skill the owner already has of their own). Kept across runs. */
     warnings?: string[];
 }
-export interface AgentStep { group_id: string; app: string; agent: string; result: 'deployed' | 'present' | 'pending' | 'error' | 'would_deploy'; task_id?: string; detail?: string }
+/**
+ * One bundled agent's outcome. `proposed`: the owner has no runner, so the agent waits for the owner's
+ * approval as a proposal on their open items (`proposal_id`); approving it creates the agent with its
+ * definition. `pending` is what a run before 2026-10-15 recorded for the same case, with nothing anyone
+ * could approve (feature-list audit #90).
+ */
+export interface AgentStep { group_id: string; app: string; agent: string; result: 'deployed' | 'present' | 'proposed' | 'pending' | 'error' | 'would_deploy'; task_id?: string; proposal_id?: string; detail?: string }
 
 export interface AppliedRecord {
     spec: typeof RECORD_SPEC;
@@ -579,6 +587,7 @@ async function deployAgents(deps: ApplyDeps, bundle: InstallBundle, record: Appl
         const id = `${a.groupId}/${a.app}/${a.agent}`;
         if (record.agents[id]?.result === 'deployed') { record.agents[id] = { ...record.agents[id], result: 'present' }; continue; }
         if (record.agents[id]?.result === 'present') continue;
+        const prior = record.agents[id];
         const instanceId = record.packages[a.groupId]?.instance_id;
         const instance = instanceId ? await storage.getInstance(instanceId) : null;
         const app = instance?.installedComponents.find(c => c.componentId === a.app && c.type === 'app');
@@ -586,12 +595,30 @@ async function deployAgents(deps: ApplyDeps, bundle: InstallBundle, record: Appl
             record.agents[id] = { group_id: a.groupId, app: a.app, agent: a.agent, result: 'error', detail: `Package ${a.groupId} has no app component "${a.app}".` };
             continue;
         }
+        // The owner as the proposer: with no runner to deploy to, the agent becomes a proposal the
+        // owner approves on their open items, as an owner's own deploy does (app-agent-deploy.ts). It
+        // stayed `pending` with nothing to approve until 2026-10-15 (feature-list audit #90).
         const out = await deployAppAgent(storage, config, {
             callerOwner: record.owner, appOwner: record.owner, filename: app.registeredAs, agentName: a.agent,
             organismId: a.organism ? record.organisms[a.organism]?.id : undefined, undeploy: false,
+            principal: { sub: record.owner, owner: record.owner, roles: ['owner'], scopes: [] },
         });
-        record.agents[id] = out.ok
-            ? { group_id: a.groupId, app: a.app, agent: a.agent, result: 'deployed', task_id: 'task_id' in out.view ? out.view.task_id : undefined }
-            : { group_id: a.groupId, app: a.app, agent: a.agent, result: out.code === 'RUNNER_NOT_FOUND' ? 'pending' : 'error', detail: `${out.code}: ${out.message}` };
+        const base = { group_id: a.groupId, app: a.app, agent: a.agent };
+        if (!out.ok && out.code === 'NAME_TAKEN' && prior?.result === 'proposed') {
+            // The owner approved the earlier proposal, so the agent exists.
+            record.agents[id] = { ...base, result: 'present', detail: 'The owner approved the proposed agent.' };
+        } else if (!out.ok) {
+            record.agents[id] = { ...base, result: 'error', detail: `${out.code}: ${out.message}` };
+        } else if (out.view.kind === 'proposed') {
+            record.agents[id] = { ...base, result: 'proposed', proposal_id: out.view.proposal_id, detail: out.view.note };
+        } else {
+            // A runner took it now: an earlier proposal still waiting is withdrawn, so approving it
+            // later does not make a second agent for the same job.
+            if (prior?.result === 'proposed' && prior.proposal_id) {
+                const waiting = await readProposal({ storage, config }, record.owner, prior.proposal_id);
+                if (waiting?.state === 'proposed') await settleProposal({ storage, config }, record.owner, waiting, 'declined');
+            }
+            record.agents[id] = { ...base, result: 'deployed', task_id: 'task_id' in out.view ? out.view.task_id : undefined };
+        }
     }
 }

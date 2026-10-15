@@ -20,6 +20,8 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   2026-10-15 — appGranteeAsGeai: an MCP grant written for `app:{owner}/{file}` names the GEAI the
+ *     app calls with (feature-list audit #12).
  *   v1.11.0 — 2026-10-14 — mayActOnAgent: the one answer to "may this caller act on the agent a
  *     route's `:name` names": the agent itself, or its own owner in person. Eight route files said yes
  *     to any owner in person, so an owner who named another account's agent by its whole GAII read
@@ -457,6 +459,23 @@ export function appSlug(appId: string): string {
   const base = appId.includes('/') ? (appId.split('/').pop() as string) : appId;
   const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64);
   return slug.length >= 3 ? slug : `app-${slug}`.slice(0, 64);
+}
+
+/**
+ * The GEAI an app calls with, for a grantee written in the documented app form `app:{owner}/{file}`
+ * (the MCP grant tools and the mcp-servers skill name an app that way). Returns null for any other
+ * string, so a GAII, a GEAI or `*` passes through the caller's own comparison unchanged.
+ *
+ * An app under an owner's grant calls as `eco:{appSlug(file)}#{owner}@{node}` (callerPrincipal), so
+ * a grant stored as `app:alice/notes.html` matched no caller until 2026-10-15 and the app kept the
+ * whole server (feature-list audit #12).
+ */
+export function appGranteeAsGeai(grantee: string, nodeId: string): string | null {
+  if (!grantee.startsWith('app:')) return null;
+  const rest = grantee.slice('app:'.length);
+  const slash = rest.indexOf('/');
+  if (slash <= 0 || slash === rest.length - 1) return null;
+  return buildGEAI(appSlug(rest.slice(slash + 1)), rest.slice(0, slash), nodeId);
 }
 
 /**

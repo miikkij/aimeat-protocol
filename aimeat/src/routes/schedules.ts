@@ -31,6 +31,8 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-10-15 — The write caller says when it is an app, so PATCH, DELETE and trigger refuse an app any
+ *     schedule but its own (feature-list audit #85).
  *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:write on POST /v1/schedules, POST /v1/schedules/:id/trigger, POST /v1/agents/:name/schedules; workflow:write on PATCH /v1/schedules/:id; memory:write on DELETE /v1/schedules/:id. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   2026-10-05 — A schedule an app makes records the app's grant (secaudit 2026-10, AI-2).
@@ -92,6 +94,7 @@ import { isManifestDeclaredJob } from '../services/extension-schedules.js';
 import { nodeTimeZone } from '../services/display-prefs.js';
 import { schedulePromptOf } from '../services/schedule-prompt.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
+import { callerFromAuth } from '../services/caller-context.js';
 
 // The record build, the per-kind input checks and the write moved to services/schedule-write.ts on
 // 2026-08-11, so the MCP tools that create, edit and cancel schedules produce the same record this
@@ -112,13 +115,18 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   const ownerGhii = (req: Express.Request) => `${req.auth!.owner}@${config.nodeId}`;
 
   /** This session in the terms services/schedule-write.ts speaks. */
-  const writeCaller = (req: Express.Request): ScheduleWriteCaller => ({
-    owner: req.auth!.owner as string,
-    identity: resolveIdentity(req.auth!, config.nodeId),
-    isOwnerSession: isOwnerInPerson(req.auth),
-    scopes: req.auth!.scopes ?? [],
-    ...(req.auth!.roles.includes('app') && req.auth!.app_grant ? { appGrant: req.auth!.app_grant } : {}),
-  });
+  const writeCaller = (req: Express.Request): ScheduleWriteCaller => {
+    // An app manages only its own schedules (services/schedule-write.ts canManageSchedule, audit #85).
+    const isApp = callerFromAuth(req.auth!, config.nodeId, storage).kind === 'app';
+    return {
+      owner: req.auth!.owner as string,
+      identity: resolveIdentity(req.auth!, config.nodeId),
+      isOwnerSession: isOwnerInPerson(req.auth),
+      scopes: req.auth!.scopes ?? [],
+      ...(isApp && req.auth!.app_grant ? { appGrant: req.auth!.app_grant } : {}),
+      isApp,
+    };
+  };
 
   /** Read an agent's self-reported internal scheduler mirror (display-only). */
   async function readAgentInternal(agentName: string, agentGaii: string): Promise<unknown[]> {

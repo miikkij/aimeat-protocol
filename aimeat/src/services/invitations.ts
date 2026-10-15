@@ -21,6 +21,8 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-10-15 — NAMED_INVITE_ACCEPT_REFUSAL, the one sentence for an agent or app that tries to accept
+ *     a named invitation (feature-list audit #57).
  *   2026-10-05 — createEmailInvitation counts the inviter's account allowance (takeInviteEmail), so
  *     the REST route and the MCP tool share one count; an install set's invitations are exempt
  *     (secaudit 2026-10, C5).
@@ -625,6 +627,16 @@ export async function cancelNameInvitation(
   emitChange('notifications', target);
   emitChange('organisms');
 }
+
+/**
+ * What a caller that is not the person in person is told when it tries to accept a named
+ * invitation, on POST /v1/organisms/:id/invitations/accept and aimeat_organism_invitation_respond.
+ * The same rule as the emailed link (routes/invite-accept.ts): joining an organism is the account
+ * holder's own decision (feature-list audit #57).
+ */
+export const NAMED_INVITE_ACCEPT_REFUSAL =
+  'Joining a shared space is the account holder\'s own decision, so an assistant or an app cannot accept the invitation. '
+  + 'Tell the person: they accept it themselves, signed in, from their notifications or the organism\'s page. You may decline it for them.';
 
 /**
  * The invitee accepts: activate the membership, sync the organism roster arrays (admins too when the

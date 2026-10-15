@@ -8,6 +8,7 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-10-15 — The owner_scope note says private records need memory:read-as-owner (feature-list audit #42).
  *   2026-10-15 — getting_started is told whether the email service is enabled, so a node without mail does not offer the registration invite (feature-list audit #23).
  *   v1.7.0 — 2026-10-12 — GET / this_node carries what /.well-known/aimeat says about the protocol:
  *     protocol_version and profiles from node 4.0.0, payment_bindings always (Core 2026-11 DISC-01).
@@ -595,7 +596,7 @@ export function bootstrapRouter(
                 // support answered by the people who run it from somewhere else. The address behaves
                 // identically either way, so the fix is the sentence rather than the mechanism.
                 'Stuck on anything here? Write to support@operators. It needs no identity lookup, it reaches the people who run this node in one thread, and they answer it in Messages.',
-                'owner_scope=true on /v1/memory returns data from your owner (GHII) AND all their agents. Without it you only see your own agent memory.',
+                'owner_scope=true on /v1/memory returns data from your owner (GHII) AND all their agents. Without it you only see your own agent memory. Their private records come back only when your owner granted you memory:read-as-owner; without it you get what they mark owner, members or public.',
                 '/v1/catalogue/knowledge lists PUBLIC packages from all users. /v1/memory?prefix=packages/&tags=knowledge-package&owner_scope=true lists YOUR packages.',
                 '/v1/packages is the APP STORE (installable app packages), NOT knowledge packages. Do not confuse these.',
               ],

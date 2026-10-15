@@ -9,6 +9,7 @@
  *   arguments a caller can steer out of. Those are the failures that would not look like failures —
  *   the feature would appear to work and would be handing out more than the owner wrote.
  * @version-history
+ *   2026-10-15 — A grant for app:{owner}/{file} narrows the app's GEAI; grantCannotNarrow (feature-list audit #12).
  *   v1.1.0 — 2026-09-24 — The owner's pass is for the owner IN PERSON, as the door states it: a name
  *     that resolves to the owner's account is not enough (an app under a grant).
  *   v1.0.0 — 2026-09-16 — Phase 2 of the MCP proxy.
@@ -18,7 +19,7 @@ import { randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import {
-  putMcpGrant, listMcpGrants, removeMcpGrant, resolveMcpAccess, applyLockedInput,
+  putMcpGrant, listMcpGrants, removeMcpGrant, resolveMcpAccess, applyLockedInput, grantCannotNarrow,
   type McpGrant,
 } from '../../src/services/mcp-client/grants.js';
 
@@ -273,5 +274,38 @@ describe('removing a narrowing', () => {
   it('answers false when there was nothing to remove', async () => {
     const storage = new SqliteStorage(':memory:');
     expect(await removeMcpGrant(storage, OWNER, 'jira', AGENT)).toBe(false);
+  });
+});
+
+describe('an app named in the documented form app:{owner}/{file} (feature-list audit #12)', () => {
+  const APP = 'eco:notes-html#alice@test-node-001';
+
+  it('the grant narrows the app calling as its GEAI', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await putMcpGrant(storage, grant({ grantee: 'app:alice/notes.html' }));
+    const refused = await resolveMcpAccess({
+      storage, server: makeServer(), grantee: APP, tool: 'delete_project', scopes: ['mcp:use'],
+    });
+    expect(refused.allowed).toBe(false);
+    if (refused.allowed) return;
+    expect(refused.code).toBe('TOOL_NOT_GRANTED');
+    const allowed = await resolveMcpAccess({
+      storage, server: makeServer(), grantee: APP, tool: 'read_issue', scopes: ['mcp:use'],
+    });
+    expect(allowed.allowed).toBe(true);
+  });
+
+  it('another app of the same owner is not the one the grant names', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await putMcpGrant(storage, grant({ grantee: 'app:alice/notes.html' }));
+    const r = await resolveMcpAccess({
+      storage, server: makeServer(), grantee: 'eco:other-html#alice@test-node-001', tool: 'delete_project', scopes: ['mcp:use'],
+    });
+    expect(r.allowed).toBe(true);
+  });
+
+  it('grantCannotNarrow names a node-wide server and passes the writer\'s own', () => {
+    expect(grantCannotNarrow(makeServer(), OWNER)).toBeNull();
+    expect(grantCannotNarrow(makeServer({ ownership: 'node', ownerGhii: null }), OWNER)).toMatch(/limit nobody/);
   });
 });

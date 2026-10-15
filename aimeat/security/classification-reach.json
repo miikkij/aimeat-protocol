@@ -512,9 +512,9 @@
       "reads": {
         "listDeletedMemory": 1,
         "memoryDb.getOwnerScope": 1,
-        "getMemory": 6
+        "getMemory": 7
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader (the bin list included); the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader (the bin list included); the other reads here serve a write or the node's own bookkeeping. 2026-10-15 (feature-list audit #42): the seventh is GET /:key reading the caller's own record when a hidden owner copy shadowed it, and it passes presentMemory like the read it replaces."
     },
     "src/routes/memory/patch.ts": {
       "reads": {
@@ -720,9 +720,9 @@
     },
     "src/services/agent-port-redirect.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The port-redirect config record."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The port-redirect config record. 2026-10-15 (feature-list audit #35): two reads of the same pointer, its system namespace (NS_AGENT_PORT) and the older location under the agent; only the peer URL leaves, never the record."
     },
     "src/services/agent-proposals.ts": {
       "reads": {

@@ -12,6 +12,7 @@
  *   problem. Flattening a chosen server into the list with its real schemas is a later phase, opted
  *   into per server.
  * @version-history
+ *   2026-10-15 — aimeat_mcp_grant_set says a node-wide server answers GRANT_NOT_APPLICABLE (feature-list audit #12).
  *   2026-10-09 — aimeat_mcp_authorize says the address is the node's confirmation page (secrets audit 2026-10-09).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
@@ -175,7 +176,7 @@ export const mcpProxyTools = [
     },
     {
         name: 'aimeat_mcp_grant_set',
-        description: "Narrow one agent or app to named tools on one attached server, optionally with arguments already decided, a call ceiling and an end date. This is how 'my coding agent may READ Jira' becomes true without also meaning it may close tickets. locked_input is the part worth understanding: {\"project\":\"SUPPORT\"} means every call lands in SUPPORT whatever the agent asks for, because those values win over what it sends. Writing a grant REPLACES any earlier one for the same agent on the same server. Needs the mcp:manage permission. Ask the person which tools before guessing; a narrowing that is too tight looks exactly like a broken server.",
+        description: "Narrow one agent or app to named tools on one attached server, optionally with arguments already decided, a call ceiling and an end date. This is how 'my coding agent may READ Jira' becomes true without also meaning it may close tickets. locked_input is the part worth understanding: {\"project\":\"SUPPORT\"} means every call lands in SUPPORT whatever the agent asks for, because those values win over what it sends. Writing a grant REPLACES any earlier one for the same agent on the same server. Only a server attached to this person's own account takes a grant: one the node offers to everybody answers GRANT_NOT_APPLICABLE. Needs the mcp:manage permission. Ask the person which tools before guessing; a narrowing that is too tight looks exactly like a broken server.",
         caller: 'agent',
         visibility: agentEverywhere,
         // Idempotent: writing the same grant twice leaves the same state. Not destructive, although

@@ -19,6 +19,7 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   2026-10-15 — GET /license-check answers for the version the app serves now (feature-list audit #110).
  *   v1.5.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:buy (an app: contract:spend) on POST /v1/app-store/purchase; wallet:read on GET /v1/app-store/purchases/:txId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.4.0 — 2026-10-11 — Ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa: an
  *     app's morsel price is its pacing amount. POST /purchase is ONE chargePacing (burn share, the
@@ -361,7 +362,10 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
         // valid licence read as false and an owner with no agents 404'd on their own app (audit
         // AI-triage 2026-08-23, invariant 1).
         const sellerGhii = `${appOwner}@${config.nodeId}`;
-        const hasLicense = await storage.hasValidLicense(gaii, sellerGhii, appFilename);
+        // Answered for the version the app serves now, as the download is: a single licence bought at
+        // an earlier version does not open a later one (feature-list audit #110).
+        const current = await storage.getAppByOwnerName(appOwner, appFilename);
+        const hasLicense = await storage.hasValidLicense(gaii, sellerGhii, appFilename, undefined, current?.versionNumber);
 
         res.json(success(config.nodeId, {
             app_filename: appFilename,

@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-15 — the paced-app download asks the licence for the version it serves, so a single licence opens only the version bought (feature-list audit #110).
  *   v1.21.2 — 2026-10-11 — The licence gate reads the app's pacing amount (`tollMorsels`, services/app-pacing.ts);
  *     a morsel is pacing, not a price, and the 401 / 402 texts say so.
  *   v1.21.1 — 2026-10-10 — The paid-app gate answers the anonymous identity 401, as it answers no
@@ -560,7 +561,9 @@ export function registerReadRoutes(
             const caller = ownerCoordinate(req.auth, config.nodeId);
             // The seller always gets their own app.
             if (caller !== app.ownerGaii) {
-                const hasLicense = await storage.hasValidLicense(caller, app.ownerGaii, filename);
+                // The version served: a single licence opens the version bought, not every later one
+                // (feature-list audit #110; a lifetime licence opens all of them).
+                const hasLicense = await storage.hasValidLicense(caller, app.ownerGaii, filename, undefined, app.versionNumber);
                 if (!hasLicense) {
                     res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED',
                         `This app has ${appToll(app.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase`));

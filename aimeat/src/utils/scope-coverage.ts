@@ -31,6 +31,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-10-15 — memory:read-as-owner (READ_AS_OWNER_SCOPE) joins the own-tick family: an agent reading
+ *     the owner's and its siblings' private records with owner_scope (feature-list audit #42).
  *   v1.8.0 — 2026-10-15 — connections:read-as-owner joins the own-tick family: an agent reading what is in
  *     the owner's connected accounts (feature-list audit 128).
  *   v1.13.0 — 2026-10-05 — ownerBypassesScopes is gone: its callers ask isOwnerInPerson (utils/gaii.ts),
@@ -79,6 +81,9 @@
 
 /** The scope an owner grants an agent to write into the owner's own namespace. */
 export const WRITE_AS_OWNER_SCOPE = 'memory:write-as-owner';
+
+/** The scope an owner grants an agent to read the owner's and its siblings' records as the owner. */
+export const READ_AS_OWNER_SCOPE = 'memory:read-as-owner';
 
 /**
  * The stronger grant on top of it: also the RESERVED, server-trusted keys — `openrouter.*` (the URL
@@ -296,6 +301,15 @@ const OWN_TICK_SCOPES = [
     // stops being seen, so an agent able to do it on "Full access" could put away the one message
     // about itself. Its own tick; not grandfathered, because the capability did not exist before.
     'messages:organize-as-owner',
+    // Read memory AS the owner: with owner_scope (and with ?agent= naming a sibling) every record the
+    // owner and their other agents hold, private ones included, the way the owner in person reads
+    // them. Without it an agent reading with owner_scope gets what the ordinary visibility rules give
+    // it (its own records and those marked owner, members or public), because an agent reading its
+    // owner's private data must not ride the human's ownership (security.md). Modelled on
+    // messages:read-as-owner and memory:write-as-owner. An app grant needs none of this: it already
+    // acts as the owner. Not grandfathered: holding memory:read was the hole (feature-list audit #42,
+    // Jouni 2026-10-15).
+    READ_AS_OWNER_SCOPE,
     // Read what is in the OWNER's connected accounts (their mail, its attachments), as the owner
     // (services/connections/access.ts CONNECTIONS_READ_AS_OWNER_SCOPE). On an agent a connection is
     // its own; reading the owner's mailbox is a delegation the owner grants on its own tick, for the

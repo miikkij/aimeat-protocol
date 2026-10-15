@@ -7,6 +7,10 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — POST /:id/invitations/accept accepts only for the person in person (isOwnerPrincipal),
+ *     as the emailed link does (feature-list audit #57). POST /:id/agents on an organism that admits only
+ *     listed agents is the owner's or an admin's alone; a member no longer lists their own agent
+ *     (feature-list audit #58).
  *   v1.7.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/organisms/:id/join-requests, GET /v1/organisms/:id/invitations, GET /v1/organisms/invitations/mine; organism:invite on POST /v1/organisms/:id/join-requests/:requestId/review, POST /v1/organisms/:id/admins, DELETE /v1/organisms/:id/admins/:ghii, DELETE /v1/organisms/:id/members/:ghii, POST /v1/organisms/:id/members/:ghii/unban, POST /v1/organisms/:id/transfer, POST /v1/organisms/:id/owners, DELETE /v1/organisms/:id/owners/:ghii, POST /v1/organisms/:id/invitations, POST /v1/organisms/:id/members, PATCH /v1/organisms/:id/invitations/:ghii, DELETE /v1/organisms/:id/invitations/:ghii, POST /v1/organisms/:id/agents, DELETE /v1/organisms/:id/agents/:gaii; organism:write on POST /v1/organisms/:id/invitations/accept, POST /v1/organisms/:id/invitations/decline. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   2026-09-28 — The member list names only the agents the organism admits (agentAccess), and says which
@@ -46,7 +50,7 @@ import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwn
 import { removeOrganismMember, MemberRemoveError } from '../../services/organism-member-remove.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
-  acceptNameInvitation, declineNameInvitation, addOrganismMember,
+  acceptNameInvitation, declineNameInvitation, addOrganismMember, NAMED_INVITE_ACCEPT_REFUSAL,
 } from '../../services/invitations.js';
 import { agentAccessOf, agentBarred } from '../../services/organism-agent-access.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
@@ -596,6 +600,13 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have not been invited to this space. Ask somebody who is already in it to invite you.'));
       return;
     }
+    // The person accepts in person, as on the emailed link (routes/invite-accept.ts) and the MCP tool:
+    // an agent, an app grant or an ecosystem token acts in the account's name and is refused here.
+    // Checked after the invitation lookup, so a refusal says nothing a 404 would not (feature-list audit #57).
+    if (!isOwnerPrincipal(req.auth)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', NAMED_INVITE_ACCEPT_REFUSAL));
+      return;
+    }
     // Shared accept core: activates the row, syncs members/admins, applies invite-time ws grants.
     const workspaces = await acceptNameInvitation(storage, config, { organism, membership });
     res.json(success(config.nodeId, { status: 'joined', role: membership.role, workspaces }));
@@ -620,7 +631,8 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
    * as an organism participant and passes the workspace membership gate in its own right. An owner
    * or admin of the organism may also attach an agent of any active member. Where the organism admits
    * only listed agents (agentAccess 'listed'), this list is who gets in, so adding to it is a grant
-   * and only a person signed in makes it: an agent could otherwise list itself and its siblings. */
+   * the organism makes: only its owner or an admin, signed in in person, adds an agent. An agent could
+   * otherwise list itself and its siblings, and a member could admit their own agent alone. */
 
   /* POST /v1/organisms/:id/agents — attach an agent GAII (the agent's owner as a member, or an organism owner/admin) */
   router.post('/v1/organisms/:id/agents', requireAuth(), requireRestScope('organism:invite'), requireRole('agent'), async (req, res) => {
@@ -647,6 +659,13 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     const isManager = isOrganismOwner(organism, callerGhii) || organism.admins.includes(callerGhii);
     if (!ownAgent && !isManager) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only attach your own agents'));
+      return;
+    }
+    // Where the list decides who gets in, adding to it is the organism's own decision: only its owner
+    // or an admin, signed in, adds an agent. A member listing their own agent admitted it by themselves
+    // until 2026-10-15 (feature-list audit #58).
+    if (agentAccessOf(organism) === 'listed' && !isManager) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'This organism admits only the agents on its list, and only its owner or an admin adds one. Ask one of them to add your agent.'));
       return;
     }
     if (agentAccessOf(organism) === 'listed' && !isOwnerPrincipal(req.auth)) {

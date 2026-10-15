@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-15 — The name-invite group gets the session caller, so accepting asks for the person in
+ *     person (feature-list audit #57).
  *   2026-10-15 — aimeat_organism_create with a shape answers `workspaces_not_created` beside `workspaces` (feature-list audit #56).
  *     aimeat_organism_export answers `truncated` when a workspace's export reached a limit (feature-list audit #68).
  *   2026-10-15 — The organism-details resource refuses a private organism the caller is not a member
@@ -415,7 +417,7 @@ export function registerOrganismsTools(
     // ── Name-invitation + direct-add tools (invite, member_add, invitation_update,
     // invitation_cancel, invitations, invitation_respond) — extracted to organisms-name-invites.ts;
     // registered here to preserve tool order.
-    registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
+    registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated, caller);
 
     // ── Email-invitation tools (invite_email, invitations_email, invitation_email_cancel) ──
     // Extracted to organisms-email-invites.ts; registered here to preserve tool order.

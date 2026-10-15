@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-15 — manage-my-agents: an owner_scope read of a private record takes memory:read-as-owner
+ *     (feature-list audit #42).
  *   2026-10-15 — manage-my-agents: `refusals_unreadable: true` on an agent row means the refusals
  *     could not be read, not that there are none (feature-list audit #30).
  *   v1.13.0 — 2026-10-14 — manage-my-agents: `tunnel_enabled: false` from aimeat_connector_list means
@@ -229,7 +231,10 @@ flowchart LR
   only to an agent whose job is that. A refusal of memory:read is the opposite case: a crew agent
   reads its own instructions with it, and one approved before 2026-10-02 with memory:write alone
   never starts. Tell the owner to give it ("Give the permission" on that agent's card); its next
-  wake runs the task that waited.
+  wake runs the task that waited. Reading with \`owner_scope\` reaches the records the owner and the
+  other agents keep private only with memory:read-as-owner, which "Full access" does not carry, since
+  2026-10-15; without it an agent reads what they mark owner, members or public. An agent that
+  needs the owner's private records for its job asks the owner for that permission by name.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
 - **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain. It
   reports the calling agent's own onboarding only.

@@ -13109,8 +13109,13 @@ paths:
       summary: Port agent to another node
       description: |
         Initiate agent migration by setting a redirect pointer on the current
-        node. Deducts a 50-morsel porting fee. After porting, use the export
-        and import endpoints to complete the transfer.
+        node. Deducts the porting fee (50 morsels by default) from the owner's
+        balance; with too few morsels it answers 402 INSUFFICIENT_MORSELS with
+        the owner's balance and the fee in `details`. After porting, use the
+        export and import endpoints to complete the transfer, then delete the
+        agent here. The pointer is kept apart from the agent's memory, so for
+        30 days GET /v1/agents/{gaii} answers 301 to the new node after the agent
+        is deleted, when that node is an active federation peer.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -16790,7 +16795,11 @@ paths:
           schema:
             type: string
             enum: ['true', 'false']
-          description: When true, list memory across the caller owner's GHII and agents; useful for same-owner shared tag areas
+          description: >-
+            When true, list memory across the caller owner's GHII and agents; useful for same-owner shared
+            tag areas. An agent gets the private records of the owner and its sibling agents only when it
+            holds `memory:read-as-owner` (outside every wildcard); without it the list and the count carry
+            what is marked owner, members or public. The same rule applies to `agent` naming a sibling.
         - name: max_flags
           in: query
           schema:
@@ -17466,6 +17475,26 @@ paths:
             When truthy, a missing key returns 200 with { value: null, exists: false }
             instead of 404. Use for optional keys (UI preferences, config) that may not
             exist yet, to avoid client-side 404 noise.
+        - name: owner_scope
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: ['true', 'false']
+          description: >-
+            When true, read the key across the owner's GHII and all their agents, GHII
+            first. An agent gets another identity's private record only when it holds
+            `memory:read-as-owner` (outside every wildcard); without it a record marked
+            owner, members or public is read and a private one answers 404. The owner in
+            person and the owner's app grant read every record.
+        - name: agent
+          in: query
+          required: false
+          schema:
+            type: string
+          description: >-
+            Read from one of the same owner's agents (its GAII). The same rule as
+            owner_scope applies to its private records.
       responses:
         '200':
           description: Memory entry
@@ -27118,7 +27147,8 @@ paths:
       description: >-
         passkey: the ceremony id and the browser's assertion. key: a base64 Ed25519 signature over
         aimeat-docsign:v1:{id}:{sha256}:{signer} with your registered key. session: the node seals that
-        you confirmed; refused from an app, where a person signs with a passkey.
+        you confirmed; refused from an app and from an owner-level personal access token (used directly
+        or exchanged), where a person signs with a passkey (400 METHOD_NOT_ALLOWED).
       tags: [Document signing]
       security:
         - BearerAuth: []
@@ -42818,7 +42848,11 @@ paths:
     get:
       operationId: checkLicense
       summary: Check app license
-      description: Check if the authenticated agent has a valid license for an app.
+      description: >-
+        Check if the authenticated caller's owner has a valid license for the version the app serves
+        now. A lifetime license covers every version. A single license covers the version it was bought
+        at (and earlier ones): after the seller publishes a later version it answers false, and the
+        download answers 402 PURCHASE_REQUIRED.
       tags: [App Store]
       security:
         - BearerAuth: []
@@ -48018,6 +48052,11 @@ paths:
       x-aimeat-scope: { word: 'organism:write', enforcedIn: '4.0.0' }
       operationId: acceptOrganismInvitation
       summary: Accept an organism invitation
+      description: >-
+        The invited person accepts, signed in as themselves, as on the emailed invitation link. An agent,
+        an app grant or an ecosystem token acting in the account's name is refused 403 ACCESS_DENIED
+        (an agent holding account:security and an owner-level personal access token pass). Declining
+        stays open to them.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -48025,6 +48064,7 @@ paths:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/organisms/{id}/invitations/decline:
@@ -48344,8 +48384,8 @@ paths:
         A member attaches one of their own agents (GAII) to the organism, adding it to agentGaiis so it
         passes the workspace membership gate in its own right. An owner or admin of the organism may also
         attach an agent of any active member. When the organism's agent_access is 'listed', agentGaiis
-        is the list of agents it admits, so only a person signed in may attach (403 ACCESS_DENIED for an
-        agent).
+        is the list of agents it admits, so only the organism's owner or an admin, signed in as a person,
+        may attach (403 ACCESS_DENIED for a member who is neither, and for an agent).
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -51380,7 +51420,9 @@ paths:
         workspaces of the bundle under the customer's names, the other users (join `account` creates
         the account now and adds the membership; join `invite` sends an email invitation carrying the
         organism role and workspace grants), and the crew agents, deployed through the owner's runner
-        agent or left `pending` until one is connected. `dry_run` true returns the plan and every
+        agent, or, with no runner, proposed to the owner (result `proposed` with a `proposal_id` on
+        the owner's open items; approving it creates the agent). An apply after a runner connects
+        deploys the agent and withdraws a proposal still waiting. `dry_run` true returns the plan and every
         problem, such as a required config value the set does not give, and writes nothing. Every
         problem is found before an account, an install or an organism is created, and the answer is
         then 409 CANNOT_APPLY with `details.problems`. Applying again creates nothing twice: what an
@@ -56723,6 +56765,9 @@ paths:
         identity from the start; if it comes to belong to one later, the entry becomes that person
         automatically and nothing the owner wrote is lost.
 
+        The owner in person, or the owner's agent holding messages:send (the word aimeat_contact_add
+        asks), saves into the OWNER's address book; an app grant or an ecosystem app is refused 403.
+
         400 INVALID_INPUT for a malformed identity (an email address given as `contact_id` says so
         and points at the person shape), 404 for a local identity that does not exist, 409 BLOCKED
         when the contact — or the account behind the address — is blocked. The block is checked
@@ -56843,7 +56888,9 @@ paths:
         contact with message history keeps its messaging state (origin flips back to 'message');
         a pure saved contact with no history is deleted. Blocked contacts are managed in Messages (409).
         Removing a saved person deletes what the owner wrote about them; the append-only outbound
-        send log is untouched, so what already left the node stays answerable.
+        send log is untouched, so what already left the node stays answerable. The owner in person,
+        or the owner's agent holding messages:send (the word aimeat_contact_remove asks), acts on the
+        owner's address book.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -56851,6 +56898,7 @@ paths:
         - { name: contactId, in: path, required: true, schema: { type: string } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
@@ -59848,6 +59896,10 @@ paths:
           description: No grantee, or no tools list.
         '404':
           description: No such server.
+        '409':
+          description: >
+            GRANT_NOT_APPLICABLE. The server is not the caller's own (a node-wide server the node
+            offers to every owner it admits), so a grant on it would limit nobody and is not stored.
   /v1/mcp-servers/{id}/grants/{grantee}:
     delete:
       operationId: removeMcpGrant

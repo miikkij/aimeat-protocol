@@ -24,6 +24,9 @@
  * @structure MCP_SERVERS_SKILL_ENTRY
  * @usage import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
  * @version-history
+ *   2026-10-15 — Section 3: an app with mcp:use calls tools, a grant for app:{owner}/{file} narrows it, an
+ *     agent's grantee is its full name, and a grant on an operator's server answers GRANT_NOT_APPLICABLE
+ *     (feature-list audit #12).
  *   2026-10-15 — A failed renewal marks the server as needing a new sign-in at once and refuses the
  *     call with UPSTREAM_UNAUTHORIZED (feature-list audit #9).
  *   2026-10-15 — aimeat-mcp-servers: an expires value that is not a date is refused when the grant is written (feature-list audit 13).
@@ -110,10 +113,12 @@ servers that are active are flattened, and a session takes a limited number of f
 ## 3. Narrow what each agent may call
 
 With no grant, the permission alone decides: an agent with \`mcp:use\` may call every tool on the
-person's servers. A **grant narrows that for one agent or app, never widens it.**
+person's servers, and so may an app the person gave \`mcp:use\` on its consent screen. A **grant
+narrows that for one agent or app, never widens it.** Only the person's own servers take a grant: a
+grant on a server the operator offers answers \`GRANT_NOT_APPLICABLE\`, because it would limit nobody.
 \`aimeat_mcp_grant_set\` with:
 
-- \`server\` and \`grantee\`: an agent's name, \`app:{owner}/{file}\` for an app, or \`*\` for everyone
+- \`server\` and \`grantee\`: an agent's full name (\`agent#owner@node\`), \`app:{owner}/{file}\` for an app, or \`*\` for everyone
   without their own grant. An agent's own grant wins over \`*\`.
 - \`tools\`: \`"*"\` or a list of tool names. Required: decide it with the person.
 - \`read_only: true\`: only tools the server itself marks as read-only (its \`readOnlyHint\`

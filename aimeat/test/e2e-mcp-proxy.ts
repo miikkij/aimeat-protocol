@@ -31,6 +31,9 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-10-15 — Phase 4b2: an app granted mcp:use calls a tool, a grant for app:{owner}/{file}
+ *     narrows it, an app without the word gets 403 and another owner's server 404; a grant on the
+ *     node-wide server answers 409 GRANT_NOT_APPLICABLE on REST and MCP (feature-list audit #12).
  *   v1.12.1 — 2026-10-13 — The shop's tool manifest carries tollMorsels: from 4.0.0 POST /v1/memory
  *     refuses price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
  *   v1.12.0 — 2026-10-09 — A sign-in callback from a browser that did not start the round seals
@@ -196,6 +199,11 @@ async function agentWithScopes(
  * principal a name alone mistakes for the owner in person. Copied from e2e-connections.ts.
  */
 async function appGrantToken(ownerBearer: string, owner: string, scopes: string[]): Promise<string> {
+  return (await appGrant(ownerBearer, owner, scopes)).token;
+}
+
+/** appGrantToken, also naming the probe app's file, for a grant written as `app:{owner}/{file}`. */
+async function appGrant(ownerBearer: string, owner: string, scopes: string[]): Promise<{ token: string; filename: string }> {
   const filename = `mcp-proxy-probe-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.html`;
   const redirect = 'http://localhost:9933/callback';
   const verifier = randomBytes(32).toString('base64url');
@@ -230,7 +238,7 @@ async function appGrantToken(ownerBearer: string, owner: string, scopes: string[
     body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect }),
   });
   assert(tok.status === 200, `app token: ${tok.status} ${JSON.stringify(tok.body.error)}`);
-  return tok.body.data.access_token as string;
+  return { token: tok.body.data.access_token as string, filename };
 }
 
 // ─── The node's own MCP door, for the arms that must hold on both surfaces ───
@@ -894,6 +902,59 @@ await test('removing the narrowing WIDENS the agent again', async () => {
   assert(status === 200, `expected 200 after the narrowing went, got ${status}`);
 });
 
+// ─── Phase 4b2: an app holding mcp:use (feature-list audit #12) ───
+console.log('\nPhase 4b2 — An app may use MCP tools, and a grant for app:{owner}/{file} narrows it');
+
+let mcpApp = { token: '', filename: '' };
+const mcpAppAuth = () => ({ Authorization: `Bearer ${mcpApp.token}` });
+
+await test('an app the owner granted mcp:use calls a tool on the owner\'s server', async () => {
+  // Until 2026-10-15 mcp:use was not a word an app could ask for, and the authorize step refused it.
+  mcpApp = await appGrant(ownerToken, ownerName, ['mcp:use']);
+  const { status, body } = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: mcpAppAuth(), body: JSON.stringify({ tool: 'echo', arguments: { text: 'from the app' } }),
+  });
+  assert(status === 200 && JSON.stringify(body).includes('echo:from the app'), `expected 200, got ${status} ${JSON.stringify(body.error)}`);
+});
+
+await test('a grant written for app:{owner}/{file} narrows that app to the named tools', async () => {
+  const grantee = `app:${ownerName}/${mcpApp.filename}`;
+  const put = await json('/v1/mcp-servers/upstream/grants', {
+    method: 'PUT', headers: ownerAuth(), body: JSON.stringify({ grantee, tools: ['echo'] }),
+  });
+  assert(put.status === 200, `put: ${put.status} ${JSON.stringify(put.body.error)}`);
+
+  const refused = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: mcpAppAuth(), body: JSON.stringify({ tool: 'refuses' }),
+  });
+  // Before the fix the grant named a string no caller had, so the app still reached every tool.
+  assert(refused.status === 403 && refused.body.error?.code === 'NOT_GRANTED',
+    `the app reached a tool its grant leaves out: ${refused.status} ${JSON.stringify(refused.body.error)}`);
+  const allowed = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: mcpAppAuth(), body: JSON.stringify({ tool: 'echo', arguments: { text: 'granted' } }),
+  });
+  assert(allowed.status === 200, `the granted tool: ${allowed.status}`);
+
+  const del = await json(`/v1/mcp-servers/upstream/grants/${encodeURIComponent(grantee)}`, { method: 'DELETE', headers: ownerAuth() });
+  assert(del.status === 200, `delete: ${del.status}`);
+});
+
+await test('an app without mcp:use is refused the call, and an app reaches no other owner\'s server', async () => {
+  const reader = await appGrantToken(ownerToken, ownerName, ['memory:read']);
+  const noWord = await json('/v1/mcp-servers/upstream/call', {
+    method: 'POST', headers: { Authorization: `Bearer ${reader}` }, body: JSON.stringify({ tool: 'echo', arguments: { text: 'x' } }),
+  });
+  assert(noWord.status === 403, `cross-scope: expected 403, got ${noWord.status}`);
+
+  const strangers = await json('/v1/mcp-servers', { headers: strangerAuth() });
+  const theirs = (strangers.body.data.servers as any[]).find((x) => x.slug === 'upstream');
+  assert(theirs?.id, 'the second owner has no upstream server');
+  const cross = await json(`/v1/mcp-servers/${theirs.id}/call`, {
+    method: 'POST', headers: mcpAppAuth(), body: JSON.stringify({ tool: 'echo', arguments: { text: 'x' } }),
+  });
+  assert(cross.status === 404, `cross-owner: expected 404, got ${cross.status}`);
+});
+
 // ─── Phase 4c: a read-only grant ───
 console.log('\nPhase 4c — Read-only: only the tools the server marks read-only');
 
@@ -1190,7 +1251,7 @@ await test('…and answers the same agent once it holds mcp:use, on both doors',
 });
 
 await test("an app grant of the server's owner is refused on the capability and WebMCP doors", async () => {
-  // Grantable words only, and mcp:use is not one: an app never holds the word a remote call asks.
+  // This app holds memory:read only, not mcp:use (an app may ask for mcp:use since 2026-10-15).
   const appAuth = { Authorization: `Bearer ${await appGrantToken(ownerToken, ownerName, ['memory:read'])}` };
 
   // The capability door asks work:request first, which is not an app word either.
@@ -1470,6 +1531,25 @@ await test('…and its agent holding mcp:manage is refused the same three acts o
   const row = await houseRow();
   assert(row && row.enabled === true && row.title === 'housewide',
     `the house server was changed over MCP: ${JSON.stringify(row)}`);
+});
+
+await test('a grant on the node-wide server is refused on REST and MCP, because nobody reads it', async () => {
+  // Grants are read under the server's own owner, and a node-wide server has none, so this answered
+  // 200 and limited nobody until 2026-10-15 (feature-list audit #12).
+  const put = await json('/v1/mcp-servers/housewide/grants', {
+    method: 'PUT', headers: plainAuth(), body: JSON.stringify({ grantee: '*', tools: ['echo'] }),
+  });
+  assert(put.status === 409 && put.body.error?.code === 'GRANT_NOT_APPLICABLE',
+    `REST: ${put.status} ${JSON.stringify(put.body.error ?? put.body.data)}`);
+
+  const agent = await agentWithScopes(plain, 'mcpplaingrant', ['mcp:read', 'mcp:use', 'mcp:manage']);
+  const session = await openMcpSession(agent.token);
+  const viaMcp = await mcpTool(session, 'aimeat_mcp_grant_set', { server: 'housewide', grantee: '*', tools: ['echo'] });
+  assert(viaMcp.isError && viaMcp.text.includes('GRANT_NOT_APPLICABLE'), `MCP: ${viaMcp.text}`);
+
+  const listed = await json('/v1/mcp-servers/grants?server=housewide', { headers: plainAuth() });
+  assert(listed.status === 200 && (listed.body.data.grants as unknown[]).length === 0,
+    `a grant was stored: ${JSON.stringify(listed.body.data)}`);
 });
 
 await test('a capability over the node server answers an owner in person, who holds every word by the role', async () => {

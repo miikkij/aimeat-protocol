@@ -17,6 +17,8 @@
  * @structure a2aCardFor(config, agent, baseUrl, opts)
  * @usage const card = a2aCardFor(config, agent, 'https://node.example/v1/a2a/claude', { offerings });
  * @version-history
+ *   2026-10-15 — A for-hire skill carries the offering's input schema (taskSpec.inputSchema), so a
+ *     stranger knows what to send (feature-list audit #83).
  *   v1.2.0 — 2026-10-11 — A skill's line names the money price or "free", then "pacing N morsels per
  *     use"; a morsel is never shown as a price, and the x402 sentence appears only when there is a
  *     money price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -157,11 +159,28 @@ export function directoryDescriptionFor(description: string | null | undefined, 
   return offerings.map(o => o.title).filter(Boolean).join(' · ');
 }
 
+/** Above this many characters the schema is not written into the card, and the sentence names where to read it. */
+const INPUT_SCHEMA_MAX_CHARS = 4000;
+
+/**
+ * What to send, from the offering's own `taskSpec.inputSchema`. A2A's AgentSkill has no schema
+ * field, so the schema travels in the description as JSON. Without it a stranger read the price
+ * and the offering id and had to guess the body (feature-list audit #83).
+ */
+function inputLine(o: Offering): string {
+  const schema = o.taskSpec?.inputSchema;
+  if (!schema || typeof schema !== 'object' || Object.keys(schema).length === 0) return '';
+  const json = JSON.stringify(schema);
+  return json.length <= INPUT_SCHEMA_MAX_CHARS
+    ? ` Send the input as a JSON data part matching this JSON Schema: ${json}`
+    : ` Send the input as a JSON data part matching the input schema at GET /v1/exchange/offerings/${encodeURIComponent(o.offeringId)} (taskSpec.inputSchema).`;
+}
+
 function offeringSkills(offerings: Offering[]): AgentCard['skills'] {
   return offerings.map(o => ({
     id: o.offeringId,
     name: o.title,
-    description: `${o.description || o.title} — ${priceLine(o)}. Send this offeringId in message metadata${hasMoneyPrice(o) ? '; payment is settled with the x402 extension before the work starts' : ''}.`,
+    description: `${o.description || o.title} — ${priceLine(o)}. Send this offeringId in message metadata${hasMoneyPrice(o) ? '; payment is settled with the x402 extension before the work starts' : ''}.${inputLine(o)}`,
     tags: ['for-hire', o.surface?.kind === 'agent-work' ? o.surface.taskType : o.action],
     examples: [],
     inputModes: ['text/plain', 'application/json'],

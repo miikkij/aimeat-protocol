@@ -8,6 +8,7 @@
  * @structure appPurchaseMethods
  * @usage Object.assign(SqliteStorage.prototype, appPurchaseMethods) in ../index.ts
  * @version-history
+ *   2026-10-15 — hasValidLicense takes the version being served: a single licence covers it only when bought at that version or later (feature-list audit #110).
  *   v1.1.0 — 2026-10-11 — A morsel is pacing, never a price: the columns priceMorsels /
  *     transactionFeeMorsels map to AppPurchaseRecord.tollMorsels / operatorShareMorsels, and the receipt's
  *     manifest snapshot is read through normalizeAppManifestPacing.
@@ -52,13 +53,17 @@ export const appPurchaseMethods = {
     return rows.map(r => this.deserializeAppPurchase(r));
   },
 
-  async hasValidLicense(this: SqliteStorage, buyerGaii: string, sellerGaii: string, filename: string, licenseType?: 'single' | 'lifetime'): Promise<boolean> {
+  async hasValidLicense(this: SqliteStorage, buyerGaii: string, sellerGaii: string, filename: string, licenseType?: 'single' | 'lifetime', versionNumber?: number): Promise<boolean> {
     // Lifetime license: any purchase of this app grants access to all versions
     const lifetime = this.db.prepare('SELECT 1 FROM app_purchases WHERE buyerGaii = ? AND sellerGaii = ? AND appFilename = ? AND licenseType = ? LIMIT 1').get(buyerGaii, sellerGaii, filename, 'lifetime') as Record<string, unknown> | undefined;
     if (lifetime) return true;
-    // Single license: buyer has at least one purchase of this app (version-specific check done at download)
+    // Single license: locked to the version bought. Given the version being served, a purchase of that
+    // version or a later one is needed; a later app version needs the update service (feature-list
+    // audit #110). Without a version: any purchase of this app (the purchase route's own question).
     if (!licenseType || licenseType === 'single') {
-      const single = this.db.prepare('SELECT 1 FROM app_purchases WHERE buyerGaii = ? AND sellerGaii = ? AND appFilename = ? LIMIT 1').get(buyerGaii, sellerGaii, filename) as Record<string, unknown> | undefined;
+      const single = (versionNumber !== undefined
+        ? this.db.prepare('SELECT 1 FROM app_purchases WHERE buyerGaii = ? AND sellerGaii = ? AND appFilename = ? AND appVersionNumber >= ? LIMIT 1').get(buyerGaii, sellerGaii, filename, versionNumber)
+        : this.db.prepare('SELECT 1 FROM app_purchases WHERE buyerGaii = ? AND sellerGaii = ? AND appFilename = ? LIMIT 1').get(buyerGaii, sellerGaii, filename)) as Record<string, unknown> | undefined;
       return !!single;
     }
     return false;

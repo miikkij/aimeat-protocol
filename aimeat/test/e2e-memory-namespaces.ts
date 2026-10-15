@@ -10,12 +10,18 @@
  *     1. A plain AGENT token writes into the agent's own GAII namespace, never the owner's.
  *     2. An APP-GRANT token (sub = owner GHII, roles ['app']) writes into the OWNER's namespace.
  *     3. GET /v1/memory/:key?owner_scope=true reads across the union; without it, an agent sees
- *        only its own namespace.
+ *        only its own namespace. An agent reads another identity's PRIVATE record there only with
+ *        memory:read-as-owner.
  *     4. When a key exists under BOTH, owner-scope resolves GHII-first and the agent's copy is
  *        shadowed — reported as `also_under` on the survivor instead of vanishing silently.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-namespaces
  * @version-history
+ *   2026-10-15 — "the agent CAN read it with ?owner_scope=true" asserted the hole: an agent holding
+ *     memory:read read the owner's private record. Now it is 404 without memory:read-as-owner on REST
+ *     read, list, count, ?agent=, search and the MCP read, a sibling's owner-visible record is still
+ *     read, "*" does not carry the word, the app grant is unaffected, another owner's agent reaches
+ *     nothing, and the granted word opens the reads (feature-list audit #42).
  *   v1.2.0 — 2026-10-11 — An `agents.` key that carries an identity where the agent's name belongs
  *     is refused on POST, PUT, PATCH, bulk and the node MCP tool, for the agent and for the owner,
  *     and the name alone is accepted (utils/agent-key-address.ts).
@@ -235,12 +241,99 @@ async function main() {
         assert(r.status === 404, `expected 404 in the agent's own namespace, got ${r.status}`);
     });
 
-    await test('the agent CAN read it with ?owner_scope=true', async () => {
-        const r = await json(`/v1/memory/${encodeURIComponent(SHARED_KEY)}?owner_scope=true`, {
-            headers: { Authorization: `Bearer ${agentToken}` },
+    // ── 2b. memory:read-as-owner (feature-list audit #42, Jouni 2026-10-15) ───
+    // This test asserted that an agent holding memory:read reads the owner's PRIVATE record with
+    // ?owner_scope=true. That was the hole: reading as the owner now costs its own word, outside every
+    // wildcard. Without it an agent reads what visibility admits a same-owner reader.
+    const mcpRead = async (args: Record<string, unknown>) => {
+        const body = await rpc('tools/call', { name: 'aimeat_memory_read', arguments: args });
+        return { isError: body?.result?.isError === true || body?.error !== undefined, text: String(body?.result?.content?.[0]?.text ?? JSON.stringify(body)) };
+    };
+    const asAgent = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
+    let sibGaii = '';
+
+    await test('without memory:read-as-owner, owner_scope does not reach the owner\'s PRIVATE record (REST read, list, MCP read)', async () => {
+        const r = await json(`/v1/memory/${encodeURIComponent(SHARED_KEY)}?owner_scope=true`, asAgent(agentToken));
+        assert(r.status === 404, `REST read: expected 404, got ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+        const l = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(SHARED_KEY)}`, asAgent(agentToken));
+        assert(l.status === 200 && !l.body.data.items.some((i: any) => i.key === SHARED_KEY), `REST list shows it: ${JSON.stringify(l.body.data.items)}`);
+        const c = await json(`/v1/memory?owner_scope=true&count=true&prefix=${encodeURIComponent(SHARED_KEY)}`, asAgent(agentToken));
+        assert(c.status === 200 && c.body.data.count === 0, `the count counts it: ${JSON.stringify(c.body.data)}`);
+        await openMcpSession(agentGaii, agentPriv);
+        const m = await mcpRead({ key: SHARED_KEY, owner_scope: true });
+        assert(m.isError && !m.text.includes('"app"'), `MCP read: ${m.text}`);
+    });
+
+    await test('a sibling agent\'s private record is hidden on ?agent= and owner_scope; its owner-visible record is read', async () => {
+        const sib = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: 'nssib', owner, capabilities: ['memory'], scopes: ['memory:write'] }),
         });
-        assert(r.status === 200, `owner_scope read: ${r.status} ${JSON.stringify(r.body)}`);
-        assert(r.body.data.value.by === 'app', 'reads the app-written value');
+        assert(sib.status === 201, `register sibling: ${sib.status} ${JSON.stringify(sib.body)}`);
+        sibGaii = sib.body.data.agent.gaii;
+        const sibToken = await getToken(sibGaii, sib.body.data.private_key, true);
+        for (const [key, visibility] of [['nstest.sib.private', 'private'], ['nstest.sib.shared', 'owner']]) {
+            const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${sibToken}` }, body: JSON.stringify({ key, value: { by: 'sibling' }, visibility }) });
+            assert(w.status === 201, `sibling write ${key}: ${w.status}`);
+        }
+        const viaAgent = await json(`/v1/memory/nstest.sib.private?agent=${encodeURIComponent(sibGaii)}`, asAgent(agentToken));
+        assert(viaAgent.status === 404, `?agent= private: expected 404, got ${viaAgent.status}`);
+        const viaScope = await json('/v1/memory/nstest.sib.private?owner_scope=true', asAgent(agentToken));
+        assert(viaScope.status === 404, `owner_scope private: expected 404, got ${viaScope.status}`);
+        const shared = await json('/v1/memory/nstest.sib.shared?owner_scope=true', asAgent(agentToken));
+        assert(shared.status === 200 && shared.body.data.value.by === 'sibling', `owner-visible record: ${shared.status}`);
+        const listed = await json(`/v1/memory?agent=${encodeURIComponent(sibGaii)}&prefix=nstest.sib.`, asAgent(agentToken));
+        const keys = (listed.body.data.items ?? []).map((i: any) => i.key);
+        assert(keys.includes('nstest.sib.shared') && !keys.includes('nstest.sib.private'), `?agent= list: ${JSON.stringify(keys)}`);
+        const found = await json(`/v1/memory/search?q=sibling&agent=${encodeURIComponent(sibGaii)}`, asAgent(agentToken));
+        assert(!(found.body.data.results ?? []).some((x: any) => x.key === 'nstest.sib.private'), `?agent= search: ${JSON.stringify(found.body.data)}`);
+    });
+
+    await test('"Full access" (*) does not carry memory:read-as-owner', async () => {
+        const star = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: 'nsstar', owner, capabilities: ['memory'], scopes: ['*'] }),
+        });
+        assert(star.status === 201, `register: ${star.status}`);
+        const starToken = await getToken(star.body.data.agent.gaii, star.body.data.private_key, true);
+        const r = await json(`/v1/memory/${encodeURIComponent(SHARED_KEY)}?owner_scope=true`, asAgent(starToken));
+        assert(r.status === 404, `cross-scope: expected 404, got ${r.status}`);
+    });
+
+    await test('the owner\'s app grant still reads everything with owner_scope (the rule is one direction)', async () => {
+        const r = await json(`/v1/memory/nstest.sib.private?owner_scope=true`, asAgent(appToken));
+        assert(r.status === 200 && r.body.data.value.by === 'sibling', `app grant: ${r.status}`);
+    });
+
+    await test('another owner\'s agent holding memory:read-as-owner reaches nothing of this owner (cross-owner)', async () => {
+        const other = `nsread${Date.now() % 1000000}`;
+        const otherToken = (await registerOwner(BASE, other)).token;
+        const ag = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
+            body: JSON.stringify({ name: 'nsreader', owner: other, capabilities: ['memory'], scopes: ['memory:read', 'memory:read-as-owner'] }),
+        });
+        assert(ag.status === 201, `register: ${ag.status} ${JSON.stringify(ag.body)}`);
+        const t = await getToken(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+        const r = await json(`/v1/memory/${encodeURIComponent(SHARED_KEY)}?owner_scope=true`, asAgent(t));
+        assert(r.status === 404, `owner_scope: expected 404, got ${r.status}`);
+        const a = await json(`/v1/memory/nstest.sib.private?agent=${encodeURIComponent(sibGaii)}`, asAgent(t));
+        assert(a.status === 403, `?agent=: expected 403, got ${a.status}`);
+    });
+
+    await test('the owner grants memory:read-as-owner, and the agent reads the private records (REST and MCP)', async () => {
+        const p = await json('/v1/agents/nsbot/scopes', {
+            method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ scopes: ['memory:read', 'memory:write', 'memory:read-as-owner'] }),
+        });
+        assert(p.status === 200, `grant: ${p.status} ${JSON.stringify(p.body)}`);
+        agentToken = await getToken(agentGaii, agentPriv, true);
+        const r = await json(`/v1/memory/${encodeURIComponent(SHARED_KEY)}?owner_scope=true`, asAgent(agentToken));
+        assert(r.status === 200 && r.body.data.value.by === 'app', `owner_scope read: ${r.status} ${JSON.stringify(r.body)}`);
+        const sibPrivate = await json(`/v1/memory/nstest.sib.private?agent=${encodeURIComponent(sibGaii)}`, asAgent(agentToken));
+        assert(sibPrivate.status === 200, `?agent= private: ${sibPrivate.status}`);
+        await openMcpSession(agentGaii, agentPriv);
+        const m = await mcpRead({ key: SHARED_KEY, owner_scope: true });
+        assert(!m.isError && m.text.includes('app'), `MCP read: ${m.text}`);
     });
 
     // ── 3. Shadowing is real, and now visible ────────────────────────────────

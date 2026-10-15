@@ -4,6 +4,8 @@
  *   Tests organism listing, detail retrieval, joining, leaving, member listing,
  *   and the organism details resource.
  * @version-history
+ *   2026-10-15 — 16b/16c: an agent is refused accepting a named invitation for its owner over MCP and
+ *     REST, and the owner in person accepts it (feature-list audit #57).
  *   v1.1.0 — 2026-10-12 — 13a/13b: leaving over MCP takes the leaver's agents off the organism and
  *     their workspace roles away, as REST leave does. 13b failed on the source.
  *   v1.0.0 — 2026-03-21 — Initial creation
@@ -560,6 +562,49 @@ await test('16. Leave non-existent organism fails', async () => {
         arguments: { organism_id: 'nonexistent-org' },
     }, 113);
     assert(body.result.isError === true, 'isError');
+});
+
+// ─── Phase 6b: a named invitation is accepted by the person in person (feature-list audit #57) ───
+console.log('\nPhase 6b — The person accepts an invitation in person');
+
+let inviteOrgId = '';
+await test('16b. User 2\'s agent may not accept an invitation for user 2, over MCP or REST', async () => {
+    const o = await json('/v1/organisms', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'MCP Invite Org', description: 'invite only', type: 'team', join_policy: 'invite_only', visibility: 'private' }),
+    });
+    assert(o.status === 201, `organism ${o.status}`);
+    inviteOrgId = o.body.data.organism.id;
+    const inv = await json(`/v1/organisms/${inviteOrgId}/invitations`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ invitee: owner2Name }),
+    });
+    assert(inv.status === 201, `invite ${inv.status}: ${JSON.stringify(inv.body.error)}`);
+
+    // Until 2026-10-15 the agent accepted here while the emailed link refused it.
+    const viaMcp = await mcpRpc2('tools/call', {
+        name: 'aimeat_organism_invitation_respond', arguments: { organism_id: inviteOrgId, decision: 'accept' },
+    }, 116);
+    const text = String(viaMcp.body.result?.content?.[0]?.text ?? '');
+    assert(viaMcp.body.result?.isError === true && text.startsWith('ACCESS_DENIED'), `MCP accept: ${text}`);
+    // An MCP token is not accepted on REST, so the agent signs in for an agent JWT of its own.
+    const ts = new Date().toISOString();
+    const agentTok = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ gaii: agent2Gaii, timestamp: ts, signature: await signMsg(agent2PrivKey, agent2Gaii + ts) }),
+    });
+    assert(agentTok.body.ok === true, `agent token: ${JSON.stringify(agentTok.body.error)}`);
+    const viaRest = await json(`/v1/organisms/${inviteOrgId}/invitations/accept`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentTok.body.data.token}` }, body: '{}',
+    });
+    assert(viaRest.status === 403 && viaRest.body.error?.code === 'ACCESS_DENIED', `REST accept: ${viaRest.status} ${JSON.stringify(viaRest.body.error)}`);
+    const mine = await json('/v1/organisms/invitations/mine', { headers: { Authorization: `Bearer ${owner2Token}` } });
+    assert((mine.body.data.invitations ?? []).some((x: any) => x.organism.id === inviteOrgId), 'the invitation is still pending');
+});
+
+await test('16c. User 2 in person accepts it', async () => {
+    const r = await json(`/v1/organisms/${inviteOrgId}/invitations/accept`, {
+        method: 'POST', headers: { Authorization: `Bearer ${owner2Token}` }, body: '{}',
+    });
+    assert(r.status === 200 && r.body.data.status === 'joined', `accept ${r.status}: ${JSON.stringify(r.body.error)}`);
 });
 
 // ─── Phase 7: Resource ───
