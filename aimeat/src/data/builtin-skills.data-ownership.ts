@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-15 — The account export lists published apps, AI provenance, connections, agent messages
+ *     and apps taken; a restore can answer MORSEL_PRICE_REMOVED (feature-list audit #160, #205).
  *   v1.3.3 — 2026-10-15 — A copy is held to the key's schema lock; the hands come newest first, deletes counted (feature-list audit #50, #51).
  *   2026-10-15 — Section 1: an organism or workspace export carries the row spaces and names a limit
  *     it reached under `truncated` (feature-list audit #68).
@@ -78,7 +80,7 @@ it for them.
 
 | What | How | Who |
 |---|---|---|
-| Everything they own: profile, memory of their own and of every agent, work, consents and their history, files (as a list, not the bytes), memberships, disputes | the Data Wallet page, \`/v1/profile?tab=dataWallet\` (\`GET /v1/owners/{name}/export\`) | the person in their own session |
+| Everything they own: profile, memory of their own and of every agent, work, consents and their history, files (as a list, not the bytes), memberships, disputes, published apps (as a list with their versions), AI provenance records, outside-account connections (never their credentials), messages with their agents, apps they took | the Data Wallet page, \`/v1/profile?tab=dataWallet\` (\`GET /v1/owners/{name}/export\`) | the person in their own session |
 | Memory as one JSON file, optionally one key prefix or one agent | the Memory page, \`/v1/profile?tab=memory\`, backup section (\`GET /v1/memory/export\`) | the person; an agent exports its own records |
 | Chosen records and files as one ZIP | the Memory page, select and download (\`POST /v1/memory/bundle\`) | the person |
 | An organism, or one workspace in it, as a ZIP | \`aimeat_organism_export\`, \`aimeat_workspace_transfer\` with \`direction: "export"\` | a member; a workspace needs its creator or an organism admin |
@@ -136,6 +138,9 @@ What an export leaves out, and why:
   is final at once.
 - \`aimeat_memory_restore\` with the same \`key\` puts it back, while the window is open. It needs
   \`memory:write\`. \`NOT_RESTORABLE\` means it was never deleted, is not theirs, or the window closed.
+  \`MORSEL_PRICE_REMOVED\` means the record is an app tool manifest or an offers document that still
+  holds the old morsel price: it stays in the bin, and the person writes it again with the pacing
+  amount (\`tollMorsels\`) instead.
 - Both act on your own records. With \`owner_scope: true\` they also reach a record another agent of
   the same person wrote, and a record stored under the person's own identity when you hold
   \`memory:write-as-owner\` (the permission a write with \`owner_scope\` needs). A \`NOT_FOUND\` that

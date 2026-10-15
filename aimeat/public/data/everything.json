@@ -1,11 +1,11 @@
 {
  "title": "AIMEAT Feature List",
  "stamp": {
-  "version": "3.26.1",
+  "version": "4.0.3",
   "date": "2026-10-12"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 3.26.1, checked against the code on 2026-10-12.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 4.0.3, checked against the code on 2026-10-12.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-Core-2026-11.md</a>, normative since node 4.0.0; before it, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a> with its errata.",
@@ -123,10 +123,10 @@
      "slug": "g-1-aimeat-connect-cli",
      "cells": [
       "<strong><code>aimeat connect</code> CLI</strong>",
-      "One command creates a dedicated agent and writes the MCP settings for Goose, Claude Code, Claude Desktop, Cursor or VS Code, without writing your key into a settings file. Also runs as a local stdio MCP server and an ACP bridge.",
+      "One command creates a dedicated agent and writes the MCP settings for Goose, Claude Code, Claude Desktop, Cursor or VS Code, without writing your key into a settings file. Also runs as a local stdio MCP server and an ACP bridge. Limits: <code>--surface</code> (a smaller tool set) is used by Claude Desktop only; the other clients get the full tool set, and the command says so.",
       "<code>aimeat connect client &lt;name&gt;</code>"
      ],
-     "plain": "aimeat connect CLI One command creates a dedicated agent and writes the MCP settings for Goose, Claude Code, Claude Desktop, Cursor or VS Code, without writing your key into a settings file. Also runs as a local stdio MCP server and an ACP bridge. aimeat connect client <name>"
+     "plain": "aimeat connect CLI One command creates a dedicated agent and writes the MCP settings for Goose, Claude Code, Claude Desktop, Cursor or VS Code, without writing your key into a settings file. Also runs as a local stdio MCP server and an ACP bridge. Limits: --surface (a smaller tool set) is used by Claude Desktop only; the other clients get the full tool set, and the command says so. aimeat connect client <name>"
     },
     {
      "slug": "g-1-watch-the-connector-in-the-terminal",
@@ -964,10 +964,10 @@
      "slug": "g-6-workspace-agent-engagements",
      "cells": [
       "<strong>Workspace agent engagements</strong>",
-      "See which agent took which workspace contract, retire the engagement and keep its history, or activate it again. The CrewAI liaison daemon checks retirement before doing that workspace work. Access permissions are managed separately.",
+      "See which agent took which workspace contract, retire the engagement and keep its history, or activate it again. The CrewAI liaison daemon checks retirement before doing that workspace work, for its own owner's agent only: an agent of the same name under another owner is not affected. Access permissions are managed separately.",
       "<code>/v1/organisms/:id/workspace/engagements</code>, <code>/v1/organisms/:id/workspace/engagements/retire</code>, Agents &gt; Contracts"
      ],
-     "plain": "Workspace agent engagements See which agent took which workspace contract, retire the engagement and keep its history, or activate it again. The CrewAI liaison daemon checks retirement before doing that workspace work. Access permissions are managed separately. /v1/organisms/:id/workspace/engagements, /v1/organisms/:id/workspace/engagements/retire, Agents > Contracts"
+     "plain": "Workspace agent engagements See which agent took which workspace contract, retire the engagement and keep its history, or activate it again. The CrewAI liaison daemon checks retirement before doing that workspace work, for its own owner's agent only: an agent of the same name under another owner is not affected. Access permissions are managed separately. /v1/organisms/:id/workspace/engagements, /v1/organisms/:id/workspace/engagements/retire, Agents > Contracts"
     },
     {
      "slug": "g-6-workspace-batch-writes",
@@ -1349,10 +1349,10 @@
      "slug": "g-7-crew-tools-and-model-choice",
      "cells": [
       "<strong>Crew tools and model choice</strong>",
-      "Inspect the tools and model profiles offered by the runtime, with the source shown as a live answer or its last reported catalogue. Choose a model for one agent or an owner default, or clear the choice. Runtime overrides can take precedence; provider credentials stay on the runner.",
+      "Inspect the tools and model profiles offered by the runtime, with the source shown as a live answer or its last reported catalogue. Choose a model for one agent or an owner default, or clear the choice. When your model rules leave the chosen model out, the choice is saved and the answer says so. Runtime overrides can take precedence; provider credentials stay on the runner.",
       "<code>aimeat_crew_menu</code>, <code>aimeat_crew_llm_set</code>, <code>/v1/agents/:name/crew/menu</code>, <code>/v1/agents/:name/crew/llm</code>"
      ],
-     "plain": "Crew tools and model choice Inspect the tools and model profiles offered by the runtime, with the source shown as a live answer or its last reported catalogue. Choose a model for one agent or an owner default, or clear the choice. Runtime overrides can take precedence; provider credentials stay on the runner. aimeat_crew_menu, aimeat_crew_llm_set, /v1/agents/:name/crew/menu, /v1/agents/:name/crew/llm"
+     "plain": "Crew tools and model choice Inspect the tools and model profiles offered by the runtime, with the source shown as a live answer or its last reported catalogue. Choose a model for one agent or an owner default, or clear the choice. When your model rules leave the chosen model out, the choice is saved and the answer says so. Runtime overrides can take precedence; provider credentials stay on the runner. aimeat_crew_menu, aimeat_crew_llm_set, /v1/agents/:name/crew/menu, /v1/agents/:name/crew/llm"
     },
     {
      "slug": "g-7-agent-modes-and-consoles",
@@ -1982,10 +1982,10 @@
      "slug": "g-10-copy-protection-options",
      "cells": [
       "<strong>Copy protection options</strong>",
-      "Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy.",
+      "Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. The setting applies to every version of the app, older ones included. These affect distribution and execution; they cannot make browser-delivered code impossible to copy.",
       "<code>aimeat_app_manage</code> action <code>settings</code> (protection), App Catalog &gt; Protection"
      ],
-     "plain": "Copy protection options Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. These affect distribution and execution; they cannot make browser-delivered code impossible to copy. aimeat_app_manage action settings (protection), App Catalog > Protection"
+     "plain": "Copy protection options Choose obfuscation, a domain lock, a watermark or refusal of raw downloads. The setting applies to every version of the app, older ones included. These affect distribution and execution; they cannot make browser-delivered code impossible to copy. aimeat_app_manage action settings (protection), App Catalog > Protection"
     },
     {
      "slug": "g-10-listing-and-access-codes",
@@ -3128,19 +3128,19 @@
      "slug": "g-17-gdpr-export-and-erasure",
      "cells": [
       "<strong>GDPR export and erasure</strong>",
-      "Export everything an account holds; delete the account and everything under it at once. Work with other accounts is settled when an account is deleted: an open request is cancelled, and the morsels held for it go back to the person who asked. Finished work stays in the other person's records, without the deleted person's name. Its free-access grants and paid contracts in EXCHANGE are revoked, so a person who later registers the same name inherits nothing. The other party keeps the record.",
+      "Export everything an account holds, published apps, AI provenance records, outside-account connections (never their credentials), messages with your agents and the apps you took included; delete the account and everything under it at once. Work with other accounts is settled when an account is deleted: an open request is cancelled, and the morsels held for it go back to the person who asked. Finished work stays in the other person's records, without the deleted person's name. Its free-access grants and paid contracts in EXCHANGE are revoked, so a person who later registers the same name inherits nothing. The other party keeps the record.",
       "<code>/v1/owners/:name/export</code>, <code>DELETE /v1/owners/:name</code>"
      ],
-     "plain": "GDPR export and erasure Export everything an account holds; delete the account and everything under it at once. Work with other accounts is settled when an account is deleted: an open request is cancelled, and the morsels held for it go back to the person who asked. Finished work stays in the other person's records, without the deleted person's name. Its free-access grants and paid contracts in EXCHANGE are revoked, so a person who later registers the same name inherits nothing. The other party keeps the record. /v1/owners/:name/export, DELETE /v1/owners/:name"
+     "plain": "GDPR export and erasure Export everything an account holds, published apps, AI provenance records, outside-account connections (never their credentials), messages with your agents and the apps you took included; delete the account and everything under it at once. Work with other accounts is settled when an account is deleted: an open request is cancelled, and the morsels held for it go back to the person who asked. Finished work stays in the other person's records, without the deleted person's name. Its free-access grants and paid contracts in EXCHANGE are revoked, so a person who later registers the same name inherits nothing. The other party keeps the record. /v1/owners/:name/export, DELETE /v1/owners/:name"
     },
     {
      "slug": "g-17-consent-receipts",
      "cells": [
       "<strong>Consent receipts</strong>",
-      "A MyData-style receipt (Kantara Consent Receipt 1.1) for each consent.",
+      "A MyData-style receipt (Kantara Consent Receipt 1.1) for each consent. It names the node's country as the jurisdiction, the person's language, and how the consent was given: a web form, an API call by an agent or an app, or an MCP tool call.",
       "<code>/v1/consent/:id/receipt</code>"
      ],
-     "plain": "Consent receipts A MyData-style receipt (Kantara Consent Receipt 1.1) for each consent. /v1/consent/:id/receipt"
+     "plain": "Consent receipts A MyData-style receipt (Kantara Consent Receipt 1.1) for each consent. It names the node's country as the jurisdiction, the person's language, and how the consent was given: a web form, an API call by an agent or an app, or an MCP tool call. /v1/consent/:id/receipt"
     },
     {
      "slug": "g-17-cookie-consent-banner",

@@ -13,6 +13,9 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   2026-10-15 — Five parts the export lacked (export-sections.ts): `published_apps`,
+ *     `ai_provenance`, `connections` (never the credential), `app_purchases`, and per agent
+ *     `messages` (feature-list audit #160).
  *   v2.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v2.0.0 — 2026-09-30 — Decided by Jouni 2026-09-30: this GDPR export takes the person's own
  *     organism records again (no leave(): the legal right to their own data), and names them in
@@ -67,6 +70,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { scopeOrganism } from '../../services/classification/policy.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
+import { exportExtraSections, exportAgentMessages } from './export-sections.js';
 
 /** One work item this identity was to do, as the export shows it: the other side is the requester. */
 function workProvidedView(w: WorkRecord) {
@@ -245,6 +249,8 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
 
       // Board subscriptions
       const boardSubscriptions = await storage.listSubscriptionsByAgent(agent.gaii);
+      // The messages between the person and this agent (feature-list audit #160).
+      const agentMessages = await exportAgentMessages(storage, agent.gaii);
 
       // agent.owner === name for every agent here (all from getAgentsByOwner(name)), so the owner
       // GHII is the already-loaded ghiiRecord — no per-agent getGHIIByOwner re-fetch. The morsel
@@ -308,6 +314,7 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
           filters: s.filters,
           created_at: s.createdAt,
         })),
+        messages: agentMessages,
       });
     }
 
@@ -487,6 +494,10 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       }));
     }
 
+    // ── Published apps, AI provenance, outside-account connections (never the credential) and the
+    //    apps taken (feature-list audit #160) ──
+    const extra = await exportExtraSections(storage, ghii, agentGaiis);
+
     res.json(success(config.nodeId, {
       owner: {
         name: owner.name,
@@ -507,6 +518,10 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
       organism_memberships: organismMemberships,
       chat_instances: chatInstancesExport,
       ghii_flags_filed: ghiiFlags,
+      published_apps: extra.published_apps,
+      ai_provenance: extra.ai_provenance,
+      connections: extra.connections,
+      app_purchases: extra.app_purchases,
       // Organism content is in this export because it is the person's own data; the file carries
       // content an organism classified, so it says which keys (decided 2026-09-30).
       ...(organismKeys.length ? {

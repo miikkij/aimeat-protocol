@@ -10,6 +10,9 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-15 — A served version takes the app's current copy protection (servedProtection), not
+ *     its own manifest's: updateAppMeta writes protection on the latest version only, and
+ *     ?version=<older> served the source unprotected (feature-list audit #103).
  *   2026-10-15 — the paced-app download asks the licence for the version it serves, so a single licence opens only the version bought (feature-list audit #110).
  *   v1.21.2 — 2026-10-11 — The licence gate reads the app's pacing amount (`tollMorsels`, services/app-pacing.ts);
  *     a morsel is pacing, not a price, and the 401 / 402 texts say so.
@@ -111,6 +114,7 @@ import { appContentType } from '../../utils/app-content-type.js';
 import { detectLocale } from '../../i18n.js';
 import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.js';
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
+import { servedProtection } from '../../services/app-served-protection.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
@@ -644,10 +648,13 @@ export function registerReadRoutes(
             if (answer === 'host') { sendFrameHost(res); return; }
         }
 
+        // The app's current protection, also for an older version (feature-list audit #103).
+        const protection = await servedProtection(storage, app, version);
+
         // Copy-protection `noRawDownload`: the owner can block the raw (attachment)
         // source download so the app is only delivered in runnable inline form. The
         // owner + operators may still download their own source (backup/management).
-        if (!runnable && app.manifest.protection?.noRawDownload) {
+        if (!runnable && protection?.noRawDownload) {
             let isOwner = false;
             if (req.auth) { const { owner: viewerOwner } = await canonicalOwner(req); isOwner = isSameAccount(viewerOwner, app.ownerName); }
             if (!isOwner && !(await operatorReads())) {
@@ -709,9 +716,9 @@ export function registerReadRoutes(
                 },
             })
             : app.data;
-        if (runnable && isHtml && hasAnyProtection(app.manifest.protection)) {
+        if (runnable && isHtml && protection && hasAnyProtection(protection)) {
             body = applyAppProtection(body, {
-                protection: app.manifest.protection!,
+                protection,
                 config,
                 viewer: req.auth?.sub ?? 'anon',
                 appOwner: app.ownerName,

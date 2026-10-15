@@ -25,6 +25,8 @@
  *   - GET /.well-known/x402.json    — machine-payment discovery, derived from the network registry
  * @usage app.use(agentConventionsRouter(config, storage));
  * @version-history
+ *   2026-10-15 — /.well-known/webmcp.json names the tools as the library registers them
+ *     (`aimeat-node-info`, `aimeat-commerce-feed`), not `node_info` / `commerce_feed` (feature-list audit #190).
  *   2026-09-28 — openapi.yaml is found by services/openapi-file.ts, which knows the packaged location.
  *   2026-09-18 - skill.md: Installation is the shared first steps (services/first-steps.ts), and the
  *     envelope is described from what the node sends (it said `success`, `node_id`, `next_actions`).
@@ -140,8 +142,13 @@ Contact: ${config.operator.email || `${b}/v1/portal`}
 /**
  * The node-level in-page tool manifest. Published apps declare their own tools through the bridge
  * library on their own origins; this is what the node itself exposes on its pages.
+ *
+ * The tool names are the ones the library registers (src/static/sdk-libs/webmcp/index.js):
+ * `aimeat-node-info` and `aimeat-commerce-feed`. The manifest said `node_info` and
+ * `commerce_feed`, names an agent could not call (feature-list audit #190);
+ * test/unit/webmcp-manifest-names.test.ts holds the two lists together.
  */
-function buildWebmcpManifest(config: AimeatConfig): object {
+export function buildWebmcpManifest(config: AimeatConfig): { tools: Array<{ name: string; description: string; inputSchema: object }> } & Record<string, unknown> {
   const b = config.baseUrl.replace(/\/$/, '');
   return {
     name: `AIMEAT node ${config.nodeId}`,
@@ -151,12 +158,12 @@ function buildWebmcpManifest(config: AimeatConfig): object {
     pages: [`${b}/`],
     tools: [
       {
-        name: 'node_info',
+        name: 'aimeat-node-info',
         description: 'What this node is, which capabilities it has enabled, and where its contract and manual are.',
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       },
       {
-        name: 'commerce_feed',
+        name: 'aimeat-commerce-feed',
         description: 'Every publicly priced agent offering and app tool on this node, with its price and how to buy it.',
         inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       },

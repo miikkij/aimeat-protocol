@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat connect` subcommand dispatch (agent connector: auth, serve, tui, inbox, tasks, tools, list, remove, refresh, logout). Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — No static import of cli/connect/config.js: it loads after `aimeat connect client`
+ *     has set the connector home (feature-list audit #6).
  *   v1.2.0 — 2026-09-30 — `--scopes a,b,c` reaches the device authorization request.
  *   v1.1.0 — 2026-09-24 — `aimeat connect tui` (./cli/connect/tui/).
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)
  */
 
 import { CONNECT_HELP_TEXT } from './index-help.js';
-import { getConfigDir } from './cli/connect/config.js';
 import { logger } from './utils/logger.js';
+// cli/connect/config.js is imported dynamically in the branches that use it, never here, so a
+// subcommand that sets AIMEAT_HOME (`aimeat connect client`) does so before it loads.
 
 /**
  * Handle the `aimeat connect ...` subcommand family. Parses connector flags from raw
@@ -125,7 +128,7 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
     if (c) console.log(JSON.stringify(c, null, 2));
     else console.log(`No config found. Expected at: ${getConfigDir()}/config.yaml`);
   } else if (connectAction === 'list') {
-    const { loadAllAgents, agentsOnLegacyLayout } = await import('./cli/connect/config.js');
+    const { loadAllAgents, agentsOnLegacyLayout, getConfigDir } = await import('./cli/connect/config.js');
     const { listAllTokens } = await import('./cli/connect/keychain.js');
     const { AimeatClient: ListClient } = await import('./cli/connect/api-client.js');
     const loaded = await loadAllAgents();

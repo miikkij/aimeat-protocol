@@ -13,6 +13,8 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   2026-10-15 — unsubscribePush(endpoint) removes that one device; it sent no endpoint and the route
+ *     removed every device of the account (feature-list audit #132).
  *   v1.13.0 — 2026-09-30 — getNodeUpdate: GET /v1/admin/node-update, for the header's new-version notice.
  *   v1.12.0 — 2026-09-26 — resolveHeldName: one name of the incident the update at start opens,
  *     decided through the incident resolve endpoint with { name, resolution }.
@@ -217,7 +219,9 @@ export const testPush            = ()                   => apiPost('/v1/admin/pu
 export const resetPushTemplates  = ()                   => apiPost('/v1/admin/push/templates/reset');
 export const getVapidKey         = ()                   => apiGet('/v1/push/vapid-key');
 export const subscribePush       = (endpoint, keys)     => apiPost('/v1/push/subscribe', { endpoint, keys });
-export const unsubscribePush     = ()                   => apiDelete('/v1/push/subscribe');
+// ONE device, named by its endpoint: DELETE /v1/push/subscribe without one removes every device of
+// the account (feature-list audit #132).
+export const unsubscribePush     = (endpoint)           => apiDelete(`/v1/push/subscribe?endpoint=${encodeURIComponent(endpoint)}`);
 
 // ── CSM ──
 export const getCsmTemplates   = ()       => apiGet('/v1/admin/csm');

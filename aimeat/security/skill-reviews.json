@@ -37,7 +37,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:c511f0db7e30a98b9b5a39e4"
+      "digest": "sha256:2bcf487e476cbdc2d9b02dea"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-02",
@@ -263,7 +263,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:249aa2f396b11ac9fc99a855"
+      "digest": "sha256:c8702c27044c9041033c1cb6"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-12",
@@ -341,7 +341,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:ffcb22d3e9809493a7d77375",
+      "digest": "sha256:186462b6b26a70c9c7c90624",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -600,8 +600,8 @@
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "562ec994ef35b79c",
       "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
-      "aimeat/src/tool-catalog/definitions/crew.ts": "83c214d092ea4949",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "ed30771916a97594",
+      "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "2cc241d84ffad32b",
       "aimeat/src/data/basic-agents.ts": "24d901efdc265451"
     },
     "node:set-up-content-pipeline": {
@@ -661,7 +661,7 @@
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "d10acbe327138c37",
       "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "ed30771916a97594",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "2cc241d84ffad32b",
       "aimeat/src/services/schedule-write.ts": "13ba30d4b9d1d111"
     },
     "node:aimeat-decide": {
@@ -719,9 +719,9 @@
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "c2d96ca91a3852f5",
       "aimeat/src/routes/memory/key.ts": "99cbdb3c794660eb",
-      "aimeat/src/services/memory-bin.ts": "3762df6d93b26409",
+      "aimeat/src/services/memory-bin.ts": "b60b792ebb28ebcd",
       "aimeat/src/routes/memory-hands.ts": "7c9bde91c26c70cc",
-      "aimeat/src/routes/owners/export.ts": "9ed397ed069b2735",
+      "aimeat/src/routes/owners/export.ts": "86ef0669d00f4040",
       "aimeat/src/services/owner-erasure.ts": "18e38187bc10c89d",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
       "aimeat/src/mcp/organisms.ts": "d8f94c7961889394"

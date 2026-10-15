@@ -63,6 +63,9 @@
     qudt: "http://qudt.org/schema/qudt/",
     saref: "https://saref.etsi.org/core/"
   });
+  var SCHEME_PREFIXES = Object.freeze({
+    owl: "http://www.w3.org/2002/07/owl#"
+  });
   function context(extra) {
     return Object.assign({}, PREFIXES, extra || {});
   }
@@ -136,7 +139,9 @@
     const s = spec || /** @type {any} */
     {};
     return {
-      "@context": context(),
+      // `owl:` is not one of the node's default prefixes, and concept() writes `owl:deprecated`; the
+      // node refuses a prefix no @context defines, so the scheme declares it once for every concept.
+      "@context": context(SCHEME_PREFIXES),
       "@type": "skos:ConceptScheme",
       "@id": "vocab:" + (s.id || ""),
       "skos:prefLabel": typeof s.label === "string" ? { en: s.label } : s.label || {},

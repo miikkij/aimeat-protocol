@@ -19,6 +19,8 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   2026-10-15 — The approval's llm_choice carries the policy warning for a pinned model the owner's
+ *     policy leaves out (feature-list audit #82).
  *   v1.5.0 — 2026-10-08 — Section 12: an agent approved with no connector connected waits, a
  *     refusing connector leaves it waiting, another owner's connector is offered nothing, and the
  *     next connect gives it its key with nothing pressed.
@@ -1334,6 +1336,28 @@ async function run() {
         assert(none.status === 200 && none.body.data.llm_choice === null, `no pick, no choice: ${JSON.stringify(none.body.data.llm_choice)}`);
         const plain = (await json('/v1/agents/plain-watcher/crew/llm', { headers: authA })).body?.data;
         assert(plain?.scope !== 'agent', `an agent approved with no pick has no choice of its own, got ${JSON.stringify(plain)}`);
+    });
+
+    await test("a pinned model the owner's policy leaves out is stored, and the approval says so (audit #82)", async () => {
+        // FAILED FIRST, on 2026-10-15: writeLlmChoice computed the warning and the approval dropped it.
+        const pol = await json('/v1/ai/policy', { method: 'PUT', headers: authA, body: JSON.stringify({ policy: { mode: 'custom', allow: ['openrouter:vendor-a/alpha-one'] } }) });
+        assert(pol.status === 200, `policy ${pol.status}: ${JSON.stringify(pol.body?.error)}`);
+        try {
+            const p = await json('/v1/agents/v2/agent-proposals', {
+                method: 'POST', headers: authA,
+                body: JSON.stringify({ name: 'policy-watcher', purpose: 'Is approved with a model the owner policy leaves out.', scopes: ['memory:read'], crew_def: APPROVED_DEF }),
+            });
+            assert(p.status === 201, `propose: ${p.status} ${JSON.stringify(p.body?.error)}`);
+            const r = await json(`/v1/agents/v2/agent-proposals/${p.body.data.proposal.id}/approve`, {
+                method: 'POST', headers: authA,
+                body: JSON.stringify({ llm_choice: { kind: 'model', label: 'other', provider: { type: 'openrouter', model: 'vendor-b/beta-two', api_key_env: 'OPENROUTER_API_KEY' } } }),
+            });
+            assert(r.status === 200, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+            assert(r.body.data.llm_choice?.saved === true && typeof r.body.data.llm_choice?.warning === 'string'
+                && r.body.data.llm_choice.warning.includes('vendor-b/beta-two'), `the answer carries the warning, got ${JSON.stringify(r.body.data.llm_choice)}`);
+        } finally {
+            await json('/v1/ai/policy', { method: 'PUT', headers: authA, body: JSON.stringify({ policy: { mode: 'open' } }) });
+        }
     });
 
     await test('a model choice the node would not store refuses the approval, and nothing is created', async () => {

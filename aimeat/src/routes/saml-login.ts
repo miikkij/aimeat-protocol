@@ -13,12 +13,16 @@
  *   from minting duplicates — (3) verified email restricted to the connection's own domains,
  *   (4) a brand-new account through the username-choice step, gated by the registration mode.
  *
- *   Deactivated accounts answer ACCOUNT_DISABLED at the ACS and at finalize; an IdP-initiated
+ *   Deactivated accounts answer ACCOUNT_DISABLED at the ACS (a redirect with ?auth_error=, which
+ *   opens the sign-in dialog with the reason) and at finalize (JSON 403); an IdP-initiated
  *   (unsolicited) Response is accepted only when the connection explicitly allows it.
  * @structure samlLoginRouter(config, storage): GET /v1/ghii/login/saml/:id (authorize),
  *   POST /v1/ghii/login/saml/:id/acs, POST /v1/ghii/login/saml/:id/finalize.
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
+ *   2026-10-15 — A refused SAML Response and a deactivated account at the ACS redirect to the front
+ *     page with ?auth_error=SAML_INVALID_RESPONSE / ACCOUNT_DISABLED, as the OIDC callback does,
+ *     instead of answering the browser with JSON 401/403 (feature-list audit #20, #22).
  *   v1.0.0 — 2026-08-23 — Initial (BR-04 phase 2).
  *   v1.1.0 — 2026-09-24 — safeRedirectPath comes from utils/same-origin-path.ts, its one home, where
  *     it also refuses a backslash and a control character in the post-login address.
@@ -143,7 +147,9 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
           if (!loggedOut && profile) profileRaw = profile as unknown as Record<string, unknown>;
         } catch (err) {
           logger.warn('SAML response refused', { connection: conn.id, error: String(err) });
-          res.status(401).json(error(config.nodeId, 'SAML_INVALID_RESPONSE', 'The sign-in response did not validate'));
+          // A browser posts this form, so the answer is a redirect the SPA reads (auth_error), as
+          // the OIDC callback does, not a JSON body the person would see as raw text.
+          fail('SAML_INVALID_RESPONSE');
           return;
         }
         if (!profileRaw) { fail('SAML_NO_ASSERTION'); return; }
@@ -196,10 +202,7 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
 
         res.redirect(`${config.baseUrl}${postLoginPath}`);
       } catch (err) {
-        if (err instanceof AccountDisabledError) {
-          res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'This account has been deactivated'));
-          return;
-        }
+        if (err instanceof AccountDisabledError) { fail('ACCOUNT_DISABLED'); return; }
         logger.error('SAML ACS failed', { connection: conn.id, error: String(err) });
         fail('SAML_CALLBACK_FAILED');
       }

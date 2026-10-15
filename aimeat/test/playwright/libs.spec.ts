@@ -475,24 +475,30 @@ test.describe('aimeat-work', () => {
 
         // Publish an action via session.fetch (work lib doesn't expose publish — that's POST /v1/actions)
         const actionId = `pw-action-${Date.now()}`;
-        const publishResult = await page.evaluate(
-            ([aid]) => {
+        const publish = (aid: string, pricing: Record<string, number>) => page.evaluate(
+            ([a, p]) => {
                 const session = (window as any).AIMEAT.auth.getSession();
                 return session.fetch('/v1/actions', {
                     method: 'POST',
                     body: JSON.stringify({
-                        id: aid,
+                        id: a,
                         display_name: 'PW Test Action',
                         description: 'Created by Playwright test',
                         category: 'utility',
                         input_schema: { type: 'object' },
                         output_schema: { type: 'object' },
-                        pricing: { base_morsels: 1 },
+                        pricing: p,
                     }),
                 });
             },
-            [actionId] as const,
+            [aid, pricing] as const,
         );
+        // The 3.x morsel price `base_morsels` is refused from 4.0.0: a morsel is pacing, not a price
+        // (feature-list audit #205; this test sent it and expected success).
+        const legacy = await publish(`${actionId}-legacy`, { base_morsels: 1 });
+        expect(legacy.ok).toBe(false);
+        expect(legacy.error?.code).toBe('MORSEL_PRICE_REMOVED');
+        const publishResult = await publish(actionId, { toll_morsels: 1 });
         expect(publishResult.ok).toBe(true);
 
         // Get action detail

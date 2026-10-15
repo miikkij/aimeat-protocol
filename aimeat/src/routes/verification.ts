@@ -5,6 +5,8 @@
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history
+ *   2026-10-15 — GET /v1/consent/:id/receipt gives the receipt the consenting person's language
+ *     (feature-list audit #161).
  *   v2.6.0 — 2026-10-15 — POST /v1/ghii/verify/ftn writes nothing: it answers 400 FTN_USE_AUTHORIZE and
  *     names the checked authorize/callback flow. It stamped level 3 from any string (feature-list
  *     audit 25).
@@ -41,7 +43,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { EudiwService } from '../services/eudiw.js';
 import type { VcIssuerService } from '../services/vc-issuer.js';
-import type { MyDataReceiptService } from '../services/mydata-receipt.js';
+import { receiptLanguageFor, type MyDataReceiptService } from '../services/mydata-receipt.js';
 import type { OidcClient } from '../services/oidc-client.js';
 import { requireAuth, requireOwnerPrincipal, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -460,7 +462,8 @@ export function verificationRouter(
         return;
       }
 
-      const receipt = mydataReceiptService.generateReceipt(consent);
+      // The language of the person whose consent it is, not a fixed one (feature-list audit #161).
+      const receipt = mydataReceiptService.generateReceipt(consent, { language: await receiptLanguageFor(storage, consent) });
       res.json(success(config.nodeId, { receipt }));
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));

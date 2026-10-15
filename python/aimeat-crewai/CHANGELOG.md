@@ -3,6 +3,14 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.35.1 - 2026-10-15
+
+- **A retire stops only your own agent.** When two owners each have an agent with the same name in
+  one workspace, the daemon now reads only the engagements of its own owner's agent. Before, it
+  compared the agent name alone, so one owner retiring their agent could stop the other owner's
+  agent of the same name, and an active engagement of one could keep the other running. A daemon
+  that runs agents of one owner only works as before.
+
 ## 0.35.0 - 2026-10-12
 
 - **A default daemon agent reaches every capability of the node.** `DAEMON_DEFAULT_TOOL_FILTER` has

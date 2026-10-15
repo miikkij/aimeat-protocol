@@ -22,6 +22,9 @@
  *     config (or synthesize one from the global config for legacy installs)
  *
  * @version-history
+ *   2026-10-15 — getConfigDir() reads AIMEAT_HOME on every call (the launch directory is still
+ *     captured at load), so `aimeat connect client` stores the credential in the client's home
+ *     even when this module was loaded before the home was set (feature-list audit #6).
  *   v2.5.0 -- 2026-10-09 -- The home is resolved in home-dir.ts (still AIMEAT_HOME, else
  *                           <cwd>/.aimeat), and saveConfig and savePerAgentConfig prepare it before
  *                           they write: 0700, and a .gitignore holding `*`, so the project's git
@@ -61,13 +64,17 @@ import { logger } from '../../utils/logger.js';
 //      so running `aimeat connect serve` from two projects on one machine no
 //      longer fights over a single global ~/.aimeat (last-writer / refused
 //      daemon / wrong-agent routing). Set AIMEAT_HOME=~/.aimeat for the old
-//      global behaviour. Captured once at module load = the launch directory.
+//      global behaviour. The launch directory is captured once at module load.
+// AIMEAT_HOME is read on every call, not at module load: `aimeat connect client` sets it after
+// this module may already be loaded, and a value captured at load time sent the token to
+// <cwd>/.aimeat while the command looked for it in the client's home, so it ended with "No
+// credential was stored" after the agent had been created on the node (feature-list audit #6).
 // Every write into it goes through prepareConnectorHome(), which keeps the folder out of the
 // project's git (secrets audit 2026-10-09, S4).
-const CONFIG_DIR = resolveConnectorHome().dir;
-const CONFIG_FILE = join(CONFIG_DIR, 'config.yaml');
+const LAUNCH_CWD = process.cwd();
 
-export function getConfigDir(): string { return CONFIG_DIR; }
+export function getConfigDir(): string { return resolveConnectorHome(process.env, LAUNCH_CWD).dir; }
+const configFile = (): string => join(getConfigDir(), 'config.yaml');
 
 /* ───────── Global config (legacy single-agent) ───────── */
 
@@ -90,15 +97,15 @@ export interface WakeConfig {
 }
 
 export function loadConfig(): AimeatConnectConfig | null {
-  if (!existsSync(CONFIG_FILE)) return null;
-  const raw = readFileSync(CONFIG_FILE, 'utf-8');
+  if (!existsSync(configFile())) return null;
+  const raw = readFileSync(configFile(), 'utf-8');
   return parse(raw) as AimeatConnectConfig;
 }
 
 export function saveConfig(config: AimeatConnectConfig): void {
   // The home holds the tokens and keys too: 0700 and a .gitignore on every write (home-dir.ts).
-  prepareConnectorHome(CONFIG_DIR);
-  writeFileSync(CONFIG_FILE, stringify(config), 'utf-8');
+  prepareConnectorHome(getConfigDir());
+  writeFileSync(configFile(), stringify(config), 'utf-8');
 }
 
 /* ───────── Per-agent config ───────── */
@@ -211,12 +218,12 @@ export interface RunnerConfig {
  * gone, and one `existsSync` per agent per start costs nothing.
  */
 function legacyPerAgentDir(agent: string): string {
-  return join(CONFIG_DIR, 'agents', agent);
+  return join(getConfigDir(), 'agents', agent);
 }
 
 /** THE LAYOUT: `agents/<owner>/<agent>/config.yaml`. One directory per identity. */
 function perAgentDir(agent: string, owner: string): string {
-  return join(CONFIG_DIR, 'agents', owner, agent);
+  return join(getConfigDir(), 'agents', owner, agent);
 }
 
 export function perAgentConfigPath(agent: string, owner: string): string {
@@ -299,7 +306,7 @@ export function fallbackConfigFor(agent: string, owner: string, global: AimeatCo
  */
 export function savePerAgentConfig(agent: string, owner: string, config: AimeatPerAgentConfig): void {
   const dir = perAgentDir(agent, owner);
-  prepareConnectorHome(CONFIG_DIR);
+  prepareConnectorHome(getConfigDir());
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   const slim: AimeatPerAgentConfig = { node_url: config.node_url };
   if (config.primary !== undefined) slim.primary = config.primary;

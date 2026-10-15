@@ -32,6 +32,8 @@
  *   const v = await AIMEAT.onto.vocab('hobbies');
  *   v.search('lintu', 'fi');   // → [{ id, prefLabel, … }]
  * @version-history
+ *   2026-10-15 — scheme() declares the `owl` prefix in its @context, because concept() writes
+ *     `owl:deprecated` and the node refuses an undeclared prefix (feature-list audit #70).
  *   v1.0.0 — 2026-09-08 — Initial: types, the SKOS record shape, and reading a vocabulary.
  */
 import { NODE_URL } from '../_core/config.js';
@@ -56,6 +58,16 @@ const PREFIXES = Object.freeze({
   rdfs: 'http://www.w3.org/2000/01/rdf-schema#',
   qudt: 'http://qudt.org/schema/qudt/',
   saref: 'https://saref.etsi.org/core/',
+});
+
+/**
+ * Prefixes a concept scheme uses beyond the default eight, declared in the `@context` scheme()
+ * writes. `owl:deprecated` marks a retired concept (concept()), and without this declaration the
+ * node refused every scheme holding one (feature-list audit #70).
+ * @type {Readonly<Record<string, string>>}
+ */
+const SCHEME_PREFIXES = Object.freeze({
+  owl: 'http://www.w3.org/2002/07/owl#',
 });
 
 /** A fresh copy of the default context, safe to spread into your own. */
@@ -172,7 +184,9 @@ function labelOf(c, lang) {
 function scheme(spec) {
   const s = spec || /** @type {any} */ ({});
   return {
-    '@context': context(),
+    // `owl:` is not one of the node's default prefixes, and concept() writes `owl:deprecated`; the
+    // node refuses a prefix no @context defines, so the scheme declares it once for every concept.
+    '@context': context(SCHEME_PREFIXES),
     '@type': 'skos:ConceptScheme',
     '@id': 'vocab:' + (s.id || ''),
     'skos:prefLabel': typeof s.label === 'string' ? { en: s.label } : (s.label || {}),

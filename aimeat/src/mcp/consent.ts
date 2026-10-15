@@ -11,6 +11,8 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-15 — aimeat_consent_grant stamps how the consent was given (MCP tool call by an agent or
+ *     the person), which the consent receipt reads (feature-list audit #161).
  *   2026-10-15 — The consent-record resource refuses another owner's record with resourceRefusal
  *     (ACCESS_DENIED and a next step) instead of the bare "Access denied" (feature-list audit #186).
  *   2026-10-15 — aimeat_consent_list lists the account's consents including those REST filed under one of
@@ -32,6 +34,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { grantConsent, revokeConsent, listAccountConsents, accountHoldsConsent } from '../services/consent-write.js';
+import { consentCollectionMethod } from '../services/mydata-receipt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { resourceRefusal } from './resource-refusal.js';
@@ -58,9 +61,13 @@ export function registerConsentTools(
     }
 
     /** The consent services' caller: the owner's account, with this session's scopes and roles. */
-    function consentCaller(): { ownerGaii: string; scopes: string[]; roles: string[] } {
+    function consentCaller(): { ownerGaii: string; scopes: string[]; roles: string[]; collectionMethod: string } {
         const session = caller();
-        return { ownerGaii: session.ownerGhii, scopes: [...session.scopes], roles: [...session.roles] };
+        return {
+            ownerGaii: session.ownerGhii, scopes: [...session.scopes], roles: [...session.roles],
+            // How it was given, for the consent receipt (feature-list audit #161).
+            collectionMethod: consentCollectionMethod('mcp', session),
+        };
     }
 
     // ── Resource: consent record ──

@@ -27,6 +27,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-owner-export.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-owner-export
  * @version-history
+ *   2026-10-15 — 14b: published apps, AI provenance, connections, agent messages and app purchases
+ *     (feature-list audit #160).
  *   v1.3.1 — 2026-10-12 — The owner's AI key is stored through PUT /v1/ai/providers/:id (the provider)
  *     and PUT /v1/ai/providers/:id/key, and 3b finds the credential where it now lives,
  *     `ai.apikey.provider.<id>`: node 4.0.0 answers 410 GONE on PUT /v1/openrouter/settings. The two
@@ -396,6 +398,30 @@ await test('An organism the owner created, and a chat instance', async () => {
     assert(chat.status === 201, `chat instance ${chat.status}: ${JSON.stringify(chat.body.error)}`);
 });
 
+// The parts the export did not carry until 2026-10-15 (feature-list audit #160).
+const APP_FILE = `export-app-${stamp}.html`;
+const PROV_KEY = `export.prov.${stamp}`;
+const MESSAGE_TEXT = `export suite message ${stamp}`;
+let provenanceId = '';
+
+await test('A published app, a memory write with AI provenance, and a message to an agent', async () => {
+    const app = await json('/v1/apps', {
+        method: 'POST', headers: authed(subjectToken),
+        body: JSON.stringify({ filename: APP_FILE, content: Buffer.from('<!DOCTYPE html><html><body>export</body></html>').toString('base64'), name: 'Export App', description: 'in the export', category: 'utility', tags: [] }),
+    });
+    assert(app.status === 201, `publish ${app.status}: ${JSON.stringify(app.body.error)}`);
+    const prov = await json('/v1/memory', {
+        method: 'POST', headers: authed(mainAgent.token),
+        body: JSON.stringify({ key: PROV_KEY, value: 'declared', visibility: 'private', ai_provenance: { level: 'original', human_involvement: 'full-human' } }),
+    });
+    assert(prov.status === 201 && typeof prov.body.data.ai_provenance_id === 'string', `provenance write ${prov.status}: ${JSON.stringify(prov.body)}`);
+    provenanceId = prov.body.data.ai_provenance_id;
+    const msg = await json('/v1/agents/exportmain/messages', {
+        method: 'POST', headers: authed(subjectToken), body: JSON.stringify({ content: MESSAGE_TEXT, direction: 'inbound' }),
+    });
+    assert(msg.status === 201, `message ${msg.status}: ${JSON.stringify(msg.body.error)}`);
+});
+
 // ─── Phase 2: one export, read section by section ───
 console.log('\nPhase 2 — the export');
 
@@ -568,6 +594,20 @@ await test('14. listings, purchases and escrow holds are not sections of the exp
     for (const agent of exported.agents as any[]) {
         assert(!('escrow_holds' in agent), `escrow_holds is still a section on ${agent.gaii}: ${JSON.stringify(agent.escrow_holds)}`);
     }
+});
+
+await test('14b. Published apps, AI provenance, connections, agent messages and app purchases are in it (audit #160)', async () => {
+    // FAILED FIRST, on 2026-10-15: none of the five sections existed.
+    const apps = exported.published_apps as any[];
+    assert(Array.isArray(apps) && apps.some(a => a.filename === APP_FILE && a.latest_version === 1),
+        `published_apps: ${JSON.stringify(apps)}`);
+    const prov = exported.ai_provenance as any[];
+    assert(Array.isArray(prov) && prov.some(p => p.id === provenanceId), `ai_provenance: ${JSON.stringify(prov?.map(p => p.id))}`);
+    assert(Array.isArray(exported.connections), 'the connections section is present');
+    for (const c of exported.connections as any[]) assert(!('credential' in c), 'a connection never carries its credential');
+    assert(Array.isArray(exported.app_purchases), 'the app_purchases section is present');
+    const main = (exported.agents as any[]).find(a => a.gaii === mainAgent.gaii);
+    assert((main.messages as any[]).some(m => m.content === MESSAGE_TEXT), `agent messages: ${JSON.stringify(main.messages)}`);
 });
 
 // ─── Phase 3: who may ask ───

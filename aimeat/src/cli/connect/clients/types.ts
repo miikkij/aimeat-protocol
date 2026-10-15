@@ -12,6 +12,7 @@
  *   - ClientAdapter — the per-client contract (id, label, configPath, apply, launchHint).
  * @usage Implemented by clients/goose.ts, claude-code.ts, cursor.ts, vscode.ts, claude-desktop.ts.
  * @version-history
+ *   2026-10-15 — WriteResult.surface: the surface an adapter actually applied (feature-list audit #6).
  *   v1.0.0 — 2026-08-02 — Initial creation: one-command client connect.
  */
 
@@ -50,6 +51,11 @@ export interface WriteResult {
     nextSteps: string[];
     /** Set when the adapter could not write and the user must act manually. */
     manual?: string;
+    /**
+     * The tool surface the adapter wrote into the client's config. Undefined = the full toolset,
+     * also when `--surface` was given and this client has no place to put it.
+     */
+    surface?: ClientTarget['surface'];
 }
 
 /** One chat client's integration. */

@@ -12,6 +12,7 @@
  *   - GET    /v1/push/vapid-key  — public VAPID key (no auth)
  * @usage app.use(pushRouter(config, storage, pushService));
  * @version-history
+ *   2026-10-15 — The requestedEndpoint comment says what the clients send now (feature-list audit #132).
  *   v1.3.0 — 2026-08-30 — GET /v1/push/subscriptions: the owner's devices, so the Notifications
  *     page can show and remove each one instead of only this browser.
  *   v1.2.0 — 2026-08-11 — Security audit H-8: the three mutating routes require the `push:manage`
@@ -85,9 +86,9 @@ function callerApp(req: Request): string | null {
 
 /**
  * Which device the caller means. A client that knows which one it is names the endpoint, in the body
- * or the query. One that names nothing clears the whole account, which is what the routes did before
- * they were per-device: today the profile page sends no endpoint, so its Turn-off button still means
- * "sign every device out" until it passes one.
+ * or the query: the profile page's Turn-off button and the admin Push tab's Unsubscribe both send
+ * this browser's endpoint. A call that names nothing clears every device of the account, which is
+ * what the routes did before they were per-device.
  */
 function requestedEndpoint(req: Request): string | undefined {
   const fromBody = (req.body as { endpoint?: unknown } | undefined)?.endpoint;

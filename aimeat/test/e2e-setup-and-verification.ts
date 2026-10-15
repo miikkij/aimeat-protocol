@@ -42,6 +42,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-setup-verification.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-and-verification
  * @version-history
+ *   2026-10-15 — Test 22: the receipt's collection method and language follow how and by whom the
+ *     consent was given (feature-list audit #161).
  *   v1.3.0 — 2026-10-11 — Test 19: the credential names https://aimeat.io/ns/credentials/v1 and the
  *     node serves that context at /ns/credentials/v1.
  *   v1.2.0 — 2026-10-09 — Test 5b: a node setting that would add a line to .env, or is not a value
@@ -635,6 +637,10 @@ try {
         const receipt = body.data.receipt;
         assert(!!receipt, `receipt: ${JSON.stringify(body.data)}`);
         assert(JSON.stringify(receipt).includes(`${PLAIN}@${NODE_ID}`), 'the receipt names the person it belongs to');
+        // Feature-list audit #161: a consent the person gave in their own session is a web form; the
+        // language is theirs (none set: the node default), not a fixed Finnish.
+        assert(receipt.collectionMethod === 'web form', `collectionMethod: ${receipt.collectionMethod}`);
+        assert(receipt.language === 'en', `language: ${receipt.language}`);
     });
 
     await test('23. A receipt is refused for somebody else\'s consent and for one that does not exist', async () => {

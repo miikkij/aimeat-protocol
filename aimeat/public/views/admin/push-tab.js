@@ -16,6 +16,8 @@
  *   - subscribe / test / unsubscribe / saveTemplate / resetTemplates: call admin service
  *
  * @version-history
+ *   2026-10-15 — Unsubscribe names this browser's endpoint, so it removes this device only; it sent
+ *     none and the route removed every device of the account (feature-list audit #132).
  *   v3.0.0 — 2026-09-27 — The page draws library components (Section, Verdict, Readings,
  *     FigureStrip, StepList, Tabs, List, TextField, TextArea, Loud, Action, Note, Code) and writes no
  *     class; admin-push.css goes. A template is a List row that opens its fields in the raised box
@@ -225,12 +227,15 @@ export default function PushTab({ data, reload, switchPage }) {
     setBusy('unsubscribe');
     setSaid(null);
     try {
+      let endpoint = null;
       const reg = await navigator.serviceWorker.getRegistration('/sw.js');
       if (reg) {
         const sub = await reg.pushManager.getSubscription();
-        if (sub) await sub.unsubscribe();
+        if (sub) { endpoint = sub.endpoint; await sub.unsubscribe(); }
       }
-      await api.unsubscribePush();
+      // This browser's device only, named by its endpoint as the profile page does. Without an
+      // endpoint the route removes every device of the account (feature-list audit #132).
+      if (endpoint) await api.unsubscribePush(endpoint);
       setBusy(null);
       setSaid({ ok: true, msg: P('unsubscribedNow') });
       reload();

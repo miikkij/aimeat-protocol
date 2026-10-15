@@ -13,6 +13,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-protect
  * @version-history
+ *   2026-10-15 — Phase 5: an older version is served with the app's current protection
+ *     (feature-list audit #103).
  *   v1.0.0 — 2026-07-07 — initial: obfuscate, watermark + operator decode, noRawDownload.
  */
 
@@ -160,6 +162,28 @@ await test('PATCH { protection: {} } clears all protection', async () => {
     if (html.length === 0) return;
     assert(html.includes('secretToken'), 'inline HTML is un-obfuscated again');
     assert(!/aimeat-wm:/i.test(html), 'no watermark after clearing');
+});
+
+// ── Phase 5: an older version is served with the app's current protection ──
+// FAILED FIRST, on 2026-10-15 (feature-list audit #103): protection is written on the latest
+// version only, and ?version=1 served the first version raw and unprotected.
+console.log('\nPhase 5: older versions');
+const FILE2 = 'protect-versions.html';
+
+await test('An older version answers with the protection set after it was published', async () => {
+    for (let i = 0; i < 2; i++) {
+        const pub = await json('/v1/apps', aAuth({ method: 'POST', body: JSON.stringify({ filename: FILE2, content: b64(APP_HTML), name: 'Protect Versions', description: 'protection on older versions', category: 'utility', tags: [] }) }));
+        assert(pub.status === 201, `publish ${i + 1}: ${pub.status}`);
+    }
+    const r = await json(`/v1/apps/${FILE2}`, aAuth({ method: 'PATCH', body: JSON.stringify({ protection: { noRawDownload: true, obfuscate: true } }) }));
+    assert(r.status === 200, `status ${r.status}`);
+    const v1raw = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE2}?version=1`, bAuth());
+    assert(v1raw.status === 403, `an outsider's raw download of version 1 must 403, got ${v1raw.status}`);
+    const v1inline = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE2}?version=1&mode=inline`, { redirect: 'manual' });
+    const html = v1inline.status === 200 ? await v1inline.text() : '';
+    if (html.length > 0) assert(!html.includes('secretToken'), 'version 1 inline HTML is obfuscated too');
+    const ownerDl = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE2}?version=1`, aAuth());
+    assert(ownerDl.status === 200, `the owner still downloads version 1, got ${ownerDl.status}`);
 });
 
 // ── Summary ──

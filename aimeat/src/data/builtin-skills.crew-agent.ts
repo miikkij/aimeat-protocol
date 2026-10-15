@@ -15,6 +15,8 @@
  *   v1.6.1 -- 2026-10-13 -- Step 1.2: the page adds the agent to the organism's agent list only where
  *     the organism admits listed agents alone; elsewhere a listed agent reaches no workspace
  *     (seen on aimeat.io 2026-10-13).
+ *   2026-10-15 -- aimeat_crew_llm_set and the approval answer with `warning` when the owner's model
+ *     policy leaves a pinned model out (feature-list audit #82).
  *   v1.6.0 -- 2026-10-13 -- Step 4: the approval page asks which model the agent thinks with and
  *     the pick is stored before the first run (`llm_choice` on the approval); section 3: a machine
  *     with its own model routing applies it when nothing is chosen for the agent.
@@ -275,7 +277,10 @@ stored), \`aimeat_crew_publish\` (live within seconds, the last ten revisions st
 \`aimeat_crew_draft\` keeps half-finished edits. \`aimeat_crew_llm_set\` chooses the model for one
 agent or the owner's default; \`{kind: "node"}\` makes the crew think through this node, so the
 owner's own key pays before the node's (the agent needs \`ai:use\`), and a pinned \`model\` may name
-only a provider key variable and a public https address. With nothing chosen, an agent holding
+only a provider key variable and a public https address. When the owner's model policy leaves a
+pinned model out, the choice is still saved (the crew runs on its own machine) and the answer
+carries \`warning\`; the approval carries it as \`llm_choice.warning\`. Tell the owner, in their words,
+that the model breaks their own rule. With nothing chosen, an agent holding
 \`ai:use\` thinks through this node when the node has a key to pay with; without \`ai:use\`, or with no
 key, it uses the key on the machine that runs it, even when the owner's default says the node. A
 machine that carries its own model routing for its agents applies that routing when nothing is

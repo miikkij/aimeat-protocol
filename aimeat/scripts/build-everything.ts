@@ -14,14 +14,19 @@
  *   parse that dropped a row fails the build rather than shipping a shorter list. The HTML is
  *   trusted because the source is a file in this repository, never a person's input.
  *
- *   THE STAMP IS READ, NEVER WRITTEN. "Node version X, checked against the code on D" is parsed
- *   from the list's own header line; if the line stops saying it, the stamp is absent and the page
- *   shows none, so the page cannot claim a version the list does not.
+ *   THE STAMP. "Node version X, checked against the code on D" is parsed from the list's own header
+ *   line; if the line stops saying it, the stamp is absent and the page shows none. The DATE is the
+ *   list's (it records a source review). The VERSION is the node's own, from aimeat/package.json,
+ *   because a hand-kept number fell behind: the list said 3.26.1 while the node was 4.0.3. The
+ *   build writes that version into the header line of every artefact it renders, so the page and
+ *   the stamp cannot disagree; a release bump makes `--check` ask for one `pnpm build:everything`.
  * @usage
  *   pnpm build:everything            # write all four artefacts
  *   pnpm check:everything            # fail when the committed artefacts are stale
  * @structure inline · parse · main
  * @version-history
+ *   2026-10-15 — The stamp's version comes from aimeat/package.json, not the list's header line,
+ *     and the rendered header line carries it (feature-list audit #5).
  *   v1.1.0 - 2026-09-15 - Generate complete Markdown and HTML with feature anchors alongside JSON.
  *   v1.0.1 — 2026-09-15 — plain() strips tags until none remain and decodes entities in one pass.
  *     The artefacts it writes are byte-identical; what changed is that `&amp;lt;` no longer decodes
@@ -39,6 +44,11 @@ const OUT_FILE = join(OUT_DIR, 'everything.json');
 const META_FILE = join(OUT_DIR, 'everything-meta.json');
 const MD_FILE = join(OUT_DIR, 'everything.md');
 const HTML_FILE = join(OUT_DIR, 'everything.html');
+/** The node's own version, the one the stamp states (feature-list audit #5). */
+const NODE_VERSION: string = JSON.parse(readFileSync(resolve(HERE, '..', 'package.json'), 'utf-8')).version;
+const STAMP_RE = /Node version ([0-9][0-9a-z.-]*), checked against the code on (\d{4}-\d{2}-\d{2})/;
+/** The header line with the node's version in place of the hand-written one. */
+const withNodeVersion = (s: string) => s.replace(STAMP_RE, (_m, _v: string, date: string) => `Node version ${NODE_VERSION}, checked against the code on ${date}`);
 /** Where a relative link in the list points on the web: the repo's docs folder. */
 const DOCS_URL = 'https://github.com/miikkij/aimeat-protocol/blob/main/docs/';
 
@@ -169,8 +179,9 @@ export function parse(md: string): Everything {
   }
   flushPara();
   const stampLine = out.intro.map(plain).find((p) => /Node version/.test(p)) || '';
-  const m = stampLine.match(/Node version ([0-9][0-9a-z.-]*), checked against the code on (\d{4}-\d{2}-\d{2})/);
-  out.stamp = m ? { version: m[1], date: m[2] } : null;
+  const m = stampLine.match(STAMP_RE);
+  out.stamp = m ? { version: NODE_VERSION, date: m[2] } : null;
+  out.intro = out.intro.map(withNodeVersion);
   out.counts = { groups: out.groups.length, rows: out.groups.reduce((s, g) => s + g.rows.length, 0) };
   return out;
 }
@@ -179,7 +190,8 @@ export function parse(md: string): Everything {
 export function renderMarkdown(md: string, parsed: Everything): string {
   let group: Group | undefined;
   let row = 0;
-  return md.split(/\r?\n/).map((line) => {
+  return md.split(/\r?\n/).map((raw) => {
+    const line = withNodeVersion(raw);
     const heading = line.match(/^## (\d+)\./);
     if (heading) {
       group = parsed.groups.find((g) => g.n === Number(heading[1]));

@@ -9,6 +9,8 @@
  *   account, the domain-fenced email link, and the username-choice step for a brand-new user.
  * @usage cd aimeat && pnpm exec vitest run test/unit/saml-assertion.test.ts
  * @version-history
+ *   2026-10-15 — The refusals expect a redirect with ?auth_error= instead of JSON 401, plus a
+ *     deactivated-account case (feature-list audit #20, #22).
  *   v1.0.0 — 2026-08-24 — Initial (BR-04 phase 2).
  */
 
@@ -199,17 +201,25 @@ describe('SAML organisation sign-in (saml-login router)', () => {
     expect(untouched!.externalIdentities?.[`saml:${CONN}`]).toBeUndefined();
   });
 
-  // ── The cryptographic refusals: each one answers 401 and creates nothing ──
+  // ── The cryptographic refusals: each one redirects to the front page with
+  //    ?auth_error=SAML_INVALID_RESPONSE (a browser posts the form) and creates nothing ──
+
+  /** Feature-list audit #20: a refused Response is a redirect the SPA reads, never JSON 401. */
+  function expectRefused(res: RawResponse): void {
+    expect(res.status).toBe(302);
+    expect(res.location).toBe(`${base}/?auth_error=SAML_INVALID_RESPONSE`);
+    expect(cookieFrom(res.setCookie, 'aimeat_rt')).toBeNull();
+  }
 
   it('a response signed by a DIFFERENT valid IdP key is refused', async () => {
     const res = await spInitiated(CONN, { nameId: 'evil-1', email: 'evil@contoso.com', signWith: OTHER_IDP.key });
-    expect(res.status).toBe(401);
+    expectRefused(res);
     expect(await storage.getGHIIByExternalId(`saml:${CONN}`, 'evil-1')).toBeNull();
   });
 
   it('an UNSIGNED response is refused', async () => {
     const res = await spInitiated(CONN, { nameId: 'evil-2', signWith: null });
-    expect(res.status).toBe(401);
+    expectRefused(res);
   });
 
   it('a wrong Audience is refused', async () => {
@@ -219,18 +229,18 @@ describe('SAML organisation sign-in (saml-login router)', () => {
       acsUrl: acsUrl(CONN), audience: 'https://some-other-sp.example/metadata', inResponseTo: requestId, nameId: 'evil-3',
     });
     const res = await rawPost(acsUrl(CONN), { SAMLResponse: samlResponse });
-    expect(res.status).toBe(401);
+    expectRefused(res);
   });
 
   it('an EXPIRED assertion is refused', async () => {
     const res = await spInitiated(CONN, { nameId: 'evil-4', notOnOrAfterMs: -60_000 });
-    expect(res.status).toBe(401);
+    expectRefused(res);
   });
 
   it('an unsolicited (IdP-initiated) response is refused when the connection does not allow it', async () => {
     const samlResponse = buildSamlResponse({ acsUrl: acsUrl(CONN), audience: audience(CONN), nameId: 'evil-5' });
     const res = await rawPost(acsUrl(CONN), { SAMLResponse: samlResponse });
-    expect(res.status).toBe(401);
+    expectRefused(res);
   });
 
   it('an IdP-initiated response IS accepted when the connection explicitly allows it', async () => {
@@ -238,6 +248,18 @@ describe('SAML organisation sign-in (saml-login router)', () => {
     const res = await rawPost(acsUrl(IDPI), { SAMLResponse: samlResponse });
     expect(res.status).toBe(302);
     expect(res.location).toContain('aimeat_signup=1');   // brand-new user → username choice
+  });
+
+  it('a deactivated account redirects with ?auth_error=ACCOUNT_DISABLED and gets no session (audit #22)', async () => {
+    await storage.updateOwner('ville', { disabledAt: new Date().toISOString(), disabledBy: 'op' });
+    try {
+      const res = await spInitiated(CONN, { nameId: 'opaque-user-1', email: 'ville@contoso.com' });
+      expect(res.status).toBe(302);
+      expect(res.location).toBe(`${base}/?auth_error=ACCOUNT_DISABLED`);
+      expect(cookieFrom(res.setCookie, 'aimeat_rt')).toBeNull();
+    } finally {
+      await storage.updateOwner('ville', { disabledAt: null, disabledBy: null });
+    }
   });
 
   // ── Doors ──

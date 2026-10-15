@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createMyDataReceiptService } from '../../src/services/mydata-receipt.js';
+import { createMyDataReceiptService, consentCollectionMethod } from '../../src/services/mydata-receipt.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { ConsentRecord } from '../../src/storage/interface.js';
 
@@ -38,10 +38,33 @@ describe('MyData Receipt Service', () => {
             expect(receipt.version).toBe('KI-CR-v1.1.0');
         });
 
-        it('has jurisdiction FI', () => {
+        // Feature-list audit #161: FI, fi and "web form" were written for every node and consent.
+        it('takes the jurisdiction from the operator country setting', () => {
+            const op = (country: string) => makeConfig({ operator: { country } as AimeatConfig['operator'] });
+            expect(createMyDataReceiptService(op('Finland')).generateReceipt(makeConsent()).jurisdiction).toBe('FI');
+            expect(createMyDataReceiptService(op('Spain')).generateReceipt(makeConsent()).jurisdiction).toBe('ES');
+            expect(createMyDataReceiptService(op('se')).generateReceipt(makeConsent()).jurisdiction).toBe('SE');
+            expect(createMyDataReceiptService(op('Atlantis')).generateReceipt(makeConsent()).jurisdiction).toBe('Atlantis');
+            expect(createMyDataReceiptService(op('')).generateReceipt(makeConsent()).jurisdiction).toBe('unspecified');
+        });
+
+        it('takes the language from the person, else the node default', () => {
             const service = createMyDataReceiptService(makeConfig());
-            const receipt = service.generateReceipt(makeConsent());
-            expect(receipt.jurisdiction).toBe('FI');
+            expect(service.generateReceipt(makeConsent(), { language: 'es' }).language).toBe('es');
+            expect(service.generateReceipt(makeConsent()).language).toBe('en');
+        });
+
+        it('takes the collection method from how the consent was given', () => {
+            const service = createMyDataReceiptService(makeConfig());
+            expect(service.generateReceipt(makeConsent({ metadata: { collection_method: 'API call by an agent' } })).collectionMethod).toBe('API call by an agent');
+            expect(service.generateReceipt(makeConsent()).collectionMethod).toBe('not recorded');
+        });
+
+        it('names the way of giving from the caller', () => {
+            expect(consentCollectionMethod('rest', { kind: 'owner', inPerson: true })).toBe('web form');
+            expect(consentCollectionMethod('rest', { kind: 'agent', inPerson: false })).toBe('API call by an agent');
+            expect(consentCollectionMethod('mcp', { kind: 'agent', inPerson: false })).toBe('MCP tool call by an agent');
+            expect(consentCollectionMethod('mcp', { kind: 'owner', inPerson: true })).toBe('MCP tool call by the person');
         });
 
         it('has piiPrincipalId matching consent owner', () => {
