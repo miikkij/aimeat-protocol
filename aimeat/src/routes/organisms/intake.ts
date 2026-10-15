@@ -19,6 +19,11 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   2026-10-15 — The published submit reads the record's own write result before it answers: a
+ *     record the batch did not store is 422 INTAKE_NOT_STORED instead of `ok: true`, and a
+ *     submission that is not stored gives its daily slot back (feature-list audit #63). Defining and
+ *     deleting a conversation form registers it for the scheduled retention job
+ *     (services/intake-thread-retention.ts; feature-list audit #64).
  *   v1.7.1 — 2026-10-13 — A comment only: why defining a form does not hand the session's scopes to
  *     the fenced-space rule, although every other code path does since the permission
  *     organism:direct (ruled 2026-10-13). A submission holds no session, so a form an agent defined
@@ -68,8 +73,9 @@ import { readPublishSpace, undeclaredSpaceRefusal } from '../../services/workspa
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
 import { fencedFormRefusal, FENCED_FORM_PUBLIC_MESSAGE } from '../../services/fenced-space.js';
 import { callerOf } from '../../middleware/caller.js';
-import { takeDailySlot, forgetDailyCount } from '../../services/intake-daily-count.js';
+import { takeDailySlot, releaseDailySlot, forgetDailyCount } from '../../services/intake-daily-count.js';
 import { parseThreadConfig, THREAD_RECORD_FIELDS, SIGNAL_RECORD_FIELDS, type IntakeThreadConfig } from '../../services/intake-thread.js';
+import { entryOfFormConfig, registerThreadForm } from '../../services/intake-thread-retention.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
@@ -268,6 +274,10 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
       visibility: 'owner', tags: ['intake-form'], ttlHours: null,
       version: 1, createdAt: cfg.createdAt, updatedAt: now,
     } as MemoryRecord);
+    // A conversation form is registered for the scheduled retention job, which deletes its
+    // conversations by date even after the form is switched off or deleted (feature-list audit #64).
+    const retention = entryOfFormConfig(org, ws, cfg);
+    if (retention) await registerThreadForm(storage, config.nodeId, retention);
     emitChange('organisms');
     res.json(success(config.nodeId, {
       form_id: formId, submit_url: `/v1/intake/${org}/${ws}/${formId}`,
@@ -307,6 +317,11 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
     const key = cfgKey(org, ws, formId);
     // The copy the public door reads is the one removed, so the link really stops working.
     const rec = await readFormRecord(org, ws, formId);
+    // The conversations of a deleted conversation form stay until their date, and the scheduled
+    // retention job deletes them then: its registry entry is written before the config goes, so a
+    // form defined before the registry existed is covered too (feature-list audit #64).
+    const retention = rec ? entryOfFormConfig(org, ws, rec.value as unknown as IntakeFormConfig) : null;
+    if (retention) await registerThreadForm(storage, config.nodeId, retention);
     if (rec) await storage.deleteMemory(rec.ownerGaii, key);
     if (rec) await forgetDailyCount(storage, config.nodeId, { org, ws, formId });
     // A conversation form also counts the turns that wake an agent (routes/organisms/intake-thread.ts).
@@ -406,6 +421,13 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
       if (cfg.maxPerDay && !(await takeDailySlot(storage, config.nodeId, { org, ws, formId }, cfg.maxPerDay))) {
         res.status(429).json(error(config.nodeId, 'INTAKE_DAILY_LIMIT', 'This form has taken all the submissions it takes in one day. Try again tomorrow.')); return;
       }
+      // A submission that is then not stored gives its slot back, so a failed write spends none of
+      // the form's day (feature-list audit #63).
+      const giveSlotBack = async (): Promise<void> => {
+        if (!cfg.maxPerDay) return;
+        await releaseDailySlot(storage, config.nodeId, { org, ws, formId })
+          .catch((err) => logger.warn('intake submit: the daily slot was not given back', { org, ws, form: formId, error: String(err) }));
+      };
 
       // Respect the workspace publish-review gate: if it's on, a submission can only become a draft.
       const orgCfg = await readConfig(org);
@@ -415,19 +437,42 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
 
       // The record is owned by the FORM OWNER (server-trusted from config), NEVER the anonymous caller.
       if (mode === 'draft') {
-        await storage.setMemory({
-          key: `organism.${org}.w.${ws}.${cfg.namespace}.${id}.draft`, ownerGaii: cfg.ownerGhii,
-          value: record, visibility: 'owner', tags: ['public-intake'], ttlHours: null,
-          version: 1, createdAt: now, updatedAt: now,
-        } as MemoryRecord);
+        try {
+          await storage.setMemory({
+            key: `organism.${org}.w.${ws}.${cfg.namespace}.${id}.draft`, ownerGaii: cfg.ownerGhii,
+            value: record, visibility: 'owner', tags: ['public-intake'], ttlHours: null,
+            version: 1, createdAt: now, updatedAt: now,
+          } as MemoryRecord);
+        } catch (err) {
+          await giveSlotBack();
+          throw err;
+        }
       } else {
         // The batch reads the manifest again and refuses by itself if the space went undeclared
         // since the check above. Answering success then would tell the submitter something false,
         // and its own refusal is worded for a member, so the anonymous caller gets the public one.
-        const out = await publishDraftsBatch(org, ws, cfg.namespace, [id], cfg.ownerGhii, undefined, { [id]: { value: record, visibility: 'owner' } });
+        let out: Awaited<ReturnType<typeof publishDraftsBatch>>;
+        try {
+          out = await publishDraftsBatch(org, ws, cfg.namespace, [id], cfg.ownerGhii, undefined, { [id]: { value: record, visibility: 'owner' } });
+        } catch (err) {
+          await giveSlotBack();
+          throw err;
+        }
         if (out.refusal) {
+          await giveSlotBack();
           const pub = undeclaredSpaceRefusal(cfg.namespace, [], { organismId: org, ws, audience: 'public' }) ?? out.refusal;
           res.status(pub.status).json(error(config.nodeId, pub.code, pub.message, pub.status, pub.details)); return;
+        }
+        // The record's own result: the space's write guard or the schema can still refuse the one
+        // record without refusing the batch. Until 2026-10-15 the answer was `ok: true` here whatever
+        // the result said, and nothing had been stored (feature-list audit #63).
+        const result = out.results[0];
+        if (!result?.ok) {
+          await giveSlotBack();
+          logger.warn('intake submit: the record was not stored', { event: 'intake.submit_refused', org, ws, form: formId, code: result?.code });
+          res.status(422).json(error(config.nodeId, 'INTAKE_NOT_STORED', 'This form could not store your submission. Try again later.',
+            422, { reason: result?.code ?? 'NO_RESULT' }));
+          return;
         }
       }
       emitChange('organisms');

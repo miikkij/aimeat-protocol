@@ -28,6 +28,8 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-10-15 — enforceQuota is exported: a workspace import checks the quotas for the rows it
+ *     restores before it writes anything (services/workspace-transfer-rows.ts; feature-list audit #68).
  *   v1.7.0 — 2026-10-13 — RowCaller carries the session's scopes and the member path hands them to
  *     the organism namespace rule, where the fenced-space rule reads them (a session that covers
  *     organism:direct writes under a record space that names extensions; ruled 2026-10-13).
@@ -368,7 +370,7 @@ export async function appendRows(
  * Both are counted BEFORE the insert. Counting after and rolling back would be the same number and a
  * worse failure: a caller whose write is undone learns nothing about which row was the one too many.
  */
-async function enforceQuota(
+export async function enforceQuota(
   deps: RowServiceDeps, organismId: string, wsId: string, rows: WorkspaceRowRecord[],
 ): Promise<void> {
   const { storage, config } = deps;

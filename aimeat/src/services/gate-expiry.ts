@@ -6,22 +6,24 @@
  *   `deadline`; once it passes, the default escalation is **abort** (fail-closed): the approval is
  *   marked `rejected` with note "expired" so nothing auto-proceeds on a stale, undecided gate
  *   (research #3 "deadline → null/abort"). Applied two ways: lazily on read (so the behavior is
- *   observable without waiting for a timer) and via a periodic backstop job.
+ *   observable without waiting for a timer) and via the scheduled job core:gate-expiry
+ *   (services/core-jobs.ts, every 10 minutes).
  * @structure
  *   - isOverdue() — pure predicate (pending + past deadline)
  *   - expireApproval() — mark one overdue approval rejected
- *   - expireOverdueApprovals() — sweep all overdue (used by the job + lazily by the list route)
- *   - startGateExpiryJob() — periodic backstop (10 min)
+ *   - expireOverdueApprovals() — sweep all overdue (used by the scheduled job + lazily by the list route)
  * @usage
- *   import { expireOverdueApprovals, startGateExpiryJob } from '../services/gate-expiry.js';
+ *   import { expireOverdueApprovals } from '../services/gate-expiry.js';
  * @version-history
+ *   2026-10-15 — The sweep runs as the scheduled job core:gate-expiry. startGateExpiryJob(), a
+ *     setInterval nothing ever started, is removed: a proposal expired only when somebody opened
+ *     the list or the decision (feature-list audit #59).
  *   v1.0.0 -- 2026-06-07 -- Phase 4: durable pause — abort-on-deadline.
  *   v1.1.0 -- 2026-09-25 -- The sweep tells the member whose suggested workspace change expired
  *     (services/workspace-suggestion-notices.ts): a suggestion is an approval that somebody is
  *     waiting on, and an expiry nobody hears of reads as an admin who never answered.
  */
 import type { Storage, PendingApprovalRecord } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
 import { isMemberChangeAction, noticeRequester } from './workspace-suggestion-notices.js';
 
 export function isOverdue(a: PendingApprovalRecord, nowIso: string): boolean {
@@ -46,11 +48,4 @@ export async function expireOverdueApprovals(storage: Storage, nowIso: string): 
     if (isMemberChangeAction(a.action)) await noticeRequester(storage, a, 'expired');
   }
   return overdue.length;
-}
-
-/** Periodic backstop (every 10 minutes), mirroring the consent-expiry job. */
-export function startGateExpiryJob(storage: Storage): NodeJS.Timeout {
-  return setInterval(() => {
-    expireOverdueApprovals(storage, new Date().toISOString()).catch(err => { logger.warn('startGateExpiryJob: background', { error: String(err) }); });
-  }, 10 * 60 * 1000);
 }

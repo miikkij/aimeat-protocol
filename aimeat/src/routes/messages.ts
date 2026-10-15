@@ -21,6 +21,10 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-10-15 -- POST /v1/messages checks interactive answers against the question they reply to
+ *     (services/interactive-answers.ts): an unknown question or option, two answers to a
+ *     single-choice question, a free-text answer where none is allowed and an unanswered required
+ *     question are refused with 400 INVALID_INPUT and `details.problems` (feature-list audit #123).
  *   v1.18.0 -- 2026-10-08 -- POST /v1/messages and POST /v1/messages/broadcast take ai_provenance and
  *     ai_provenance_id, as the aimeat_dm_* tools do, refuse a declaration the caller may not make
  *     with 403 SCOPE_DENIED before the send turn is taken, and name the record in the answer
@@ -127,6 +131,7 @@ import { readAiFile } from '../services/ai-inputs.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { aiCallerOf } from './ai-policy.js';
+import { checkInteractiveAnswers } from '../services/interactive-answers.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -278,6 +283,16 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       const visible = !!question && (question.recipientGhii === senderGhii || question.ownerGhii === senderGhii);
       if (!question || !visible || question.interactive?.role !== 'questions') {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'interactive.answersFor does not reference a question you received'));
+        return;
+      }
+      // The answers must fit the question: its options, single or multiple choice, the free-text
+      // answer and the required questions. Only the page checked this until 2026-10-15, and an agent
+      // answers without the page (feature-list audit #123).
+      const problems = checkInteractiveAnswers(question.interactive.questions, input.interactive.answers);
+      if (problems.length) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          'These answers do not fit the questions they reply to. Fix what the details below name, then send again.',
+          400, { problems }));
         return;
       }
     }

@@ -10,6 +10,9 @@
  * @structure importWorkspace(storage, config, { orgId, importerGaii, importerOwner, zip }) -> result
  * @usage import { importWorkspace } from '../services/workspace-import.js';
  * @version-history
+ *   2026-10-15 -- The rows of the row spaces are restored (`rows` in the result), held to the
+ *     workspace and organism row quotas before anything is written; a bundle made before then
+ *     carries none (feature-list audit #68).
  *   v1.1.0 -- 2026-09-13 -- A record in a space the bundle's manifest does not declare is not written
  *     and is named in `skipped_undeclared` (undeclaredSpaceRefusal decides, as on every write door).
  *   v1.0.0 -- 2026-06-09 -- Initial: ZIP import with id remap, schema re-lock, image dedup + URL rewrite.
@@ -21,6 +24,7 @@ import { WS_EXPORT_VERSION } from './workspace-export.js';
 import { safeUnzip, BACKUP_ZIP_LIMITS } from './safe-zip.js';
 import { logger } from '../utils/logger.js';
 import { undeclaredSpaceRefusal, isPlatformWorkspaceNamespace, type WriteObjectType } from './workspace-write-items.js';
+import { prepareRowRestore, writeRestoredRows } from './workspace-transfer-rows.js';
 
 const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 
@@ -29,6 +33,8 @@ const WORKSPACE_ALLOW = (n: string) => n === 'workspace.json' || /^images\/[A-Za
 
 export interface ImportResult {
   ws: string; objects: number; documents: number; images: number; images_deduped: number; schemas: number;
+  /** Rows restored into the workspace's row spaces. */
+  rows: number;
   /** Records the bundle carried in spaces its own manifest does not declare: not written, and named
    *  here, because a write into an undeclared space is refused on every door (2026-09-13). */
   skipped_undeclared?: Array<{ namespace: string; id: string; role: string }>;
@@ -71,6 +77,11 @@ export async function restoreWorkspace(
   const oldRoot = `organism.${data.source.organismId}.w.${data.source.ws}`;
   const newRoot = `organism.${orgId}.w.${newWs}`;
   const now = new Date().toISOString();
+
+  // 0) The rows of the row spaces, built and held to the workspace and organism quotas BEFORE
+  // anything is written, so a bundle that does not fit is refused with nothing half restored
+  // (feature-list audit #68). A bundle made before 2026-10-15 carries no `rows`.
+  const rowPlan = await prepareRowRestore({ storage, config }, { orgId, ws: newWs, manifest: data.manifest, rows: data.rows, importerIdentity: importerGaii });
 
   const writeMem = async (key: string, value: unknown, visibility: 'private' | 'owner' | 'group' | 'public' = 'private') => {
     const prev = await storage.getMemory(importerGaii, key);
@@ -151,6 +162,11 @@ export async function restoreWorkspace(
     await writeMem(key, value, (o.visibility as 'private' | 'owner' | 'group' | 'public') || 'private');
   }
 
+  // 4b) The rows of the row spaces, as prepared above. A row of a space the bundle's manifest does
+  // not declare as a row space is named with the skipped records.
+  const rows = await writeRestoredRows(storage, rowPlan.records);
+  skippedUndeclared.push(...rowPlan.skipped);
+
   // 5) Register the new workspace under the importer.
   const regKey = `organism.${orgId}.meta.workspaces`;
   const regRec = await storage.getMemory(importerGaii, regKey);
@@ -158,7 +174,7 @@ export async function restoreWorkspace(
   await writeMem(regKey, { workspaces: [...list, { id: newWs, name: data.name || newWs, createdAt: now, createdBy: importerOwner }] });
 
   return {
-    ws: newWs, objects, documents, images: imagesCreated, images_deduped: imagesDeduped, schemas,
+    ws: newWs, objects, documents, rows, images: imagesCreated, images_deduped: imagesDeduped, schemas,
     ...(skippedUndeclared.length ? { skipped_undeclared: skippedUndeclared } : {}),
   };
 }

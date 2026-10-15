@@ -15,6 +15,7 @@
  *   import { registerWorkspaceTransferTool } from './workspace-transfer.js';
  *   registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason, findWsEntry, roleOf });
  * @version-history
+ *   2026-10-15 — The export answers `truncated` when it reached a limit (feature-list audit #68).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-01 — Extracted from mcp/workspaces.ts (max-file-lines, pure extraction).
  *   v1.1.0 — 2026-09-29 — The export passes the agent's classification reader (TARGET-082).
@@ -69,13 +70,18 @@ export function registerWorkspaceTransferTool(
                 if (!entry) return fail('Workspace not found');
                 const role = await roleOf(organism_id);
                 if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can export.');
-                const { buffer, filename, leftOut } = await exportWorkspace(storage, config, {
+                const { buffer, filename, leftOut, truncated } = await exportWorkspace(storage, config, {
                     orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString(),
                     isOrgManager: role === 'creator' || role === 'admin',
                     reader: readerForAgent({ storage, config }, agentGaii),
                 });
                 if (buffer.length > MAX_INLINE_EXPORT_BYTES) return fail(`Workspace too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.`);
-                return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64'), ...(leftOut.length ? { left_out: leftOut } : {}) });
+                return ok({
+                    filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64'),
+                    ...(leftOut.length ? { left_out: leftOut } : {}),
+                    // A limit the export reached: the backup is smaller than the workspace (feature-list audit #68).
+                    ...(truncated.length ? { truncated } : {}),
+                });
             }
             if (direction === 'import') {
                 if (!zip_base64) return fail("direction='import' needs zip_base64.");

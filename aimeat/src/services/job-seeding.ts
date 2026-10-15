@@ -11,6 +11,8 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-10-15 — Seed core:gate-expiry (every 10 minutes; feature-list audit #59) and
+ *     core:intake-thread-retention (hourly at :50; feature-list audit #64).
  *   v1.13.0 — 2026-10-09 — Seed core:nonce-cleanup on every node, not only with FTN or EUDIW on
  *     (secrets audit 2026-10-09, chapter 2).
  *   v1.12.0 — 2026-10-09 — Seed core:device-auth-cleanup (every 5 minutes).
@@ -72,6 +74,12 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     { id: 'core:package-peer-cleanup', name: 'Package Peer Cleanup', coreHandler: 'package-peer-cleanup', cron: '29 5 * * *' },
     // Mark still-pending email invitations expired once their TTL passes (lazy checks also enforce this).
     { id: 'core:invitation-expiry', name: 'Invitation Expiry', coreHandler: 'invitation-expiry', cron: '*/10 * * * *' },
+    // Gate approvals past their deadline (a member's suggested workspace change: 30 days) expired
+    // even when nobody opens the list or the decision.
+    { id: 'core:gate-expiry', name: 'Gate Approval Expiry', coreHandler: 'gate-expiry', cron: '*/10 * * * *' },
+    // Visitor conversations of public intake forms deleted on the retention date the form promised.
+    // Hourly at :50; a node with no intake form reads one indexed query and stops.
+    { id: 'core:intake-thread-retention', name: 'Intake Conversation Retention', coreHandler: 'intake-thread-retention', cron: '50 * * * *' },
     // Operator storage-growth telemetry: capture a per-table row-count snapshot every hour.
     { id: 'core:storage-stats-snapshot', name: 'Storage Stats Snapshot', coreHandler: 'storage-stats-snapshot', cron: '0 * * * *' },
     // The compliance report for the month that just ended. 04:00 on the first, after the nightly

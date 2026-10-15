@@ -13,6 +13,8 @@
  * @structure ORGANISMS_SKILL_ENTRY
  * @usage import { ORGANISMS_SKILL_ENTRY } from './builtin-skills.organisms.js';
  * @version-history
+ *   2026-10-15 — A shaped create names the workspaces it could not make (`workspaces_not_created`;
+ *     feature-list audit #56).
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -61,7 +63,9 @@ the home page it is called "a shared place".
 4. Wait for their yes. Then create it in one call:
 
 \`aimeat_organism_create { name, description, shape, lang }\`, with \`lang\` the person's language
-(en, fi or es). The answer names the organism and the workspaces made.
+(en, fi or es). The answer names the organism and the workspaces made. A workspace the node could
+not make is listed under \`workspaces_not_created\` with its reason; tell the person, and create it
+with \`aimeat_workspace_create\`.
 
 | shape | for | makes |
 |---|---|---|

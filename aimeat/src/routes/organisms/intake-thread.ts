@@ -26,6 +26,9 @@
  *   POST /v1/intake/:org/:ws/:formId/thread/read    (PUBLIC) the conversation the token opens
  *   POST /v1/intake/:org/:ws/:formId/thread/forget  (PUBLIC) delete it: all three records, every version
  * @version-history
+ *   2026-10-15 — The expiry sweep on a new conversation is gone: the scheduled job
+ *     core:intake-thread-retention deletes by date, whatever state the form is in, and the
+ *     forget route deletes through the same service (feature-list audit #64).
  *   v1.1.0 — 2026-10-13 — A turn asks the fenced-space rule (services/fenced-space.ts) for the
  *     identity the form stores, before anything is written: a form stored under an agent's identity
  *     writes nothing into a record space that names extensions (ruled by the developer on 2026-10-13).
@@ -45,8 +48,9 @@ import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import {
   THREAD_DEFAULTS, MIN_TURN_INTERVAL_MS, newThreadToken, threadIdOf, cleanTurnText, turnsOfThread, replyState, composeTurns,
-  threadIsExpired, type IntakeThreadConfig,
+  type IntakeThreadConfig,
 } from '../../services/intake-thread.js';
+import { forgetThreadRecords } from '../../services/intake-thread-retention.js';
 import type { OrganismHelpers } from './shared.js';
 
 /** The part of a form's stored config these routes read (routes/organisms/intake.ts writes it). */
@@ -54,10 +58,6 @@ interface ThreadFormConfig {
   formId: string; namespace: string; ownerGhii: string; enabled: boolean;
   honeypotField: string | null; maxPerDay: number | null; thread?: IntakeThreadConfig | null;
 }
-
-/** How often one form's expired conversations are looked for, and the most one look deletes. */
-const SWEEP_EVERY_MS = 6 * 60 * 60 * 1000;
-const SWEEP_MAX = 200;
 
 export function registerOrganismIntakeThreadRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { publishDraftsBatch } = H;
@@ -71,13 +71,6 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
 
   const baseKey = (org: string, ws: string, namespace: string, id: string) => `organism.${org}.w.${ws}.${namespace}.${id}`;
 
-  /** Every stored row of one record: its live value, its versions and a draft, whoever owns each. */
-  async function rowsOf(org: string, ws: string, namespace: string, id: string): Promise<MemoryRecord[]> {
-    const base = baseKey(org, ws, namespace, id);
-    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
-    return items.filter((r) => r.key.startsWith(`${base}.`));
-  }
-
   /** The live value of one record, the freshest copy when more than one owner holds it. */
   async function latestOf(org: string, ws: string, namespace: string, id: string): Promise<MemoryRecord | null> {
     const key = `${baseKey(org, ws, namespace, id)}.latest`;
@@ -85,16 +78,10 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
     return items.filter((r) => r.key === key).reduce<MemoryRecord | null>((best, r) => (!best || r.updatedAt > best.updatedAt ? r : best), null);
   }
 
-  /** Delete a conversation: the thread, the reply and the signal, with every version of each. */
-  async function forgetThread(org: string, ws: string, cfg: ThreadFormConfig & { thread: IntakeThreadConfig }, id: string): Promise<number> {
-    let deleted = 0;
-    for (const namespace of [cfg.namespace, cfg.thread.replyNamespace, cfg.thread.signalNamespace]) {
-      for (const row of await rowsOf(org, ws, namespace, id)) {
-        await storage.deleteMemory(row.ownerGaii, row.key);
-        deleted++;
-      }
-    }
-    return deleted;
+  /** Delete a conversation: the thread, the reply and the signal, with every version of each
+   *  (services/intake-thread-retention.ts, which the scheduled retention job uses too). */
+  function forgetThread(org: string, ws: string, cfg: ThreadFormConfig & { thread: IntakeThreadConfig }, id: string): Promise<number> {
+    return forgetThreadRecords(storage, { org, ws, namespace: cfg.namespace, replyNamespace: cfg.thread.replyNamespace, signalNamespace: cfg.thread.signalNamespace }, id);
   }
 
   // One chain per form: a conversation's read, its checks and its write run before the next
@@ -109,22 +96,10 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
     return next;
   }
 
-  // Conversations past the form's keeping time are deleted when a new one starts, at most once
-  // per SWEEP_EVERY_MS for one form. A form nobody writes to keeps what it has until the next start.
-  const lastSweep = new Map<string, number>();
-  async function sweepExpired(org: string, ws: string, cfg: ThreadFormConfig & { thread: IntakeThreadConfig }): Promise<void> {
-    const formKey = `${org}/${ws}/${cfg.formId}`;
-    const now = Date.now();
-    if (now - (lastSweep.get(formKey) ?? 0) < SWEEP_EVERY_MS) return;
-    lastSweep.set(formKey, now);
-    const prefix = `organism.${org}.w.${ws}.${cfg.namespace}.`;
-    const { items } = await storage.listAllMemory({ prefix, limit: 20000, excludeVersionRows: true });
-    const expired = items
-      .filter((r) => r.key.endsWith('.latest') && (r.value as { form_id?: unknown } | null)?.form_id === cfg.formId && threadIsExpired(r.value, now, cfg.thread.ttlDays))
-      .slice(0, SWEEP_MAX);
-    for (const r of expired) await forgetThread(org, ws, cfg, r.key.slice(prefix.length, -'.latest'.length));
-    if (expired.length) logger.info('Intake thread: expired conversations deleted', { event: 'intake.thread_expired', org, ws, form: cfg.formId, count: expired.length });
-  }
+  // Conversations past the form's keeping time are deleted by the scheduled job
+  // core:intake-thread-retention (services/intake-thread-retention.ts), whatever state the form is
+  // in. Until 2026-10-15 the deletion ran here, when a new conversation started, so a form nobody
+  // wrote to, or one switched off or deleted, kept everything (feature-list audit #64).
 
   const params = (req: Request) => ({ org: req.params.org as string, ws: req.params.ws as string, formId: req.params.formId as string });
 
@@ -173,7 +148,6 @@ export function registerOrganismIntakeThreadRoutes(router: Router, config: Aimea
           if (!(await takeDailySlot(storage, config.nodeId, { org, ws, formId }, cfg.maxPerDay ?? THREAD_DEFAULTS.maxThreadsPerDay))) {
             refuse(res, 429, 'INTAKE_DAILY_LIMIT', 'This form has started all the conversations it starts in one day. Try again tomorrow.'); return;
           }
-          await sweepExpired(org, ws, cfg).catch((err) => logger.warn('Intake thread: the expiry sweep failed', { org, ws, form: formId, error: String(err) }));
           token = newThreadToken();
           threadId = threadIdOf(token) as string;
           turns = [{ text: cleaned.text, at }];

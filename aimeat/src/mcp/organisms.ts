@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-15 — aimeat_organism_create with a shape answers `workspaces_not_created` beside `workspaces` (feature-list audit #56).
+ *     aimeat_organism_export answers `truncated` when a workspace's export reached a limit (feature-list audit #68).
  *   2026-10-15 — The organism-details resource refuses a private organism the caller is not a member
  *     of with resourceRefusal (FORBIDDEN and a next step) instead of the bare "Access denied"
  *     (feature-list audit #186).
@@ -594,7 +596,7 @@ export function registerOrganismsTools(
                     text: JSON.stringify({
                         created: true,
                         organism: { id: record.id, name: record.name, board_id: record.boardId, visibility: record.visibility, join_policy: record.joinPolicy },
-                        ...(result.workspaces ? { workspaces: result.workspaces } : {}),
+                        ...(result.workspaces ? { workspaces: result.workspaces, workspaces_not_created: result.workspacesNotCreated ?? [] } : {}),
                     }, null, 2),
                 }],
             };
@@ -646,12 +648,12 @@ export function registerOrganismsTools(
             // Any active member: the bundle holds only what the member reads live (gate matches the
             // read model — the REST route applies the same policy).
             if (!m || m.status !== 'active') return { content: [{ type: 'text' as const, text: 'Only an active member of the organism can export it.' }], isError: true };
-            const { buffer, filename, workspaces, leftOut } = await exportOrganism(storage, config, {
+            const { buffer, filename, workspaces, leftOut, truncated } = await exportOrganism(storage, config, {
                 orgId: organism_id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString(),
                 reader: readerForAgent({ storage, config }, agentGaii),
             });
             if (buffer.length > 1_500_000) return { content: [{ type: 'text' as const, text: `Organism too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.` }], isError: true };
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, size_bytes: buffer.length, workspaces, zip_base64: buffer.toString('base64'), ...(leftOut.length ? { left_out: leftOut } : {}) }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ filename, size_bytes: buffer.length, workspaces, zip_base64: buffer.toString('base64'), ...(leftOut.length ? { left_out: leftOut } : {}), ...(truncated.length ? { truncated } : {}) }, null, 2) }] };
         });
 
     // ── Tool 8: aimeat_organism_import ──

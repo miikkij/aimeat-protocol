@@ -58,13 +58,13 @@
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
-      "reviewedOn": "2026-10-12",
+      "reviewedOn": "2026-10-15",
       "watches": [
         "aimeat/src/data/organism-shapes.ts",
         "aimeat/src/services/organism-lifecycle.ts",
         "aimeat/src/services/organism-shape-apply.ts"
       ],
-      "digest": "sha256:2b6ca41e42c323796c1fb83a",
+      "digest": "sha256:935c077ec8d188116a85c233",
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
@@ -696,8 +696,8 @@
     },
     "node:aimeat-organisms": {
       "aimeat/src/data/organism-shapes.ts": "e876d870cd931846",
-      "aimeat/src/services/organism-lifecycle.ts": "0ab56b9c6de11093",
-      "aimeat/src/services/organism-shape-apply.ts": "14fc1dff927d3970"
+      "aimeat/src/services/organism-lifecycle.ts": "0d2eaadc4795d20f",
+      "aimeat/src/services/organism-shape-apply.ts": "190c0a20e5cb806c"
     },
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
@@ -750,7 +750,7 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "c6cd3abb7698d83a",
       "aimeat/src/services/extension-ctx-contract.ts": "430a87e8facd9657",
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
-      "aimeat/src/services/workspace-rows/row-service.ts": "63095910320e3ff3",
+      "aimeat/src/services/workspace-rows/row-service.ts": "436bea50a33f2989",
       "aimeat/src/services/refinery/pipeline.ts": "e51d2a097f60fede",
       "aimeat/src/routes/outbound.ts": "949e4deacd60ee41"
     }

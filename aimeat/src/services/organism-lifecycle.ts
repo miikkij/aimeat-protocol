@@ -29,6 +29,8 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-15 — createOrganismRecord with a shape answers `workspacesNotCreated` beside `workspaces`:
+ *     each workspace of the shape that failed, with its reason (feature-list audit #56).
  *   2026-10-12 — leaveOrganism() takes the leaver's agents off the organism and their workspace roles
  *     away (revokeDepartedMemberAccess), so aimeat_organism_leave does what POST /:id/leave did
  *     (wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app-).
@@ -54,7 +56,7 @@ import { notify } from './notify.js';
 import { recordPublicActivity } from './public-activity.js';
 import { recordAccountEvent } from './account-events.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
-import { resolveShape, applyOrganismShape, type ShapedWorkspace } from './organism-shape-apply.js';
+import { resolveShape, applyOrganismShape, type ShapedWorkspace, type ShapedWorkspaceFailure } from './organism-shape-apply.js';
 import { getOrganismReadme, setOrganismReadme } from './organism-readme.js';
 import { MEMBER_VISIBILITY_VALUES } from './organism-privacy.js';
 import { logger } from '../utils/logger.js';
@@ -119,7 +121,7 @@ export async function createOrganismRecord(
   deps: OrganismDeps,
   creatorOwner: string,
   input: CreateOrganismInput,
-): Promise<OrganismRefusal | { ok: true; organism: OrganismRecord; workspaces?: ShapedWorkspace[] }> {
+): Promise<OrganismRefusal | { ok: true; organism: OrganismRecord; workspaces?: ShapedWorkspace[]; workspacesNotCreated?: ShapedWorkspaceFailure[] }> {
   const { storage, config } = deps;
 
   const name = typeof input.name === 'string' ? input.name.trim() : '';
@@ -213,9 +215,9 @@ export async function createOrganismRecord(
 
   if (shape) {
     const lang = typeof input.lang === 'string' ? input.lang.slice(0, 2) : 'en';
-    const workspaces = await applyOrganismShape(deps, id, creatorOwner, shape, lang);
-    if (workspaces.length) emitChange('organisms');
-    return { ok: true, organism, workspaces };
+    const { made, notCreated } = await applyOrganismShape(deps, id, creatorOwner, shape, lang);
+    if (made.length) emitChange('organisms');
+    return { ok: true, organism, workspaces: made, workspacesNotCreated: notCreated };
   }
   return { ok: true, organism };
 }
