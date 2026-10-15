@@ -319,6 +319,10 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         AIMEAT_DOCSIGN_EUDI_ENABLED: 'true',
         AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL: resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'docsign', 'eudi-rp-test.txt'),
         AIMEAT_DOCSIGN_ONLINE_CHECKS: 'false',
+        // The wallet signer's test CA, trusted as an operator anchor: a wallet signature must reach a
+        // trusted root to be sealed (feature-list audit 38). Only this CA, so the other docsign
+        // fixtures (signed.pdf and its copies) stay untrusted as their tests expect.
+        AIMEAT_DOCSIGN_TRUST_ANCHORS: resolve(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'docsign', 'wallet-ca-anchor.txt'),
         // Off for the credential suites (ANONYMOUS_OFF_SUITES above), on for the rest.
         AIMEAT_ANONYMOUS: anonymousModeFor(suite),
         AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',

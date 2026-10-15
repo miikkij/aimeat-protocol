@@ -39,6 +39,7 @@
  *   walletClient · parseDocumentWithSignature
  * @usage const s = await startWalletSignature(ctx, caller, id, { bytes });
  * @version-history
+ *   2026-10-15 — A wallet signature is sealed only when its chain reaches a trusted root (422 SIGNER_NOT_TRUSTED) and the certificate names the account holder (422 NAME_MISMATCH) (feature-list audit 38).
  *   v1.0.0 — 2026-10-10 — Initial (wish-allekirjoitus-eudi-lompakolla).
  *   v1.1.0 — 2026-10-10 — x509_san_uri: the EU test registrar's access certificate for aimeat.io
  *     names URI:https://aimeat.io, and the wallet then requires response_uri to equal it, so the
@@ -442,6 +443,20 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
       : `no signature in the returned PDF (${report.signatures.length} fields)`;
     await refuse('SIGNATURE_NOT_VALID', `The wallet's signature did not check out (${why}).`, signed);
     throw new DocsignError('SIGNATURE_NOT_VALID', 422, `The returned signature did not check out: ${why}`);
+  }
+
+  // A wallet signature is sealed as the person's own only when its chain reaches a trusted root (the
+  // EU trusted list, an operator anchor, or an EUDI test root, decision "EU wallet signing",
+  // 2026-10-09) and the certificate names the person who signs. An unverified chain was accepted as
+  // indeterminate and the name match was only recorded (feature-list audit 38).
+  if (!newest.trust.source) {
+    await refuse('SIGNER_NOT_TRUSTED', `The signing certificate's chain does not reach a root this node trusts (issuer ${newest.issuer?.name ?? 'unknown'}), so the signature cannot be sealed as yours.`, signed);
+    throw new DocsignError('SIGNER_NOT_TRUSTED', 422, 'The wallet signed with a certificate whose chain reaches no root this node trusts, so nothing was sealed. Sign with a wallet whose certificate comes from a trusted provider, or ask the operator which providers this node trusts.');
+  }
+  const signerGhii = await ctx.storage.getGHII(s.signer);
+  if (sameName(newest.signer?.name, signerGhii?.displayName) !== true) {
+    await refuse('NAME_MISMATCH', `The name in the signing certificate (${newest.signer?.name ?? 'none'}) is not the name on the account (${signerGhii?.displayName ?? 'none'}).`, signed);
+    throw new DocsignError('NAME_MISMATCH', 422, 'The name in the wallet\'s certificate is not the name on your account, so nothing was sealed. Set your display name to the name on your identity document, then sign again.');
   }
 
   // The request may have moved on while the person was in the wallet (cancelled, signed some other

@@ -29,6 +29,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=docsign
  * @version-history
+ *   2026-10-15 — The wallet signer comes from the test CA the node trusts; a chain to no trusted root and a certificate naming somebody else are refused (feature-list audit 38).
  *   2026-10-15 — An owner-level personal access token is refused method "session", used directly and
  *     exchanged; alice in person signs the same request (feature-list audit #37).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
@@ -39,7 +40,7 @@
  *   v1.4.0 — 2026-10-10 — A wallet answer for a request cancelled meanwhile stores nothing (secaudit 2026-10-10 I14).
  */
 import * as ed from '@noble/ed25519';
-import { createHash, X509Certificate } from 'node:crypto';
+import { createHash, createPrivateKey, X509Certificate } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -343,13 +344,21 @@ async function main() {
 
     const walletPdf = plainPdf(`Kauppakirja ${stamp}`);
     const walletSha = createHash('sha256').update(walletPdf).digest('hex');
-    const walletSigner = (() => {
-        const ca = newRsa(), key = newRsa();
-        const caName = name('Wallet Test QTSP CA', 'AIMEAT Test');
-        const caCert = makeCert({ subject: caName, issuer: caName, publicKey: ca.publicKey, signer: ca.privateKey, ca: true, serial: 9 });
-        const cert = makeCert({ subject: name(names.alice, 'AIMEAT Test'), issuer: caName, publicKey: key.publicKey, signer: ca.privateKey, ca: false, serial: 10 });
-        return { cert, key: key.privateKey, chain: [caCert] };
+    // The wallet signer's certificate comes from the TEST-ONLY CA the E2E node trusts as an operator
+    // anchor (fixtures/docsign/wallet-ca-test.txt, AIMEAT_DOCSIGN_TRUST_ANCHORS in run-e2e-server.ts):
+    // a wallet signature must reach a trusted root to be sealed (feature-list audit 38).
+    const walletCa = (() => {
+        const text = readFileSync(join(FIX, 'wallet-ca-test.txt'), 'utf8');
+        const key = createPrivateKey(text.slice(0, text.indexOf('-----BEGIN CERTIFICATE-----')));
+        const certB64 = text.slice(text.indexOf('-----BEGIN CERTIFICATE-----')).replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+        return { key, cert: Buffer.from(certB64, 'base64'), name: name('AIMEAT Test Wallet QTSP CA', 'AIMEAT Test') };
     })();
+    const signerFrom = (ca: { key: any; cert: Buffer; name: any }, who: string, serial: number) => {
+        const key = newRsa();
+        const cert = makeCert({ subject: name(who, 'AIMEAT Test'), issuer: ca.name, publicKey: key.publicKey, signer: ca.key, ca: false, serial });
+        return { cert, key: key.privateKey, chain: [ca.cert] };
+    };
+    const walletSigner = signerFrom(walletCa, names.alice, 10);
     let walletRequestId = '';
 
     /** What the wallet does with a link: fetch and check the request object, then download the PDF. */
@@ -427,6 +436,27 @@ async function main() {
         assert(kept.status === 200 && Buffer.from(await kept.arrayBuffer()).equals(forged), `the returned PDF is kept: ${kept.status}`);
     });
 
+    // Feature-list audit 38: a chain that reaches no trusted root, and a certificate naming somebody
+    // else, are refused before anything is stored or sealed.
+    await test('a wallet signature whose chain reaches no trusted root, or names somebody else, is refused', async () => {
+        const untrustedCa = (() => {
+            const ca = newRsa(); const caName = name('Unknown QTSP CA', 'Nobody');
+            return { key: ca.privateKey, cert: makeCert({ subject: caName, issuer: caName, publicKey: ca.publicKey, signer: ca.privateKey, ca: true, serial: 31 }), name: caName };
+        })();
+        for (const [signer, code] of [[signerFrom(untrustedCa, names.alice, 32), 'SIGNER_NOT_TRUSTED'], [signerFrom(walletCa, 'Somebody Else', 33), 'NAME_MISMATCH']] as const) {
+            const started = await fetch(`${BASE}/v1/docsign/requests/${walletRequestId}/wallet`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: walletPdf });
+            const s = (await started.json() as any).data;
+            const { claims, pdf } = await walletOpens(s.wallet_link);
+            const signedHere = appendSignature(pdf, signer.cert, signer.key, signer.chain);
+            const r = await walletPosts(claims, { state: claims.state, documentWithSignature: JSON.stringify([signedHere.toString('base64')]) });
+            assert(r.status === 422, `${code}: ${r.status}`);
+            const st = await json(`/v1/docsign/requests/${walletRequestId}/wallet/${s.session_id}`, { headers: auth(alice.token) });
+            assert(st.body.data.status === 'failed' && st.body.data.error.code === code, `${code} status: ${JSON.stringify(st.body.data)}`);
+            const got = await json(`/v1/docsign/requests/${walletRequestId}`, { headers: auth(alice.token) });
+            assert(!got.body.data.request.signatures?.[ghii(names.alice)], `${code}: nothing was sealed`);
+        }
+    });
+
     let signedPdf = Buffer.alloc(0);
     await test('alice signs in her wallet: the node checks the PDF, stores it in her files and seals the signature', async () => {
         const started = await fetch(`${BASE}/v1/docsign/requests/${walletRequestId}/wallet`, { method: 'POST', headers: { ...auth(alice.token), 'Content-Type': 'application/pdf' }, body: walletPdf });
@@ -460,7 +490,10 @@ async function main() {
         const started = JSON.parse(toolText(await mcpCall(bobAgent.token, 'aimeat_docsign_wallet_start', { id: walletRequestId, storage_key: 'kauppakirja-signed.pdf' })));
         assert(started.signer === ghii(names.bob) && String(started.wallet_link).startsWith('eudi-rqes://'), `tool: ${JSON.stringify(started).slice(0, 200)}`);
         const { claims, pdf } = await walletOpens(started.wallet_link);
-        const twice = appendSignature(pdf, walletSigner.cert, walletSigner.key, walletSigner.chain);
+        // Bob's wallet carries bob's own certificate: a certificate naming alice is refused for him
+        // (feature-list audit 38). It signed with alice's until 2026-10-15.
+        const bobSigner = signerFrom(walletCa, names.bob, 11);
+        const twice = appendSignature(pdf, bobSigner.cert, bobSigner.key, bobSigner.chain);
         const r = await walletPosts(claims, { state: claims.state, documentWithSignature: twice.toString('base64') });
         assert(r.status === 200, `bob's response: ${r.status}`);
         const status = JSON.parse(toolText(await mcpCall(bobAgent.token, 'aimeat_docsign_wallet_status', { id: walletRequestId, session_id: started.session_id })));

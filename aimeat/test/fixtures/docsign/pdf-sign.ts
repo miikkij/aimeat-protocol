@@ -16,6 +16,7 @@
  *   makeRpCredential · pem · newRsa
  * @usage const pdf = appendSignature(original, signerCert, signerKey, [caCert]);
  * @version-history
+ *   2026-10-15 — makeWalletTestCa: the wallet signer's TEST-ONLY CA (feature-list audit 38).
  *   v1.0.0 — 2026-10-10 — Moved out of make-fixtures.ts unchanged, plus appendSignature and
  *     makeRpCredential for the wallet tests (wish-allekirjoitus-eudi-lompakolla).
  */
@@ -201,6 +202,19 @@ export function appendSignature(original: Buffer, signerCert: Buffer, signerKey:
 export const pem = (der: Buffer, label = 'CERTIFICATE') => `-----BEGIN ${label}-----\n${der.toString('base64').match(/.{1,64}/g)!.join('\n')}\n-----END ${label}-----\n`;
 
 /** A wallet relying-party credential in the PEM layout docsign.eudi_rp_credential reads: key, leaf, CA. */
+/**
+ * TEST-ONLY: a CA that issues the wallet signer's certificate in e2e-docsign, as its private key
+ * (PKCS#8) followed by its certificate. The E2E node trusts the certificate as an operator anchor
+ * (AIMEAT_DOCSIGN_TRUST_ANCHORS), so a wallet signature from it reaches a trusted root; a signer
+ * from any other CA does not (feature-list audit 38).
+ */
+export function makeWalletTestCa(): string {
+  const ca = newRsa();
+  const caName = name('AIMEAT Test Wallet QTSP CA', 'AIMEAT Test');
+  const caCert = makeCert({ subject: caName, issuer: caName, publicKey: ca.publicKey, signer: ca.privateKey, ca: true, serial: 5 });
+  return ca.privateKey.export({ type: 'pkcs8', format: 'pem' }).toString() + pem(caCert);
+}
+
 export function makeRpCredential(host: string): string {
   const ca = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const leaf = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
