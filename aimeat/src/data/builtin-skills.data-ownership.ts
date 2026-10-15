@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-15 — Section 1: an organism or workspace export carries the row spaces and names a limit
+ *     it reached under `truncated` (feature-list audit #68).
  *   v1.3.2 — 2026-10-14 — Section 4: an agent that holds organism:direct deletes, restores and
  *     archives in a closed space directly, and the workspace's structure record is protected when
  *     a change touches a closed space's list (services/fenced-space.ts v1.1.0).
@@ -92,6 +94,10 @@ What an export leaves out, and why:
 - **Records under an organism's classification** are left behind by the memory export and the
   organism export and listed under \`left_out\`: they belong to the group's rules, not to one member.
   The account export includes them and names them, because the law gives a person their own records.
+- **A very large workspace**: one workspace's export reads at most 10 000 records, and at most as many
+  rows as a workspace may hold. When it reaches a limit, the answer lists it under \`truncated\`; tell
+  the person the backup is not whole. The rows of a workspace's row spaces are in the export and come
+  back with the import.
 
 ## 2. Bring it in
 

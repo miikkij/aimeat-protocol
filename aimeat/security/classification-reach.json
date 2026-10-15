@@ -555,9 +555,9 @@
     },
     "src/routes/organisms/intake-thread.ts": {
       "reads": {
-        "listAllMemory": 3
+        "listAllMemory": 1
       },
-      "why": "Reviewed 2026-10-13, the node's own read: the thread record and the reply record of ONE conversation, by the record id that is the hash of the visitor's token. They are read to append the visitor's next message, to decide the caps, and to answer the visitor the turns of their own conversation: the visitor's own words and the answers the owner's side wrote for that visitor (role, text and time only; no other field of either record leaves). The third read lists the form's thread records when a conversation starts, to delete the ones past the form's keeping time; nothing of them is returned. A classification label on a reply record does not hide an answer from the visitor it was written to."
+      "why": "Reviewed 2026-10-13, the node's own read: the thread record and the reply record of ONE conversation, by the record id that is the hash of the visitor's token. They are read to append the visitor's next message, to decide the caps, and to answer the visitor the turns of their own conversation: the visitor's own words and the answers the owner's side wrote for that visitor (role, text and time only; no other field of either record leaves). A classification label on a reply record does not hide an answer from the visitor it was written to. 2026-10-15 (feature-list audit #64): the expiry sweep and the forget deletion moved to services/intake-thread-retention.ts, so two reads left this file."
     },
     "src/routes/organisms/record-helpers.ts": {
       "reads": {
@@ -1573,9 +1573,16 @@
     },
     "src/services/intake-daily-count.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-10-13, the node's own read: the per-form count of today's public intake submissions in the system namespace (a day and a number), read to decide whether the form takes one more. No caller is handed it."
+      "why": "Reviewed 2026-10-13, the node's own read: the per-form count of today's public intake submissions in the system namespace (a day and a number), read to decide whether the form takes one more. No caller is handed it. 2026-10-15 (feature-list audit #63): the second read is releaseDailySlot, which reads the same count to give back the slot of a submission that was not stored."
+    },
+    "src/services/intake-thread-retention.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listAllMemory": 3
+      },
+      "why": "Reviewed 2026-10-15 (feature-list audit #64), the node's own read: the registry of conversation forms in the system namespace, each conversation form's config records found once on the first run, and the thread records of a form (keys, form_id and the last visitor turn's time) to find the conversations past the form's keeping time and delete them with every version. Nothing read here is returned to any caller; the scheduled job and the visitor's forget route only delete."
     },
     "src/services/invitations.ts": {
       "reads": {
@@ -2318,6 +2325,12 @@
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+    },
+    "src/services/workspace-transfer-rows.ts": {
+      "reads": {
+        "listWorkspaceRows": 1
+      },
+      "why": "Reviewed 2026-10-15 (feature-list audit #68): the rows of a workspace's row spaces for its export. Every page passes the exporter's classification reader, show and then leave with the destination export (rowTarget, as readRows addresses a row), before a row enters the bundle; what leave keeps back is named in leftOut."
     },
     "src/services/workspace-import.ts": {
       "reads": {

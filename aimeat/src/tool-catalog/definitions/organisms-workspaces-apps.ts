@@ -5,6 +5,9 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-15 — aimeat_organism_create names `workspaces_not_created` in its description (feature-list audit #56).
+ *     aimeat_organism_export says any active member may export, as GET /v1/organisms/:id/export
+ *     decides, and names the row spaces and `truncated` (feature-list audit #68).
  *   2026-10-12 — aimeat_workspace_list and aimeat_organism_invitations name organism:read, and
  *     aimeat_organism_invitation_respond organism:write, the words their REST twins ask; enforced from
  *     4.0.0 (scopeEnforcedFrom), counted before it.
@@ -546,7 +549,7 @@ export const organismsWorkspacesAppsTools = [
     ...workspaceMemberChangeTools,
     {
         name: 'aimeat_organism_create',
-        description: 'Create a new ORGANISM (a shared, governed container for people + agents): one place every AI the person connects and every person they invite reads and writes. You become its creator/admin/member, and it gets a discussion board. Give a `shape` to start it with ready workspaces (own-work, team, company, family, club, project; GET /v1/organisms/shapes lists what each makes), or add workspaces afterwards with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch.',
+        description: 'Create a new ORGANISM (a shared, governed container for people + agents): one place every AI the person connects and every person they invite reads and writes. You become its creator/admin/member, and it gets a discussion board. Give a `shape` to start it with ready workspaces (own-work, team, company, family, club, project; GET /v1/organisms/shapes lists what each makes), or add workspaces afterwards with aimeat_workspace_create. With a shape the answer lists `workspaces` (made) and `workspaces_not_created` (each with its reason); create a missing one with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Create Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -678,7 +681,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_transfer',
-        description: "Back up or restore a workspace, via `direction`. 'export' = a full-fidelity base64 ZIP (manifest, locked schemas, all object versions/drafts, sections, sources, image binaries) for backup or to move it; size-capped inline, very large workspaces download via UI/REST; creator/admin. 'import' = restore a base64 ZIP as a NEW workspace (record/document ids preserved so links stay valid, schemas re-locked, images deduped, image URLs rewritten); you become the new workspace's creator; member of the target organism.",
+        description: "Back up or restore a workspace, via `direction`. 'export' = a full-fidelity base64 ZIP (manifest, locked schemas, all object versions/drafts, sections, sources, image binaries, the rows of its row spaces) for backup or to move it; `truncated` in the answer names a limit the export reached; size-capped inline, very large workspaces download via UI/REST; creator/admin. 'import' = restore a base64 ZIP as a NEW workspace (record/document ids preserved so links stay valid, schemas re-locked, images deduped, image URLs rewritten, rows restored within the row quotas); you become the new workspace's creator; member of the target organism.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Export / Import Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -694,7 +697,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_organism_export',
-        description: 'Export a whole organism (its settings + every workspace you can read) as one base64 ZIP backup. Organism creator or admin. Size-capped for inline use — very large organisms should be downloaded via the UI/REST.',
+        description: 'Export a whole organism (its settings + every workspace you can read, with its records, documents, images and row spaces) as one base64 ZIP backup. Any active member may export; the bundle holds only what that member can read. The answer lists `truncated` when a workspace reached an export limit (10 000 memory records, or the most rows a workspace may hold), and `left_out` for what the classification kept back. Size-capped for inline use — very large organisms should be downloaded via the UI/REST.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Export Organism', readOnlyHint: true },

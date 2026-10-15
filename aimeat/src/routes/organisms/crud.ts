@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-15 — POST /v1/organisms with a shape answers `workspaces_not_created` beside `workspaces` (feature-list audit #56).
  *   v1.16.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/organisms/waiting. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.15.0 — 2026-10-12 — POST /:id/leave no longer calls revokeDepartedMemberAccess itself:
  *     leaveOrganism() does, so aimeat_organism_leave takes the agents and workspace roles away too.
@@ -104,7 +105,11 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    res.status(201).json(success(config.nodeId, { organism: result.organism, ...(result.workspaces ? { workspaces: result.workspaces } : {}) }, [
+    // A shaped create names the workspaces it could not make, so a 201 never hides a missing one.
+    res.status(201).json(success(config.nodeId, {
+      organism: result.organism,
+      ...(result.workspaces ? { workspaces: result.workspaces, workspaces_not_created: result.workspacesNotCreated ?? [] } : {}),
+    }, [
       { description: 'View organism', method: 'GET', url: `/v1/organisms/${result.organism.id}` },
       { description: 'List members', method: 'GET', url: `/v1/organisms/${result.organism.id}/members` },
     ]));

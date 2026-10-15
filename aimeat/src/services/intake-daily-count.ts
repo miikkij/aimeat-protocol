@@ -15,9 +15,12 @@
  *   starts the count again in the same record, so the key count does not grow with time. The day is
  *   the UTC date. The read, the compare and the write run one after another per node, so two
  *   submissions that arrive together cannot both take the last slot.
- * @structure takeDailySlot(storage, nodeId, form, max) · forgetDailyCount(storage, nodeId, form)
+ * @structure takeDailySlot(storage, nodeId, form, max) · releaseDailySlot(storage, nodeId, form) ·
+ *   forgetDailyCount(storage, nodeId, form)
  * @usage if (cfg.maxPerDay && !(await takeDailySlot(storage, nodeId, { org, ws, formId }, cfg.maxPerDay))) refuse 429
  * @version-history
+ *   2026-10-15 — releaseDailySlot(): a submission whose write failed gives its slot back
+ *     (feature-list audit #63).
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import type { Storage } from '../storage/interface.js';
@@ -59,6 +62,25 @@ export function takeDailySlot(storage: Storage, nodeId: string, form: IntakeForm
       createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
     return true;
+  });
+}
+
+/**
+ * Give back one of today's slots: the submission that took it was then not stored, so it spends
+ * none of the form's day (feature-list audit #63). A count from an earlier day, or already at 0,
+ * is left as it is.
+ */
+export function releaseDailySlot(storage: Storage, nodeId: string, form: IntakeFormRef): Promise<void> {
+  return inOrder(nodeId, async () => {
+    const systemGhii = systemGhiiFor(nodeId);
+    const key = countKey(form);
+    const existing = await storage.getMemory(systemGhii, key);
+    const held = existing?.value as { day?: string; n?: number } | undefined;
+    if (!existing || held?.day !== today() || typeof held.n !== 'number' || held.n <= 0) return;
+    await storage.setMemory({
+      ...existing, value: { day: held.day, n: held.n - 1 },
+      version: existing.version + 1, updatedAt: new Date().toISOString(),
+    });
   });
 }
 

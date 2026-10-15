@@ -9,6 +9,8 @@
  *   importer becomes the new organism's creator.
  * @structure ORG_EXPORT_VERSION; exportOrganism(storage, config, { orgId, exporterGaii, exportedAt })
  * @version-history
+ *   2026-10-15 -- organism.json and the result carry `truncated` ({ ws, what, namespace?, exported,
+ *     total }): a workspace whose export reached a limit is named (feature-list audit #68).
  *   v1.1.0 -- 2026-06-24 -- Secretary P5 (S-B): add `skeleton` mode (strip every workspace's objects +
  *     images, keeping only schema/purpose/structure — content-free, safe to publish) and an optional
  *     top-level `templateJson` (use-case template metadata: specialists + extension deps + scope presets).
@@ -27,7 +29,7 @@
 import { ZipArchive } from 'archiver';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { collectWorkspace } from './workspace-export.js';
+import { collectWorkspace, type ExportTruncation } from './workspace-export.js';
 import { listOrganismWorkspaceEntries } from './workspace-meta.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -40,7 +42,7 @@ export async function exportOrganism(
   storage: Storage,
   config: AimeatConfig,
   opts: { orgId: string; exporterGaii: string; exportedAt: string; reader: ContentReader },
-): Promise<{ buffer: Buffer; filename: string; workspaces: number; leftOut: Array<LeftOut & { ws: string }> }> {
+): Promise<{ buffer: Buffer; filename: string; workspaces: number; leftOut: Array<LeftOut & { ws: string }>; truncated: Array<ExportTruncation & { ws: string }> }> {
   const { orgId, exporterGaii, exportedAt, reader } = opts;
   const org = await storage.getOrganism(orgId);
   if (!org) throw new Error('Organism not found');
@@ -78,10 +80,13 @@ export async function exportOrganism(
   let count = 0;
   // What the classification kept out, across every workspace (each workspace.json names its own too).
   const leftOut: Array<LeftOut & { ws: string }> = [];
+  // What a workspace's export did not carry in full because a limit was reached (feature-list audit #68).
+  const truncated: Array<ExportTruncation & { ws: string }> = [];
   for (const w of wss) {
     try {
       const { json, images } = await collectWorkspace(storage, config, { orgId, ws: w.id, exporterGaii, exportedAt, isOrgManager, reader });
       leftOut.push(...json.leftOut.map(l => ({ ws: w.id, ...l })));
+      truncated.push(...(json.truncated ?? []).map(t => ({ ws: w.id, ...t })));
       const folder = `workspaces/${w.id}`;
       for (const [name, data] of images) archive.append(data, { name: `${folder}/${name}` });
       archive.append(JSON.stringify(json, null, 2), { name: `${folder}/workspace.json` });
@@ -91,10 +96,11 @@ export async function exportOrganism(
   }
 
   orgJson.leftOut = leftOut;
+  orgJson.truncated = truncated;
   archive.append(JSON.stringify(orgJson, null, 2), { name: 'organism.json' });
   archive.finalize();
   const buffer = await done;
   const safe = String(org.name).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'organism';
   const prefix = 'organism';
-  return { buffer, filename: `${prefix}-${safe}.zip`, workspaces: count, leftOut };
+  return { buffer, filename: `${prefix}-${safe}.zip`, workspaces: count, leftOut, truncated };
 }

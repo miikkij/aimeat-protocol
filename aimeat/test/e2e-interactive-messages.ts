@@ -10,6 +10,10 @@
 // structured question, the picks an agent will act on, so a stranger must neither read Bob's thread
 // nor accept the first-contact request on his behalf. One of the 34 seeded into
 // security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
+//
+// 2026-10-15 — 7b: the node refuses answers that do not fit the question (an option it never offered,
+// two answers to a single choice, free text where none is allowed, a required question unanswered, an
+// unknown question id), which until then only the inbox page restricted (feature-list audit #123).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -223,6 +227,34 @@ await test('7. A malformed question spec (option without id) is rejected (400)',
         }),
     });
     assert(status === 400, `expected 400 for malformed spec, got ${status}`);
+});
+
+// The node checks an answer against its question (feature-list audit #123): until 2026-10-15 only the
+// inbox page did, and every one of these was stored and read back by the agent as a choice.
+await test('7b. Answers that do not fit the question are refused (400 INVALID_INPUT with problems), and nothing is stored', async () => {
+    const send = (answers: Record<string, unknown>) => json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+        body: JSON.stringify({
+            to: askbot.gaii, conversation_id: conversationId, reply_to: questionId, body: 'a reply that does not fit',
+            interactive: { role: 'answers', v: 1, answersFor: questionId, answers },
+        }),
+    });
+    const cases: Array<[string, Record<string, unknown>, string]> = [
+        ['an option the question never offered', { q1: { selected: ['magic-link'], other: null } }, 'q1'],
+        ['two options on a single-choice question', { q1: { selected: ['oauth', 'pw'], other: null } }, 'q1'],
+        ['a free-text answer where the question allows none', { q1: { selected: ['oauth'] }, q2: { selected: [], other: 'Everything' } }, 'q2'],
+        ['the required question left unanswered', { q2: { selected: ['read'], other: null } }, 'q1'],
+        ['a question id the question set does not have', { q1: { selected: ['oauth'] }, q9: { selected: ['x'] } }, 'q9'],
+    ];
+    for (const [what, answers, question] of cases) {
+        const r = await send(answers);
+        assert(r.status === 400 && r.body?.error?.code === 'INVALID_INPUT', `${what}: expected 400 INVALID_INPUT, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const problems = r.body.error.details?.problems as Array<{ question: string }> | undefined;
+        assert(!!problems?.some((p) => p.question === question), `${what}: details.problems names ${question}, got ${JSON.stringify(problems)}`);
+    }
+    const thread = await json(`/v1/messages/agent-thread/${encodeURIComponent(conversationId)}`, { headers: { Authorization: `Bearer ${askbot.token}` } });
+    const stored = (thread.body.data.messages as any[]).filter((m) => m.body === 'a reply that does not fit');
+    assert(stored.length === 0, `a refused answer reached the thread: ${stored.length}`);
 });
 
 await test('8. Owner can ask its OWN agent a question (own-agent path, no gate)', async () => {

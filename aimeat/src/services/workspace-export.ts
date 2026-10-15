@@ -14,6 +14,10 @@
  *   - exportWorkspace(storage, config, { orgId, ws, exporterGaii, exportedAt }) -> { buffer, filename }
  * @usage import { exportWorkspace } from '../services/workspace-export.js';
  * @version-history
+ *   2026-10-15 -- The row spaces (`backing: 'rows'`) are in the export as `rows`
+ *     (services/workspace-transfer-rows.ts), and a limit the export reached (10 000 memory records,
+ *     or the most rows a workspace may hold) is named in `truncated` and returned by
+ *     exportWorkspace. Both used to be missing without a word (feature-list audit #68).
  *   v1.1.0 -- 2026-10-05 -- An image shared into the organism leaves the export only when its organism
  *     classification lets it: its workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 -- 2026-06-09 -- Initial: ZIP export (workspace.json + images/) reusing archiver.
@@ -47,6 +51,9 @@ import { memoryTarget, fileTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
 import { leaveMemories, leftOutOf, type LeftOut } from './classification-exits.js';
 import { logger } from '../utils/logger.js';
+import { collectRowSpaces, type ExportRow, type ExportTruncation } from './workspace-transfer-rows.js';
+
+export type { ExportRow, ExportTruncation } from './workspace-transfer-rows.js';
 
 export const WS_EXPORT_VERSION = '1.0';
 
@@ -76,7 +83,14 @@ export interface WorkspaceExportJson {
   images: ExportImage[];
   /** What the classification kept out of the export, by key (records and images), with the label and why. */
   leftOut: LeftOut[];
+  /** The rows of the workspace's row spaces (`backing: 'rows'`). Absent in a bundle made before 2026-10-15. */
+  rows?: ExportRow[];
+  /** What the export did not carry in full because a limit was reached. Empty when it carried everything. */
+  truncated?: ExportTruncation[];
 }
+
+/** The most memory records (records, documents, versions, meta) one workspace export reads. */
+export const EXPORT_RECORD_LIMIT = 10000;
 
 /** Pull storage keys out of an image URL: /v1/storage/<key> or /v1/pub/<ghii>/<key>. */
 const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
@@ -103,7 +117,9 @@ export async function collectWorkspace(
     isActiveMemberOwner = !!m && m.status === 'active';
   }
 
-  const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 });
+  // `total` is the count past the limit too, so a workspace larger than the export reads is named in
+  // `truncated` instead of arriving as a smaller backup without a word (feature-list audit #68).
+  const { items, total: recordTotal } = await storage.listAllMemory({ prefix: `${root}.`, limit: EXPORT_RECORD_LIMIT });
 
   // SECURITY (C-5): membership of the organism is not access to every workspace in it. The live read
   // decides per workspace, on its manifest record — an org manager reads all, the manifest's own
@@ -141,8 +157,9 @@ export async function collectWorkspace(
     aimeatWorkspaceExport: WS_EXPORT_VERSION, exportedAt,
     source: { organismId: orgId, ws, nodeId: config.nodeId },
     name: ws, manifest: null, readme: null, config: null,
-    schemas: {}, sections: {}, sources: null, objects: [], images: [], leftOut,
+    schemas: {}, sections: {}, sources: null, objects: [], images: [], leftOut, rows: [], truncated: [],
   };
+  if (recordTotal > items.length) out.truncated!.push({ what: 'records', exported: items.length, total: recordTotal });
   const namespaces = new Set<string>();
   const imageKeys = new Set<string>();
 
@@ -177,6 +194,13 @@ export async function collectWorkspace(
     const md = (r.value && typeof r.value === 'object') ? (r.value as { markdown?: unknown }).markdown : undefined;
     if (typeof md === 'string') for (const m of md.matchAll(STORAGE_URL_RE)) imageKeys.add(decodeURIComponent(m[1]));
   }
+
+  // The row spaces live in their own table, so the memory scan above never meets them: their rows
+  // are read here, through the same show and leave (feature-list audit #68).
+  const rowPart = await collectRowSpaces({ storage, config }, { orgId, ws, manifest: out.manifest, reader });
+  out.rows = rowPart.rows;
+  out.leftOut.push(...rowPart.leftOut);
+  out.truncated!.push(...rowPart.truncated);
 
   // Locked schemas per namespace.
   for (const ns of namespaces) {
@@ -215,7 +239,7 @@ export async function exportWorkspace(
   storage: Storage,
   config: AimeatConfig,
   opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean; reader: ContentReader },
-): Promise<{ buffer: Buffer; filename: string; leftOut: LeftOut[] }> {
+): Promise<{ buffer: Buffer; filename: string; leftOut: LeftOut[]; truncated: ExportTruncation[] }> {
   const { json, images } = await collectWorkspace(storage, config, opts);
   const archive = new ZipArchive({ zlib: { level: 6 } });
   const chunks: Buffer[] = [];
@@ -229,5 +253,5 @@ export async function exportWorkspace(
   archive.finalize();
   const buffer = await done;
   const safe = String(json.name).replace(/[^a-z0-9_-]+/gi, '-').slice(0, 40) || 'workspace';
-  return { buffer, filename: `workspace-${safe}.zip`, leftOut: json.leftOut };
+  return { buffer, filename: `workspace-${safe}.zip`, leftOut: json.leftOut, truncated: json.truncated ?? [] };
 }

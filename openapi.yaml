@@ -38565,7 +38565,9 @@ paths:
                     A starting shape (GET /v1/organisms/shapes): the organism takes the shape's
                     type, join policy and visibility unless they are given, and gets the shape's
                     workspaces, each with its spaces, locked schemas and a readme. An unknown shape
-                    is refused with 400 before anything is written. The answer carries `workspaces`.
+                    is refused with 400 before anything is written. The answer carries `workspaces`
+                    (the ones made) and `workspaces_not_created` (the ones that failed, each with
+                    its reason); the organism and the workspaces made stay either way.
                 lang:
                   type: string
                   enum: [en, fi, es]
@@ -38581,7 +38583,30 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/OrganismRecord'
+                        type: object
+                        properties:
+                          organism:
+                            $ref: '#/components/schemas/OrganismRecord'
+                          workspaces:
+                            type: array
+                            description: With a shape only. The shape's workspaces that were created.
+                            items:
+                              type: object
+                              properties:
+                                ws: { type: string }
+                                name: { type: string }
+                          workspaces_not_created:
+                            type: array
+                            description: >-
+                              With a shape only. The shape's workspaces that were NOT created, each
+                              with its place in the shape and the reason. Empty when every workspace
+                              was made. Create a missing one with POST /v1/organisms/{id}/workspaces.
+                            items:
+                              type: object
+                              properties:
+                                name: { type: string }
+                                index: { type: integer }
+                                reason: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -40201,7 +40226,7 @@ paths:
         - { name: ws, in: query, required: true, schema: { type: string } }
         - { name: form_id, in: query, required: true, schema: { type: string } }
       responses:
-        '200': { description: Deleted (or already absent) }
+        '200': { description: 'Deleted (or already absent). The conversations of a conversation form stay until their own date (`ttl_days` after the last visitor message), when the node deletes them.' }
         '403': { description: Not the workspace creator / org admin }
   /v1/intake/{org}/{ws}/{formId}:
     get:
@@ -40231,7 +40256,9 @@ paths:
         against the destination's locked schema, and writes ONE record (published or draft). Returns only
         { ok, id, mode } — never any other record. A form defined with `max_per_day` takes that many
         submissions in one UTC day, from all senders together, and answers 429 INTAKE_DAILY_LIMIT to
-        the next; a submission that writes nothing (the honeypot, a refusal) uses none of the count.
+        the next; a submission that writes nothing (the honeypot, a refusal, a write that failed) uses
+        none of the count. `ok: true` is answered only after the record's own write result says it
+        was stored.
       tags: [Public Intake]
       security: []
       parameters:
@@ -40252,7 +40279,9 @@ paths:
             Nothing was saved. SCHEMA_VALIDATION_FAILED: the submission does not match the destination
             schema. UNDECLARED_SPACE: the form's destination is not a space its workspace manifest
             declares (see components/responses/UndeclaredSpace); an anonymous submitter is told neither
-            the namespace nor the declared spaces, only `how_to_fix`.
+            the namespace nor the declared spaces, only `how_to_fix`. INTAKE_NOT_STORED: the published
+            write refused the record (details.reason: the space's write guard or schema, INVALID, and
+            the like); the daily slot is given back.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -40337,7 +40366,8 @@ paths:
       description: |
         Deletes the thread record, the reply record and the signal record with every stored version
         of each. The token opens nothing afterwards. The node also deletes a conversation by itself
-        `ttl_days` after its last visitor message, when the form next starts a conversation.
+        `ttl_days` after its last visitor message, on an hourly scheduled job, whether the form is
+        still open, switched off or deleted.
       tags: [Public Intake]
       security: []
       parameters:
@@ -40656,7 +40686,11 @@ paths:
         binaries). Workspace creator or org admin. Add `?format=base64` to get a size-capped base64
         JSON payload instead of the binary (for programmatic/MCP callers). What the classification
         keeps out of an export (TARGET-082) is named in `workspace.json` `leftOut` and, in base64
-        mode, in `left_out` (ClassificationLeftOut items).
+        mode, in `left_out` (ClassificationLeftOut items). The rows of the workspace's row spaces
+        (`backing: 'rows'`) are in `workspace.json` `rows`. A limit the export reached (10 000 memory
+        records, or the most rows a workspace may hold) is named in `workspace.json` `truncated`
+        (`{ what: records|rows, namespace?, exported, total }`), in base64 mode in `truncated`, and on
+        the binary download by the header `X-Aimeat-Export-Truncated: true`.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -40832,8 +40866,11 @@ paths:
       description: |
         Restores a workspace export ZIP as a NEW workspace in this organism: remaps the
         organism/workspace ids (record + document ids are preserved so links/references stay valid),
-        re-locks schemas, re-creates images (deduped if already present) and rewrites their URLs. The
-        importer becomes the new workspace's creator. Body is the raw ZIP (Content-Type:
+        re-locks schemas, re-creates images (deduped if already present) and rewrites their URLs, and
+        restores the rows of the row spaces (row ids, bodies and `occurredAt` kept; written now, by
+        the importer). The rows are held to the workspace and organism row quotas before anything is
+        written, so a bundle that does not fit is refused (400 IMPORT_FAILED) with nothing restored.
+        The importer becomes the new workspace's creator. Body is the raw ZIP (Content-Type:
         application/zip) or JSON `{ zip_base64 }`. Member of the target organism.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
@@ -40853,9 +40890,9 @@ paths:
       responses:
         '201':
           description: >-
-            Imported. Returns { ws, objects, documents, images, images_deduped, schemas }, and
-            skipped_undeclared when the bundle carried records in spaces its own manifest does not
-            declare.
+            Imported. Returns { ws, objects, documents, rows, images, images_deduped, schemas }, and
+            skipped_undeclared when the bundle carried records (or rows, role "row") in spaces its
+            own manifest does not declare.
           content:
             application/json:
               schema:
@@ -41446,6 +41483,10 @@ paths:
         payload instead of the binary. Membership/board are not exported. What the classification
         keeps out (TARGET-082) is named per workspace in `workspace.json` `leftOut`, across the bundle
         in `organism.json` `leftOut`, and in base64 mode in `left_out` (each item adds its `ws`).
+        Each workspace carries the rows of its row spaces. A limit a workspace's export reached is
+        named in that `workspace.json` `truncated`, across the bundle in `organism.json` `truncated`,
+        in base64 mode in `truncated` (each item adds its `ws`), and on the binary download by the
+        header `X-Aimeat-Export-Truncated: true`.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -55565,6 +55606,14 @@ paths:
         A group conversation is currently node-local: every participant must live on this node. A
         thread that arrived from a peer keeps that peer's party as a return address rather than as a
         participant, which is how an answer travels back without a foreign member.
+
+        ANSWERS TO A STRUCTURED QUESTION (`interactive.role: answers`) are checked against the
+        question they reply to (`answersFor`), whoever sends them: every answered question id is one
+        of the question set, every `selected` id is one of that question's options, given once, a
+        single-choice question takes one answer (one option or `other`), `other` is given only where
+        the question allows it, and every required question is answered. Answers that do not fit are
+        refused with 400 INVALID_INPUT and `details.problems` (`[{ question, problem }]`); nothing is
+        stored.
       tags: [Direct Messages]
       security:
         - BearerAuth: []

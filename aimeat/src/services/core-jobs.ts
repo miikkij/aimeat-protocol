@@ -11,6 +11,9 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-15 — gate-expiry: overdue gate approvals expired on a clock; startGateExpiryJob was
+ *     written and never started (feature-list audit #59). intake-thread-retention: visitor
+ *     conversations deleted on their retention date (feature-list audit #64).
  *   2026-10-15 — The daily allowance credits each person once, with a ledger row (runDailyAllowance); it
  *     credited once per agent (feature-list audit 135).
  *   v1.15.0 — 2026-10-09 — nonce-cleanup is registered on every node, not only with FTN or EUDIW on:
@@ -72,6 +75,21 @@ export function registerCoreHandlers(
     await runDesignBookAgingJob(storage, config);
   });
   scheduler.registerCoreHandler('invitation-expiry', () => runInvitationExpiryJob(storage));
+  // Gate approvals past their deadline, among them a member's suggested workspace change (30 days):
+  // marked rejected and the member told. The list and decision routes expire lazily as well; this
+  // scheduled job is what expires an approval nobody opens (feature-list audit #59).
+  scheduler.registerCoreHandler('gate-expiry', async () => {
+    const { expireOverdueApprovals } = await import('./gate-expiry.js');
+    const expired = await expireOverdueApprovals(storage, new Date().toISOString());
+    if (expired > 0) logger.info(`Gate expiry: ${expired} overdue approval(s) expired`);
+  });
+  // Visitor conversations of public intake forms past the retention date the form promised: the
+  // thread and its messages are deleted, whatever state the form is in (feature-list audit #64).
+  scheduler.registerCoreHandler('intake-thread-retention', async () => {
+    const { runIntakeThreadRetention } = await import('./intake-thread-retention.js');
+    const removed = await runIntakeThreadRetention(storage, config.nodeId);
+    if (removed > 0) logger.info(`Intake thread retention: ${removed} visitor conversation(s) deleted`);
+  });
   // The model catalogue (System 2 plan V4): the job runs daily and refreshes when the operator's
   // cadence (AIMEAT_AI_CATALOG_REFRESH: weekly, daily, off) says it is due. Dynamic import like the
   // other heavy handlers.
