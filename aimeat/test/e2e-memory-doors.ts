@@ -24,6 +24,7 @@
  *     test/run-e2e-ci.ts --test=memory-doors
  *
  * @version-history
+ *   2026-10-16 — The bulk write refuses an entry whose visibility the single write refuses (`workspace`, an unknown word) and writes the rest (QA audit list review).
  *   2026-10-15 — A copy past a schema lock is refused with 422 (feature-list audit #51). The hands on a
  *     key count a delete and come back newest first across the owner's namespaces (feature-list audit #50).
  *   v1.2.0 — 2026-10-05 — A schema lock with the aimeat-validate formats (fi-business-id, iban) and
@@ -220,6 +221,40 @@ await test('bulk: an OWNER session may not name ANOTHER owner\'s agent (403)', a
     body: JSON.stringify({ agent: siblingGaii, entries: [{ key: 'doors.bulk.own', value: 1 }] }),
   });
   assert(mine.status === 200, `own agent: expected 200, got ${mine.status}: ${JSON.stringify(mine.body?.error)}`);
+});
+
+// The bulk write took `workspace` as a visibility, which the single write and aimeat_memory_write
+// refuse, and turned any other unknown word into private without saying so.
+await test('bulk: an entry with a visibility the single write refuses fails, and the others are written', async () => {
+  const single = await json('/v1/memory', {
+    method: 'POST', headers: agentAuth(), body: JSON.stringify({ key: 'doors.bulk.vis.single', value: 1, visibility: 'workspace' }),
+  });
+  assert(single.status === 400, `the single write refuses workspace: ${single.status}`);
+
+  const { status, body } = await json('/v1/memory/bulk', {
+    method: 'POST', headers: agentAuth(),
+    body: JSON.stringify({ entries: [
+      { key: 'doors.bulk.vis.ws', value: 1, visibility: 'workspace' },
+      { key: 'doors.bulk.vis.odd', value: 2, visibility: 'everyone' },
+      { key: 'doors.bulk.vis.ok', value: 3, visibility: 'members' },
+      { key: 'doors.bulk.vis.none', value: 4 },
+    ] }),
+  });
+  assert(status === 200, `the batch answers: ${status} ${JSON.stringify(body?.error)}`);
+  assert(body.data.created === 2, `the two valid entries are written: ${JSON.stringify(body.data)}`);
+  const failedKeys = (body.data.failed as Array<{ key: string; reason: string }>).map(f => f.key).sort();
+  assert(JSON.stringify(failedKeys) === JSON.stringify(['doors.bulk.vis.odd', 'doors.bulk.vis.ws']), `the two refused: ${JSON.stringify(body.data.failed)}`);
+  for (const f of body.data.failed as Array<{ key: string; reason: string }>) {
+    assert(/visibility/.test(f.reason) && /private, owner, group, members, public/.test(f.reason), `the reason names the visibilities: ${f.reason}`);
+  }
+  for (const key of ['doors.bulk.vis.ws', 'doors.bulk.vis.odd']) {
+    const r = await json(`/v1/memory/${key}`, { headers: agentAuth() });
+    assert(r.status === 404, `${key} was not stored: ${r.status}`);
+  }
+  const ok = await json('/v1/memory/doors.bulk.vis.ok', { headers: agentAuth() });
+  assert(ok.status === 200 && ok.body.data.visibility === 'members', `the valid entry keeps its visibility: ${JSON.stringify(ok.body?.data)}`);
+  const none = await json('/v1/memory/doors.bulk.vis.none', { headers: agentAuth() });
+  assert(none.status === 200 && none.body.data.visibility === 'private', `no visibility means private: ${JSON.stringify(none.body?.data)}`);
 });
 
 await test('export: ?agent naming another owner\'s agent → 403; the caller\'s own sibling is allowed', async () => {

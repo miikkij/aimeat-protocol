@@ -16863,6 +16863,11 @@ paths:
         Public for a public app, because this is the promise the app makes to whoever installs it and
         an agent weighing it has not signed in. The publish check's `gap` is the owner's own
         unfinished business and is stripped for everyone else.
+
+        The map of an app that is not public goes only to whoever may see that app: an app an
+        operator hid, an app behind an access code and an unlisted app to its owner's account and an
+        operator; an app listed to the community also to every signed-in member of this node.
+        Everyone else gets the same 404 as for an app that does not exist.
       tags: [Apps]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
@@ -16885,7 +16890,7 @@ paths:
                           stamp:
                             allOf: [{ $ref: '#/components/schemas/DataMapStamp' }]
                             nullable: true
-        '404': { description: No such app, or it has no map yet }
+        '404': { description: 'No such app, or an app that is not public and the caller may not see it' }
     put:
       summary: State where an app puts what
       description: |
@@ -17883,7 +17888,11 @@ paths:
                       value: {}
                       visibility:
                         type: string
-                        enum: [private, owner, group, members, public, workspace]
+                        enum: [private, owner, group, members, public]
+                        description: >-
+                          The visibilities POST /v1/memory takes; absent means private. Any other value,
+                          `workspace` included, fails that entry under failed[]. A record a workspace
+                          reads is written through the workspace.
                       tags:
                         type: array
                         items: { type: string }

@@ -11,6 +11,7 @@
  *   here is either "this works end to end" or "this is refused with a sentence naming the fix".
  *   There is deliberately no middle.
  * @version-history
+ *   2026-10-16 — The quota refusals this header promised and nobody had written: a write past the workspace row quota and one past the organism row quota are refused whole, with the rows already there kept and nothing of the refused write stored (QA audit list review).
  *   v1.1.0 — 2026-09-24 — Which copy of the manifest decides a row space's policy (secaudit 2026-09,
  *     A6-9): an admin's copy written first and the creator's after it, and the row gate answers from
  *     the creator's; a plain member's own copy is refused at the write.
@@ -320,6 +321,106 @@ await test('one row is removed by id, and the second delete says there is nothin
     assert(first.status === 200, `delete ${first.status}`);
     const again = await json(url, { method: 'DELETE', headers: authA() });
     assert(again.status === 404, `second delete: ${again.status}`);
+});
+
+// ── The quotas ───────────────────────────────────────────────────────────────
+//
+// Both quotas are counted before the insert (row-service.ts enforceQuota), so a write past either
+// one is refused whole: none of its rows land, and the rows already there stay. The ceilings are
+// lowered for these tests through the operator's config route (A is the first owner on the fresh
+// database, so A is the operator), then set back to their values and their overrides removed.
+
+const setQuota = (path: string, value: number) => json('/v1/admin/config', {
+    method: 'PUT', headers: authA(), body: JSON.stringify({ changes: [{ path, value }] }),
+});
+const dropQuota = (path: string) => json(`/v1/admin/config/${encodeURIComponent(path)}`, { method: 'DELETE', headers: authA() });
+/** The value a setting has now, so a test can put it back: removing the override alone takes effect only at the next restart. */
+const quotaNow = async (path: string): Promise<number> => {
+    const r = await json('/v1/admin/config', { headers: authA() });
+    assert(r.status === 200, `config read ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    return r.body.data.schema[path].value as number;
+};
+/** Put the setting back to what it was, then remove the override so the stored config is as it was too. */
+const restoreQuota = async (path: string, value: number): Promise<void> => {
+    const put = await setQuota(path, value);
+    assert(put.status === 200, `the setting is put back: ${put.status} ${JSON.stringify(put.body)}`);
+    const dropped = await dropQuota(path);
+    assert(dropped.status === 200, `the override is removed: ${dropped.status} ${JSON.stringify(dropped.body)}`);
+};
+const rowCount = async (): Promise<number> => {
+    const s = await json(`/v1/organisms/${orgId}/workspace/rows/mailmessage/stats?ws=${WS}`, { headers: authA() });
+    assert(s.status === 200, `stats ${s.status}: ${JSON.stringify(s.body)}`);
+    return s.body.data.stats.rows as number;
+};
+
+await test('a write past the workspace row quota is refused, and none of its rows are written', async () => {
+    const before = await rowCount();
+    const original = await quotaNow('quota.ws_rows_max_per_workspace');
+    const set = await setQuota('quota.ws_rows_max_per_workspace', before + 2);
+    assert(set.status === 200, `the operator lowers the workspace row quota: ${set.status} ${JSON.stringify(set.body)}`);
+    try {
+        const three = Array.from({ length: 3 }, (_, i) => ({ row_id: `quota-ws-${i}`, body: { contactRef: 'c-q', subject: `q${i}` } }));
+        const over = await json(rowsUrl('mailmessage'), { method: 'POST', headers: authA(), body: JSON.stringify({ rows: three }) });
+        assert(over.status === 413 && over.body.error?.code === 'QUOTA_EXCEEDED',
+            `a batch of three past a room of two is refused: ${over.status} ${JSON.stringify(over.body.error ?? over.body)}`);
+        assert(String(over.body.error.message).includes('ws_rows_max_per_workspace'), `the refusal names the setting: ${over.body.error.message}`);
+        assert(await rowCount() === before, 'none of the three rows was written');
+
+        const two = await json(rowsUrl('mailmessage'), { method: 'POST', headers: authA(), body: JSON.stringify({ rows: three.slice(0, 2) }) });
+        assert(two.status === 200 && two.body.data.written === 2, `two rows fit: ${two.status} ${JSON.stringify(two.body)}`);
+        const one = await json(rowsUrl('mailmessage'), {
+            method: 'POST', headers: authA(), body: JSON.stringify({ row_id: 'quota-ws-x', body: { contactRef: 'c-q' } }),
+        });
+        assert(one.status === 413 && one.body.error?.code === 'QUOTA_EXCEEDED', `the row one past the quota is refused: ${one.status}`);
+        assert(await rowCount() === before + 2, 'the full workspace still holds what it held');
+    } finally {
+        await restoreQuota('quota.ws_rows_max_per_workspace', original);
+    }
+});
+
+await test('a write past the organism row quota is refused, and none of its rows are written', async () => {
+    // 1 MB is the smallest quota the setting takes. Four rows of about 230 kB fit under it beside the
+    // small rows already there, and a fifth crosses it. Each row stays under the 256 kB row ceiling.
+    const big = (i: number) => ({ row_id: `quota-org-${i}`, body: { contactRef: 'c-big', text: 'x'.repeat(230 * 1024) } });
+    const original = await quotaNow('quota.ws_rows_quota_mb');
+    const set = await setQuota('quota.ws_rows_quota_mb', 1);
+    assert(set.status === 200, `the operator lowers the organism row quota: ${set.status} ${JSON.stringify(set.body)}`);
+    try {
+        const four = await json(rowsUrl('mailmessage'), { method: 'POST', headers: authA(), body: JSON.stringify({ rows: [0, 1, 2, 3].map(big) }) });
+        assert(four.status === 200 && four.body.data.written === 4, `four rows fit: ${four.status} ${JSON.stringify(four.body.error ?? four.body.data)}`);
+        const before = await rowCount();
+
+        const fifth = await json(rowsUrl('mailmessage'), { method: 'POST', headers: authA(), body: JSON.stringify({ rows: [big(4)] }) });
+        assert(fifth.status === 413 && fifth.body.error?.code === 'QUOTA_EXCEEDED',
+            `the row past the organism quota is refused: ${fifth.status} ${JSON.stringify(fifth.body.error ?? fifth.body)}`);
+        assert(String(fifth.body.error.message).includes('ws_rows_quota_mb'), `the refusal names the setting: ${fifth.body.error.message}`);
+        assert(await rowCount() === before, 'the refused row was not written');
+
+        // A row space in ANOTHER workspace of the same organism shares the quota: it is the
+        // organism's, not the workspace's.
+        const otherWs = 'ws-rows-quota';
+        const manifest = {
+            manifestVersion: '1', id: orgId, name: 'Rows quota WS', kind: 'workspace', status: 'active',
+            objectTypes: [{ name: 'mailmessage', schemaRef: 'schema:mail@1', namespace: 'crm.mail', backing: 'rows', writeRole: 'member', mode: 'records' }],
+        };
+        const m = await json('/v1/memory', {
+            method: 'POST', headers: authA(),
+            body: JSON.stringify({ key: `organism.${orgId}.w.${otherWs}.meta.manifest`, value: manifest, visibility: 'private' }),
+        });
+        assert(m.status === 200 || m.status === 201, `second workspace manifest ${m.status}: ${JSON.stringify(m.body)}`);
+        const elsewhere = await json(`/v1/organisms/${orgId}/workspace/rows/mailmessage?ws=${otherWs}`, {
+            method: 'POST', headers: authA(), body: JSON.stringify({ rows: [big(5)] }),
+        });
+        assert(elsewhere.status === 413 && elsewhere.body.error?.code === 'QUOTA_EXCEEDED',
+            `the same organism's other workspace is refused too: ${elsewhere.status} ${JSON.stringify(elsewhere.body.error ?? elsewhere.body)}`);
+        const s = await json(`/v1/organisms/${orgId}/workspace/rows/mailmessage/stats?ws=${otherWs}`, { headers: authA() });
+        assert(s.status === 200 && s.body.data.stats.rows === 0, `nothing landed in the other workspace: ${JSON.stringify(s.body)}`);
+    } finally {
+        await restoreQuota('quota.ws_rows_quota_mb', original);
+        for (let i = 0; i < 4; i++) {
+            await json(`/v1/organisms/${orgId}/workspace/rows/mailmessage/quota-org-${i}?ws=${WS}`, { method: 'DELETE', headers: authA() });
+        }
+    }
 });
 
 // ── Which copy of the manifest decides (secaudit 2026-09, A6-9) ──────────────

@@ -714,10 +714,10 @@
      "slug": "g-5-memory-bulk-writes",
      "cells": [
       "<strong>Memory bulk writes</strong>",
-      "Write many records in one call. Valid entries are saved; the response counts the created, updated and skipped entries and lists each failed one with its reason. One failed entry does not cancel the others.",
+      "Write many records in one call. Valid entries are saved; the response counts the created, updated and skipped entries and lists each failed one with its reason. One failed entry does not cancel the others. An entry takes the same visibilities as a single write; any other value fails that entry.",
       "<code>POST /v1/memory/bulk</code>"
      ],
-     "plain": "Memory bulk writes Write many records in one call. Valid entries are saved; the response counts the created, updated and skipped entries and lists each failed one with its reason. One failed entry does not cancel the others. POST /v1/memory/bulk"
+     "plain": "Memory bulk writes Write many records in one call. Valid entries are saved; the response counts the created, updated and skipped entries and lists each failed one with its reason. One failed entry does not cancel the others. An entry takes the same visibilities as a single write; any other value fails that entry. POST /v1/memory/bulk"
     },
     {
      "slug": "g-5-memory-export-import-and-copy",
@@ -813,10 +813,10 @@
      "slug": "g-5-data-map",
      "cells": [
       "<strong>Data map</strong>",
-      "Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. Anyone can read the map of any app on the node, signed in or not; only the app's owner also gets the findings, such as personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24).",
+      "Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. Anyone reads the map of a public app; the map of an unlisted, access-coded or operator-hidden app goes only to its owner and the operator, and the map of a community-listed app also to the node's signed-in members. Only the app's owner also gets the findings, such as personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24).",
       "<code>/v1/datamap/apps/:owner/:filename</code>, <code>aimeat_datamap_get</code>, <code>aimeat_datamap_set</code>"
      ],
-     "plain": "Data map Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. Anyone can read the map of any app on the node, signed in or not; only the app's owner also gets the findings, such as personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24). /v1/datamap/apps/:owner/:filename, aimeat_datamap_get, aimeat_datamap_set"
+     "plain": "Data map Read what an app stores, why it stores it, the exact location, who can read it, how long it is kept and what could be lost. Anyone reads the map of a public app; the map of an unlisted, access-coded or operator-hidden app goes only to its owner and the operator, and the map of a community-listed app also to the node's signed-in members. Only the app's owner also gets the findings, such as personal data and missing explanations. A row can also name the classification the app expects for that data by default, such as confidential (see section 24). /v1/datamap/apps/:owner/:filename, aimeat_datamap_get, aimeat_datamap_set"
     },
     {
      "slug": "g-5-open-items",
@@ -3273,7 +3273,7 @@
    "title": "Operating a node",
    "slug": "g-19",
    "lead": [
-    "The operator dashboard is the one place with server-built screens. Everything on it is also reachable by an operator's own agent, because agents must be able to run a whole node without a person present. An agent gets these tools only when the operator ticks the <code>operator:admin</code> permission for it; &quot;Full access&quot; does not include it. When the permission arrived, each node gave it once to the operator's agents that already held &quot;Full access&quot;, listed them on the operator's feed, and left the operator's other agents as they were."
+    "The operator dashboard is the one place with server-built screens. An operator's own agent reaches every <code>/v1/admin/*</code> route over REST, because agents must be able to run a whole node without a person present. Over MCP it reaches only the parts that have a tool, the <code>aimeat_admin_*</code> and <code>aimeat_operator_*</code> tools named in the rows below; a row that names only a <code>/v1/admin/...</code> address, such as memory across accounts, the scheduler, the email and push templates, or backup and restore, is REST only. An agent gets this reach only when the operator ticks the <code>operator:admin</code> permission for it; &quot;Full access&quot; does not include it. When the permission arrived, each node gave it once to the operator's agents that already held &quot;Full access&quot;, listed them on the operator's feed, and left the operator's other agents as they were."
    ],
    "columns": [
     "Feature",

@@ -12,6 +12,7 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-10-16 — readProgramMap answers the map of an app an operator hid, an app behind an access code, an unlisted app or a community-listed app only to a caller who may see that app (the owner's account, an operator, and for a community listing any signed-in member of this node); everyone else gets the 404 of an app that does not exist. The caller 'node' is the node's own check (decide service) and passes. (QA audit list review).
  *   v2.1.2 — 2026-09-26 — readProgramMap takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v2.1.1 — 2026-09-24 — readProgramMap strips the stamp's `gap` for everyone but the owner, as it
  *     already did `findings` (A6-10). The REST read and aimeat_datamap_get both come through here.
@@ -26,6 +27,8 @@ import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { MemoryWriteCaller } from '../memory-write.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { operatorOverride, type OperatorAuth } from '../operator-override.js';
+import { appListingOf, type AppRecord } from '../../storage/types/apps.js';
 import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
 import { checkMap, stampFor } from './data-map-check.js';
 import { DATA_MAP_SPEC, type DataMap, type DataMapStamp } from './data-map-types.js';
@@ -49,7 +52,18 @@ export interface DataMapCaller {
   ownerName: string;
   roles: string[];
   scopes: string[];
+  /**
+   * A signed-in person of this node or a principal acting for one: not the anonymous credential and
+   * not a session from another node. Only a member is ever the app's owner here, and a member reads
+   * the map of an app listed to the community. Absent counts as not a member.
+   */
+  member?: boolean;
+  /** The session for the operator question (operator-override.ts). Absent: never an operator. */
+  auth?: OperatorAuth;
 }
+
+/** The node itself reading a map for its own check (decide service): no person, no visibility gate. */
+export const NODE_READ = 'node' as const;
 
 const appIdOf = (filename: string): string => filename.replace(/\.html$/i, '');
 
@@ -63,25 +77,33 @@ export function splitAppRef(ref: string): { owner: string; filename: string } | 
 /**
  * One app's map.
  *
- * The map is public — it is what an AI reads before it touches the app — and the findings are not:
- * what is still missing is the owner's own unfinished business.
+ * The map of a public app is public — it is what an AI reads before it touches the app — and the
+ * findings are not: what is still missing is the owner's own unfinished business. The map of an app
+ * that is not public goes only to whoever may see that app (mayReadMap below).
  */
 export async function readProgramMap(
-  storage: Storage, config: AimeatConfig, caller: DataMapCaller | null, appRef: string, at: string,
+  storage: Storage, config: AimeatConfig, caller: DataMapCaller | typeof NODE_READ | null, appRef: string, at: string,
 ): Promise<ProgramMapResult | DataMapRefusal> {
   const ref = splitAppRef(appRef);
   if (!ref) {
     return { refusal: { status: 400, code: 'INVALID_INPUT', message: 'Name the app as "owner/filename.html".' } };
   }
+  const notFound: DataMapRefusal = {
+    refusal: { status: 404, code: 'NOT_FOUND', message: `No app "${appRef}" on this node. Check the owner name and the filename.` },
+  };
   const bare = localAccountName(ref.owner);
   const record = await storage.getAppByOwnerName(bare, ref.filename);
-  if (!record) {
-    return { refusal: { status: 404, code: 'NOT_FOUND', message: `No app "${appRef}" on this node.` } };
-  }
+  if (!record) return notFound;
+
+  const person = caller === NODE_READ ? null : caller;
+  // Only a member of this node is ever the owner: a visitor's or the anonymous credential's owner
+  // field is not a local account name, whatever its text.
+  const isOwn = !!person && person.member === true && person.ownerName === record.ownerName;
+  // The same 404 as an app that does not exist, so a refusal does not tell that the app is there.
+  if (caller !== NODE_READ && !isOwn && !(await mayReadMap(storage, config, person, record))) return notFound;
 
   const appId = appIdOf(ref.filename);
   const map = await readAppDataMap(storage, record.ownerGaii, appId);
-  const isOwn = !!caller && caller.ownerName === record.ownerName;
   const check = checkMap(map, at);
 
   // The stamp carries the worst finding as `gap`, and that is the same unfinished business as
@@ -97,6 +119,26 @@ export async function readProgramMap(
     stamp,
     ...(isOwn ? { findings: check.findings } : {}),
   };
+}
+
+/**
+ * Whether somebody other than the app's owner may read this app's map. The gates are the app's own,
+ * as the app read routes apply them (routes/apps/read.ts, routes/apps/legal.ts,
+ * services/app-config.ts): an app an operator hid, an app behind an access code and an unlisted app
+ * are the owner's and an operator's; an app listed to the community is also every signed-in member's
+ * of this node; a listed app is everyone's. The operator's read of another person's private map
+ * writes the operator trail, as the app read does.
+ */
+async function mayReadMap(
+  storage: Storage, config: AimeatConfig, caller: DataMapCaller | null, record: AppRecord,
+): Promise<boolean> {
+  const listing = appListingOf(record);
+  const open = !record.operatorHidden && !record.accessCode;
+  if (open && listing === 'listed') return true;
+  if (open && listing === 'community' && caller?.member === true) return true;
+  return operatorOverride(storage, config, caller?.auth ?? null, {
+    ownerOf: record.ownerName, area: 'app', action: 'read', subject: `${record.filename} data map`,
+  });
 }
 
 /** Everything a stated map must carry before it is worth storing. */

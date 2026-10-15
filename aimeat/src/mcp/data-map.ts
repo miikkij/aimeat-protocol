@@ -18,6 +18,7 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-10-16 — The data map caller says whether it is a member of this node and carries its session for the operator question, so aimeat_datamap_get applies the app's own visibility as GET /v1/datamap/apps/:owner/:filename does (QA audit list review).
  *   2026-10-11 — aimeat_app_agent_tie and aimeat_app_agent_untie: one row of an app's map that names
  *     an agent, added or removed.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -63,6 +64,8 @@ export function registerDataMapTools(
       ownerName: session.owner,
       roles: [...session.roles],
       scopes: [...session.scopes],
+      member: session.kind !== 'anonymous' && !session.visitor,
+      auth: session.auth,
     };
   };
 

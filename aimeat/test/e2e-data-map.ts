@@ -11,6 +11,7 @@
  *   that guessing cannot come back without turning this suite red.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-map
  * @version-history
+ *   2026-10-16 — The map of an app that is not public (unlisted, behind an access code, listed to the community, hidden by an operator) goes only to whoever may see the app; another owner, another owner's agent over MCP and a caller with no token get a 404 (QA audit list review).
  *   v2.2.0 — 2026-09-26 — A6-10 on the MCP door: aimeat_app_get gives another owner's agent the
  *     manifest without `dataMap.gap`. Failed on the code before the fix: the gap was there.
  *   v2.1.0 — 2026-09-24 — A6-10: another owner and a caller with no token read the stamp without
@@ -312,6 +313,70 @@ async function publish(o: Owner, filename: string): Promise<void> {
         // And the good map is still there, untouched.
         const r = await json(`/v1/datamap/apps/${o.name}/probe-good.html`, { headers: auth(o.token) });
         assert(r.body.data.data_map?.what === GOOD_MAP.what, 'a refused write changes nothing');
+    });
+
+    // The map of an app that is not public went to anyone who asked, signed out included: the read
+    // looked at no visibility. It goes now only to whoever may see the app, and everyone else gets
+    // the 404 of an app that does not exist. `o` is the first owner on the fresh database, so `o` is
+    // the operator here, and the cross-owner readers are `other` and `third`.
+    const patchApp = async (owner: Owner, filename: string, body: Record<string, unknown>): Promise<void> => {
+        const r = await json(`/v1/apps/${filename}`, { method: 'PATCH', headers: auth(owner.token), body: JSON.stringify(body) });
+        assert(r.status === 200, `PATCH ${filename} ${JSON.stringify(body)}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    };
+    const readMap = (owner: string, filename: string, token?: string) =>
+        json(`/v1/datamap/apps/${owner}/${filename}`, token ? { headers: auth(token) } : {});
+    const refused = (r: { status: number; body: any }, who: string): void => {
+        assert(r.status === 404 && r.body?.error?.code === 'NOT_FOUND', `${who} must get the 404 of a missing app, got ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+    };
+
+    await test('the map of an unlisted app goes to its owner and to nobody else, on REST and over MCP', async () => {
+        await publish(o, 'probe-unlisted.html');
+        const w = await json(`/v1/datamap/apps/${o.name}/probe-unlisted.html`, { method: 'PUT', headers: auth(o.token), body: JSON.stringify(GOOD_MAP) });
+        assert(w.status === 200, `write ${w.status}`);
+        await patchApp(o, 'probe-unlisted.html', { listing: 'unlisted' });
+
+        const mine = await readMap(o.name, 'probe-unlisted.html', o.token);
+        assert(mine.status === 200 && mine.body.data.data_map?.what === GOOD_MAP.what, `the owner reads it: ${mine.status}`);
+        refused(await readMap(o.name, 'probe-unlisted.html', other.token), 'another owner');
+        refused(await readMap(o.name, 'probe-unlisted.html'), 'a caller with no token');
+
+        const ownAgent = await mcpCall(await agentOf(o), 'aimeat_datamap_get', { app: `${o.name}/probe-unlisted.html` });
+        assert(!ownAgent.isError && ownAgent.parsed?.data_map?.what === GOOD_MAP.what, `the owner's agent reads it: ${ownAgent.raw.slice(0, 200)}`);
+        const theirAgent = await mcpCall(await agentOf(other), 'aimeat_datamap_get', { app: `${o.name}/probe-unlisted.html` });
+        assert(theirAgent.isError && !theirAgent.raw.includes(GOOD_MAP.what), `another owner's agent is refused: ${theirAgent.raw.slice(0, 200)}`);
+    });
+
+    await test('the map of an app behind an access code goes to its owner and to nobody else', async () => {
+        await publish(o, 'probe-coded.html');
+        await patchApp(o, 'probe-coded.html', { access_code: 'Sesame-2026-code' });
+        const mine = await readMap(o.name, 'probe-coded.html', o.token);
+        assert(mine.status === 200, `the owner reads it: ${mine.status}`);
+        refused(await readMap(o.name, 'probe-coded.html', other.token), 'another owner');
+        refused(await readMap(o.name, 'probe-coded.html'), 'a caller with no token');
+    });
+
+    await test('the map of an app listed to the community goes to the node\'s signed-in members, not to a caller with no token', async () => {
+        await publish(o, 'probe-community.html');
+        await patchApp(o, 'probe-community.html', { listing: 'community' });
+        const member = await readMap(o.name, 'probe-community.html', other.token);
+        assert(member.status === 200, `another member of this node reads it: ${member.status}`);
+        assert(member.body.data.findings === undefined, 'without the owner\'s findings');
+        refused(await readMap(o.name, 'probe-community.html'), 'a caller with no token');
+    });
+
+    await test('the map of an app an operator hid goes to its owner and the operator, not to another owner', async () => {
+        const third = await registerOwner('dmap3');
+        await publish(other, 'probe-hidden.html');
+        const hide = await json(`/v1/admin/apps/${other.name}/probe-hidden.html/moderate`, {
+            method: 'POST', headers: auth(o.token), body: JSON.stringify({ hidden: true, reason: 'E2E' }),
+        });
+        assert(hide.status === 200, `the operator hides the app: ${hide.status} ${JSON.stringify(hide.body?.error)}`);
+        const owner = await readMap(other.name, 'probe-hidden.html', other.token);
+        assert(owner.status === 200, `the owner still reads it: ${owner.status}`);
+        const operator = await readMap(other.name, 'probe-hidden.html', o.token);
+        assert(operator.status === 200, `the operator reads it: ${operator.status}`);
+        refused(await readMap(other.name, 'probe-hidden.html', third.token), 'another owner');
+        refused(await readMap(other.name, 'probe-hidden.html'), 'a caller with no token');
     });
 
     await test('an unknown app is a 404, not an empty map', async () => {
