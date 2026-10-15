@@ -27,6 +27,9 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.3.0 — 2026-10-15 — accountHoldsConsent and listAccountConsents: a consent is the account's on both
+ *     doors, and revokeConsent admits the account for a consent filed under one of its agents
+ *     (feature-list audit 40).
  *   v1.2.0 — 2026-10-12 — The reach is decided here for both surfaces (Core 2026-11 AUTHZ-18): `local`,
  *     `federation` or `auth`; `private` and `dmz` are stored as `local`, counted and named on the
  *     response; an absent reach is `federation` before 4.0.0 and `local` from it (utils/consent-reach.ts).
@@ -44,6 +47,7 @@ import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { isSameOwner, localAccountName } from '../utils/gaii.js';
 import {
     CONSENT_REACH_ALIAS_REMOVED_IN, CONSENT_REACH_INPUTS, consentReachOf, defaultConsentReach, isConsentReachAlias,
 } from '../utils/consent-reach.js';
@@ -65,6 +69,27 @@ export const VALID_RECIPIENT_PATTERNS = [
     /^[^*][^:]*#[^@]+@.+$/,      // one agent  (agent#owner@node)
     /^[^#@*:]+@[^@]+$/,          // one owner  (owner@node)
 ];
+
+/**
+ * Whether the account `account` (a person's GHII) holds the consent filed under `consentOwner`: it is
+ * filed under the account itself, or under one of the account's agents. A consent is the account's
+ * whichever door filed it; REST filed an agent's under the agent's GAII until 2026-10-15, and those
+ * rows stay the account's to see and revoke (feature-list audit 40).
+ */
+export function accountHoldsConsent(account: string, consentOwner: string): boolean {
+    return consentOwner === account || (!account.includes('#') && isSameOwner(consentOwner, account));
+}
+
+/** The account's consents: those filed under it and under any of its agents, oldest rows included. */
+export async function listAccountConsents(
+    storage: Storage, account: string, opts: { status?: 'active' | 'revoked' | 'expired'; recipient?: string } = {},
+): Promise<ConsentRecord[]> {
+    const own = await storage.listConsents(account, opts);
+    const name = localAccountName(account);
+    const agents = name && !account.includes('#') ? await storage.getAgentsByOwner(name) : [];
+    const theirs = (await Promise.all(agents.map(a => storage.listConsents(a.gaii, opts)))).flat();
+    return [...own, ...theirs];
+}
 
 export interface ConsentCaller {
     /** The GHII the consent belongs to, already resolved from the session. */
@@ -209,7 +234,7 @@ export async function revokeConsent(
     if (!consent) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `Consent not found: ${consentId}` };
     }
-    if (consent.ownerGaii !== caller.ownerGaii) {
+    if (!accountHoldsConsent(caller.ownerGaii, consent.ownerGaii)) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the consent owner can revoke' };
     }
 

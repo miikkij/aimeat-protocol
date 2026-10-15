@@ -31,6 +31,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.8.0 — 2026-10-15 — connections:read-as-owner joins the own-tick family: an agent reading what is in
+ *     the owner's connected accounts (feature-list audit 128).
  *   v1.13.0 — 2026-10-05 — ownerBypassesScopes is gone: its callers ask isOwnerInPerson (utils/gaii.ts),
  *     the one test for the account holder in person (secaudit 2026-10, C4).
  *   v1.12.0 — 2026-10-05 — exceedsCeiling(ceiling, requested): the node's scope ceiling, which five
@@ -294,6 +296,11 @@ const OWN_TICK_SCOPES = [
     // stops being seen, so an agent able to do it on "Full access" could put away the one message
     // about itself. Its own tick; not grandfathered, because the capability did not exist before.
     'messages:organize-as-owner',
+    // Read what is in the OWNER's connected accounts (their mail, its attachments), as the owner
+    // (services/connections/access.ts CONNECTIONS_READ_AS_OWNER_SCOPE). On an agent a connection is
+    // its own; reading the owner's mailbox is a delegation the owner grants on its own tick, for the
+    // reason messages:read-as-owner is. Not grandfathered: the capability did not exist before.
+    'connections:read-as-owner',
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [

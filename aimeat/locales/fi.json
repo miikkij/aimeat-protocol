@@ -16606,6 +16606,7 @@
             "read": "Näe mitkä some- ja julkaisutilit olet liittänyt.",
             "use": "Julkaise ja lähetä niiden tilien kautta, jotka olet jo liittänyt: päivitykset someen ja sähköpostit omasta postilaatikostasi. Tilien sisältöä tämä lupa ei avaa.",
             "read-through": "Lue niiden tilien sisältöä, jotka olet jo liittänyt: hae sähköposteistasi, avaa viestejä ja liitteitä ja katso osoitteet, joista lähetät postia.",
+            "read-as-owner": "Lue sinuna niitä postilaatikoita, jotka olet itse liittänyt: hae sähköposteistasi ja avaa viestejä ja liitteitä. Agentti tarvitsee lisäksi luvan lukea tilien sisältöä.",
             "write": "Liitä uusia sometilejä nimiisi ja irrota olemassa olevia."
           },
           "consent": {

@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.15.0 — 2026-10-15 — connections:read-as-owner, outside every wildcard: reading what is in the
+ *     owner's connected accounts (feature-list audit 128).
  *   v1.19.0 — 2026-10-13 — organism:direct, inside the wildcard and in neither preset: writing a
  *     record space directly that an app closed to agents, and changing which extensions such a space
  *     names. No permission let an agent through that rule before (Jouni, 2026-10-13).
@@ -172,6 +174,11 @@ export const NOT_IN_WILDCARD = [
   // asked only whether the account runs the node, so every agent an operator connected held all of
   // them. Only an operator's own agent can be given it at all.
   'operator:admin',
+  // ── Added 2026-10-15 ─────────────────────────────────────────────────────────────────────────
+  // Reading what is in the owner's connected accounts, as the owner: their mail and its attachments.
+  // An agent's connections are its own; this is what lets the owner's AI read the mailbox the owner
+  // connected, and it costs its own tick for the reason messages:read-as-owner does.
+  'connections:read-as-owner',
 ];
 
 /**
@@ -240,7 +247,8 @@ export const SCOPE_DOMAINS = [
   { key: 'company',   permissions: ['read', 'write'] },
   // connections:use publishes and sends THROUGH an account; connections:read-through reads what is
   // IN one, the mailbox included. Two favours, two boxes, since 2026-09-24.
-  { key: 'connections', permissions: ['read', 'write', 'use', 'read-through'] },
+  // read-as-owner — read what is in the OWNER's connected accounts; read-through alone reads the agent's own.
+  { key: 'connections', permissions: ['read', 'write', 'use', 'read-through', 'read-as-owner'] },
   // The other MCP servers this account has attached — an issue tracker, a wiki, whatever the
   // person connected. Three words for the same reason connections has three: knowing WHICH servers
   // are attached, calling a tool THROUGH one, and attaching another are three different favours.

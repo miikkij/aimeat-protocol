@@ -29,6 +29,8 @@
  * @structure createRemoteMcpSource(storage, config) → DiscoverySource
  * @usage registry.register(createRemoteMcpSource(storage, config));
  * @version-history
+ *   2026-10-15 — The servers are resolved for the caller's account (ownerGhiiOf), so an agent finds its
+ *     owner's attached tools; a group's server is left out until a route can call it (feature-list audit 16).
  *   v1.0.0 — 2026-09-16 — Phase 6 of the MCP proxy.
  */
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
@@ -37,6 +39,7 @@ import type { AimeatConfig } from '../../../config.js';
 import type { McpServerRecord, RemoteToolSnapshot } from '../../../models/mcp-server-schemas.js';
 import { listUsableServers, requireUsableServer } from '../../mcp-client/registry.js';
 import { logger } from '../../../utils/logger.js';
+import { ownerGhiiOf } from '../../../utils/gaii.js';
 
 export const REMOTE_MCP_SOURCE_ID = 'remote-mcp';
 const MAX_LIMIT = 100;
@@ -65,9 +68,13 @@ export function createRemoteMcpSource(storage: Storage, config: AimeatConfig): D
       const limit = Math.min(ctx.filters.limit ?? 20, MAX_LIMIT);
       const q = (ctx.filters.q ?? '').trim().toLowerCase();
 
+      // The servers are the account's: an agent reaches its owner's attached servers, as every other
+      // door resolves them (mcp-proxy.ts, routes/mcp-servers.ts). The agent's own GAII owns none, so
+      // an agent asking here found nothing its owner had attached (feature-list audit 16).
+      const ownerGhii = ownerGhiiOf(ctx.caller.gaii);
       let reachable;
       try {
-        reachable = await listUsableServers(storage, ctx.caller.gaii, config);
+        reachable = await listUsableServers(storage, ownerGhii, config);
       } catch (err) {
         // A directory that cannot read one source answers with the others. Discovery is the place
         // somebody goes when they do not know what exists; failing the whole question because one
@@ -84,8 +91,11 @@ export function createRemoteMcpSource(storage: Storage, config: AimeatConfig): D
         // listUsableServers returns the PUBLIC projection, which deliberately holds no tool list.
         // requireUsableServer re-resolves the row through the same access rule, so this loop cannot
         // see a server the listing would not have shown.
-        const server = await requireUsableServer(storage, ctx.caller.gaii, pub.id, config);
+        const server = await requireUsableServer(storage, ownerGhii, pub.id, config);
         if (!server || !server.enabled || server.status !== 'active') continue;
+        // A group's server is listed only once a route can call it; none can yet, so the directory
+        // does not offer what the caller cannot use (feature-list audit 16).
+        if (server.ownership === 'organism') continue;
 
         for (const tool of server.toolCache) {
           if (hits.length >= limit) break;

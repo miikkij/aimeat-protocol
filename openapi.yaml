@@ -25657,7 +25657,11 @@ paths:
     post:
       operationId: requestMorsels
       summary: Request morsels
-      description: Request additional morsels from the operator (subject to operator policy).
+      description: >-
+        Add the day's morsels to the caller's balance: at most the daily allowance, once per UTC day,
+        up to the accumulation cap. It is the same grant the daily job makes, so a person who already
+        got today's morsels is answered 409 ALREADY_GRANTED_TODAY; a balance at the cap is answered
+        409 QUOTA_EXCEEDED. Every grant writes a ledger row of type allowance.
       tags: [Economy]
       security:
         - BearerAuth: []
@@ -25674,6 +25678,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '409':
+          description: Today's morsels were already added (ALREADY_GRANTED_TODAY), or the balance is at the cap (QUOTA_EXCEEDED).
 
   # ── Notification Boards ────────────────────────────────────
   /v1/boards:
@@ -48976,11 +48982,16 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
     get:
       operationId: genesisMemoryReadPublic
-      summary: Read memory from genesis peer (public)
+      summary: Read memory for an approved genesis peer
       description: >-
-        Answers { results, total, withheld? }. Records whose classification does not let them leave
-        their organism are not sent (TARGET-082); `withheld` counts them with one reason
-        ({ count, reason }) and never names their keys, which are logged on this node.
+        Answers { results, total, withheld? } to an approved genesis peer only, on a request it signed
+        for this node: x-source-node, x-timestamp, x-audience, x-nonce and x-signature over
+        { source_node, timestamp, purpose: "genesis-memory-read", gaii, key, prefix, audience, nonce },
+        each query value empty when absent (from 4.0.4; until then the route answered anyone). Only
+        public keys that one of the identity's active federation consents covers by its data pattern
+        are sent. Records whose classification does not let them leave their organism are not sent
+        (TARGET-082); `withheld` counts them with one reason ({ count, reason }) and never names their
+        keys, which are logged on this node.
       tags: [Federation]
       parameters:
         - name: gaii
@@ -48991,9 +49002,17 @@ paths:
           in: query
           schema:
             type: string
+        - name: prefix
+          in: query
+          schema:
+            type: string
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          description: The request is unsigned, its signature does not match, or it was already received.
+        '403':
+          description: The signing node is not an approved genesis peer of this node.
 
   # ── Packages (Component Packages) ────────────────────────
   /v1/packages:
@@ -59891,11 +59910,13 @@ paths:
       operationId: listConnections
       summary: Accounts the caller has connected
       description: >
-        The caller's own connections and no one else's. The credential is never part of any
-        response; what comes back is enough to name the account in a picker and to see that it
-        needs attention. Any one of `connections:read`, `connections:use` or
-        `connections:read-through` is enough, because an app that may publish through a connection
-        or read through one has to be able to name it.
+        The caller's own connections, each with `holder: own`. An agent also gets its owner's, with
+        `holder: owner`, when it holds `connections:use` (to send through them) or
+        `connections:read-as-owner` (to read them through POST /v1/connections/{id}/read/{resource}).
+        The credential is never part of any response; what comes back is enough to name the account
+        in a picker and to see that it needs attention. Any one of `connections:read`,
+        `connections:use` or `connections:read-through` is enough, because an app that may publish
+        through a connection or read through one has to be able to name it.
       tags: [Connections]
       security:
         - BearerAuth: []
@@ -60457,7 +60478,9 @@ paths:
       summary: Read something from a connected account
       description: >
         The direction this surface never had. Everything else here writes OUT; this brings a
-        person's own data home from wherever it lives behind somebody else's OAuth.
+        person's own data home from wherever it lives behind somebody else's OAuth. An agent reads
+        its own connections on `connections:read-through`, and its owner's when it also holds
+        `connections:read-as-owner`, a word outside every wildcard.
 
 
         A caller names a RESOURCE the provider declares and supplies parameters. It never supplies a
@@ -71499,7 +71522,7 @@ paths:
       operationId: runVisibilityBehaviourFix
       tags: [Signals]
       summary: Run the fixing agent on one app now
-      description: 'Reads the app''s findings of the last seven days, asks the owner''s own AI (their AI settings and credit) for a corrected app, and writes the answer as the app''s draft. It never publishes: the live app is unchanged until the owner publishes the draft. A draft the owner wrote is left alone. The answer is the run: `findings`, `draft` (whether one was written), `model` and `note` (why no draft was written). 403 FEATURE_DISABLED when the operator switched layer D off, 404 NOT_FOUND for an app the caller does not have. The MCP tool aimeat_visibility_behaviour_fix does the same. Requires scope signals:write.'
+      description: 'Reads the app''s findings of the last seven days, asks the owner''s own AI (their AI settings and credit) for a corrected app, and writes the answer as the app''s draft. It never publishes: the live app is unchanged until the owner publishes the draft. A draft the owner wrote is left alone. The answer is the run: `findings`, `draft` (whether one was written), `model` and `note` (why no draft was written). 403 FEATURE_DISABLED when the operator switched layer D off, 409 FIXER_OFF while the owner has the fixing agent switched off (PUT /v1/visibility/behaviour/settings with fixer: true), 404 NOT_FOUND for an app the caller does not have. The MCP tool aimeat_visibility_behaviour_fix does the same. Requires scopes signals:write and app:write, because it writes the app draft.'
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true

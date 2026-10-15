@@ -18,6 +18,8 @@
  *   - mintMorsels: operator mint against the daily cap, for every door that mints
  *
  * @version-history
+ *   2026-10-15 — mintMorsels reads the shared daily ceiling, addedToday: mints and sold pacing packs,
+ *     summed by the database (feature-list audit 176).
  *   v1.3.0 — 2026-10-11 — calculateWorkCost names the escrowed amount `toll`, the action's pacing
  *     amount (was `basePrice`); the arithmetic is unchanged. presentWorkCost: the response shape, with
  *     the old field as a deprecated mirror until MORSEL_PRICE_FIELDS_REMOVED_IN (ruling
@@ -39,6 +41,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, WorkRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { addedToday } from './mint-ceiling.js';
+
 
 export interface SettlementResult {
     providerEarnings: number;
@@ -359,13 +363,10 @@ export async function mintMorsels(
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `Agent not found: ${gaii}` };
     }
 
-    // Enforce daily mint cap (§16.1: max_operator_mint_per_day default 10,000)
-    const dayStart = new Date();
-    dayStart.setUTCHours(0, 0, 0, 0);
-    const allTx = await storage.listAllTransactions();
-    const mintedToday = allTx
-        .filter(tx => tx.type === 'mint' && new Date(tx.timestamp) >= dayStart)
-        .reduce((sum, tx) => sum + tx.amount, 0);
+    // Enforce daily mint cap (§16.1: max_operator_mint_per_day default 10,000). Mints and sold pacing
+    // packs share it, summed by the database: this counted mint rows only, over the newest 10 000
+    // rows (services/mint-ceiling.ts; feature-list audit 176).
+    const mintedToday = await addedToday(storage);
 
     if (mintedToday + amount > config.maxOperatorMintPerDay) {
         return {

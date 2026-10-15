@@ -14,6 +14,8 @@
  *   counted together with operator mints), so a sale cannot print more than the operator could.
  * @structure pacingPackOffer · insufficientMorselsMessage · pacingPackSellableResolver
  * @version-history
+ *   2026-10-15 — The daily ceiling is addedToday (services/mint-ceiling.ts), the one the operator mint
+ *     reads too, summed by the database (feature-list audit 176).
  *   v1.0.0 — 2026-10-11 — Initial (wish-tarjouksella-rahahinta-ja-tahdistus-morselhinnat-tahdistukse).
  */
 import { randomUUID } from 'node:crypto';
@@ -25,6 +27,8 @@ import { listPaymentHandlers } from './payment-handlers.js';
 import { formatMoneyMajor, isSupportedMoneyCurrency } from './money.js';
 import { resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
 import { localAccountName } from '../utils/gaii.js';
+import { addedToday } from '../services/mint-ceiling.js';
+
 
 export const PACING_PACK_KIND = 'pacing-pack';
 
@@ -46,16 +50,6 @@ export function insufficientMorselsMessage(config: AimeatConfig, needed: number)
     ? ` or buy pacing capacity from the operator: ${pack.morsels} morsels for ${formatMoneyMajor(pack.price.amount)} ${pack.price.currency} (checkout item { kind: "${PACING_PACK_KIND}" })`
     : ' or ask the operator of this node';
   return `This use needs ${needed} morsels of pacing and your balance does not cover it. Get more with the daily allowance (POST /v1/wallet/request),${buy}. Morsels pace how fast anything is used; they are not a price.`;
-}
-
-/** Morsels added today by sales and operator mints together, for the shared daily ceiling. */
-async function mintedToday(storage: Storage): Promise<number> {
-  const dayStart = new Date();
-  dayStart.setUTCHours(0, 0, 0, 0);
-  const all = await storage.listAllTransactions();
-  return all
-    .filter(tx => (tx.type === 'mint' || tx.type === 'pacing_pack') && new Date(tx.timestamp) >= dayStart)
-    .reduce((sum, tx) => sum + Math.max(0, tx.amount), 0);
 }
 
 /**
@@ -92,7 +86,8 @@ export function pacingPackSellableResolver(): {
         unitPrice: pack.price.amount, tollMorsels: 0, psp,
         async fulfill(ctx, { session, item }) {
           const morsels = pack.morsels * Math.max(1, item.quantity);
-          if (await mintedToday(ctx.storage) + morsels > ctx.config.maxOperatorMintPerDay) {
+          // The one ceiling mints and sales share, summed by the database (services/mint-ceiling.ts).
+          if (await addedToday(ctx.storage) + morsels > ctx.config.maxOperatorMintPerDay) {
             throw new CommerceError('PACING_PACK_CAP', 429, `The node adds at most ${ctx.config.maxOperatorMintPerDay} morsels a day, and today's limit is reached. Try again tomorrow.`);
           }
           await ctx.storage.creditBalance(session.buyerGhii, morsels);

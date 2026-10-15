@@ -14,6 +14,8 @@
  *   refused on REST and has no such tool on MCP; no token is 401; a beacon for an unknown app, for
  *   another node's owner or of the wrong shape counts nothing.
  * @version-history
+ *   2026-10-15 — 6b: a run on request reads the fixer switch (409 FIXER_OFF) and asks app:write; the
+ *     writer agent holds app:write (feature-list audit 91).
  *   v1.0.0 — 2026-10-08 — Initial.
  */
 
@@ -172,7 +174,9 @@ void OP;
 const S = await makeOwner('behseller');
 const B = await makeOwner('behother');
 const narrowAgent = await makeAgent(S, ['memory:read']);
-const writerAgent = await makeAgent(S, ['signals:read', 'signals:write']);
+// The fixing agent writes the app draft, so running it asks app:write as well (feature-list audit 91).
+const writerAgent = await makeAgent(S, ['signals:read', 'signals:write', 'app:write']);
+const signalsOnlyAgent = await makeAgent(S, ['signals:read', 'signals:write']);
 
 const filename = `behaviour${Date.now().toString(36).slice(-5)}.html`;
 const ORIGINAL = '<!doctype html><html><head><title>Shop</title></head><body><h1>Shop</h1><button id="buy">Buy</button><p data-original>v1</p></body></html>';
@@ -268,6 +272,13 @@ await test('6. another owner sees none of it; memory:read is refused on REST and
   assert(anon.status === 401, `no token → 401, got ${anon.status}`);
   const fix = await json('/v1/visibility/behaviour/fix', { method: 'POST', headers: authed(B.token), body: JSON.stringify({ app: filename }) });
   assert(fix.status === 404, `another owner cannot run the fixer on this app, got ${fix.status}`);
+});
+
+await test('6b. with the fixer off, a run on request is refused with FIXER_OFF; without app:write the tool is refused', async () => {
+  const r = await json('/v1/visibility/behaviour/fix', { method: 'POST', headers: authed(S.token), body: JSON.stringify({ app: filename }) });
+  assert(r.status === 409 && r.body?.error?.code === 'FIXER_OFF', `fixer off answers 409 FIXER_OFF, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+  const noWrite = await callTool(signalsOnlyAgent, 'aimeat_visibility_behaviour_fix', { app: filename });
+  assert(noWrite.isError, `an agent without app:write cannot run the fixer: ${noWrite.text.slice(0, 200)}`);
 });
 
 await test('7. an agent with signals:read and signals:write reads the same report and switches the fixer on over MCP', async () => {

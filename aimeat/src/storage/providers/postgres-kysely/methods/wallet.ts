@@ -7,6 +7,8 @@
  *   all balance ops resolve any GAII/GEAI/bare-name to the owner GHII first (agents hold no balance).
  *   Translated 1:1 from the SQLite/Prisma implementations.
  * @version-history
+ *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
+ *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
  *   v1.4.0 — 2026-09-26 — resolveGhii moved to ../ghii-resolve.ts by pure extraction, so the owner
  *     cascade gives an erased person's requesters their held morsels back through the same resolver.
  *   v1.3.0 — 2026-09-09 — deleteTransactions and transferBalance deleted: no caller.
@@ -70,6 +72,15 @@ export const walletMethods = {
   async listAllTransactions(this: PostgresKyselyStorage, limit = 10000): Promise<WalletTransaction[]> {
     const rows = await this.db.selectFrom('Transaction').selectAll().orderBy('timestamp', 'desc').limit(Math.min(limit, 10000)).execute();
     return rows.map(mapTx);
+  },
+  async sumTransactionsSince(this: PostgresKyselyStorage, types: readonly string[], since: string): Promise<number> {
+    if (types.length === 0) return 0;
+    const row = await this.db.selectFrom('Transaction')
+      .select(sql<string>`coalesce(sum(case when "amount" > 0 then "amount" else 0 end), 0)`.as('total'))
+      .where('type', 'in', [...types])
+      .where('timestamp', '>=', new Date(since))
+      .executeTakeFirst();
+    return Number(row?.total ?? 0);
   },
   // ── Atomic morsel-balance mutations (on GHIIRecord.morselBalance) ──
   async debitBalance(this: PostgresKyselyStorage, gaii: string, amount: number): Promise<boolean> {

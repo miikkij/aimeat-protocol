@@ -13,6 +13,7 @@
  *   - genesis-memory-read (POST/GET): forwards reads to peers or answers peer reads under federation consent
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  * @version-history
+ *   v1.11.0 — 2026-10-15 — GET /v1/federation/genesis-memory-read answers only an approved genesis peer on a request signed for this node (checkNodeRequest), and only keys a federation consent pattern covers (federationConsentCovers); the POST handler signs its fan-out (feature-list audit 166). The GET handler moved to federation-genesis-memory-read.ts, unchanged, to keep this file under 800 lines.
  *   v1.11.0 — 2026-10-11 — Cross-catalogue action pricing is the pacing amount, toll_morsels, with base_morsels as a deprecated mirror until 4.0.0; a 3.x genesis entry's base_morsels reads as toll_morsels (a morsel is pacing, not a price).
  *   v1.10.0 — 2026-10-10 — A genesis peer that has once sent a verified delivery proof is held to it: an ingest without one is refused whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal, deliveryProofAt; secaudit 2026-10-10 I21).
  *   v1.9.0 — 2026-10-06 — genesis-catalogue-ingest checks a delivery proof: this node named, sent inside five minutes, heard once (deliveryRefusal; secaudit 2026-10 last items, D3).
@@ -48,7 +49,8 @@ import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { verify } from '../auth/keypair.js';
-import { deliveryRefusal, pinnedRefusal, genesisPeerProofPin } from '../services/signed-node-request.js';
+import { deliveryRefusal, pinnedRefusal, genesisPeerProofPin, signNodeRequest } from '../services/signed-node-request.js';
+import { registerGenesisMemoryReadAnswer, genesisMemoryReadFields } from './federation-genesis-memory-read.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { emitChange } from '../services/event-bus.js';
@@ -56,7 +58,6 @@ import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
 import { cacheGenesisResults, findCachedGenesis } from '../services/genesis-memory-cache.js';
-import { leaveMemoriesToPeer } from '../services/classification-exits.js';
 import { logger } from '../utils/logger.js';
 import { actionPricingFromPeer, presentActionPricing } from '../services/action-pacing.js';
 
@@ -490,11 +491,14 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                     if (key) queryParams.set('key', key);
                     if (prefix) queryParams.set('prefix', prefix);
 
+                    // Signed for this peer, which answers only an approved genesis peer (feature-list audit 166).
+                    const signed = await signNodeRequest(storage, config, peer.genesisNodeId,
+                        genesisMemoryReadFields({ gaii: target_gaii, key, prefix }));
                     const resp = await peerFetch(
                         `${peer.genesisUrl}/v1/federation/genesis-memory-read?${queryParams}`,
                         {
                             method: 'GET',
-                            headers: { 'Accept': 'application/json' },
+                            headers: { 'Accept': 'application/json', ...signed },
                         },
                         { timeoutMs: config.federationTimeoutMs },
                     );
@@ -545,111 +549,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
         }
     });
 
-    // GET /v1/federation/genesis-memory-read — E.2: Local memory read handler for genesis peer queries
-    // Responds to incoming genesis peer memory read requests
-    router.get('/v1/federation/genesis-memory-read', async (req, res) => {
-        try {
-            const gaii = req.query.gaii as string | undefined;
-            const key = req.query.key as string | undefined;
-            const prefix = req.query.prefix as string | undefined;
-
-            if (!gaii && !key && !prefix) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'gaii, key, or prefix required'));
-                return;
-            }
-
-            const results: Array<Record<string, unknown>> = [];
-
-            if (gaii && key) {
-                // Direct lookup
-                const memory = await storage.getMemory(gaii, key);
-                if (memory && memory.visibility === 'public') {
-                    // Check for federation consent
-                    const consents = await storage.listConsents(gaii);
-                    const hasConsent = consents.some(c =>
-                        c.status === 'active' && c.scope === 'federation',
-                    );
-                    if (hasConsent) {
-                        results.push({
-                            key: memory.key,
-                            gaii: memory.ownerGaii,
-                            value: memory.value,
-                            visibility: memory.visibility,
-                            version: memory.version,
-                            source_node: config.nodeId,
-                            updated_at: memory.updatedAt,
-                        });
-                    }
-                }
-            } else if (gaii && prefix) {
-                // Prefix search for a specific agent
-                const memories = await storage.listMemory(gaii, { prefix, visibility: 'public' });
-                const consents = await storage.listConsents(gaii);
-                const hasConsent = consents.some(c =>
-                    c.status === 'active' && c.scope === 'federation',
-                );
-
-                if (hasConsent) {
-                    for (const memory of memories) {
-                        if (memory.key.startsWith('replica:') || memory.key.startsWith('genesis:') ||
-                            memory.key.startsWith('expiring:')) continue;
-
-                        results.push({
-                            key: memory.key,
-                            gaii: memory.ownerGaii,
-                            value: memory.value,
-                            visibility: memory.visibility,
-                            version: memory.version,
-                            source_node: config.nodeId,
-                            updated_at: memory.updatedAt,
-                        });
-                    }
-                }
-            } else if (prefix) {
-                // Prefix search across all agents
-                const agents = await storage.listAgents();
-                for (const agent of agents) {
-                    if (agent.gaii === '__genesis__') continue;
-                    try {
-                        const consents = await storage.listConsents(agent.gaii);
-                        const hasConsent = consents.some(c =>
-                            c.status === 'active' && c.scope === 'federation',
-                        );
-                        if (!hasConsent) continue;
-
-                        const memories = await storage.listMemory(agent.gaii, { prefix, visibility: 'public' });
-                        for (const memory of memories) {
-                            if (memory.key.startsWith('replica:') || memory.key.startsWith('genesis:') ||
-                                memory.key.startsWith('expiring:')) continue;
-
-                            results.push({
-                                key: memory.key,
-                                gaii: memory.ownerGaii,
-                                value: memory.value,
-                                visibility: memory.visibility,
-                                version: memory.version,
-                                source_node: config.nodeId,
-                                updated_at: memory.updatedAt,
-                            });
-                        }
-                    } catch (err) { logger.warn('GET /v1/federation/genesis-memory-read: skip agent', { error: String(err) }); }
-                }
-            }
-
-            // Memory leaving this node for a peer asks the classification component first (TARGET-082).
-            // What stays is counted in the answer, never named: the keys are logged on this node.
-            const { kept: leaving, withheld } = await leaveMemoriesToPeer({ storage, config },
-                results.map(r => ({ ...r, ownerGaii: String(r.gaii), key: String(r.key) })), 'genesis-peer', 'genesis memory read');
-            const sent = leaving.map(({ ownerGaii: _o, ...r }) => r);
-            res.json(success(config.nodeId, {
-                results: sent,
-                total: sent.length,
-                ...(withheld ? { withheld } : {}),
-            }));
-        } catch (err) {
-            res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
-        }
-    });
+    registerGenesisMemoryReadAnswer(router, config, storage);
 
     // PUT /v1/federation/genesis-peer/:id/subscriptions — E.3: Set memory prefix subscriptions
     router.put('/v1/federation/genesis-peer/:id/subscriptions', requireAuth(), requireOperator(storage), async (req, res) => {

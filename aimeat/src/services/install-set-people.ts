@@ -86,7 +86,7 @@ export async function ensureOwner(storage: Storage, config: AimeatConfig, owner:
         });
     } catch (err) {
         if (err instanceof ProvisionEmailTakenError) return { ok: false, status: 409, code: 'EMAIL_TAKEN', message: err.message };
-        if (err instanceof RegistrationClosedError) return { ok: false, status: 403, code: 'REGISTRATION_CLOSED', message: err.message };
+        if (err instanceof RegistrationClosedError) return { ok: false, status: 403, code: err.code, message: err.message };
         throw err;
     }
     return { ok: true, created: true };

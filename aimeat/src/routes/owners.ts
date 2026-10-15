@@ -11,6 +11,9 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-10-15 — The registration hooks go through ownerRegistrationRefusal / announceOwnerRegistered, the
+ *     helpers every account-creating route uses (feature-list audit 89).
+ *   2026-10-15 — Who becomes operator is createdAccountIsOperator (feature-list audit 19).
  *   v1.8.0 — 2026-10-12 — The POST /v1/owners answer's next action is the password sign-in (POST /v1/ghii/login), not the owner-key sign-in that node 4.0.0 removes. What the route stores is unchanged.
  *   v1.7.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.6.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -44,10 +47,9 @@ import { requireAuth, requireOwnerPrincipal, requireOperator, requireLocalSessio
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, isForeignPrincipal } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
-import { executeHooks } from '../services/hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
-import { registrationRefusal } from '../services/owner-provisioning.js';
+import { registrationRefusal, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../services/owner-provisioning.js';
 import { emitChange } from '../services/event-bus.js';
 import { eraseOwner } from '../services/owner-erasure.js';
 import { logger } from '../utils/logger.js';
@@ -68,10 +70,10 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Extension hook: pre_owner_registration
-    const hookResult = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
-    if (!hookResult.allowed) {
-      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookResult.reason ?? 'Registration denied by extension hook'));
+    // Extension hook: pre_owner_registration, the same gate every account-creating route asks.
+    const hookRefusal = await ownerRegistrationRefusal(storage, config, { name, displayName: display_name, via: 'direct' });
+    if (hookRefusal) {
+      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookRefusal));
       return;
     }
 
@@ -91,12 +93,9 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
 
     // Check if this is the first real owner — they get operator role
     // Skip the "anonymous" system owner when counting
-    const allOwners = await storage.listOwners();
-    const realOwners = allOwners.filter(o => o.name !== 'anonymous');
+    // The one rule every account-creating route asks (feature-list audit 19).
     const roles = ['owner'];
-    if (realOwners.length === 0) {
-      roles.push('operator');
-    }
+    if (await createdAccountIsOperator(storage)) roles.push('operator');
 
     const owner = await storage.createOwner({
       name,
@@ -159,7 +158,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       .catch(err => logger.warn('owners register: welcome message failed', { error: String(err) }));
 
     // Extension hook: post_owner_registration (fire-and-forget)
-    fireHook(config, storage, 'post_owner_registration', { name: owner.name, roles: owner.roles });
+    announceOwnerRegistered(storage, config, owner, 'direct');
 
     // SECURITY: Prevent caching of response containing private key
     res.set('Cache-Control', 'no-store');

@@ -14837,6 +14837,7 @@
             "read": "Ver qué cuentas sociales y de publicación tienes conectadas.",
             "use": "Publicar y enviar a través de las cuentas que ya tienes conectadas: publicaciones en redes sociales y correos desde tu propio buzón. No lee lo que hay en ellas.",
             "read-through": "Leer lo que hay en las cuentas que ya tienes conectadas: buscar en tu correo, abrir mensajes y archivos adjuntos, y ver las direcciones desde las que envías.",
+            "read-as-owner": "Leer como tú los buzones que conectaste tú mismo: buscar en tu correo y abrir mensajes y archivos adjuntos. El agente también necesita el permiso para leer lo que hay en las cuentas.",
             "write": "Conectar cuentas sociales nuevas a tu nombre y desconectar las que ya tienes."
           },
           "consent": {

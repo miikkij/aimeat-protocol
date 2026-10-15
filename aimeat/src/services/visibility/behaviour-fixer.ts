@@ -19,6 +19,7 @@
  *   BehaviourFixError
  * @usage const run = await runBehaviourFix(storage, config, ownerGhii, 'shop.html', 'owner');
  * @version-history
+ *   2026-10-15 — A run on request reads the fixer switch too: 409 FIXER_OFF while it is off (feature-list audit 91).
  *   v1.0.1 — 2026-10-11 — The runs record's `spec` is the served contract address (VISIBILITY_MONTH_SPEC).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
@@ -125,6 +126,11 @@ export async function runBehaviourFix(
   const ownerName = localAccountOf(ownerGhii);
   const app = ownerName ? await storage.getApp(ownerGhii, filename) : null;
   if (!ownerName || !app) throw new BehaviourFixError('NOT_FOUND', 404, `You have no app named ${filename}.`);
+  // The fixing agent stays off until the owner switches it on, and a run on request reads the same
+  // switch as the weekly run: it spends the owner's AI credit (feature-list audit 91).
+  if (!(await getBehaviourSettings(storage, ownerGhii)).fixer) {
+    throw new BehaviourFixError('FIXER_OFF', 409, 'The fixing agent is switched off. Switch it on in your on-page behaviour settings, then ask again.');
+  }
 
   const findings = (await readBehaviour(storage, config, ownerGhii, { app: filename, days: 7 })).apps[0]?.findings ?? [];
   const run: BehaviourRun = { app: filename, at: new Date().toISOString(), by, findings, draft: false, model: null, note: null };

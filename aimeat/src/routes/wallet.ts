@@ -11,6 +11,8 @@
  *   - GET  /v1/wallet/history      — deprecated alias for /transactions
  *   - POST /v1/wallet/request      — request daily allowance morsels
  * @version-history
+ *   2026-10-15 — POST /v1/wallet/request grants the day's morsels once a day (grantDailyAllowance;
+ *     409 ALREADY_GRANTED_TODAY), the grant the daily job makes (feature-list audit 135).
  *   v1.1.0 — 2026-07-27 — Transactions carry `initiator_gaii`: who made the call, beside whose balance
  *     moved. An agent's spending is filed under its owner, so before this it left the owner's history
  *     unable to explain a debit.
@@ -34,13 +36,13 @@
  *     price, checkout_item), or null when the node sells none.
  */
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, WalletTransaction } from '../storage/interface.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { DEFAULT_CONTEXT } from '../utils/onto-context.js';
 import { calculateEscrow } from '../services/morsel.js';
+import { grantDailyAllowance } from '../services/daily-allowance.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { cached, TTL } from '../services/cache.js';
@@ -204,21 +206,19 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const identity = ghiiRecord.ghii;
-    const credited = await storage.creditBalanceCapped(identity, grantAmount, config.dailyAllowanceCap);
+    // Once a day, the grant the daily job makes too: every call added the day's amount until the
+    // balance reached the cap (feature-list audit 135).
+    const { credited, already } = await grantDailyAllowance(storage, config, ghiiRecord.ghii, grantAmount);
+    if (already) {
+      res.status(409).json(error(config.nodeId, 'ALREADY_GRANTED_TODAY',
+        'Today\'s morsels were already added to your balance. The next ones come tomorrow.'));
+      return;
+    }
     if (credited <= 0) {
       res.status(409).json(error(config.nodeId, 'QUOTA_EXCEEDED',
         `Balance is already at or above accumulation cap of ${config.dailyAllowanceCap}`));
       return;
     }
-
-    await storage.addTransaction({
-      id: `tx-${randomUUID()}`,
-      gaii: identity,
-      type: 'allowance',
-      amount: credited,
-      timestamp: new Date().toISOString(),
-    });
 
     const updatedRecord = await storage.getGHIIByOwner(ownerName);
     res.json(success(config.nodeId, {

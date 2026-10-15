@@ -24,6 +24,8 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-10-15 — SendInput.mailboxHolder: an agent sending through a mailbox of its own names it; the
+ *     book stays the owner's (feature-list audit 129).
  *   2026-10-08 — sendOutbound stamps the message with a provenance record (Mint-3 for an agent),
  *     held until the send goes out, and attaches a caller-named record only when it is the sender's
  *     own; the X-AI-Disclosure-Record header names that record and nothing else (aiprov D9).
@@ -310,6 +312,9 @@ async function openPixelUrl(
 export interface SendInput {
   /** Who is sending, when it is not the owner in person (an agent's GAII); an organism's company checks it. */
   principal?: string;
+  /** Whose connection `connectionId` is, when it is not the owner's: an agent's own mailbox
+   *  (services/connections/access.ts mailboxHolderFor). Absent means the owner's. */
+  mailboxHolder?: string;
   contactId: string;
   kind: OutboundKind;
   subject?: string;
@@ -492,7 +497,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // to. It is deliberately not `bookOwner`: the book may be the company's, but the mailbox is the
   // person's, and those are the two halves this feature exists to keep apart.
   const mailbox = input.connectionId
-    ? await resolveMailbox(config, storage, ownerGhii, input.connectionId, input.fromAlias)
+    ? await resolveMailbox(config, storage, input.mailboxHolder ?? ownerGhii, input.connectionId, input.fromAlias)
     : null;
 
   // THE BOOK. Recipients, opt-outs, suppression, the daily allowance and the log all belong to the

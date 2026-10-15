@@ -27,6 +27,8 @@
  * @structure McpGrant · putMcpGrant · listMcpGrants · removeMcpGrant · resolveMcpAccess
  * @usage const verdict = await resolveMcpAccess({ storage, owner, server, grantee, tool, scopes });
  * @version-history
+ *   2026-10-15 — The call cap counts with countUsageCalls plus the unflushed usage buffer, and an end date
+ *     that does not parse counts as passed (feature-list audit 13).
  *   v1.2.0 — 2026-10-08 — `readOnly`: only tools the server marks readOnlyHint in its cached list,
  *     so a log-reading agent can never reach a server's response tools (aimeat-soc).
  *   v1.1.0 — 2026-09-24 — The owner's pass needs `ownerInPerson` from the door: a caller whose name
@@ -37,6 +39,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { McpServerRecord } from '../../models/mcp-server-schemas.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { logger } from '../../utils/logger.js';
+import { pendingUsageCalls } from '../usage/usage-buffer.js';
 
 /**
  * System namespace — server-side only, never surfaced as a readable memory key.
@@ -183,7 +186,10 @@ export async function resolveMcpAccess(input: AccessInput): Promise<McpAccess> {
   const grant = exact ?? wildcard;
   if (!grant) return { allowed: true };
 
-  if (grant.expires && new Date(grant.expires).getTime() < Date.now()) {
+  // An end date that does not parse counts as passed: a grant stored before the write refused one
+  // must not stay open for ever (feature-list audit 13).
+  const endsAt = grant.expires ? Date.parse(grant.expires) : NaN;
+  if (grant.expires && (!Number.isFinite(endsAt) || endsAt < Date.now())) {
     return {
       allowed: false,
       code: 'GRANT_EXPIRED',
@@ -250,12 +256,13 @@ async function countRecentCalls(
   storage: Storage, grantee: string, slug: string, since: string,
 ): Promise<number> {
   try {
-    const rows = await storage.listUsageCalls({
-      actorGaii: grantee, from: since, surface: 'mcp-remote', outcome: 'ok',
-    });
-    // Filtered on the coordinate here rather than in SQL: the filter has no such dimension,
-    // and one grantee's calls inside one window is a small page however busy they are.
-    return rows.filter((r) => r.coordinate.startsWith(`${slug}/`)).length;
+    const filter = { actorGaii: grantee, from: since, surface: 'mcp-remote' as const, outcome: 'ok' as const };
+    // Counted by the database, plus the calls still in the usage buffer (flushed every 15 s). This
+    // counted a list capped at 200 rows and missed the unflushed tail, so a cap over 200 was never
+    // reached and the last seconds of calls were free (feature-list audit 13).
+    const stored = await storage.countUsageCalls(filter, `${slug}/`);
+    const pending = pendingUsageCalls(filter).filter((r) => r.coordinate.startsWith(`${slug}/`)).length;
+    return stored + pending;
   } catch (err) {
     logger.warn('mcp-client: a call cap could not be counted, so it was not enforced this time', {
       grantee, server: slug, error: String(err),

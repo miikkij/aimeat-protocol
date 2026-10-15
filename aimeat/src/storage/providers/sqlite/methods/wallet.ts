@@ -8,6 +8,8 @@
  * @structure walletMethods
  * @usage Object.assign(SqliteStorage.prototype, walletMethods) in ../index.ts
  * @version-history
+ *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
+ *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
  *   v1.0.0 — 2026-10-05 — debitBalance, creditBalance, creditBalanceCapped moved here from agents.ts;
  *     addTransaction, getTransactions, findTransactionByTrackingCode, listAllTransactions,
  *     deserializeTransaction moved here from work.ts so the file mirrors postgres-kysely/methods/wallet.ts
@@ -104,6 +106,15 @@ export const walletMethods = {
   async listAllTransactions(this: SqliteStorage, limit = 10000): Promise<WalletTransaction[]> {
     const rows = this.db.prepare('SELECT * FROM wallet_transactions ORDER BY timestamp DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeTransaction(r));
+  },
+
+  async sumTransactionsSince(this: SqliteStorage, types: readonly string[], since: string): Promise<number> {
+    if (types.length === 0) return 0;
+    const row = this.db.prepare(
+      `SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS total FROM wallet_transactions
+       WHERE type IN (${types.map(() => '?').join(', ')}) AND timestamp >= ?`,
+    ).get(...types, since) as { total: number };
+    return Number(row.total);
   },
 
   deserializeTransaction(this: SqliteStorage, row: Record<string, unknown>): WalletTransaction {

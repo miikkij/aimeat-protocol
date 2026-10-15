@@ -5,6 +5,8 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   2026-10-15 — wallet.request: a second ask the same day is refused with ALREADY_GRANTED_TODAY; the two
+ *     tests that asked repeatedly up to the cap pinned the defect (feature-list audit 135).
  *   v1.13.4 — 2026-10-12 — The work-test action is published with its pacing amount as
  *     pricing.toll_morsels; node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the
  *     new field means the same on 3.x.
@@ -459,53 +461,20 @@ await test('wallet.request — the grant lands on the OWNER balance, exactly wha
     assert((mine.morsel_balance ?? 0) === 0, `an agent holds no morsels of its own, got ${mine.morsel_balance}`);
 });
 
-// MorselRequestSchema caps the ASK at 1000; the route then clamps the GRANT to the node's daily
-// allowance. The allowance is not hardcoded here: two maximum asks in a row must be granted the same
-// figure, and that figure must be below the ask. Drop the clamp and one of the two gives: either the
-// ask is granted whole, or the first ask drains the headroom and the second answers QUOTA_EXCEEDED.
+// The day's morsels come once a day, to the person (feature-list audit 135). Until 2026-10-15 these
+// tests asked again and again, and every ask added the day's amount until the balance reached the
+// cap: they pinned the defect. The clamp to the daily allowance and the cap are unit-tested in
+// test/unit/daily-allowance.test.ts.
 const MAX_ASK = 1000;
 
-await test('wallet.request — the ask is clamped, and the same clamp applies twice', async () => {
+await test('wallet.request — a second ask the same day adds nothing (409 ALREADY_GRANTED_TODAY)', async () => {
     const before = await walletBalance(agentJwt);
-    const first = await authApi('/v1/wallet/request', agentJwt, {
-        method: 'POST', body: JSON.stringify({ amount: MAX_ASK, reason: 'E2E clamp probe 1' }),
-    });
-    assert(first.ok === true, `first max ask failed: ${first.error?.message}`);
-    const mid = await walletBalance(agentJwt);
-    assert(mid - before === first.data.granted, `balance moved by ${mid - before}, granted says ${first.data.granted}`);
-    assert(first.data.granted < MAX_ASK, `the ask must be clamped below ${MAX_ASK}, got ${first.data.granted}`);
-
-    const second = await authApi('/v1/wallet/request', agentJwt, {
-        method: 'POST', body: JSON.stringify({ amount: MAX_ASK, reason: 'E2E clamp probe 2' }),
-    });
-    assert(second.ok === true, `second max ask failed: ${second.error?.code} ${second.error?.message}`);
-    const after = await walletBalance(agentJwt);
-    assert(after - mid === second.data.granted, `balance moved by ${after - mid}, granted says ${second.data.granted}`);
-    assert(second.data.granted === first.data.granted,
-        `the per-call clamp is a fixed allowance, got ${first.data.granted} then ${second.data.granted}`);
-});
-
-await test('wallet.request — repeated asks stop at the accumulation cap (409 QUOTA_EXCEEDED)', async () => {
-    let last: any = null;
-    let hitTheCap = false;
-    let granted = 0;
-    for (let i = 0; i < 40; i++) {
-        last = await authApi('/v1/wallet/request', agentJwt, {
-            method: 'POST',
-            body: JSON.stringify({ amount: MAX_ASK, reason: `E2E cap probe ${i}` }),
-        });
-        if (last.ok !== true) { hitTheCap = true; break; }
-        granted += last.data.granted;
-    }
-    assert(hitTheCap, `the allowance must run into its accumulation cap rather than paying out forever (granted ${granted} and still going)`);
-    assert(last.error?.code === 'QUOTA_EXCEEDED', `expected QUOTA_EXCEEDED, got ${last.error?.code}: ${last.error?.message}`);
-    // …and the refusal is real: the balance did not move on the refused call.
-    const atCap = await walletBalance(agentJwt);
     const again = await authApi('/v1/wallet/request', agentJwt, {
-        method: 'POST', body: JSON.stringify({ amount: MAX_ASK, reason: 'E2E cap probe again' }),
+        method: 'POST', body: JSON.stringify({ amount: MAX_ASK, reason: 'E2E second ask today' }),
     });
-    assert(again.ok !== true, 'a second ask at the cap is refused too');
-    assert(await walletBalance(agentJwt) === atCap, 'a refused allowance request must not move the balance');
+    assert(again.ok !== true && again.error?.code === 'ALREADY_GRANTED_TODAY',
+        `expected ALREADY_GRANTED_TODAY, got ${again.error?.code}: ${again.error?.message}`);
+    assert(await walletBalance(agentJwt) === before, 'a refused allowance request must not move the balance');
 });
 
 // ═══════════════════════════════════════════════

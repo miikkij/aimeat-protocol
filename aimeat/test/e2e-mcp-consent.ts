@@ -372,6 +372,34 @@ await test('8. Consent resource template listed in resources/templates', async (
     assert(found !== undefined, 'consent resource template present');
 });
 
+// Feature-list audit row 40: POST /v1/consent filed an agent's grant under the agent's own GAII,
+// where the owner's list did not show it and the owner got 403 reading or revoking it; the MCP tool
+// filed the same grant under the owner. Both file it under the account now.
+await test('9. A consent an agent grants over REST is the owner\'s: listed, readable and revocable by the owner', async () => {
+    const name = `cnrest${Date.now().toString(36)}`;
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name, owner: ownerName, capabilities: ['consent'], scopes: ['consent:manage', 'memory:read'] }),
+    });
+    assert(reg.status === 201, `agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }) });
+    const agentToken = tok.body.data.token as string;
+    const granted = await json('/v1/consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ data_pattern: 'profile.restconsent.*', recipient: `someone@${NODE_ID}`, purpose: 'REST probe' }),
+    });
+    assert(granted.status === 201, `agent grant ${granted.status}: ${JSON.stringify(granted.body?.error)}`);
+    const id = granted.body.data.id as string;
+    const list = await json('/v1/consent', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert((list.body.data?.consents ?? []).some((c: any) => c.id === id), `the owner's list does not show the agent's consent`);
+    const read = await json(`/v1/consent/${id}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(read.status === 200, `the owner reads the agent's consent: ${read.status}`);
+    const del = await json(`/v1/consent/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(del.status === 200, `the owner revokes the agent's consent: ${del.status} ${JSON.stringify(del.body?.error)}`);
+});
+
 // ─── Summary ───
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

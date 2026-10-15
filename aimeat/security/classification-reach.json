@@ -380,10 +380,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tool manifests, read to list the priced tool bindings."
     },
+    "src/routes/federation-genesis-memory-read.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 2
+      },
+      "why": "Moved out of federation-genesis.ts on 2026-10-15 (feature-list audit 166). The genesis memory read answers an approved genesis peer only, and every record it found passes leaveMemoriesToPeer (services/classification-exits.ts) before it leaves this node."
+    },
     "src/routes/federation-genesis.ts": {
       "reads": {
-        "listMemory": 3,
-        "getMemory": 2
+        "listMemory": 1,
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },

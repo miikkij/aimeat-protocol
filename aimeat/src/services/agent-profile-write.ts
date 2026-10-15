@@ -33,6 +33,8 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   2026-10-15 — setAgentCapabilities verifies an mcp-type capability only when it names a server the node
+ *     knows for the owner; the name alone made it verified (feature-list audit 74).
  *   v1.5.1 -- 2026-10-05 -- The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  *   v1.5.0 -- 2026-10-02 -- setAgentRuntimeSource takes `llm` ('node' | 'machine'): where the crew's
  *     model calls go, which the own-key answer reads per agent (services/own-key-coverage.ts).
@@ -61,7 +63,8 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { AgentRecord, AgentTechnicalCapability, Storage } from '../storage/interface.js';
-import { buildGAII } from '../utils/gaii.js';
+import { buildGAII, ownerGhiiOf } from '../utils/gaii.js';
+import { requireUsableServer } from './mcp-client/registry.js';
 import { emitChange } from './event-bus.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { emitToolListChanged } from '../mcp/resource-events.js';
@@ -571,8 +574,8 @@ async function syncOnboardingFlowToMode(storage: Storage, gaii: string, mode: Ag
 /**
  * Store an agent's capability self-report.
  *
- * `liveMcpSession` marks the caller as speaking over an authenticated agent session, which is what
- * makes an mcp-type capability verified: the connection is the proof. Languages are their own
+ * `liveMcpSession` marks the caller as speaking over an authenticated agent session. An mcp-type
+ * capability is verified only when it also names a server the node knows (feature-list audit 74). Languages are their own
  * field, never folded into the domain list.
  */
 export async function setAgentCapabilities(
@@ -594,11 +597,17 @@ export async function setAgentCapabilities(
     }
     const body = parsed.data;
 
-    const technicalCapabilities: AgentTechnicalCapability[] = body.technical.map(cap => ({
+    // Verified means the node checked it. An mcp-type capability is verified when the agent reports it
+    // over its own session AND it names a server the node knows: one the owner attached or may use
+    // (services/mcp-client/registry.ts). A server on the agent's own computer cannot be checked from
+    // here, so it is reported, not verified; the name alone made it verified (feature-list audit 74).
+    const ownerGhii = ownerGhiiOf(agentGaii);
+    const technicalCapabilities: AgentTechnicalCapability[] = await Promise.all(body.technical.map(async cap => ({
         name: cap.name,
         type: cap.type,
-        verified: opts.liveMcpSession && cap.type === 'mcp',
-    }));
+        verified: opts.liveMcpSession && cap.type === 'mcp'
+            && !!(await requireUsableServer(deps.storage, ownerGhii, cap.name, deps.config)),
+    })));
 
     const updated = await deps.storage.updateAgent(agentGaii, {
         technicalCapabilities,

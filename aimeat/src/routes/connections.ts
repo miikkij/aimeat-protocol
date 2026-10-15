@@ -29,6 +29,8 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   2026-10-15 — GET /v1/connections lists an agent's owner's connections on connections:use, and
+ *     POST /v1/connections/:id/read reads them on connections:read-as-owner (feature-list audit 128).
  *   v1.9.0 — 2026-10-15 — POST /start takes `account` (which Facebook Page), and the delegated
  *     publish hands the recipe the node's public address for a provider that fetches the file.
  *   v1.8.0 — 2026-10-09 — POST /start binds the round to the owner's browser when the owner starts it
@@ -74,7 +76,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { buildOutboundProviders, listProviderMeta, findProvider } from '../services/connections/providers.js';
 import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
-import { listOwnConnections, requireOwnConnection, toPublicConnection, toPublicClient } from '../services/connections/access.js';
+import { connectionHoldersOf, listUsableConnections, requireUsableConnection, toPublicConnection, toPublicClient } from '../services/connections/access.js';
 import { startAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { answerConnectCallback, connectCallbackPath } from './connections-callback.js';
 import { browserCanBind, issueRoundBinding } from '../middleware/oauth-round-cookie.js';
@@ -103,6 +105,9 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   const router = Router();
   const providers = buildOutboundProviders(config);
   const resolve = (req: Request): string => resolveIdentity(req.auth!, config.nodeId);
+  /** Whose connections the caller may name or read (services/connections/access.ts connectionHoldersOf). */
+  const holdersOf = (req: Request, purpose: 'name' | 'read'): string[] =>
+    connectionHoldersOf(resolve(req), `${req.auth!.owner}@${config.nodeId}`, req.auth!.scopes, purpose);
 
   /**
    * Build the service context, or explain why not. A missing encryption key is a hard stop rather
@@ -349,8 +354,8 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   // appear in it.
   router.get('/v1/connections', requireAuth(), requireAnyScope('connections:read', 'connections:use', 'connections:read-through'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
-    const principal = resolve(req);
-    res.json(success(config.nodeId, { connections: await listOwnConnections(storage, principal) }));
+    // The caller's own, and an agent's owner's on the words for it (feature-list audit 128).
+    res.json(success(config.nodeId, { connections: await listUsableConnections(storage, holdersOf(req, 'name')) }));
   });
 
   // ── POST /v1/connections/start ──
@@ -700,8 +705,9 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   router.post('/v1/connections/:id/read/:resource', requireAuth(), explainReadThrough, requireScope('connections:read-through'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
-    // Absent and not-yours answer alike, as everywhere else in this file.
-    const connection = await requireOwnConnection(storage, principal, req.params.id as string);
+    // Absent and not-yours answer alike, as everywhere else in this file. An agent reads its owner's
+    // connection on connections:read-as-owner (feature-list audit 128).
+    const connection = await requireUsableConnection(storage, holdersOf(req, 'read'), req.params.id as string);
     if (!connection) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such connection of yours'));
     }

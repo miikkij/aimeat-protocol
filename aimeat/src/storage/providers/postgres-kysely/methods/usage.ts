@@ -17,6 +17,8 @@
  *   - usageMethods.queryUsageRollup / clearUsageRollupRange
  * @usage Object.assign(PostgresKyselyStorage.prototype, usageMethods) in ../index.ts
  * @version-history
+ *   2026-10-15 — countUsageCalls: how many calls match, counted by the database, optionally under a
+ *     coordinate prefix; the MCP grant call cap counted a list capped at 200 rows (feature-list audit 13).
  *   v1.1.0 — 2026-09-25 — foldNamedAppVisits: after thirteen months an app open keeps its count and
  *     loses the visitor's account, in the hot table, the archive and the rollups.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
@@ -272,6 +274,22 @@ export const usageMethods = {
     const limit = Math.min(Math.max(filter.limit ?? 200, 1), 2000);
     const rows = await q.orderBy('ts', 'desc').limit(limit).execute();
     return rows.map(r => toCall(r as unknown as Record<string, unknown>));
+  },
+
+  async countUsageCalls(this: PostgresKyselyStorage, filter: UsageCallFilter, coordinatePrefix?: string): Promise<number> {
+    // Counted by the database rather than over a capped list (feature-list audit 13).
+    let q = this.db.selectFrom('UsageCall').select(sql<string>`count(*)`.as('n'));
+    if (filter.ownerGhii) q = q.where('ownerGhii', '=', filter.ownerGhii);
+    if (filter.actorGaii) q = q.where('actorGaii', '=', filter.actorGaii);
+    if (filter.surface) q = q.where('surface', '=', filter.surface);
+    if (filter.appId) q = q.where('appId', '=', filter.appId);
+    if (filter.outcome) q = q.where('outcome', '=', filter.outcome);
+    if (filter.from) q = q.where('ts', '>=', filter.from);
+    if (filter.to) q = q.where('ts', '<=', filter.to);
+    // left() rather than LIKE, so a '_' or '%' in the prefix is not a wildcard.
+    if (coordinatePrefix) q = q.where(sql<boolean>`left("coordinate", ${coordinatePrefix.length}) = ${coordinatePrefix}`);
+    const row = await q.executeTakeFirst();
+    return Number(row?.n ?? 0);
   },
 
   async listUsageCallsForFold(this: PostgresKyselyStorage, c: UsageFoldCursor): Promise<UsageCallRecord[]> {

@@ -36,6 +36,7 @@
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   2026-10-15 — Each basic agent runs pre_agent_registration (a refused one is skipped and named) and post_agent_registration (feature-list audit 89).
  *   v1.5.0 — 2026-10-12 — The GET asks agent:read from 4.0.0, the word of the fleet list.
  *   v1.4.0 — 2026-10-02 — A created basic agent carries its template's `taskStart`.
  *   v1.3.0 — 2026-09-08 — The grant, the offer and the read-back move to
@@ -61,6 +62,8 @@ import { describeBasicAgents, requestBasicAgents, daemonPrincipals } from '../..
 import { crewSeedAuthored, type CrewCaller } from '../../services/crew-ops.js';
 import { offerEnrolment } from '../../services/agent-enrolment-offer.js';
 import { emitChange } from '../../services/event-bus.js';
+import { executeHooks } from '../../services/hooks.js';
+import { fireHook } from '../../utils/fire-hook.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { logger } from '../../utils/logger.js';
 
@@ -169,6 +172,15 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
         continue;
       }
 
+      // Extension hook: pre_agent_registration, as on every agent-creating route (feature-list
+      // audit 89). A refused template is named in the answer and the others are still made.
+      const hookResult = await executeHooks(config, storage, 'pre_agent_registration',
+        { name: template.name, owner, display_name: template.displayName, via: 'basic_agents' });
+      if (!hookResult.allowed) {
+        skipped.push({ name: template.name, reason: 'refused_by_extension' });
+        continue;
+      }
+
       const gaii = buildGAII(template.name, owner, config.nodeId);
       await storage.createAgent({
         name: template.name,
@@ -195,6 +207,7 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
         // The creation ledger: a person pressed a button on their own account.
         registeredBy: owner,
       });
+      fireHook(config, storage, 'post_agent_registration', { gaii, owner, via: 'basic_agents' });
       created.push(template.name);
       toEnrol.push(template.name);
     }

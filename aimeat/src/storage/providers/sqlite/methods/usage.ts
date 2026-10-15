@@ -10,6 +10,8 @@
  *   thirteen-month visit fold across all three
  * @usage Object.assign(SqliteStorage.prototype, usageMethods) in ../index.ts
  * @version-history
+ *   2026-10-15 — countUsageCalls: how many calls match, counted by the database, optionally under a
+ *     coordinate prefix; the MCP grant call cap counted a list capped at 200 rows (feature-list audit 13).
  *   v1.1.0 — 2026-09-25 — foldNamedAppVisits.
  *   v1.0.0 — 2026-08-14 — Initial: three-layer usage telemetry substrate.
  */
@@ -35,6 +37,10 @@ export const usageMethods = {
 
   async listUsageCalls(this: SqliteStorage, filter: UsageCallFilter): Promise<UsageCallRecord[]> {
     return usageRepo.listUsageCalls(this.db, filter);
+  },
+
+  async countUsageCalls(this: SqliteStorage, filter: UsageCallFilter, coordinatePrefix?: string): Promise<number> {
+    return usageRepo.countUsageCalls(this.db, filter, coordinatePrefix);
   },
 
   async listUsageCallsForFold(this: SqliteStorage, cursor: UsageFoldCursor): Promise<UsageCallRecord[]> {

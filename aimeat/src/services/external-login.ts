@@ -23,6 +23,8 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-10-15 — A refusal from an extension bound to pre_owner_registration answers 403 HOOK_REJECTED
+ *     instead of a 500 (feature-list audit 89).
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-23 — Extracted from routes/oauth-login.ts (BR-04 phase 2). Two widenings:
  *     provider ids are strings (`saml:<connection>` joins the union), and createOwnerForProvider
@@ -38,7 +40,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
 import { establishOwnerSession } from './owner-session.js';
-import { provisionOwner, registrationRefusal, type RegistrationVia } from './owner-provisioning.js';
+import { provisionOwner, registrationRefusal, RegistrationClosedError, type RegistrationVia } from './owner-provisioning.js';
 import { emitChange } from './event-bus.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
@@ -420,16 +422,22 @@ export async function finalizeExternalSignup(
       ? req.body.displayName.trim()
       : pending.displayName;
 
-    ghiiRecord = await createOwnerForProvider(storage, config, {
-      providerId: opts.providerId,
-      username,
-      displayName: chosenDisplayName,
-      sub: pending.providerSub,
-      email: pending.email,
-      emailVerified: pending.emailVerified,
-      via: opts.via,
-      managedBy: opts.managedBy ?? null,
-    });
+    try {
+      ghiiRecord = await createOwnerForProvider(storage, config, {
+        providerId: opts.providerId,
+        username,
+        displayName: chosenDisplayName,
+        sub: pending.providerSub,
+        email: pending.email,
+        emailVerified: pending.emailVerified,
+        via: opts.via,
+        managedBy: opts.managedBy ?? null,
+      });
+    } catch (e) {
+      // An extension bound to pre_owner_registration refused the account (feature-list audit 89).
+      if (e instanceof RegistrationClosedError) return { ok: false, status: 403, code: e.code, message: e.message };
+      throw e;
+    }
   }
 
   await establishForGhii(storage, config, req, res, ghiiRecord);

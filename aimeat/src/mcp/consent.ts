@@ -11,6 +11,8 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-15 — aimeat_consent_list lists the account's consents including those REST filed under one of
+ *     its agents (feature-list audit 40).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for consent management via MCP
@@ -27,7 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { grantConsent, revokeConsent } from '../services/consent-write.js';
+import { grantConsent, revokeConsent, listAccountConsents, accountHoldsConsent } from '../services/consent-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 
@@ -64,7 +66,7 @@ export function registerConsentTools(
         new ResourceTemplate('aimeat://consent/{id}', {
             list: async () => {
                 const ghii = ownerGhii();
-                const consents = await storage.listConsents(ghii);
+                const consents = await listAccountConsents(storage, ghii);
                 return {
                     resources: consents.map(c => ({
                         uri: `aimeat://consent/${encodeURIComponent(c.id)}`,
@@ -82,7 +84,7 @@ export function registerConsentTools(
             if (!consent) return { contents: [{ uri: uri.toString(), text: 'Consent not found' }] };
 
             const ghii = ownerGhii();
-            if (consent.ownerGaii !== ghii) {
+            if (!accountHoldsConsent(ghii, consent.ownerGaii)) {
                 return { contents: [{ uri: uri.toString(), text: 'Access denied' }] };
             }
 
@@ -154,7 +156,7 @@ export function registerConsentTools(
         annotationsFor('aimeat_consent_list'),
         async () => {
             const ghii = ownerGhii();
-            const consents = await storage.listConsents(ghii);
+            const consents = await listAccountConsents(storage, ghii);
 
             return {
                 content: [{

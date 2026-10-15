@@ -16607,6 +16607,7 @@
             "read": "See which social and publishing accounts you have connected.",
             "use": "Post and send through the accounts you have already connected: social posts, and email from your own mailbox. It does not read what is in them.",
             "read-through": "Read what is in the accounts you have already connected: search your mail, open messages and attachments, and see the addresses you send from.",
+            "read-as-owner": "Read the mailboxes you connected yourself, as you: search your mail and open messages and attachments. The agent also needs the permission to read what is in accounts.",
             "write": "Connect new social accounts to your name and disconnect existing ones."
           },
           "consent": {

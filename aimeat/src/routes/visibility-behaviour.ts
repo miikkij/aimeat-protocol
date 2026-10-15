@@ -15,6 +15,7 @@
  *   GET|PUT /v1/visibility/behaviour/settings · POST /v1/visibility/behaviour/fix)
  * @usage router.use(visibilityBehaviourRouter(config, storage)) inside signalsRouter (routes/signals.ts)
  * @version-history
+ *   2026-10-15 — POST /v1/visibility/behaviour/fix asks app:write beside signals:write, since it writes the app draft (feature-list audit 91).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
 import express, { Router, type Request, type Response } from 'express';
@@ -134,7 +135,7 @@ export function visibilityBehaviourRouter(config: AimeatConfig, storage: Storage
     res.json(success(config.nodeId, await behaviourSettingsView(storage, config, owner)));
   });
 
-  router.post('/v1/visibility/behaviour/fix', requireAuth(), requireScope('signals:write'), async (req, res) => {
+  router.post('/v1/visibility/behaviour/fix', requireAuth(), requireScope('signals:write'), requireScope('app:write'), async (req, res) => {
     const parsed = FixSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.message)); return; }
     const owner = ownerOf(req, res);

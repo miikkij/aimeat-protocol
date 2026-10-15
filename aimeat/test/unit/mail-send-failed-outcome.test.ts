@@ -15,6 +15,7 @@
  *   Each door is exercised with a sent outcome as well, so "everything is an error now" cannot pass.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mail-send-failed-outcome.test.ts
  * @version-history
+ *   2026-10-15 — The node tool reads the owner's address book, so the contact and the log are the owner's (feature-list audit 129).
  *   v1.2.1 — 2026-10-05 — The connector case takes the tool from the whole connector: it is served over
  *     its CLI dispatch definition now (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-26 — The tool's refusal no longer carries `channel`: whether an address has an
@@ -59,6 +60,8 @@ function fakeSmtp(accepts: boolean): EmailService {
 }
 
 const PRINCIPAL = 'claude#alice@test-node';
+/** The tool reads the owner's address book and logs under it, as POST /v1/outbound/send does (feature-list audit 129). */
+const OWNER = 'alice@test-node';
 
 function cfg(): AimeatConfig {
     return {
@@ -85,7 +88,7 @@ describe('node MCP aimeat_mail_send', () => {
         registerNodeConnectionTools(mcp, storage, cfg(), () => PRINCIPAL, ['outbound:send', 'connections:use']);
         send = handlers.get('aimeat_mail_send')!;
         // A plain address with no AIMEAT identity, so the email channel is the one chosen.
-        contactId = (await ensureContact(storage, PRINCIPAL, { name: 'Asiakas', email: 'asiakas@example.com' })).id;
+        contactId = (await ensureContact(storage, OWNER, { name: 'Asiakas', email: 'asiakas@example.com' })).id;
     });
 
     it('a send the provider refused is an error result carrying the reason', async () => {
@@ -94,7 +97,7 @@ describe('node MCP aimeat_mail_send', () => {
         expect(out.isError, `a refused send came back as a success: ${out.content[0].text}`).toBe(true);
         expect(out.content[0].text).toContain('SMTP_SEND_FAILED');
         // The attempt is still in the send log, and the answer says where.
-        const logged = await storage.listOutboundMessages({ ownerGhii: PRINCIPAL, limit: 10, offset: 0 });
+        const logged = await storage.listOutboundMessages({ ownerGhii: OWNER, limit: 10, offset: 0 });
         expect(logged).toHaveLength(1);
         expect(logged[0].status).toBe('failed');
         expect(out.content[0].text).toContain(logged[0].id);

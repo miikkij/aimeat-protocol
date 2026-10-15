@@ -10,6 +10,7 @@
  * @structure visibilityTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   2026-10-15 — aimeat_visibility_behaviour_fix asks app:write beside signals:write, and says it runs only while the fixer is on (feature-list audit 91).
  *   v1.3.0 — 2026-10-08 — aimeat_visibility_behaviour, _behaviour_set and _behaviour_fix: on-page behaviour and the fixing agent (layer D).
  *   v1.2.0 — 2026-10-08 — aimeat_visibility_feed: the product feeds for Copilot Checkout and Stripe (layer E).
  *   v1.1.0 — 2026-10-08 — aimeat_visibility_settings_set takes clarity_project_id and ga4_measurement_id (layer B).
@@ -93,12 +94,13 @@ export const visibilityTools = [
     },
     {
         name: 'aimeat_visibility_behaviour_fix',
-        description: 'Run the fixing agent on one of the person\'s apps now: it reads the app\'s findings of the last seven days, asks the person\'s own AI for a corrected app, and writes it as the app\'s DRAFT. It never publishes: the live app stays as it is until the person publishes the draft (aimeat_app_draft_publish). It does not replace a draft the person wrote. The answer is the run: the findings, whether a draft was written, the model, and a note when none was. It spends the person\'s AI credit; ask before you run it.',
+        description: 'Run the fixing agent on one of the person\'s apps now: it reads the app\'s findings of the last seven days, asks the person\'s own AI for a corrected app, and writes it as the app\'s DRAFT. It never publishes: the live app stays as it is until the person publishes the draft (aimeat_app_draft_publish). It does not replace a draft the person wrote. The answer is the run: the findings, whether a draft was written, the model, and a note when none was. It spends the person\'s AI credit; ask before you run it. It runs only while the person has the fixing agent switched on (aimeat_visibility_behaviour_set with fixer: true).',
         caller: 'agent',
         visibility: agentEverywhere,
         // Not idempotent: each run is a new AI call and may write a new draft. Open world: it calls the person's AI provider.
         annotations: { title: 'Fix an App from its Findings', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
-        scope: 'signals:write',
+        // It writes the app's draft, so it asks app:write as the draft routes do (feature-list audit 91).
+        scope: ['signals:write', 'app:write'],
         surfaces: ['appdev', 'commerce'],
         input: {
             app: { type: 'string', description: 'The app\'s filename, such as shop.html.', required: true, zod: z.string().min(1).max(200) },

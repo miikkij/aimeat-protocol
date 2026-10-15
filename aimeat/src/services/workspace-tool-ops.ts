@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-10-15 — writeWorkspaceDraftsOp asks the organism rule for each item's real key, so the meta rule
+ *     applies to a draft as it does to POST /v1/memory (feature-list audit 61).
  *   v1.11.1 — 2026-10-13 — The organism namespace rule is asked with the caller's scopes, which the
  *     fenced-space rule reads (a session that covers organism:direct writes directly; ruled 2026-10-13).
  *   v1.11.0 — 2026-10-13 — The draft write, the publish, the batch publish (direct values and draft
@@ -360,6 +362,16 @@ export async function writeWorkspaceDraftsOp(
     const fenced = await fencedOpRefusal(deps, caller, organismId, ws,
         { keys: resolved.map(item => `${root}.${item.namespace}.${item.instanceId}.draft`) });
     if (fenced) return fenced;
+    // The organism rule for each item's real key, as POST /v1/memory asks it. The check above reads a
+    // stand-in key that lies in no space, so the workspace's meta rule (keys under `.meta`) never
+    // fired here and a contributor's draft landed in a declared meta space this route's twin refuses
+    // (feature-list audit 61).
+    for (const [i, item] of resolved.entries()) {
+        const key = `${root}.${item.namespace}.${item.instanceId}.draft`;
+        const itemRefusal = await checkOrganismNamespaceAccess({ storage, config },
+            { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes }, key, 'write');
+        if (itemRefusal) return refuse(itemRefusal.status, itemRefusal.code, `${batch ? `items[${i}]: ` : ''}${itemRefusal.message}`);
+    }
     const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
     for (const [i, item] of resolved.entries()) {
         const key = `${root}.${item.namespace}.${item.instanceId}.draft`;

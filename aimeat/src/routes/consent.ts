@@ -13,6 +13,9 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   v1.3.0 — 2026-10-15 — The owner in person lists, reads and revokes the consents their agents filed
+ *     on this route (listAccountConsents, accountHoldsConsent); an agent's consent stays under its own
+ *     GAII, where the access checks read it (feature-list audit 40).
  *   v1.2.0 — 2026-10-12 — POST /v1/consent no longer defaults the reach to `federation` here: the
  *     service decides it by version, and `private`/`dmz` are answered as `local` (Core 2026-11 AUTHZ-18).
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -27,13 +30,18 @@ import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
 import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { grantConsent, revokeConsent } from '../services/consent-write.js';
+import { grantConsent, revokeConsent, listAccountConsents, accountHoldsConsent } from '../services/consent-write.js';
 import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
 import { operatorOverride } from '../services/operator-override.js';
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
+    // A consent covers the data of the identity it is filed under, because every access check reads
+    // the consents of the data's owner. An agent's consent on this route covers the agent's own data
+    // and stays under its GAII (decision 2026-10-02, consent stays per agent); the owner in person
+    // lists, reads and revokes it through listAccountConsents and accountHoldsConsent. The owner got
+    // 403 on it and did not see it in the list (feature-list audit 40).
     const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
     // POST /v1/consent — Create a new consent grant
@@ -108,7 +116,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             opts.recipient = req.query.recipient as string;
         }
 
-        const consents = await storage.listConsents(ownerGaii, opts);
+        const consents = await listAccountConsents(storage, ownerGaii, opts);
 
         res.json(success(config.nodeId, {
             consents: consents.map(c => ({
@@ -185,7 +193,7 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
 
         // Another person's record: the operator's pass (operatorOverride) admits the operator and the
         // operator's agent holding operator:admin, as on MCP, and writes the operator trail.
-        if (consent.ownerGaii !== resolve(req) && !(await operatorOverride(storage, config, req.auth,
+        if (!accountHoldsConsent(resolve(req), consent.ownerGaii) && !(await operatorOverride(storage, config, req.auth,
             { ownerOf: consent.ownerGaii, area: 'consent', action: 'read', subject: consent.id }))) {
             res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not own this consent record'));
             return;

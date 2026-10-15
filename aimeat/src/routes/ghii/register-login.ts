@@ -6,6 +6,10 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — The registration hooks run here too (ownerRegistrationRefusal before any row,
+ *     announceOwnerRegistered after); only POST /v1/owners ran them (feature-list audit 89).
+ *   2026-10-15 — Who becomes operator is createdAccountIsOperator (services/owner-provisioning.ts), the one
+ *     rule every account-creating route asks (feature-list audit 19).
  *   v1.14.0 — 2026-10-06 — The federated sign-in verification names the home node it is for
  *     (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.13.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -69,7 +73,6 @@ import { audienceProof } from '../../services/signed-node-request.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { validateOwnerName, FEDERATED_ROLE, homeIdentityOf } from '../../utils/gaii.js';
-import { isOperatorAccount } from '../../utils/operator-account.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { createHash } from 'node:crypto';
 import { hashPassword } from '../../services/password.js';
@@ -85,7 +88,7 @@ import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../mod
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { parseLoginIdentifier } from '../../utils/login-identifier.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
-import { registrationRefusal, creditWelcomeBonus } from '../../services/owner-provisioning.js';
+import { registrationRefusal, creditWelcomeBonus, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../../services/owner-provisioning.js';
 import { eraseOwner } from '../../services/owner-erasure.js';
 
 export function registerRegisterLoginRoutes(
@@ -232,15 +235,17 @@ export function registerRegisterLoginRoutes(
             return;
         }
 
+        // The operator's registration gate, before any row exists (feature-list audit 89).
+        const hookRefusal = await ownerRegistrationRefusal(storage, config, { name: username, displayName: display_name, via: 'direct' });
+        if (hookRefusal) {
+            res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookRefusal));
+            return;
+        }
+
         // First real owner gets operator role (same logic as /v1/owners)
         // Self-heal: if no operator exists anywhere, promote this user
-        const allOwners = await storage.listOwners();
-        const realOwners = allOwners.filter(o => o.name !== 'anonymous');
-        const hasOperator = allOwners.some(isOperatorAccount);
         const roles: string[] = ['owner'];
-        if (realOwners.length === 0 || !hasOperator) {
-            roles.push('operator');
-        }
+        if (await createdAccountIsOperator(storage)) roles.push('operator');
 
         const owner = await storage.createOwner({
             name: username,
@@ -273,6 +278,7 @@ export function registerRegisterLoginRoutes(
 
         // The welcome bonus, decided in one place for every door that creates an account.
         await creditWelcomeBonus(storage, config, ghii, now);
+        announceOwnerRegistered(storage, config, owner, 'direct');
 
         // Which onboarding path this account was created on (05-mittaus.md). K3: new accounts get
         // the remake. Written here rather than at first sign-in because a cohort is defined by when
