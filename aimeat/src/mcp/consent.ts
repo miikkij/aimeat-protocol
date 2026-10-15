@@ -11,6 +11,8 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-15 — The consent-record resource refuses another owner's record with resourceRefusal
+ *     (ACCESS_DENIED and a next step) instead of the bare "Access denied" (feature-list audit #186).
  *   2026-10-15 — aimeat_consent_list lists the account's consents including those REST filed under one of
  *     its agents (feature-list audit 40).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -32,6 +34,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { grantConsent, revokeConsent, listAccountConsents, accountHoldsConsent } from '../services/consent-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { resourceRefusal } from './resource-refusal.js';
 
 export function registerConsentTools(
     mcp: McpServer,
@@ -85,7 +88,8 @@ export function registerConsentTools(
 
             const ghii = ownerGhii();
             if (!accountHoldsConsent(ghii, consent.ownerGaii)) {
-                return { contents: [{ uri: uri.toString(), text: 'Access denied' }] };
+                return resourceRefusal(uri, 'ACCESS_DENIED', 'This consent record belongs to someone else, so it cannot be read here. '
+                    + 'List your own consent records instead.');
             }
 
             return {

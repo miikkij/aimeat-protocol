@@ -19,6 +19,8 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller, scopes });
  * @version-history
+ *   2026-10-15 — A failed token renewal refuses the call with UPSTREAM_UNAUTHORIZED; refreshMcpOAuth
+ *     has already parked the server in needs_reauth (feature-list audit #9).
  *   v1.9.0 — 2026-10-09 — A parked server's stored lastError and the log line carry the error through
  *     describeUpstreamError: the host and the status, never the endpoint or the upstream's body
  *     (secrets audit 2026-10-09, chapter 2).
@@ -227,6 +229,17 @@ async function resolveCredential(
   // call and a parked server, and the owner is told to reconnect something that only needed a
   // renewal. Single-flight inside, and a no-op when the token has time left or never expires.
   const fresh = await refreshMcpOAuth(storage, config, server);
+  // The renewal failed and the row is already in needs_reauth. The call is refused rather than
+  // sent on the old token: a success on it would set the row back to active (feature-list audit #9).
+  if (fresh === 'renewal-failed') {
+    return {
+      refusal: {
+        ok: false,
+        code: 'UPSTREAM_UNAUTHORIZED',
+        message: `The sign-in to "${server.slug}" could not be renewed. Sign in to it again.`,
+      },
+    };
+  }
   if (fresh === null) {
     await storage.setMcpServerStatus(
       server.id, 'needs_reauth', 'The stored credential could not be opened.',

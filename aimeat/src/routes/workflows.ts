@@ -28,6 +28,8 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   2026-10-15 — GET /:id/preflight answers a missing workflow 404 NOT_FOUND, as the contract and the
+ *     other workflow routes do; it answered 404 with WORKFLOW_STALE (feature-list audit #87).
  *   v1.7.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.7.0 — 2026-09-29 — GET /:id/runs and /:id/runs/:runId read runs as the caller's classification
@@ -426,8 +428,14 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   router.get('/v1/workflows/:id/preflight', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const result = await preflightWorkflow({ storage, config, engine }, ownerGhiiOf(req), req.auth!.owner, id);
+    // A missing workflow is NOT_FOUND, as on every other workflow route; WORKFLOW_STALE is for one
+    // that exists and whose offers changed (feature-list audit #87).
+    if (!result.ok && result.notFound) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Workflow "${id}" not found`));
+      return;
+    }
     if (!result.ok) {
-      res.status(result.errors[0]?.endsWith('not found') ? 404 : 409).json(error(config.nodeId, 'WORKFLOW_STALE', 'This workflow cannot run as it is: one of its offers has changed or gone. Open it and pick a replacement.', undefined, { errors: result.errors }));
+      res.status(409).json(error(config.nodeId, 'WORKFLOW_STALE', 'This workflow cannot run as it is: one of its offers has changed or gone. Open it and pick a replacement.', undefined, { errors: result.errors }));
       return;
     }
     res.json(success(config.nodeId, result.preflight, [

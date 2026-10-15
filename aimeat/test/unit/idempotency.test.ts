@@ -1,7 +1,10 @@
 /**
  * @file test/unit/idempotency.test.ts
  * @description Exercises reservation lifetime, concurrent writes and lost responses.
- * @version-history v1.0.0 -- 2026-09-16 -- Proves the gaps in the response-only cache.
+ * @version-history
+ *   2026-10-15 -- idempotency() takes the node id; the 400, 409 and 503 refusals are asserted to be
+ *     the shared envelope with a request id and the support next step (feature-list audit #186).
+ *   v1.0.0 -- 2026-09-16 -- Proves the gaps in the response-only cache.
  */
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
@@ -24,8 +27,45 @@ function request(key = randomUUID(), sub = 'owner-a', method = 'POST', path = '/
 beforeEach(() => { vi.useFakeTimers(); vi.resetModules(); });
 afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 
+const NODE = 'idem-test-node';
+
+/** The shared envelope (middleware/envelope.ts error()): the node, a request id and the support next step. */
+function expectEnvelope(body: unknown, code: string): void {
+    const b = body as { ok: boolean; node: string; request_id: string; error: { code: string }; hints: { next_actions: Array<{ example_body?: { to?: string } }> } };
+    expect(b.ok).toBe(false);
+    expect(b.node).toBe(NODE);
+    expect(b.request_id).toMatch(/^req-/);
+    expect(b.error.code).toBe(code);
+    expect(b.hints.next_actions.some(a => a.example_body?.to === 'support@operators')).toBe(true);
+}
+
+// Feature-list audit #186: the three refusals were bare `{ ok, error }` objects with no request id and
+// no next step.
+it('each refusal is the shared envelope: malformed key 400, duplicate 409, full cache 503', async () => {
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
+    const next = vi.fn();
+    const malformed = response();
+    middleware(request('not-a-uuid'), malformed, next);
+    expect(malformed.statusCode).toBe(400);
+    expectEnvelope(malformed.body, 'INVALID_IDEMPOTENCY_KEY');
+    expect((malformed.body as { error: { details: unknown } }).error.details).toEqual({ header: 'Idempotency-Key', expected: 'UUID' });
+
+    const req = request();
+    middleware(req, response(), next);
+    const duplicate = response();
+    middleware(req, duplicate, next);
+    expect(duplicate.statusCode).toBe(409);
+    expectEnvelope(duplicate.body, 'IDEMPOTENCY_IN_PROGRESS');
+
+    for (let n = 1; n < 10_000; n++) middleware(request(), response(), next);
+    const overflow = response();
+    middleware(request(), overflow, next);
+    expect(overflow.statusCode).toBe(503);
+    expectEnvelope(overflow.body, 'IDEMPOTENCY_CAPACITY');
+});
+
 it('reserves before starting work, then replays the original 502 response', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const req = request(), first = response(), second = response(), next = vi.fn();
     middleware(req, first, next);
     middleware(req, second, next);
@@ -41,7 +81,7 @@ it('reserves before starting work, then replays the original 502 response', asyn
 });
 
 it('a disconnected client cannot release work that may still finish', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const req = request(), first = response(), next = vi.fn();
     middleware(req, first, next);
     first.emit('close');
@@ -56,7 +96,7 @@ it('a disconnected client cannot release work that may still finish', async () =
 });
 
 it('a non-JSON response retains a refusal instead of executing again', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const req = request(), first = response(), next = vi.fn();
     middleware(req, first, next);
     first.emit('finish');
@@ -67,7 +107,7 @@ it('a non-JSON response retains a refusal instead of executing again', async () 
 });
 
 it('isolates principal, method and URL, including query parameters', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const key = randomUUID(), next = vi.fn();
     for (const req of [request(key), request(key, 'owner-b'), request(key, 'owner-a', 'PUT'),
         request(key, 'owner-a', 'POST', '/v1/other'), request(key, 'owner-a', 'POST', '/v1/memory?mode=other')]) {
@@ -77,7 +117,7 @@ it('isolates principal, method and URL, including query parameters', async () =>
 });
 
 it('expired responses are not replayed before the next sweep', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const req = request(), first = response(), next = vi.fn();
     middleware(req, first, next);
     first.json({ ok: true });
@@ -87,7 +127,7 @@ it('expired responses are not replayed before the next sweep', async () => {
 });
 
 it('a 401 refusal can be retried after credential refresh', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const req = request(), first = response(), next = vi.fn();
     middleware(req, first, next);
     first.status(401).json({ ok: false });
@@ -96,7 +136,7 @@ it('a 401 refusal can be retried after credential refresh', async () => {
 });
 
 it('never evicts a pending request when all 10,000 slots are occupied', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const firstKey = randomUUID(), next = vi.fn();
     middleware(request(firstKey), response(), next);
     for (let n = 1; n < 10_000; n++) middleware(request(), response(), next);
@@ -122,7 +162,7 @@ const ONE_TIME_BODIES: Array<[string, unknown]> = [
 ];
 for (const [label, body] of ONE_TIME_BODIES) {
     it(`a replay never hands out ${label} again`, async () => {
-        const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+        const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
         const req = request(), first = response(), next = vi.fn();
         middleware(req, first, next);
         first.status(201).json(body);
@@ -136,7 +176,7 @@ for (const [label, body] of ONE_TIME_BODIES) {
 }
 
 it('a response marked Cache-Control: no-store is not kept for a replay', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const req = request(), first = response(), next = vi.fn();
     const headers: Record<string, string> = {};
     Object.assign(first, {
@@ -154,7 +194,7 @@ it('a response marked Cache-Control: no-store is not kept for a replay', async (
 });
 
 it('an ordinary response is still replayed, flags and counts included', async () => {
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const req = request(), first = response(), next = vi.fn();
     middleware(req, first, next);
     first.status(201).json({ ok: true, data: { key: 'notes.a', version: 2, has_password: true, max_tokens: 10 } });
@@ -166,7 +206,7 @@ it('an ordinary response is still replayed, flags and counts included', async ()
 
 it('a real HTTP disconnect and concurrent duplicate still execute a slow write only once', async () => {
     vi.useRealTimers();
-    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency();
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const started = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
     const finished = Promise.withResolvers<void>();
     let writes = 0;

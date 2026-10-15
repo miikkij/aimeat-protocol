@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-15 — aimeat_agents_list answers `refusals: null` and `refusals_unreadable: true` on every
+ *     row when the refusal notes cannot be read, the same field GET /v1/agents answers (feature-list
+ *     audit #30).
  *   2026-10-11 — aimeat_catalogue_search answers `pricing.toll_morsels` (the pacing amount, with the
  *     deprecated `base_morsels` mirror) and aimeat_work_request's `cost` carries `toll`, as REST does.
  *   2026-10-11 — aimeat_agents_list rows carry `stopped`, `stopped_at` and `stopped_by`.
@@ -140,7 +143,7 @@ import { registerCoreBoardTools } from './core-boards.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
-import { readOwnerAgentAccess, agentAccessView } from '../services/agent-refusals.js';
+import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../services/agent-refusals.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
@@ -364,10 +367,7 @@ export function registerCoreTools(
             }
             const agents = await storage.getAgentsByOwner(localAccountName(agentGaii));
             // The same two fields GET /v1/agents gives the owner and the owner's agents.
-            const access = await readOwnerAgentAccess(storage, ownerGhiiOf(agentGaii)).catch((err) => {
-                logger.warn('aimeat_agents_list: refusal notes not read, the list goes without them', { error: String(err) });
-                return new Map();
-            });
+            const access = await readOwnerAgentAccessOrMarker(storage, ownerGhiiOf(agentGaii), 'aimeat_agents_list');
             const useOf = await scopeUseLookup(storage, agents);
             return structuredResult('aimeat_agents_list', undefined, {
                 agents: agents.map(a => ({
@@ -397,7 +397,7 @@ export function registerCoreTools(
                     // started again, and a runtime reads that here (services/agent-stop-rules.ts).
                     ...stoppedView(a),
                     default_scopes: a.defaultScopes ?? ['*'],
-                    ...agentAccessView(a.defaultScopes ?? ['*'], access.get(a.name)),
+                    ...agentAccessFields(a.defaultScopes ?? ['*'], access, a.name),
                 })),
             });
         },

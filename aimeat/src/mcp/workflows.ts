@@ -11,6 +11,9 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-15 — aimeat_workflow_run in signals-only mode reads its run by id (getRun), as the REST
+ *     route does; the run list it searched leaves checks out since 2026-08-30, so it answered empty
+ *     steps and no status (feature-list audit #87).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-06 — aimeat_workflow_save registers the catalog's schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -51,7 +54,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { getActiveWorkflowEngine, HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import {
-  saveWorkflow, getWorkflow, listWorkflows, listRuns, validateWorkflow, buildBlueprint,
+  saveWorkflow, getWorkflow, listWorkflows, listRuns, getRun, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
 import { syncWorkflowTriggers } from '../services/workflow/lifecycle.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
@@ -191,8 +194,9 @@ export function registerWorkflowTools(
       }
       // For signals-only the run completes synchronously — return the per-step verdicts inline.
       if (a.mode === 'signals-only') {
-        const runs = await listRuns(storage, ownerGhii, a.id);
-        const run = runs.find(r => r.runId === result.runId);
+        // By id, as POST /v1/workflows/:id/run reads it: the run list leaves checks out, and this is
+        // a check, so a lookup in the list found nothing and answered empty steps (feature-list audit #87).
+        const run = await getRun(storage, ownerGhii, a.id, result.runId);
         const steps = run ? Object.fromEntries(Object.entries(run.steps).map(([k, s]) => [k, s.state])) : {};
         return text({ runId: result.runId, status: run?.status, steps });
       }

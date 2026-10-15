@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — The shutdown handler flushes the write buffers through flushProcessBuffers, which
+ *     also flushes the agent refusal notes; they were lost on shutdown before (feature-list audit #30).
  *   v1.10.0 — 2026-10-12 — The three WebSocket servers add the Deprecation headers to the 101 answer
  *     of an upgrade let in on ?token= (upgradeDeprecationHeaderLines, Core 2026-11 HTTP-07).
  *   v1.9.1 — 2026-10-09 — The TOTP start-up warning says what a node without either key does now:
@@ -469,18 +471,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     shutdownChat();
     const statsInstance = getStatsInstance();
     if (statsInstance) await statsInstance.shutdown();
-    const { shutdownTelemetryBuffer } = await import('./services/telemetry-buffer.js');
-    await shutdownTelemetryBuffer();
-    const { shutdownUsageBuffer } = await import('./services/usage/usage-buffer.js');
-    await shutdownUsageBuffer();
-    const { shutdownScopeUse } = await import('./services/scope-use.js');
-    await shutdownScopeUse();
-    const { shutdownWriteTallyBuffer } = await import('./services/data-map/write-tally-buffer.js');
-    await shutdownWriteTallyBuffer();
-    const { shutdownConsentAuditBuffer } = await import('./services/consent-audit-buffer.js');
-    await shutdownConsentAuditBuffer();
-    const { shutdownClassificationAudit } = await import('./services/classification/audit.js');
-    await shutdownClassificationAudit();
+    // Every write buffer, the agent refusal notes included (server-bootstrap/process-buffers.ts).
+    const { flushProcessBuffers } = await import('./server-bootstrap/process-buffers.js');
+    await flushProcessBuffers();
     const { shutdownCache } = await import('./services/cache.js');
     shutdownCache();
     if (tunnelManager) await tunnelManager.shutdown();

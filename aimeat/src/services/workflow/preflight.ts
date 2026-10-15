@@ -10,6 +10,7 @@
  * @structure preflightWorkflow
  * @usage const p = await preflightWorkflow({ storage, config, engine }, ownerGhii, ownerName, id, vars);
  * @version-history
+ *   2026-10-15 — A missing workflow is answered with `notFound: true` (feature-list audit #87).
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { randomUUID } from 'node:crypto';
@@ -46,7 +47,8 @@ export interface Preflight {
   lastRun: { startedAt: string; endedAt?: string; status: string; durationMs?: number } | null;
 }
 
-export type PreflightResult = { ok: true; preflight: Preflight } | { ok: false; errors: string[] };
+/** `notFound` is set when the workflow does not exist, so the route answers 404 NOT_FOUND rather than a stale-offer refusal. */
+export type PreflightResult = { ok: true; preflight: Preflight } | { ok: false; errors: string[]; notFound?: true };
 
 const HUMAN_TIMEOUT_MIN = 1440;
 
@@ -59,7 +61,7 @@ export async function preflightWorkflow(
 ): Promise<PreflightResult> {
   const { storage, config, engine } = deps;
   const def = await getWorkflow(storage, ownerGhii, workflowId);
-  if (!def) return { ok: false, errors: [`workflow "${workflowId}" not found`] };
+  if (!def) return { ok: false, errors: [`workflow "${workflowId}" not found`], notFound: true };
   const v = await validateWorkflow(storage, config, ownerName, def);
   if (!v.ok || !v.resolved) return { ok: false, errors: v.errors };
 

@@ -8,9 +8,13 @@
  *
  * @structure
  *   - SCHEMA_MAP: path → { method → Zod schema } registry of validatable endpoints
+ *   - findValidationRule(method, endpoint): the rule for a concrete address, by route pattern
  *   - validateRouter(config): mounts POST /v1/validate returning validity/errors or a no-rules note
  *
  * @version-history
+ *   2026-10-15 — A concrete address (/v1/memory/my-key) finds its rule by route pattern; an address
+ *     with no rule answers `valid: null, checked: false` instead of `valid: true`; answers carry
+ *     `checked` and the `matched` pattern (feature-list audit #187).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -59,6 +63,27 @@ const SCHEMA_MAP: Record<string, Record<string, z.ZodType<unknown>>> = {
     '/v1/admin/roles/revoke': { POST: RoleGrantSchema },
 };
 
+/** One SCHEMA_MAP pattern as a matcher: a `:name` segment matches any one non-empty path segment. */
+function patternMatches(pattern: string, path: string): boolean {
+    const want = pattern.split('/');
+    const got = path.split('/');
+    return want.length === got.length && want.every((seg, i) => (seg.startsWith(':') ? got[i] !== '' : seg === got[i]));
+}
+
+/**
+ * The rule for a concrete address such as `/v1/memory/my-key`, looked up by the route PATTERN it
+ * matches (`/v1/memory/:key`), not by string equality, which found only the literal pattern text
+ * (feature-list audit #187). The query string is not part of the address. A literal entry wins over
+ * a pattern. Null when this node has no rule for that address and method.
+ */
+export function findValidationRule(method: string, endpoint: string): { pattern: string; schema: z.ZodType<unknown> } | null {
+    const path = endpoint.split('?')[0]!.replace(/\/+$/, '') || '/';
+    const verb = method.toUpperCase();
+    const pattern = SCHEMA_MAP[path] ? path : Object.keys(SCHEMA_MAP).find(p => p.includes(':') && patternMatches(p, path));
+    const schema = pattern ? SCHEMA_MAP[pattern]![verb] : undefined;
+    return pattern && schema ? { pattern, schema } : null;
+}
+
 export function validateRouter(config: AimeatConfig): Router {
     const router = Router();
 
@@ -66,36 +91,35 @@ export function validateRouter(config: AimeatConfig): Router {
     router.post('/v1/validate', validateBody(ValidateRequestSchema, config.nodeId), (req, res) => {
         const { method, endpoint, body } = req.body ?? {};
 
-        const schemaForPath = SCHEMA_MAP[endpoint];
-        if (!schemaForPath) {
+        // No rule is not a pass. `valid: null` and `checked: false` say that nothing was checked; the
+        // answer was `valid: true` for any content, which a client read as a pass (feature-list audit #187).
+        const rule = findValidationRule(method, endpoint);
+        if (!rule) {
             res.json(success(config.nodeId, {
-                valid: true,
-                note: `No schema validation rules defined for ${endpoint}. Request assumed valid.`,
+                valid: null,
+                checked: false,
+                method,
+                endpoint,
+                note: 'This node has no validation rules for this address and method, so nothing was checked. '
+                    + 'Send the request itself and read its answer instead.',
             }));
             return;
         }
 
-        const schema = schemaForPath[method.toUpperCase()];
-        if (!schema) {
-            res.json(success(config.nodeId, {
-                valid: true,
-                note: `No schema for ${method} ${endpoint}. Request assumed valid.`,
-            }));
-            return;
-        }
-
-        const result = schema.safeParse(body ?? {});
+        const result = rule.schema.safeParse(body ?? {});
         if (result.success) {
-            res.json(success(config.nodeId, { valid: true, method, endpoint }));
+            res.json(success(config.nodeId, { valid: true, checked: true, method, endpoint, matched: rule.pattern }));
         } else {
             res.json(success(config.nodeId, {
                 valid: false,
+                checked: true,
                 errors: result.error.issues.map(i => ({
                     path: i.path.join('.'),
                     message: i.message,
                 })),
                 method,
                 endpoint,
+                matched: rule.pattern,
             }));
         }
     });

@@ -11,6 +11,9 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-15 — The board-posts resource refuses a board not shared with the caller with
+ *     resourceRefusal (ACCESS_DENIED and a next step) instead of the bare "Access denied"
+ *     (feature-list audit #186).
  *   2026-10-08 — aimeat_board_reply hands the session's scopes to the reply service, so a declaration
  *     needs provenance:write in the session as well as on the grant.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -62,6 +65,7 @@ import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { resourceRefusal } from './resource-refusal.js';
 
 /**
  * How long a post lives when neither the post nor the board names a lifetime.
@@ -161,7 +165,10 @@ export function registerBoardsTools(
             const boardId = decodeURIComponent(variables.boardId as string);
             const board = await storage.getBoard(boardId);
             if (!board) return { contents: [{ uri: uri.toString(), text: 'Board not found' }] };
-            if (!canSeeBoard(board)) return { contents: [{ uri: uri.toString(), text: 'Access denied' }] };
+            if (!canSeeBoard(board)) {
+                return resourceRefusal(uri, 'ACCESS_DENIED', 'This board is not shared with you, so its posts cannot be read here. '
+                    + 'Ask the board\'s owner to let you in, or list the boards you can read instead.');
+            }
             const posts = await withoutHiddenPosts({ storage, config }, board, agentGaii, await storage.listPosts(boardId, { limit: 50 }));
             return {
                 contents: [{

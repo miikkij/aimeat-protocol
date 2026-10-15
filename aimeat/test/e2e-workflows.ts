@@ -53,6 +53,8 @@
  *     DELETE /v1/ai/providers/custom instead of DELETE /v1/openrouter/settings (410 on 4.0.0).
  *     "costCapMorsels still saves" asks the node its release: on 3.x the warning as before, on 4.0.0
  *     400 WORKFLOW_INVALID naming maxCostUsd on REST and an error over MCP, with nothing written.
+ *   2026-10-15 — GET /:id/preflight of a missing workflow is 404 NOT_FOUND, and aimeat_workflow_run in
+ *     signals-only mode answers the status and each step's verdict (feature-list audit #87).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -940,6 +942,25 @@ async function run() {
     assert(p.lastRun && typeof p.lastRun.status === 'string', 'the last real run rides along');
     const after = await json('/v1/workflows/news/runs?include=checks', { headers: auth });
     assert(after.body.data.count === before.body.data.count, 'a preflight left no record behind');
+  });
+
+  // Feature-list audit #87. Both failed on the code before the fix: the preflight answered 404 with
+  // WORKFLOW_STALE, and the MCP tool searched the run list, which leaves checks out, so it answered
+  // `steps: {}` and no status.
+  await test('GET preflight of a missing workflow answers 404 NOT_FOUND, not WORKFLOW_STALE', async () => {
+    const { status, body } = await json('/v1/workflows/no-such-workflow/preflight', { headers: auth });
+    assert(status === 404, `expected 404, got ${status} ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'NOT_FOUND', `expected NOT_FOUND, got ${JSON.stringify(body.error)}`);
+  });
+
+  await test('aimeat_workflow_run in signals-only mode answers each step verdict and the status, as the REST route does', async () => {
+    const checker = await mintAgent('wf-mcp-check', ['workflow:read', 'workflow:write', 'memory:read']);
+    const out = await mcpCall(checker.token, 'aimeat_workflow_run', { id: 'news', mode: 'signals-only' });
+    assert(!out.isError, `the check ran: ${out.raw}`);
+    const d = JSON.parse(out.raw);
+    assert(typeof d.status === 'string' && d.status.length > 0, `the run status belongs in the answer: ${out.raw}`);
+    assert(['green', 'input-red', 'output-red'].includes(d.steps?.fetch) && ['green', 'input-red', 'output-red'].includes(d.steps?.write),
+      `each step's verdict: ${out.raw}`);
   });
 
   await test('the three prompts for a person\'s own AI are served with the owner and the workflow filled in', async () => {

@@ -15,6 +15,9 @@
  *   round that "works" against a server which never checks the verifier proves nothing about the
  *   half that never travels.
  * @version-history
+ *   2026-10-15 — The renewal: a refused refresh token and a credential with no refresh token both
+ *     answer 'renewal-failed' and park the server in needs_reauth at once; a working refresh token
+ *     renews and keeps the server active (feature-list audit #9).
  *   v1.1.0 — 2026-10-09 — Rounds are bound to a browser: the finish takes the binding, a missing or
  *     foreign one is NOT_THIS_BROWSER with nothing sealed, an unbound round waits for the owner, and
  *     the stored round holds no plaintext verifier or client_secret (secrets audit 2026-10-09).
@@ -25,8 +28,8 @@ import http from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
-import { startMcpOAuth, finishMcpOAuth } from '../../src/services/mcp-client/oauth.js';
-import { openMcpCredential } from '../../src/services/mcp-client/credential.js';
+import { startMcpOAuth, finishMcpOAuth, refreshMcpOAuth, RENEWAL_FAILED_REASON } from '../../src/services/mcp-client/oauth.js';
+import { openMcpCredential, sealMcpCredential, requireEncryptionKey } from '../../src/services/mcp-client/credential.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
 import { bindingHash } from '../../src/services/oauth-round-secrets.js';
 import type { AimeatConfig } from '../../src/config.js';
@@ -63,7 +66,7 @@ let server: http.Server;
 beforeAll(async () => {
   server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', BASE);
-    const json = (body: unknown, status = 200) => {
+    const json =(body: unknown, status = 200) => {
       res.writeHead(status, { 'content-type': 'application/json' });
       res.end(JSON.stringify(body));
     };
@@ -106,6 +109,8 @@ beforeAll(async () => {
       const form = new URLSearchParams(await readBody());
       if (form.get('grant_type') === 'refresh_token') {
         seen.refreshUsed = true;
+        // A refresh token the authorization server no longer honours (revoked, rotated away).
+        if (form.get('refresh_token') === 'dead-refresh') return json({ error: 'invalid_grant' }, 400);
         return json({ access_token: 'renewed-token', token_type: 'Bearer', expires_in: 3600 });
       }
       // The half that never travels: the verifier must hash to the challenge we saw earlier.
@@ -313,5 +318,60 @@ describe('the OAuth round, against a real authorization server', () => {
     // Refused BEFORE the round: sending somebody to a consent screen whose result this node cannot
     // keep would waste their approval and leave nothing behind.
     expect(r.message).toContain('AIMEAT_ENCRYPTION_KEY');
+  });
+});
+
+describe('the renewal of an expiring token (feature-list audit #9)', () => {
+  /** An active server whose token expired a minute ago, holding the given refresh token. */
+  async function expiringServer(storage: SqliteStorage, refreshToken?: string): Promise<McpServerRecord> {
+    const credential = sealMcpCredential({
+      shape: 'oauth2',
+      accessToken: 'old-token',
+      ...(refreshToken ? { refreshToken } : {}),
+      oauthClient: { client_id: 'client-abc', client_secret: 'secret-xyz' },
+    }, requireEncryptionKey(config)!);
+    const row = makeRow({
+      status: 'active', credential, credentialShape: 'oauth2',
+      expiresAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+    await storage.createMcpServer(row);
+    return (await storage.getMcpServer(row.id))!;
+  }
+
+  it('parks the server in needs_reauth at once when the refresh token is refused', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = await expiringServer(storage, 'dead-refresh');
+
+    const r = await refreshMcpOAuth(storage, config, row);
+
+    expect(r).toBe('renewal-failed');
+    const stored = await storage.getMcpServer(row.id);
+    expect(stored?.status).toBe('needs_reauth');
+    expect(stored?.lastError).toBe(RENEWAL_FAILED_REASON);
+  });
+
+  it('parks the server in needs_reauth when there is no refresh token to renew with', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = await expiringServer(storage);
+
+    const r = await refreshMcpOAuth(storage, config, row);
+
+    expect(r).toBe('renewal-failed');
+    expect((await storage.getMcpServer(row.id))?.status).toBe('needs_reauth');
+  });
+
+  it('renews with a working refresh token and leaves the server active', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = await expiringServer(storage, 'refresh-me');
+
+    const r = await refreshMcpOAuth(storage, config, row);
+
+    expect(r).not.toBe('renewal-failed');
+    expect(r).not.toBeNull();
+    const stored = await storage.getMcpServer(row.id);
+    expect(stored?.status).toBe('active');
+    const opened = openMcpCredential(stored!.credential!, config);
+    if (!opened || opened === 'no-key') throw new Error('credential not readable');
+    expect(opened.accessToken).toBe('renewed-token');
   });
 });

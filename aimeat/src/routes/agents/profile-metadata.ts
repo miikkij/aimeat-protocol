@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — GET /v1/agents answers `refusals: null` and `refusals_unreadable: true` on every row
+ *     when the refusal notes cannot be read, instead of an empty list (feature-list audit #30).
  *   v1.17.0 — 2026-10-12 — GET /v1/agents asks agent:read from 4.0.0 (requireRestScope; counted with a
  *     Deprecation header before it). Ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan,
  *     item 11 replaces the decision recorded in v1.7.0 below that an agent listing its owner's fleet
@@ -69,7 +71,7 @@ import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
 import { setAgentTaskStart, taskStartView, scopeUseLookup } from '../../services/agent-task-start-write.js';
-import { readOwnerAgentAccess, agentAccessView } from '../../services/agent-refusals.js';
+import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../../services/agent-refusals.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
@@ -233,10 +235,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // them manages these agents' permissions.
     const seesAccess = !isForeignPrincipal(req.auth!) && !req.auth!.roles.some(r => r === 'app' || r === 'ecosystem');
     const access = seesAccess && agents.length > 0
-        ? await readOwnerAgentAccess(storage, `${req.auth!.owner}@${config.nodeId}`).catch((err) => {
-          logger.warn('GET /v1/agents: refusal notes not read, the list goes without them', { error: String(err) });
-          return new Map();
-        })
+        ? await readOwnerAgentAccessOrMarker(storage, `${req.auth!.owner}@${config.nodeId}`, 'GET /v1/agents')
         : null;
 
     // Which connector holds each agent, for the audience the connector list has (GET
@@ -330,7 +329,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         card_enrolled: !!a.enrolledAt,
         enrolled_at: a.enrolledAt ?? null,
         ...(wantCredentials ? { credential: credentialHealth[a.gaii] } : {}),
-        ...(access ? agentAccessView(a.defaultScopes ?? ['*'], access.get(a.name)) : {}),
+        ...(access ? agentAccessFields(a.defaultScopes ?? ['*'], access, a.name) : {}),
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
         ...(wantStats ? {
           stats: {

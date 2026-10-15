@@ -7,10 +7,13 @@
  *   response. Process-local, 24h TTL, bounded cache; active reservations are never evicted for space.
  *
  * @structure
- *   - idempotency(): middleware factory; skips non-POST/PUT and keyless requests, validates + caches
+ *   - idempotency(nodeId): middleware factory; skips non-POST/PUT and keyless requests, validates + caches
  *   - cache / TTL_MS / MAX_CACHE_SIZE: in-memory store with periodic expiry sweep
  *
  * @version-history
+ *   2026-10-15 — The 400, 409 and 503 refusals are built with the shared error() envelope, so they
+ *     carry the node, the request id and the next steps; the malformed-key sentence is plain and
+ *     names the header in `details` (feature-list audit #186).
  *   v1.4.0 -- 2026-10-09 -- A response marked Cache-Control: no-store, or one carrying a credential
  *     field, is not kept: a replay is answered IDEMPOTENCY_RESULT_UNAVAILABLE and never hands a
  *     one-time secret out again (secrets audit 2026-10-09, finding 1.8).
@@ -28,6 +31,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { carriesCredentialField } from '../utils/redact-credentials.js';
+import { error } from './envelope.js';
 
 interface CachedResponse {
     state: 'pending' | 'complete' | 'unavailable';
@@ -85,7 +89,8 @@ function mustNotKeep(res: Response, body: unknown): boolean {
     return carriesCredentialField(body);
 }
 
-export function idempotency() {
+/** `nodeId` names this node in the refusal envelopes (middleware/envelope.ts error()). */
+export function idempotency(nodeId: string) {
     return (req: Request, res: Response, next: NextFunction) => {
         // Only applies to POST/PUT methods
         if (req.method !== 'POST' && req.method !== 'PUT') {
@@ -109,10 +114,10 @@ export function idempotency() {
 
         // SECURITY: Validate key format to prevent cache key abuse
         if (!UUID_REGEX.test(idempotencyKey)) {
-            res.status(400).json({
-                ok: false,
-                error: { code: 'INVALID_IDEMPOTENCY_KEY', message: 'Idempotency-Key must be a valid UUID (e.g., 550e8400-e29b-41d4-a716-446655440000)' },
-            });
+            res.status(400).json(error(nodeId, 'INVALID_IDEMPOTENCY_KEY',
+                'The repeat-protection key on this request is not in the expected form. Send a new random key '
+                + 'in the form 550e8400-e29b-41d4-a716-446655440000, or leave the header out.',
+                400, { header: 'Idempotency-Key', expected: 'UUID' }));
             return;
         }
 
@@ -128,11 +133,11 @@ export function idempotency() {
                 res.status(cached.status!).json(cached.body);
             } else {
                 const running = cached.state === 'pending';
-                res.status(409).json({ ok: false, error: {
-                    code: running ? 'IDEMPOTENCY_IN_PROGRESS' : 'IDEMPOTENCY_RESULT_UNAVAILABLE',
-                    message: running ? 'This request is still running. Check its result before sending it again.'
+                res.status(409).json(error(nodeId,
+                    running ? 'IDEMPOTENCY_IN_PROGRESS' : 'IDEMPOTENCY_RESULT_UNAVAILABLE',
+                    running ? 'This request is still running. Check its result before sending it again.'
                         : 'This request was already accepted, but its response is unavailable. Check its result before sending it again.',
-                } });
+                    409));
             }
             return;
         }
@@ -149,10 +154,8 @@ export function idempotency() {
             }
             if (oldestKey) cache.delete(oldestKey);
             else {
-                res.status(503).json({ ok: false, error: {
-                    code: 'IDEMPOTENCY_CAPACITY',
-                    message: 'The server cannot accept another protected request yet. Try again later.',
-                } });
+                res.status(503).json(error(nodeId, 'IDEMPOTENCY_CAPACITY',
+                    'The server cannot accept another protected request yet. Try again later.', 503));
                 return;
             }
         }

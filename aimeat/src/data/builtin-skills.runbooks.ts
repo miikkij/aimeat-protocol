@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-15 — manage-my-agents: `refusals_unreadable: true` on an agent row means the refusals
+ *     could not be read, not that there are none (feature-list audit #30).
  *   v1.13.0 — 2026-10-14 — manage-my-agents: `tunnel_enabled: false` from aimeat_connector_list means
  *     this node takes no computers; the agent says the operators must turn it on and restart.
  *   v1.12.0 — 2026-10-12 — manage-my-agents: listing agents needs agent:read from node 4.0.0.
@@ -215,7 +217,9 @@ flowchart LR
   when last), and \`scope_request\` says what the agent asked for at its last approval. A refusal is
   often why a task waits or a run looked fine and wrote nothing. Tell the owner which permission is
   missing, in words, and that they give it in Profile → Agents → Manage access rights. A refusal
-  goes away when the permission is given. Reading the owner's address book (\`aimeat_contact_list\`)
+  goes away when the permission is given. When a row says \`refusals_unreadable: true\`, the node
+  could not read the refusals: \`refusals\` is then null and says nothing about whether any were
+  refused, so ask again later rather than telling the owner there are none. Reading the owner's address book (\`aimeat_contact_list\`)
   needs its own permission, contacts:read, since 2026-10-01; an agent approved before then holds only
   messages:read for it and is refused until the owner gives contacts:read. An agent sets its OWN
   tags without agent:write since 2026-10-02, so a refusal of agent:write for its own tags
