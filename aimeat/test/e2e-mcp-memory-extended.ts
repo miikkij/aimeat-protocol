@@ -3,6 +3,7 @@
  * @description E2E tests for MCP memory-extended module — 2 tools: full-text search and
  *   public memory cross-agent read.
  * @version-history
+ *   2026-10-15 — 6d: the search follows one rule, values only, six levels, word start (feature-list audit #52).
  *   v1.0.0 — 2026-03-21 — Initial creation
  */
 
@@ -391,6 +392,24 @@ await test('6c. aimeat_memory_search honours limit', async () => {
     const res = JSON.parse((await mcpRpc('tools/call', { name: 'aimeat_memory_search', arguments: { query: 'limitword', limit: 2 } }, 120)).body.result.content[0].text);
     assert(res.hits.length <= 2, `limit 2 → at most 2 hits, got ${res.hits.length}`);
     assert(res.truncated === true, 'truncated flag set when more matched than the limit');
+});
+
+// Feature-list audit #52: one search rule on both backends and both surfaces. The tool matched a
+// substring over the raw JSON on SQLite (field names included, any depth) and over the blob on
+// PostgreSQL; GET /v1/memory/search matched a word start over the values. Now the tool reads the
+// same storage.searchText the REST route reads, and SQLite indexes what PostgreSQL indexes.
+await test('6d. aimeat_memory_search: values only, to six levels, matched at the start of a word', async () => {
+    let deep: unknown = 'zqdeepseven';
+    for (let i = 0; i < 7; i++) deep = { [`lvl${i}`]: deep };
+    await mcpRpc('tools/call', { name: 'aimeat_memory_write', arguments: { key: 'search.rule.fields', value: { zqfieldname: 'zqvalueword' } } }, 121);
+    await mcpRpc('tools/call', { name: 'aimeat_memory_write', arguments: { key: 'search.rule.deep', value: deep } }, 122);
+    const keys = async (query: string, id: number): Promise<string[]> =>
+        JSON.parse((await mcpRpc('tools/call', { name: 'aimeat_memory_search', arguments: { query } }, id)).body.result.content[0].text)
+            .hits.map((h: { key: string }) => h.key);
+    assert((await keys('zqvalue', 123)).includes('search.rule.fields'), 'a word start finds the value');
+    assert(!(await keys('valueword', 124)).includes('search.rule.fields'), 'the inside of a word does not');
+    assert(!(await keys('zqfieldname', 125)).includes('search.rule.fields'), 'a field name is not searched');
+    assert(!(await keys('zqdeepseven', 126)).includes('search.rule.deep'), 'a value seven levels down is not searched');
 });
 
 // ─── Phase 3: Cross-agent public memory read ───

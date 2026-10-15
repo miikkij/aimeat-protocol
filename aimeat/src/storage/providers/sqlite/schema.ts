@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-15 — memory.searchValues: the FTS triggers index the scalar values to six levels without field names, the PostgreSQL rule; rows that predate it are filled at start (schema-memory-search.ts, feature-list audit #52).
  *   2026-10-11 — agents.stoppedAt and agents.stoppedBy: an agent can be stopped (migration 0101 says
  *     why). The agents table's column block from the push layer to the v2 identity moves to
  *     schema-columns-agents.ts unchanged (max-file-lines).
@@ -83,6 +84,7 @@ import { applySchemaTables3 } from './schema-tables-3.js';
 import { applySchemaTables4 } from './schema-tables-4.js';
 import { splitPushSubscriptionsPerDevice, relaxPushLastUsedAt, relaxInvitationsOrganismId } from './schema-rebuilds.js';
 import { moveActionsAndWorkToFullIdentity } from './schema-identity-backfill.js';
+import { backfillMemorySearchValues } from './schema-memory-search.js';
 import { applySchedulerColumns } from './schema-columns-scheduler.js';
 import { applyExtensionColumns } from './schema-columns-extensions.js';
 import { applyAgentRuntimeColumns } from './schema-columns-agents.js';
@@ -703,6 +705,11 @@ export function initializeSchema(db: Database.Database): void {
   // setting archived=1) moves its FTS entry from the live index to the archive index automatically.
   // The triggers are DROPped + recreated (not IF NOT EXISTS) so upgraded DBs that already carry the
   // pre-split single-table triggers pick up the archive-aware bodies.
+  //
+  // THE INDEXED VALUE IS `searchValues`, the scalar values to six levels without field names, which is
+  // the PostgreSQL rule (storage/search-text.ts, feature-list audit #52). The raw JSON is the fallback
+  // only for a row that has no searchValues yet; backfillMemorySearchValues below fills those.
+  safeAddColumn('memory', 'searchValues', 'TEXT');
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
       key, value, tags,
@@ -719,9 +726,9 @@ export function initializeSchema(db: Database.Database): void {
 
     CREATE TRIGGER memory_fts_ai AFTER INSERT ON memory BEGIN
       INSERT INTO memory_fts(rowid, key, value, tags)
-      SELECT new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 0;
+      SELECT new.rowid, new.key, COALESCE(new.searchValues, new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 0;
       INSERT INTO memory_archive_fts(rowid, key, value, tags)
-      SELECT new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 1;
+      SELECT new.rowid, new.key, COALESCE(new.searchValues, new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 1;
     END;
     CREATE TRIGGER memory_fts_ad AFTER DELETE ON memory BEGIN
       DELETE FROM memory_fts WHERE rowid = old.rowid;
@@ -731,23 +738,25 @@ export function initializeSchema(db: Database.Database): void {
       DELETE FROM memory_fts WHERE rowid = old.rowid;
       DELETE FROM memory_archive_fts WHERE rowid = old.rowid;
       INSERT INTO memory_fts(rowid, key, value, tags)
-      SELECT new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 0;
+      SELECT new.rowid, new.key, COALESCE(new.searchValues, new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 0;
       INSERT INTO memory_archive_fts(rowid, key, value, tags)
-      SELECT new.rowid, new.key, COALESCE(new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 1;
+      SELECT new.rowid, new.key, COALESCE(new.searchValues, new.value, ''), COALESCE(new.tags, '') WHERE new.archived = 1;
     END;
   `);
+  // Rows written before searchValues existed get it now; the update trigger re-indexes each one.
+  backfillMemorySearchValues(db);
 
   // Backfill — idempotent + archive-aware + self-healing. Inserts only missing rowids into whichever
   // index matches the row's archived state, and evicts any row that landed in the wrong index (e.g.
   // archived before the split triggers existed). Cheap on every boot (NOT IN over a small index).
   db.exec(`
     INSERT INTO memory_fts(rowid, key, value, tags)
-    SELECT m.rowid, m.key, COALESCE(m.value, ''), COALESCE(m.tags, '')
+    SELECT m.rowid, m.key, COALESCE(m.searchValues, m.value, ''), COALESCE(m.tags, '')
     FROM memory m
     WHERE m.archived = 0 AND m.rowid NOT IN (SELECT rowid FROM memory_fts);
 
     INSERT INTO memory_archive_fts(rowid, key, value, tags)
-    SELECT m.rowid, m.key, COALESCE(m.value, ''), COALESCE(m.tags, '')
+    SELECT m.rowid, m.key, COALESCE(m.searchValues, m.value, ''), COALESCE(m.tags, '')
     FROM memory m
     WHERE m.archived = 1 AND m.rowid NOT IN (SELECT rowid FROM memory_archive_fts);
 

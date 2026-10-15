@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-15 — metrics.enabled is immutable (restart-required): server-bootstrap/routes-loader.ts reads it once at start to mount the metrics middleware (feature-list audit #181).
  *   v1.33.0 — 2026-10-15 — connections.facebook_*, instagram_* and reddit_* client settings; the provider
  *     client rows moved to config-schema-connections.ts (max-file-lines), in the same place in the list.
  *   v1.32.1 — 2026-10-14 — work.otk_grace_ms removed: the connectivity-key routes it timed are gone (feature-list audit row 202).
@@ -536,7 +537,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Stats & Metrics (mutable) ──
   { key: 'statsEnabled', dotPath: 'stats.enabled', envVar: 'AIMEAT_STATS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable stats API' },
   { key: 'statsAccess', dotPath: 'stats.access', envVar: 'AIMEAT_STATS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Stats API visibility: public, authenticated, or operator' },
-  { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable Prometheus metrics endpoint' },
+  { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Enable Prometheus metrics endpoint. Read at start: the request counter mounts before any route, so a change takes effect after a restart' },
   { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
 
   // ── MCP sessions (mutable) ──

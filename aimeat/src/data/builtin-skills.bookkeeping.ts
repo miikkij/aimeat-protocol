@@ -27,6 +27,7 @@
  * @structure BOOKKEEPING_SKILL_ENTRY
  * @usage import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
  * @version-history
+ *   v1.0.1 — 2026-10-15 — Fiscal years: the overlap check is per company (feature-list audit #148).
  *   2026-10-15 — The OData passage says a table over 5 000 rows is paged with @odata.nextLink (feature-list audit #151, #193).
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5a).
  */
@@ -114,7 +115,8 @@ code. Paid invoices and Stripe payments book their own vouchers. The person's re
   \`POST /v1/finance/vouchers/{id}/reverse\` and a \`reason\`, which books the counter-voucher, and then
   the right voucher is booked.
 - **Fiscal years.** One for the calendar year is created when the first invoice needs it; others with
-  \`POST /v1/finance/fiscal-years\`. When the accounts for a year are closed, the person locks it
+  \`POST /v1/finance/fiscal-years\`. A year belongs to one company: two companies may have years for
+  the same days, and one company's years may not overlap (409 \`FISCAL_YEAR_OVERLAP\`). When the accounts for a year are closed, the person locks it
   (\`POST /v1/finance/fiscal-years/{id}/lock\`, the person in their own session): after that nothing
   is booked or sent into it (409 \`FISCAL_YEAR_LOCKED\`). This is how the books stop changing.
 - There is no chart of accounts and no double-entry journal here. An accountant who keeps one imports

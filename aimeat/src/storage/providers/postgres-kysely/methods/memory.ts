@@ -9,6 +9,7 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-10-15 -- searchMemory is one owner's searchText (word-start), no longer a substring ILIKE over the blob (feature-list audit #52).
  *   v1.6.0 -- 2026-10-12 -- bulkBinMemory: many rows into the bin, chunked like bulkDeleteMemory.
  *   v1.5.0 -- 2026-09-08 -- countMemoryWithOrigins, for the operator's CORS page.
  *   v1.4.0 -- 2026-09-06 -- Review item 5.1: countArchivedByKeyPrefix returns { active, archived },
@@ -431,10 +432,13 @@ export const memoryMethods = {
   },
 
   async searchMemory(this: PostgresKyselyStorage, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter; limit?: number }): Promise<MemoryRecord[]> {
-    let q = applyList(this.db.selectFrom('Memory').selectAll().where('ownerGaii', '=', ownerGaii), opts as ListOpts);
-    q = q.where(sql<boolean>`"searchBlob" ILIKE ${'%' + query + '%'}`);
-    const rows = await q.limit(opts?.limit ?? 100).execute();
-    return rows.filter(isVisible).map(rowToRecord);
+    // One owner's searchText: the same word-start match over the same indexed text. A substring match
+    // over the blob here gave the MCP tool a second search rule (feature-list audit #52).
+    const hits = await this.searchText(query, {
+      ownerGaiis: [ownerGaii], keyPrefix: opts?.prefix, visibility: opts?.visibility,
+      maxFlags: opts?.maxFlags, archived: opts?.archived, limit: opts?.limit ?? 100,
+    });
+    return hits.map(h => h.record);
   },
 
   async searchText(this: PostgresKyselyStorage, query: string, opts?: MemoryTextSearchOpts): Promise<MemoryTextHit[]> {

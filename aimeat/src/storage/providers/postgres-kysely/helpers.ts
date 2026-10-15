@@ -7,6 +7,7 @@
  *   same way (matching the Mongo/SQLite backends: byteSize = utf8 bytes of the JSON value; searchBlob =
  *   key + tags + recursively-collected scalar values, which the DB turns into the ranked tsvector).
  * @version-history
+ *   2026-10-15 — buildSearchBlob moved to storage/search-text.ts and is re-exported here, so SQLite indexes the same text (feature-list audit #52).
  *   v1.0.0 — 2026-07-15 — Phase 5: memory-domain mappers + jsonb param helper.
  */
 import { sql } from 'kysely';
@@ -18,23 +19,9 @@ import type { Memory } from './db-types.js';
 /** utf8 byte length of a value's JSON encoding — the stored per-row byteSize (quota accounting). */
 export const byteSize = (value: unknown): number => Buffer.byteLength(JSON.stringify(value ?? null), 'utf8');
 
-/** The FTS source text for a row: key + tags + recursively-collected scalar values (depth ≤ 6),
- *  space-joined. The DB's GENERATED searchTsv column turns this into the tsvector. Matches the
- *  Mongo/SQLite buildSearchBlob so search recall is comparable across backends. */
-export function buildSearchBlob(record: MemoryRecord): string {
-  // Include the key AND its punctuation-split segments so a dotted key like `search.findme` is findable
-  // by `findme` — Postgres' tsvector keeps `search.findme` as one token, whereas SQLite FTS5 / Mongo
-  // $text split on punctuation; emitting the segments matches their recall.
-  const parts: string[] = [record.key, ...record.key.split(/[._:/\-\s]+/).filter(Boolean), ...(record.tags ?? [])];
-  const walk = (v: unknown, depth: number): void => {
-    if (depth > 6 || v == null) return;
-    if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') { parts.push(String(v)); return; }
-    if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return; }
-    if (typeof v === 'object') { for (const x of Object.values(v as Record<string, unknown>)) walk(x, depth + 1); }
-  };
-  walk(record.value, 0);
-  return parts.join(' ');
-}
+/** The FTS source text for a row. One definition for both providers, in storage/search-text.ts, so
+ *  the SQLite index holds the same text (feature-list audit #52). */
+export { buildSearchBlob } from '../../search-text.js';
 
 /** A jsonb parameter — pass a JS value, get a `<json>::jsonb` fragment (handles objects, arrays, null
  *  uniformly, unlike node-pg's default object/array coercion). */

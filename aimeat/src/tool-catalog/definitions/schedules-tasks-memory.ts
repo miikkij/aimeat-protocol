@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-15 — aimeat_memory_search states the match rule: word-start over key, tags and values, no field names (feature-list audit #52).
  *   2026-10-12 — aimeat_memory_delete and aimeat_memory_restore say what owner_scope reaches: the
  *     sibling agents, and the owner's own namespace with memory:write-as-owner.
  *   2026-10-13 — aimeat_workflow_save names the three events, the event_* variables a run an event
@@ -554,7 +555,7 @@ export const schedulesTasksMemoryTools = [
     },
     {
         name: 'aimeat_memory_search',
-        description: 'Full-text search across this agent\'s own memory entries (optionally filtered by visibility). Returns a SNIPPET per hit (a short window around the match) + key/bytes/tags — NOT the full value, so a broad query stays a sane size. Capped at `limit` hits (default 50) and skips `.version.N` history by default. Read a hit\'s full value with aimeat_memory_read on its exact key. Use when you know roughly what you stored but not the exact key; to browse keys by prefix/tag use aimeat_memory_list. `type` narrows to what a record IS rather than what it says — a semantic type such as schema:Person or aimeat:Task, several separated by commas, or a full IRI; it matches whichever spelling the writer used, so schema:Person finds a record written as https://schema.org/Person. Give a single `type` with no `query` to list records of that type; give both to search within one type. GET /v1/ns lists the types this node names for itself.',
+        description: 'Full-text search across this agent\'s own memory entries (optionally filtered by visibility). Each query word matches a word that begins with it, in the key, the tags and the values (field names are not searched, values to six levels deep), the same rule as GET /v1/memory/search. Returns a SNIPPET per hit (a short window around the match) + key/bytes/tags — NOT the full value, so a broad query stays a sane size. Capped at `limit` hits (default 50) and skips `.version.N` history by default. Read a hit\'s full value with aimeat_memory_read on its exact key. Use when you know roughly what you stored but not the exact key; to browse keys by prefix/tag use aimeat_memory_list. `type` narrows to what a record IS rather than what it says — a semantic type such as schema:Person or aimeat:Task, several separated by commas, or a full IRI; it matches whichever spelling the writer used, so schema:Person finds a record written as https://schema.org/Person. Give a single `type` with no `query` to list records of that type; give both to search within one type. GET /v1/ns lists the types this node names for itself.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Search Memory', readOnlyHint: true },

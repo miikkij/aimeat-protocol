@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — Copy validates the copied value against the schema lock of its key (validateMemoryWrite, as the memory write does) and answers 422 SCHEMA_VALIDATION_FAILED (feature-list audit #51).
  *   v1.14.0 — 2026-10-13 — Import, copy and bulk-delete hand the session's scopes to the fenced-space
  *     rule, and import hands it each entry's value: a session that covers organism:direct writes a
  *     record space that names extensions directly, and a write or removal of a workspace's manifest
@@ -654,6 +655,19 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       ? await presentMemory(readerFor({ storage, config }, req.auth), stored) : null;
     if (!stored || !sourceRecord) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public memory entry not found'));
+      return;
+    }
+
+    // A schema lock holds on the copy as on every other write: the copy lands under the caller's own
+    // key, so it is validated against the schema that key falls under (feature-list audit #51).
+    const copyValidation = await validateMemoryWrite(key, sourceRecord.value, storage);
+    if (!copyValidation.valid) {
+      res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
+        'The copied value does not match the schema locked on this key. Read the schema at schema_url; the copy is stored only when the value matches it.', 422, {
+          key,
+          violations: copyValidation.errors,
+          schema_url: `/v1/memory/${encodeURIComponent(copyValidation.schemaKey!)}/schema`,
+        }));
       return;
     }
 

@@ -11,6 +11,7 @@
  *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints
  *
  * @version-history
+ *   2026-10-15 — The operator ruling takes only requester_wins, provider_wins or split (OperatorRulingSchema, 400 VALIDATION_ERROR otherwise) (feature-list audit #143). Accept-fault records a requester_wins ruling, and every resolution stores the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   v2.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v2.2.0 — 2026-09-26 — Every door names the caller by its resolved identity (resolveIdentity): a
  *     person by their GHII, an agent by its GAII. A work item carries the same identity for its two
@@ -59,6 +60,7 @@ import { emitChange } from '../services/event-bus.js';
 import { returnEscrow, settlePayment } from '../services/morsel.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { isOperatorCaller } from '../services/operator-override.js';
+import { refreshTrustScore } from '../services/trust.js';
 import { DisputeOpenSchema, CounterDisputeSchema, PartialOfferSchema, OperatorRulingSchema, validateBody } from '../models/schemas.js';
 
 function param(p: string | string[]): string {
@@ -289,8 +291,15 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         // Return escrow to requester
         await returnEscrow(storage, work);
 
-        await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
+        // Recorded as the verdict it is, so the trust score reads it as a dispute the provider lost.
+        // Without a ruling this outcome was invisible to the score (feature-list audit #144).
+        await storage.updateDispute(dispute.id, {
+            status: 'resolved',
+            ruling: { ruling: 'requester_wins', distribution: { toRequester: work.cost.total, toProvider: 0, burned: 0 }, reason: 'The provider accepted fault.' },
+            updatedAt: new Date().toISOString(),
+        });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
+        await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'accept_fault', me, { full_refund: true });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'requester_refunded' }));
@@ -346,6 +355,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
+        await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'accept_redelivery', me, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'redelivery_accepted' }));
@@ -394,6 +404,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
+        await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'partial_accepted', me, { refund_morsels: refundAmount });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', refund_morsels: refundAmount }));
@@ -435,6 +446,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
         await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
+        await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'withdraw_dispute', me, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'resolved', outcome: 'withdrawn' }));
@@ -535,6 +547,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
             updatedAt: new Date().toISOString(),
         });
         await storage.updateWork(dispute.trackingCode, { status: 'settled', updatedAt: new Date().toISOString() });
+        await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'operator_ruled', me, { ruling, distribution, reason });
 
         res.json(success(config.nodeId, {

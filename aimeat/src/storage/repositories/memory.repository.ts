@@ -14,6 +14,7 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-10-15 — searchText states the one match rule for both backends; searchMemory is one owner's searchText (feature-list audit #52).
  *   v1.3.0 — 2026-10-12 — bulkBinMemory: the batched workspace record delete puts rows in the bin.
  *   v1.2.0 — 2026-09-08 — countMemoryWithOrigins: how many records carry a CORS list of their own,
  *     for the operator's CORS page.
@@ -251,11 +252,14 @@ export interface MemoryRepository {
   purgeDeletedMemory(cutoffIso: string): Promise<number>;
   deleteAllMemory(ownerGaii: string): Promise<number>;
   incrementMemoryFlagCount(ownerGaii: string, key: string): Promise<void>;
+  /** One owner's {@link searchText}, answered as records: the same match rule, kept for the callers
+   *  that ask about a single owner. */
   searchMemory(ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter; limit?: number }): Promise<MemoryRecord[]>;
   /**
-   * Native full-text search over memory values (Tier-1 librarian retrieval). Indexed + ranked
-   * (SQLite FTS5 / MongoDB `$text`), best-first. Unlike {@link searchMemory} (single owner, O(n)
-   * substring scan) this is the cross-owner primitive the librarian fans across organisms with.
+   * Native full-text search over memory (Tier-1 librarian retrieval). Indexed + ranked (SQLite FTS5 /
+   * PostgreSQL tsvector), best-first. ONE RULE ON BOTH BACKENDS (storage/search-text.ts): each query
+   * word matches a word that begins with it, in the key, the tags and the scalar values to six levels
+   * deep; field names are not searched. The cross-owner primitive the librarian fans across organisms with.
    */
   searchText(query: string, opts?: MemoryTextSearchOpts): Promise<MemoryTextHit[]>;
   /**

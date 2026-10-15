@@ -20,6 +20,7 @@
  * @structure memoryHandsRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-15 — The hands from all the caller's namespaces are sorted by last_at, newest first, as openapi.yaml states (feature-list audit #50).
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 10.
  */
 import { Router } from 'express';
@@ -56,6 +57,9 @@ export function memoryHandsRouter(config: AimeatConfig, storage: Storage): Route
     const rows = (await Promise.all(
       namespaces.map(ns => storage.listMemoryWriteTally({ ownerGaii: ns, key })),
     )).flat();
+    // Each namespace query is ordered on its own; the merged list is ordered here, newest first, as
+    // the contract states (feature-list audit #50).
+    rows.sort((a, b) => (b.lastAt ?? '').localeCompare(a.lastAt ?? ''));
 
     res.json(success(config.nodeId, {
       key,

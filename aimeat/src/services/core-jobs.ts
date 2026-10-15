@@ -11,6 +11,7 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-15 — The work timeout and the dispute timeout store the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   2026-10-15 — gate-expiry: overdue gate approvals expired on a clock; startGateExpiryJob was
  *     written and never started (feature-list audit #59). intake-thread-retention: visitor
  *     conversations deleted on their retention date (feature-list audit #64).
@@ -53,6 +54,7 @@ import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
 import { logger } from '../utils/logger.js';
 import { installWriteClassifier, runClassificationQueueJob } from './classification-queue-job.js';
+import { refreshTrustScore } from './trust.js';
 
 /**
  * Register all core job handlers on the scheduler.
@@ -254,6 +256,8 @@ async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage): Promis
           status: 'expired',
           updatedAt: new Date().toISOString(),
         });
+        // An expiry counts against the provider's score (feature-list audit #144).
+        await refreshTrustScore(storage, work.providerGaii);
 
         if (work.callbackUrl) {
           // THE SAME WEBHOOK THE ROUTES FIRE, through the same function. work.callbackUrl is
@@ -363,6 +367,8 @@ async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Storage): Pr
         status: 'settled',
         updatedAt: new Date().toISOString(),
       });
+      // A timed-out dispute is a lost one (services/trust.ts LOST_DISPUTE_VERDICTS).
+      await refreshTrustScore(storage, work.providerGaii);
 
       const log = await storage.getDisputeAuditLog(dispute.id);
       const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';

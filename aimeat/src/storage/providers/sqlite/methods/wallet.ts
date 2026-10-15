@@ -8,6 +8,7 @@
  * @structure walletMethods
  * @usage Object.assign(SqliteStorage.prototype, walletMethods) in ../index.ts
  * @version-history
+ *   2026-10-15 — sumTransactionsByType: per-type totals in one GROUP BY (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
  *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
  *   v1.0.0 — 2026-10-05 — debitBalance, creditBalance, creditBalanceCapped moved here from agents.ts;
@@ -16,6 +17,7 @@
  *     (secaudit 2026-10, M8).
  */
 import type { WalletTransaction } from '../../../interface.js';
+import type { TransactionTypeSum } from '../../../repositories/wallet.repository.js';
 import type { SqliteStorage } from '../index.js';
 
 export const walletMethods = {
@@ -106,6 +108,15 @@ export const walletMethods = {
   async listAllTransactions(this: SqliteStorage, limit = 10000): Promise<WalletTransaction[]> {
     const rows = this.db.prepare('SELECT * FROM wallet_transactions ORDER BY timestamp DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeTransaction(r));
+  },
+
+  async sumTransactionsByType(this: SqliteStorage, since?: string): Promise<TransactionTypeSum[]> {
+    // The timestamps are ISO strings in UTC, so a string comparison orders them.
+    const rows = this.db.prepare(
+      `SELECT type, COUNT(*) AS count, COALESCE(SUM(amount), 0) AS total, COALESCE(SUM(ABS(amount)), 0) AS absTotal
+       FROM wallet_transactions ${since ? 'WHERE timestamp >= ?' : ''} GROUP BY type`,
+    ).all(...(since ? [since] : [])) as { type: string; count: number; total: number; absTotal: number }[];
+    return rows.map(r => ({ type: r.type, count: Number(r.count), total: Number(r.total), absTotal: Number(r.absTotal) }));
   },
 
   async sumTransactionsSince(this: SqliteStorage, types: readonly string[], since: string): Promise<number> {

@@ -10,6 +10,7 @@
  *   vat-report · exports)
  * @usage app.use(financeLedgerRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-15 — POST /v1/finance/fiscal-years checks overlap within the same company (organism_id) only (feature-list audit #148).
  *   v1.1.0 — 2026-10-11 — The voucher list's source filter no longer names 'morsel': a morsel is
  *     pacing, never a booking (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
@@ -224,7 +225,12 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
       }
       const owner = resolve(req);
       const existing = await storage.listFiscalYears(owner);
-      const overlap = existing.find((y) => y.startDate <= b.end_date && b.start_date <= y.endDate);
+      // A fiscal year belongs to one company (organism_id; null is the owner's own books), so only
+      // that company's years can overlap it. Comparing against every company of the owner refused a
+      // second company its year for the same dates (feature-list audit #148).
+      const company = b.organism_id ?? null;
+      const overlap = existing.find((y) => (y.organismId ?? null) === company
+        && y.startDate <= b.end_date && b.start_date <= y.endDate);
       if (overlap) {
         res.status(409).json(error(config.nodeId, 'FISCAL_YEAR_OVERLAP', `These dates overlap ${overlap.label}, which already runs from ${overlap.startDate} to ${overlap.endDate}. Choose dates outside it.`));
         return;

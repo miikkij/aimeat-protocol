@@ -12,6 +12,7 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   2026-10-15 — Rate and reject store the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   v1.7.0 — 2026-10-11 — The escrow holds the action's pacing amount (`toll`, was `basePrice`) plus
  *     the network fee; a morsel is pacing, not a price. Every response's `cost` carries `toll` and,
  *     until 4.0.0, the old `base_price` / `basePrice` as a deprecated mirror (presentWorkCost).
@@ -75,6 +76,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { acceptWork, deliverWork, fireWebhook } from '../services/work-lifecycle.js';
+import { refreshTrustScore } from '../services/trust.js';
 import { identitiesActingFor } from '../services/db/owner-identity.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 
@@ -570,6 +572,8 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       status: 'cancelled',
       updatedAt: new Date().toISOString(),
     });
+    // A declined request counts against the provider's score (feature-list audit #144).
+    await refreshTrustScore(storage, work.providerGaii);
 
     res.json(success(config.nodeId, {
       tracking_code: updated!.trackingCode,
@@ -624,6 +628,8 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       rating: { score: rating === 'positive' ? 5 : 1, comment },
       updatedAt: new Date().toISOString(),
     });
+    // A rating changes the provider's score; the stored one follows now (feature-list audit #144).
+    await refreshTrustScore(storage, work.providerGaii);
 
     res.json(success(config.nodeId, {
       tracking_code: updated!.trackingCode,

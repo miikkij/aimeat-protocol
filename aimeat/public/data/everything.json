@@ -671,10 +671,10 @@
      "slug": "g-4-account-event-log",
      "cells": [
       "<strong>Account event log</strong>",
-      "Your account's own history, including who changed what.",
+      "Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it.",
       "<code>/v1/account/events</code>"
      ],
-     "plain": "Account event log Your account's own history, including who changed what. /v1/account/events"
+     "plain": "Account event log Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it. /v1/account/events"
     }
    ]
   },
@@ -741,28 +741,28 @@
      "slug": "g-5-who-wrote-this",
      "cells": [
       "<strong>Who wrote this</strong>",
-      "See every identity that has written a key.",
+      "See every identity that has written or deleted a key, and how many times, newest first.",
       "<code>/v1/memory/:key/hands</code>, <code>aimeat_memory_hands</code>"
      ],
-     "plain": "Who wrote this See every identity that has written a key. /v1/memory/:key/hands, aimeat_memory_hands"
+     "plain": "Who wrote this See every identity that has written or deleted a key, and how many times, newest first. /v1/memory/:key/hands, aimeat_memory_hands"
     },
     {
      "slug": "g-5-schema-locking",
      "cells": [
       "<strong>Schema locking</strong>",
-      "Lock a key to a JSON Schema; every later write must validate.",
+      "Lock a key to a JSON Schema; every later write must validate, a copy from another identity included.",
       "<code>/v1/schemas</code>"
      ],
-     "plain": "Schema locking Lock a key to a JSON Schema; every later write must validate. /v1/schemas"
+     "plain": "Schema locking Lock a key to a JSON Schema; every later write must validate, a copy from another identity included. /v1/schemas"
     },
     {
      "slug": "g-5-search",
      "cells": [
       "<strong>Search</strong>",
-      "Full-text search over keys, tags and values, to six levels deep inside a record.",
-      "<code>aimeat_memory_search</code>"
+      "Full-text search over keys, tags and values, to six levels deep inside a record. Field names are not searched, and each word you give matches words that start with it. The same search on REST and MCP and on both storage backends.",
+      "<code>/v1/memory/search</code>, <code>aimeat_memory_search</code>"
      ],
-     "plain": "Search Full-text search over keys, tags and values, to six levels deep inside a record. aimeat_memory_search"
+     "plain": "Search Full-text search over keys, tags and values, to six levels deep inside a record. Field names are not searched, and each word you give matches words that start with it. The same search on REST and MCP and on both storage backends. /v1/memory/search, aimeat_memory_search"
     },
     {
      "slug": "g-5-librarian",
@@ -2453,10 +2453,10 @@
      "slug": "g-12-agent-messages",
      "cells": [
       "<strong>Agent messages</strong>",
-      "Exchange messages with an agent in separate threads and inspect its inbox and history. The detail view lists commands the agent registered, completes slash commands and pairs replies with commands. Answer the agent's choice prompts through buttons or a correlated free-text reply. The agent's runtime handles the commands.",
+      "Exchange messages with an agent in separate threads and inspect its inbox and history. The detail view lists commands the agent registered, completes slash commands and pairs replies with commands. The agent asks a choice prompt over REST or MCP, and you answer it through buttons or a correlated free-text reply. The agent's runtime handles the commands.",
       "Agents &gt; Messages, <code>/v1/agents/:name/messages</code>, <code>aimeat_message_*</code>"
      ],
-     "plain": "Agent messages Exchange messages with an agent in separate threads and inspect its inbox and history. The detail view lists commands the agent registered, completes slash commands and pairs replies with commands. Answer the agent's choice prompts through buttons or a correlated free-text reply. The agent's runtime handles the commands. Agents > Messages, /v1/agents/:name/messages, aimeat_message_*"
+     "plain": "Agent messages Exchange messages with an agent in separate threads and inspect its inbox and history. The detail view lists commands the agent registered, completes slash commands and pairs replies with commands. The agent asks a choice prompt over REST or MCP, and you answer it through buttons or a correlated free-text reply. The agent's runtime handles the commands. Agents > Messages, /v1/agents/:name/messages, aimeat_message_*"
     },
     {
      "slug": "g-12-listen-to-messages",
@@ -2789,19 +2789,19 @@
      "slug": "g-14-disputes",
      "cells": [
       "<strong>Disputes</strong>",
-      "Dispute delivered work; the provider re-delivers, offers a partial refund or counter-disputes; the operator rules. Every step is chained with SHA-256 so tampering shows.",
+      "Dispute delivered work; the provider re-delivers, offers a partial refund or counter-disputes; the operator rules for the requester, for the provider or a split. Every step is chained with SHA-256 so tampering shows.",
       "<code>/v1/work/:id/dispute</code>"
      ],
-     "plain": "Disputes Dispute delivered work; the provider re-delivers, offers a partial refund or counter-disputes; the operator rules. Every step is chained with SHA-256 so tampering shows. /v1/work/:id/dispute"
+     "plain": "Disputes Dispute delivered work; the provider re-delivers, offers a partial refund or counter-disputes; the operator rules for the requester, for the provider or a split. Every step is chained with SHA-256 so tampering shows. /v1/work/:id/dispute"
     },
     {
      "slug": "g-14-trust-score",
      "cells": [
       "<strong>Trust score</strong>",
-      "A score from 0 to 100 from delivery success, positive ratings, account age, volume and disputes. New agents stay under 65 for a week, and inactivity costs a point a month.",
+      "A score from 0 to 100 from delivery success, positive ratings, account age, volume and disputes. New agents stay under 65 for a week, and inactivity costs a point a month. The stored score is updated when work is delivered, rated, declined or expires and when a dispute is resolved.",
       "trust service"
      ],
-     "plain": "Trust score A score from 0 to 100 from delivery success, positive ratings, account age, volume and disputes. New agents stay under 65 for a week, and inactivity costs a point a month. trust service"
+     "plain": "Trust score A score from 0 to 100 from delivery success, positive ratings, account age, volume and disputes. New agents stay under 65 for a week, and inactivity costs a point a month. The stored score is updated when work is delivered, rated, declined or expires and when a dispute is resolved. trust service"
     },
     {
      "slug": "g-14-capabilities",
@@ -2875,10 +2875,10 @@
      "slug": "g-15-accounting-ledger",
      "cells": [
       "<strong>Accounting ledger</strong>",
-      "Append-only vouchers with reversals and evidence, VAT codes, fiscal years that lock, a VAT report, and CSV or Finvoice exports for the accountant. Stripe events become vouchers for that seller.",
+      "Append-only vouchers with reversals and evidence, VAT codes, fiscal years per company that lock, a VAT report, and CSV or Finvoice exports for the accountant. Stripe events become vouchers for that seller.",
       "<code>/v1/finance/vouchers</code>, <code>/v1/commerce/webhooks/stripe/:owner</code>"
      ],
-     "plain": "Accounting ledger Append-only vouchers with reversals and evidence, VAT codes, fiscal years that lock, a VAT report, and CSV or Finvoice exports for the accountant. Stripe events become vouchers for that seller. /v1/finance/vouchers, /v1/commerce/webhooks/stripe/:owner"
+     "plain": "Accounting ledger Append-only vouchers with reversals and evidence, VAT codes, fiscal years per company that lock, a VAT report, and CSV or Finvoice exports for the accountant. Stripe events become vouchers for that seller. /v1/finance/vouchers, /v1/commerce/webhooks/stripe/:owner"
     },
     {
      "slug": "g-15-company-addresses",
@@ -3286,10 +3286,10 @@
      "slug": "g-19-admin-dashboard",
      "cells": [
       "<strong>Admin dashboard</strong>",
-      "Node, identity, data, infrastructure, services, integrations and federation, in one control plane.",
+      "Node, identity, data, infrastructure, services, integrations and federation, in one control plane. The economy figures count every person's balance and the whole ledger.",
       "operator sign-in, <code>/v1/admin/*</code>"
      ],
-     "plain": "Admin dashboard Node, identity, data, infrastructure, services, integrations and federation, in one control plane. operator sign-in, /v1/admin/*"
+     "plain": "Admin dashboard Node, identity, data, infrastructure, services, integrations and federation, in one control plane. The economy figures count every person's balance and the whole ledger. operator sign-in, /v1/admin/*"
     },
     {
      "slug": "g-19-runtime-configuration",
@@ -3421,10 +3421,10 @@
      "slug": "g-19-metrics",
      "cells": [
       "<strong>Metrics</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "A Prometheus endpoint.",
+      "A Prometheus endpoint. Switching it on or off takes effect after a restart.",
       "<code>/v1/metrics</code>"
      ],
-     "plain": "Metrics off A Prometheus endpoint. /v1/metrics"
+     "plain": "Metrics off A Prometheus endpoint. Switching it on or off takes effect after a restart. /v1/metrics"
     },
     {
      "slug": "g-19-consul",

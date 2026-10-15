@@ -21,6 +21,9 @@
  *   suite's own server with the variable unset.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sealed-config.ts
  * @version-history
+ *   2026-10-15 -- The sealed boolean is seo.indexnow_auto: metrics.enabled is restart-required (immutable)
+ *     now, and an immutable setting is never sealed, so it no longer stood for a sealed mutable boolean
+ *     (feature-list audit #181).
  *   v1.4.0 -- 2026-10-12 -- 2c saves the address as a provider of the person's own
  *     (PUT /v1/ai/providers/:id, the route node 4.0.0 keeps) and asserts the missing-key refusal in
  *     place of the node's key; the legacy setting is still tried, through PUT /v1/openrouter/settings
@@ -53,7 +56,7 @@ const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 
 /** The settings this suite's node hands to its "host" to seal. One of each shape that matters. */
-const SEALED = ['quota.memory_mb', 'rate_limits.global', 'metrics.enabled'];
+const SEALED = ['quota.memory_mb', 'rate_limits.global', 'seo.indexnow_auto'];
 /**
  * A SECRET the host injects and seals. It is mutable (an operator on an unsealed node may replace
  * it) and shown on GET only as `_configured`, so no door may ever answer with its value: not the
@@ -163,7 +166,7 @@ async function startServer(sealed: boolean): Promise<ChildProcess> {
         AIMEAT_SQLITE_PATH: USE_POSTGRES ? '' : DB_PATH,
         AIMEAT_MEMORY_QUOTA_MB: String(HOST_MEMORY_QUOTA_MB),
         AIMEAT_RL_GLOBAL: String(HOST_RL_GLOBAL),
-        AIMEAT_METRICS_ENABLED: 'false',
+        AIMEAT_SEO_INDEXNOW_AUTO: 'false',
         AIMEAT_GOOSE_PROVIDER_API_KEY: HOST_CHAT_KEY,
         AIMEAT_OPENROUTER_INSTANCE_KEY: HOST_INSTANCE_KEY,
         AIMEAT_TURN_CREDENTIAL: HOST_TURN_CREDENTIAL,
@@ -401,7 +404,7 @@ async function main() {
 
         await test('6. →403 SEALED_CONFIG on PUT, for every sealed setting', async () => {
             for (const path of SEALED) {
-                const value = path === 'metrics.enabled' ? true : 99999;
+                const value = path === 'seo.indexnow_auto' ? true : 99999;
                 const { status, body } = await json('/v1/admin/config', {
                     method: 'PUT', headers: auth(opToken),
                     body: JSON.stringify({ changes: [{ path, value }] }),

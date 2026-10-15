@@ -10,6 +10,7 @@
  *   - addTransaction / getTransactions(gaii) / listAllTransactions: append + per-gaii / global reads
  *
  * @version-history
+ *   2026-10-15 — sumTransactionsByType: per-type totals computed in the database, for the admin dashboard's all-time figures (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
  *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
  *   v1.2.0 — 2026-09-09 — deleteTransactions deleted: no caller.
@@ -28,4 +29,18 @@ export interface WalletRepository {
   listAllTransactions(limit?: number): Promise<WalletTransaction[]>;
   /** The sum of the positive amounts of these transaction types since `since` (ISO), by the database. */
   sumTransactionsSince(types: readonly string[], since: string): Promise<number>;
+  /**
+   * Totals per transaction type, computed in the database over the WHOLE ledger, or over the rows at
+   * or after `since` (an ISO timestamp). listAllTransactions stops at the newest 10 000 rows, so an
+   * "all time" figure summed from it covered only that window (feature-list audit #169).
+   */
+  sumTransactionsByType(since?: string): Promise<TransactionTypeSum[]>;
+}
+
+/** One transaction type's totals: the row count, the signed sum and the sum of absolute amounts. */
+export interface TransactionTypeSum {
+  type: string;
+  count: number;
+  total: number;
+  absTotal: number;
 }

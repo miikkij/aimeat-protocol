@@ -29,6 +29,7 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-15 — The organism_joined, organism_member_joined and organism_left account events are stored under the full identity (accountGhii), which the account feed reads by (feature-list audit #44).
  *   2026-10-15 — createOrganismRecord with a shape answers `workspacesNotCreated` beside `workspaces`:
  *     each workspace of the shape that failed, with its reason (feature-list audit #56).
  *   2026-10-12 — leaveOrganism() takes the leaver's agents off the organism and their workspace roles
@@ -80,6 +81,15 @@ export interface OrganismRefusal {
 
 function refuse(status: number, code: string, message: string): OrganismRefusal {
   return { ok: false, status, code, message };
+}
+
+/**
+ * The full identity (GHII) of an account name as membership rows key it. The account feed is read
+ * by the owner's GHII (routes/account-events.ts), so an event stored under the bare name never shows.
+ * A visitor from another node is already named by its home GHII and is returned whole.
+ */
+function accountGhii(account: string, nodeId: string): string {
+  return account.includes('@') ? account : `${account}@${nodeId}`;
 }
 
 // The five presets the settings offer; a type is free text since 2026-08-29, and these only name
@@ -390,14 +400,15 @@ export async function joinOrganism(
     // Two feeds, because two people had something happen. The joiner joined; the creator gained a
     // member, which is news on THEIR account and would otherwise reach them only if they went and
     // looked at the roster.
+    const joinerGhii = accountGhii(joinerOwner, config.nodeId);
     void recordAccountEvent(storage, {
-      ownerGhii: joinerOwner, kind: 'organism_joined', actorGaii: joinerOwner,
+      ownerGhii: joinerGhii, kind: 'organism_joined', actorGaii: joinerGhii,
       subject: id, link: `/v1/organism/${encodeURIComponent(id)}`,
       data: { name: organism.name || id },
     }, config);
     if (organism.createdBy && organism.createdBy !== joinerOwner) {
       void recordAccountEvent(storage, {
-        ownerGhii: organism.createdBy, kind: 'organism_member_joined', actorGaii: joinerOwner,
+        ownerGhii: accountGhii(organism.createdBy, config.nodeId), kind: 'organism_member_joined', actorGaii: joinerGhii,
         subject: id, link: `/v1/organism/${encodeURIComponent(id)}`,
         data: { name: organism.name || id, who: localAccountName(joinerOwner) },
       }, config);
@@ -483,8 +494,9 @@ export async function leaveOrganism(
   // The leaver's own record only. Someone leaving is not something the organism's creator needs
   // interrupting for, and a feed that reports every departure on somebody else's account turns
   // into a roster diff nobody asked for.
+  const leaverGhii = accountGhii(leaverOwner, config.nodeId);
   void recordAccountEvent(storage, {
-    ownerGhii: leaverOwner, kind: 'organism_left', actorGaii: leaverOwner,
+    ownerGhii: leaverGhii, kind: 'organism_left', actorGaii: leaverGhii,
     subject: id, data: { name: organism.name || id },
   }, config);
   return { ok: true };

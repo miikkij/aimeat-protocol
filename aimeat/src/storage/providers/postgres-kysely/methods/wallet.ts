@@ -7,6 +7,7 @@
  *   all balance ops resolve any GAII/GEAI/bare-name to the owner GHII first (agents hold no balance).
  *   Translated 1:1 from the SQLite/Prisma implementations.
  * @version-history
+ *   2026-10-15 — sumTransactionsByType: per-type totals in one GROUP BY (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
  *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
  *   v1.4.0 — 2026-09-26 — resolveGhii moved to ../ghii-resolve.ts by pure extraction, so the owner
@@ -23,6 +24,7 @@
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type { WalletTransaction } from '../../../interface.js';
+import type { TransactionTypeSum } from '../../../repositories/wallet.repository.js';
 import type { Transaction } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { resolveGhii } from '../ghii-resolve.js';
@@ -73,6 +75,19 @@ export const walletMethods = {
     const rows = await this.db.selectFrom('Transaction').selectAll().orderBy('timestamp', 'desc').limit(Math.min(limit, 10000)).execute();
     return rows.map(mapTx);
   },
+  async sumTransactionsByType(this: PostgresKyselyStorage, since?: string): Promise<TransactionTypeSum[]> {
+    let q = this.db.selectFrom('Transaction').select([
+      'type',
+      sql<string>`count(*)`.as('count'),
+      sql<string>`coalesce(sum("amount"), 0)`.as('total'),
+      sql<string>`coalesce(sum(abs("amount")), 0)`.as('absTotal'),
+    ]);
+    if (since) q = q.where('timestamp', '>=', new Date(since));
+    const rows = await q.groupBy('type').execute();
+    // count and sum come back as strings (bigint / numeric); the totals fit a JS number.
+    return rows.map(r => ({ type: r.type, count: Number(r.count), total: Number(r.total), absTotal: Number(r.absTotal) }));
+  },
+
   async sumTransactionsSince(this: PostgresKyselyStorage, types: readonly string[], since: string): Promise<number> {
     if (types.length === 0) return 0;
     const row = await this.db.selectFrom('Transaction')

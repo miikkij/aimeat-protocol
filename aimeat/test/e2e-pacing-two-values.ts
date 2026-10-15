@@ -16,6 +16,7 @@
  *   (f) ACP, UCP and the feed show money only
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=pacing-two-values
  * @version-history
+ *   2026-10-15 — (a) asserts the dashboard's morsels in circulation cover the three wallets (feature-list audit #169).
  *   2026-10-15 — A pack past the daily mint ceiling answers 429 PACING_PACK_CAP, refunded, session open (feature-list audit #137).
  *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses price.morsels (MORSEL_PRICE_REMOVED), and the setup's PUT
  *     offers carried the old client's offer, so the whole setup was refused there. That offer moved to
@@ -160,6 +161,11 @@ await test('(a) a free offer with a pacing amount: the buyer pays 10 morsels, 2 
   const dash = await json('/v1/admin/dashboard', { headers: auth(op.token) });
   const eco = dash.body?.data?.economy ?? {};
   assert(dash.status === 200 && eco.total_burned_all_time >= 2 + 1 && eco.burned_today >= 3, `burned on the economy page: ${JSON.stringify({ all: eco.total_burned_all_time, today: eco.burned_today })}`);
+  // Feature-list audit #169: the supply was summed from agent rows, which always hold 0, so it read 0.
+  // A balance lives on the person; the three people here hold at least what their wallets say.
+  const held = await balance(buyer.token) + await balance(seller.token) + await balance(op.token);
+  assert(eco.total_morsels_in_circulation >= held && held > 0,
+    `morsels in circulation ${eco.total_morsels_in_circulation}, while three wallets alone hold ${held}`);
 });
 
 await test('(b) a money price and a pacing amount: 1 EUR through a money handler, 5 morsels of pacing as in (a)', async () => {
