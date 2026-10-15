@@ -56,6 +56,7 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   2026-10-16 — The data map check reads as the node itself (NODE_READ), so the visibility gate on a private app's map does not refuse the app's own declaration (QA audit list review).
  *   v1.4.8 -- 2026-10-08 -- A provider's 404 is 422 PROVIDER_REJECTED, as a 400 is, not 502 (aiprov plan, A10).
  *   v1.4.7 -- 2026-10-07 -- A refusal of the node's own key is 424 INVALID_API_KEY too, not 502 PROVIDER_ERROR.
  *   v1.4.6 -- 2026-10-07 -- A provider's refusal of the owner's or the agent's key is 424 INVALID_API_KEY, not 401.
@@ -93,7 +94,7 @@ import type {
 } from '../../storage/interface.js';
 import { assertAppAllowed, assertWithinBudget, getTodayUsage, recordAiUsage, AiCompletionError, PROVIDER_KEY_REFUSED_STATUS } from '../ai/completion.js';
 import { nodeKeyStanding, debitAllowance } from '../ai-allowance.js';
-import { readProgramMap } from '../data-map/data-map-access.js';
+import { readProgramMap, NODE_READ } from '../data-map/data-map-access.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
 import { canonicalAiAppId } from '../ai-app-id.js';
@@ -235,7 +236,8 @@ async function knownNamesFor(storage: Storage, gaii: string): Promise<string[]> 
  */
 async function assertDeclaredInDataMap(storage: Storage, config: AimeatConfig, appRef: string, provider: DecisionProvider): Promise<void> {
   if (!provider.leaves) return;
-  const result = await readProgramMap(storage, config, null, appRef, new Date().toISOString());
+  // The node's own check, so the app's visibility does not apply: a private app declares too.
+  const result = await readProgramMap(storage, config, NODE_READ, appRef, new Date().toISOString());
   if ('refusal' in result) {
     throw new DecideError('DATAMAP_REQUIRED', 403,
       `This app has no data map this node can read, so it may not send data to the decision model. ${result.refusal.message}`);

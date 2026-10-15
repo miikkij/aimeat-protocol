@@ -2,7 +2,7 @@
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
     "node:aimeat-decide": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-15",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -10,7 +10,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:4c552bd97a805c904ca3c82b"
+      "digest": "sha256:aee6d40ee34edece3dc19e74"
     },
     "node:aimeat-refinery": {
       "reviewedOn": "2026-10-13",
@@ -341,7 +341,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:186462b6b26a70c9c7c90624",
+      "digest": "sha256:94289b1fefd2a1da4759cc43",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -666,7 +666,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
-      "aimeat/src/services/decide/service.ts": "b4dddc91e6899963",
+      "aimeat/src/services/decide/service.ts": "515617e2f5d8f9d4",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
       "aimeat/src/services/decide/settings.ts": "bb5b771bd7739ac0",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"
@@ -717,7 +717,7 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "c2d96ca91a3852f5",
+      "aimeat/src/routes/memory/bulk.ts": "346589232166087f",
       "aimeat/src/routes/memory/key.ts": "99cbdb3c794660eb",
       "aimeat/src/services/memory-bin.ts": "b60b792ebb28ebcd",
       "aimeat/src/routes/memory-hands.ts": "7c9bde91c26c70cc",

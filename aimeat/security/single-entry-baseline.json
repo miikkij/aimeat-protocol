@@ -629,10 +629,6 @@
         "count": 2,
         "why": "UNREVIEWED"
       },
-      "src/routes/data-map.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/routes/extensions/actions.ts": {
         "count": 6,
         "why": "UNREVIEWED"

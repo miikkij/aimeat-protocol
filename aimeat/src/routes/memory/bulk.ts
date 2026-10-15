@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — POST /v1/memory/bulk refuses an entry whose visibility the single write refuses (visibilityRefusal, batch-guards.ts): workspace and unknown words fail that entry instead of being stored (QA audit list review).
  *   2026-10-15 — Copy validates the copied value against the schema lock of its key (validateMemoryWrite, as the memory write does) and answers 422 SCHEMA_VALIDATION_FAILED (feature-list audit #51).
  *   v1.14.0 — 2026-10-13 — Import, copy and bulk-delete hand the session's scopes to the fenced-space
  *     rule, and import hands it each entry's value: a session that covers organism:direct writes a
@@ -85,7 +86,7 @@ import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js'
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
-import { batchKeyRefusal, storageReferenceRefusal } from './batch-guards.js';
+import { batchKeyRefusal, storageReferenceRefusal, visibilityRefusal } from './batch-guards.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isKeyArchived } from '../../services/archive.js';
@@ -175,10 +176,14 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // normal bulk write (no storage_refs) pays nothing.
       const refRefusal = await storageReferenceRefusal(storage, gaii, e.value);
       if (refRefusal) { preFailed.push({ key, status: 'failed', reason: refRefusal }); continue; }
+      // The single write's visibilities and no others. `workspace` was taken here and stored a record
+      // with no workspace on it; an unknown word was turned into private without a word.
+      const visRefusal = visibilityRefusal(e.visibility);
+      if (visRefusal) { preFailed.push({ key, status: 'failed', reason: visRefusal }); continue; }
       items.push({
         key,
         value: e.value,
-        visibility: (['private', 'owner', 'group', 'members', 'public', 'workspace'].includes(e.visibility) ? e.visibility : 'private'),
+        visibility: (e.visibility ?? 'private') as MemoryRecord['visibility'],
         tags: Array.isArray(e.tags) ? e.tags : [],
         ttlHours: typeof e.ttl_hours === 'number' ? e.ttl_hours : null,
         ...(e.group_id ? { groupId: e.group_id } : {}),
