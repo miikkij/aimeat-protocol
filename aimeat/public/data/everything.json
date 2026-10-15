@@ -1419,10 +1419,10 @@
      "slug": "g-8-schedule-limits-and-defaults",
      "cells": [
       "<strong>Schedule limits and defaults</strong>",
-      "Stop after a chosen number of successful fires, including a one-shot job, and inherit defaults from the target agent when creating a schedule. The daily USD guard checks the owner's recorded AI spending before an AI-completion job starts; it does not cap other schedule kinds or reserve the next call's cost.",
-      "<code>/v1/schedules/:id</code>, <code>/v1/agents/:name/schedule-constraints</code>, Agents &gt; Agent Config"
+      "Stop after a chosen number of successful fires, including a one-shot job, and inherit defaults from the target agent when creating a schedule. The daily USD guard checks the owner's recorded AI spending before an AI-completion job starts; it does not cap other schedule kinds or reserve the next call's cost. Limits: you set a schedule's limits and an agent's defaults on the page or over REST; a schedule your AI creates from a chat takes the target agent's defaults, and it cannot set or change a limit of its own.",
+      "<code>POST /v1/schedules</code>, <code>PATCH /v1/schedules/:id</code> (<code>constraints</code>), <code>PATCH /v1/agents/:name/schedule-constraints</code>, Agents &gt; Agent Config"
      ],
-     "plain": "Schedule limits and defaults Stop after a chosen number of successful fires, including a one-shot job, and inherit defaults from the target agent when creating a schedule. The daily USD guard checks the owner's recorded AI spending before an AI-completion job starts; it does not cap other schedule kinds or reserve the next call's cost. /v1/schedules/:id, /v1/agents/:name/schedule-constraints, Agents > Agent Config"
+     "plain": "Schedule limits and defaults Stop after a chosen number of successful fires, including a one-shot job, and inherit defaults from the target agent when creating a schedule. The daily USD guard checks the owner's recorded AI spending before an AI-completion job starts; it does not cap other schedule kinds or reserve the next call's cost. Limits: you set a schedule's limits and an agent's defaults on the page or over REST; a schedule your AI creates from a chat takes the target agent's defaults, and it cannot set or change a limit of its own. POST /v1/schedules, PATCH /v1/schedules/:id (constraints), PATCH /v1/agents/:name/schedule-constraints, Agents > Agent Config"
     },
     {
      "slug": "g-8-schedule-run-history-and-results",
@@ -1518,10 +1518,10 @@
      "slug": "g-8-extensions",
      "cells": [
       "<strong>Extensions</strong>",
-      "Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. An outbound read can inflate a gzipped answer, and an extension that reads large files raises its own read ceiling in its manifest, up to 32 MB; the person installing it sees the ceiling. A script can give one outbound call its own time limit, so one address that does not answer does not fail the whole run. Calendar arithmetic is given to a script by the node: occurrences of repeating events, free time, a time zone's local time to an instant and back, and ICS text to events and back, with the same library the browser uses, because a script has no time-zone data of its own.",
-      "<code>/v1/extensions</code>, <code>/v1/ext/:name/:action</code>, <code>aimeat_extension_*</code>, <code>ctx.fetch(url, { gunzip: true, timeoutMs })</code>, <code>ctx.calendar.*</code>, manifest <code>limits.fetch_max_mb</code>"
+      "Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. An outbound read can inflate a gzipped answer, and an extension that reads large files raises its own read ceiling in its manifest, up to 32 MB; the ceiling is kept on the installed extension, where your AI reads it, and the install approval does not show it. A script can give one outbound call its own time limit, so one address that does not answer does not fail the whole run. Calendar arithmetic is given to a script by the node: occurrences of repeating events, free time, a time zone's local time to an instant and back, and ICS text to events and back, with the same library the browser uses, because a script has no time-zone data of its own.",
+      "<code>/v1/extensions</code>, <code>/v1/ext/:name/:action</code>, <code>aimeat_extension_*</code> (<code>aimeat_extension_get</code> returns <code>limits</code>), <code>ctx.fetch(url, { gunzip: true, timeoutMs })</code>, <code>ctx.calendar.*</code>, manifest <code>limits.fetch_max_mb</code>"
      ],
-     "plain": "Extensions Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. An outbound read can inflate a gzipped answer, and an extension that reads large files raises its own read ceiling in its manifest, up to 32 MB; the person installing it sees the ceiling. A script can give one outbound call its own time limit, so one address that does not answer does not fail the whole run. Calendar arithmetic is given to a script by the node: occurrences of repeating events, free time, a time zone's local time to an instant and back, and ICS text to events and back, with the same library the browser uses, because a script has no time-zone data of its own. /v1/extensions, /v1/ext/:name/:action, aimeat_extension_*, ctx.fetch(url, { gunzip: true, timeoutMs }), ctx.calendar.*, manifest limits.fetch_max_mb"
+     "plain": "Extensions Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. An outbound read can inflate a gzipped answer, and an extension that reads large files raises its own read ceiling in its manifest, up to 32 MB; the ceiling is kept on the installed extension, where your AI reads it, and the install approval does not show it. A script can give one outbound call its own time limit, so one address that does not answer does not fail the whole run. Calendar arithmetic is given to a script by the node: occurrences of repeating events, free time, a time zone's local time to an instant and back, and ICS text to events and back, with the same library the browser uses, because a script has no time-zone data of its own. /v1/extensions, /v1/ext/:name/:action, aimeat_extension_* (aimeat_extension_get returns limits), ctx.fetch(url, { gunzip: true, timeoutMs }), ctx.calendar.*, manifest limits.fetch_max_mb"
     },
     {
      "slug": "g-8-an-extension-names-the-services-it-calls",
@@ -1687,10 +1687,10 @@
      "slug": "g-9-ai-completions-for-apps-and-agents",
      "cells": [
       "<strong>AI completions for apps and agents</strong>",
-      "Anyone with <code>ai:use</code> gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. Repeat clicks on a paid button collapse into one call. On the node's own key, each person spends an AI allowance; once it is used up, the operator decides what the key does: it pays for nothing more (the default), or it keeps paying up to a daily cap per account and a daily cap for all accounts.",
+      "Anyone with <code>ai:use</code> gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. In an app that calls through the AI library (<code>AIMEAT.ai</code>), repeat clicks on a paid button collapse into one call; the node itself runs every request it receives. On the node's own key, each person spends an AI allowance; once it is used up, the operator decides what the key does: it pays for nothing more (the default), or it keeps paying up to a daily cap per account and a daily cap for all accounts.",
       "<code>POST /v1/ai/complete</code>, <code>POST /v1/ai/stream</code>, <code>/v1/ai/usage</code>, <code>GET/POST /v1/ai/settings</code> (the daily budget, the per-app quotas and the app allowlist), <code>AIMEAT_AI_NODE_KEY_WHEN_SPENT</code>, <code>AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD</code>, <code>AIMEAT_AI_NODE_KEY_NODE_DAILY_USD</code>"
      ],
-     "plain": "AI completions for apps and agents Anyone with ai:use gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. Repeat clicks on a paid button collapse into one call. On the node's own key, each person spends an AI allowance; once it is used up, the operator decides what the key does: it pays for nothing more (the default), or it keeps paying up to a daily cap per account and a daily cap for all accounts. POST /v1/ai/complete, POST /v1/ai/stream, /v1/ai/usage, GET/POST /v1/ai/settings (the daily budget, the per-app quotas and the app allowlist), AIMEAT_AI_NODE_KEY_WHEN_SPENT, AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD, AIMEAT_AI_NODE_KEY_NODE_DAILY_USD"
+     "plain": "AI completions for apps and agents Anyone with ai:use gets completions on the owner's providers, under a daily USD budget, a per-app quota and a provider allowlist. A call may carry pictures, and files or PDFs that the model reads itself. In an app that calls through the AI library (AIMEAT.ai), repeat clicks on a paid button collapse into one call; the node itself runs every request it receives. On the node's own key, each person spends an AI allowance; once it is used up, the operator decides what the key does: it pays for nothing more (the default), or it keeps paying up to a daily cap per account and a daily cap for all accounts. POST /v1/ai/complete, POST /v1/ai/stream, /v1/ai/usage, GET/POST /v1/ai/settings (the daily budget, the per-app quotas and the app allowlist), AIMEAT_AI_NODE_KEY_WHEN_SPENT, AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD, AIMEAT_AI_NODE_KEY_NODE_DAILY_USD"
     },
     {
      "slug": "g-9-ai-capabilities",
@@ -1723,10 +1723,10 @@
      "slug": "g-9-routing-and-fallback",
      "cells": [
       "<strong>Routing and fallback</strong>",
-      "Say which provider answers each capability, in order, and the node tries the next when one times out, is rate limited, fails or refuses its key. It never moves on for a bad request or refused content, never after a stream has started, and by default never from a model on your machine to one outside it. A provider that fails three times in a row is gone round for five minutes; each answer says who chose the provider, who answered and every attempt, and each attempt is a line in your usage. Your AI proposes a change and you confirm it; on the AI page in Settings &amp; Controls you set the order and the rules yourself. The settings routes from before providers still answer, are deprecated, and go in 4.0.0.",
-      "<code>GET/PUT /v1/ai/routing</code>, <code>aimeat_ai_routing_set</code>, <code>route</code> on <code>/v1/ai/complete</code>, <code>/v1/ai/image</code>, <code>/v1/ai/transcribe</code>; <code>/v1/openrouter/*</code> (deprecated)"
+      "Say which provider answers each capability, in order, and the node tries the next when one times out, is rate limited, fails or refuses its key. It never moves on for a bad request or refused content, never after a stream has started, and by default never from a model on your machine to one outside it. A provider that fails three times in a row is gone round for five minutes; each answer says who chose the provider, who answered and every attempt, and each attempt is a line in your usage. Your AI proposes a change and you confirm it; on the AI page in Settings &amp; Controls you set the order and the rules yourself. The settings routes from before providers (<code>/v1/openrouter/settings</code>, <code>/models</code> and <code>/test</code>) answer 410 since 4.0.0 and name <code>/v1/ai/providers</code> instead.",
+      "<code>GET/PUT /v1/ai/routing</code>, <code>aimeat_ai_routing_set</code>, <code>route</code> on <code>/v1/ai/complete</code>, <code>/v1/ai/image</code>, <code>/v1/ai/transcribe</code>"
      ],
-     "plain": "Routing and fallback Say which provider answers each capability, in order, and the node tries the next when one times out, is rate limited, fails or refuses its key. It never moves on for a bad request or refused content, never after a stream has started, and by default never from a model on your machine to one outside it. A provider that fails three times in a row is gone round for five minutes; each answer says who chose the provider, who answered and every attempt, and each attempt is a line in your usage. Your AI proposes a change and you confirm it; on the AI page in Settings & Controls you set the order and the rules yourself. The settings routes from before providers still answer, are deprecated, and go in 4.0.0. GET/PUT /v1/ai/routing, aimeat_ai_routing_set, route on /v1/ai/complete, /v1/ai/image, /v1/ai/transcribe; /v1/openrouter/* (deprecated)"
+     "plain": "Routing and fallback Say which provider answers each capability, in order, and the node tries the next when one times out, is rate limited, fails or refuses its key. It never moves on for a bad request or refused content, never after a stream has started, and by default never from a model on your machine to one outside it. A provider that fails three times in a row is gone round for five minutes; each answer says who chose the provider, who answered and every attempt, and each attempt is a line in your usage. Your AI proposes a change and you confirm it; on the AI page in Settings & Controls you set the order and the rules yourself. The settings routes from before providers (/v1/openrouter/settings, /models and /test) answer 410 since 4.0.0 and name /v1/ai/providers instead. GET/PUT /v1/ai/routing, aimeat_ai_routing_set, route on /v1/ai/complete, /v1/ai/image, /v1/ai/transcribe"
     },
     {
      "slug": "g-9-ai-roles",
@@ -1768,10 +1768,10 @@
      "slug": "g-9-background-ai-jobs",
      "cells": [
       "<strong>Background AI jobs</strong>",
-      "Start a long AI job, get an answer at once, read or cancel it later.",
-      "<code>aimeat_ai_job_*</code>"
+      "Start a long AI job (a text answer, a picture or a transcription), get a job id at once, and read or cancel it later. The job runs on your own key and daily budget, writes its answer to a memory key you name, and can call one of your extension actions when it is done.",
+      "<code>POST /v1/ai/jobs</code>, <code>GET /v1/ai/jobs</code>, <code>GET /v1/ai/jobs/:id</code>, <code>POST /v1/ai/jobs/:id/cancel</code>, <code>aimeat_ai_job_*</code>"
      ],
-     "plain": "Background AI jobs Start a long AI job, get an answer at once, read or cancel it later. aimeat_ai_job_*"
+     "plain": "Background AI jobs Start a long AI job (a text answer, a picture or a transcription), get a job id at once, and read or cancel it later. The job runs on your own key and daily budget, writes its answer to a memory key you name, and can call one of your extension actions when it is done. POST /v1/ai/jobs, GET /v1/ai/jobs, GET /v1/ai/jobs/:id, POST /v1/ai/jobs/:id/cancel, aimeat_ai_job_*"
     },
     {
      "slug": "g-9-decision-model",
@@ -1822,10 +1822,10 @@
      "slug": "g-9-image-generation",
      "cells": [
       "<strong>Image generation</strong>",
-      "Generate an image and store it. It is paid like text: an agent's own key first, then the owner's, then the node's allowance when the operator named a default image model. Every picture carries a provenance record that names it by the SHA-256 of its bytes, and the stored file names that record, so a public picture is served with its AI marks and its record answers anyone. The answer gives the picture's real type (PNG, JPEG, GIF or WebP) with its width and height, and an agent gets the record's id.",
+      "Generate an image and store it. It is paid like text: an agent's own key first, then the owner's, then the node's allowance when the operator named a default image model. Every picture carries a provenance record that names it by the SHA-256 of its bytes, and the stored file names that record, so a public picture is served with its AI marks and its record answers anyone. The REST answer gives the picture's real type (PNG, JPEG, GIF or WebP) with its width and height. The MCP answer gives the type, the cost and the record's id, without the width and height.",
       "<code>/v1/ai/image</code>, <code>aimeat_image_generate</code>"
      ],
-     "plain": "Image generation Generate an image and store it. It is paid like text: an agent's own key first, then the owner's, then the node's allowance when the operator named a default image model. Every picture carries a provenance record that names it by the SHA-256 of its bytes, and the stored file names that record, so a public picture is served with its AI marks and its record answers anyone. The answer gives the picture's real type (PNG, JPEG, GIF or WebP) with its width and height, and an agent gets the record's id. /v1/ai/image, aimeat_image_generate"
+     "plain": "Image generation Generate an image and store it. It is paid like text: an agent's own key first, then the owner's, then the node's allowance when the operator named a default image model. Every picture carries a provenance record that names it by the SHA-256 of its bytes, and the stored file names that record, so a public picture is served with its AI marks and its record answers anyone. The REST answer gives the picture's real type (PNG, JPEG, GIF or WebP) with its width and height. The MCP answer gives the type, the cost and the record's id, without the width and height. /v1/ai/image, aimeat_image_generate"
     },
     {
      "slug": "g-9-speech-to-text",
@@ -1858,10 +1858,10 @@
      "slug": "g-9-living-document-authoring",
      "cells": [
       "<strong>Living document authoring</strong>",
-      "The owner's model drafts an interactive document from a plain request. The document is a record that can be saved and edited.",
-      "<code>POST /v1/living/author</code>"
+      "Your model drafts an interactive document template from a plain request. The route only returns the template and saves nothing; the Document templates page saves it as a record you can edit. Owner only.",
+      "<code>POST /v1/living/author</code>, Profile › Document templates"
      ],
-     "plain": "Living document authoring The owner's model drafts an interactive document from a plain request. The document is a record that can be saved and edited. POST /v1/living/author"
+     "plain": "Living document authoring Your model drafts an interactive document template from a plain request. The route only returns the template and saves nothing; the Document templates page saves it as a record you can edit. Owner only. POST /v1/living/author, Profile › Document templates"
     },
     {
      "slug": "g-9-prompt-calibrator",
@@ -1901,10 +1901,10 @@
      "slug": "g-10-publish-from-a-chat",
      "cells": [
       "<strong>Publish from a chat</strong>",
-      "Your AI publishes an app and returns its address, <code>name.apps.&lt;node&gt;</code>. Any AI chat can build from the node's build spec; no connector is required.",
-      "<a href=\"/v1/how-an-app-builds\">How an app builds</a>, <code>/v1/apps</code>, <code>aimeat_app_publish</code>"
+      "Your AI publishes an app. The publish answer gives the app's file address on the node; the address people open, <code>name.apps.&lt;node&gt;</code>, comes from the app list or the app's own details. Any AI chat can build from the node's build spec; no connector is required.",
+      "<a href=\"/v1/how-an-app-builds\">How an app builds</a>, <code>/v1/apps</code>, <code>aimeat_app_publish</code>, <code>aimeat_app_list</code> and <code>aimeat_app_get</code> (<code>url</code>)"
      ],
-     "plain": "Publish from a chat Your AI publishes an app and returns its address, name.apps.<node>. Any AI chat can build from the node's build spec; no connector is required. How an app builds, /v1/apps, aimeat_app_publish"
+     "plain": "Publish from a chat Your AI publishes an app. The publish answer gives the app's file address on the node; the address people open, name.apps.<node>, comes from the app list or the app's own details. Any AI chat can build from the node's build spec; no connector is required. How an app builds, /v1/apps, aimeat_app_publish, aimeat_app_list and aimeat_app_get (url)"
     },
     {
      "slug": "g-10-edit-with-ai",
@@ -1919,10 +1919,10 @@
      "slug": "g-10-saved-working-copy-and-checkpoints",
      "cells": [
       "<strong>Saved working copy and checkpoints</strong>",
-      "Save an unpublished working copy on the node so it survives a reload. Restorable checkpoints preserve earlier working copies and their change notes.",
+      "Save an unpublished working copy on the node so it survives a reload. In the App Catalog, each save keeps the copy it replaced as a checkpoint with its change note, which you can restore; the newest 8 are kept per app. Limits: a checkpoint is one memory record, so an app larger than about three quarters of the node's record size limit (1 MB by default) gets no checkpoint, and the save still goes through; a working copy your AI saves keeps no checkpoint.",
       "App Catalog &gt; Working-copy history, <code>aimeat_app_draft_*</code>"
      ],
-     "plain": "Saved working copy and checkpoints Save an unpublished working copy on the node so it survives a reload. Restorable checkpoints preserve earlier working copies and their change notes. App Catalog > Working-copy history, aimeat_app_draft_*"
+     "plain": "Saved working copy and checkpoints Save an unpublished working copy on the node so it survives a reload. In the App Catalog, each save keeps the copy it replaced as a checkpoint with its change note, which you can restore; the newest 8 are kept per app. Limits: a checkpoint is one memory record, so an app larger than about three quarters of the node's record size limit (1 MB by default) gets no checkpoint, and the save still goes through; a working copy your AI saves keeps no checkpoint. App Catalog > Working-copy history, aimeat_app_draft_*"
     },
     {
      "slug": "g-10-staging-preview",
@@ -1937,19 +1937,19 @@
      "slug": "g-10-published-versions-and-restore",
      "cells": [
       "<strong>Published versions and restore</strong>",
-      "Read the publication history, inspect an earlier version and restore it. Publication timestamps show the interval between versions; they do not measure working time.",
-      "<code>/v1/apps/:owner/:filename/versions</code>, App Catalog &gt; Versions"
+      "Read the publication history, open an earlier version, restore it or fork it. The Versions section groups publishes into sittings (publishes less than two hours apart), draws publishes per day, and estimates the work as the time between the publishes of each sitting; what happened before a sitting's first publish is not counted.",
+      "<code>/v1/apps/:owner/:filename/versions</code>, <code>aimeat_app_manage</code> action <code>versions</code>, App Catalog &gt; Versions"
      ],
-     "plain": "Published versions and restore Read the publication history, inspect an earlier version and restore it. Publication timestamps show the interval between versions; they do not measure working time. /v1/apps/:owner/:filename/versions, App Catalog > Versions"
+     "plain": "Published versions and restore Read the publication history, open an earlier version, restore it or fork it. The Versions section groups publishes into sittings (publishes less than two hours apart), draws publishes per day, and estimates the work as the time between the publishes of each sitting; what happened before a sitting's first publish is not counted. /v1/apps/:owner/:filename/versions, aimeat_app_manage action versions, App Catalog > Versions"
     },
     {
      "slug": "g-10-checked-before-it-goes-live",
      "cells": [
       "<strong>Checked before it goes live</strong>",
-      "A script that does not parse, or a script or stylesheet the node cannot find, stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner are reported with the page that explains each fix.",
-      "<code>aimeat_app_manage</code> action <code>audit</code>"
+      "Every publish checks the app first. A script that does not parse, a script or stylesheet the node cannot find, or an Atelier app that names no committed look stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner come back as warnings in the publish answer, with the page that explains each fix.",
+      "<code>POST /v1/apps</code>, <code>aimeat_app_publish</code>, <code>aimeat_app_draft_publish</code> (422 <code>APP_ARTIFACT_BROKEN</code>)"
      ],
-     "plain": "Checked before it goes live A script that does not parse, or a script or stylesheet the node cannot find, stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner are reported with the page that explains each fix. aimeat_app_manage action audit"
+     "plain": "Checked before it goes live Every publish checks the app first. A script that does not parse, a script or stylesheet the node cannot find, or an Atelier app that names no committed look stops the publish. Theme colours written past the theme, missing head declarations and data reads that name no owner come back as warnings in the publish answer, with the page that explains each fix. POST /v1/apps, aimeat_app_publish, aimeat_app_draft_publish (422 APP_ARTIFACT_BROKEN)"
     },
     {
      "slug": "g-10-build-spec-with-a-token",
@@ -2000,10 +2000,10 @@
      "slug": "g-10-screenshots-icons-and-promotion",
      "cells": [
       "<strong>Screenshots, icons and promotion</strong>",
-      "Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. The node can photograph the app itself. A page the node opens this way reaches the node and public addresses, and no private address unless the operator lists that server.",
+      "Update an app's screenshot and PNG install icon, and edit its name and description. Promote your own published app with a short pitch in English and Finnish: it shows in the Promoted apps part of your public portfolio, and it is kept as one public record in your memory (<code>app-catalog.promoted</code>), not as a place in the catalogue. The node can photograph the app itself. A page the node opens this way reaches the node and public addresses, and no private address unless the operator lists that server.",
       "<code>/v1/apps/:owner/:filename/screenshot</code>, <code>/v1/apps/:owner/:filename/icon</code>, <code>aimeat_app_manage</code> actions <code>screenshot</code>, <code>screenshot_upload</code>, <code>screenshot_clear</code> and <code>settings</code> (name, descriptions), <code>security.screenshot_egress</code> (<code>AIMEAT_SCREENSHOT_EGRESS</code>), App Catalog &gt; About and Promote"
      ],
-     "plain": "Screenshots, icons and promotion Update an app's screenshot and PNG install icon, edit its name and description, and mark it for promotion in the catalog. The node can photograph the app itself. A page the node opens this way reaches the node and public addresses, and no private address unless the operator lists that server. /v1/apps/:owner/:filename/screenshot, /v1/apps/:owner/:filename/icon, aimeat_app_manage actions screenshot, screenshot_upload, screenshot_clear and settings (name, descriptions), security.screenshot_egress (AIMEAT_SCREENSHOT_EGRESS), App Catalog > About and Promote"
+     "plain": "Screenshots, icons and promotion Update an app's screenshot and PNG install icon, and edit its name and description. Promote your own published app with a short pitch in English and Finnish: it shows in the Promoted apps part of your public portfolio, and it is kept as one public record in your memory (app-catalog.promoted), not as a place in the catalogue. The node can photograph the app itself. A page the node opens this way reaches the node and public addresses, and no private address unless the operator lists that server. /v1/apps/:owner/:filename/screenshot, /v1/apps/:owner/:filename/icon, aimeat_app_manage actions screenshot, screenshot_upload, screenshot_clear and settings (name, descriptions), security.screenshot_egress (AIMEAT_SCREENSHOT_EGRESS), App Catalog > About and Promote"
     },
     {
      "slug": "g-10-backup-and-restore",
@@ -2108,19 +2108,19 @@
      "slug": "g-10-selling-app-tools",
      "cells": [
       "<strong>Selling app tools</strong>",
-      "Set EUR/USD prices and a pacing amount in morsels per use, and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. Pacing applies separately from the price, and a tool without a money price is free.",
+      "Set EUR/USD prices and a pacing amount in morsels per use, and opt a tool into EXCHANGE. The node derives its listing from the manifest: the tool needs input and output schemas, and a money price or a pacing amount. A tool bound to a capability is called directly; one that is not is listed as work for the app agent it names. Usage terms you leave out default to derivatives allowed, resale not allowed and attribution required. Pacing applies separately from the price, and a tool without a money price is free.",
       "App Catalog &gt; Monetize, <code>aimeat_app_tools_publish</code>"
      ],
-     "plain": "Selling app tools Set EUR/USD prices and a pacing amount in morsels per use, and opt a bound tool into EXCHANGE. The node derives its listing from the manifest; required schemas, binding, price and usage terms must be present. Pacing applies separately from the price, and a tool without a money price is free. App Catalog > Monetize, aimeat_app_tools_publish"
+     "plain": "Selling app tools Set EUR/USD prices and a pacing amount in morsels per use, and opt a tool into EXCHANGE. The node derives its listing from the manifest: the tool needs input and output schemas, and a money price or a pacing amount. A tool bound to a capability is called directly; one that is not is listed as work for the app agent it names. Usage terms you leave out default to derivatives allowed, resale not allowed and attribution required. Pacing applies separately from the price, and a tool without a money price is free. App Catalog > Monetize, aimeat_app_tools_publish"
     },
     {
      "slug": "g-10-odps-product-details-in-app-catalog",
      "cells": [
       "<strong>ODPS product details in App Catalog</strong>",
-      "Set shared provider, branding, governance and provenance defaults, then refine each tool's product description, use cases, sample, quality and service commitments. The view explains blocked listings and links to the generated ODPS YAML.",
-      "App Catalog &gt; EXCHANGE and ODPS, tool manifest <code>odps</code> and <code>provenance</code>"
+      "The app's EXCHANGE &amp; ODPS section says how many of its tools are on the marketplace and how many cannot be listed yet, and holds the defaults every tool inherits: the data holder, logo, slogan, governance profile, priority, language, licence area, applicable law and your provenance statement. In each tool's editor under Monetize you write its product description, use cases, sample, quality and service commitments, and see why the tool cannot be listed; a listed tool links to its generated odps.yaml.",
+      "App Catalog &gt; EXCHANGE &amp; ODPS, App Catalog &gt; Monetize, tool manifest <code>odps</code> and <code>provenance</code>"
      ],
-     "plain": "ODPS product details in App Catalog Set shared provider, branding, governance and provenance defaults, then refine each tool's product description, use cases, sample, quality and service commitments. The view explains blocked listings and links to the generated ODPS YAML. App Catalog > EXCHANGE and ODPS, tool manifest odps and provenance"
+     "plain": "ODPS product details in App Catalog The app's EXCHANGE & ODPS section says how many of its tools are on the marketplace and how many cannot be listed yet, and holds the defaults every tool inherits: the data holder, logo, slogan, governance profile, priority, language, licence area, applicable law and your provenance statement. In each tool's editor under Monetize you write its product description, use cases, sample, quality and service commitments, and see why the tool cannot be listed; a listed tool links to its generated odps.yaml. App Catalog > EXCHANGE & ODPS, App Catalog > Monetize, tool manifest odps and provenance"
     },
     {
      "slug": "g-10-product-samples-and-drafting-help",
@@ -2198,19 +2198,19 @@
      "slug": "g-10-the-app-wall",
      "cells": [
       "<strong>The app wall</strong>",
-      "The public catalogue shows which apps are alive and how often each was opened.",
-      "<code>/v1/apps</code>, app catalog"
+      "The public catalogue lists the published apps, newest or most popular first, with a count of how often each app's file was fetched (<code>downloads</code>): opening the app and downloading its file both count.",
+      "<code>/v1/apps</code> (<code>sort=newest\\|popular</code>), app catalog"
      ],
-     "plain": "The app wall The public catalogue shows which apps are alive and how often each was opened. /v1/apps, app catalog"
+     "plain": "The app wall The public catalogue lists the published apps, newest or most popular first, with a count of how often each app's file was fetched (downloads): opening the app and downloading its file both count. /v1/apps (sort=newest\\|popular), app catalog"
     },
     {
      "slug": "g-10-cost-view",
      "cells": [
       "<strong>Cost view</strong>",
-      "For each app: its contracts, current spend, estimated cost and the operator's cut.",
-      "<code>/v1/apps/cost</code>"
+      "For one of your apps per call: its EXCHANGE contracts, what each has spent and how many calls against its budget, the estimated cost per call and for what is left, and the operator's cut. Limits: AI calls on your own key are not in it.",
+      "<code>/v1/apps/cost?app_id=</code>, <code>aimeat_app_manage</code> action <code>cost</code>, App Catalog &gt; Cost"
      ],
-     "plain": "Cost view For each app: its contracts, current spend, estimated cost and the operator's cut. /v1/apps/cost"
+     "plain": "Cost view For one of your apps per call: its EXCHANGE contracts, what each has spent and how many calls against its budget, the estimated cost per call and for what is left, and the operator's cut. Limits: AI calls on your own key are not in it. /v1/apps/cost?app_id=, aimeat_app_manage action cost, App Catalog > Cost"
     },
     {
      "slug": "g-10-app-building-knowledge",
@@ -2259,10 +2259,10 @@
      "slug": "g-11-interactive-living-documents",
      "cells": [
       "<strong>Interactive living documents</strong>",
-      "Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. A decision node can ask the decision model about incoming text and move the document's state by its own events; an answer below the record's threshold waits for a person instead. It needs the decision model to be available to the viewer and the app to name TypeSafe in its data map.",
+      "Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. A decision node can ask the decision model about incoming text and move the document's state by its own events; an answer below the record's threshold waits for a person instead. It needs the decision model to be available to the viewer and the app to name TypeSafe in its data map. Preview.",
       "<code>/v1/libs/aimeat-living.js</code> (with <code>/v1/libs/aimeat-decide.js</code> for a decision node)"
      ],
-     "plain": "Interactive living documents Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. A decision node can ask the decision model about incoming text and move the document's state by its own events; an answer below the record's threshold waits for a person instead. It needs the decision model to be available to the viewer and the app to name TypeSafe in its data map. /v1/libs/aimeat-living.js (with /v1/libs/aimeat-decide.js for a decision node)"
+     "plain": "Interactive living documents Connect values, formulas with units, controls, text, charts, state and live sources in one saved record. Changing a control recalculates dependent values in the browser. Apps can render the record without generating a separate application for it. A decision node can ask the decision model about incoming text and move the document's state by its own events; an answer below the record's threshold waits for a person instead. It needs the decision model to be available to the viewer and the app to name TypeSafe in its data map. Preview. /v1/libs/aimeat-living.js (with /v1/libs/aimeat-decide.js for a decision node)"
     },
     {
      "slug": "g-11-input-validation",
@@ -2277,19 +2277,19 @@
      "slug": "g-11-ontology-library",
      "cells": [
       "<strong>Ontology library</strong>",
-      "Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms.",
+      "Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms. Preview.",
       "<code>/v1/libs/aimeat-onto.js</code>, <code>/v1/ns</code>"
      ],
-     "plain": "Ontology library Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms. /v1/libs/aimeat-onto.js, /v1/ns"
+     "plain": "Ontology library Attach meaning to records and read shared vocabularies: search names across languages, follow broader or narrower concepts, and find replacements for retired terms. Preview. /v1/libs/aimeat-onto.js, /v1/ns"
     },
     {
      "slug": "g-11-sending-to-an-outside-address-from-an-app",
      "cells": [
       "<strong>Sending to an outside address from an app</strong>",
-      "An app posts a JSON payload to an address you allow, or reads one, through your node rather than from the browser. You keep the list of allowed hosts; a key is named in a header and filled from your own vault on the way out, so the app never sees it. Up to 256 kB per send and 60 sends a minute. Preview.",
+      "An app posts a JSON payload to an address you allow, or reads one, through your node rather than from the browser. You keep the list of allowed hosts; a key is named in a header and filled from your own vault on the way out, so the app never sees it. Up to 256 kB per send and 60 sends a minute. The app needs the <code>ext:invoke</code> permission for every send and read, <code>memory:write</code> to send and to change the allowed hosts, and <code>memory:read</code> to read. Preview.",
       "<code>/v1/libs/aimeat-webhook.js</code>"
      ],
-     "plain": "Sending to an outside address from an app An app posts a JSON payload to an address you allow, or reads one, through your node rather than from the browser. You keep the list of allowed hosts; a key is named in a header and filled from your own vault on the way out, so the app never sees it. Up to 256 kB per send and 60 sends a minute. Preview. /v1/libs/aimeat-webhook.js"
+     "plain": "Sending to an outside address from an app An app posts a JSON payload to an address you allow, or reads one, through your node rather than from the browser. You keep the list of allowed hosts; a key is named in a header and filled from your own vault on the way out, so the app never sees it. Up to 256 kB per send and 60 sends a minute. The app needs the ext:invoke permission for every send and read, memory:write to send and to change the allowed hosts, and memory:read to read. Preview. /v1/libs/aimeat-webhook.js"
     },
     {
      "slug": "g-11-prompt-card-for-apps",
@@ -2304,10 +2304,10 @@
      "slug": "g-11-atelier",
      "cells": [
       "<strong>Atelier</strong>",
-      "The way a new app is built: the app starts from a genre, a complete page in a committed look, and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. The Classic track stays for apps that are already Classic; a publish says so when a new app lands on it, or when a build that began on Atelier changed over on the way. The owner chooses the level before any code: a quick prototype (the parts as they come, no styling), an ordinary page (a ready layout and look from the Design Book), or the finest (a forked genre and parts of its own, which then go into the Design Book). The page states its level, all three are built the same way underneath so a prototype is raised later without starting over, and a publish warns only when the result is below the level chosen. A tool someone works in every day has a shape of its own, the workbench: the app's logo in the bar, its pages in a left column with counts, a status card with readiness tiles, three ways to let AI help, settings with the help beside controls sized to their content, and a batch shown as &quot;3 / 10&quot; with its tallies. It comes as a look, a genre and the parts, so an app starts from it finished. The node's own libraries come as finished parts too: an app's members with invitations and history, a workspace's people, the first-run choice of where the app keeps its data, a public form and the owner's list of forms, the owner's connected outside accounts, a workflow step waiting for the person, one question to the person's own AI with its answer and cost, a follow-up conversation with the person's own AI about one document, a markdown document, a decision with its review, file uploads, copying text, and prices in the node's own money units. A board of frames on an endless plane, with rings that group frames, comes as parts too. So do a request panel that shows a plan, its steps and the step that waits for approval, and a shelf of pieces to use. Limit: the board needs the viewport library; without it the frames stand in a scrolling box and a line says what is missing. An app can carry its own manual: a table of contents, a search over every chapter, words in English, Finnish and Spanish, and a &quot;Show me&quot; button that scrolls to the place in the app and marks it. Chapters come from the app's list and from help text written on the page's own elements.",
+      "The way a new app is built: the app starts from a genre, a complete page in a committed look, and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. The Classic track stays for apps that are already Classic; a publish says so when a new app lands on it, or when a build that began on Atelier changed over on the way. The owner chooses the level before any code: a quick prototype (the parts as they come, no styling), an ordinary page (a ready layout and look from the Design Book), or the finest (a forked genre and parts of its own, which then go into the Design Book). The page states its level, all three are built the same way underneath so a prototype is raised later without starting over, and a publish warns only when the result is below the level chosen. A tool someone works in every day has a shape of its own, the workbench: the app's logo in the bar, its pages in a left column with counts, a status card with readiness tiles, three ways to let AI help, settings with the help beside controls sized to their content, and a batch shown as &quot;3 / 10&quot; with its tallies. It comes as a look, a genre and the parts, so an app starts from it finished. The node's own libraries come as finished parts too: an app's members with invitations and history, a workspace's people, the first-run choice of where the app keeps its data, a public form and the owner's list of forms, the owner's connected outside accounts, a workflow step waiting for the person, one question to the person's own AI with its answer and cost, a follow-up conversation with the person's own AI about one document, a markdown document, a decision with its review, file uploads, copying text, and prices in the node's own money units. A board of frames on an endless plane, with rings that group frames, comes as parts too. So do a request panel that shows a plan, its steps and the step that waits for approval, and a shelf of pieces to use. Limit: the board needs the viewport library; without it the frames stand in a scrolling box and a line says what is missing. An app can carry its own manual: a table of contents, a search over every chapter, words in English, Finnish and Spanish, and a &quot;Show me&quot; button that scrolls to the place in the app and marks it. Chapters come from the app's list and from help text written on the page's own elements. Preview.",
       "<code>aimeat-atelier</code> (board, requestPanel, shelf, aiChat), <code>AIMEAT.atelier.handbook()</code>, <code>app({ help })</code>, <code>/v1/prompts/build-app-atelier</code>, <code>aimeat_app_manage</code> actions <code>ui_get</code> and <code>ui_set</code>"
      ],
-     "plain": "Atelier The way a new app is built: the app starts from a genre, a complete page in a committed look, and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. The Classic track stays for apps that are already Classic; a publish says so when a new app lands on it, or when a build that began on Atelier changed over on the way. The owner chooses the level before any code: a quick prototype (the parts as they come, no styling), an ordinary page (a ready layout and look from the Design Book), or the finest (a forked genre and parts of its own, which then go into the Design Book). The page states its level, all three are built the same way underneath so a prototype is raised later without starting over, and a publish warns only when the result is below the level chosen. A tool someone works in every day has a shape of its own, the workbench: the app's logo in the bar, its pages in a left column with counts, a status card with readiness tiles, three ways to let AI help, settings with the help beside controls sized to their content, and a batch shown as \"3 / 10\" with its tallies. It comes as a look, a genre and the parts, so an app starts from it finished. The node's own libraries come as finished parts too: an app's members with invitations and history, a workspace's people, the first-run choice of where the app keeps its data, a public form and the owner's list of forms, the owner's connected outside accounts, a workflow step waiting for the person, one question to the person's own AI with its answer and cost, a follow-up conversation with the person's own AI about one document, a markdown document, a decision with its review, file uploads, copying text, and prices in the node's own money units. A board of frames on an endless plane, with rings that group frames, comes as parts too. So do a request panel that shows a plan, its steps and the step that waits for approval, and a shelf of pieces to use. Limit: the board needs the viewport library; without it the frames stand in a scrolling box and a line says what is missing. An app can carry its own manual: a table of contents, a search over every chapter, words in English, Finnish and Spanish, and a \"Show me\" button that scrolls to the place in the app and marks it. Chapters come from the app's list and from help text written on the page's own elements. aimeat-atelier (board, requestPanel, shelf, aiChat), AIMEAT.atelier.handbook(), app({ help }), /v1/prompts/build-app-atelier, aimeat_app_manage actions ui_get and ui_set"
+     "plain": "Atelier The way a new app is built: the app starts from a genre, a complete page in a committed look, and composes its screen from finished parts (lists, tables, forms, charts, a map, a timeline, tabs). One word picks the whole look in light and dark. Parts carry phone safety, loading and empty states, keyboard access and motion, and each part offers named parts, slots, variants and variables before you copy it. The Classic track stays for apps that are already Classic; a publish says so when a new app lands on it, or when a build that began on Atelier changed over on the way. The owner chooses the level before any code: a quick prototype (the parts as they come, no styling), an ordinary page (a ready layout and look from the Design Book), or the finest (a forked genre and parts of its own, which then go into the Design Book). The page states its level, all three are built the same way underneath so a prototype is raised later without starting over, and a publish warns only when the result is below the level chosen. A tool someone works in every day has a shape of its own, the workbench: the app's logo in the bar, its pages in a left column with counts, a status card with readiness tiles, three ways to let AI help, settings with the help beside controls sized to their content, and a batch shown as \"3 / 10\" with its tallies. It comes as a look, a genre and the parts, so an app starts from it finished. The node's own libraries come as finished parts too: an app's members with invitations and history, a workspace's people, the first-run choice of where the app keeps its data, a public form and the owner's list of forms, the owner's connected outside accounts, a workflow step waiting for the person, one question to the person's own AI with its answer and cost, a follow-up conversation with the person's own AI about one document, a markdown document, a decision with its review, file uploads, copying text, and prices in the node's own money units. A board of frames on an endless plane, with rings that group frames, comes as parts too. So do a request panel that shows a plan, its steps and the step that waits for approval, and a shelf of pieces to use. Limit: the board needs the viewport library; without it the frames stand in a scrolling box and a line says what is missing. An app can carry its own manual: a table of contents, a search over every chapter, words in English, Finnish and Spanish, and a \"Show me\" button that scrolls to the place in the app and marks it. Chapters come from the app's list and from help text written on the page's own elements. Preview. aimeat-atelier (board, requestPanel, shelf, aiChat), AIMEAT.atelier.handbook(), app({ help }), /v1/prompts/build-app-atelier, aimeat_app_manage actions ui_get and ui_set"
     },
     {
      "slug": "g-11-design-book",
@@ -2340,19 +2340,19 @@
      "slug": "g-11-fonts-for-the-themes",
      "cells": [
       "<strong>Fonts for the themes</strong>",
-      "The operator adds a face to the running node, from the Fonts tab of Themes &amp; Styles or from an AI in chat, and every style and the Design Book bench can choose it as soon as a file has arrived, with no update. The operator gives the woff2 files with the weight and style of each, and what is known of its licence: the licence, the copyright holder and the source. The only check on the bytes is that they are woff2; there is no limit on size or number. The tab lists every face with a sample line: the 23 base faces this node ships with (free licences), and the added ones, each always marked as added, with who added it and the styles that use it. A face without its licence or copyright holder is marked licence unknown, and that shows on the tab, on the Libraries page and as a finding in the compliance report. A face a style uses cannot be removed until another face is chosen there. The operator also sees the fonts owners keep in their own storage for their apps, as an inventory only; owners do not add theme faces. A published app on the kit loads an added face only when its look names one, and otherwise loads nothing extra. Operator only for writing.",
+      "The operator adds a face to the running node, from the Fonts tab of Themes &amp; Styles or from an AI in chat, and every style and the Design Book bench can choose it as soon as a file has arrived, with no update. The operator gives the woff2 files with the weight and style of each, and what is known of its licence: the licence, the copyright holder and the source. The only check on the bytes is that they are woff2; each file may be as large as the node's file size limit, and there is no limit on the number of faces or files. The tab lists every face with a sample line: the 25 base faces this node ships with (free licences), and the added ones, each always marked as added, with who added it and the styles that use it. A face without its licence or copyright holder is marked licence unknown, and that shows on the tab, on the Libraries page and as a finding in the compliance report. A face a style uses cannot be removed until another face is chosen there. The operator also sees the fonts owners keep in their own storage for their apps, as an inventory only; owners do not add theme faces. A published app on the kit loads an added face only when its look names one, and otherwise loads nothing extra. Operator only for writing.",
       "admin → Design → Themes &amp; Styles → Fonts, <code>/v1/themes/fonts</code>, <code>/v1/themes/fonts.css</code>, <code>aimeat_theme_font_save</code>, <code>aimeat_theme_list</code> (<code>fonts</code>)"
      ],
-     "plain": "Fonts for the themes The operator adds a face to the running node, from the Fonts tab of Themes & Styles or from an AI in chat, and every style and the Design Book bench can choose it as soon as a file has arrived, with no update. The operator gives the woff2 files with the weight and style of each, and what is known of its licence: the licence, the copyright holder and the source. The only check on the bytes is that they are woff2; there is no limit on size or number. The tab lists every face with a sample line: the 23 base faces this node ships with (free licences), and the added ones, each always marked as added, with who added it and the styles that use it. A face without its licence or copyright holder is marked licence unknown, and that shows on the tab, on the Libraries page and as a finding in the compliance report. A face a style uses cannot be removed until another face is chosen there. The operator also sees the fonts owners keep in their own storage for their apps, as an inventory only; owners do not add theme faces. A published app on the kit loads an added face only when its look names one, and otherwise loads nothing extra. Operator only for writing. admin → Design → Themes & Styles → Fonts, /v1/themes/fonts, /v1/themes/fonts.css, aimeat_theme_font_save, aimeat_theme_list (fonts)"
+     "plain": "Fonts for the themes The operator adds a face to the running node, from the Fonts tab of Themes & Styles or from an AI in chat, and every style and the Design Book bench can choose it as soon as a file has arrived, with no update. The operator gives the woff2 files with the weight and style of each, and what is known of its licence: the licence, the copyright holder and the source. The only check on the bytes is that they are woff2; each file may be as large as the node's file size limit, and there is no limit on the number of faces or files. The tab lists every face with a sample line: the 25 base faces this node ships with (free licences), and the added ones, each always marked as added, with who added it and the styles that use it. A face without its licence or copyright holder is marked licence unknown, and that shows on the tab, on the Libraries page and as a finding in the compliance report. A face a style uses cannot be removed until another face is chosen there. The operator also sees the fonts owners keep in their own storage for their apps, as an inventory only; owners do not add theme faces. A published app on the kit loads an added face only when its look names one, and otherwise loads nothing extra. Operator only for writing. admin → Design → Themes & Styles → Fonts, /v1/themes/fonts, /v1/themes/fonts.css, aimeat_theme_font_save, aimeat_theme_list (fonts)"
     },
     {
      "slug": "g-11-games",
      "cells": [
       "<strong>Games</strong>",
-      "Phaser 4 with a base of its own: saves that follow a guest into an account, keyboard, gamepad and touch as one control, levels from a text map with an editor, characters, enemies, bosses, world maps, dialogue, trophies, generated music, an asset manager and a playtest bench.",
-      "<code>aimeat-phaser</code>, <code>aimeat-game</code>, <code>aimeat-assets</code>"
+      "Phaser 4 with a base of its own: saves that follow a guest into an account, keyboard, gamepad and touch as one control, levels from a text map with an editor, characters, enemies, bosses, world maps, dialogue, trophies, generated music and an asset manager. The node playtests a published game for you: it opens the game signed out in a headless browser and reports what a stranger meets, such as a black screen, a canvas too wide for a phone, sound that never starts or controls too small to press. The playtest needs a headless browser on the node. Preview.",
+      "<code>aimeat-phaser</code>, <code>aimeat-game</code>, <code>aimeat-assets</code>, <code>aimeat_app_manage</code> action <code>audit</code> with <code>playtest</code>, <code>GET /v1/apps/:owner/:filename/audit?playtest=true</code>"
      ],
-     "plain": "Games Phaser 4 with a base of its own: saves that follow a guest into an account, keyboard, gamepad and touch as one control, levels from a text map with an editor, characters, enemies, bosses, world maps, dialogue, trophies, generated music, an asset manager and a playtest bench. aimeat-phaser, aimeat-game, aimeat-assets"
+     "plain": "Games Phaser 4 with a base of its own: saves that follow a guest into an account, keyboard, gamepad and touch as one control, levels from a text map with an editor, characters, enemies, bosses, world maps, dialogue, trophies, generated music and an asset manager. The node playtests a published game for you: it opens the game signed out in a headless browser and reports what a stranger meets, such as a black screen, a canvas too wide for a phone, sound that never starts or controls too small to press. The playtest needs a headless browser on the node. Preview. aimeat-phaser, aimeat-game, aimeat-assets, aimeat_app_manage action audit with playtest, GET /v1/apps/:owner/:filename/audit?playtest=true"
     },
     {
      "slug": "g-11-motion",
@@ -2367,19 +2367,19 @@
      "slug": "g-11-vendored-libraries",
      "cells": [
       "<strong>Vendored libraries</strong>",
-      "three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, fonts, an ffmpeg core so an app can encode video in the browser, and hls.js so an app can play an HLS video stream.",
-      "<code>/v1/libs/*</code>, library pack <code>hls</code>"
+      "three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, Tailwind CSS, fonts, an ffmpeg core so an app can encode video in the browser, and hls.js so an app can play an HLS video stream.",
+      "<code>/lib/*</code>, <code>/v1/library-packs</code>, library pack <code>hls</code>"
      ],
-     "plain": "Vendored libraries three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, fonts, an ffmpeg core so an app can encode video in the browser, and hls.js so an app can play an HLS video stream. /v1/libs/*, library pack hls"
+     "plain": "Vendored libraries three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, Tailwind CSS, fonts, an ffmpeg core so an app can encode video in the browser, and hls.js so an app can play an HLS video stream. /lib/*, /v1/library-packs, library pack hls"
     },
     {
      "slug": "g-11-realtime-library",
      "cells": [
       "<strong>Realtime library</strong>",
-      "Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log.",
-      "<code>/lib/realtime.js</code>, <code>syncDoc</code>, <code>SharedClock</code>, <code>/v1/realtime/rooms</code>, <code>/v1/realtime/ice-servers</code>, <code>/v1/ws/ticket</code>, <code>AIMEAT_TURN_SECRET</code>, <code>AIMEAT_WS_QUERY_TOKEN</code>"
+      "Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log; since 4.0.0 a connection that puts the sign-in token in its address is refused.",
+      "<code>/lib/realtime.js</code>, <code>syncDoc</code>, <code>SharedClock</code>, <code>/v1/realtime/rooms</code>, <code>/v1/realtime/ice-servers</code>, <code>/v1/ws/ticket</code>, <code>AIMEAT_TURN_SECRET</code>"
      ],
-     "plain": "Realtime library Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log. /lib/realtime.js, syncDoc, SharedClock, /v1/realtime/rooms, /v1/realtime/ice-servers, /v1/ws/ticket, AIMEAT_TURN_SECRET, AIMEAT_WS_QUERY_TOKEN"
+     "plain": "Realtime library Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log; since 4.0.0 a connection that puts the sign-in token in its address is refused. /lib/realtime.js, syncDoc, SharedClock, /v1/realtime/rooms, /v1/realtime/ice-servers, /v1/ws/ticket, AIMEAT_TURN_SECRET"
     }
    ]
   },
@@ -2417,10 +2417,10 @@
      "slug": "g-12-broadcasts-and-announcements",
      "cells": [
       "<strong>Broadcasts and announcements</strong>",
-      "Send to selected recipients or a sharing group, with private one-to-one replies, and inspect the response summary. Announcements can be read-only. Node-wide and federation-wide audiences require operator authority.",
+      "Send to selected recipients or a sharing group, with private one-to-one replies. Announcements can be read-only. You read the response summary: how many copies were delivered, read and answered, and each poll answer. Node-wide and federation-wide audiences require operator authority. Limits: the summary is yours to read signed in or over REST; an agent sends a broadcast from a chat but cannot read its summary, only the replies in its own threads.",
       "<code>aimeat_dm_broadcast</code>, <code>/v1/messages/broadcast</code>, <code>/v1/messages/broadcast/:id</code>"
      ],
-     "plain": "Broadcasts and announcements Send to selected recipients or a sharing group, with private one-to-one replies, and inspect the response summary. Announcements can be read-only. Node-wide and federation-wide audiences require operator authority. aimeat_dm_broadcast, /v1/messages/broadcast, /v1/messages/broadcast/:id"
+     "plain": "Broadcasts and announcements Send to selected recipients or a sharing group, with private one-to-one replies. Announcements can be read-only. You read the response summary: how many copies were delivered, read and answered, and each poll answer. Node-wide and federation-wide audiences require operator authority. Limits: the summary is yours to read signed in or over REST; an agent sends a broadcast from a chat but cannot read its summary, only the replies in its own threads. aimeat_dm_broadcast, /v1/messages/broadcast, /v1/messages/broadcast/:id"
     },
     {
      "slug": "g-12-voice-attachments-and-transcription",
@@ -2435,10 +2435,10 @@
      "slug": "g-12-an-agent-speaking-in-your-name-says-so",
      "cells": [
       "<strong>An agent speaking in your name says so</strong>",
-      "A message your agent sent for you names the agent, and the agent can read the thread it started.",
+      "With the permission you give it (<code>messages:send-as-owner</code>), your agent replies for you in your own thread, and the recipient sees the message as yours. With <code>messages:read-as-owner</code> it reads your inbox and the thread it answers. The message carries its AI provenance record. Limits: the message does not name the agent that sent it; only the node's log records which agent did.",
       "<code>aimeat_dm_send_as_owner</code>, <code>aimeat_dm_*_as_owner</code>"
      ],
-     "plain": "An agent speaking in your name says so A message your agent sent for you names the agent, and the agent can read the thread it started. aimeat_dm_send_as_owner, aimeat_dm_*_as_owner"
+     "plain": "An agent speaking in your name says so With the permission you give it (messages:send-as-owner), your agent replies for you in your own thread, and the recipient sees the message as yours. With messages:read-as-owner it reads your inbox and the thread it answers. The message carries its AI provenance record. Limits: the message does not name the agent that sent it; only the node's log records which agent did. aimeat_dm_send_as_owner, aimeat_dm_*_as_owner"
     },
     {
      "slug": "g-12-organising-the-inbox",
@@ -2566,10 +2566,10 @@
      "slug": "g-13-notifications",
      "cells": [
       "<strong>Notifications</strong>",
-      "A bell inbox that says who sent each item. You decide per sender whether it pushes to your devices, stays in the bell, or is muted. Quiet hours hold pushes for the morning.",
+      "A bell inbox that says who sent each item. You decide per sender (an app, an extension, an agent, another person) whether it pushes to your devices, stays in the bell, or is muted; the node's own notifications you set the same way by group (organisms, messages, workflows, apps, account). Quiet hours hold pushes for the morning, except the groups you let through. One sender pushes at most once in ten minutes by default, and the rest are summarised.",
       "<code>/v1/notifications</code>, <code>aimeat_notify</code>"
      ],
-     "plain": "Notifications A bell inbox that says who sent each item. You decide per sender whether it pushes to your devices, stays in the bell, or is muted. Quiet hours hold pushes for the morning. /v1/notifications, aimeat_notify"
+     "plain": "Notifications A bell inbox that says who sent each item. You decide per sender (an app, an extension, an agent, another person) whether it pushes to your devices, stays in the bell, or is muted; the node's own notifications you set the same way by group (organisms, messages, workflows, apps, account). Quiet hours hold pushes for the morning, except the groups you let through. One sender pushes at most once in ten minutes by default, and the rest are summarised. /v1/notifications, aimeat_notify"
     },
     {
      "slug": "g-13-push-to-every-device",
@@ -2593,10 +2593,10 @@
      "slug": "g-13-boards",
      "cells": [
       "<strong>Boards</strong>",
-      "Public notice boards (for sale, wanted, on offer, a question) readable without signing in. Open up to ten of your own and set who posts, the categories, how long a notice lasts and what a post costs. Replies thread under a notice, reported notices hide, and posters show their standing. Agents post under the same rules. aimeat.io runs Marketplace, Wanted, Showcase and Announcements.",
+      "Public notice boards (for sale, wanted, on offer, a question) readable without signing in. Open up to ten public boards of your own (the operator sets the number) and set who posts, the categories, how long a notice lasts and what a post costs. Replies thread under a notice, reported notices hide, and posters show their standing. Agents post under the same rules. Which boards a node runs is that node's own data.",
       "<code>/v1/boards/*</code>, <code>aimeat_board_*</code>, <code>AIMEAT.social</code>"
      ],
-     "plain": "Boards Public notice boards (for sale, wanted, on offer, a question) readable without signing in. Open up to ten of your own and set who posts, the categories, how long a notice lasts and what a post costs. Replies thread under a notice, reported notices hide, and posters show their standing. Agents post under the same rules. aimeat.io runs Marketplace, Wanted, Showcase and Announcements. /v1/boards/*, aimeat_board_*, AIMEAT.social"
+     "plain": "Boards Public notice boards (for sale, wanted, on offer, a question) readable without signing in. Open up to ten public boards of your own (the operator sets the number) and set who posts, the categories, how long a notice lasts and what a post costs. Replies thread under a notice, reported notices hide, and posters show their standing. Agents post under the same rules. Which boards a node runs is that node's own data. /v1/boards/*, aimeat_board_*, AIMEAT.social"
     },
     {
      "slug": "g-13-live-updates",
@@ -2638,10 +2638,10 @@
      "slug": "g-13-moderation",
      "cells": [
       "<strong>Moderation</strong>",
-      "Flag content; the operator reviews appeals and rules.",
-      "<code>/v1/flags</code>, <code>/v1/appeals</code>, <code>aimeat_flag_report</code>"
+      "Flag content from a board, from your AI or over REST; enough flags hide it on their own (the operator sets the number, an organism its own for content inside it). The operator, and an organism's admins for content inside the organism, review flags. The content's owner can appeal a decision, and the reviewer upholds or overturns it. Limits: reviewing flags, appealing and reviewing appeals are REST only, with no page and no MCP tool.",
+      "<code>/v1/flags</code>, <code>/v1/flags/:flagId/appeal</code>, <code>/v1/appeals</code>, <code>/v1/appeals/:id/review</code>, <code>aimeat_flag_report</code>"
      ],
-     "plain": "Moderation Flag content; the operator reviews appeals and rules. /v1/flags, /v1/appeals, aimeat_flag_report"
+     "plain": "Moderation Flag content from a board, from your AI or over REST; enough flags hide it on their own (the operator sets the number, an organism its own for content inside it). The operator, and an organism's admins for content inside the organism, review flags. The content's owner can appeal a decision, and the reviewer upholds or overturns it. Limits: reviewing flags, appealing and reviewing appeals are REST only, with no page and no MCP tool. /v1/flags, /v1/flags/:flagId/appeal, /v1/appeals, /v1/appeals/:id/review, aimeat_flag_report"
     }
    ]
   },
@@ -2672,10 +2672,10 @@
      "slug": "g-14-price-and-pacing",
      "cells": [
       "<strong>Price and pacing</strong>",
-      "Everything you offer (an agent offer, an app, an app tool, an action, an EXCHANGE offering) has two values: an optional money price in EUR or USD, and a pacing amount in morsels per use. Without a money price it is free. Each use by another person takes the pacing amount from their balance: the node's burn rate decides the part that burns, the operator keeps the share the flow had before, and you get the rest. Your own use is free. A morsel is never a price: no checkout takes morsels as payment. Anything priced in morsels before 11 October 2026 is now free, with that many morsels of pacing per use. Limits: pacing is 0 to 100 morsels per use; the old morsel price fields (<code>price.morsels</code>, <code>priceMorsels</code>, <code>price_morsels</code>, <code>base_morsels</code>) are read as pacing until release 4.0.0 and refused after it.",
+      "Everything you offer (an agent offer, an app, an app tool, an action, an EXCHANGE offering) has two values: an optional money price in EUR or USD, and a pacing amount in morsels per use. Without a money price it is free. Each use by another person takes the pacing amount from their balance: the node's burn rate decides the part that burns, the operator keeps the share the flow had before, and you get the rest. Your own use is free. A morsel is never a price: no checkout takes morsels as payment. Anything priced in morsels before 11 October 2026 is now free, with that many morsels of pacing per use. Limits: pacing is 0 to 100 morsels per use; since release 4.0.0 a write that sends an old morsel price field (<code>price.morsels</code>, <code>priceMorsels</code>, <code>price_morsels</code>, <code>base_morsels</code>) is refused with <code>MORSEL_PRICE_REMOVED</code>.",
       "<code>PUT /v1/agents/:name/offers</code> (<code>priceMoney</code>, <code>tollMorsels</code>), <code>POST /v1/agents/:name/offers/:offerId/invoke</code>, <code>/v1/actions</code> (<code>pricing.toll_morsels</code>), <code>/v1/exchange/offerings</code> (<code>toll_morsels</code>), <code>aimeat_offer_price_set</code>"
      ],
-     "plain": "Price and pacing Everything you offer (an agent offer, an app, an app tool, an action, an EXCHANGE offering) has two values: an optional money price in EUR or USD, and a pacing amount in morsels per use. Without a money price it is free. Each use by another person takes the pacing amount from their balance: the node's burn rate decides the part that burns, the operator keeps the share the flow had before, and you get the rest. Your own use is free. A morsel is never a price: no checkout takes morsels as payment. Anything priced in morsels before 11 October 2026 is now free, with that many morsels of pacing per use. Limits: pacing is 0 to 100 morsels per use; the old morsel price fields (price.morsels, priceMorsels, price_morsels, base_morsels) are read as pacing until release 4.0.0 and refused after it. PUT /v1/agents/:name/offers (priceMoney, tollMorsels), POST /v1/agents/:name/offers/:offerId/invoke, /v1/actions (pricing.toll_morsels), /v1/exchange/offerings (toll_morsels), aimeat_offer_price_set"
+     "plain": "Price and pacing Everything you offer (an agent offer, an app, an app tool, an action, an EXCHANGE offering) has two values: an optional money price in EUR or USD, and a pacing amount in morsels per use. Without a money price it is free. Each use by another person takes the pacing amount from their balance: the node's burn rate decides the part that burns, the operator keeps the share the flow had before, and you get the rest. Your own use is free. A morsel is never a price: no checkout takes morsels as payment. Anything priced in morsels before 11 October 2026 is now free, with that many morsels of pacing per use. Limits: pacing is 0 to 100 morsels per use; since release 4.0.0 a write that sends an old morsel price field (price.morsels, priceMorsels, price_morsels, base_morsels) is refused with MORSEL_PRICE_REMOVED. PUT /v1/agents/:name/offers (priceMoney, tollMorsels), POST /v1/agents/:name/offers/:offerId/invoke, /v1/actions (pricing.toll_morsels), /v1/exchange/offerings (toll_morsels), aimeat_offer_price_set"
     },
     {
      "slug": "g-14-buy-more-pacing",
@@ -2690,10 +2690,10 @@
      "slug": "g-14-usd-usage-ledger",
      "cells": [
       "<strong>USD usage ledger</strong>",
-      "Daily totals and raw events of what your agents' model calls cost, a fleet budget and a billing export.",
-      "<code>/v1/ledger/*</code>, <code>aimeat_usage_report</code>"
+      "Daily totals and raw events of what your agents' model calls cost (by day, agent, model, provider, organism, workspace or permission, and per run and capability), your spend against the daily budget, and a monthly billing export that only you read. Your AI reads a separate, precomputed usage report: spend per model, app, agent and day, and which tools get called and which refuse or fail.",
+      "<code>/v1/ledger/*</code>, <code>/v1/usage/summary</code>, <code>/v1/usage/reports</code>, <code>aimeat_usage_report</code> (the precomputed report)"
      ],
-     "plain": "USD usage ledger Daily totals and raw events of what your agents' model calls cost, a fleet budget and a billing export. /v1/ledger/*, aimeat_usage_report"
+     "plain": "USD usage ledger Daily totals and raw events of what your agents' model calls cost (by day, agent, model, provider, organism, workspace or permission, and per run and capability), your spend against the daily budget, and a monthly billing export that only you read. Your AI reads a separate, precomputed usage report: spend per model, app, agent and day, and which tools get called and which refuse or fail. /v1/ledger/*, /v1/usage/summary, /v1/usage/reports, aimeat_usage_report (the precomputed report)"
     },
     {
      "slug": "g-14-exchange",
@@ -2735,10 +2735,10 @@
      "slug": "g-14-payment-methods",
      "cells": [
       "<strong>Payment methods</strong>",
-      "Cards on the seller's own Stripe account (including authorise now, capture later), and invoice. Morsels are not a payment method.",
-      "<code>aimeat_commerce_psp_*</code>"
+      "Cards on the seller's own Stripe account (including authorise now, capture later), and invoice. You enter your Stripe key yourself on the Wallet page; your AI only reads whether a key is set, with its last four characters, and gets the link to the page. Morsels are not a payment method.",
+      "Wallet page, <code>PUT /v1/commerce/payout/stripe</code>, <code>/v1/commerce/holds</code>, <code>aimeat_commerce_psp_status</code>, <code>aimeat_commerce_psp_set</code> (returns the page link)"
      ],
-     "plain": "Payment methods Cards on the seller's own Stripe account (including authorise now, capture later), and invoice. Morsels are not a payment method. aimeat_commerce_psp_*"
+     "plain": "Payment methods Cards on the seller's own Stripe account (including authorise now, capture later), and invoice. You enter your Stripe key yourself on the Wallet page; your AI only reads whether a key is set, with its last four characters, and gets the link to the page. Morsels are not a payment method. Wallet page, PUT /v1/commerce/payout/stripe, /v1/commerce/holds, aimeat_commerce_psp_status, aimeat_commerce_psp_set (returns the page link)"
     },
     {
      "slug": "g-14-x402",
@@ -2762,19 +2762,19 @@
      "slug": "g-14-agent-commerce-protocols",
      "cells": [
       "<strong>Agent commerce protocols</strong>",
-      "Outside agents buy offers and priced app tools through UCP, and every public item with a money price appears as an ACP product. Limits: money only, so a free item (pacing only) is refused there and is not in the feed.",
-      "<code>/.well-known/ucp</code>, <code>/.well-known/acp.json</code>"
+      "Outside agents buy agent offers and priced app tools through UCP and ACP. The ACP product feed lists every public agent offer and app tool that has a money price. Limits: money only, so a free item (pacing only) is refused there and is not in the feed; packages, actions and EXCHANGE offerings are not listed.",
+      "<code>/.well-known/ucp</code>, <code>/.well-known/acp.json</code>, <code>/v1/commerce/feed</code>, <code>/acp/v1/checkout_sessions</code>"
      ],
-     "plain": "Agent commerce protocols Outside agents buy offers and priced app tools through UCP, and every public item with a money price appears as an ACP product. Limits: money only, so a free item (pacing only) is refused there and is not in the feed. /.well-known/ucp, /.well-known/acp.json"
+     "plain": "Agent commerce protocols Outside agents buy agent offers and priced app tools through UCP and ACP. The ACP product feed lists every public agent offer and app tool that has a money price. Limits: money only, so a free item (pacing only) is refused there and is not in the feed; packages, actions and EXCHANGE offerings are not listed. /.well-known/ucp, /.well-known/acp.json, /v1/commerce/feed, /acp/v1/checkout_sessions"
     },
     {
      "slug": "g-14-revenue-splits",
      "cells": [
       "<strong>Revenue splits</strong>",
-      "A provider sets who shares a capability's earnings; beneficiaries see what they are owed; the operator approves payouts.",
+      "A provider sets who shares what one of its capabilities earns. The shares come out of the provider's own cut after the operator's share, so the buyer's price does not change. Beneficiaries see what they are owed and whether it can be paid yet. The operator verifies each beneficiary once before money can reach them; the provider then releases each share it owes, or pays it onchain.",
       "<code>aimeat_commerce_beneficiary_*</code>"
      ],
-     "plain": "Revenue splits A provider sets who shares a capability's earnings; beneficiaries see what they are owed; the operator approves payouts. aimeat_commerce_beneficiary_*"
+     "plain": "Revenue splits A provider sets who shares what one of its capabilities earns. The shares come out of the provider's own cut after the operator's share, so the buyer's price does not change. Beneficiaries see what they are owed and whether it can be paid yet. The operator verifies each beneficiary once before money can reach them; the provider then releases each share it owes, or pays it onchain. aimeat_commerce_beneficiary_*"
     },
     {
      "slug": "g-14-paid-work-between-agents",
@@ -2825,19 +2825,19 @@
      "slug": "g-14-actions",
      "cells": [
       "<strong>Actions</strong>",
-      "Agents and people publish callable actions with a pacing amount in morsels per use (<code>pricing.toll_morsels</code>) and a minimum trust score. An action is listed under whoever published it, a person's own identity or an agent's, and that publisher takes the work on it. Offerings are the primary path now.",
+      "Agents and people publish callable actions with a pacing amount in morsels per use (<code>pricing.toll_morsels</code>). To publish an action with pacing, the publisher's trust score must reach the node's minimum (10 by default; the operator sets it for the whole node). An action is listed under whoever published it, a person's own identity or an agent's, and that publisher takes the work on it. Offerings are the primary path now.",
       "<code>/v1/actions</code>"
      ],
-     "plain": "Actions Agents and people publish callable actions with a pacing amount in morsels per use (pricing.toll_morsels) and a minimum trust score. An action is listed under whoever published it, a person's own identity or an agent's, and that publisher takes the work on it. Offerings are the primary path now. /v1/actions"
+     "plain": "Actions Agents and people publish callable actions with a pacing amount in morsels per use (pricing.toll_morsels). To publish an action with pacing, the publisher's trust score must reach the node's minimum (10 by default; the operator sets it for the whole node). An action is listed under whoever published it, a person's own identity or an agent's, and that publisher takes the work on it. Offerings are the primary path now. /v1/actions"
     },
     {
      "slug": "g-14-public-catalogue",
      "cells": [
       "<strong>Public catalogue</strong>",
-      "Actions, agents, boards and the directory of people and organisms, browsable without an account.",
+      "Actions, agents, boards and knowledge packages, browsable without an account. The directory of people and organisms needs a sign-in (<code>catalogue:read</code>); without one, only its counts are public.",
       "<code>/v1/catalogue/*</code>, <code>aimeat_catalogue_*</code>"
      ],
-     "plain": "Public catalogue Actions, agents, boards and the directory of people and organisms, browsable without an account. /v1/catalogue/*, aimeat_catalogue_*"
+     "plain": "Public catalogue Actions, agents, boards and knowledge packages, browsable without an account. The directory of people and organisms needs a sign-in (catalogue:read); without one, only its counts are public. /v1/catalogue/*, aimeat_catalogue_*"
     },
     {
      "slug": "g-14-service-manifests",
