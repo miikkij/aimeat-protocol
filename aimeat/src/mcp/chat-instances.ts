@@ -11,6 +11,8 @@
  *   import { registerChatInstancesTools } from './chat-instances.js';
  *   registerChatInstancesTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-15 — The chat-instance resource refuses another owner's instance with resourceRefusal
+ *     (ACCESS_DENIED and a next step) instead of the bare "Access denied" (feature-list audit #186).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools + 1 resource for chat instance management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -32,6 +34,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { registerChatInstance } from '../services/chat-instance-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { resourceRefusal } from './resource-refusal.js';
 
 export function registerChatInstancesTools(
     mcp: McpServer,
@@ -71,7 +74,8 @@ export function registerChatInstancesTools(
             if (!inst) return { contents: [{ uri: uri.toString(), text: 'Instance not found' }] };
 
             if (inst.ownerName !== ownerName()) {
-                return { contents: [{ uri: uri.toString(), text: 'Access denied' }] };
+                return resourceRefusal(uri, 'ACCESS_DENIED', 'This chat instance belongs to someone else, so it cannot be read here. '
+                    + 'List your own chat instances instead.');
             }
 
             return {

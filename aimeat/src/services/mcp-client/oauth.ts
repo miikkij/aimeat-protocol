@@ -33,6 +33,9 @@
  * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · McpOAuthProvider
  * @usage const r = await startMcpOAuth({ storage, config, server, ownerGhii });
  * @version-history
+ *   2026-10-15 — A failed token renewal parks the server in needs_reauth at once and refreshMcpOAuth
+ *     answers 'renewal-failed', instead of logging and carrying on with the old token until the far
+ *     side answered 401 (feature-list audit #9).
  *   v1.1.0 — 2026-10-09 — A round is bound to one browser (bindBrowser at the start, the binding checked in
  *     finishMcpOAuth before the exchange, NOT_THIS_BROWSER otherwise); the verifier and the client
  *     registration are sealed in the stored round; the three log lines carry the error through
@@ -413,16 +416,25 @@ async function sealAndStore(
   return (await storage.getMcpServer(server.id)) ?? server;
 }
 
+/** What the server row says when a renewal did not produce a new token. */
+export const RENEWAL_FAILED_REASON = 'The sign-in could not be renewed. Sign in to this server again.';
+
 /**
  * Renew an expiring token, single-flight.
  *
  * The claim is what stops two concurrent calls both refreshing: several servers invalidate the old
  * refresh token as they issue a new one, so the loser of that race would hold a dead token and park
  * a healthy server in needs_reauth — a failure caused entirely by our own concurrency.
+ *
+ * Returns the (possibly renewed) row, null when the stored credential cannot be opened, or
+ * 'renewal-failed' when the renewal did not produce a new token. In that last case the row is
+ * already in needs_reauth: the caller refuses the call rather than sending a token that is about to
+ * expire, because a call that succeeded on it would set the row back to active and hide the failure
+ * until the far side answered 401 (feature-list audit #9).
  */
 export async function refreshMcpOAuth(
   storage: Storage, config: AimeatConfig, server: McpServerRecord,
-): Promise<McpServerRecord | null> {
+): Promise<McpServerRecord | null | 'renewal-failed'> {
   if (server.auth !== 'oauth' || !server.credential) return server;
   // Not expired, or no expiry at all: nothing to do. The skew is what keeps a call from setting off
   // with a token that dies in flight.
@@ -457,16 +469,32 @@ export async function refreshMcpOAuth(
     });
 
     await auth(provider, { serverUrl: endpoint, fetchFn: guardedFetch });
-    if (!provider.captured.tokens) return server;
+    // No captured tokens means the SDK could not renew and fell through to a new authorization
+    // round ('REDIRECT'): the refresh token was missing, refused, or the token endpoint failed.
+    if (!provider.captured.tokens) return await markRenewalFailed(storage, server, 'no new token was issued');
     return await sealAndStore(storage, config, server, provider);
   } catch (err) {
-    // A network failure is NOT a dead grant. Parking the server here would tell the owner to
-    // reconnect an account that is perfectly fine, because the far side was briefly down.
-    logger.warn('mcp-client: a token could not be renewed', {
-      server: server.slug, error: describeUpstreamError(err),
-    });
-    return server;
+    // The authorization server refused the refresh token (invalid_grant and the other OAuth errors
+    // the SDK rethrows), or discovery failed. Either way this node holds no token it can renew, so
+    // the row says so now instead of after the far side answers 401 (feature-list audit #9).
+    return await markRenewalFailed(storage, server, describeUpstreamError(err));
   } finally {
     await storage.releaseMcpRefresh(server.id);
   }
+}
+
+/**
+ * Park the row in needs_reauth after a failed renewal and drop the pooled client, which still holds
+ * the old token in its headers. The detail is logged without an endpoint or an upstream body
+ * (describeUpstreamError); the row carries the sentence the owner acts on.
+ */
+async function markRenewalFailed(
+  storage: Storage, server: McpServerRecord, detail: string,
+): Promise<'renewal-failed'> {
+  logger.warn('mcp-client: a token could not be renewed; the server needs a new sign-in', {
+    server: server.slug, error: detail,
+  });
+  await storage.setMcpServerStatus(server.id, 'needs_reauth', RENEWAL_FAILED_REASON);
+  await mcpClientPool.invalidate(server.id);
+  return 'renewal-failed';
 }

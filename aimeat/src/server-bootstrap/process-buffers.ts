@@ -13,10 +13,13 @@
  *   ORDER IS PART OF THE CONTRACT. The refusal log is armed before any route exists, because the
  *   first thing a node does on a public address is refuse somebody and those refusals must not be
  *   lost. Callers keep this call ahead of route mounting for the same reason.
- * @structure initProcessBuffers(config, storage) -> { webhookDispatcher, stats }
+ * @structure initProcessBuffers(config, storage) -> { webhookDispatcher, stats } · flushProcessBuffers()
  * @usage
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
+ *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-10-15 — flushProcessBuffers: the shutdown flush of the write buffers, moved from
+ *     index-start.ts, and the agent refusal notes flushed with them (feature-list audit #30).
  *   v1.1.0 — 2026-10-02 — initScopeUse: the record of the permissions each `*` agent uses.
  *   v1.0.0 — 2026-08-27 — Pure extraction from routes-loader.ts (which was at 799 of 800 lines).
  *   v1.0.1 — 2026-09-26 — The owner in the cache tag comes from localAccountName (utils/gaii.ts),
@@ -99,4 +102,27 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   }));
 
   return { webhookDispatcher, stats };
+}
+
+/**
+ * Write what every buffer armed above still holds, at shutdown. One list beside the one that arms
+ * them, so a buffer added to initProcessBuffers has its flush next to it. The agent refusal notes
+ * were armed and never flushed here, so a refusal inside its one-minute window was lost when the
+ * process stopped (feature-list audit #30).
+ */
+export async function flushProcessBuffers(): Promise<void> {
+  const { shutdownTelemetryBuffer } = await import('../services/telemetry-buffer.js');
+  await shutdownTelemetryBuffer();
+  const { shutdownUsageBuffer } = await import('../services/usage/usage-buffer.js');
+  await shutdownUsageBuffer();
+  const { shutdownScopeUse } = await import('../services/scope-use.js');
+  await shutdownScopeUse();
+  const { shutdownWriteTallyBuffer } = await import('../services/data-map/write-tally-buffer.js');
+  await shutdownWriteTallyBuffer();
+  const { shutdownConsentAuditBuffer } = await import('../services/consent-audit-buffer.js');
+  await shutdownConsentAuditBuffer();
+  const { shutdownClassificationAudit } = await import('../services/classification/audit.js');
+  await shutdownClassificationAudit();
+  const { flushAgentRefusals } = await import('../services/agent-refusals.js');
+  await flushAgentRefusals();
 }

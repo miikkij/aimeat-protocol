@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-10-15 — The extended-features guard is requireExtendedFeatures (middleware/extended-features-gate.ts),
+ *     which answers with the shared error() envelope (feature-list audit #186).
  *   v1.22.1 — 2026-10-13 — test.money registers whenever AIMEAT_TEST_MONEY_HANDLER is on, on any node
  *     (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v1.22.0 — 2026-10-02 — The `package` sellable kind (services/packages/sale/package-sale-checkout.ts).
@@ -71,6 +73,7 @@ import type { WorkflowEngine } from '../services/workflow/engine.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
+import { requireExtendedFeatures } from '../middleware/extended-features-gate.js';
 import { logger } from '../utils/logger.js';
 import { registerPaymentHandler, resetPaymentHandlers } from '../commerce/payment-handlers.js';
 import { stripePaymentHandler } from '../commerce/stripe-handler.js';
@@ -549,17 +552,7 @@ export async function mountRoutes(
   app.use(knowledgeRouter(config, storage));
 
   // Extended features guard — returns 503 when extended features are disabled
-  const requireExtended: express.RequestHandler = (_req, res, next) => {
-    if (!config.extendedFeaturesEnabled) {
-      res.status(503).json({
-        ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
-        timestamp: new Date().toISOString(),
-        error: { code: 'FEATURE_DISABLED', message: 'Extended features are disabled on this node' },
-      });
-      return;
-    }
-    next();
-  };
+  const requireExtended = requireExtendedFeatures(config);
 
   app.use('/v1/boards', requireExtended);
   app.use('/v1/federation', (req, res, next) => {

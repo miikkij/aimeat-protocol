@@ -11,6 +11,9 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-15 — The organism-details resource refuses a private organism the caller is not a member
+ *     of with resourceRefusal (FORBIDDEN and a next step) instead of the bare "Access denied"
+ *     (feature-list audit #186).
  *   2026-10-13 — aimeat_organism_archive hands the session's scopes to the fenced-space rule: a
  *     session that covers organism:direct archives and brings back a record of a space that names
  *     extensions (ruled by the developer on 2026-10-13).
@@ -93,6 +96,7 @@ import { agentBarred } from '../services/organism-agent-access.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { resourceRefusal } from './resource-refusal.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -154,7 +158,10 @@ export function registerOrganismsTools(
             const id = decodeURIComponent(variables.id as string);
             const organism = await storage.getOrganism(id);
             if (!organism) return { contents: [{ uri: uri.toString(), text: 'Organism not found' }] };
-            if (!(await canSeeOrganism(organism))) return { contents: [{ uri: uri.toString(), text: 'Access denied' }] };
+            if (!(await canSeeOrganism(organism))) {
+                return resourceRefusal(uri, 'FORBIDDEN', 'This organism is private and you are not a member of it yet. '
+                    + 'Ask one of its owners for an invitation, or search the organisms you can join instead.');
+            }
             const allMembers = await storage.listMembers(id, { status: 'active' });
             // Roster privacy (memberVisibility): below the tier only creator/admin rows + own row.
             const canSeeRoster = await canSeeMembers(storage, organism, await rosterCaller());

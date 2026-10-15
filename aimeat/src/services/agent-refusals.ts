@@ -42,6 +42,7 @@
  *   - readOwnerAgentAccess(storage, ownerGhii) — every agent of an owner in one list read
  *   - openRefusals(entries, heldScopes, nowMs, since?) — which refusals still stand
  *   - refusalView / scopeRequestView / agentAccessView — the wire shape, one for every surface
+ *   - readOwnerAgentAccessOrMarker / agentAccessFields — the agent list's read, with a marker when it fails
  *   - declineRefusals(storage, gaii, needed?) — the owner declines to give the permissions
  *   - forgetAgentAccess(storage, ownerGhii, agentName) — the agent was deleted
  *   - flushAgentRefusals() — write what the windows hold now (tests, shutdown)
@@ -49,6 +50,9 @@
  *   noteAgentRefusal(req.auth, ['agent:write'], false, 'PATCH /v1/agents/:name/tags');
  *   const { refusals, request } = await readAgentAccess(storage, ownerGhii, 'concierge', agent.defaultScopes ?? ['*']);
  * @version-history
+ *   2026-10-15 — readOwnerAgentAccessOrMarker and agentAccessFields: a failed read of the notes is
+ *     answered with `refusals: null` and `refusals_unreadable: true` on every agent row, on REST and
+ *     MCP alike, instead of an empty list (feature-list audit #30).
  *   v1.2.0 — 2026-09-30 — A read waits for the agent's writes in flight and lays the refusals still
  *     waiting in their one-minute window over the record (settledEntries). A second run refused
  *     within a minute of the first read the first run's time and completed (crewaimeat-dev).
@@ -482,6 +486,39 @@ export function agentAccessView(
     refusals: openRefusals(slot?.entries ?? [], heldScopes, nowMs).filter((e) => !e.declinedAt).map(refusalView),
     scope_request: scopeRequestView(slot?.request ?? null),
   };
+}
+
+/** What readOwnerAgentAccessOrMarker answers when the refusal notes could not be read. */
+export const AGENT_ACCESS_UNREADABLE = 'unreadable' as const;
+export type OwnerAgentAccess = Awaited<ReturnType<typeof readOwnerAgentAccess>> | typeof AGENT_ACCESS_UNREADABLE;
+
+/**
+ * readOwnerAgentAccess for a list that must still answer when the notes cannot be read: the failure
+ * is logged and answered with AGENT_ACCESS_UNREADABLE, never with an empty map, because an empty map
+ * reads as "nothing was refused" (feature-list audit #30). GET /v1/agents and aimeat_agents_list
+ * both read through this, so both answer the same field.
+ */
+export async function readOwnerAgentAccessOrMarker(
+  storage: Storage, ownerGhii: string, where: string,
+): Promise<OwnerAgentAccess> {
+  try {
+    return await readOwnerAgentAccess(storage, ownerGhii);
+  } catch (err) {
+    logger.warn(`${where}: refusal notes not read, the list says so on every agent`, { error: String(err) });
+    return AGENT_ACCESS_UNREADABLE;
+  }
+}
+
+/**
+ * The access fields of one agent row. When the notes could not be read, `refusals` and
+ * `scope_request` are null and `refusals_unreadable` is true, so a reader can tell "none" from
+ * "not known" (feature-list audit #30).
+ */
+export function agentAccessFields(
+  heldScopes: readonly string[], access: OwnerAgentAccess, agentName: string,
+): ReturnType<typeof agentAccessView> | { refusals: null; scope_request: null; refusals_unreadable: true } {
+  if (access === AGENT_ACCESS_UNREADABLE) return { refusals: null, scope_request: null, refusals_unreadable: true };
+  return agentAccessView(heldScopes, access.get(agentName));
 }
 
 /**

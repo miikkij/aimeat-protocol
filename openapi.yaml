@@ -8163,9 +8163,11 @@ paths:
       operationId: validateRequest
       summary: Validate a request against OpenAPI schemas
       description: |
-        Developer tool — submit a path and body to check if it conforms to the
-        AIMEAT OpenAPI schema. Returns validation errors or confirms valid.
-        Useful for testing integrations without side effects.
+        Developer tool — submit an address, a method and a body to check the body against the
+        node's validation rules for that route, without side effects. A concrete address such as
+        `/v1/memory/my-key` is looked up by the route pattern it matches (`/v1/memory/:key`); the
+        query string is ignored. When the node has no rule for the address and method, the answer is
+        `valid: null` and `checked: false`: nothing was checked, which is not a pass.
       tags: [Bootstrap]
       requestBody:
         required: true
@@ -8173,14 +8175,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [method, path, body]
+              required: [method, endpoint]
               properties:
                 method:
                   type: string
-                  enum: [GET, POST, PUT, DELETE]
-                path:
+                  enum: [GET, POST, PUT, DELETE, PATCH]
+                endpoint:
                   type: string
-                  example: /v1/memory
+                  example: /v1/memory/my-key
                 body:
                   type: object
                   description: The request body to validate
@@ -8199,16 +8201,27 @@ paths:
                         properties:
                           valid:
                             type: boolean
+                            nullable: true
+                            description: True or false when a rule was checked; null when the node has no rule for this address and method.
+                          checked:
+                            type: boolean
+                            description: Whether a rule was found and the body checked against it.
+                          method: { type: string }
+                          endpoint: { type: string }
+                          matched:
+                            type: string
+                            description: The route pattern whose rule was checked, such as /v1/memory/:key.
+                          note:
+                            type: string
+                            description: Present when nothing was checked, saying why.
                           errors:
                             type: array
                             items:
                               type: object
                               properties:
-                                field:
+                                path:
                                   type: string
                                 message:
-                                  type: string
-                                expected:
                                   type: string
 
   # ── Authentication ─────────────────────────────────────────
@@ -12232,13 +12245,18 @@ paths:
                                         proposal: { type: array, items: { type: string } }
                                     refusals:
                                       type: array
+                                      nullable: true
                                       description: |
                                         Calls the node refused this agent with 403 SCOPE_DENIED for a permission it
                                         still lacks, newest first. A refusal closes when the permission is granted and
                                         ages out after 14 days. Given to the owner and the owner's agents, not to an app
-                                        grant, an ecosystem app or a visitor.
+                                        grant, an ecosystem app or a visitor. Null, with `refusals_unreadable: true`,
+                                        when the node could not read the refusal notes: an empty list means none.
                                       items:
                                         $ref: '#/components/schemas/AgentRefusal'
+                                    refusals_unreadable:
+                                      type: boolean
+                                      description: Present and true only when the refusal notes could not be read. `refusals` and `scope_request` are then null and say nothing about what was refused; ask again later.
                                     scope_request:
                                       $ref: '#/components/schemas/AgentScopeRequest'
                                     stats:

@@ -13,6 +13,9 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-15 — The JSON 404 and the global error handler moved to middleware/fallback-handlers.ts and
+ *     are built with the shared error() envelope, so they carry a request id and the support next step
+ *     (feature-list audit #194); idempotency() takes the node id for its refusal envelopes (#186).
  *   v1.8.0 — 2026-10-09 — hideInternalErrorText() after systemFaultReporter(): a 500 answer whose code
  *     means the node failed carries a sentence and the request id, and the exception text goes to the
  *     log (secrets audit 2026-10-09, d4).
@@ -68,6 +71,7 @@ import { relayGate } from './middleware/relay-gate.js';
 import { mountRoutes } from './server-bootstrap/routes-loader.js';
 import { systemFaultReporter } from './middleware/system-fault.js';
 import { hideInternalErrorText } from './middleware/internal-error-text.js';
+import { notFoundHandler, errorHandler } from './middleware/fallback-handlers.js';
 import { perfTraceMiddleware } from './services/perf-trace.js';
 
 export interface ServerResult {
@@ -267,7 +271,7 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   app.use('/v1/catalogue', rateLimit(config.rateLimits.catalogue, config.rateLimits.roleMultipliers));
 
   // Idempotency-Key support for POST/PUT
-  app.use(idempotency());
+  app.use(idempotency(config.nodeId));
 
   // ── Storage & Config Initialization ──
   const { storage, provenance, consulService } = await initializeConfig(config, configSources);
@@ -322,39 +326,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
     invalidateHasOwnersCache: guards.invalidateHasOwnersCache,
   });
 
-  // JSON 404 handler — prevent Express from returning HTML for unknown routes
-  app.use((_req: express.Request, res: express.Response) => {
-    res.status(404).json({
-      ok: false, protocol: 'aimeat', version: 'v1', node: config.nodeId,
-      timestamp: new Date().toISOString(),
-      error: { code: 'NOT_FOUND', message: `Route not found: ${_req.method} ${_req.path}` },
-    });
-  });
-
-  // Global error handler
-  app.use((err: Error & { status?: number; type?: string }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    const status = err.status ?? 500;
-    const isPayloadError = err.type === 'entity.too.large' || status === 413;
-    if (status >= 500) {
-      logger.error('Unhandled error', { error: err.message, stack: err.stack });
-    }
-    res.status(status).json({
-      ok: false,
-      protocol: 'aimeat',
-      version: 'v1',
-      node: config.nodeId,
-      timestamp: new Date().toISOString(),
-      error: {
-        code: isPayloadError ? 'QUOTA_EXCEEDED' : status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR',
-        message: isPayloadError ? 'Request body too large' : status >= 500 ? 'An unexpected error occurred' : err.message,
-      },
-      hints: {
-        next_actions: [
-          { description: 'Try again or check node status', method: 'GET', url: '/' },
-        ],
-      },
-    });
-  });
+  // JSON 404 handler — prevent Express from returning HTML for unknown routes — and the global
+  // error handler, both built with the shared error() envelope (middleware/fallback-handlers.ts).
+  app.use(notFoundHandler(config.nodeId));
+  app.use(errorHandler(config.nodeId));
 
   return {
     app,

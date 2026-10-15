@@ -24,6 +24,8 @@
  * @structure MCP_SERVERS_SKILL_ENTRY
  * @usage import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
  * @version-history
+ *   2026-10-15 — A failed renewal marks the server as needing a new sign-in at once and refuses the
+ *     call with UPSTREAM_UNAUTHORIZED (feature-list audit #9).
  *   2026-10-15 — aimeat-mcp-servers: an expires value that is not a date is refused when the grant is written (feature-list audit 13).
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5a).
  */
@@ -86,8 +88,9 @@ token) is attached through \`POST /v1/mcp-servers\` with \`auth: "oauth"\`, or f
    bound to the person's browser.
 3. When they come back, \`aimeat_mcp_tools\` with \`refresh: true\` shows the tools.
 
-The node refreshes the sign-in by itself before calls. A server whose sign-in stopped working is
-marked as needing a new sign-in: run \`aimeat_mcp_authorize\` again and hand the address over.
+The node refreshes the sign-in by itself before calls. When that renewal fails, the server is marked
+as needing a new sign-in at once and the call is refused (\`UPSTREAM_UNAUTHORIZED\`): run
+\`aimeat_mcp_authorize\` again and hand the address over.
 
 ## 2. Look and call
 
