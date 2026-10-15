@@ -16,6 +16,7 @@
  * @structure notFoundHandler(nodeId) · errorHandler(nodeId)
  * @usage app.use(notFoundHandler(config.nodeId)); app.use(errorHandler(config.nodeId));
  * @version-history
+ *   2026-10-15 — A 4xx error a route threw keeps its own sentence as the message; only a body the parser could not read gets the generic sentence (the Design Book adopt refusal, e2e-designbook).
  *   2026-10-15 — Moved out of server.ts and built with error() (feature-list audit #194).
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -52,10 +53,17 @@ export function errorHandler(nodeId: string) {
         [{ description: 'Try again, or check whether the node is up', method: 'GET', url: '/' }]));
       return;
     }
-    // A caller's error the body parser or a route threw (a body that does not parse, a bad header).
-    // The thrown text names the parser's view of it, so it goes in details, not in the sentence.
-    res.status(status).json(error(nodeId, 'REQUEST_ERROR',
-      'The request could not be read. Check that the body is well formed and matches its Content-Type, then send it again.',
-      status, { reason: err.message, ...(err.type ? { type: err.type } : {}) }));
+    // A body the parser could not read (it sets `type`): the thrown text is the parser's view of it,
+    // so it goes in details, not in the sentence.
+    if (err.type) {
+      res.status(status).json(error(nodeId, 'REQUEST_ERROR',
+        'The request could not be read. Check that the body is well formed and matches its Content-Type, then send it again.',
+        status, { reason: err.message, type: err.type }));
+      return;
+    }
+    // A caller's error a route threw with its own status: its sentence is written for the caller
+    // (the Design Book's adopt refusal names the numbers in it), and it was answered as it is
+    // before the envelope moved here, so it stays the message.
+    res.status(status).json(error(nodeId, 'REQUEST_ERROR', err.message, status));
   };
 }
