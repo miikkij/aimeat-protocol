@@ -17,6 +17,8 @@
  *   });
  *   if (!r.allowed) { res.status(403)...; return; }
  * @version-history
+ *   v1.5.0 -- 2026-10-15 -- `noAudit`: GET /v1/permissions/check asks this guard as a simulation and
+ *     writes no audit row (feature-list audit 43).
  *   v1.4.0 -- 2026-09-08 -- A person reads what their own agents and apps hold. The owner-self bypass
  *     was an exact identity match, which kept a scoped agent from riding its human's ownership (still
  *     does, the rule is one-directional now) but also hid a person's own files from them: an
@@ -70,6 +72,8 @@ export interface AuthorizeReadArgs {
   /** The accessor's bare owner name — needed for the workspace membership check. */
   accessorOwner?: string;
   action: 'read' | 'list' | 'search';
+  /** A simulation (GET /v1/permissions/check): answer as a read would, and write no audit row. */
+  noAudit?: boolean;
 }
 
 /**
@@ -159,7 +163,7 @@ export async function authorizeRead(
         return { allowed: true, reason: 'workspace_member' };
       }
     }
-    await auditDataAccess(storage, null, ownerGaii, accessorGaii, resourceKey, action, false);
+    if (!args.noAudit) await auditDataAccess(storage, null, ownerGaii, accessorGaii, resourceKey, action, false);
     return { allowed: false, reason: 'workspace_denied' };
   }
 
@@ -168,7 +172,7 @@ export async function authorizeRead(
   }
 
   const result = await checkConsentForRead(storage, resourceKey, ownerGaii, accessorGaii, visibility, groupId);
-  if (!result.allowed) {
+  if (!result.allowed && !args.noAudit) {
     await auditDataAccess(storage, result.consentId ?? null, ownerGaii, accessorGaii, resourceKey, action, false);
   }
   return result;

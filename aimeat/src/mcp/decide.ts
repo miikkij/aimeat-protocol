@@ -16,6 +16,8 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-15 — aimeat_decide_rule_propose refuses an ecosystem app, as the REST route does
+ *     (feature-list audit 95).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -32,7 +34,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { localAccountName } from '../utils/gaii.js';
+import { localAccountName, isGEAI } from '../utils/gaii.js';
 import { AiCompletionError } from '../services/ai/completion.js';
 import {
   decideForOwner, listDecisions, getDecision, reviewDecision, decisionStats, ruleCallerKind, DecideError, type DecideCaller,
@@ -246,6 +248,11 @@ export function registerDecideTools(
     annotationsFor('aimeat_decide_rule_propose'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
+      // The REST route refuses an app and an ecosystem app (routes/ai-decide-rules.ts); this tool did
+      // not (feature-list audit 95). On MCP an ecosystem app's session is named by its GEAI.
+      if (isGEAI(agentGaii)) {
+        return err('ACCESS_DENIED: This is for the account holder and their own agents. An app cannot propose a decision rule.');
+      }
       try {
         const out = await proposeRule(storage, config, ownerGhii, agentGaii, { rule: a.rule, reason: a.reason });
         return text({

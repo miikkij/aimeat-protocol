@@ -437,6 +437,24 @@ await test('18b. Import writes memory through the memory write rules: a node-wri
     assert(keys.includes('k5.import.ok'), `the allowed record is stored: ${JSON.stringify(keys)}`);
 });
 
+// An agent created with no scopes of its own gets the same default on both backends: Postgres stored
+// ['*'] and SQLite stored nothing, so an imported agent read its own memory on one and was refused on
+// the other. Postgres is the reference (Jouni, 2026-10-15).
+await test('18c. An imported agent holds the same default scopes on every backend: it reads its own record', async () => {
+    const name = `k5scope${Date.now().toString(36)}`;
+    const r = await json('/v1/agents/import', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ agent: { name, owner: A.name }, memory: [{ key: 'k5.scope.own', value: { mine: true } }] }),
+    });
+    assert(r.status === 201, `import ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const gaii = r.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(r.body.data.private_key, gaii + ts) }) });
+    assert(tok.body.ok === true, `imported agent token: ${JSON.stringify(tok.body.error)}`);
+    const own = await json('/v1/memory/k5.scope.own', { headers: auth(tok.body.data.token) });
+    assert(own.status === 200 && own.body.data?.value?.mine === true, `the imported agent reads its own record: ${own.status} ${JSON.stringify(own.body.error)}`);
+});
+
 // ─── Phase 4 — rekey ───
 console.log('Phase 4 — rekey');
 
@@ -472,6 +490,22 @@ await test('20. Rekey rotates the key: the OLD private key stops minting a token
     });
     assert(newMint.status === 200 && typeof newMint.body.data?.token === 'string',
         `the new key must mint, got ${newMint.status}: ${JSON.stringify(newMint.body.error)}`);
+});
+
+// Feature-list audit row 34: a rekey is usually made because the old key leaked, and the route, the
+// row and openapi.yaml all say the tokens issued before it stop working. They worked until expiry.
+await test('20b. A token issued before the rekey stops working; one minted with the new key works', async () => {
+    const agent = await setupAgent(A, 'rotatetok', ['memory:read']);
+    const before = await json('/v1/memory', { headers: auth(agent.token) });
+    assert(before.status === 200, `the token works before the rekey: ${before.status}`);
+    const r = await json(`/v1/agents/${encodeURIComponent(agent.gaii)}/rekey`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(r.status === 200, `rekey ${r.status}`);
+    const after = await json('/v1/memory', { headers: auth(agent.token) });
+    assert(after.status === 401, `the token issued before the rekey must be refused, got ${after.status}`);
+    const ts = new Date().toISOString();
+    const fresh = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii: agent.gaii, timestamp: ts, signature: await signMsg(r.body.data.private_key, agent.gaii + ts) }) });
+    const works = await json('/v1/memory', { headers: auth(fresh.body.data.token) });
+    assert(works.status === 200, `a token minted with the new key works: ${works.status}`);
 });
 
 // ─── Phase 5 — port ───

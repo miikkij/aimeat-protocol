@@ -12,6 +12,9 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.8.0 — 2026-10-15 — GET /v1/mcp/approval-check is removed: unauthenticated, called by no page,
+ *     and it told anybody whether a client was approved for an agent. The stored approval records the
+ *     agent's own scopes instead of 'aimeat:full' (feature-list audit 2).
  *   v1.7.0 — 2026-10-12 — PKCE (S256) and the resource indicator (RFC 8707) are read on authorize,
  *     authorize-consent and token, and refused when missing from 4.0.0 (MCP_OAUTH_LAX_REMOVED_IN);
  *     before 4.0.0 a request without them is accepted and counted (mcp_oauth_legacy). Every access
@@ -436,12 +439,15 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         });
         noteIssuedCode(config, code_challenge, consentResources);
 
-        // Remember this approval so future authorizations skip the consent screen
+        // The record of what the owner approved: this client, as this agent, with the agent's own
+        // scopes, which are what the token minted from this code carries. It said 'aimeat:full'
+        // whatever the agent held. The consent screen is shown on every authorization; no page skips
+        // it on this record (feature-list audit 2).
         await storage.createOAuthApproval({
             clientId: client_id,
             gaii,
             owner: localAccountName(gaii) || agent.owner,
-            scope: 'aimeat:full',
+            scope: (agent.defaultScopes ?? ['*']).join(' '),
             approvedAt: new Date().toISOString(),
         });
 
@@ -463,19 +469,6 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         } else {
             res.json({ code, state });
         }
-    });
-
-    // GET /v1/mcp/approval-check — Check if a client+agent pair has a remembered approval
-    // Used by the consent page to auto-submit when the user has previously approved this client
-    router.get('/v1/mcp/approval-check', async (req: Request, res: Response) => {
-        const rawClientId = req.query.client_id; const clientId = (Array.isArray(rawClientId) ? rawClientId[0] : rawClientId) as string;
-        const rawGaii = req.query.gaii; const gaii = (Array.isArray(rawGaii) ? rawGaii[0] : rawGaii) as string;
-        if (!clientId || !gaii) {
-            res.json({ approved: false });
-            return;
-        }
-        const approval = await storage.getOAuthApproval(clientId, gaii);
-        res.json({ approved: !!approval });
     });
 
     // POST /v1/mcp/token — Token exchange endpoint

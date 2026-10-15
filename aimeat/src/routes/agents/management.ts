@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.1 -- 2026-10-15 -- POST /v1/agents/import gives the imported agent ['*'] on both backends, as
+ *     Postgres did; SQLite left the list empty and the agent held no scope (Jouni: Postgres is the reference).
+ *   v1.15.0 -- 2026-10-15 -- POST /v1/agents/:gaii/rekey revokes the agent's sessions, so a token
+ *     issued before the rekey stops working, as the answer and openapi.yaml say (feature-list audit 34).
  *   v1.14.0 -- 2026-10-14 -- POST /v1/agents/import writes the bundle's memory through
  *     writeMemoryRecord (services/memory-write.ts), the writer POST /v1/memory uses, and names each
  *     refused record in imported.memories_failed. It wrote with storage.setMemory, past every memory
@@ -210,6 +214,12 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       trustScore: importedTrust,
       morselBalance: 0, // agents use GHII owner balance
       tags: Array.isArray(agentData.tags) ? agentData.tags : [],
+      // The scope list Postgres gave an imported agent, written out so SQLite gives the same: the
+      // Postgres store fills ['*'] for a missing list and SQLite left it empty, so an imported agent
+      // held every scope on one backend and none on the other (Jouni, 2026-10-15: Postgres is the
+      // reference). Set here rather than as a storage default, because elsewhere an empty list is
+      // the recorded state "no list", which the scope migrations treat on its own.
+      defaultScopes: ['*'],
       createdAt: now,
       lastSeen: now,
     });
@@ -305,6 +315,10 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
 
     const keyPair = await generateKeyPair();
     await storage.updateAgent(gaii, { publicKey: keyPair.publicKey });
+    // The tokens issued before the rekey stop now. A key is rotated because the old one may have
+    // leaked, and the answer below, openapi.yaml and the feature list all say they are invalidated;
+    // they worked until they expired (feature-list audit row 34).
+    await storage.revokeSessionsByGaii(gaii);
 
     // Extension hook: agent_rekey (fire-and-forget)
     fireHook(config, storage, 'agent_rekey', { gaii, owner: agent.owner });

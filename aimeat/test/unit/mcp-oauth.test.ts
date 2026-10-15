@@ -45,12 +45,5 @@ describe('MCP OAuth authorize dual-path flow', () => {
       expect(client.redirectUris.includes('https://evil.com/steal')).toBe(false);
     });
 
-    it('allows when client has no registered URIs', () => {
-      const client = { redirectUris: [] as string[] };
-      // When no URIs registered, any URI is allowed (per OAuth spec for dev clients)
-      const redirectUri = 'https://localhost:3000/callback';
-      const isAllowed = client.redirectUris.length === 0 || client.redirectUris.includes(redirectUri);
-      expect(isAllowed).toBe(true);
-    });
   });
 });

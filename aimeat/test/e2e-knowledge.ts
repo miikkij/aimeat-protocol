@@ -601,6 +601,22 @@ await test('Owner-1 imports a non-catalog (owner-visibility) package', async () 
   contributedPkgId = body.data.package_id;
 });
 
+// Feature-list audit row 207: the reputation read had no visibility filter, so an unlisted package
+// answered to anybody holding its id, and it named the last moderation review to everyone.
+await test('Reputation: an unlisted package answers only to its owner, and the review only to the owner', async () => {
+  const anon = await json(`/v1/knowledge/${contributedPkgId}/reputation`);
+  assert(anon.status === 404, `an anonymous caller read an unlisted package's reputation: ${anon.status}`);
+  const stranger = await json(`/v1/knowledge/${contributedPkgId}/reputation`, { headers: { Authorization: `Bearer ${plainToken}` } });
+  assert(stranger.status === 404, `another account read an unlisted package's reputation: ${stranger.status}`);
+  const own = await json(`/v1/knowledge/${contributedPkgId}/reputation`, { headers: { Authorization: `Bearer ${agentToken}` } });
+  assert(own.status === 200, `the owner reads their own unlisted package's reputation: ${own.status}`);
+  // The public package has a review (Phase 4): a stranger gets the signals and not the review.
+  const pub = await json(`/v1/knowledge/${discoverablePackageId}/reputation`);
+  assert(pub.status === 200 && pub.body.data?.last_review === null, `the review reached a stranger: ${JSON.stringify(pub.body.data?.last_review)}`);
+  const pubOwn = await json(`/v1/knowledge/${discoverablePackageId}/reputation`, { headers: { Authorization: `Bearer ${agentToken}` } });
+  assert(pubOwn.status === 200 && pubOwn.body.data?.last_review?.action === 'approve', `the owner sees the review: ${JSON.stringify(pubOwn.body.data?.last_review)}`);
+});
+
 await test('Owner-1 contributes the package to the organism', async () => {
   const { status, body } = await json(`/v1/knowledge/${contributedPkgId}/contribute`, {
     method: 'POST',

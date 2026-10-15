@@ -452,6 +452,37 @@ await test('An agent reading its owner\'s slice needs the activity-read word', a
     assert(r.status === 403, `an agent without wallet:read should be refused, got ${r.status}`);
 });
 
+/** One MCP tool call with an agent's own token, on a fresh session. */
+async function mcpTool(token: string, name: string, args: Record<string, unknown>): Promise<{ isError?: boolean; text: string }> {
+    let session = '';
+    const rpc = async (method: string, params: Record<string, unknown>, id: number) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`,
+                ...(session ? { 'mcp-session-id': session, 'mcp-protocol-version': '2025-03-26' } : {}) },
+            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        });
+        session = res.headers.get('mcp-session-id') ?? session;
+        const raw = await res.text();
+        const lines = raw.split('\n').filter(l => l.startsWith('data: ')).map(l => l.slice(6));
+        return JSON.parse(lines.length ? lines[lines.length - 1] : raw);
+    };
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'compliance-e2e', version: '1' } }, 1);
+    const r = await rpc('tools/call', { name, arguments: args }, 2);
+    return { isError: r.result?.isError, text: (r.result?.content ?? []).map((c: any) => c.text).join('') || JSON.stringify(r.error ?? {}) };
+}
+
+// Feature-list audit row 159: the MCP tool gave the owner's slice to an agent with no word at all,
+// where GET /v1/compliance/report/mine asks wallet:read of it.
+await test('The MCP tool asks the same activity-read word of an agent as the REST route does', async () => {
+    const bare = await agentToken(plain, 'slicemcpbare', ['memory:read']);
+    const refused = await mcpTool(bare, 'aimeat_compliance_report', { scope: 'mine' });
+    assert(refused.isError === true && /wallet:read/.test(refused.text), `an agent without wallet:read read the slice over MCP: ${refused.text.slice(0, 200)}`);
+    const holder = await agentToken(plain, 'slicemcp', ['memory:read', 'wallet:read']);
+    const allowed = await mcpTool(holder, 'aimeat_compliance_report', { scope: 'mine' });
+    assert(!allowed.isError && allowed.text.includes(plain.name), `an agent with wallet:read reads its owner's slice over MCP: ${allowed.text.slice(0, 200)}`);
+});
+
 await test('An agent WITH the word sees its OWNER, not itself', async () => {
     const agent = await agentToken(plain, 'slice', ['memory:read', 'wallet:read']);
     const r = await json(MINE, { headers: auth(agent) });

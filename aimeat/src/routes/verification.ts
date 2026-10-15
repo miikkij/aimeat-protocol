@@ -5,6 +5,9 @@
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history
+ *   v2.6.0 — 2026-10-15 — POST /v1/ghii/verify/ftn writes nothing: it answers 400 FTN_USE_AUTHORIZE and
+ *     names the checked authorize/callback flow. It stamped level 3 from any string (feature-list
+ *     audit 25).
  *   v2.5.0 — 2026-10-09 — The EUDIW and FTN doors that consume a state take only a round of their
  *     own flow (type 'eudiw' or 'ftn'); another flow's round is refused as an unknown state and left
  *     in place for its own callback (secrets audit 2026-10-09, chapter 2).
@@ -380,29 +383,14 @@ export function verificationRouter(
         res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Missing callback_token'));
         return;
       }
-
-      const ownerName = req.auth!.owner;
-      const ghii = await storage.getGHIIByOwner(ownerName);
-      if (!ghii) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'GHII profile not found'));
-        return;
-      }
-
-      await storage.updateGHII(ghii.ghii, {
-        verificationLevel: 3,
-        ftnVerified: true,
-        verificationMethod: 'eidas',
-        updatedAt: new Date().toISOString(),
-      });
-
-      res.json(success(config.nodeId, {
-        ghii: ghii.ghii,
-        verificationLevel: 3,
-        verificationMethod: 'ftn',
-        ftnVerified: true,
-        verifiedAt: new Date().toISOString(),
-      }));
-      emitChange('verification');
+      // This route cannot check a token: it marked the account verified at level 3, the highest the
+      // node has, from any string it was handed, with or without a provider set up (feature-list
+      // audit 25). The checked exchange is the OIDC pair, which validates the bank's answer against
+      // the nonce it minted, so this route sends the caller there and writes nothing.
+      res.status(400).json(error(config.nodeId, 'FTN_USE_AUTHORIZE',
+        'Your bank identity is checked through the sign-in of your own bank, not from a code sent here. Start the bank sign-in from your profile.',
+        400, { start: 'GET /v1/ghii/verify/ftn/authorize', then: 'open the authorizationUrl it returns' },
+        [{ description: 'Start the bank sign-in', method: 'GET', url: '/v1/ghii/verify/ftn/authorize' }]));
     } catch (err) {
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', String(err)));
     }

@@ -25,6 +25,8 @@
  *   const out = await crewPublish({ storage, config }, caller, 'json-demo', doc);
  *   if (!out.ok) return renderRefusal(out);
  * @version-history
+ *   v1.3.0 — 2026-10-15 — A trial and a validation refuse an app grant (refuseAppRun), as every change
+ *     to the definition does (feature-list audit 81).
  *   v1.2.0 — 2026-10-11 — A trial on a stopped agent is refused, AGENT_STOPPED (agent-stop-rules.ts).
  *   v1.1.0 — 2026-10-11 — Publish, restore and seed answer with `warnings` for the definition
  *     (crew-def-warnings.ts).
@@ -116,6 +118,19 @@ function refuseAppGrant(caller: CrewCaller): CrewRefusal | null {
   return {
     ok: false, status: 403, code: 'ACCESS_DENIED',
     message: 'An app cannot change an agent\'s definition. Do it from the Crew tab in Profile → Agents, or from your own AI connected over MCP.',
+  };
+}
+
+/**
+ * An app grant may not run the owner's runtime either: a trial runs the crew and spends on a model,
+ * and a validation asks the runtime. Both were open to an app holding memory:write while every change
+ * to the definition refused it (feature-list audit 81).
+ */
+function refuseAppRun(caller: CrewCaller): CrewRefusal | null {
+  if (!caller.roles.includes('app')) return null;
+  return {
+    ok: false, status: 403, code: 'ACCESS_DENIED',
+    message: 'An app cannot run or check an agent\'s crew. Do it from the Crew tab in Profile → Agents, or from your own AI connected over MCP.',
   };
 }
 
@@ -211,6 +226,8 @@ export async function crewValidate(deps: CrewDeps, caller: CrewCaller, identifie
 > {
   const target = await resolveCrewAgent(deps, caller, identifier);
   if (!target.ok) return target;
+  const app = refuseAppRun(caller);
+  if (app) return app;
   const asked = await askCrew(deps.config, target.agent, 'crew.validate', { doc }, caller.principal, deps.config.connectTunnelRequestTimeoutMs);
   if (!asked.ok) return asked;
   const errors = errorsOf(asked.result);
@@ -224,6 +241,8 @@ export async function crewTryStart(deps: CrewDeps, caller: CrewCaller, identifie
 > {
   const target = await resolveCrewAgent(deps, caller, identifier);
   if (!target.ok) return target;
+  const app = refuseAppRun(caller);
+  if (app) return app;
   const { agent } = target;
   // A trial is work: it runs the crew and spends on a model. A stopped agent starts none.
   if (isStopped(agent)) {

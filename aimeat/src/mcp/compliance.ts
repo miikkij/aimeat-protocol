@@ -25,6 +25,8 @@
  *   import { registerComplianceTools } from './compliance.js';
  *   registerComplianceTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-15 — aimeat_compliance_report with scope "mine" asks wallet:read, as the REST route does;
+ *     it asked nothing (feature-list audit 159).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
@@ -34,7 +36,10 @@ import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE } from '../utils/scope-coverage.js';
+import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
+
+/** The word the owner's slice asks of an agent, the one GET /v1/compliance/report/mine asks. */
+const OWN_ACTIVITY_SCOPE = 'wallet:read';
 import { complianceRefusal } from '../services/compliance-access.js';
 import { buildComplianceReport, MONTH_RE } from '../services/compliance-report.js';
 import { draftRegisterFromActivity } from '../services/compliance-draft.js';
@@ -87,6 +92,12 @@ export function registerComplianceTools(
         const denied = await gate(COMPLIANCE_READ_SCOPE);
         if (denied) return refuse(denied);
         return text(await buildComplianceReport(storage, config, { sinceDays: since_days, month }));
+      }
+      // The owner's slice asks the word GET /v1/compliance/report/mine asks (OWN_ACTIVITY_SCOPE in
+      // routes/compliance.ts): an agent session reads its owner's AI activity only on wallet:read.
+      // This tool asked nothing (feature-list audit 159).
+      if (!scopeIsCovered(sessionScopes, OWN_ACTIVITY_SCOPE)) {
+        return refuse(`Reading your owner's compliance slice needs the "${OWN_ACTIVITY_SCOPE}" permission, which this session does not carry. Ask your owner to grant it.`);
       }
       const ownerGhii = ownerGhiiOf(agentGaii);
       return text(await buildComplianceReport(storage, config, { ownerGhii, sinceDays: since_days, month }));
