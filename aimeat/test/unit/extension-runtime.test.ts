@@ -1,5 +1,12 @@
+/**
+ * @file extension-runtime.test.ts
+ * @description The QuickJS sandbox runtime: results, limits, isolation and teardown.
+ * @version-history
+ *   2026-10-16 — A run that awaits a promise that never settles, and one kept waiting by slow host
+ *     calls, end at the wall-clock deadline (QA audit S7-02).
+ */
 import { describe, it, expect, vi } from 'vitest';
-import { executeExtensionAction, isEngineAbort } from '../../src/services/extension-runtime.js';
+import { executeExtensionAction, isEngineAbort, extensionWallClockMs } from '../../src/services/extension-runtime.js';
 import type { ExtensionCtx, ExtensionLimits } from '../../src/services/extension-runtime.js';
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -86,6 +93,42 @@ describe('executeExtensionAction', () => {
         await expect(
             executeExtensionAction(script, makeCtx(), {}, defaultLimits({ timeoutMs: 200 })),
         ).rejects.toThrow(/timed out|interrupted/i);
+    });
+
+    // QA audit S7-02: the CPU limit is an interrupt handler, which the engine calls only while guest
+    // code runs. A script that awaits a promise that never settles ran for ever: the caller never got
+    // an answer, and the scheduler's extension slot was never released.
+    it('ends a run that awaits a promise that never settles, at the wall-clock deadline', async () => {
+        const script = `export default async function(ctx, input) {
+            await new Promise(() => {});
+            return {};
+        }`;
+        const started = Date.now();
+        const outcome = await Promise.race([
+            executeExtensionAction(script, makeCtx(), {}, defaultLimits({ timeoutMs: 200, wallClockMs: 400 }))
+                .then(() => 'returned', (e: Error) => e.message),
+            new Promise<string>(resolve => setTimeout(() => resolve('still running after 5 s'), 5_000)),
+        ]);
+        expect(outcome).toMatch(/timed out/i);
+        expect(Date.now() - started).toBeLessThan(5_000);
+    });
+
+    it('ends a run whose host calls keep it waiting past the wall-clock deadline', async () => {
+        const slow = makeCtx();
+        slow.memory.get = () => new Promise(resolve => setTimeout(() => resolve(null), 300));
+        const script = `export default async function(ctx, input) {
+            for (let i = 0; i < 20; i++) await ctx.memory.get('k' + i);
+            return { done: true };
+        }`;
+        await expect(
+            executeExtensionAction(script, slow, {}, defaultLimits({ timeoutMs: 5000, wallClockMs: 700 })),
+        ).rejects.toThrow(/timed out/i);
+    });
+
+    it('the default wall clock is twelve times the CPU limit, at least a minute', () => {
+        expect(extensionWallClockMs({ timeoutMs: 5000 })).toBe(60_000);
+        expect(extensionWallClockMs({ timeoutMs: 10_000 })).toBe(120_000);
+        expect(extensionWallClockMs({ timeoutMs: 5000, wallClockMs: 900 })).toBe(900);
     });
 
     it('does not expose Node.js globals (process, require)', async () => {

@@ -16,6 +16,8 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   2026-10-16 — An app tool with no backing capability is marked fulfillsAsTask: it only queues a
+ *     task, so the invoice rail stays open for it (QA audit S8-03).
  *   v1.7.0 — 2026-10-11 — Two values per item (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
  *     arvoa): `unitPrice` is the money price (0 = free) and `tollMorsels` the pacing amount, which reads
  *     an old morsel price as pacing. There is no morsel currency: 'morsel' or none means the default
@@ -256,6 +258,8 @@ export function appToolSellableResolver(): SellableResolver {
         agentGaii: appRef, agentName: appId, offerId: tool.name,
         title: `${appId} · ${tool.name}`, sellerOwner, sellerGhii,
         unitPrice, tollMorsels: toll, psp,
+        // An unbound tool only queues a task, so it is delivered later (commerce/session-claim.ts).
+        ...(actionId ? {} : { fulfillsAsTask: true }),
         // Fulfillment — a throw refunds the collect and leaves the session open (session-service
         // contract). Callable tools invoke the backing capability with the buyer's persisted input;
         // unbound tools become an agent TASK on the shared commerce task path (phase B).

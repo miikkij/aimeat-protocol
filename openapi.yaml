@@ -25426,9 +25426,13 @@ paths:
       operationId: acceptFault
       summary: Provider accepts fault
       description: |
-        Provider acknowledges the dispute. Escrow returned to requester. The dispute is resolved with
-        the ruling `requester_wins` (reason "The provider accepted fault."), which GET
-        /v1/work/{tc}/dispute shows and which counts as a dispute the provider lost in its trust score.
+        Provider acknowledges the dispute. Delivery already paid the provider the work's pacing
+        amount (the toll); accepting fault moves that amount from the provider back to the requester
+        (`refund_morsels` in the answer). The network fee was burned or split at delivery and is not
+        returned. A provider whose balance holds less than the refund is refused 409
+        PROVIDER_BALANCE_SHORT and nothing changes. The dispute is resolved with the ruling
+        `requester_wins` (reason "The provider accepted fault."), which GET /v1/work/{tc}/dispute
+        shows and which counts as a dispute the provider lost in its trust score.
       tags: [Disputes]
       security:
         - BearerAuth: []
@@ -25437,6 +25441,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /v1/work/{tc}/counter-dispute:
     post:
@@ -25465,6 +25471,9 @@ paths:
     post:
       operationId: offerPartialRefund
       summary: Provider offers partial refund
+      description: |
+        The provider offers to return part of what delivery paid them. `refund_morsels` may not exceed
+        the work's pacing amount (the toll); a larger offer is 400 REFUND_EXCEEDS_ESCROW.
       tags: [Disputes]
       security:
         - BearerAuth: []
@@ -25484,6 +25493,7 @@ paths:
     post:
       operationId: acceptRedelivery
       summary: Requester accepts re-delivery
+      description: Resolves the dispute. No morsels move, because delivery already paid the provider.
       tags: [Disputes]
       security:
         - BearerAuth: []
@@ -25497,6 +25507,10 @@ paths:
     post:
       operationId: acceptPartial
       summary: Requester accepts partial offer
+      description: |
+        The offered amount (at most the toll delivery paid) moves from the provider to the requester;
+        the provider keeps the rest. A provider whose balance holds less is refused 409
+        PROVIDER_BALANCE_SHORT and nothing changes.
       tags: [Disputes]
       security:
         - BearerAuth: []
@@ -25505,6 +25519,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /v1/work/{tc}/reject-partial:
     post:
@@ -25523,6 +25539,7 @@ paths:
     post:
       operationId: withdrawDispute
       summary: Requester withdraws dispute
+      description: Resolves the dispute. No morsels move, because delivery already paid the provider.
       tags: [Disputes]
       security:
         - BearerAuth: []
@@ -25550,7 +25567,12 @@ paths:
       operationId: operatorRule
       summary: Operator rules on dispute
       description: |
-        The operator resolves an escalated dispute and shares out the escrow. `ruling` is one of
+        The operator resolves an escalated dispute and shares out what delivery paid the provider (the
+        work's toll; the escrow was settled at delivery). `to_requester` moves from the provider to the
+        requester, `burned` is taken from the provider and burned, and the provider keeps the rest,
+        which the answer reports as `to_provider`. A distribution above the toll is 400
+        RULING_EXCEEDS_ESCROW, and a provider whose balance holds less than what the ruling takes back
+        is 409 PROVIDER_BALANCE_SHORT; nothing is written either way. `ruling` is one of
         `requester_wins`, `provider_wins` or `split`; any other value answers 400 VALIDATION_ERROR and
         nothing is written. A `requester_wins` ruling counts as a dispute the provider lost in the
         provider's trust score, and the stored score is updated when the ruling is made.
@@ -25574,6 +25596,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   /v1/admin/disputes/{id}/audit-log:
     get:
@@ -27658,7 +27682,10 @@ paths:
         on-chain straight to an address you control, and **invoice** captures nothing at all and books
         the obligation for you to bill offline. Returns `{ x402: { enabled, network, testnet, configured,
         address, currencies, assets, note }, stripe: { configured, provider, keyHint, currencies, note },
-        invoice: { available, currencies, note } }`. `currencies`
+        invoice: { available, currencies, accept_immediate, note } }`. `invoice.accept_immediate` says
+        whether you take invoice payment for items delivered as soon as a checkout completes (a tool call,
+        a package grant, a pay token, a pacing pack); it is false until you turn it on with PUT
+        /v1/commerce/payout/invoice. `currencies`
         and `assets` are READ FROM THE NODE'S NETWORK REGISTRY, so they list only what this node can
         really settle: `assets` carries `{ currency, symbol, address, decimals }` per settleable
         currency (USD → USDC, EUR → EURC on the Base networks). ONE payout address receives every asset.
@@ -27702,6 +27729,28 @@ paths:
       security: [{ BearerAuth: [] }]
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/payout/invoice:
+    put:
+      operationId: commercePayoutInvoiceSet
+      summary: Take invoice payment for items delivered at once, or not (owner)
+      description: >
+        The invoice rail (io.aimeat.invoice) captures nothing: the order completes and what the buyer owes
+        is booked for you to bill. A buyer may choose it for a task you can still decline. For an item
+        delivered as soon as the checkout completes (a tool call, a package grant, a pay token, a pacing
+        pack) nothing can be withheld afterwards, so a buyer may choose it only when you set
+        `accept_immediate: true` here; otherwise completion answers 422 INVOICE_NOT_ACCEPTED and nothing
+        is charged or delivered. MERGED into your payment-settings record. Responds `{ accept_immediate }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [accept_immediate], properties: {
+          accept_immediate: { type: boolean, description: "true: take invoice payment for items delivered at once. false (the default): refuse it." } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
         '401': { $ref: '#/components/responses/AimeatError' }
 
   /v1/commerce/payout/stripe:
@@ -28318,6 +28367,13 @@ paths:
         unbound app-tools queue an agent TASK for the manifest agent or the app owner
         (session.fulfillment.taskIds) — writes the seller's order copy, and closes the session.
         A fulfillment failure after a successful charge refunds and leaves the session open.
+        One completion claims the session before anything is charged (status `completing`); a second
+        completion of the same session while the first runs, or after it, answers 409 SESSION_NOT_OPEN
+        and charges nothing. A refusal before the money stays moved puts the session back to `open`.
+        The invoice rail (`io.aimeat.invoice`) is refused with 422 INVOICE_NOT_ACCEPTED for a line
+        delivered as soon as the checkout completes (an app-tool with a backing capability, an
+        ext-call, a package, a pacing pack) unless the seller turned on invoice.accept_immediate (PUT
+        /v1/commerce/payout/invoice); a line fulfilled as a task takes the invoice rail either way.
         x402 (TARGET-042): a buyer settling a money (USD) session in USDC sends the signed x402
         proof in the X-PAYMENT header; when present it selects the non-custodial com.coinbase.x402
         handler, which verifies + settles it through the configured facilitator (funds move buyer →
@@ -28972,7 +29028,12 @@ paths:
       description: |
         Returns a compact summary of all federated items (actions, agents, boards)
         on this node. Used by hub nodes to aggregate service listings from peers.
-        Requires x-source-node header matching an active peer with catalogue sharing enabled.
+        Requires x-source-node header matching an active peer with catalogue sharing enabled,
+        and the request signed as that node: x-signature over
+        `{"source_node","timestamp","purpose":"service-summary"}` as JSON, x-timestamp within five
+        minutes, and x-audience naming this node with x-audience-signature (the sending node's
+        signature over "aimeat-audience:" + audience + a newline + the signed string). Each signed
+        request is answered once (401 REPLAYED the second time); an unsigned one is 401.
       tags: [Federation]
       parameters:
         - name: x-source-node
@@ -28981,11 +29042,29 @@ paths:
           schema:
             type: string
           description: Node ID of the requesting peer
+        - name: x-timestamp
+          in: header
+          required: true
+          schema: { type: string, format: date-time }
+        - name: x-signature
+          in: header
+          required: true
+          schema: { type: string }
+        - name: x-audience
+          in: header
+          required: true
+          schema: { type: string }
+        - name: x-audience-signature
+          in: header
+          required: true
+          schema: { type: string }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
 
@@ -29128,7 +29207,12 @@ paths:
       summary: Receive replicated memory
       description: |
         Accept a memory entry replicated from a peer node. The source node must
-        be an active peer. Memory is stored with a `replica:{source}:` key prefix.
+        be an active peer. Memory is stored with a `replica:{source}:` key prefix, in the
+        namespace `gaii` names, which must be a person or agent of `source_node` or a person or
+        agent that exists on this node (a visitor's push-home); any other namespace is refused
+        with 403 NAMESPACE_NOT_ALLOWED before anything is written. When a newer write replaces
+        a replica, the earlier value is kept for seven days under
+        `replica:{source}:{key}._conflict_{ms}`.
       tags: [Federation]
       requestBody:
         required: true
@@ -29303,6 +29387,10 @@ paths:
         otherwise 403 KEY_NOT_PROVEN and nothing is admitted. Changing an established key
         needs a signature by the current key (409 KEY_ROTATION_DENIED), and a refused
         rotation is recorded on the Security page as a node id held under another key.
+        The exchange carries the NODE key only, which the node's card publishes anyway:
+        `agent_keys` in the answer is always an empty list, whatever the peer's tier, and agent
+        keys a peer sends are not kept. An unchanged key is answered without a signature for
+        that reason (Core 2026-11 section 9.3).
       tags: [Federation]
       requestBody:
         required: true
@@ -29344,6 +29432,12 @@ paths:
                               type: string
                           accepted:
                             type: boolean
+                          agent_keys:
+                            type: array
+                            maxItems: 0
+                            description: Always empty. Kept so a peer on an older version that reads the field still parses the answer.
+                            items:
+                              type: object
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -49007,7 +49101,10 @@ paths:
     get:
       operationId: resolveGaii
       summary: Resolve GAII to node
-      description: Find which node hosts a given GAII.
+      description: |
+        Find which node hosts a given GAII. Only this node and the peers the public directory lists
+        are named: a private peer (a contact link) is neither named nor asked, so its address is not
+        given out.
       tags: [Federation]
       parameters:
         - name: gaii
@@ -49058,7 +49155,11 @@ paths:
     post:
       operationId: federationSettle
       summary: Receive settlement from peer
-      description: Process incoming settlement from a peer node.
+      description: |
+        Process incoming settlement from a peer node. The body is signed with the peer's node key
+        over `{from_node, to_node, gaii, amount, tracking_code, reason, timestamp}`; `to_node` must be
+        this node, `timestamp` must be within five minutes of this node's clock (400 STALE_TIMESTAMP
+        otherwise), and a tracking code is credited once (409 CONFLICT the second time).
       tags: [Federation]
       requestBody:
         required: true
@@ -49069,6 +49170,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
   /v1/federation/settle/outbound:
     post:
@@ -52284,12 +52387,26 @@ paths:
     get:
       operationId: listFederationTemplates
       summary: List federation templates
-      description: Serve approved template listings to peer nodes for federation sync.
+      description: |
+        Serve approved template listings to peer nodes for federation sync. The caller signs as
+        its node: x-source-node, x-timestamp (within five minutes), x-signature over
+        `{"source_node","timestamp"}` as JSON, and x-audience naming this node with
+        x-audience-signature. Each signed request is answered once (401 REPLAYED the second time),
+        one signed for another node is 401 WRONG_AUDIENCE, and one without the audience is 401
+        AUDIENCE_REQUIRED.
       tags: [Federation]
       parameters:
         - name: limit
           in: query
           schema: { type: integer, default: 100 }
+        - name: x-audience
+          in: header
+          schema: { type: string }
+          description: The node this request is for (this node).
+        - name: x-audience-signature
+          in: header
+          schema: { type: string }
+          description: The sending node's signature over "aimeat-audience:" + audience + a newline + the signed string.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -68812,6 +68929,8 @@ paths:
         Peer-to-peer endpoint. Accept a signed federation broadcast from an active peer operator and
         fan it out to this node's local owners' inboxes (respecting blocks). Authenticated by an
         Ed25519 signature over the payload verified against the pinned peer key — not a bearer token.
+        A node speaks for its own people only: a `broadcast.senderGhii` that is not on `source_node`
+        is refused with 403 SENDER_NOT_OF_PEER before any inbox copy or contact is written.
       requestBody:
         required: true
         content:

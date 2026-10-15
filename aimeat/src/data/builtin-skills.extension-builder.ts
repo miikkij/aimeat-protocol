@@ -27,6 +27,7 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-16 — A run ends at a wall-clock limit, waiting included (QA audit S7-02).
  *   v2.1.0 — 2026-10-12 — Instances: calling an action asks ext:invoke, reading the instances ext:invoke or
  *     ext:write (the REST scope gates of 4.0.0, auth/rest-scope-gate.ts).
  *   v2.0.0 — 2026-10-11 — Built in, extended with the AI half of the service-extensions manual,
@@ -123,7 +124,9 @@ may already do it.
 - \`ctx.now()\` is the run's start time, fixed for the run; \`ctx.hash(s)\` is the FNV-1a hash an app
   can compute the same way.
 - A run has 500 host calls and 5 seconds by default (\`AIMEAT_EXT_MAX_API_CALLS\`,
-  \`AIMEAT_EXT_TIMEOUT_MS\`). \`ctx.memory.search(prefix)\` returns values too, so do not read each key
+  \`AIMEAT_EXT_TIMEOUT_MS\`, which counts the script's own running time). The whole run, waiting on
+  host calls included, ends at twelve times that limit, at least one minute, so a run that awaits
+  something that never answers fails instead of hanging. \`ctx.memory.search(prefix)\` returns values too, so do not read each key
   again. Many workspace records go through \`ctx.workspace.publishRecords\` in one call.
 - The sandbox starts fresh for each call. All state lives in memory.
 - Check the caller in the script: \`ctx.caller.roles\` (an owner in person has \`['owner']\` and no

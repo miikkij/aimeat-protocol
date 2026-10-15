@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — Bulk, import and copy refuse an entry that changes an agent's live crew definition's browser
+ *     site list unless the owner writes it in person (OWNER_APPROVES_SITES; QA audit F07b-02).
  *   2026-10-16 — POST /v1/memory/bulk refuses an entry whose visibility the single write refuses (visibilityRefusal, batch-guards.ts): workspace and unknown words fail that entry instead of being stored (QA audit list review).
  *   2026-10-15 — Copy validates the copied value against the schema lock of its key (validateMemoryWrite, as the memory write does) and answers 422 SCHEMA_VALIDATION_FAILED (feature-list audit #51).
  *   v1.14.0 — 2026-10-13 — Import, copy and bulk-delete hand the session's scopes to the fenced-space
@@ -83,6 +85,7 @@ import { fencedKeysRefusal, type ManifestWrite } from '../../services/fenced-spa
 import { callerOf } from '../../middleware/caller.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
+import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
@@ -171,6 +174,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
       const legacyPacing = legacyPacingWriteRefusal(key, e.value);
       if (legacyPacing) { preFailed.push({ key, status: 'failed', reason: `${legacyPacing.code}: ${legacyPacing.message}` }); continue; }
+      // The live crew definition's browser site list is the owner's to change, in person (QA audit F07b-02).
+      const sites = await crewSitesWriteRefusal(storage, key, gaii, e.value, req.auth!);
+      if (sites) { preFailed.push({ key, status: 'failed', reason: `OWNER_APPROVES_SITES: ${sites}` }); continue; }
       // storage_ref integrity (parity with the single POST /v1/memory): a value pointing at a stored file
       // must name an existing one. The getStorageFile lookup runs ONLY for storage_ref entries, so a
       // normal bulk write (no storage_refs) pays nothing.
@@ -352,6 +358,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
       const legacyPacing = legacyPacingWriteRefusal(key, (entry as { value?: unknown }).value);
       if (legacyPacing) { failed.push({ key, reason: `${legacyPacing.code}: ${legacyPacing.message}` }); continue; }
+      const sites = await crewSitesWriteRefusal(storage, key, gaii, (entry as { value?: unknown }).value, req.auth!);
+      if (sites) { failed.push({ key, reason: `OWNER_APPROVES_SITES: ${sites}` }); continue; }
       const refRefusal = await storageReferenceRefusal(storage, gaii, entry.value);
       if (refRefusal) { failed.push({ key, reason: refRefusal }); continue; }
       survivors.push({ key, entry });
@@ -691,6 +699,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
     const legacyPacing = legacyPacingWriteRefusal(key, sourceRecord.value);
     if (legacyPacing) { res.status(legacyPacing.status).json(error(config.nodeId, legacyPacing.code, legacyPacing.message)); return; }
+    const sites = await crewSitesWriteRefusal(storage, key, callerGaii, sourceRecord.value, req.auth!);
+    if (sites) { res.status(403).json(error(config.nodeId, 'OWNER_APPROVES_SITES', sites)); return; }
     const newVersion = existing ? existing.version + 1 : 1;
 
     // The copy keeps its source's classification (never lower), set before the bytes land so the

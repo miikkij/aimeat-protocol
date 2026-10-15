@@ -13,6 +13,7 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   2026-10-16 — ExtensionLimits.wallClockMs: the wall-clock limit of a whole run (QA audit S7-02).
  *   v1.10.0 — 2026-10-13 — `ctx.calendar`: the calendar library's computation as host calls
  *     (services/extension-calendar.ts).
  *   v1.9.0 — 2026-10-13 — `ctx.workspace.readRow`: one row by its id, under the same rule as
@@ -349,7 +350,13 @@ export const EXT_HASH_REFERENCE_JS = `function aimeatHash(s) {
 
 export interface ExtensionLimits {
     memoryMb: number;
+    /** The CPU limit: the interrupt handler stops guest code that runs longer. */
     timeoutMs: number;
+    /**
+     * The wall-clock limit of the whole run, waiting on host calls included. Absent: twelve times
+     * timeoutMs, at least one minute (extensionWallClockMs in extension-runtime.ts; QA audit S7-02).
+     */
+    wallClockMs?: number;
     maxApiCalls: number;
     /** How much of one answer ctx.fetch reads, raw and inflated. Absent on a record whose manifest named none: the 4 MB default applies. */
     fetchMaxBytes?: number;

@@ -20,6 +20,7 @@
  *   enumeration from services/workspace-versions.ts) rather than a second scheme.
  * @structure
  *   - crewKeysFor() / CREW_VERSION_WINDOW — the key contract
+ *   - crewSitesWriteRefusal() — the browser site list on the generic memory write
  *   - readCrewState() — everything the Crew tab shows, in one read
  *   - saveCrewDraft() / discardCrewDraft()
  *   - publishCrewDef() — snapshot, write live, drop the draft, prune, wake the runtime
@@ -28,6 +29,8 @@
  *   const state = await readCrewState(storage, agent);
  *   const out = await publishCrewDef({ storage, config }, caller, agent, doc);
  * @version-history
+ *   2026-10-16 — crewSitesWriteRefusal(): a memory write of the live definition that changes its
+ *     browser site list is the owner's in person, as on the crew routes (QA audit F07b-02).
  *   v1.1.0 — 2026-08-28 — misdirectedCrewKey(): the one rule every memory door applies so a crews.*
  *     key cannot land in the wrong principal's namespace (a chat session writing json-demo's
  *     definition under its own name — found in production, hidden for a day).
@@ -39,6 +42,7 @@ import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
 import { listVersionRefs, versionNumberOf } from './workspace-versions.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
 
 export const CREW_REGISTRY_PREFIX = 'crews.registry.';
 export const CREW_RUNTIME_PREFIX = 'crews.runtime.';
@@ -69,6 +73,29 @@ export function misdirectedCrewKey(key: string, targetGaii: string, visibility: 
   if (targetAgent === named) return null;
   const where = targetAgent ? `${targetAgent}'s` : 'your own';
   return `A crew definition for ${named} lives in ${named}'s own namespace, and this write would land in ${where}, where neither the Crew tab nor ${named}'s runtime looks. Publish it with aimeat_crew_publish or the Crew tab instead; those write it where it belongs.`;
+}
+
+/**
+ * The browser site list on the generic memory write (QA audit F07b-02). `crews.registry.<agent>` is
+ * the live definition the runtime runs, and it stays off the reserved-key list on purpose, so a plain
+ * memory write by the agent itself could replace it, skipping the crew routes' check that only the
+ * owner in person changes the sites the agent's browser may open (crew-ops.ts browserListRefusal).
+ * The same rule here: a write of the live definition whose browser_domains differ from the stored
+ * definition's is refused unless the caller is the owner in person. Returns the refusal message, or
+ * null when the write is fine. Drafts and version rows are not live, and a restore checks the list.
+ */
+export async function crewSitesWriteRefusal(
+  storage: Pick<Storage, 'getMemory'>, key: string, targetGaii: string, value: unknown, caller: { roles?: readonly string[] | null; federated?: boolean },
+): Promise<string | null> {
+  const m = /^crews\.registry\.([^.]+)$/.exec(key);
+  if (!m || isOwnerInPerson(caller)) return null;
+  const sites = (doc: Record<string, unknown> | null | undefined): string =>
+    JSON.stringify([...((doc?.browser_domains as unknown[] | undefined) ?? [])].map(String).sort());
+  const stored = await storage.getMemory(targetGaii, key);
+  const before = stored ? unwrapEnvelope(stored.value, m[1]!)?.doc : null;
+  const after = unwrapEnvelope(value, m[1]!)?.doc ?? null;
+  if (sites(after) === sites(before)) return null;
+  return `This changes the sites ${m[1]}'s browser may open, and the owner approves that list. Ask your owner to publish it from the Crew tab in Profile → Agents.`;
 }
 
 export function crewKeysFor(agentName: string): CrewKeys {

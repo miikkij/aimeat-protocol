@@ -8,10 +8,12 @@
  *
  * @structure
  *   - matchesKeyword/matchesActionKeyword/matchesGenesisKeyword/matchesLocation: search filters
- *   - PeerKeyEntry / peerKeyCache: TTL cache of peer node + agent public keys
+ *   - PeerKeyEntry / peerKeyCache: TTL cache of peer node public keys
  *   - performKeyExchange(peerUrl, config, storage, expectNodeId): exchange and cache peer public keys
  *
  * @version-history
+ *   2026-10-16 — performKeyExchange sends no agent roster (agent_keys is an empty list) and keeps none
+ *     it receives; PeerKeyEntry holds the node key only (QA audit S6-04).
  *   v1.2.0 — 2026-10-12 — performKeyExchange asks peerUrlRefusal first: a public node exchanges keys
  *     only over https:// from 4.0.0 (Core 2026-11 FED-13).
  *   v1.1.0 — 2026-10-01 — performKeyExchange names the node it asks (`expectNodeId`). An answer that
@@ -65,9 +67,14 @@ export function matchesLocation(val: Record<string, unknown>, location: string):
 // ── A.3: Peer Key Cache ──
 // Caches peer node + agent public keys with TTL for signature verification
 
+/**
+ * A peer's NODE key with its time to live. The exchange used to carry every agent's GAII and public
+ * key as well, which named every person on the node and how many agents each runs; nothing read the
+ * agent keys a node received, and cross-node messages are signed with the node key alone, so neither
+ * side sends or keeps them any more (QA audit S6-04).
+ */
 export interface PeerKeyEntry {
     publicKey: string;
-    agentKeys: Map<string, string>;  // gaii → publicKey
     expiresAt: number;
 }
 
@@ -95,16 +102,13 @@ export async function performKeyExchange(
             return { success: false, error: 'No node key available' };
         }
 
-        const agents = await storage.listAgents();
-        const agentKeys = agents
-            .filter(a => a.publicKey)
-            .map(a => ({ gaii: a.gaii, public_key: a.publicKey }));
-
+        // agent_keys stays in the payload as an empty list, so a peer on an older version that reads
+        // the field still parses the request. The roster is not sent to any tier (QA audit S6-04).
         const payload = {
             node_id: config.nodeId,
             node_url: config.baseUrl,
             node_public_key: nodeKey.publicKey,
-            agent_keys: agentKeys,
+            agent_keys: [] as Array<{ gaii: string; public_key: string }>,
             timestamp: new Date().toISOString(),
         };
 
@@ -128,7 +132,6 @@ export async function performKeyExchange(
             data?: {
                 node_id?: string;
                 node_public_key?: string;
-                agent_keys?: Array<{ gaii: string; public_key: string }>;
             };
         };
 
@@ -141,23 +144,14 @@ export async function performKeyExchange(
             return { success: false, error: `The node at ${peerUrl} answered as ${peerData.node_id}, not ${expectNodeId}` };
         }
 
-        // Cache peer keys with TTL
+        // Cache the peer's node key with TTL. Agent keys an older peer still sends are not kept.
         const ttlMs = config.keyCacheRefreshMinutes * 60_000;
-        const agentKeyMap = new Map<string, string>();
-        if (peerData.agent_keys) {
-            for (const ak of peerData.agent_keys) {
-                agentKeyMap.set(ak.gaii, ak.public_key);
-            }
-        }
-
         peerKeyCache.set(expectNodeId, {
             publicKey: peerData.node_public_key,
-            agentKeys: agentKeyMap,
             expiresAt: Date.now() + ttlMs,
         });
 
         logger.info(`Key exchange completed with peer ${peerData.node_id}`, {
-            agentKeysReceived: agentKeyMap.size,
             ttlMinutes: config.keyCacheRefreshMinutes,
         });
 

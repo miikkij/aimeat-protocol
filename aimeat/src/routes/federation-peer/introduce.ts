@@ -5,6 +5,9 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — GET /v1/federation/service-summary answers a signed request only: a signature over
+ *     { source_node, timestamp, purpose } with the peer's key, the audience headers and one use inside
+ *     five minutes (signedGetRefusal; QA audit S6-09). The x-source-node header alone was the gate.
  *   v1.7.0 — 2026-10-12 — The introduction, the outbound peering request and the readiness test ask
  *     peerUrlRefusal: a public node takes an https:// address only from 4.0.0 (Core 2026-11 FED-13).
  *   v1.6.0 — 2026-10-10 — A peer held under the signing key that has once sent a verified audience or
@@ -40,7 +43,9 @@ import { executeHooks } from '../../services/hooks.js';
 import { PeeringRequestSchema, validateBody } from '../../models/schemas.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
+import {
+    signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal, SERVICE_SUMMARY_PURPOSE,
+} from '../../services/signed-node-request.js';
 import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
@@ -125,6 +130,29 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             res.status(403).json(error(config.nodeId, 'POLICY_DENIED', 'Catalogue sharing is disabled for this peer'));
             return;
         }
+
+        // The header names a node, and a node id is public (GET /v1/federation/directory), so the
+        // caller proves it is that node: a signature over { source_node, timestamp, purpose } with
+        // the peer's key, the audience headers naming this node, and one use inside five minutes
+        // (Core 2026-11 FED-08; QA audit S6-09). The header alone was the whole gate before, the
+        // finding templates.ts closed for the template listing in 2026-08.
+        const timestamp = req.headers['x-timestamp'] as string | undefined;
+        const signature = req.headers['x-signature'] as string | undefined;
+        if (!timestamp || !signature || !peer.publicKey) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED',
+                'The service summary is for peer nodes: sign the request as your node (x-timestamp, x-signature, x-audience, x-audience-signature).'));
+            return;
+        }
+        const signed = JSON.stringify({ source_node: sourceNode, timestamp, purpose: SERVICE_SUMMARY_PURPOSE });
+        if (!await verify(peer.publicKey, signed, signature)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'The signature on this service summary request is not the sending node\'s.'));
+            return;
+        }
+        const refusal = await signedGetRefusal({
+            pin: await federationPeerProofPin(storage, peer), headers: req.headers, signed, sourceNode,
+            timestamp, signature, publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired,
+        });
+        if (refusal) { res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message)); return; }
 
         const summary = await computeServiceSummary(config, storage);
         res.json(success(config.nodeId, summary));

@@ -6,6 +6,12 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-disputes
  * @version-history
+ *   2026-10-16 — Every dispute outcome conserves morsels: the two wallets end exactly the network fee
+ *     (and a ruling's burn) below where they were before the work was created (assertConserved). Tests
+ *     11, 18 and 19 asserted the second payment the audit found (accept-fault returning the whole
+ *     escrow, a ruling paying on top of delivery's settlement) and now assert the toll moving back
+ *     from the provider or staying with it; 12b refuses an offer of the toll plus the fee; 13 and 19b
+ *     are new (QA audit S8-02).
  *   2026-10-15 — Tests 18 and 19 send the verdicts openapi.yaml names (requester_wins, provider_wins):
  *     their free-text verdicts no longer matched the contract, which the route now enforces (setup no
  *     longer matched production). 18a: a free-text verdict is refused with nothing written (feature-list
@@ -96,8 +102,30 @@ let providerGaii = '';
 const trackingCodes: string[] = [];
 const disputeIds: string[] = [];
 
+/**
+ * The two wallets added together, measured before each work item is created (QA audit S8-02). A
+ * delivered item costs the requester its toll (10) plus the network fee (1), and pays the provider the
+ * toll, so the pair holds the fee less afterwards. No dispute outcome may change that: every resolution
+ * here paid out the escrow a second time after delivery had settled it, and the pair grew by the toll.
+ */
+const pairBefore = new Map<string, number>();
+const NETWORK_FEE = 1;
+async function pairSum(): Promise<number> {
+    const one = async (token: string) => Number((await json('/v1/wallet', { headers: { Authorization: `Bearer ${token}` } })).body.data.balance);
+    return (await one(requesterToken)) + (await one(providerToken));
+}
+/** The pair is down exactly the network fee (and what a ruling burned) since the work was created. */
+async function assertConserved(tc: string, burned = 0): Promise<void> {
+    const before = pairBefore.get(tc);
+    assert(before !== undefined, `no starting balance recorded for ${tc}`);
+    const now = await pairSum();
+    assert(now === before! - NETWORK_FEE - burned,
+        `the two wallets held ${before} before the work and ${now} now; expected ${before! - NETWORK_FEE - burned} (the fee${burned ? ` and ${burned} burned` : ''} less)`);
+}
+
 // Helper: Create a delivered work item (full lifecycle)
 async function createDeliveredWork(): Promise<string> {
+    const startingPair = await pairSum();
     // Provider publishes action (idempotent)
     await json('/v1/actions', {
         method: 'POST',
@@ -140,6 +168,7 @@ async function createDeliveredWork(): Promise<string> {
     });
     assert(delBody.ok === true, `work deliver: ${JSON.stringify(delBody.error)}`);
 
+    pairBefore.set(tc, startingPair);
     return tc;
 }
 
@@ -372,6 +401,8 @@ await test('9. Requester accepts redelivery', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
     assert(body.data.outcome === 'redelivery_accepted', `outcome: ${body.data.outcome}`);
+    // Delivery paid the provider; accepting the redelivery moves nothing more (QA audit S8-02).
+    await assertConserved(tc);
 });
 
 // ─── Phase 4: Resolution — Accept Fault ───
@@ -416,11 +447,14 @@ await test('10. Provider accepts fault', async () => {
     assert(view.body.data.ruling?.ruling === 'requester_wins', `ruling after accept-fault: ${JSON.stringify(view.body.data.ruling)}`);
 });
 
-await test('11. Verify requester wallet refund', async () => {
+await test('11. Verify requester wallet refund: the toll comes back from the provider, and nothing is created', async () => {
     const { body } = await json('/v1/wallet', {
         headers: { Authorization: `Bearer ${requesterToken}` },
     });
-    assert(body.data.balance > requesterBalanceBefore, `balance ${body.data.balance} > ${requesterBalanceBefore}`);
+    // QA audit S8-02: accept-fault returned the whole escrow (11) while the provider kept the 10
+    // delivery paid, so the pair of wallets grew by 10. The refund is the toll, from the provider.
+    assert(body.data.balance === requesterBalanceBefore + 10, `the requester gets the toll back: ${requesterBalanceBefore} -> ${body.data.balance}`);
+    await assertConserved(trackingCodes[1]);
 });
 
 // ─── Phase 5: Resolution — Partial Refund ───
@@ -477,16 +511,32 @@ await test('12b. Partial refund above the escrow is refused and mints nothing (C
     });
     assert(Number(afterWallet.data.balance) === before,
         `requester balance moved on a refused offer: ${before} -> ${afterWallet.data.balance}`);
+
+    // QA audit S8-02: the ceiling read cost.inEscrow, the whole escrow (11), after delivery had paid
+    // the provider the toll (10). One morsel over the toll is refused now.
+    const overToll = await json(`/v1/work/${tc}/offer-partial`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${providerToken}` },
+        body: JSON.stringify({ refund_morsels: 11, message: 'the whole escrow' }),
+    });
+    assert(overToll.status === 400 && overToll.body.error?.code === 'REFUND_EXCEEDS_ESCROW',
+        `an offer of the toll plus the fee: ${overToll.status} ${JSON.stringify(overToll.body.error)}`);
 });
 
-await test('13. Requester accepts partial', async () => {
+await test('13. Requester accepts partial: 5 move from the provider to the requester, and nothing is created', async () => {
     const tc = trackingCodes[2];
+    const reqBefore = await walletOf(requesterToken);
+    const provBefore = await walletOf(providerToken);
     const { status, body } = await json(`/v1/work/${tc}/accept-partial`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${requesterToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
+    // QA audit S8-02: the refund came from nowhere and the provider was paid the rest a second time.
+    assert(await walletOf(requesterToken) === reqBefore + 5, 'the requester receives the 5 offered');
+    assert(await walletOf(providerToken) === provBefore - 5, 'the 5 come out of what delivery paid the provider');
+    await assertConserved(tc);
 });
 
 // Phase 5b: Reject partial
@@ -541,6 +591,8 @@ await test('15. Requester withdraws dispute', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
     assert(body.data.outcome === 'withdrawn', `outcome: ${body.data.outcome}`);
+    // A withdrawn dispute leaves delivery's payment as it was; it paid the provider again (QA audit S8-02).
+    await assertConserved(tc);
 });
 
 // ─── Phase 7: Escalation & Operator Ruling ───
@@ -647,8 +699,11 @@ await test('18. Operator rules in favor of requester', async () => {
     const provAfter = await walletOf(providerToken);
     assert(reqAfter - reqBefore === 10,
         `the requester was awarded 10 and received ${reqAfter - reqBefore} (${reqBefore} -> ${reqAfter})`);
-    assert(provAfter === provBefore,
-        `the provider was awarded nothing and moved anyway: ${provBefore} -> ${provAfter}`);
+    // QA audit S8-02: delivery had paid the provider these 10, and this test asserted that the
+    // provider kept them while the requester was credited 10 more. They come back from the provider.
+    assert(provAfter === provBefore - 10,
+        `the requester's 10 come out of what delivery paid the provider: ${provBefore} -> ${provAfter}`);
+    await assertConserved(trackingCodes[4]);
 });
 
 // Provider-favorable ruling
@@ -694,12 +749,39 @@ await test('19. Operator rules in favor of provider', async () => {
 
     // The mirror of 18, and the pair is what makes either one mean something: a distribution that
     // ignored its own arguments and always paid the requester would pass 18 alone.
+    //
+    // QA audit S8-02: delivery already paid the provider the 10 awarded, and this test asserted a
+    // second payment of 10. Awarded to the provider, they stay where delivery put them.
     const reqAfter = await walletOf(requesterToken);
     const provAfter = await walletOf(providerToken);
-    assert(provAfter - provBefore === 10,
-        `the provider was awarded 10 and received ${provAfter - provBefore} (${provBefore} -> ${provAfter})`);
+    assert(provAfter === provBefore,
+        `the provider keeps what delivery paid and is not paid again: ${provBefore} -> ${provAfter}`);
     assert(reqAfter === reqBefore,
         `the requester was awarded nothing and moved anyway: ${reqBefore} -> ${reqAfter}`);
+    await assertConserved(trackingCodes[5]);
+});
+
+// A ruling that burns part of the toll takes it from the provider, and the pair is down by exactly
+// the burn (QA audit S8-02: the burn was a ledger row on the requester with no debit at all).
+await test('19b. A split ruling with a burn: the requester\'s share and the burn come from the provider', async () => {
+    const tc = await createDeliveredWork();
+    const open = await json(`/v1/work/${tc}/dispute`, {
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` }, body: JSON.stringify({ reason: 'Split it' }),
+    });
+    assert(open.status === 201, `open: ${open.status} ${JSON.stringify(open.body)}`);
+    const esc = await json(`/v1/work/${tc}/escalate`, { method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` } });
+    assert(esc.status === 200, `escalate: ${esc.status} ${JSON.stringify(esc.body)}`);
+    const reqBefore = await walletOf(requesterToken);
+    const provBefore = await walletOf(providerToken);
+    const { status, body } = await json(`/v1/admin/disputes/${open.body.data.dispute_id}/rule`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ ruling: 'split', distribution: { to_requester: 4, to_provider: 4, burned: 2 }, reason: 'Both partly right' }),
+    });
+    assert(status === 200, `rule: ${status} ${JSON.stringify(body)}`);
+    assert(body.data.ruling.distribution.to_provider === 4, `the provider keeps 4: ${JSON.stringify(body.data.ruling)}`);
+    assert(await walletOf(requesterToken) === reqBefore + 4, 'the requester receives 4');
+    assert(await walletOf(providerToken) === provBefore - 6, 'the provider gives back the 4 and the 2 burned');
+    await assertConserved(tc, 2);
 });
 
 // Phase 8 was Tier 0.5: the same two operations reached by GET with a one-time key in the query

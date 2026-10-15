@@ -16,6 +16,9 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   2026-10-16 — PUT /v1/commerce/payout/invoice sets whether the seller takes invoice payment for items
+ *     delivered as soon as a checkout completes (off by default); GET /v1/commerce/payout reports it as
+ *     invoice.accept_immediate (QA audit S8-03).
  *   v1.10.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:buy (an app: contract:spend, which completeSession also asks) on POST /v1/commerce/checkout-sessions/:id/complete. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.9.0 — 2026-10-11 — A line item may be `{ kind: 'pacing-pack', quantity }`, pacing capacity the
  *     operator sells for money (commerce/pacing-pack.ts); it needs no offer_id or tool.
@@ -129,7 +132,7 @@ const PSP_KEY = 'commerce.psp';
 /** An EVM account address — the only shape an x402 stablecoin settlement can pay out to. */
 const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
-type PspRecord = { provider?: string; secretKey?: unknown; webhookSecret?: unknown; payTo?: string; address?: string; x402?: { address?: string; payTo?: string } };
+type PspRecord = { provider?: string; secretKey?: unknown; webhookSecret?: unknown; payTo?: string; address?: string; x402?: { address?: string; payTo?: string }; invoiceImmediate?: boolean };
 
 /** Read the seller's payment settings record (private, owner-scoped). */
 async function readPsp(storage: Storage, ownerGhii: string): Promise<PspRecord> {
@@ -227,7 +230,12 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         // the other two, because it is the answer for a seller who bills separately.
         available: true,
         currencies: ['EUR', 'USD'],
-        note: 'Take a money order without any payment provider — the obligation is booked and you invoice it out of band.',
+        // Items delivered as soon as the checkout completes take it only when the seller says so
+        // (PUT /v1/commerce/payout/invoice; QA audit S8-03).
+        accept_immediate: psp.invoiceImmediate === true,
+        note: psp.invoiceImmediate === true
+          ? 'Take a money order without any payment provider — the obligation is booked and you invoice it out of band, also for items delivered at once.'
+          : 'Take a money order without any payment provider — the obligation is booked and you invoice it out of band. Items delivered as soon as the checkout completes are not sold this way until you turn accept_immediate on.',
       },
     }));
   });
@@ -334,6 +342,24 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     if (next.x402) { const x = { ...next.x402 }; delete x.address; delete x.payTo; next.x402 = x; }
     await writePsp(storage, ownerGhii, next, getEncryptionKey(config));
     return res.json(success(config.nodeId, { configured: false, note: 'Stablecoin sales now fail until an address is set again. Card/invoice settlement is unaffected.' }));
+  });
+
+  /**
+   * Whether this seller gives invoice credit for what is delivered as soon as a checkout completes (a
+   * tool call, a package grant, a pay token, a pacing pack). Off by default: the invoice rail captures
+   * nothing, and such a line cannot be withheld afterwards, so a buyer could take it for a book entry
+   * the seller never agreed to (QA audit S8-03). A task the seller can still decline is open to the
+   * invoice rail either way. Merges into the record, so the other rails' settings survive.
+   */
+  router.put('/v1/commerce/payout/invoice', requireAuth(), requireRole('owner'), async (req, res) => {
+    const raw = (req.body ?? {}) as { accept_immediate?: unknown };
+    if (typeof raw.accept_immediate !== 'boolean') {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'Send accept_immediate: true to take invoice payment for items delivered as soon as the checkout completes, or false to refuse it.'));
+    }
+    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
+    await writePsp(storage, ownerGhii, { ...(await readPsp(storage, ownerGhii)), invoiceImmediate: raw.accept_immediate }, getEncryptionKey(config));
+    return res.json(success(config.nodeId, { accept_immediate: raw.accept_immediate }));
   });
 
   router.post('/v1/commerce/checkout-sessions', requireAuth(), requireScope('commerce:buy'), async (req, res) => {

@@ -8,6 +8,10 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   2026-10-16 — 6b: three completions of one session at the same moment complete once and charge the
+ *     pacing once (QA audit S8-04). 37c: the invoice rail is refused for a callable app-tool, a line
+ *     delivered at once, until the seller turns invoice.accept_immediate on, and nothing is charged or
+ *     delivered on the refusal (QA audit S8-03).
  *   v1.8.1 — 2026-10-12 — The seller's offers and the app-tool manifest carry their morsel amounts as
  *     tollMorsels instead of price.morsels, which node 4.0.0 refuses on the offers route with
  *     MORSEL_PRICE_REMOVED; 27 tests had failed in a cascade from that one setup. Tests 28, 31 and 32
@@ -238,6 +242,25 @@ await test('5. Complete → pacing charged and split, fulfillment TASK queued fo
 await test('6. Double-complete is refused (409 SESSION_NOT_OPEN)', async () => {
     const r = await json(`/v1/commerce/checkout-sessions/${sessionId}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
     assert(r.status === 409 && r.body.error?.code === 'SESSION_NOT_OPEN', `expected 409 SESSION_NOT_OPEN, got ${r.status} ${r.body.error?.code}`);
+});
+
+// QA audit S8-04: completion tested `open` on the copy it had loaded and wrote `completed` only at the
+// end, so two completions at the same moment each charged and each fulfilled. One claims the session.
+await test('6b. Two completions of one session at the same moment: one completes, the other is 409, the pacing is charged once', async () => {
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc', quantity: 1 }] }),
+    });
+    assert(create.status === 201, `create ${create.status}`);
+    const id = create.body.data.session.id;
+    const before = await balance(buyer.token);
+    const complete = () => json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    const results = await Promise.all([complete(), complete(), complete()]);
+    const done = results.filter(r => r.status === 200);
+    const refused = results.filter(r => r.status === 409 && r.body.error?.code === 'SESSION_NOT_OPEN');
+    assert(done.length === 1 && refused.length === 2, `one completes and two are refused: ${JSON.stringify(results.map(r => [r.status, r.body.error?.code]))}`);
+    assert(await balance(buyer.token) === before - PRICE, `the pacing is charged once: ${before} -> ${await balance(buyer.token)}`);
+    assert((done[0]!.body.data.session.fulfillment?.taskIds ?? []).length === 1, 'one fulfilment');
 });
 
 await test('7. Not enough morsels for the pacing → 402, session stays open for retry', async () => {
@@ -887,6 +910,53 @@ await test('37b. UCP and ACP sell the EUR offer in money: the feed lists it, the
         method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment_data: { handler: 'io.aimeat.invoice' } }),
     });
     assert(acpDone.status === 200 && acpDone.body.status === 'completed', `acp invoice complete ${acpDone.status}: ${JSON.stringify(acpDone.body)}`);
+});
+
+// QA audit S8-03: the buyer named the invoice rail for anything, and a line delivered during
+// completion (here a callable app-tool) ran for a book entry the seller never agreed to.
+await test('37c. The invoice rail is refused for a tool call until the seller takes invoices for it; nothing runs on the refusal', async () => {
+    const key = `apps.${appId}.tools`;
+    const current = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(seller.token) });
+    const doc = (current.body.data?.value ?? current.body.data?.record?.value) as { tools: any[] };
+    assert(Array.isArray(doc?.tools), `the manifest reads back: ${JSON.stringify(current.body)}`);
+    const withPaid = { ...doc, tools: [...doc.tools.filter((t: any) => t.name !== 'paid-echo'),
+        { name: 'paid-echo', description: 'Echo, sold in euros per call', action_id: echoCapId, priceMoney: { amount: 1_000_000, currency: 'EUR' } }] };
+    const write = await json('/v1/memory', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ key, value: withPaid, visibility: 'public' }) });
+    assert(write.status === 200 || write.status === 201, `manifest write ${write.status}: ${JSON.stringify(write.body.error)}`);
+
+    const open = async () => {
+        const r = await json('/v1/commerce/checkout-sessions', {
+            method: 'POST', headers: auth(buyer.token),
+            body: JSON.stringify({ items: [{ kind: 'app-tool', app: appRef, tool: 'paid-echo', input: { message: 'on credit' } }], currency: 'EUR' }),
+        });
+        assert(r.status === 201 && r.body.data.session.total === 1_000_000, `EUR tool session ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data?.session)}`);
+        return r.body.data.session.id as string;
+    };
+    const completeOnInvoice = (id: string) => json(`/v1/commerce/checkout-sessions/${id}/complete`, {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'io.aimeat.invoice' } }),
+    });
+
+    const id = await open();
+    const refused = await completeOnInvoice(id);
+    assert(refused.status === 422 && refused.body.error?.code === 'INVOICE_NOT_ACCEPTED', `expected 422 INVOICE_NOT_ACCEPTED, got ${refused.status} ${JSON.stringify(refused.body.error)}`);
+    const after = await json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyer.token) });
+    assert(after.body.data.session.status === 'open' && !after.body.data.session.fulfillment, `nothing ran and the session stays open: ${JSON.stringify(after.body.data.session)}`);
+
+    const payout = await json('/v1/commerce/payout', { headers: auth(seller.token) });
+    assert(payout.body.data.invoice?.accept_immediate === false, `off by default: ${JSON.stringify(payout.body.data.invoice)}`);
+    const bad = await json('/v1/commerce/payout/invoice', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ accept_immediate: 'yes' }) });
+    assert(bad.status === 400, `a non-boolean is refused: ${bad.status}`);
+    const on = await json('/v1/commerce/payout/invoice', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ accept_immediate: true }) });
+    assert(on.status === 200 && on.body.data.accept_immediate === true, `turn on: ${on.status} ${JSON.stringify(on.body)}`);
+    assert((await json('/v1/commerce/payout', { headers: auth(seller.token) })).body.data.invoice?.accept_immediate === true, 'reported on');
+
+    const done = await completeOnInvoice(id);
+    assert(done.status === 200 && done.body.data.session.status === 'completed', `with the seller's consent: ${done.status} ${JSON.stringify(done.body.error)}`);
+    assert(String(done.body.data.session.receipt?.trackingCode ?? '').startsWith('inv_'), `booked on the invoice rail: ${JSON.stringify(done.body.data.session.receipt)}`);
+    assert((done.body.data.session.fulfillment?.results ?? []).length === 1, `the tool ran once: ${JSON.stringify(done.body.data.session.fulfillment)}`);
+
+    const off = await json('/v1/commerce/payout/invoice', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ accept_immediate: false }) });
+    assert(off.status === 200 && off.body.data.accept_immediate === false, `turn off again: ${off.status}`);
 });
 
 // ─── Web Bot Auth: outbound safeFetch traffic is signed (RFC 9421) and verifiable ───

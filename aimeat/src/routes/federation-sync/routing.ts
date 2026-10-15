@@ -5,6 +5,8 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — GET /v1/federation/resolve/:gaii names and asks only the peers the public directory
+ *     lists; a private peer's address is not given out (QA audit S6-09).
  *   2026-10-15 — POST /v1/federation/route and POST /v1/federation/cross-node/work answer a refusal from the far node with an error envelope (PEER_REFUSED, its status, its answer in details) instead of ok: true (peerRefusal).
  *   v1.8.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): work:request on POST /v1/federation/cross-node/work. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.7.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -368,11 +370,16 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             return;
         }
 
+        // This route answers anyone, so it names only the peers the public directory names: a private
+        // peer (a contact link) is nobody's to learn about, and its address was handed to whoever
+        // guessed its node id (QA audit S6-09).
+        const listedPeers = [...peers.values()].filter(p => p.status === 'active' && p.peerMode !== 'private');
+
         // Parse GAII to extract node hint (agent#owner@node)
         const atIdx = gaii.lastIndexOf('@');
         if (atIdx !== -1) {
             const nodeHint = gaii.substring(atIdx + 1);
-            const peer = [...peers.values()].find(p => p.nodeId === nodeHint && p.status === 'active');
+            const peer = listedPeers.find(p => p.nodeId === nodeHint);
             if (peer) {
                 res.json(success(config.nodeId, {
                     gaii,
@@ -385,8 +392,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
         }
 
         // Ask peers (broadcast resolve)
-        const activePeers = [...peers.values()].filter(p => p.status === 'active');
-        for (const peer of activePeers) {
+        for (const peer of listedPeers) {
             try {
                 // SSRF validation: block requests to private/reserved IPs
                 const peerResolveCheck = await validateOutboundUrl(peer.url);

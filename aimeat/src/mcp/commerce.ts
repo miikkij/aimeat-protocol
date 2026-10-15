@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-16 — aimeat_commerce_psp_status reports invoice_accept_immediate: whether the owner takes
+ *     invoice payment for items delivered at once (QA audit S8-03).
  *   2026-10-11 — aimeat_app_tools_publish stores an old `price.morsels` as the tool's `tollMorsels`,
  *     refuses it from 4.0.0 (legacyToolPriceRefusal), and answers each tool's `toll_morsels`.
  *   2026-10-11 — aimeat_offer_price_set sets the money price and the pacing amount (`toll_morsels`,
@@ -228,13 +230,15 @@ export function registerCommerceTools(
         annotationsFor('aimeat_commerce_psp_status'),
         async () => {
             const rec = await storage.getMemory(ownerGhii, PSP_KEY);
-            const v = (rec?.value ?? {}) as { provider?: string; secretKey?: unknown };
+            const v = (rec?.value ?? {}) as { provider?: string; secretKey?: unknown; invoiceImmediate?: unknown };
+            // Whether the owner takes invoice payment for items delivered at once (QA audit S8-03).
+            const invoice_accept_immediate = v.invoiceImmediate === true;
             // `configured` means CREDENTIALS are set, which is what GET /v1/commerce/payout has
             // always reported (`stripe.configured: !!psp.secretKey`). Keying it off the record's
             // existence answered "configured" for a seller whose record holds only the stablecoin
             // payout address and no card credentials at all.
-            if (!v.secretKey) return ok({ configured: false });
-            return ok({ configured: true, provider: v.provider ?? 'unknown', key_hint: pspSecretHint(v.secretKey), updated_at: rec?.updatedAt });
+            if (!v.secretKey) return ok({ configured: false, invoice_accept_immediate });
+            return ok({ configured: true, provider: v.provider ?? 'unknown', key_hint: pspSecretHint(v.secretKey), updated_at: rec?.updatedAt, invoice_accept_immediate });
         },
     );
 

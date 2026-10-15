@@ -19,6 +19,7 @@
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   2026-10-16 — A session a completion has claimed reads as ACP status in_progress (QA audit S8-04).
  *   v1.7.0 — 2026-10-11 — Money only (ruling D4): the feed lists money prices and never the currency
  *     "MORSEL"; a checkout opens in a money currency (the request's `currency`, else the first one
  *     the items are priced in) or is refused MONEY_PRICE_REQUIRED; completion names its handler; the
@@ -119,6 +120,8 @@ const ACP_VERSION = '2026-01-30';
 
 const ACP_STATUS: Record<CheckoutSessionRecord['status'], string> = {
   open: 'ready_for_payment', completed: 'completed', cancelled: 'canceled', expired: 'expired',
+  // A completion has claimed the session and is running (commerce/session-claim.ts; QA audit S8-04).
+  completing: 'in_progress',
 };
 
 function toAcpSession(s: CheckoutSessionRecord) {

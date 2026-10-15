@@ -16,6 +16,10 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-16 — completeSession claims the session (open → completing, compare-and-swap) before the
+ *     pacing and the collect, puts it back on a refusal, and records the collected tracking code
+ *     before fulfilment (QA audit S8-04); the invoice rail is refused for a line delivered at once
+ *     unless the seller gives that credit (INVOICE_NOT_ACCEPTED, QA audit S8-03). Both in session-claim.ts.
  *   2026-10-15 — A fulfilment that refuses on a limit (CommerceError 429, e.g. PACING_PACK_CAP) is refunded and answered with its own code and status, not 502 FULFILLMENT_FAILED (feature-list audit #137).
  *   v3.1.0 — 2026-10-14 — Completion compares each line's quote with the live price and the session
  *     total with the sum of its lines before charging, and refuses a difference with 409
@@ -81,6 +85,7 @@ import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 import { recordPurchase, recordCheckoutStage } from '../services/visibility/visibility-counter.js';
+import { claimSessionForCompletion, releaseSessionClaim, recordCollected, invoiceRailRefusal } from './session-claim.js';
 
 export { CommerceError } from './errors.js';
 // Moved to platform-fee.ts (2026-10-11); re-exported for the callers that import it from here.
@@ -577,6 +582,13 @@ async function completeSessionInner(
       : 'This checkout\'s total does not match its lines. Update the items to get a new quote, then complete again.');
   }
 
+  // The invoice rail for a line delivered at once only where the seller gives that credit (QA audit S8-03).
+  const invoiceRefusal = invoiceRailRefusal(handler?.id, sellables);
+  if (invoiceRefusal) throw invoiceRefusal;
+  // One completion claims the session before any money moves; a refusal below puts it back (QA audit S8-04).
+  const key = sessionKey(session.id);
+  await claimSessionForCompletion(storage, session, key);
+
   // Per-item money math on the QUOTED prices the session carries, which equal the live prices above.
   const feePct = commerceFeePercent(config);
   const lines = session.items.map((item) => {
@@ -597,7 +609,7 @@ async function completeSessionInner(
   // before the collect, so two completions in the same instant cannot both pass (secaudit 2026-10,
   // PKG-6). The early check above stays: it refuses before the session is read further.
   const reserved = await reserveAgentPurchase(storage, config, session, caller);
-  if (reserved) throw reserved;
+  if (reserved) { await releaseSessionClaim(storage, session, key); throw reserved; }
   // Pacing first, before any money moves: a buyer who cannot cover it is refused having paid nothing.
   // The quoted amount, like the quoted prices. Part burns, the checkout's existing operator share is
   // kept, the rest goes to the seller (services/metered-settlement.ts chargePacing).
@@ -608,6 +620,7 @@ async function completeSessionInner(
   });
   if (!paced) {
     await releaseAgentPurchase(storage, session, caller);
+    await releaseSessionClaim(storage, session, key);
     throw new CommerceError('INSUFFICIENT_MORSELS', 402, insufficientMorselsMessage(config, session.pacingMorsels ?? 0));
   }
   let collected: { trackingCode: string; saved?: import('./types.js').SavedPayment };
@@ -618,8 +631,10 @@ async function completeSessionInner(
   } catch (err) {
     await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
+    await releaseSessionClaim(storage, session, key);
     throw err;
   }
+  if (handler && session.total > 0) await recordCollected(storage, session, key, collected.trackingCode);
 
   // 2) Fulfillment — a failure here refunds the collect and leaves the session open.
   //    Default: an agent TASK per line item. A sellable's custom fulfill() replaces it
@@ -658,6 +673,7 @@ async function completeSessionInner(
     }
     await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
+    await releaseSessionClaim(storage, session, key);
     // A limit the fulfilment refuses on (429, e.g. the pacing pack's daily PACING_PACK_CAP) keeps its
     // own code and status, so the buyer learns which limit it was and that a later try can succeed.
     // Any other failure stays FULFILLMENT_FAILED 502.
@@ -709,7 +725,7 @@ async function completeSessionInner(
     fulfillment: { taskIds, ...(results.length ? { results } : {}) },
     updatedAt: new Date().toISOString(),
   };
-  await putRecord(storage, session.buyerGhii, sessionKey(session.id), completed);
+  await putRecord(storage, session.buyerGhii, key, completed);
   // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data). It
   // carries the seller's view of each result, never a buyer's one-time token (secrets audit
   // 2026-10-09, S-3).

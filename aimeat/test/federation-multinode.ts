@@ -29,6 +29,9 @@
  *     pricing.base_morsels, 400 MORSEL_PRICE_REMOVED), and signedPingBody names the receiving node
  *     and adds the audience proof (4.0.0 refuses a ping without it, 401 AUDIENCE_REQUIRED). The
  *     unsigned and wrong-key pings still fail on their signature (401 UNAUTHORIZED).
+ *   2026-10-16 -- Node A's service summary read of Node C is signed as A for C, as the heartbeat
+ *     client signs it; the unsigned read is refused from this version (QA audit S6-09). Setup that no
+ *     longer matched production.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-multinode.ts
@@ -39,7 +42,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
-import { audienceProof } from '../src/services/signed-node-request.js';
+import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from '../src/services/signed-node-request.js';
 
 // ─── Ed25519 setup ───
 ed.hashes.sha512 = (m: Uint8Array) =>
@@ -401,9 +404,10 @@ await test('Publish federated action on Node C', async () => {
 });
 
 await test('Node A fetches service summary from Node C', async () => {
-    // Simulate what A's heartbeat would do: call C's service-summary endpoint
+    // Simulate what A's heartbeat would do: call C's service-summary endpoint, signed as A for C
+    // the way services/federation.ts signs it (QA audit S6-09).
     const { status, body } = await nodeC!.json('/v1/federation/service-summary', {
-        headers: { 'x-source-node': 'aimeat-hub-001-testa' },
+        headers: await signedGetHeaders(nodeA!.nodeKey.privateKey, 'aimeat-hub-001-testa', nodeC!.config.nodeId, { purpose: SERVICE_SUMMARY_PURPOSE }),
     });
     assert(status === 200, `service-summary: ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');

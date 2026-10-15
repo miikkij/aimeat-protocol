@@ -17,9 +17,11 @@
  *   seller's payable book entry for the receipt (the money already sits on their Stripe balance);
  *   refund reverses the intent. Amounts are 6-decimal micro-units everywhere and convert to Stripe
  *   minor units ONLY here, at the settlement rail, through the money chokepoint.
- * @structure STRIPE_HANDLER_ID · stripePaymentHandler · stripeApi (module-local)
+ * @structure STRIPE_HANDLER_ID · stripeIdempotencyKey · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   2026-10-16 — Every charge Stripe could make twice carries an Idempotency-Key (stripeIdempotencyKey):
+ *     the checkout and its customer, the renewal of a period, the hold (QA audit S8-04).
  *   v1.5.0 — 2026-10-09 — Stripe's error text goes to the log, redacted, and the buyer gets a plain
  *     sentence; only a card_error, which Stripe writes for the cardholder, passes (secrets audit d5).
  *   v1.4.0 — 2026-10-08 — collect charges a shared payment token (spt_…) as payment_method_data
@@ -36,6 +38,7 @@
  *   v1.0.0 — 2026-07-28 — Promoted into core from the removed ee/ module, stripped of the Connect
  *     platform path: every seller charges on their own credentials (single edition, no fork).
  */
+import { createHash } from 'node:crypto';
 import type { PaymentHandler } from './types.js';
 import { openPspSecret } from './psp-secrets.js';
 import { PaymentError } from './payment-handlers.js';
@@ -79,11 +82,14 @@ const STRIPE_UNREADABLE = 'The card payment provider gave an answer the node cou
  * auth failure or 5xx becomes a 502, because it is the seller's or Stripe's problem, not the call's.
  */
 async function stripeApi(
-  key: string, method: string, path: string, params?: Record<string, string>, version?: string,
+  key: string, method: string, path: string, params?: Record<string, string>, version?: string, idempotencyKey?: string,
 ): Promise<Record<string, unknown>> {
   const headers: Record<string, string> = { Authorization: `Bearer ${key}` };
   if (params) headers['Content-Type'] = 'application/x-www-form-urlencoded';
   if (version) headers['Stripe-Version'] = version;
+  // Stripe answers a repeated key with the first request's result instead of acting twice, so a
+  // retry after a timeout, or a second completion of the same checkout, charges once (QA audit S8-04).
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const res = await safeFetch(`https://api.stripe.com/v1/${path}`, {
     method,
     headers,
@@ -117,6 +123,17 @@ async function stripeApi(
 }
 
 /**
+ * The Idempotency-Key of one charge: what it is for (`checkout`, `renewal`, `hold`), the node's own
+ * reference for it, and, where the buyer supplies the card, a digest of that card token. The same
+ * checkout paid with the same card gets the same key, so it is charged once however often the
+ * request arrives; another card is a new attempt, so a declined card does not block a second one.
+ */
+export function stripeIdempotencyKey(kind: string, reference: string, instrument?: string): string {
+  const card = instrument ? `-${createHash('sha256').update(instrument).digest('hex').slice(0, 16)}` : '';
+  return `aimeat-${kind}-${reference}${card}`.slice(0, 255);
+}
+
+/**
  * The Stripe handler. Always registered — it carries no node-level credential, so a node without
  * any selling owner simply never reaches a charge. A seller who has not set a key gets
  * PSP_NOT_CONFIGURED at collect, which names exactly what to do.
@@ -143,8 +160,9 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
       // Automatic renewal: the card is kept at Stripe for charges without the buyer present, on the
       // seller's own account. Stripe needs a customer to attach it to, and setup_future_usage tells the
       // bank at this first charge, with the buyer present, that later ones will come.
+      const chargeKey = stripeIdempotencyKey('checkout', reference, instrument);
       const customer = saveForLater
-        ? String((await stripeApi(key, 'POST', 'customers', { description: `AIMEAT buyer, checkout ${reference}` })).id)
+        ? String((await stripeApi(key, 'POST', 'customers', { description: `AIMEAT buyer, checkout ${reference}` }, undefined, `${chargeKey}-customer`)).id)
         : null;
       // A shared payment token (spt_…) is an AI platform's grant for this one charge (the UCP guest
       // checkout, commerce/ucp-guest-checkout.ts): Stripe takes it as payment_method_data, under the
@@ -164,7 +182,7 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
         }),
         description: `AIMEAT checkout ${reference}`,
         ...(customer ? { customer, setup_future_usage: 'off_session' } : {}),
-      }, isSpt ? SPT_STRIPE_VERSION : undefined);
+      }, isSpt ? SPT_STRIPE_VERSION : undefined, chargeKey);
       if (intent.status !== 'succeeded') {
         throw new PaymentError('PAYMENT_NOT_CAPTURED', 402, `Stripe payment intent status: ${String(intent.status)}`);
       }
@@ -188,7 +206,9 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
         off_session: 'true',
         confirm: 'true',
         description: `AIMEAT renewal ${reference}`,
-      });
+        // The renewal's reference names the period, so the daily job that retries a charge Stripe
+        // accepted but the node timed out on gets the first charge back instead of a second one.
+      }, undefined, stripeIdempotencyKey('renewal', reference));
       if (intent.status !== 'succeeded') {
         throw new PaymentError('PAYMENT_NOT_CAPTURED', 402, `Stripe payment intent status: ${String(intent.status)}`);
       }
@@ -250,7 +270,7 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
         'automatic_payment_methods[enabled]': 'true',
         'automatic_payment_methods[allow_redirects]': 'never',
         description: `AIMEAT hold ${reference}`,
-      });
+      }, undefined, stripeIdempotencyKey('hold', reference, instrument));
       if (intent.status !== 'requires_capture') {
         throw new PaymentError('HOLD_NOT_PLACED', 402, `Stripe payment intent status: ${String(intent.status)}`);
       }

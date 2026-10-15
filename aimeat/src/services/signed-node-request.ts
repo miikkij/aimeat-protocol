@@ -23,12 +23,17 @@
  *   audienceRefusal(opts) · signedMessageRefusal(sourceNode, timestamp, signature) ·
  *   deliveryProof(privateKey, signed, audience, sentAt?) · deliveryRefusal(opts) · ProofPin ·
  *   carriesProof(body) · pinnedRefusal(pin, body, check) · federationPeerProofPin(storage, peer) ·
- *   genesisPeerProofPin(storage, peer) · nodeRequestSignedBy(headers, opts)
+ *   genesisPeerProofPin(storage, peer) · nodeRequestSignedBy(headers, opts) ·
+ *   audienceHeaders(privateKey, signed, audience) · signedGetHeaders(privateKey, sourceNode, audience, fields) ·
+ *   signedGetRefusal(opts)
  * @usage
  *   const headers = await signNodeRequest(storage, config, peerId, { purpose: 'package', group_id });
  *   const who = await checkNodeRequest(req.headers, { thisNodeId, fields, keyOf: (node) => ... });
  *   const refusal = signedMessageRefusal(source_node, timestamp, signature);   // an older format, after verify
  * @version-history
+ *   2026-10-16 — audienceHeaders and signedGetRefusal: a signed GET in the older format (the template
+ *     listing, the service summary) names its audience in headers and passes inside five minutes and
+ *     once (QA audit S6-09).
  *   v1.5.0 — 2026-10-12 — The unproven format is a version gate: from UNPROVEN_FORMAT_REMOVED_IN
  *     audienceRefusal and deliveryRefusal refuse a message without the proof whatever `required` says;
  *     before it, a message let through is counted and named on the response (noteDeprecatedUse;
@@ -199,6 +204,53 @@ export async function audienceRefusal(opts: {
     return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'The audience of this message is not signed by the sending node.' };
   }
   return null;
+}
+
+/**
+ * A signed GET in the older format carries its signature in headers (x-source-node, x-timestamp,
+ * x-signature over a JSON string the route names), so its audience proof goes in two more headers:
+ * the template listing and the service summary (QA audit S6-09).
+ */
+export async function audienceHeaders(privateKey: string, signed: string, audience: string): Promise<{ 'x-audience': string; 'x-audience-signature': string }> {
+  const proof = await audienceProof(privateKey, signed, audience);
+  return { 'x-audience': proof.audience, 'x-audience-signature': proof.audience_signature };
+}
+
+/** The purpose a service summary request signs, so its signature cannot be spent on another GET. */
+export const SERVICE_SUMMARY_PURPOSE = 'service-summary';
+
+/**
+ * Every header of a signed GET in the older format: the sending node, the moment, the signature over
+ * `{ source_node, timestamp, ...fields }` as JSON, and the audience headers. `fields` names the
+ * request (a purpose), so a signature made for one GET cannot be spent on another.
+ */
+export async function signedGetHeaders(
+  privateKey: string, sourceNode: string, audience: string, fields: Record<string, string> = {},
+): Promise<Record<string, string>> {
+  const timestamp = new Date().toISOString();
+  const signed = JSON.stringify({ source_node: sourceNode, timestamp, ...fields });
+  return {
+    'x-source-node': sourceNode, 'x-timestamp': timestamp,
+    'x-signature': await sign(privateKey, signed),
+    ...await audienceHeaders(privateKey, signed, audience),
+  };
+}
+
+/**
+ * The receiving side of a signed GET in the older format, after its own signature verified: the
+ * audience headers name this node and carry the sending node's proof (with the peer's pin), and the
+ * request passes inside five minutes and once (signedMessageRefusal). Null when it may pass.
+ */
+export async function signedGetRefusal(opts: {
+  pin: ProofPin; headers: Record<string, string | string[] | undefined>; signed: string;
+  sourceNode: string; timestamp: string; signature: string; publicKey: string; thisNodeId: string; required: boolean;
+}): Promise<Refusal | null> {
+  const pick = (h: string): string | undefined => { const v = opts.headers[h]; return Array.isArray(v) ? v[0] : v; };
+  const body: Record<string, unknown> = { audience: pick('x-audience'), audience_signature: pick('x-audience-signature') };
+  return await pinnedRefusal(opts.pin, body, provenSince => audienceRefusal({
+    signed: opts.signed, audience: body.audience, audienceSignature: body.audience_signature,
+    publicKey: opts.publicKey, thisNodeId: opts.thisNodeId, required: opts.required, provenSince,
+  })) ?? signedMessageRefusal(opts.sourceNode, opts.timestamp, opts.signature);
 }
 
 /**

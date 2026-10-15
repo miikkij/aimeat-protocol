@@ -13,11 +13,16 @@
  *   - routingFee: the 1-morsel fee of one route to another node, taken when the call goes out and
  *     given back when no route was made
  *   - settlePayment: burn + fee split + pay provider on successful delivery
+ *   - disputedAmount/takeBackFromProvider: what a dispute re-divides (the toll delivery paid), and the
+ *     one atomic debit of the provider that funds a refund or a burn
  *   - applyDailyAllowance: capped daily allowance credit
  *   - calculateEscrow: sum in-escrow amounts across a requester's open work
  *   - mintMorsels: operator mint against the daily cap, for every door that mints
  *
  * @version-history
+ *   2026-10-16 — disputedAmount() and takeBackFromProvider(): a dispute re-divides the toll delivery
+ *     paid the provider, funded by one atomic debit of the provider; it no longer returns the escrow
+ *     or pays the provider a second time (QA audit S8-02).
  *   2026-10-15 — morselsInCirculation(): the sum of the account holders' balances, for the admin dashboard and aimeat_admin_stats (feature-list audit #169).
  *   2026-10-15 — mintMorsels reads the shared daily ceiling, addedToday: mints and sold pacing packs,
  *     summed by the database (feature-list audit 176).
@@ -246,6 +251,56 @@ export async function returnEscrow(
             timestamp: new Date().toISOString(),
         });
     }
+}
+
+/**
+ * What a dispute can move: the pacing amount delivery paid the provider (settlePayment). A dispute
+ * opens only on delivered work, so the escrow is already shared out by then: the toll went to the
+ * provider and the network fee was burned or split. A resolution re-divides the toll and nothing
+ * else; returning the whole escrow or paying the provider again created morsels (QA audit S8-02).
+ */
+export function disputedAmount(work: WorkRecord): number {
+    return Math.max(0, work.cost.toll ?? 0);
+}
+
+/**
+ * Take back part of what delivery paid the provider: `toRequester` goes to the requester, `burned` is
+ * removed from circulation. One atomic debit of the provider covers both, so a provider whose balance
+ * holds less refuses the whole resolution and nothing is written (false). Every morsel credited here
+ * was debited here first, so a resolution never creates any (QA audit S8-02).
+ */
+export async function takeBackFromProvider(
+    storage: Storage,
+    work: WorkRecord,
+    amounts: { toRequester: number; burned?: number },
+): Promise<boolean> {
+    const toRequester = Math.max(0, amounts.toRequester);
+    const burned = Math.max(0, amounts.burned ?? 0);
+    const total = toRequester + burned;
+    if (total === 0) return true;
+    const debited = await storage.debitBalance(work.providerGaii, total);
+    if (!debited) return false;
+    const now = new Date().toISOString();
+    await storage.addTransaction({
+        id: `tx-${randomUUID()}`, gaii: work.providerGaii, type: 'dispute_refund', amount: -total,
+        counterpartyGaii: work.requesterGaii, trackingCode: work.trackingCode, timestamp: now,
+    });
+    if (toRequester > 0) {
+        const credited = await storage.creditBalance(work.requesterGaii, toRequester);
+        if (credited) {
+            await storage.addTransaction({
+                id: `tx-${randomUUID()}`, gaii: work.requesterGaii, type: 'dispute_refund', amount: toRequester,
+                counterpartyGaii: work.providerGaii, trackingCode: work.trackingCode, timestamp: now,
+            });
+        }
+    }
+    if (burned > 0) {
+        await storage.addTransaction({
+            id: `tx-${randomUUID()}`, gaii: work.providerGaii, type: 'burn', amount: -burned,
+            trackingCode: work.trackingCode, timestamp: now,
+        });
+    }
+    return true;
 }
 
 /** The fee for routing one call to another node (§15), in morsels. */
