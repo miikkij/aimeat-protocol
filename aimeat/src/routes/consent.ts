@@ -13,6 +13,8 @@
  *   - GET /v1/consent/audit: pending consent-audit buffer entries
  *
  * @version-history
+ *   2026-10-15 — POST /v1/consent stamps how the consent was given (web form for the person, API call
+ *     by an agent or app), which the consent receipt reads (feature-list audit #161).
  *   v1.3.0 — 2026-10-15 — The owner in person lists, reads and revokes the consents their agents filed
  *     on this route (listAccountConsents, accountHoldsConsent); an agent's consent stays under its own
  *     GAII, where the access checks read it (feature-list audit 40).
@@ -34,6 +36,8 @@ import { grantConsent, revokeConsent, listAccountConsents, accountHoldsConsent }
 import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
 import { operatorOverride } from '../services/operator-override.js';
+import { callerOf } from '../middleware/caller.js';
+import { consentCollectionMethod } from '../services/mydata-receipt.js';
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
@@ -64,6 +68,8 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
       ownerGaii,
       scopes: req.auth!.scopes ?? [],
       roles: req.auth!.roles,
+      // How it was given, for the consent receipt (feature-list audit #161).
+      collectionMethod: consentCollectionMethod('rest', callerOf(req, config.nodeId, storage)),
     }, { recipient, dataPattern: data_pattern, purpose, scope, expires, metadata });
     if (!granted.ok) {
       res.status(granted.status).json(error(config.nodeId, granted.code, granted.message));

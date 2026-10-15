@@ -15,6 +15,8 @@
  *     aimeat_crew_draft, aimeat_crew_publish
  * @usage registerAgentCrewTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-15 — aimeat_crew_llm_set answers with `warning` when the owner's model policy leaves the
+ *     chosen model out (feature-list audit #82).
  *   2026-10-11 — aimeat_crew_publish and aimeat_crew_seed answer with `warnings`.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-08-28 -- Initial: the five tools over services/crew-ops.ts.
@@ -201,7 +203,7 @@ export function registerAgentCrewTools(
             }
             const out = await writeLlmChoice(deps, caller, name, choice ?? null);
             if (!out.ok) return refused(out);
-            return ok({ key: out.key, cleared: out.cleared, scope: name ? 'agent' : 'default' });
+            return ok({ key: out.key, cleared: out.cleared, scope: name ? 'agent' : 'default', ...(out.warning ? { warning: out.warning } : {}) });
         },
     );
 }

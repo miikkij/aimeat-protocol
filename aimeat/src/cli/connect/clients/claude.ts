@@ -16,6 +16,8 @@
  *   - claudeDesktopAdapter — merges a stdio entry into claude_desktop_config.json.
  * @usage Registered in clients/registry.ts as `claude-code` and `claude-desktop`.
  * @version-history
+ *   2026-10-15 — The Desktop adapter reports the surface it wrote (WriteResult.surface), so the
+ *     summary prints `--surface` only when it was applied (feature-list audit #6).
  *   v1.0.0 — 2026-08-02 — Initial creation: one-command client connect.
  */
 
@@ -110,6 +112,7 @@ export const claudeDesktopAdapter: ClientAdapter = {
         return {
             written: [file],
             backedUp: bak ? [bak] : [],
+            surface: target.surface,
             nextSteps: [
                 'Restart Claude Desktop, then check Settings > Developer for the aimeat server.',
                 'Desktop connects over the local connector (stdio), not the HTTP endpoint: its config file cannot carry a remote URL.',

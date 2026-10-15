@@ -399,6 +399,26 @@ await test('25. A provider carrying a credential is refused', async () => {
   assert(r.status === 400 && r.body?.error?.code === 'SECRET_IN_CHOICE', `got ${r.status} ${r.body?.error?.code}`);
 });
 
+await test("25b. A pinned model the owner's policy leaves out is saved, and both answers say so (audit #82)", async () => {
+  // FAILED FIRST, on 2026-10-15: writeLlmChoice computed the warning and neither PUT answered with it.
+  const pol = await json('/v1/ai/policy', { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ policy: { mode: 'custom', allow: ['openrouter:vendor-a/alpha-one'] } }) });
+  assert(pol.status === 200, `policy ${pol.status}: ${JSON.stringify(pol.body?.error)}`);
+  const pin = (model: string) => JSON.stringify({ choice: { kind: 'model', label: model, provider: { type: 'openrouter', model, api_key_env: 'OPENROUTER_API_KEY' } } });
+  try {
+    const one = await json(crew('/llm'), { method: 'PUT', headers: auth(ownerToken), body: pin('vendor-b/beta-two') });
+    assert(one.status === 200, `set ${one.status}: ${JSON.stringify(one.body?.error)}`);
+    assert(typeof one.body.data.warning === 'string' && one.body.data.warning.includes('vendor-b/beta-two'), `the agent answer carries the warning: ${JSON.stringify(one.body.data)}`);
+    const all = await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(ownerToken), body: pin('vendor-b/beta-two') });
+    assert(all.status === 200 && typeof all.body.data.warning === 'string', `the default answer carries the warning: ${JSON.stringify(all.body.data)}`);
+    const fine = await json(crew('/llm'), { method: 'PUT', headers: auth(ownerToken), body: pin('vendor-a/alpha-one') });
+    assert(fine.status === 200 && fine.body.data.warning === undefined, `an allowed model has no warning: ${JSON.stringify(fine.body.data)}`);
+  } finally {
+    await json('/v1/ai/policy', { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ policy: { mode: 'open' } }) });
+    await json(crew('/llm'), { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: null }) });
+    await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: null }) });
+  }
+});
+
 await test('26. Another owner can neither read the menu nor set the choice', async () => {
   const m = await json(crew('/menu'), { headers: auth(otherToken) });
   assert(m.status === 404 || m.status === 403, `menu as another owner: ${m.status}`);

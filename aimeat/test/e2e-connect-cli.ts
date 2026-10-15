@@ -32,6 +32,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-cli.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connect-cli
  * @version-history
+ *   2026-10-15 — The `client --home` DEFECT test is inverted: the credential lands in --home
+ *     (feature-list audit #6).
  *   v1.0.0 — 2026-09-08 — Initial creation. No suite had ever run these commands.
  */
 
@@ -664,13 +666,12 @@ await test('client claude-code writes the headers helper even when the claude CL
   assert(!sh.includes(acc.agentToken.slice(0, 24)), 'the helper reads the token at run time; it must not embed it');
 });
 
-await test('DEFECT — `client` with a fresh --home stores the credential in AIMEAT_HOME instead', async () => {
-  // AS IT BEHAVES TODAY, not as it should. clients/index.ts sets process.env.AIMEAT_HOME = target.home
-  // and says the dynamic imports below it are what make that take effect — but src/index-connect.ts
-  // imports cli/connect/config.js STATICALLY, so CONFIG_DIR was already captured from the ambient
-  // AIMEAT_HOME before any of this ran. The device flow therefore writes the token to the ambient
-  // home, `tokenFileIn(target.home)` finds nothing, and the command exits 1 having created a real
-  // agent on the node and left it where the client cannot see it.
+await test('`client` with a fresh --home stores the credential in that home, not in AIMEAT_HOME', async () => {
+  // Until 2026-10-15 this test pinned the defect: src/index-connect.ts imported cli/connect/config.js
+  // statically, so CONFIG_DIR was captured from the ambient AIMEAT_HOME before clients/index.ts set
+  // it, the token went to the ambient home, and the command exited 1 ("No credential was stored")
+  // having created a real agent on the node. config.ts now reads AIMEAT_HOME on every call and
+  // index-connect.ts imports it dynamically (feature-list audit #6).
   const clientAgent = 'clientbot';
   mkdirSync(defectHome, { recursive: true });
   mkdirSync(defectAimeatHome, { recursive: true });
@@ -680,12 +681,11 @@ await test('DEFECT — `client` with a fresh --home stores the credential in AIM
   await approveDeviceRequest(acc.ownerToken, clientAgent, 40_000);
   const r = await running;
 
-  exited(r, 1);
-  said(r, 'No credential was stored', 'stderr');
-  assert(existsSync(join(defectAimeatHome, 'tokens', `${clientAgent}@${OWNER}.token`)),
-    'the token should have landed in the ambient AIMEAT_HOME (that is the defect)');
-  assert(!existsSync(join(defectHome, 'tokens', `${clientAgent}@${OWNER}.token`)),
-    'if the token IS in --home now, the defect is fixed and this assertion should be inverted');
+  exited(r, 0);
+  assert(existsSync(join(defectHome, 'tokens', `${clientAgent}@${OWNER}.token`)),
+    'the token should be in the client home given with --home');
+  assert(!existsSync(join(defectAimeatHome, 'tokens', `${clientAgent}@${OWNER}.token`)),
+    'the token must not land in the ambient AIMEAT_HOME');
 });
 
 // ─── remove and logout ───

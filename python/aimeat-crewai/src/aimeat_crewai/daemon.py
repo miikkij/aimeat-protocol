@@ -1131,7 +1131,30 @@ def _agent_engagements(api: _Api, org: str, ws: str, agent_name: str) -> list[di
         engs = (r.json().get("data") or {}).get("engagements") or []
     except Exception:  # noqa: BLE001 -- no engagement list is the same answer as an unreachable node: nothing to do
         return None
-    return [e for e in engs if isinstance(e, dict) and e.get("agentName") == agent_name]
+    # THE OWNER IS PART OF WHO THIS AGENT IS (0.35.1). Two owners may each have an agent called
+    # `web-researcher` in one workspace, and a filter on the name alone made one owner's retire stop
+    # the other owner's agent. The owner comes from the GAII the _Api routes with; an _Api built
+    # from a bare name (a single-owner daemon) has none, and there the name is the whole identity.
+    my_owner = _owner_of_gaii(getattr(api, "gaii", "") or "")
+    return [e for e in engs if isinstance(e, dict) and e.get("agentName") == agent_name
+            and (my_owner is None or _engagement_owner(e) == my_owner)]
+
+
+def _owner_of_gaii(gaii: str) -> str | None:
+    """The owner part of `name#owner@node`, or None for a bare name (no `#`)."""
+    if "#" not in gaii:
+        return None
+    rest = gaii.split("#", 1)[1]
+    return rest.rsplit("@", 1)[0] if "@" in rest else rest
+
+
+def _engagement_owner(e: dict[str, Any]) -> str | None:
+    """An engagement's owner: its `owner` field, else the owner part of its `agent` GAII."""
+    owner = e.get("owner")
+    if isinstance(owner, str) and owner:
+        return owner
+    agent = e.get("agent")
+    return _owner_of_gaii(agent) if isinstance(agent, str) else None
 
 
 def _space_contract(api: _Api, org: str, ws: str, space: str, cache: dict[str, dict[str, str]]) -> str | None:

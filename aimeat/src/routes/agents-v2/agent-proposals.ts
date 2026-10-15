@@ -23,6 +23,8 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   2026-10-15 — The approval's `llm_choice` carries `warning` when the owner's model policy leaves
+ *     the picked model out (feature-list audit #82).
  *   2026-10-15 — The approval runs pre_agent_registration before any write and post_agent_registration after (feature-list audit 89).
  *   v1.9.0 — 2026-10-13 — Approval takes `llm_choice`, the model the owner picked for this agent:
  *     checked before anything is created, stored before the agent is offered to its connector, so
@@ -316,6 +318,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
     // A choice that could not be saved is reported in the answer and undoes nothing: the agent
     // runs on the default, and the owner can set the model on the agent's page.
     let llmProblem: { code: string; message: string } | null = null;
+    let llmWarning: string | null = null;
     if (llmChoice) {
       const saved = await writeLlmChoice({ storage, config }, {
         principal: `${owner}@${config.nodeId}`, owner, scopes: ['memory:write'], roles: ['owner'], pipeline: 'rest.agent-proposal.llm',
@@ -325,6 +328,8 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
         logger.warn('Agent proposal: the model choice could not be saved', {
           event: 'agent_v2.proposal_llm_failed', owner, name: proposal.name, reason: saved.code,
         });
+      } else if (saved.warning) {
+        llmWarning = saved.warning;
       }
     }
 
@@ -403,10 +408,11 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       // waiting agent waits for THIS connector, and no other one of the owner's is offered it.
       connector: target ? { id: target.id, name: target.name } : null,
       // The model the owner picked on this approval: whether it was stored for the agent; null
-      // when none was picked; `problem` when it was picked and could not be saved.
+      // when none was picked; `problem` when it was picked and could not be saved; `warning` when
+      // it was saved and the owner's model policy leaves that model out.
       llm_choice: llmChoice === null ? null
         : llmProblem ? { saved: false, problem: llmProblem }
-          : { saved: true, kind: llmChoice.kind, label: llmChoice.label ?? llmChoice.profile ?? null },
+          : { saved: true, kind: llmChoice.kind, label: llmChoice.label ?? llmChoice.profile ?? null, ...(llmWarning ? { warning: llmWarning } : {}) },
       // The agent's work given once now: the task's id and whether it started at once; null when
       // the caller asked for none or the agent has nothing to run; `problem` when it was not made.
       first_run: firstRun === null ? null

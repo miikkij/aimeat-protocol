@@ -6,6 +6,9 @@
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.
  * @version-history
+ *   2026-10-15 -- Save sends the version the list read; an upload is created with POST into the
+ *     agent's namespace under `agents.config.<agent name>.`, the prefix the list reads
+ *     (agent-config-files.js) (feature-list audit #78).
  *   v1.18.0 -- 2026-10-02 -- The question marks that explain the run budget: schedule.max_runs, schedule.daily_limit on their Checks (components/HelpTip.js).
  *   v1.17.1 --2026-09-26 -- The file's text scrolls after 300px again, as main's
  *     .pf-agd-config-preview did (Code scroll="medium"; fix pass).
@@ -61,7 +64,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
-import { apiGet, apiPut, apiPatch } from '/js/api.js';
+import { apiGet, apiPost, apiPut, apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 import { Action, Loud, Actions } from '/components/Action.js';
@@ -77,6 +80,7 @@ import { SubHeading, HeadDesc } from '/components/SubHeading.js';
 import { Row as Line, Split, Space } from '/components/Layout.js';
 import { List, Row, Name, Doors } from '/components/List.js';
 import { AgentAiSection } from './agent-ai-section.js';
+import { CONFIG_PREFIX, configFileName, uploadRequest, saveRequest } from './agent-config-files.js';
 
 const html = htm.bind(h);
 
@@ -161,11 +165,12 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
     if (showSpinner) setLoading(true);
     try {
       const gaii = agent?.gaii || agentName;
-      const resp = await apiGet(`/v1/memory?prefix=agents.config.&agent=${encodeURIComponent(gaii)}`);
+      const resp = await apiGet(`/v1/memory?prefix=${CONFIG_PREFIX}&agent=${encodeURIComponent(gaii)}`);
       const items = resp?.data?.items || resp?.data?.memories || [];
       const configFiles = items.map(item => ({
         key: item.key,
-        filename: item.key.replace(/^agents\.(?:config\.|[^.]+\.config\.)/, ''),
+        version: item.version,
+        filename: configFileName(item.key, agent?.name || agentName),
         content: typeof item.value === 'string' ? item.value : JSON.stringify(item.value, null, 2),
         updatedAt: item.updated_at || item.updatedAt,
         description: item.description,
@@ -210,11 +215,16 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
   }
 
   async function handleSave() {
+    const file = files.find(f => f.key === selectedFile);
+    if (!file) return;
     try {
-      await apiPut(`/v1/memory/${encodeURIComponent(selectedFile)}`, { value: editContent });
+      // The version the list read: PUT refuses a body without one (feature-list audit #78).
+      const req = saveRequest(file, editContent);
+      const resp = await apiPut(req.path, req.body);
+      const version = resp?.data?.version ?? (typeof file.version === 'number' ? file.version + 1 : file.version);
       setPreview(editContent);
       setEditing(false);
-      const updated = files.map(f => f.key === selectedFile ? { ...f, content: editContent } : f);
+      const updated = files.map(f => f.key === selectedFile ? { ...f, content: editContent, version } : f);
       setFiles(updated);
       showToast(t('profile.agents.detail.agent_config.saved'));
     } catch (err) {
@@ -246,12 +256,14 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
     const reader = new FileReader();
     reader.onload = async () => {
       const content = reader.result;
-      const key = `agents.${agentName}.config.${file.name}`;
+      // Into the agent's namespace under the prefix the list reads, created with POST (PUT only
+      // updates a record that exists) (feature-list audit #78).
+      const req = uploadRequest({ name: agent?.name || agentName, gaii: agent?.gaii }, file.name, content);
       try {
-        await apiPut(`/v1/memory/${encodeURIComponent(key)}`, { value: content });
+        await apiPost(req.path, req.body);
         showToast(t('profile.agents.detail.agent_config.uploaded'));
         await loadFiles();
-        setSelectedFile(key);
+        setSelectedFile(req.body.key);
         setPreview(content);
       } catch (err) {
         showToast(err.message || t('profile.agents.detail.agent_config.uploadError'), true);

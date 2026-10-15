@@ -115,6 +115,24 @@ def test_agent_engagements_filters_to_this_agent():
     assert api.gets[0][1]["params"]["ws"] == "ws1"
 
 
+def test_agent_engagements_keeps_only_this_owners_agent_of_the_same_name():
+    # Two owners, one agent name, one workspace: bob's retired engagement must not reach alice's agent.
+    path = "/v1/organisms/org1/workspace/engagements"
+    payload = {"data": {"engagements": [
+        {"agent": "web-researcher#alice@node-1", "owner": "alice", "agentName": "web-researcher",
+         "contract": "research", "state": "active"},
+        {"agent": "web-researcher#bob@node-1", "owner": "bob", "agentName": "web-researcher",
+         "contract": "research", "state": "retired"},
+        {"agent": "web-researcher#carol@node-1", "agentName": "web-researcher",
+         "contract": "research", "state": "retired"},
+    ]}}
+    api = _FakeApi("web-researcher", {path: _FakeResp(200, payload)})
+    api.gaii = "web-researcher#alice@node-1"
+    out = _agent_engagements(api, "org1", "ws1", "web-researcher")
+    assert out is not None and [e["owner"] for e in out] == ["alice"]
+    assert _engagement_verdict(out, "research") == "process"
+
+
 def test_agent_engagements_non_200_returns_none():
     path = "/v1/organisms/org1/workspace/engagements"
     api = _FakeApi("web-researcher", {path: _FakeResp(500, {})})

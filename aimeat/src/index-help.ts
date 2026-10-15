@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — The client help says --surface is used by claude-desktop only (feature-list audit #6).
  *   v1.1.11 — 2026-10-12 — The serve help names AIMEAT_RUNTIME_FEATURES.
  *   v1.1.10 — 2026-10-11 — The task-runner paragraph names the runner block's fields instead of
  *     docs/integrations/crewai.md, a repository file an installed CLI cannot open and which never
@@ -130,6 +131,7 @@ USAGE
       replacing what is already there), and leave a launcher that supplies the
       token at run time so it never lands in a config file.
       Options: --url --owner --agent --workdir --home --surface --name --reuse
+      (--surface is used by claude-desktop only; the other clients get the full toolset)
       e.g. aimeat connect client goose --url https://aimeat.io --owner alice
 
       Interactive clients reach the node over its HTTP MCP endpoint (/v1/mcp).

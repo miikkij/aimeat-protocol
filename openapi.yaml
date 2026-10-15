@@ -3746,20 +3746,22 @@ components:
           example: '1.0'
         jurisdiction:
           type: string
-          description: Legal jurisdiction
-          example: EU
+          description: "The node's operator.country setting: an ISO 3166-1 alpha-2 code when it names a country, as written otherwise, and `unspecified` when it is empty."
+          example: FI
         consentTimestamp:
           type: string
           format: date-time
         collectionMethod:
           type: string
-          example: web_form
+          description: "How the consent was given, stamped when it was granted: `web form` (the person in their own session), `API call by an agent` (or an app, an ecosystem app), `MCP tool call by an agent` (or the person). `not recorded` for a consent granted before 2026-10-15 or by the node itself."
+          example: web form
         consentReceiptID:
           type: string
         publicKey:
           type: string
         language:
           type: string
+          description: The language of the person whose consent it is (their account locale), else the node default.
           example: en
         piiPrincipalId:
           type: string
@@ -8881,6 +8883,13 @@ paths:
         organism records, `classified_organism_content` { count, keys, note } names them and says the
         file carries content an organism classified. The ordinary export (GET /v1/memory/export and the
         bundle) keeps such a record behind and names it in `left_out`.
+
+        Since 2026-10-15 the export also carries `published_apps` (each app with its latest manifest
+        fields and its version numbers; the bytes come from GET /v1/apps/{owner}/{filename}),
+        `ai_provenance` (every provenance record of the account, the document as stored),
+        `connections` (the outside-account connections, never the credential), `app_purchases` (the
+        apps the person or their agents took, without the stored copy) and, on each agent,
+        `messages` (the messages between the person and that agent).
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -9597,6 +9606,7 @@ paths:
                               saved: { type: boolean }
                               kind: { type: string, description: 'node, profile or model' }
                               label: { type: string, nullable: true, description: The profile name or the model label; null for a node choice without one. }
+                              warning: { type: string, description: "Present when the choice was saved and the owner's model policy leaves that model out." }
                               problem:
                                 type: object
                                 properties:
@@ -17420,6 +17430,14 @@ paths:
         the `ai.apikey.*` keys and the per-agent keys) is never put back through
         the bin, by anyone: 403 SECRET_RECORD, naming the route that stores that
         credential. The owner stores the credential they mean to use there.
+
+
+        A restore answers to the write path's rule on the old morsel price: an
+        app tool manifest (`apps.{app}.tools`) or an offers document
+        (`agents.{agent}.offers`) that still holds the 3.x morsel price stays in
+        the bin with 400 MORSEL_PRICE_REMOVED, as the same document is refused on
+        POST, PUT and PATCH. A knowledge package manifest whose two pacing names
+        disagree is refused the same way.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -32163,7 +32181,7 @@ paths:
         - { in: path, name: filename, required: true, schema: { type: string } }
         - { in: query, name: mode, required: false, schema: { type: string, enum: [inline, frame] }, description: "inline: runnable. frame: runnable in an opaque-origin sandbox (the isolated frame's own request)." }
         - { in: query, name: format, required: false, schema: { type: string, enum: [md] }, description: "md forces the Agent Face markdown variant regardless of the Accept header" }
-        - { in: query, name: version, required: false, schema: { type: integer } }
+        - { in: query, name: version, required: false, schema: { type: integer }, description: "An earlier version from the version list. It is served with the app's CURRENT copy protection (obfuscate, domainLock, watermark, noRawDownload), not the setting it was published with." }
         - in: query
           name: code
           required: false
@@ -37798,7 +37816,11 @@ paths:
         and the validity window — and only then maps the identity: returning user by NameID, a
         SCIM-provisioned account whose externalId equals the NameID (adopted, never duplicated),
         a verified email inside the connection's domains, or the one-time username-choice step via
-        the pending-signup cookie. A deactivated account answers 403 ACCOUNT_DISABLED.
+        the pending-signup cookie. A browser posts this form, so every refusal is a 302 to the
+        front page with `?auth_error=<CODE>`, which opens the sign-in dialog with the reason:
+        SAML_INVALID_RESPONSE when the Response did not validate (nothing was read or written),
+        ACCOUNT_DISABLED for a deactivated account, and SAML_MISSING_RESPONSE, SAML_NO_ASSERTION,
+        SAML_NO_SUBJECT or SAML_CALLBACK_FAILED otherwise.
       tags: [SSO]
       parameters:
         - name: connectionId
@@ -37816,9 +37838,7 @@ paths:
                 SAMLResponse: { type: string, description: Base64 SAML 2.0 Response }
                 RelayState: { type: string }
       responses:
-        '302': { description: 'Signed in (session cookie set), or bounced to the username-choice step' }
-        '401': { description: The Response did not validate — nothing was read or written }
-        '403': { description: The account has been deactivated }
+        '302': { description: 'Signed in (session cookie set), sent to the username-choice step, or refused (front page with ?auth_error=<CODE>, no session)' }
         '503': { description: Organisation sign-in is not enabled on this node }
 
   /v1/ghii/login/saml/{connectionId}/finalize:
@@ -58305,6 +58325,7 @@ paths:
                         properties:
                           key: { type: string }
                           cleared: { type: boolean }
+                          warning: { type: string, description: "Present when the owner's model policy leaves the chosen model out. The choice is saved anyway, because the crew runs on its own machine." }
         '400': { description: Not a choice this runtime could resolve, it carried a credential, or it names a key variable or an address the guard refuses (UNSAFE_CHOICE) }
         '403': { description: Not this account's agent }
         '404': { description: No agent of this account by that name }
@@ -58348,6 +58369,7 @@ paths:
                         properties:
                           key: { type: string }
                           cleared: { type: boolean }
+                          warning: { type: string, description: "Present when the owner's model policy leaves the chosen model out. The choice is saved anyway, because the crew runs on its own machine." }
         '400': { description: Not a choice this runtime could resolve, or it carried a credential }
 
   /v1/agents/{name}/crew/seed:

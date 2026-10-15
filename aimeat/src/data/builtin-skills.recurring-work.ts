@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-10-15 — Section 4: the approval's llm_choice.warning when the person's model policy leaves
+ *     the picked model out (feature-list audit #82).
  *   2026-10-15 — Says whose schedules update, trigger and delete reach: any agent-made one of the owner,
  *     never the owner's own; an app only its own (feature-list audit #85).
  *   v1.8.1 — 2026-10-13 — Section 4: the approval page asks which model the agent thinks with, and
@@ -189,7 +191,9 @@ connector says which computer: \`aimeat_connector_list\` names them, and the pro
 Say which model the work needs, too. The approval page asks "Which model it thinks with" and lists
 the models the chosen computer reaches; the person's pick is stored before the first run. With no
 pick the computer uses the model in its own settings, which can be a small one: tell a person
-whose agent searches, reads sources or works in many steps to pick a strong model there.
+whose agent searches, reads sources or works in many steps to pick a strong model there. When the
+person's own model policy leaves the picked model out, the agent is still made with it and the
+approval says so in \`llm_choice.warning\`: tell the person.
 
 ## 5. Putting the work on a clock
 

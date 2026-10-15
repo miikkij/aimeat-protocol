@@ -12,13 +12,15 @@
  *   - resolveTarget() — flags + defaults into a ClientTarget (home, workdir, server name, surface).
  * @usage Dispatched from src/index-connect.ts on `aimeat connect client <id> [flags]`.
  * @version-history
+ *   2026-10-15 — The summary prints the tool surface the adapter applied (surfaceLines), not the
+ *     flag, and notes a `--surface` that this client does not take (feature-list audit #6).
  *   v1.0.0 — 2026-08-02 — Initial creation: one-command client connect.
  */
 
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ClientAdapter, ClientTarget } from './types.js';
+import type { ClientAdapter, ClientTarget, WriteResult } from './types.js';
 import { gooseAdapter } from './goose.js';
 import { cursorAdapter, vscodeAdapter } from './cursor-vscode.js';
 import { claudeCodeAdapter, claudeDesktopAdapter } from './claude.js';
@@ -87,10 +89,24 @@ function usage(): string {
         '  --agent <name>       Agent name to create (default: the client id)',
         '  --workdir <path>     Where the client starts (default ~/aimeat-work)',
         '  --home <path>        Connector home for this client (default ~/.aimeat-<client>)',
-        '  --surface <role>     appdev | agent | service | admin (default: the full toolset)',
+        '  --surface <role>     appdev | agent | service | admin, claude-desktop only (default: the full toolset)',
         '  --name <server>      Name the MCP server gets in the client config (default: aimeat)',
         '  --reuse              Skip device authorization and use the credential already in --home',
     ].join('\n');
+}
+
+/**
+ * The summary's tool-surface lines, from what the adapter APPLIED, not from the flag: only the
+ * Claude Desktop adapter writes `--surface` into the client's config, and the summary used to
+ * print the flag's value for every client (feature-list audit #6).
+ */
+export function surfaceLines(client: Pick<ClientAdapter, 'label'>, target: Pick<ClientTarget, 'surface'>, result: Pick<WriteResult, 'surface'>): string[] {
+    if (result.surface) return [`  Tool surface : ${result.surface}`];
+    const lines = ['  Tool surface : full'];
+    if (target.surface) {
+        lines.push(`  note         : --surface ${target.surface} was not used: ${client.label} connects to the full toolset. Only claude-desktop takes --surface.`);
+    }
+    return lines;
 }
 
 /**
@@ -114,8 +130,9 @@ export async function runConnectClient(clientId: string | undefined, flags: Reco
     const target = resolveTarget(client, flags);
     if (!existsSync(target.home)) mkdirSync(target.home, { recursive: true });
 
-    // config.ts captures AIMEAT_HOME at module load, so it must be set before anything under
-    // connect/ is imported — hence the dynamic imports below.
+    // Set before anything under connect/ is imported (the dynamic imports below). config.ts also
+    // reads AIMEAT_HOME on every call, so a config.js loaded earlier still writes the credential
+    // here (feature-list audit #6).
     process.env.AIMEAT_HOME = target.home;
 
     const existingToken = tokenFileIn(target.home);
@@ -146,7 +163,7 @@ export async function runConnectClient(clientId: string | undefined, flags: Reco
     console.log('');
     console.log(`${client.label} is connected to ${target.nodeUrl} as ${target.agent}@${target.owner}.`);
     console.log(`  MCP endpoint : ${client.transport === 'http' ? target.mcpUrl : 'local connector (stdio)'}`);
-    console.log(`  Tool surface : ${target.surface ?? 'full'}`);
+    for (const line of surfaceLines(client, target, result)) console.log(line);
     console.log(`  Working dir  : ${target.workdir}`);
     for (const f of result.written) console.log(`  wrote        : ${f}`);
     for (const b of result.backedUp) console.log(`  backup       : ${b}`);

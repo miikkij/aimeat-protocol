@@ -18,6 +18,8 @@
  * @structure featureMapPieceIds() · featureMapParts() · featureMapPiece(id)
  * @usage const piece = featureMapPiece('g-10'); piece?.text
  * @version-history
+ *   2026-10-15 — The `start` heading formats the build stamp as text (stampText) instead of
+ *     printing the object as "[object Object]" (feature-list audit #5).
  *   v1.0.0 — 2026-10-01 — Initial.
  *   v1.1.0 — 2026-10-10 — An area over 20 000 characters is split between features into
  *     `g-<n>`, `g-<n>.2`, … (Automation had reached 28 292 and no longer fit one tool result).
@@ -26,7 +28,18 @@ import { readFileSync } from 'node:fs';
 
 interface EverythingRow { slug: string; cells: string[] }
 interface EverythingGroup { n: number; title: string; slug: string; lead: string[]; columns: string[]; rows: EverythingRow[] }
-interface Everything { title: string; stamp: string; groups: EverythingGroup[] }
+interface Everything { title: string; stamp: { version: string; date: string } | null; groups: EverythingGroup[] }
+
+/**
+ * The build stamp as text for the heading: "node 4.0.3, checked 2026-10-12". The stamp is an
+ * object in everything.json (scripts/build-everything.ts), and a template literal printed it as
+ * "[object Object]" (feature-list audit #5). Empty when the list carries no stamp.
+ */
+export function stampText(stamp: Everything['stamp'] | string | undefined): string {
+    if (!stamp) return '';
+    if (typeof stamp === 'string') return stamp;
+    return [stamp.version ? `node ${stamp.version}` : '', stamp.date ? `checked ${stamp.date}` : ''].filter(Boolean).join(', ');
+}
 
 /** Read once at start, like the Everything page itself (utils/everything-page.ts). */
 const EVERYTHING = JSON.parse(readFileSync(new URL('../../public/data/everything.json', import.meta.url), 'utf8')) as Everything;
@@ -93,8 +106,9 @@ export function featureMapPieceIds(): string[] {
 function startText(): string {
     const lines = EVERYTHING.groups.map(g =>
         `- \`features/${g.slug}\` **${g.title}** (${g.rows.length}): ${firstSentence(plain((g.lead ?? []).join(' ')))}`);
+    const stamp = stampText(EVERYTHING.stamp);
     return [
-        `# What this AIMEAT can do (${EVERYTHING.stamp})`,
+        `# What this AIMEAT can do${stamp ? ` (${stamp})` : ''}`,
         '',
         'Read this after you know what the person needs, and offer the one thing that fits. Do not recite it.',
         'Each area below is one part: ask for it with aimeat_handbook_get { tier: "features/<id>" }.',

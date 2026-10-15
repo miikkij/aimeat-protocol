@@ -25,6 +25,8 @@
  *   - GET    /v1/agents/:name/crew/llm        the model choice that applies now, for the runtime
  * @usage app.use(agentCrewRouter(config, storage));
  * @version-history
+ *   2026-10-15 — PUT .../crew/llm and PUT /v1/agents/llm-default answer with `warning` when the
+ *     owner's model policy leaves the chosen model out (feature-list audit #82).
  *   v1.4.0 — 2026-10-11 — The publish, restore and seed answers carry `warnings`.
  *   v1.3.1 — 2026-10-10 — `:name` is read as Express 5 decoded it; the second decode threw a URIError
  *     (500) on `%25zz` (secaudit 2026-10-10 I0).
@@ -179,7 +181,8 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
     if (!target.ok) return refuse(res, target);
     const out = await writeLlmChoice(deps, callerOf(req, 'rest.agent-crew.llm'), target.agent.name, req.body.choice ?? null);
     if (!out.ok) return refuse(res, out);
-    res.json(success(config.nodeId, { key: out.key, cleared: out.cleared }));
+    // `warning`: the owner's model policy leaves this model out; the choice is saved anyway.
+    res.json(success(config.nodeId, { key: out.key, cleared: out.cleared, ...(out.warning ? { warning: out.warning } : {}) }));
   });
 
   // PUT /v1/agents/llm-default — the same choice, for every agent this owner has. A literal path, so
@@ -187,7 +190,7 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
   router.put('/v1/agents/llm-default', requireAuth(), requireScope('memory:write'), validateBody(LlmBody, config.nodeId), async (req, res) => {
     const out = await writeLlmChoice(deps, callerOf(req, 'rest.agent-crew.llm-default'), null, req.body.choice ?? null);
     if (!out.ok) return refuse(res, out);
-    res.json(success(config.nodeId, { key: out.key, cleared: out.cleared }));
+    res.json(success(config.nodeId, { key: out.key, cleared: out.cleared, ...(out.warning ? { warning: out.warning } : {}) }));
   });
 
   return router;

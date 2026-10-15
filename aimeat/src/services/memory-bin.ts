@@ -20,6 +20,8 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-15 — restoreMemoryRecord applies the write path's old-morsel-price rule
+ *     (legacyPacingWriteRefusal): 400 MORSEL_PRICE_REMOVED from 4.0.0 (feature-list audit #205).
  *   2026-10-15 — deleteMemoryRecord records the delete in the memory write tally (recordMemoryTouch, kind 'delete'), so the hands answer counts it (feature-list audit #50).
  *   v1.7.0 — 2026-10-13 — The organism namespace rule is asked with the session's scopes, which the
  *     fenced-space rule reads: a session that covers organism:direct removes and puts back a record
@@ -54,13 +56,15 @@ import { isServiceOwnedKey, isReservedServerKey, serverWrittenKeyRefusal } from 
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
 import { isSecretRecordKey, secretRecordBinRefusal } from './secret-records.js';
+import { legacyPacingWriteRefusal, type LegacyPacingWriteRefusal } from './legacy-pacing-write.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
 export interface MemoryBinRefusal {
   ok: false;
-  code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD';
+  code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD'
+    | LegacyPacingWriteRefusal['code'];
   message: string;
   /** What the door should answer. 404 for the two original codes, so an old caller reads the same. */
   status?: number;
@@ -277,12 +281,20 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
 
   // The bin is invisible to getMemory by design, so "is it in there" is a bin read, not a key read.
   let visibility: string | undefined;
+  let binned: unknown;
   const inBin = async (gaii: string) => {
     const record = (await deps.storage.listDeletedMemory(gaii)).find(r => r.key === req.key);
-    if (record) visibility = record.visibility;
+    if (record) { visibility = record.visibility; binned = record.value; }
     return !!record;
   };
   const found = await locate(deps, req, inBin);
+  // A restore writes the record back, so it answers to the write path's rule on the old morsel
+  // price: a tool manifest or an offers document deleted with `price.morsels` in it stays in the
+  // bin from 4.0.0, as the same document is refused on POST, PUT and PATCH (feature-list audit #205).
+  if (found) {
+    const legacy = legacyPacingWriteRefusal(req.key, binned);
+    if (legacy) return { ok: false, code: legacy.code, message: legacy.message, status: legacy.status };
+  }
   if (!found || !(await deps.storage.restoreMemory(found, req.key))) {
     return {
       ok: false, code: 'NOT_RESTORABLE',

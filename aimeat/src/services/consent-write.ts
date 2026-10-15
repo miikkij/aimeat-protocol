@@ -27,6 +27,8 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-15 — A grant stamps metadata.collection_method from ConsentCaller.collectionMethod, which
+ *     the consent receipt reads (feature-list audit #161).
  *   2026-10-15 — The consent_granted and consent_revoked account events go to the owner's GHII (ownerGhiiOf) on both REST and MCP; the consent record keeps the identity it was filed under (feature-list audit #44).
  *   v1.3.0 — 2026-10-15 — accountHoldsConsent and listAccountConsents: a consent is the account's on both
  *     doors, and revokeConsent admits the account for a consent filed under one of its agents
@@ -53,6 +55,7 @@ import {
     CONSENT_REACH_ALIAS_REMOVED_IN, CONSENT_REACH_INPUTS, consentReachOf, defaultConsentReach, isConsentReachAlias,
 } from '../utils/consent-reach.js';
 import { noteDeprecatedUse, removedFrom } from './deprecation.js';
+import { COLLECTION_METHOD_KEY } from './mydata-receipt.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -97,6 +100,12 @@ export interface ConsentCaller {
     ownerGaii: string;
     scopes: string[];
     roles: string[];
+    /**
+     * How the consent is being given, in the receipt's words (consentCollectionMethod in
+     * services/mydata-receipt.ts). Stamped as metadata.collection_method on a grant; a caller's own
+     * metadata cannot set that key (feature-list audit #161).
+     */
+    collectionMethod?: string;
 }
 
 export interface ConsentGrantInput {
@@ -185,6 +194,11 @@ export async function grantConsent(
     }
 
     const now = new Date().toISOString();
+    // The node's stamp of how the consent was given wins over anything the caller sent under the
+    // same key: the receipt reads it as fact (feature-list audit #161).
+    const metadata = caller.collectionMethod
+        ? { ...(input.metadata ?? {}), [COLLECTION_METHOD_KEY]: caller.collectionMethod }
+        : input.metadata;
     const consent = await storage.createConsent({
         id: randomUUID(),
         ownerGaii: caller.ownerGaii,
@@ -196,7 +210,7 @@ export async function grantConsent(
         status: 'active',
         grantedAt: now,
         revokedAt: null,
-        ...(input.metadata ? { metadata: input.metadata } : {}),
+        ...(metadata ? { metadata } : {}),
     });
 
     // The trail that answers "who was given access to what, and when". The MCP door wrote nothing

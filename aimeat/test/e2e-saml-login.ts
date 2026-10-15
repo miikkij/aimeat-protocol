@@ -6,11 +6,14 @@
  *   the admin routes with pasted IdP metadata, runs a full signed login round-trip against the
  *   fake IdP (test/helpers/fake-saml-idp.ts), and asserts the refusals that live at THIS layer:
  *   management locked → 403, hidden connection absent from discovery, invite-mode → 403 for a new
- *   user, deactivated account → 403 at the ACS, and everything back to 503 when the flag drops.
+ *   user, deactivated account → redirect with ?auth_error=ACCOUNT_DISABLED at the ACS, and
+ *   everything back to 503 when the flag drops.
  *   The cryptographic refusals (bad signature, wrong audience, expiry, unsolicited response) are
  *   asserted per-case in test/unit/saml-assertion.test.ts against the same router.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=saml-login
  * @version-history
+ *   2026-10-15 — The ACS refusals expect a redirect with ?auth_error= instead of JSON 401/403
+ *     (feature-list audit #20, #22).
  *   v1.1.0 — 2026-09-04 — The suite puts `sso.enabled` and `sso.connections_locked` where it needs
  *     them before its first assertion. They are node config rather than per-run fixtures, so a run
  *     that dies before its own restore leaves them set, and on Postgres they survive; inherited
@@ -186,7 +189,7 @@ async function run() {
         assert(!!cookieFrom(acs.setCookie, 'aimeat_rt'), 'session cookie set');
     });
 
-    await test('a foreign-certificate response answers 401 at the ACS', async () => {
+    await test('a foreign-certificate response redirects with ?auth_error=SAML_INVALID_RESPONSE at the ACS', async () => {
         const authz = await rawGet(`/v1/ghii/login/saml/${CONN}`);
         const requestId = requestIdFromAuthorizeUrl(authz.location);
         const relayState = new URL(authz.location).searchParams.get('RelayState')!;
@@ -194,7 +197,8 @@ async function run() {
         // connection's audience — the full per-cause matrix lives in the unit suite.
         const resp = buildSamlResponse({ acsUrl: acsUrl(CONN), audience: audience(HIDDEN), inResponseTo: requestId, nameId: 'evil' });
         const acs = await postAcs(CONN, { SAMLResponse: resp, RelayState: relayState });
-        assert(acs.status === 401, `expected 401, got ${acs.status}`);
+        assert(acs.status === 302 && acs.location.endsWith('/?auth_error=SAML_INVALID_RESPONSE'), `expected 302 auth_error=SAML_INVALID_RESPONSE, got ${acs.status} ${acs.location}`);
+        assert(!cookieFrom(acs.setCookie, 'aimeat_rt'), 'no session cookie on a refused response');
     });
 
     await test('invite-mode: a brand-new SAML user is refused at finalize, an existing one still signs in', async () => {
@@ -222,7 +226,7 @@ async function run() {
         }
     });
 
-    await test('a deactivated account answers 403 ACCOUNT_DISABLED at the ACS', async () => {
+    await test('a deactivated account redirects with ?auth_error=ACCOUNT_DISABLED at the ACS', async () => {
         const dis = await json(`/v1/admin/owners/${userOwner}/disable`, { method: 'POST', headers: bearer(op.ownerToken) });
         assert(dis.status === 200, `disable ${dis.status}`);
         const authz = await rawGet(`/v1/ghii/login/saml/${CONN}`);
@@ -230,7 +234,8 @@ async function run() {
         const relayState = new URL(authz.location).searchParams.get('RelayState')!;
         const resp = buildSamlResponse({ acsUrl: acsUrl(CONN), audience: audience(CONN), inResponseTo: requestId, nameId: 'objectid-ville' });
         const acs = await postAcs(CONN, { SAMLResponse: resp, RelayState: relayState });
-        assert(acs.status === 403, `expected 403, got ${acs.status}`);
+        assert(acs.status === 302 && acs.location.endsWith('/?auth_error=ACCOUNT_DISABLED'), `expected 302 auth_error=ACCOUNT_DISABLED, got ${acs.status} ${acs.location}`);
+        assert(!cookieFrom(acs.setCookie, 'aimeat_rt'), 'no session cookie for a deactivated account');
         await json(`/v1/admin/owners/${userOwner}/enable`, { method: 'POST', headers: bearer(op.ownerToken) });
     });
 
