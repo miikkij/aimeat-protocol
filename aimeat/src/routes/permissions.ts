@@ -6,6 +6,8 @@
  *   simulation, and per-key effective rules (the UI's sharing-rules popover).
  * @structure permissionsRouter() — GET /v1/permissions/summary, /check, /memory/:key
  * @version-history
+ *   2026-10-15 — GET /v1/permissions/check asks authorizeRead, the reads' own guard, as a simulation
+ *     (noAudit), instead of checkConsentForRead (feature-list audit 43).
  *   v1.1.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.1.0 — 2026-06-10 — Owner-session cross-agent fallback (getOwnedMemory): per-key
@@ -20,9 +22,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { checkConsentForRead } from '../services/consent.js';
+import { authorizeRead } from '../services/access-guard.js';
 import { consentMatchPattern } from '../storage/pattern-utils.js';
-import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson, localAccountName } from '../utils/gaii.js';
 
 export function permissionsRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -79,7 +81,15 @@ export function permissionsRouter(config: AimeatConfig, storage: Storage): Route
         const memory = await getOwnedMemory(req, ownerGaii, key);
         const visibility = memory?.visibility ?? 'private';
 
-        const result = await checkConsentForRead(storage, key, memory?.ownerGaii ?? ownerGaii, accessor, visibility, memory?.groupId);
+        // The reads' own guard, as a simulation: a key-space share, a members record, a workspace
+        // member and the owner's own agents answer here as they do on the read. This asked
+        // checkConsentForRead, which knows none of them, and said "not allowed" where the read
+        // succeeded (feature-list audit 43).
+        const result = await authorizeRead(storage, config, {
+            ownerGaii: memory?.ownerGaii ?? ownerGaii, accessorGaii: accessor, resourceKey: key,
+            visibility, groupId: memory?.groupId, workspaceRef: memory?.workspaceRef,
+            accessorSub: accessor, accessorOwner: localAccountName(accessor), action: 'read', noAudit: true,
+        });
 
         res.json(success(config.nodeId, {
             key,

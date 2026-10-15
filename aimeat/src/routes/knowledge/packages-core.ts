@@ -6,6 +6,8 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-15 — GET /v1/knowledge/:id finds its manifest with helpers.ts findReadableManifest, which the
+ *     reputation read shares (feature-list audit 207).
  *   2026-10-13 — POST /v1/knowledge/import stores the pacing amount as sharing.toll_morsels; the 3.x
  *     name sharing.morsel_price is accepted with the Deprecation headers and counted, and a mismatch
  *     of the two is 400 TOLL_MORSELS_MISMATCH. GET /v1/knowledge/:id answers the new name
@@ -46,8 +48,7 @@ import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { memoryContentBytes } from '../../utils/memory-content.js';
 import { logger } from '../../utils/logger.js';
-import { readerFor } from '../../services/classification/reader.js';
-import { presentMemory, classificationWarningOf } from '../../services/classification/present-memory.js';
+import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
 
@@ -60,7 +61,7 @@ export function registerPackagesCoreRoutes(
   storage: Storage,
   helpers: KnowledgeHelpers,
 ): void {
-  const { resolve, findOwnerScopeMemory } = helpers;
+  const { resolve, findReadableManifest } = helpers;
 
   /* ── POST /v1/knowledge/import — Import a knowledge package from AI Chat output ── */
   router.post('/v1/knowledge/import', requireAuth(), requireScope('memory:write'), async (req, res) => {
@@ -299,25 +300,10 @@ export function registerPackagesCoreRoutes(
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Try public read: one IN query over all owner GHIIs, then (only if none) one over all agent
-    // GAIIs — the public manifest lives under whoever published it. Owners keep priority over agents.
-    // (Was listMemory PER owner AND PER agent = a full O(owners+agents) node-scan.)
-    let manifest: import('../../storage/interface.js').MemoryRecord | undefined;
-    const allOwners = await storage.listOwners();
-    const ownerGaiis = allOwners.map(o => `${o.name}@${config.nodeId}`);
-    manifest = (await storage.listMemoryForOwners(ownerGaiis, { prefix: manifestKey, visibility: 'public' }))[0];
-    if (!manifest) {
-      const allAgents = await storage.listAgents();
-      manifest = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' }))[0];
-    }
-    // If authenticated, also check the caller's own packages (any visibility) via owner scope
-    if (!manifest && req.auth?.sub) {
-      const found = await findOwnerScopeMemory(req, manifestKey);
-      if (found) manifest = found.record;
-    }
-    // What the caller is shown is the classification reader's decision (TARGET-082): a manifest the
-    // caller may not see answers the same as one that is not there.
-    if (manifest) manifest = (await presentMemory(readerFor({ storage, config }, req.auth), manifest)) ?? undefined;
+    // A public manifest of any account, else the caller's own in any visibility, as the
+    // classification reader shows it (TARGET-082): helpers.ts findReadableManifest, which the
+    // reputation read asks too, so the two cannot answer differently.
+    const manifest = (await findReadableManifest(req, manifestKey))?.record;
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
       return;

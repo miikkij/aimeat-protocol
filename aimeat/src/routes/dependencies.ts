@@ -11,6 +11,8 @@
  * @structure dependenciesRouter(config, storage) → Router
  * @usage app.use(dependenciesRouter(config, storage)) from the routes loader.
  * @version-history
+ *   2026-10-15 — ?app= answers 404 for an app the caller may not see, as the dependants lists name a
+ *     parked or hidden app only to its owner (feature-list audit 113).
  *   v1.0.0 — 2026-09-03 — Initial (dependency map, slice 1).
  *   v1.1.0 — 2026-09-03 — ?pack= answers who uses one library pack; the whole map carries `packs`.
  */
@@ -50,6 +52,12 @@ export function dependenciesRouter(config: AimeatConfig, storage: Storage): Rout
     if (app) {
       if (!app.includes('/')) {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'app must be "owner/filename"'));
+        return;
+      }
+      // The same rule the dependants lists follow: a parked or operator-hidden app is named only to
+      // its owner, so its requirements are too. It answered any signed-in caller (feature-list audit 113).
+      if (!visible.has(app)) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No app ${app} that you can see`));
         return;
       }
       res.json(success(config.nodeId, { app, requires: await requirementsOf(storage, 'app', app) }));

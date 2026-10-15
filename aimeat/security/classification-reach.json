@@ -431,23 +431,21 @@
     "src/routes/knowledge/helpers.ts": {
       "reads": {
         "getMemory": 1,
-        "listMemoryForOwners": 1
+        "listMemoryForOwners": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Read-to-update for the sharing routes; GET /:id checks its result with presentMemory in packages-core."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Read-to-update for the sharing routes; GET /:id checks its result with presentMemory in packages-core. Reviewed 2026-10-15 (feature-list audit 207): findReadableManifest reads a public manifest across owners and agents, or the caller's own, and returns it only through presentMemory; GET /v1/knowledge/:id and the reputation read both take it from there."
     },
     "src/routes/knowledge/organism.ts": {
       "reads": {
-        "getMemory": 2,
-        "listMemoryForOwners": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The organism package list and the reputation manifest pass reader.show; the other read is read-to-update."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The organism package list passes reader.show; the other reads are read-to-update. Since 2026-10-15 the reputation manifest comes from helpers.ts findReadableManifest."
     },
     "src/routes/knowledge/packages-core.ts": {
       "reads": {
-        "listMemoryForOwners": 2,
         "getMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The manifest passes presentMemory; the other reads are read-to-update and an ownership check."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: the reads here are read-to-update and an ownership check. Since 2026-10-15 the manifest of GET /:id comes from helpers.ts findReadableManifest, which passes presentMemory."
     },
     "src/routes/knowledge/sharing.ts": {
       "reads": {

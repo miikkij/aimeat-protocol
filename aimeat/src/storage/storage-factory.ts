@@ -15,6 +15,8 @@
  *   - StorageProvider / StorageOptions: provider union and factory input types
  *
  * @version-history
+ *   v2.2.0 — 2026-10-15 — An unknown provider word refuses to start; only "memory" opens the
+ *     in-memory database. A misspelt AIMEAT_STORAGE booted a node empty (feature-list audit 168).
  *   v2.1.1 — 2026-10-11 — The schema-failure message names docs/pitfalls.md by its GitHub address,
  *     which an installed package's operator can open.
  *   v2.1.0 — 2026-08-13 — A schema failure no longer reports itself as broken native bindings. One
@@ -101,7 +103,12 @@ export async function createStorage(opts: StorageOptions): Promise<Storage> {
       await pgk.ready;
       return pgk as unknown as Storage;
     }
-    default:
+    case 'memory':
       return openSqlite(':memory:');
+    default:
+      // A word this factory does not know refuses to start. It fell through to the in-memory
+      // database, so a misspelt AIMEAT_STORAGE booted a production node empty, which the comment at
+      // the top of this function calls far worse than refusing (feature-list audit 168).
+      throw new Error(`Unknown storage provider "${String(opts.provider)}". Supported: postgres-kysely (production), sqlite, memory (in-memory, for tests). Set AIMEAT_STORAGE to one of them.`);
   }
 }

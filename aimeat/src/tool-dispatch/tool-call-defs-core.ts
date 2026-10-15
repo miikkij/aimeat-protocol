@@ -474,7 +474,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
         // a path segment. An unchecked value here would be a path the route never declared.
         name: 'aimeat_compliance_report',
         handler: ({ client }, input) => {
-            // Two doors for two reports: the owner slice needs no permission, the whole installation
+            // Two doors for two reports: the owner slice asks wallet:read of an agent, the whole installation
             // needs an operator account plus the exact word. Defaulting to the slice is least
             // privilege, and it is what almost every caller means.
             const scope = optionalString(input, 'scope');

@@ -13,10 +13,14 @@
  *     presentMemory first (packages-core.ts GET /v1/knowledge/:id does).
  *   v1.1.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
+ *   v1.2.0 — 2026-10-15 — findReadableManifest: the manifest a caller may read, shared by the package
+ *     read and the reputation read, and whether it is the caller's own (feature-list audit 207).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
-import { resolveIdentity, isOwnerInPerson } from '../../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson, isForeignPrincipal, isSameOwner } from '../../utils/gaii.js';
+import { readerFor } from '../../services/classification/reader.js';
+import { presentMemory } from '../../services/classification/present-memory.js';
 
 export type KnowledgeHelpers = {
   resolve: (req: Express.Request) => string;
@@ -24,6 +28,10 @@ export type KnowledgeHelpers = {
     req: Express.Request,
     key: string,
   ) => Promise<{ record: MemoryRecord; ownerGaii: string } | null>;
+  findReadableManifest: (
+    req: Express.Request,
+    manifestKey: string,
+  ) => Promise<{ record: MemoryRecord; own: boolean } | null>;
 };
 
 export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): KnowledgeHelpers {
@@ -54,5 +62,33 @@ export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): Kn
     return null;
   }
 
-  return { resolve, findOwnerScopeMemory };
+  // The package manifest this caller may read, the one rule GET /v1/knowledge/:id and the reputation
+  // read share: a public manifest of any account (an owner's before an agent's), else one of the
+  // caller's own account in any visibility, and then what the classification reader shows. `own` says
+  // whether the manifest is the caller's account's, which is who sees the moderation record. The
+  // reputation read had its own lookup with no visibility filter, so an unlisted package answered to
+  // anybody with its id (feature-list audit 207).
+  async function findReadableManifest(req: Express.Request, manifestKey: string): Promise<{ record: MemoryRecord; own: boolean } | null> {
+    let record: MemoryRecord | undefined;
+    let own = false;
+    const allOwners = await storage.listOwners();
+    record = (await storage.listMemoryForOwners(allOwners.map(o => `${o.name}@${config.nodeId}`), { prefix: manifestKey, visibility: 'public' }))[0];
+    if (!record) {
+      const allAgents = await storage.listAgents();
+      record = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' }))[0];
+    }
+    const signedIn = !!req.auth && !req.auth.anonymous;
+    if (!record && signedIn) {
+      const found = await findOwnerScopeMemory(req, manifestKey);
+      if (found) { record = found.record; own = true; }
+    }
+    if (record && !own && signedIn && !isForeignPrincipal(req.auth)) {
+      own = isSameOwner(record.ownerGaii, `${req.auth!.owner}@${config.nodeId}`);
+    }
+    if (!record) return null;
+    const shown = await presentMemory(readerFor({ storage, config }, req.auth), record);
+    return shown ? { record: shown, own } : null;
+  }
+
+  return { resolve, findOwnerScopeMemory, findReadableManifest };
 }

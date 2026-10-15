@@ -156,6 +156,11 @@ await test('a parked app is counted for a stranger and named only to its owner',
     assert(mine.data.used_by.apps.some((a: any) => a.owner === ownerB), `owner cannot see own parked dependant: ${JSON.stringify(mine.data.used_by)}`);
     assert(theirs.data.used_by.apps_total >= 2, `stranger count lost the parked app: ${JSON.stringify(theirs.data.used_by)}`);
     assert(!theirs.data.used_by.apps.some((a: any) => a.owner === ownerB), `stranger was handed a parked app's name: ${JSON.stringify(theirs.data.used_by)}`);
+    // Feature-list audit row 113: ?app= answered a parked app's requirements to anyone signed in.
+    const strangerApp = await json(`/v1/dependencies?app=${ownerB}/${PARKED_APP}`, auth(tokenA));
+    assert(strangerApp.status === 404 && !strangerApp.body?.data?.requires, `a stranger read a parked app's requirements: ${strangerApp.status} ${JSON.stringify(strangerApp.body?.data)}`);
+    const ownerApp = await json(`/v1/dependencies?app=${ownerB}/${PARKED_APP}`, auth(tokenB));
+    assert(ownerApp.status === 200 && typeof ownerApp.body?.data?.requires === 'object' && ownerApp.body.data.requires !== null, `the owner reads their parked app's requirements: ${ownerApp.status}`);
 });
 
 await test('a library pack an app includes is an edge too: ?pack=, requires.packs and the pack index used_by', async () => {

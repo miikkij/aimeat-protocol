@@ -43140,12 +43140,13 @@ paths:
   /v1/ghii/verify/ftn:
     post:
       operationId: verifyFtn
-      summary: Finnish Trust Network verification
+      summary: Finnish Trust Network verification (refuses; use the authorize flow)
       description: |
-        Verify identity through the Finnish Trust Network (FTN).
-        Accepts a callback token from the FTN authentication flow.
-        On success, updates the GHII verification level with strong
-        identity assurance (eIDAS substantial/high).
+        This route cannot check a token, so it never marks an account verified. It answers 400
+        FTN_USE_AUTHORIZE and names the checked flow: GET /v1/ghii/verify/ftn/authorize returns the
+        bank's authorizationUrl, and GET /v1/ghii/verify/ftn/callback validates the bank's answer
+        against the nonce the node minted and writes the verification. Until 2026-10-15 this route
+        wrote level 3 from any string it was handed.
       tags: [Verification]
       security:
         - BearerAuth: []
@@ -43161,31 +43162,8 @@ paths:
                   type: string
                   description: Token received from FTN callback
       responses:
-        '200':
-          description: FTN verification result
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          ghii:
-                            type: string
-                          verificationLevel:
-                            type: string
-                            enum: [basic, enhanced, verified]
-                          ftnVerified:
-                            type: boolean
-                            example: true
-                          verifiedAt:
-                            type: string
-                            format: date-time
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Always, with FTN_USE_AUTHORIZE (or VALIDATION_ERROR without a callback_token). Nothing is written.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
@@ -74151,44 +74129,14 @@ paths:
                           code: { example: BACKFILL_FAILED }
 
   # ── MCP OAuth consent ─────────────────────────────────────────
-  /v1/mcp/approval-check:
-    get:
-      operationId: getMcpApprovalCheck
-      summary: Has this client already been approved for this agent
-      description: >-
-        Says whether the owner has previously approved this OAuth client for this agent, so the
-        consent page can submit itself instead of asking again. A missing parameter answers
-        `approved: false` rather than an error. The response is a bare JSON object, not the AIMEAT
-        envelope, because the consent page is an OAuth surface.
-      tags: [MCP]
-      parameters:
-        - name: client_id
-          in: query
-          required: true
-          schema: { type: string }
-        - name: gaii
-          in: query
-          required: true
-          schema: { type: string }
-          description: The agent the client would act as.
-      responses:
-        '200':
-          description: Whether a remembered approval exists
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  approved: { type: boolean }
-
   /v1/mcp/authorize-consent:
     post:
       operationId: submitMcpAuthorizeConsent
       summary: Approve an OAuth client for one of your agents
       description: >-
         The consent page posts this after the person has signed in, chosen an agent and approved.
-        It mints a single-use authorization code, remembers the approval so the next authorization
-        skips the screen, and answers with the redirect URL. A caller that asks for JSON gets
+        It mints a single-use authorization code, records the approval with the agent's own scopes
+        (the consent screen is shown on every authorization), and answers with the redirect URL. A caller that asks for JSON gets
         `redirect_url`; a form post is redirected with 302; with no redirect URI at all the code and
         state are returned directly.
 

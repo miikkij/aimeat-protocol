@@ -1120,6 +1120,10 @@ await test('The OWNER session still approves — the fix costs the real path not
         body: JSON.stringify({ client_id: clientId, gaii: agentGaii, owner_token: ownerToken, ...authorizeParams(mcpPkce(BASE)) }),
     });
     assert(r.status === 200, `the owner must still be able to approve, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    // Feature-list audit row 2: GET /v1/mcp/approval-check told anybody, with no credential, whether
+    // an owner had approved a client for an agent, and no page called it. It is gone.
+    const check = await fetch(`${BASE}/v1/mcp/approval-check?client_id=${encodeURIComponent(clientId)}&gaii=${encodeURIComponent(agentGaii)}`);
+    assert(check.status === 404, `the unauthenticated approval oracle still answers: ${check.status}`);
 });
 
 // ─── The signature in the query string, and the two allowlists an omission used to switch off ───

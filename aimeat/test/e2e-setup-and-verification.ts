@@ -443,32 +443,21 @@ try {
             assert(body.error?.code === 'ACCESS_DENIED', `code: ${body.error?.code}`);
         });
 
-        await test('13. FTN takes any callback_token and stamps level 3 on the record', async () => {
-            // WHAT THIS PINS: the route does not verify the token against anything. Whatever string
-            // arrives, the account is marked verified at the highest level the node has. The real
-            // exchange is the OIDC authorize/callback pair, which this suite deliberately leaves
-            // alone; this is the manual/API path beside it, and it takes no proof.
-            const before = await call(setupNode.base, `/v1/ghii/${encodeURIComponent(setupGhii)}`, {
-                headers: authed(setupOwnerToken),
-            });
-            const levelBefore = before.body.data.verification_level ?? before.body.data.verificationLevel;
-            assert(levelBefore === 0, `the account starts unverified: ${levelBefore}`);
-
+        await test('13. FTN does not stamp level 3 from a token it cannot check: it sends the caller to the checked flow', async () => {
+            // Feature-list audit row 25. This route took any callback_token and marked the account
+            // verified at level 3, the highest the node has, with nothing checked. The checked exchange
+            // is the OIDC authorize/callback pair; this route now refuses and names it.
             const { status, body } = await call(setupNode.base, '/v1/ghii/verify/ftn', {
                 method: 'POST', headers: authed(setupOwnerToken),
                 body: JSON.stringify({ callback_token: 'a string this node never checks' }),
             });
-            assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
-            assert(body.data.verificationLevel === 3, `level: ${body.data.verificationLevel}`);
-            assert(body.data.ftnVerified === true, `ftnVerified: ${body.data.ftnVerified}`);
-            assert(body.data.verificationMethod === 'ftn', `method: ${body.data.verificationMethod}`);
-            assert(body.data.ghii === setupGhii, `ghii: ${body.data.ghii}`);
-
+            assert(status === 400 && body.error?.code === 'FTN_USE_AUTHORIZE', `expected 400 FTN_USE_AUTHORIZE, got ${status} ${body.error?.code}`);
+            assert(String(body.error?.details?.start).includes('/v1/ghii/verify/ftn/authorize'), `the answer names the checked flow: ${JSON.stringify(body.error?.details)}`);
             const after = await call(setupNode.base, `/v1/ghii/${encodeURIComponent(setupGhii)}`, {
                 headers: authed(setupOwnerToken),
             });
             const level = after.body.data.verification_level ?? after.body.data.verificationLevel;
-            assert(level === 3, `the level is on the record, not only in the answer: ${level}`);
+            assert(level === 0, `the account stays unverified: ${level}`);
         });
     } finally {
         await stopNode(setupNode);

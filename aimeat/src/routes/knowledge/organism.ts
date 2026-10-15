@@ -6,6 +6,8 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — GET /v1/knowledge/:id/reputation reads the manifest by helpers.ts findReadableManifest
+ *     and names the last review only to the package owner (feature-list audit 207).
  *   2026-10-13 — GET /v1/knowledge/organism/:id answers a contributed manifest's pacing amount as
  *     sharing.toll_morsels (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:write on POST /v1/knowledge/:id/contribute. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
@@ -38,7 +40,7 @@ export function registerOrganismRoutes(
   storage: Storage,
   helpers: KnowledgeHelpers,
 ): void {
-  const { resolve } = helpers;
+  const { resolve, findReadableManifest } = helpers;
 
   /* ── POST /v1/knowledge/:id/contribute — Contribute a package to an organism ── */
   router.post('/v1/knowledge/:id/contribute', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
@@ -175,14 +177,12 @@ export function registerOrganismRoutes(
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Find the manifest across all agents in ONE IN query (was getMemory per agent = node-scan).
-    const allAgents = await storage.listAgents();
-    const rows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey });
-    const found: MemoryRecord | null = rows.find(r => r.key === manifestKey) ?? null;
-    // TARGET-082: a manifest this caller may not see answers like a missing one.
-    const manifest = found
-      ? (await readerFor({ storage, config }, req.auth).show([found], r => memoryTarget(r.ownerGaii, r.key)))[0] ?? null
-      : null;
+    // The manifest this caller may read, by the rule GET /v1/knowledge/:id uses: a public one of any
+    // account, else the caller's own in any visibility. This read had a lookup of its own with no
+    // visibility filter and over agents only, so an unlisted package answered to anybody with its id
+    // and a package a person imported in person answered to nobody (feature-list audit 207).
+    const readable = await findReadableManifest(req, manifestKey);
+    const manifest = readable?.record ?? null;
 
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
@@ -217,7 +217,8 @@ export function registerOrganismRoutes(
       synthesis_level: value.synthesis?.level,
       maturity: value.maturity,
       last_updated: value.updated || manifest.updatedAt,
-      last_review: lastReview ? {
+      // The moderation record is the package owner's to see, as GET /v1/knowledge/:id/reviews rules.
+      last_review: lastReview && readable?.own ? {
         action: lastReview.action,
         reason: lastReview.reason,
         timestamp: lastReview.timestamp,

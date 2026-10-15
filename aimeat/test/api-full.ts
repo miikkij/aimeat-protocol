@@ -2339,6 +2339,24 @@ await test('GET /v1/permissions/check — denied case (no consent)', async () =>
     assert(body.data?.allowed === false, `expected allowed=false, got ${body.data?.allowed}`);
 });
 
+// Feature-list audit row 43: the check asked a different function than the reads, so a record the
+// real read gives out (visibility members, a key-space share, a workspace member) was answered
+// "not allowed". It asks the reads' own guard now, without writing an audit row for the simulation.
+await test('GET /v1/permissions/check — answers what the real read does for a members record', async () => {
+    const put = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'perm-check.members', value: { for: 'members' }, visibility: 'members' }),
+    });
+    assert(put.status === 201 || put.status === 200, `write ${put.status}`);
+    const real = await json(`/v1/memory/${encodeURIComponent(agentGaii)}/perm-check.members`, { headers: { Authorization: `Bearer ${agent2bToken}` } });
+    const { status, body } = await json(
+        `/v1/permissions/check?key=perm-check.members&accessor=${encodeURIComponent(agent2bGaii)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.data?.allowed === (real.status === 200), `the check says ${body.data?.allowed}, the real read answered ${real.status}`);
+});
+
 await test('GET /v1/permissions/memory/:key — returns matching consents', async () => {
     const { status, body } = await json('/v1/permissions/memory/consent-test.ghii.data', {
         headers: { Authorization: `Bearer ${agentToken}` },
