@@ -12,6 +12,7 @@
  *   nothing else). The builders are in pdf-sign.ts.
  * @usage cd aimeat && pnpm exec tsx test/fixtures/docsign/make-fixtures.ts
  * @version-history
+ *   2026-10-15 — Writes wallet-ca-test.txt and wallet-ca-anchor.txt, the wallet signer's test CA and the anchor the E2E node trusts (feature-list audit 38).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — The builders moved to pdf-sign.ts; writes eudi-rp-test.txt
  *     (wish-allekirjoitus-eudi-lompakolla).
@@ -19,7 +20,7 @@
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { name, makeCert, signPdf, pem, newRsa, makeRpCredential } from './pdf-sign.js';
+import { name, makeCert, signPdf, pem, newRsa, makeRpCredential, makeWalletTestCa } from './pdf-sign.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -45,4 +46,9 @@ writeFileSync(join(here, 'signed-tampered.pdf'), tampered);
 writeFileSync(join(here, 'signed-page-added.pdf'), added);
 // TEST-ONLY key material for the E2E node's wallet access certificate (AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL).
 writeFileSync(join(here, 'eudi-rp-test.txt'), makeRpCredential('localhost'));
-console.log('wrote trust-anchors.txt, signed.pdf, signed-tampered.pdf, signed-page-added.pdf, eudi-rp-test.txt');
+// TEST-ONLY: the CA of the wallet signer in e2e-docsign (key and certificate), and its certificate alone,
+// the operator anchor the E2E node trusts (AIMEAT_DOCSIGN_TRUST_ANCHORS; feature-list audit 38).
+const walletCa = makeWalletTestCa();
+writeFileSync(join(here, 'wallet-ca-test.txt'), walletCa);
+writeFileSync(join(here, 'wallet-ca-anchor.txt'), walletCa.slice(walletCa.indexOf('-----BEGIN CERTIFICATE-----')));
+console.log('wrote trust-anchors.txt, signed.pdf, signed-tampered.pdf, signed-page-added.pdf, eudi-rp-test.txt, wallet-ca-test.txt, wallet-ca-anchor.txt');
