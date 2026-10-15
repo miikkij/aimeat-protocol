@@ -2866,10 +2866,10 @@
      "slug": "g-15-invoices",
      "cells": [
       "<strong>Invoices</strong>",
-      "Draft, send, mark paid, credit notes, PDF, and Finvoice XML with delivery.",
-      "<code>/v1/finance/invoices</code>"
+      "Draft, send, mark paid, credit notes, PDF, and Finvoice XML. Sent by email, an invoice carries its PDF and XML as attachments. Delivery as a Finnish e-invoice goes to a gateway the operator configures, through a generic REST bridge; no named e-invoice operator is connected yet, and without a gateway the node says to send by email instead.",
+      "<code>/v1/finance/invoices</code>, <code>/v1/outbound/send</code> (<code>invoice_id</code>), <code>AIMEAT_FINVOICE_OPERATOR</code>"
      ],
-     "plain": "Invoices Draft, send, mark paid, credit notes, PDF, and Finvoice XML with delivery. /v1/finance/invoices"
+     "plain": "Invoices Draft, send, mark paid, credit notes, PDF, and Finvoice XML. Sent by email, an invoice carries its PDF and XML as attachments. Delivery as a Finnish e-invoice goes to a gateway the operator configures, through a generic REST bridge; no named e-invoice operator is connected yet, and without a gateway the node says to send by email instead. /v1/finance/invoices, /v1/outbound/send (invoice_id), AIMEAT_FINVOICE_OPERATOR"
     },
     {
      "slug": "g-15-accounting-ledger",
@@ -2884,10 +2884,10 @@
      "slug": "g-15-company-addresses",
      "cells": [
       "<strong>Company addresses</strong>",
-      "Claim <code>name.co.&lt;apex&gt;</code> and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition. The company's description says how it was made: when your AI writes it, the node records that, as it does for a board post, and a description you type yourself is not stamped.",
+      "Claim <code>name.co.&lt;apex&gt;</code> and point it at an app you published, at the company's own page (which you or your AI publish first), or at another web address. A business runs on its own node; there is no separate company edition. The company's description says how it was made: when your AI writes it, the node records that, as it does for a board post, and a description you type yourself is not stamped.",
       "<code>/v1/companies</code>, <code>aimeat_company_*</code>"
      ],
-     "plain": "Company addresses Claim name.co.<apex> and point it at an app you published or at your portfolio. A business runs on its own node; there is no separate company edition. The company's description says how it was made: when your AI writes it, the node records that, as it does for a board post, and a description you type yourself is not stamped. /v1/companies, aimeat_company_*"
+     "plain": "Company addresses Claim name.co.<apex> and point it at an app you published, at the company's own page (which you or your AI publish first), or at another web address. A business runs on its own node; there is no separate company edition. The company's description says how it was made: when your AI writes it, the node records that, as it does for a board post, and a description you type yourself is not stamped. /v1/companies, aimeat_company_*"
     },
     {
      "slug": "g-15-frictionless-data-packages",
@@ -2902,10 +2902,10 @@
      "slug": "g-15-data-package-versions-and-provenance",
      "cells": [
       "<strong>Data-package versions and provenance</strong>",
-      "Each version has an immutable address identified by a content hash; a latest-version pointer lets consumers follow updates. Record changes, sources, lineage, transformations and producer information. An optional retention policy retires old versions.",
+      "Each version has an immutable address identified by a content hash; a latest-version pointer lets consumers follow updates. Every version records what changed, its sources and who produced it. Over REST you can also record lineage and transformations, and set a retention policy that retires old versions (keep a number of versions or months). The MCP tool takes the changes, sources, licence and legal basis only.",
       "<code>/v1/datapackages/:owner/:name</code>, <code>/v1/datapackages/:owner/:name/versions</code>"
      ],
-     "plain": "Data-package versions and provenance Each version has an immutable address identified by a content hash; a latest-version pointer lets consumers follow updates. Record changes, sources, lineage, transformations and producer information. An optional retention policy retires old versions. /v1/datapackages/:owner/:name, /v1/datapackages/:owner/:name/versions"
+     "plain": "Data-package versions and provenance Each version has an immutable address identified by a content hash; a latest-version pointer lets consumers follow updates. Every version records what changed, its sources and who produced it. Over REST you can also record lineage and transformations, and set a retention policy that retires old versions (keep a number of versions or months). The MCP tool takes the changes, sources, licence and legal basis only. /v1/datapackages/:owner/:name, /v1/datapackages/:owner/:name/versions"
     },
     {
      "slug": "g-15-data-package-odps-sheets",
@@ -2943,10 +2943,10 @@
      "slug": "g-16-the-front-page-as-a-showroom",
      "cells": [
       "<strong>The front page as a showroom</strong>",
-      "One line on what the place is, a box that asks what you need, live figures, the wall of apps, the store, and the change log. The store and the signage example appear only where the operator names them (<code>AIMEAT_SITE_STORE_URL</code>, <code>AIMEAT_SITE_SIGNAGE_URL</code>), so a customer's node shows none of aimeat.io's own. Before the store takes orders, the operator sets its status to &quot;soon&quot; (<code>AIMEAT_SITE_STORE_STATUS</code>): the store section keeps its prices and says the marketplace opens soon, in the operator's own words per language if they wrote any, and every control that led into the store reads &quot;Opens soon&quot; instead. With a discount code set (<code>AIMEAT_SITE_STORE_SOON_CODE</code>, one code for everybody that the store itself checks, from its own DISCOUNT_CODE setting), &quot;Opens soon&quot; can be pressed and shows the code with a copy button.",
+      "One line on what the place is, a box that asks what you need, live figures, a short look at what your AI gets, a slide show of the screens, prompts with what they made, the wall of apps, the store, the safety list and a closing line. The change log is no longer on the default page; an operator can put it back as a block. The store and the signage example appear only where the operator names them (<code>AIMEAT_SITE_STORE_URL</code>, <code>AIMEAT_SITE_SIGNAGE_URL</code>), so a customer's node shows none of aimeat.io's own. Before the store takes orders, the operator sets its status to &quot;soon&quot; (<code>AIMEAT_SITE_STORE_STATUS</code>): the store section keeps its prices and says the marketplace opens soon, in the operator's own words per language if they wrote any, and every control that led into the store reads &quot;Opens soon&quot; instead. With a discount code set (<code>AIMEAT_SITE_STORE_SOON_CODE</code>, one code for everybody that the store itself checks, from its own DISCOUNT_CODE setting), &quot;Opens soon&quot; can be pressed and shows the code with a copy button.",
       "<code>/</code>"
      ],
-     "plain": "The front page as a showroom One line on what the place is, a box that asks what you need, live figures, the wall of apps, the store, and the change log. The store and the signage example appear only where the operator names them (AIMEAT_SITE_STORE_URL, AIMEAT_SITE_SIGNAGE_URL), so a customer's node shows none of aimeat.io's own. Before the store takes orders, the operator sets its status to \"soon\" (AIMEAT_SITE_STORE_STATUS): the store section keeps its prices and says the marketplace opens soon, in the operator's own words per language if they wrote any, and every control that led into the store reads \"Opens soon\" instead. With a discount code set (AIMEAT_SITE_STORE_SOON_CODE, one code for everybody that the store itself checks, from its own DISCOUNT_CODE setting), \"Opens soon\" can be pressed and shows the code with a copy button. /"
+     "plain": "The front page as a showroom One line on what the place is, a box that asks what you need, live figures, a short look at what your AI gets, a slide show of the screens, prompts with what they made, the wall of apps, the store, the safety list and a closing line. The change log is no longer on the default page; an operator can put it back as a block. The store and the signage example appear only where the operator names them (AIMEAT_SITE_STORE_URL, AIMEAT_SITE_SIGNAGE_URL), so a customer's node shows none of aimeat.io's own. Before the store takes orders, the operator sets its status to \"soon\" (AIMEAT_SITE_STORE_STATUS): the store section keeps its prices and says the marketplace opens soon, in the operator's own words per language if they wrote any, and every control that led into the store reads \"Opens soon\" instead. With a discount code set (AIMEAT_SITE_STORE_SOON_CODE, one code for everybody that the store itself checks, from its own DISCOUNT_CODE setting), \"Opens soon\" can be pressed and shows the code with a copy button. /"
     },
     {
      "slug": "g-16-the-aimeat-io-badge-on-apps",
@@ -3006,10 +3006,10 @@
      "slug": "g-16-an-app-answers-format-md-itself",
      "cells": [
       "<strong>An app answers ?format=md itself</strong>",
-      "An app whose content is built from records names an action of its owner's own extension in its head (<code>&lt;meta name=&quot;aimeat-format-md&quot; content=&quot;/v1/ext/&lt;extension&gt;/&lt;action&gt;&quot;&gt;</code>). A request for the app with <code>?format=md</code>, or one that prefers markdown, then gets what that action returns, always current, with the node's footer of tools and skills. The app's page in the catalogue says who answers. Without the declaration, or when the action fails, the stored page or the app's page converted answers as before. Limits: only the owner's own extension; the action runs as the owner with nobody present, within the extension's time limit.",
+      "An app whose content is built from records names an action of its owner's own extension in its head (<code>&lt;meta name=&quot;aimeat-format-md&quot; content=&quot;/v1/ext/&lt;extension&gt;/&lt;action&gt;&quot;&gt;</code>). A request for the app with <code>?format=md</code>, or one that prefers markdown, then gets what that action returns, with the node's footer of tools and skills. The answer is kept for up to 10 seconds, so it can be that much behind the records; a republish clears it at once. The app's page in the catalogue says who answers. Without the declaration, or when the action fails, the stored page or the app's page converted answers as before. Limits: only the owner's own extension; the action runs as the owner with nobody present, within the extension's time limit.",
       "<code>aimeat-format-md</code>, <code>/v1/apps/:owner/:filename?format=md</code>, <code>/v1/appcat</code>"
      ],
-     "plain": "An app answers ?format=md itself An app whose content is built from records names an action of its owner's own extension in its head (<meta name=\"aimeat-format-md\" content=\"/v1/ext/<extension>/<action>\">). A request for the app with ?format=md, or one that prefers markdown, then gets what that action returns, always current, with the node's footer of tools and skills. The app's page in the catalogue says who answers. Without the declaration, or when the action fails, the stored page or the app's page converted answers as before. Limits: only the owner's own extension; the action runs as the owner with nobody present, within the extension's time limit. aimeat-format-md, /v1/apps/:owner/:filename?format=md, /v1/appcat"
+     "plain": "An app answers ?format=md itself An app whose content is built from records names an action of its owner's own extension in its head (<meta name=\"aimeat-format-md\" content=\"/v1/ext/<extension>/<action>\">). A request for the app with ?format=md, or one that prefers markdown, then gets what that action returns, with the node's footer of tools and skills. The answer is kept for up to 10 seconds, so it can be that much behind the records; a republish clears it at once. The app's page in the catalogue says who answers. Without the declaration, or when the action fails, the stored page or the app's page converted answers as before. Limits: only the owner's own extension; the action runs as the owner with nobody present, within the extension's time limit. aimeat-format-md, /v1/apps/:owner/:filename?format=md, /v1/appcat"
     },
     {
      "slug": "g-16-pages-an-ai-can-read",
@@ -3024,28 +3024,28 @@
      "slug": "g-16-record-contracts-at-an-address",
      "cells": [
       "<strong>Record contracts at an address</strong>",
-      "A record that names its format (signal counts, visibility reports, tracked responses) points at an address this node serves, where anyone reads the contract as Markdown without signing in. A record written before 2026-10-11 names the old address, which redirects there.",
-      "<code>GET /v1/specs/{name}</code> (<code>signals-contract.md</code>, <code>visibility-contract.md</code>, <code>tracked-response-contract.md</code>)"
+      "A record that names its format (signal counts, visibility reports, tracked responses, an app's data map) points at an address this node serves, where anyone reads the contract as Markdown without signing in. The contract between two nodes for a package sale is served the same way. A record written before 2026-10-11 names the old address, which redirects there.",
+      "<code>GET /v1/specs/{name}</code> (<code>signals-contract.md</code>, <code>visibility-contract.md</code>, <code>tracked-response-contract.md</code>, <code>datamap.md</code>, <code>package-sale.md</code>)"
      ],
-     "plain": "Record contracts at an address A record that names its format (signal counts, visibility reports, tracked responses) points at an address this node serves, where anyone reads the contract as Markdown without signing in. A record written before 2026-10-11 names the old address, which redirects there. GET /v1/specs/{name} (signals-contract.md, visibility-contract.md, tracked-response-contract.md)"
+     "plain": "Record contracts at an address A record that names its format (signal counts, visibility reports, tracked responses, an app's data map) points at an address this node serves, where anyone reads the contract as Markdown without signing in. The contract between two nodes for a package sale is served the same way. A record written before 2026-10-11 names the old address, which redirects there. GET /v1/specs/{name} (signals-contract.md, visibility-contract.md, tracked-response-contract.md, datamap.md, package-sale.md)"
     },
     {
      "slug": "g-16-search-engine-setup",
      "cells": [
       "<strong>Search engine setup</strong>",
-      "A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines. Only the public pages are offered for indexing: signed-in views, tool pages and machine documents such as llms.txt and the API answers tell search engines not to index them, and AI agents can still read them. The setting <code>seo.announce_apps</code> decides whether the sitemap index and the instant-update notices name the node's apps at all; the status says how it stands.",
+      "A Discovery page reports what the node actually serves to Google and Bing, read from the live pages rather than from the settings. It has one row per search engine with its verification field and links to where each step is done, sends instant updates for the whole site, sets the site's name and preview picture, and can turn the whole site away from search engines. Only the public pages are offered for indexing: signed-in views, tool pages and machine documents such as llms.txt and the API answers tell search engines not to index them, and AI agents can still read them. The setting <code>seo.announce_apps</code> decides whether the sitemap index and the instant-update notices name the node's apps at all; the status says how it stands.",
       "Admin › Discovery, <code>aimeat_seo_*</code>, <code>GET /v1/admin/seo/status</code>, <code>seo.announce_apps</code> (<code>AIMEAT_SEO_ANNOUNCE_APPS</code>)"
      ],
-     "plain": "Search engine setup A Discovery page reports what the node actually serves to Google and Bing, walks five steps, sets the site's name and preview picture, and can turn the whole site away from search engines. Only the public pages are offered for indexing: signed-in views, tool pages and machine documents such as llms.txt and the API answers tell search engines not to index them, and AI agents can still read them. The setting seo.announce_apps decides whether the sitemap index and the instant-update notices name the node's apps at all; the status says how it stands. Admin › Discovery, aimeat_seo_*, GET /v1/admin/seo/status, seo.announce_apps (AIMEAT_SEO_ANNOUNCE_APPS)"
+     "plain": "Search engine setup A Discovery page reports what the node actually serves to Google and Bing, read from the live pages rather than from the settings. It has one row per search engine with its verification field and links to where each step is done, sends instant updates for the whole site, sets the site's name and preview picture, and can turn the whole site away from search engines. Only the public pages are offered for indexing: signed-in views, tool pages and machine documents such as llms.txt and the API answers tell search engines not to index them, and AI agents can still read them. The setting seo.announce_apps decides whether the sitemap index and the instant-update notices name the node's apps at all; the status says how it stands. Admin › Discovery, aimeat_seo_*, GET /v1/admin/seo/status, seo.announce_apps (AIMEAT_SEO_ANNOUNCE_APPS)"
     },
     {
      "slug": "g-16-sitemaps",
      "cells": [
       "<strong>Sitemaps</strong>",
-      "Generated from the node's page registry and the apps that opted in. They list pages a person reads; the documents for agents are found through <code>/llms.txt</code> and the links on each page.",
-      "<code>/sitemap.xml</code>"
+      "Three sitemaps: the node's public pages from its page registry, the portfolios whose owners asked to be found, and an index that points at both and at the own sitemap of each app that opted in (while <code>seo.announce_apps</code> is on). They list pages a person reads; the documents for agents are found through <code>/llms.txt</code> and the links on each page.",
+      "<code>/sitemap.xml</code>, <code>/sitemap-portfolios.xml</code>, <code>/sitemap-index.xml</code>"
      ],
-     "plain": "Sitemaps Generated from the node's page registry and the apps that opted in. They list pages a person reads; the documents for agents are found through /llms.txt and the links on each page. /sitemap.xml"
+     "plain": "Sitemaps Three sitemaps: the node's public pages from its page registry, the portfolios whose owners asked to be found, and an index that points at both and at the own sitemap of each app that opted in (while seo.announce_apps is on). They list pages a person reads; the documents for agents are found through /llms.txt and the links on each page. /sitemap.xml, /sitemap-portfolios.xml, /sitemap-index.xml"
     },
     {
      "slug": "g-16-what-shipped",
@@ -3074,10 +3074,10 @@
      "slug": "g-17-ai-provenance-records",
      "cells": [
       "<strong>AI provenance records</strong>",
-      "Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, what kind of thing it is (text, image, audio, video, app or data), and a hash of the exact bytes. Records are append-only. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/ai-transparency.md\" target=\"_blank\" rel=\"noopener\">ai-transparency.md</a>.",
+      "Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, what kind of thing it is (text, image, audio, video, code such as an app, or data), and a hash of the exact bytes. Records are append-only. See <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/ai-transparency.md\" target=\"_blank\" rel=\"noopener\">ai-transparency.md</a>.",
       "<code>POST /v1/provenance</code>, <code>ai_provenance</code> on MCP write tools"
      ],
-     "plain": "AI provenance records Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, what kind of thing it is (text, image, audio, video, app or data), and a hash of the exact bytes. Records are append-only. See ai-transparency.md. POST /v1/provenance, ai_provenance on MCP write tools"
+     "plain": "AI provenance records Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, what kind of thing it is (text, image, audio, video, code such as an app, or data), and a hash of the exact bytes. Records are append-only. See ai-transparency.md. POST /v1/provenance, ai_provenance on MCP write tools"
     },
     {
      "slug": "g-17-visible-labels",
@@ -3110,10 +3110,10 @@
      "slug": "g-17-transparency-statement",
      "cells": [
       "<strong>Transparency statement</strong>",
-      "The node states its own posture, operator, supervisory authority and which Code of Practice sections it signed. aimeat.io signed Section 2 of the EU Code of Practice and not Section 1.",
-      "<code>/v1/ai-transparency</code>, <code>/v1/transparency</code>"
+      "The node states how it labels AI content, who operates it, its supervisory authority, and which sections of the EU Code of Practice its operator signed. The operator sets these facts; a node whose operator set no signed sections says it signed none. On aimeat.io the operator signed Section 2 and not Section 1.",
+      "<code>/v1/ai-transparency</code>, <code>/v1/transparency</code>, <code>AIMEAT_AI_COP_SECTIONS</code>, <code>AIMEAT_AI_SUPERVISORY_NAME</code>"
      ],
-     "plain": "Transparency statement The node states its own posture, operator, supervisory authority and which Code of Practice sections it signed. aimeat.io signed Section 2 of the EU Code of Practice and not Section 1. /v1/ai-transparency, /v1/transparency"
+     "plain": "Transparency statement The node states how it labels AI content, who operates it, its supervisory authority, and which sections of the EU Code of Practice its operator signed. The operator sets these facts; a node whose operator set no signed sections says it signed none. On aimeat.io the operator signed Section 2 and not Section 1. /v1/ai-transparency, /v1/transparency, AIMEAT_AI_COP_SECTIONS, AIMEAT_AI_SUPERVISORY_NAME"
     },
     {
      "slug": "g-17-compliance-register",
@@ -3180,10 +3180,10 @@
      "slug": "g-18-peering",
      "cells": [
       "<strong>Peering</strong>",
-      "Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. A relayed request carries a signed relay claim; the operator sees which peers still relay without one and can keep a single peer on its own setting until <code>optional</code> is removed in 4.0.0, from which every relay needs a claim whatever is set (the default is <code>required</code> from 3.20.0). The operator sees how each peer arrived, also a peer a package sale or an install set added without them, and the Security page says when a registration failed its check or a node tried to use a node id this node holds for someone else. The operator can remove a peer from chat as well, which frees its node id. A signed message between nodes passes within five minutes of its time, once, and names the node it is for, so it cannot be passed on to a third node; memory replication, catalogue sync and read receipts carry their send time for this. A node on an older version names none and is still heard until the operator turns on <code>federation.audience_required</code> (default on from 3.27.0, and on whatever is set from 4.0.0). From 4.0.0 a node on the public internet takes only <code>https://</code> peer addresses; a local node keeps plain http.",
-      "<code>/v1/federation/*</code>, <code>aimeat_admin_federation</code>, <code>aimeat_admin_federation_relay_claim_set</code>, <code>aimeat_admin_federation_peer_remove</code>, <code>federation.audience_required</code> (<code>AIMEAT_FEDERATION_AUDIENCE_REQUIRED</code>)"
+      "Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. Every relayed request must carry a signed relay claim: a relay without one is refused, whatever the node's or a peer's relay-claim setting says, so that setting no longer changes anything. The operator sees how each peer arrived, also a peer a package sale or an install set added without them, and the Security page says when a registration failed its check or a node tried to use a node id this node holds for someone else. The operator can remove a peer from chat as well, which frees its node id. A signed message between nodes passes within five minutes of its time, once, and names the node it is for, so it cannot be passed on to a third node; memory replication, catalogue sync and read receipts carry their send time for this. A message that names no node it is for is refused, whatever <code>federation.audience_required</code> says. A node on the public internet takes only <code>https://</code> peer addresses; a local node keeps plain http.",
+      "<code>/v1/federation/*</code>, <code>aimeat_admin_federation</code>, <code>aimeat_admin_federation_peer_remove</code>"
      ],
-     "plain": "Peering Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. A relayed request carries a signed relay claim; the operator sees which peers still relay without one and can keep a single peer on its own setting until optional is removed in 4.0.0, from which every relay needs a claim whatever is set (the default is required from 3.20.0). The operator sees how each peer arrived, also a peer a package sale or an install set added without them, and the Security page says when a registration failed its check or a node tried to use a node id this node holds for someone else. The operator can remove a peer from chat as well, which frees its node id. A signed message between nodes passes within five minutes of its time, once, and names the node it is for, so it cannot be passed on to a third node; memory replication, catalogue sync and read receipts carry their send time for this. A node on an older version names none and is still heard until the operator turns on federation.audience_required (default on from 3.27.0, and on whatever is set from 4.0.0). From 4.0.0 a node on the public internet takes only https:// peer addresses; a local node keeps plain http. /v1/federation/*, aimeat_admin_federation, aimeat_admin_federation_relay_claim_set, aimeat_admin_federation_peer_remove, federation.audience_required (AIMEAT_FEDERATION_AUDIENCE_REQUIRED)"
+     "plain": "Peering Nodes introduce themselves with signatures, exchange keys, keep a heartbeat, and admit peers by tier. A node runs peerless by default. Every relayed request must carry a signed relay claim: a relay without one is refused, whatever the node's or a peer's relay-claim setting says, so that setting no longer changes anything. The operator sees how each peer arrived, also a peer a package sale or an install set added without them, and the Security page says when a registration failed its check or a node tried to use a node id this node holds for someone else. The operator can remove a peer from chat as well, which frees its node id. A signed message between nodes passes within five minutes of its time, once, and names the node it is for, so it cannot be passed on to a third node; memory replication, catalogue sync and read receipts carry their send time for this. A message that names no node it is for is refused, whatever federation.audience_required says. A node on the public internet takes only https:// peer addresses; a local node keeps plain http. /v1/federation/*, aimeat_admin_federation, aimeat_admin_federation_peer_remove"
     },
     {
      "slug": "g-18-catalogue-sync-and-memory-replication",
@@ -3197,11 +3197,11 @@
     {
      "slug": "g-18-cross-node-sign-in",
      "cells": [
-      "<strong>Cross-node sign-in</strong>",
-      "Sign in on another node with your home identity.",
-      "<code>/v1/federation/auth/*</code>"
+      "<strong>Cross-node sign-in</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "Sign in on another node as <code>you@your-home-node</code> with your home password, and your two-step code if you use one. The other node asks your home node, which answers yes only when you have allowed that node to sign you in, the two nodes are peers whose link carries sign-ins, and the other node's operator accepts sign-ins from its peers.",
+      "<code>POST /v1/ghii/login</code>, <code>POST /v1/federation/auth/verify</code>, <code>AIMEAT_FEDERATION_AUTH_POLICY</code>"
      ],
-     "plain": "Cross-node sign-in Sign in on another node with your home identity. /v1/federation/auth/*"
+     "plain": "Cross-node sign-in off Sign in on another node as you@your-home-node with your home password, and your two-step code if you use one. The other node asks your home node, which answers yes only when you have allowed that node to sign you in, the two nodes are peers whose link carries sign-ins, and the other node's operator accepts sign-ins from its peers. POST /v1/ghii/login, POST /v1/federation/auth/verify, AIMEAT_FEDERATION_AUTH_POLICY"
     },
     {
      "slug": "g-18-cross-node-work-and-settlement",
@@ -3243,10 +3243,10 @@
      "slug": "g-18-four-node-types",
      "cells": [
       "<strong>Four node types</strong>",
-      "Full, relay, mirror and personal, chosen by configuration.",
-      "environment configs"
+      "Full, relay, mirror and personal, chosen by configuration. A relay refuses agents, memory, work and boards, and a mirror refuses every write except replication from its peers. Beyond those two guards, relay and mirror are not tested as working roles: check them on your own deployment before you rely on one.",
+      "<code>AIMEAT_NODE_TYPE</code>, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/coding-guidelines/environment-configs.md\" target=\"_blank\" rel=\"noopener\">environment configs</a>"
      ],
-     "plain": "Four node types Full, relay, mirror and personal, chosen by configuration. environment configs"
+     "plain": "Four node types Full, relay, mirror and personal, chosen by configuration. A relay refuses agents, memory, work and boards, and a mirror refuses every write except replication from its peers. Beyond those two guards, relay and mirror are not tested as working roles: check them on your own deployment before you rely on one. AIMEAT_NODE_TYPE, environment configs"
     },
     {
      "slug": "g-18-two-databases",
@@ -3295,10 +3295,10 @@
      "slug": "g-19-runtime-configuration",
      "cells": [
       "<strong>Runtime configuration</strong>",
-      "Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart, rate limits included; the configuration reference lists the available settings. The range beside a number setting is either a recommendation, which a larger value may pass, or a limit, and the Config tab and a refused save say which.",
-      "<code>/v1/admin/config</code> (<code>rangeKind</code>), <code>aimeat_admin_config</code>"
+      "Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart, rate limits included; the configuration reference lists the available settings. The range beside a number setting is either a recommendation, which a larger value may pass, or a limit, and the Config tab and a refused save say which. Over MCP the operator's agent reads the configuration and does not change it; changes go through the Config tab or the API.",
+      "<code>/v1/admin/config</code> (<code>rangeKind</code>), <code>aimeat_admin_config</code> (read only)"
      ],
-     "plain": "Runtime configuration Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart, rate limits included; the configuration reference lists the available settings. The range beside a number setting is either a recommendation, which a larger value may pass, or a limit, and the Config tab and a refused save say which. /v1/admin/config (rangeKind), aimeat_admin_config"
+     "plain": "Runtime configuration Configure the node through environment variables, files, CLI or the API. Mutable settings apply without a restart, rate limits included; the configuration reference lists the available settings. The range beside a number setting is either a recommendation, which a larger value may pass, or a limit, and the Config tab and a refused save say which. Over MCP the operator's agent reads the configuration and does not change it; changes go through the Config tab or the API. /v1/admin/config (rangeKind), aimeat_admin_config (read only)"
     },
     {
      "slug": "g-19-which-code-the-node-runs",
@@ -3331,10 +3331,10 @@
      "slug": "g-19-cors",
      "cells": [
       "<strong>CORS</strong>",
-      "Allowed origins per node, person, agent and memory key.",
-      "<code>aimeat_admin_cors_*</code>"
+      "Which browser origins may call the node: a default list for the whole node, and lists of their own per person, per agent and per memory key, which win over the default. The operator sees them all on one page and sets a person's or an agent's list; a person sets their own and their agents' lists, and an agent sets one on a memory key it holds.",
+      "<code>AIMEAT_CORS_ALLOWED_ORIGINS</code>, <code>GET /v1/admin/cors/overview</code>, <code>PUT /v1/admin/ghii/:ghii/cors</code>, <code>PUT /v1/admin/agents/:gaii/cors</code>, <code>/v1/ghii/cors</code>, <code>/v1/agents/:name/cors</code>, <code>/v1/memory/cors/:key</code>, <code>aimeat_admin_cors_*</code>"
      ],
-     "plain": "CORS Allowed origins per node, person, agent and memory key. aimeat_admin_cors_*"
+     "plain": "CORS Which browser origins may call the node: a default list for the whole node, and lists of their own per person, per agent and per memory key, which win over the default. The operator sees them all on one page and sets a person's or an agent's list; a person sets their own and their agents' lists, and an agent sets one on a memory key it holds. AIMEAT_CORS_ALLOWED_ORIGINS, GET /v1/admin/cors/overview, PUT /v1/admin/ghii/:ghii/cors, PUT /v1/admin/agents/:gaii/cors, /v1/ghii/cors, /v1/agents/:name/cors, /v1/memory/cors/:key, aimeat_admin_cors_*"
     },
     {
      "slug": "g-19-memory-across-accounts",
@@ -3349,28 +3349,28 @@
      "slug": "g-19-organism-break-glass",
      "cells": [
       "<strong>Organism break-glass</strong>",
-      "Take over or add an owner to an organism whose owners are gone.",
-      "<code>aimeat_admin_organism_*</code>"
+      "List every organism and who holds it, and add an owner to any organism, for the case where its owners can no longer be reached. The node does not check that they are gone; the operator decides. The existing owners keep their place, a person who is not yet a member is made one, a blocked person is refused, and each repair is written to the node's log. Needs the exact permission <code>operator:organism-repair</code>, which &quot;Full access&quot; does not include.",
+      "<code>/v1/admin/organisms</code>, <code>aimeat_admin_organism_*</code>"
      ],
-     "plain": "Organism break-glass Take over or add an owner to an organism whose owners are gone. aimeat_admin_organism_*"
+     "plain": "Organism break-glass List every organism and who holds it, and add an owner to any organism, for the case where its owners can no longer be reached. The node does not check that they are gone; the operator decides. The existing owners keep their place, a person who is not yet a member is made one, a blocked person is refused, and each repair is written to the node's log. Needs the exact permission operator:organism-repair, which \"Full access\" does not include. /v1/admin/organisms, aimeat_admin_organism_*"
     },
     {
      "slug": "g-19-scheduler-and-maintenance",
      "cells": [
       "<strong>Scheduler and maintenance</strong>",
-      "See and trigger background jobs; put the node in maintenance.",
+      "See the background jobs and their run log; run a job now, switch it off or on, change its schedule or remove it, and clear the log. Put the node in maintenance, and run two clean-ups: remove old saved versions of workspace documents, and fill in the home feed of accounts made before it existed.",
       "<code>/v1/admin/scheduler/*</code>, <code>/v1/admin/maintenance</code>"
      ],
-     "plain": "Scheduler and maintenance See and trigger background jobs; put the node in maintenance. /v1/admin/scheduler/*, /v1/admin/maintenance"
+     "plain": "Scheduler and maintenance See the background jobs and their run log; run a job now, switch it off or on, change its schedule or remove it, and clear the log. Put the node in maintenance, and run two clean-ups: remove old saved versions of workspace documents, and fill in the home feed of accounts made before it existed. /v1/admin/scheduler/*, /v1/admin/maintenance"
     },
     {
      "slug": "g-19-usage-and-storage-growth",
      "cells": [
       "<strong>Usage and storage growth</strong>",
-      "Who spends what, and how storage grows.",
-      "<code>aimeat_admin_usage</code>, <code>/v1/admin/storage-stats</code>"
+      "What AI costs on the node, split by whose money it is (the node's own key, or people's own provider accounts), with the most the node's key can cost before someone is refused; and how each database table grows, from live row counts and hourly snapshots. Limit: chat turns are not in the cost figures.",
+      "<code>aimeat_admin_usage</code>, <code>/v1/admin/usage/*</code>, <code>/v1/admin/storage-stats</code>"
      ],
-     "plain": "Usage and storage growth Who spends what, and how storage grows. aimeat_admin_usage, /v1/admin/storage-stats"
+     "plain": "Usage and storage growth What AI costs on the node, split by whose money it is (the node's own key, or people's own provider accounts), with the most the node's key can cost before someone is refused; and how each database table grows, from live row counts and hourly snapshots. Limit: chat turns are not in the cost figures. aimeat_admin_usage, /v1/admin/usage/*, /v1/admin/storage-stats"
     },
     {
      "slug": "g-19-morsel-minting",
@@ -3385,28 +3385,28 @@
      "slug": "g-19-operator-agents",
      "cells": [
       "<strong>Operator agents</strong>",
-      "Configure the node's own agents and its AI provider.",
+      "Despite the name, these work for any owner, on the owner's own agents and settings, not on the node's. Your agent changes another of your agents (name, description, mode, tags, and a narrower set of permissions) and your AI models and daily budget, each time first showing you the change and applying it only after you confirm. It cannot add permissions or read your API key.",
       "<code>aimeat_operator_agent_configure</code>, <code>aimeat_operator_ai_config</code>"
      ],
-     "plain": "Operator agents Configure the node's own agents and its AI provider. aimeat_operator_agent_configure, aimeat_operator_ai_config"
+     "plain": "Operator agents Despite the name, these work for any owner, on the owner's own agents and settings, not on the node's. Your agent changes another of your agents (name, description, mode, tags, and a narrower set of permissions) and your AI models and daily budget, each time first showing you the change and applying it only after you confirm. It cannot add permissions or read your API key. aimeat_operator_agent_configure, aimeat_operator_ai_config"
     },
     {
      "slug": "g-19-email-and-push-templates",
      "cells": [
       "<strong>Email and push templates</strong>",
-      "Edit the templates the node sends, per language.",
+      "Edit, per language, the push message and the email the node sends when something arrives in a mailbox; the sends use your text. The three email templates on the Email page (verification code, sign-in link, notification) can be edited and saved, but every send still uses the built-in text, and the page says so.",
       "<code>/v1/admin/email/*</code>, <code>/v1/admin/push*</code>"
      ],
-     "plain": "Email and push templates Edit the templates the node sends, per language. /v1/admin/email/*, /v1/admin/push*"
+     "plain": "Email and push templates Edit, per language, the push message and the email the node sends when something arrives in a mailbox; the sends use your text. The three email templates on the Email page (verification code, sign-in link, notification) can be edited and saved, but every send still uses the built-in text, and the page says so. /v1/admin/email/*, /v1/admin/push*"
     },
     {
      "slug": "g-19-backup-and-restore",
      "cells": [
       "<strong>Backup and restore</strong>",
-      "Back the node up and restore it.",
+      "Download a JSON backup of the accounts, agents, actions and boards, with each agent's memory and transactions, and load it into a node, skipping what already exists. It is not a copy of the whole node: the owners' own memory, organisms, files and apps are not in it, and passwords, keys, webhook secrets and stored credentials never are, so they are set again after a restore. For the whole node, back up the database.",
       "<code>/v1/admin/backup</code>, <code>/v1/admin/restore</code>"
      ],
-     "plain": "Backup and restore Back the node up and restore it. /v1/admin/backup, /v1/admin/restore"
+     "plain": "Backup and restore Download a JSON backup of the accounts, agents, actions and boards, with each agent's memory and transactions, and load it into a node, skipping what already exists. It is not a copy of the whole node: the owners' own memory, organisms, files and apps are not in it, and passwords, keys, webhook secrets and stored credentials never are, so they are set again after a restore. For the whole node, back up the database. /v1/admin/backup, /v1/admin/restore"
     },
     {
      "slug": "g-19-new-version-notice",
@@ -3471,10 +3471,10 @@
      "slug": "g-20-rate-limiting",
      "cells": [
       "<strong>Rate limiting</strong>",
-      "Per identity or per address, with multipliers by role and separate buckets for sign-in, work, memory, boards and flags.",
+      "Per identity or per address, with multipliers by role and separate buckets for sign-in, work, memory, boards and flags. The counts are kept in each process's memory: a restart clears them, and a node run as several processes gives each process its own limit.",
       "rate-limit middleware"
      ],
-     "plain": "Rate limiting Per identity or per address, with multipliers by role and separate buckets for sign-in, work, memory, boards and flags. rate-limit middleware"
+     "plain": "Rate limiting Per identity or per address, with multipliers by role and separate buckets for sign-in, work, memory, boards and flags. The counts are kept in each process's memory: a restart clears them, and a node run as several processes gives each process its own limit. rate-limit middleware"
     },
     {
      "slug": "g-20-login-tarpit",
@@ -3489,28 +3489,28 @@
      "slug": "g-20-idempotency",
      "cells": [
       "<strong>Idempotency</strong>",
-      "A retried POST or PUT with the same key returns the first answer for 24 hours.",
+      "A retried POST or PUT with the same key returns the first answer for 24 hours, per caller and route, and a copy sent while the first is still running is refused. The answers are kept in the process's memory, up to 10 000, so a restart forgets them. An answer that carried a secret is not given out again.",
       "<code>Idempotency-Key</code>"
      ],
-     "plain": "Idempotency A retried POST or PUT with the same key returns the first answer for 24 hours. Idempotency-Key"
+     "plain": "Idempotency A retried POST or PUT with the same key returns the first answer for 24 hours, per caller and route, and a copy sent while the first is still running is refused. The answers are kept in the process's memory, up to 10 000, so a restart forgets them. An answer that carried a secret is not given out again. Idempotency-Key"
     },
     {
      "slug": "g-20-outbound-request-guard",
      "cells": [
       "<strong>Outbound request guard</strong>",
-      "Every non-constant outbound request goes through one guard that refuses internal addresses.",
+      "An outbound request whose address is not fixed in the code goes through one guard that refuses internal addresses, at every redirect too. The calls that do not go through it are listed, each with its written reason: requests to federation peers the operator linked (a peer on a private network must work), calls to the AI provider address an owner set, which the operator's provider allowlist checks instead, the node calling itself, addresses from the operator's own configuration, and code that runs in a browser or on a person's own machine. A check refuses any new one.",
       "<code>safeFetch</code>"
      ],
-     "plain": "Outbound request guard Every non-constant outbound request goes through one guard that refuses internal addresses. safeFetch"
+     "plain": "Outbound request guard An outbound request whose address is not fixed in the code goes through one guard that refuses internal addresses, at every redirect too. The calls that do not go through it are listed, each with its written reason: requests to federation peers the operator linked (a peer on a private network must work), calls to the AI provider address an owner set, which the operator's provider allowlist checks instead, the node calling itself, addresses from the operator's own configuration, and code that runs in a browser or on a person's own machine. A check refuses any new one. safeFetch"
     },
     {
      "slug": "g-20-host-only-cookies-and-app-isolation",
      "cells": [
       "<strong>Host-only cookies and app isolation</strong>",
-      "The session cookie never reaches app subdomains. On a node several people share without app subdomains, an app runs in an opaque-origin frame, where neither the cookie nor the stored session can be read.",
-      "<code>*.apps.&lt;apex&gt;</code>, the isolated frame"
+      "The session cookie never reaches app subdomains. On a node several people share without app subdomains, an app runs in an opaque-origin frame, where neither the cookie nor the stored session can be read. Sign-in and registration from an app are meant to be refused, so that an app never holds the owner's session, but the refusal is off by default: until the operator turns it on, each such request is logged and let through.",
+      "<code>*.apps.&lt;apex&gt;</code>, the isolated frame, <code>AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE</code>"
      ],
-     "plain": "Host-only cookies and app isolation The session cookie never reaches app subdomains. On a node several people share without app subdomains, an app runs in an opaque-origin frame, where neither the cookie nor the stored session can be read. *.apps.<apex>, the isolated frame"
+     "plain": "Host-only cookies and app isolation The session cookie never reaches app subdomains. On a node several people share without app subdomains, an app runs in an opaque-origin frame, where neither the cookie nor the stored session can be read. Sign-in and registration from an app are meant to be refused, so that an app never holds the owner's session, but the refusal is off by default: until the operator turns it on, each such request is logged and let through. *.apps.<apex>, the isolated frame, AIMEAT_APP_ORIGIN_SIGN_IN_REFUSE"
     },
     {
      "slug": "g-20-no-session-token-in-a-socket-address",
@@ -3552,10 +3552,10 @@
      "slug": "g-20-browser-library-vulnerability-check",
      "cells": [
       "<strong>Browser library vulnerability check</strong>",
-      "Every library the node hands to a browser is checked against public vulnerability databases by a command.",
+      "A command checks the node's npm dependencies and the libraries it hands to a browser against the OSV vulnerability database. A served library is checked when it has an npm package address; the fonts and the model price data have none and are not checked.",
       "<code>pnpm scan:vulns</code>"
      ],
-     "plain": "Browser library vulnerability check Every library the node hands to a browser is checked against public vulnerability databases by a command. pnpm scan:vulns"
+     "plain": "Browser library vulnerability check A command checks the node's npm dependencies and the libraries it hands to a browser against the OSV vulnerability database. A served library is checked when it has an npm package address; the fonts and the model price data have none and are not checked. pnpm scan:vulns"
     }
    ]
   },
@@ -3683,10 +3683,10 @@
      "slug": "g-21-openid4vp-sd-jwt-w3c-verifiable-credentials",
      "cells": [
       "<strong>OpenID4VP, SD-JWT, W3C Verifiable Credentials</strong>",
-      "Identity verification and credentials.",
-      "section 2"
+      "The node issues a W3C identity credential for an account. Verification with an EU Digital Identity Wallet (OpenID4VP, SD-JWT) is in the code but cannot be used yet: the node refuses to start with it switched on, because a presented credential is not yet tied to the wallet that holds it and could be replayed.",
+      "section 2, <code>AIMEAT_EUDIW_ENABLED</code>"
      ],
-     "plain": "OpenID4VP, SD-JWT, W3C Verifiable Credentials Identity verification and credentials. section 2"
+     "plain": "OpenID4VP, SD-JWT, W3C Verifiable Credentials The node issues a W3C identity credential for an account. Verification with an EU Digital Identity Wallet (OpenID4VP, SD-JWT) is in the code but cannot be used yet: the node refuses to start with it switched on, because a presented credential is not yet tied to the wallet that holds it and could be replayed. section 2, AIMEAT_EUDIW_ENABLED"
     },
     {
      "slug": "g-21-eu-ai-act-article-50-iptc-digital-source-type-ai-disclosure-header",
@@ -3760,10 +3760,10 @@
      "slug": "g-22-aimeat-crewai",
      "cells": [
       "<strong>aimeat-crewai</strong>",
-      "A pip-installable CrewAI integration: drop one liaison agent into a crew and it handles onboarding, capability reports, memory, knowledge and task updates over MCP.",
+      "A pip-installable CrewAI integration: drop one liaison agent into a crew and it handles onboarding, capability reports, memory, knowledge and task updates over MCP. The rest of the package calls the node's REST routes directly: the node's AI, files, messages, data packages, offers, decisions, usage reports, and a daemon that runs the crew as a node agent and works its tasks.",
       "<code>python/aimeat-crewai/</code>"
      ],
-     "plain": "aimeat-crewai A pip-installable CrewAI integration: drop one liaison agent into a crew and it handles onboarding, capability reports, memory, knowledge and task updates over MCP. python/aimeat-crewai/"
+     "plain": "aimeat-crewai A pip-installable CrewAI integration: drop one liaison agent into a crew and it handles onboarding, capability reports, memory, knowledge and task updates over MCP. The rest of the package calls the node's REST routes directly: the node's AI, files, messages, data packages, offers, decisions, usage reports, and a daemon that runs the crew as a node agent and works its tasks. python/aimeat-crewai/"
     },
     {
      "slug": "g-22-aimeat-desktop",
@@ -3787,10 +3787,10 @@
      "slug": "g-22-guides-for-builders",
      "cells": [
       "<strong>Guides for builders</strong>",
-      "Building an agent, an ecosystem app, apps that use the owner's AI key.",
-      "<a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md\" target=\"_blank\" rel=\"noopener\">building-an-aimeat-compatible-agent.md</a>, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md\" target=\"_blank\" rel=\"noopener\">building-an-aimeat-compatible-ecosystem-app.md</a>, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/app-developer-ai-guide.md\" target=\"_blank\" rel=\"noopener\">app-developer-ai-guide.md</a>"
+      "Building an agent, an ecosystem app, and apps that use the owner's AI. The last is served by every node as the built-in skill <code>aimeat-ai-capabilities</code>, so an AI reads it from the node it builds on.",
+      "<a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md\" target=\"_blank\" rel=\"noopener\">building-an-aimeat-compatible-agent.md</a>, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-ecosystem-app.md\" target=\"_blank\" rel=\"noopener\">building-an-aimeat-compatible-ecosystem-app.md</a>, <code>aimeat_skill_get</code> (<code>aimeat-ai-capabilities</code>)"
      ],
-     "plain": "Guides for builders Building an agent, an ecosystem app, apps that use the owner's AI key. building-an-aimeat-compatible-agent.md, building-an-aimeat-compatible-ecosystem-app.md, app-developer-ai-guide.md"
+     "plain": "Guides for builders Building an agent, an ecosystem app, and apps that use the owner's AI. The last is served by every node as the built-in skill aimeat-ai-capabilities, so an AI reads it from the node it builds on. building-an-aimeat-compatible-agent.md, building-an-aimeat-compatible-ecosystem-app.md, aimeat_skill_get (aimeat-ai-capabilities)"
     }
    ]
   },
@@ -3855,19 +3855,19 @@
      "slug": "g-23-secretary-agent",
      "cells": [
       "<strong>Secretary agent</strong>",
-      "Removed",
+      "Removed 2026-07-10; a few screen texts still name it (the image-reading model on the AI page, a scheduler job kind, a note on internal agents)",
       "The owner's own agents, schedules and workflows."
      ],
-     "plain": "Secretary agent Removed The owner's own agents, schedules and workflows."
+     "plain": "Secretary agent Removed 2026-07-10; a few screen texts still name it (the image-reading model on the AI page, a scheduler job kind, a note on internal agents) The owner's own agents, schedules and workflows."
     },
     {
      "slug": "g-23-feedback-channel",
      "cells": [
       "<strong>Feedback channel</strong>",
-      "Removed 2026-08-12",
+      "Removed 2026-08-11",
       "<code>support@operators</code>."
      ],
-     "plain": "Feedback channel Removed 2026-08-12 support@operators."
+     "plain": "Feedback channel Removed 2026-08-11 support@operators."
     },
     {
      "slug": "g-23-pricing-page",
@@ -3910,9 +3910,9 @@
      "cells": [
       "<strong>Wash-trading detection</strong>",
       "Not in the code",
-      "Trust caps an agent with fewer than three counterparties at 40."
+      "Trust caps an agent at 40 until it has delivered work to three different requesters. Requesters are counted by identity, not by person, so three agents of one owner count as three."
      ],
-     "plain": "Wash-trading detection Not in the code Trust caps an agent with fewer than three counterparties at 40."
+     "plain": "Wash-trading detection Not in the code Trust caps an agent at 40 until it has delivered work to three different requesters. Requesters are counted by identity, not by person, so three agents of one owner count as three."
     },
     {
      "slug": "g-23-knowledge-contributor-reputation",
@@ -3986,10 +3986,10 @@
      "slug": "g-24-what-an-ai-sees",
      "cells": [
       "<strong>What an AI sees</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, and a call that names it is refused with <code>CLASSIFIED</code>. A reader who is not signed in gets the strictest treatment, the same as an AI.",
+      "By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, a read that names it answers as if it did not exist (<code>NOT_FOUND</code>), and an AI call that takes it as input (a file, an AI job's inputs, a decision run) is refused with <code>CLASSIFIED</code>. A reader who is not signed in gets the strictest treatment, the same as an AI.",
       "every MCP tool and REST read an AI uses"
      ],
-     "plain": "What an AI sees off By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, and a call that names it is refused with CLASSIFIED. A reader who is not signed in gets the strictest treatment, the same as an AI. every MCP tool and REST read an AI uses"
+     "plain": "What an AI sees off By default an AI sees everything: no level that comes with the node hides content from it. Confidential and highly confidential content reaches the AI with a warning, and the AI uses it only for the task it was given. You, an organism or the operator can set a level to hide content from AI: then it is not in the AI's lists, a read that names it answers as if it did not exist (NOT_FOUND), and an AI call that takes it as input (a file, an AI job's inputs, a decision run) is refused with CLASSIFIED. A reader who is not signed in gets the strictest treatment, the same as an AI. every MCP tool and REST read an AI uses"
     },
     {
      "slug": "g-24-content-that-stays-in-its-organism",
@@ -4049,10 +4049,10 @@
      "slug": "g-24-apps-state-the-classification-they-expect",
      "cells": [
       "<strong>Apps state the classification they expect</strong>",
-      "An app's data map can name, for each group of keys, the classification the app expects that data to have by default. It classifies nothing: it lets you compare what the builder meant with what the content has.",
-      "<code>aimeat_datamap_set</code>, <code>PUT /v1/datamap/apps/:owner/:filename</code>"
+      "An app's data map can name, for each group of keys, the classification the app expects that data to have by default, and the node checks that the name can be a classification. It classifies nothing, and nothing on the node compares it with the classification the content actually has yet: you read the map and compare.",
+      "<code>aimeat_datamap_set</code>, <code>aimeat_datamap_get</code>, <code>PUT /v1/datamap/apps/:owner/:filename</code>, <code>GET /v1/datamap/apps/:owner/:filename</code>"
      ],
-     "plain": "Apps state the classification they expect An app's data map can name, for each group of keys, the classification the app expects that data to have by default. It classifies nothing: it lets you compare what the builder meant with what the content has. aimeat_datamap_set, PUT /v1/datamap/apps/:owner/:filename"
+     "plain": "Apps state the classification they expect An app's data map can name, for each group of keys, the classification the app expects that data to have by default, and the node checks that the name can be a classification. It classifies nothing, and nothing on the node compares it with the classification the content actually has yet: you read the map and compare. aimeat_datamap_set, aimeat_datamap_get, PUT /v1/datamap/apps/:owner/:filename, GET /v1/datamap/apps/:owner/:filename"
     }
    ]
   }
