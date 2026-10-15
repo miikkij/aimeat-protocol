@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-15 — aimeat_memory_read and aimeat_memory_list with owner_scope: without memory:read-as-owner
+ *     only records whose visibility admits a same-owner reader (feature-list audit #42).
  *   2026-10-15 — aimeat_agents_list answers `refusals: null` and `refusals_unreadable: true` on every
  *     row when the refusal notes cannot be read, the same field GET /v1/agents answers (feature-list
  *     audit #30).
@@ -152,6 +154,7 @@ import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType
 import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
+import { readsAsOwner, ownerScopeView } from '../services/owner-scope-read.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
@@ -414,6 +417,8 @@ export function registerCoreTools(
             let stored = await storage.getMemory(agentGaii, key);
             if (!stored && owner_scope && parsedRead) {
                 stored = await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key);
+                // Without memory:read-as-owner only what visibility admits a same-owner reader (audit #42).
+                if (stored && !ownerScopeView([stored], agentGaii, readsAsOwner(caller())).length) stored = null;
             }
             // The one presentation of a memory value (classification reader + credential mask). A
             // record this agent may not see answers as an absent one, on the hint below as well.
@@ -429,7 +434,8 @@ export function registerCoreTools(
                 const found = parsed
                     ? await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key)
                     : null;
-                const elsewhere = found ? await presentMemory(reader, found) : null;
+                const elsewhere = found && ownerScopeView([found], agentGaii, readsAsOwner(caller())).length
+                    ? await presentMemory(reader, found) : null;
                 if (elsewhere) {
                     return {
                         content: [{
@@ -577,6 +583,7 @@ export function registerCoreTools(
                     if (entries.length > cap) break;
                     entries.push(...await storage.listMemoryMeta(agent.gaii, { prefix, visibility, tags }));
                 }
+                entries = ownerScopeView(entries, agentGaii, readsAsOwner(caller()));
             } else {
                 entries = await storage.listMemoryMeta(agentGaii, { prefix, visibility, tags });
             }

@@ -15,6 +15,9 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   2026-10-15 — POST /v1/contacts and DELETE /v1/contacts/:contactId admit the owner's agent holding
+ *     messages:send, the word aimeat_contact_add and aimeat_contact_remove declare, and act on the owner's
+ *     address book (feature-list audit #127).
  *   v1.7.2 — 2026-10-06 — POST /v1/contacts/handles refuses an app's draft origin (secaudit 2026-10
  *     follow-up, A2).
  *   v1.7.1 — 2026-10-05 — GET /v1/contacts answers listContactsFor (services/contacts.ts), which the MCP
@@ -62,6 +65,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { callerOf } from '../middleware/caller.js';
 import {
   ContactsError, listContactsMerged, listContactsFor, addContact, updatePersonContact, removeContact, resolveContactEmail,
   sendToContact, type AddContactInput,
@@ -197,8 +201,12 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * A blocked contact stays blocked (409) — lift the block via Messages first. Saving a person by
    * email says on the record whether the address has an account here, the lookup's answer, so the
    * service counts it against the account's lookups (services/email-lookup-limit.ts); a save by id
-   * is not an address question and is not counted. ── */
-  router.post('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
+   * is not an address question and is not counted.
+   * WHO. The owner in person, or their agent holding messages:send, the word aimeat_contact_add
+   * declares, as on POST /v1/contacts/invite: the node's tool, the connector's (which calls this route)
+   * and REST give one answer, and the contact lands in the OWNER's address book whoever saves it
+   * (feature-list audit #127). requireRole('agent') keeps an app grant and an ecosystem app out. ── */
+  router.post('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:send'), async (req, res) => {
     const input = parseAddInput((req.body ?? {}) as Record<string, unknown>);
     if (!input) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -206,7 +214,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     try {
-      const saved = await addContact(storage, config, resolve(req), input);
+      const saved = await addContact(storage, config, callerOf(req, config.nodeId, storage).ownerGhii, input);
       res.status(201).json(success(config.nodeId, {
         contact_id: saved.contact_id, kind: saved.kind,
         // `contact` stays the consent row it always was, so existing callers read back unchanged.
@@ -234,11 +242,13 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   /* ── DELETE /v1/contacts/:contactId — remove from the address book WITHOUT resetting the DM
-   * first-contact gate (a row with message history keeps its gate state as origin 'message'). ── */
-  router.delete('/v1/contacts/:contactId', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
+   * first-contact gate (a row with message history keeps its gate state as origin 'message').
+   * WHO. As POST /v1/contacts: the owner in person, or their agent holding messages:send, the word
+   * aimeat_contact_remove declares, acting on the owner's address book (feature-list audit #127). ── */
+  router.delete('/v1/contacts/:contactId', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:send'), async (req, res) => {
     const contactId = decodeURIComponent(req.params.contactId as string);
     try {
-      await removeContact(storage, resolve(req), contactId);
+      await removeContact(storage, callerOf(req, config.nodeId, storage).ownerGhii, contactId);
       res.json(success(config.nodeId, { removed: contactId }));
     } catch (e) { if (!sendErr(res, e)) throw e; }
   });

@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-15 — aimeat_task_request_changes leaves the catalog: no surface offers it any more (feature-list audit #79).
+ *   2026-10-15 — aimeat_memory_read and aimeat_memory_list say a private record of the owner or a sibling needs memory:read-as-owner (feature-list audit #42).
  *   2026-10-15 — aimeat_memory_search states the match rule: word-start over key, tags and values, no field names (feature-list audit #52).
  *   2026-10-12 — aimeat_memory_delete and aimeat_memory_restore say what owner_scope reaches: the
  *     sibling agents, and the owner's own namespace with memory:write-as-owner.
@@ -64,7 +66,7 @@ import { flexibleBoolean } from '../input-schemas.js';
 import { MEMORY_LIST_MAX_LIMIT } from '../../models/tool-input-vocabulary.js';
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
-import { agentEverywhere, connectorOnly } from './types.js';
+import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 export const schedulesTasksMemoryTools = [
@@ -261,8 +263,6 @@ export const schedulesTasksMemoryTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Create Task', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         scope: 'task:write',
-        // On `agent`: NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
-        // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
         surfaces: ['agent', 'chat'],
         input: {
             target_agent: { type: 'string', required: true, description: 'Name of the agent the task is FOR. Must be owned by the same owner as the calling agent.' },
@@ -384,17 +384,6 @@ export const schedulesTasksMemoryTools = [
         },
     },
     {
-        name: 'aimeat_task_request_changes',
-        description: "Owner-only: ask an agent to revise its proposed TODO plan for a queued task. Marks the existing todos as outdated, flips the task status to 'revision_requested', and pushes a linked message to the agent's inbox carrying the owner's free-text change request.",
-        caller: 'owner',
-        visibility: connectorOnly,
-        annotations: { title: 'Request TODO Plan Changes', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-        input: {
-            task_id: { type: 'string', required: true, description: 'Task identifier (must be a queued task with existing proposed todos).' },
-            message: { type: 'string', required: true, description: "Owner's free-text change request." },
-        },
-    },
-    {
         name: 'aimeat_task_event',
         description: 'Append a progress event (e.g. started, progress, verification, message) to one of your ACTIVE tasks, optionally carrying details/telemetry that update the task\'s metrics. Use this to narrate work as it happens so the owner can follow along. Events can only be appended while the task is active; to flip individual todos use aimeat_task_todo, and to finish use aimeat_task_complete / aimeat_task_fail.',
         caller: 'agent',
@@ -478,7 +467,7 @@ export const schedulesTasksMemoryTools = [
         conciseFields: ['key', 'value'],
         input: {
             key: { type: 'string', required: true, description: 'Exact memory entry key (hierarchical, slash-separated).' },
-            owner_scope: { type: 'boolean', description: "Also look in the OWNER's namespace and your sibling agents', not only your own.", zod: flexibleBoolean },
+            owner_scope: { type: 'boolean', description: "Also look in the OWNER's namespace and your sibling agents', not only your own. A record they keep private is read only with the memory:read-as-owner scope; without it you read what they mark owner, members or public.", zod: flexibleBoolean },
         },
     },
     {
@@ -549,7 +538,7 @@ export const schedulesTasksMemoryTools = [
             prefix: { type: 'string', description: 'Key prefix filter, e.g. "project/".' },
             visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Optional visibility filter.', zod: z.string() },
             tags: { type: 'array', description: 'Optional tag filters.', zod: z.array(z.string()) },
-            owner_scope: { type: 'boolean', description: 'When true, list same-owner GHII and all same-owner agent memory.', zod: flexibleBoolean },
+            owner_scope: { type: 'boolean', description: 'When true, list same-owner GHII and all same-owner agent memory. Their private records are listed only with the memory:read-as-owner scope.', zod: flexibleBoolean },
             limit: { type: 'number', description: 'Maximum entries to return (recommended on large stores).', zod: z.number().int().positive().max(MEMORY_LIST_MAX_LIMIT) },
         },
     },

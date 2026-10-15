@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 -- POST /v1/agents/:gaii/port keeps the redirect pointer in a system namespace the agent's
+ *     deletion does not touch (services/agent-port-redirect.ts), and a refusal for want of morsels names
+ *     the owner's balance, which the fee is drawn from, not the agent's, which is always 0
+ *     (feature-list audit #35).
  *   v1.15.2 — 2026-10-15 — POST /v1/agents/import runs pre_agent_registration and post_agent_registration
  *     (feature-list audit 89).
  *   v1.15.1 -- 2026-10-15 -- POST /v1/agents/import gives the imported agent ['*'] on both backends, as
@@ -60,6 +64,7 @@ import type { Storage } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { requireAuth, requireRole, requireRoleOrScope, requireLocalSession, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { narrowAgent } from '../../services/scope-narrowing.js';
+import { putPortRedirect } from '../../services/agent-port-redirect.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
@@ -369,12 +374,15 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
-    // Porting fee — atomic debit prevents double-spending
+    // Porting fee — atomic debit prevents double-spending. debitBalance draws on the OWNER's balance
+    // (an agent's is always 0), so the refusal names the owner's balance (feature-list audit #35).
     const PORTING_FEE = config.agentPortingFeeMorsels;
     const debited = await storage.debitBalance(gaii, PORTING_FEE);
     if (!debited) {
+      const ownerBalance = (await storage.getGHII(ownerGhiiOf(gaii)))?.morselBalance ?? 0;
       res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
-        `Porting requires ${PORTING_FEE} morsels, you have ${agent.morselBalance}`));
+        `Porting an agent takes ${PORTING_FEE} morsels from your balance, and you have ${ownerBalance}. Your balance grows on its own; try again when it reaches ${PORTING_FEE}.`,
+        402, { required: PORTING_FEE, balance: ownerBalance }));
       return;
     }
     await storage.addTransaction({
@@ -385,17 +393,11 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       timestamp: new Date().toISOString(),
     });
 
-    // Store redirect pointer (use memory to persist the redirect)
-    await storage.setMemory({
-      key: `__redirect__`,
-      ownerGaii: gaii,
-      value: { target_node_url, target_node_id: target_node_id ?? 'unknown', ported_at: new Date().toISOString() },
-      visibility: 'public',
-      tags: ['system', 'redirect'],
-      ttlHours: 30 * 24,
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    // The redirect pointer, in a system namespace the agent's deletion does not touch, so GET
+    // /v1/agents/:gaii still answers 301 after the owner deletes the agent here (feature-list audit #35).
+    await putPortRedirect(storage, gaii, {
+      targetNodeUrl: String(target_node_url),
+      ...(typeof target_node_id === 'string' ? { targetNodeId: target_node_id } : {}),
     });
 
     res.json(success(config.nodeId, {
@@ -403,7 +405,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       gaii,
       target_node_url,
       porting_fee: PORTING_FEE,
-      note: 'Redirect pointer set. Export and import agent data to complete the port.',
+      note: 'Redirect pointer set. Export and import agent data to complete the port, then delete the agent here. For 30 days its address here sends visitors to the new node, when that node is a federation peer of this one.',
     }, [
       { description: 'Export agent data', method: 'POST', url: `/v1/agents/${encodeURIComponent(gaii)}/export` },
     ]));

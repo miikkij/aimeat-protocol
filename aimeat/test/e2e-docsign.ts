@@ -29,6 +29,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=docsign
  * @version-history
+ *   2026-10-15 — An owner-level personal access token is refused method "session", used directly and
+ *     exchanged; alice in person signs the same request (feature-list audit #37).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Signing with an EU Digital Identity Wallet, the suite playing the wallet
  *     (wish-allekirjoitus-eudi-lompakolla).
@@ -220,6 +222,26 @@ async function main() {
         assert(check.valid === true && check.sealValid === true && check.evidenceValid === null, `check ${JSON.stringify(check)}`);
         const again = await post(`/v1/docsign/requests/${requestId}/sign`, alice.token, { method: 'session' });
         assert(again.status === 409 && again.body.error?.code === 'ALREADY_SIGNED', `again: ${again.status}`);
+    });
+
+    // Feature-list audit #37. An owner-level personal access token is a program, not alice at this
+    // node's page, so its press proves no more than an app's: method "session" is refused for it, used
+    // directly or exchanged for a JWT. Until 2026-10-15 both signed.
+    await test('an owner-level personal access token cannot sign with method "session", directly or exchanged', async () => {
+        const made = await post('/v1/access/tokens', alice.token, { label: 'docsign-pat', grant_owner: true });
+        assert(made.status === 201, `PAT: ${made.status} ${JSON.stringify(made.body.error)}`);
+        const pat = made.body.data.token as string;
+        const r = await post('/v1/docsign/requests', alice.token, { title: 'PAT test', document: { sha256: sha, name: 'pat.txt', size: 1 }, parties: [ghii(names.alice)] });
+        assert(r.status === 201, `create: ${r.status} ${JSON.stringify(r.body.error)}`);
+        const id = r.body.data.request.id;
+        const direct = await post(`/v1/docsign/requests/${id}/sign`, pat, { method: 'session' });
+        assert(direct.status === 400 && direct.body.error?.code === 'METHOD_NOT_ALLOWED', `PAT direct: ${direct.status} ${JSON.stringify(direct.body.error)}`);
+        const exchanged = await post('/v1/auth/token/exchange', pat, {});
+        assert(exchanged.status === 200, `exchange: ${exchanged.status}`);
+        const viaJwt = await post(`/v1/docsign/requests/${id}/sign`, exchanged.body.data.access_token, { method: 'session' });
+        assert(viaJwt.status === 400 && viaJwt.body.error?.code === 'METHOD_NOT_ALLOWED', `PAT exchanged: ${viaJwt.status} ${JSON.stringify(viaJwt.body.error)}`);
+        const inPerson = await post(`/v1/docsign/requests/${id}/sign`, alice.token, { method: 'session' });
+        assert(inPerson.status === 200 && inPerson.body.data.request.state === 'complete', `alice in person: ${inPerson.status}`);
     });
 
     // Passkeys are on by default (AIMEAT_PASSKEY_ENABLED), and the test node runs the default.

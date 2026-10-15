@@ -6,6 +6,7 @@
  *   purchase receipt a buyer holds for a paid app, plus the license-validity check the fork/download gate
  *   uses. Translated 1:1 from the SQLite/Prisma implementations — appManifest is a jsonb column.
  * @version-history
+ *   2026-10-15 — hasValidLicense takes the version being served: a single licence covers it only when bought at that version or later (feature-list audit #110).
  *   v1.1.0 — 2026-10-11 — A morsel is pacing, never a price: the columns priceMorsels /
  *     transactionFeeMorsels map to AppPurchaseRecord.tollMorsels / operatorShareMorsels, and the receipt's
  *     manifest snapshot is read through normalizeAppManifestPacing.
@@ -56,17 +57,20 @@ export const appPurchaseMethods = {
   async listAppPurchasesBySeller(this: PostgresKyselyStorage, sellerGaii: string): Promise<AppPurchaseRecord[]> {
     return (await this.db.selectFrom('AppPurchase').selectAll().where('sellerGaii', '=', sellerGaii).orderBy('purchasedAt', 'desc').execute()).map(toPurchase);
   },
-  async hasValidLicense(this: PostgresKyselyStorage, buyerGaii: string, sellerGaii: string, filename: string, licenseType?: 'single' | 'lifetime'): Promise<boolean> {
+  async hasValidLicense(this: PostgresKyselyStorage, buyerGaii: string, sellerGaii: string, filename: string, licenseType?: 'single' | 'lifetime', versionNumber?: number): Promise<boolean> {
     // Lifetime license: any lifetime purchase of this app grants access to all versions.
     const lifetime = await this.db.selectFrom('AppPurchase').select('transactionId')
       .where('buyerGaii', '=', buyerGaii).where('sellerGaii', '=', sellerGaii).where('appFilename', '=', filename)
       .where('licenseType', '=', 'lifetime').limit(1).executeTakeFirst();
     if (lifetime) return true;
-    // Single license: at least one purchase of this app (version-specific check happens at download).
+    // Single license: locked to the version bought. Given the version being served, a purchase of that
+    // version or a later one is needed; a later app version needs the update service (feature-list
+    // audit #110). Without a version: any purchase of this app (the purchase route's own question).
     if (!licenseType || licenseType === 'single') {
-      const single = await this.db.selectFrom('AppPurchase').select('transactionId')
-        .where('buyerGaii', '=', buyerGaii).where('sellerGaii', '=', sellerGaii).where('appFilename', '=', filename)
-        .limit(1).executeTakeFirst();
+      let q = this.db.selectFrom('AppPurchase').select('transactionId')
+        .where('buyerGaii', '=', buyerGaii).where('sellerGaii', '=', sellerGaii).where('appFilename', '=', filename);
+      if (versionNumber !== undefined) q = q.where('appVersionNumber', '>=', versionNumber);
+      const single = await q.limit(1).executeTakeFirst();
       return !!single;
     }
     return false;

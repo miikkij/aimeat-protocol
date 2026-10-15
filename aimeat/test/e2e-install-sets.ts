@@ -28,6 +28,9 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   2026-10-15 — With no runner the bundled agent is proposed to the owner (result proposed, a waiting
+ *     proposal); it asserted `pending`, which nobody could approve. The apply with a runner withdraws
+ *     that proposal (feature-list audit #90).
  *   v1.4.0 — 2026-10-01 — A node is registered as a peer only after its own card answers with the same
  *     id and key (the peer-registration incident, finding F). The sale to a node nothing answers for
  *     (127.0.0.1:40799) now stands with its registration pending (`peer_pending`), and the seller whose
@@ -358,7 +361,13 @@ await test('Applying installs the package managed for the owner, makes the organ
     assert(typeof record.organisms.team?.id === 'string' && Object.keys(record.organisms.team.workspaces).length === 2, `organism: ${JSON.stringify(record.organisms)}`);
     assert(record.members[ANN].created === true && record.members[ANN].joined[0] === 'team', `ann: ${JSON.stringify(record.members[ANN])}`);
     assert(record.members[BOB].invited[0] === 'team' && record.members[BOB].account === null, `bob: ${JSON.stringify(record.members[BOB])}`);
-    assert(record.agents[`${shopOnR}/app-shop/shopkeeper`].result === 'pending', `the agent waits for a runner: ${JSON.stringify(record.agents)}`);
+    // With no runner the agent reaches the owner as a proposal they can approve. It sat at `pending`,
+    // with nothing anyone could approve, until 2026-10-15 (feature-list audit #90).
+    const step = record.agents[`${shopOnR}/app-shop/shopkeeper`];
+    assert(step.result === 'proposed' && typeof step.proposal_id === 'string', `the agent is proposed to the owner: ${JSON.stringify(record.agents)}`);
+    const waiting = await C.json('/v1/agents/v2/agent-proposals', { headers: auth(acmeToken) });
+    assert((waiting.body.data?.proposals ?? []).some((p: any) => p.id === step.proposal_id && p.state === 'proposed'),
+        `the owner sees it waiting: ${JSON.stringify(waiting.body.data ?? waiting.body.error).slice(0, 300)}`);
 });
 
 console.log('\nPhase 3 — What the apply made');
@@ -453,6 +462,11 @@ await test('With a runner connected, the second apply deploys the agent and crea
     assert(again.members[ANN].created === false && again.members[ANN].already[0] === 'team', `ann once: ${JSON.stringify(again.members[ANN])}`);
     assert(again.members[BOB].already[0] === 'team', `bob once: ${JSON.stringify(again.members[BOB])}`);
     assert(again.agents[`${shopOnR}/app-shop/shopkeeper`].result === 'deployed', `deployed: ${JSON.stringify(again.agents)}`);
+    // The runner took the job, so the proposal from the first apply is withdrawn rather than left to
+    // make a second agent when approved.
+    const proposals = await C.json('/v1/agents/v2/agent-proposals', { headers: auth(acmeToken) });
+    const first = (proposals.body.data?.proposals ?? []).find((p: any) => p.id === record.agents[`${shopOnR}/app-shop/shopkeeper`].proposal_id);
+    assert(first?.state === 'declined', `the earlier proposal is withdrawn: ${JSON.stringify(first)}`);
     assert(mailsTo(ANN).filter(m => m.method === 'sendRaw').length === 1, `ann is welcomed once: ${mailsTo(ANN).length}`);
 });
 

@@ -9,6 +9,8 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   2026-10-15 — mcp:use, calling tools on the owner's attached MCP servers, askable by an app
+ *     (feature-list audit #12).
  *   v1.9.0 -- 2026-10-12 -- agent:read, the word the agent list asks from 4.0.0 (auth/rest-scope-gate.ts).
  *   v1.8.0 -- 2026-10-12 -- packages:read, the word the install reads ask from 4.0.0 (auth/rest-scope-gate.ts).
  *   v1.7.0 -- 2026-10-09 -- ext:invoke, running an installed extension's action, askable by an app: an
@@ -89,6 +91,11 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // extension, however much the owner wanted it to (the SOC console, 2026-10-09). Its own tick:
   // installing or removing an extension stays ext:write, which no app may ask for.
   'ext:invoke': 'Run actions of the extensions installed on your account, also as steps of your automations (never install or remove one)',
+  // Calling a tool on an MCP server the owner attached (POST /v1/mcp-servers/:id/call). The node holds
+  // the credential and the app never sees the server's address. The owner narrows one app with a grant
+  // written for `app:{owner}/{file}` (services/mcp-client/grants.ts). Attaching and removing servers
+  // stays mcp:manage, which no app may ask for (Jouni, feature-list audit #12, 2026-10-15).
+  'mcp:use': 'Call tools on the MCP servers you have attached. This AIMEAT holds the credential and spends it for you; the app never sees it',
   // TARGET-057. Deliberately NOT connections:write: an app that may publish to an account you
   // already connected is a different favour from one that may attach new accounts to your name.
   // Attaching is a human act at the provider's own consent screen and no app performs it.

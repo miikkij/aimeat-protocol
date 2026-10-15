@@ -8,6 +8,7 @@
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   2026-10-15 — Gate 2 asks the licence for the version it copies (feature-list audit #110).
  *   v1.2.0 — 2026-10-11 — Gate 2 reads the app's pacing amount (`tollMorsels`; a morsel is pacing, not
  *     a price) and asks the licence of the caller's owner GHII, as POST .../fork does. It asked the
  *     agent's own GAII, which no receipt is keyed on, so an agent could not fork an app its owner took.
@@ -68,7 +69,8 @@ export function registerAppForkTool(
             // keyed on the buyer's OWNER GHII (app-store.ts), so it is asked of ownerGhiiOf(agentGaii),
             // the coordinate POST .../fork asks; an agent's own GAII holds no receipt.
             if (appIsPaced(config, source.manifest) && !sameOwner) {
-                const hasLicense = await storage.hasValidLicense(ownerGhiiOf(agentGaii), source.ownerGaii, filename);
+                // The version copied: a single licence covers the version bought (feature-list audit #110).
+                const hasLicense = await storage.hasValidLicense(ownerGhiiOf(agentGaii), source.ownerGaii, filename, undefined, source.versionNumber);
                 if (!hasLicense) {
                     return { content: [{ type: 'text' as const, text: `This app has ${appToll(source.manifest)} morsels of pacing. Take it first (POST /v1/app-store/purchase), then fork it.` }], isError: true };
                 }

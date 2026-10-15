@@ -27,6 +27,11 @@
  *            line in the other side's ledger, no cortex and no ecosystem app
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   2026-10-15 — Test 22: the 402 names the owner's balance and the fee. Test 22b: the porting path's
+ *     pointer is in no agent's memory any more (a system namespace the agent's deletion leaves in place),
+ *     which it asserted the other way (feature-list audit #35). Test 62's positive control agent holds
+ *     memory:read-as-owner, which a private owner_scope read takes now: the setup no longer matched
+ *     (feature-list audit #42).
  *   v1.13.0 — 2026-10-14 — Phase 10: the connectivity-key mint and POST /v1/agents/connect are
  *     removed (Jouni, feature-list audit row 202), so 44 and 45 assert 404, no key, no private key
  *     and no agent; 46 to 51 and the erasure cases 49 and 49b went with the routes (the erasure of
@@ -544,6 +549,14 @@ await test('22. Porting succeeds while the balance holds, then answers 402 INSUF
     while (last.status === 200 && calls < 20) { last = await call(); calls++; }
     assert(last.status === 402, `after the balance runs out the port must answer 402, got ${last.status} after ${calls} calls`);
     assert(last.body.error?.code === 'INSUFFICIENT_MORSELS', `expected INSUFFICIENT_MORSELS, got ${last.body.error?.code}`);
+    // The fee comes out of the OWNER's balance, and the refusal says that balance. It named the agent's,
+    // which is always 0 (feature-list audit #35).
+    const wallet = await json('/v1/wallet', { headers: auth(P.token) });
+    const ownerBalance = wallet.body.data?.balance ?? wallet.body.data?.morsel_balance;
+    assert(typeof ownerBalance === 'number', `the owner's wallet: ${JSON.stringify(wallet.body.data).slice(0, 200)}`);
+    assert(last.body.error?.details?.balance === ownerBalance && last.body.error?.details?.required === fee,
+        `the refusal names the owner's balance ${ownerBalance} and the fee ${fee}: ${JSON.stringify(last.body.error)}`);
+    assert(String(last.body.error?.message).includes(`you have ${ownerBalance}`), `the sentence says it too: ${last.body.error?.message}`);
 });
 
 // The public profile GET /v1/agents/:gaii answers a 301 to wherever `__redirect__` points when no
@@ -551,11 +564,12 @@ await test('22. Porting succeeds while the balance holds, then answers 402 INSUF
 // is the one writer. A memory door that took it from the identity itself made the address of any
 // account, the owner's own included, an open redirect to a host of its choosing.
 await test('22b. Only the porting path writes the redirect pointer, and a self-written one forwards nobody', async () => {
-    // The porting path wrote one in test 22, under the agent it ported.
+    // The porting path wrote one in test 22. Since 2026-10-15 it lives in a system namespace that no
+    // memory route reaches and the agent's deletion leaves in place (feature-list audit #35), so it is
+    // not in the agent's memory at all; it was there before, under `__redirect__`.
     const porterGaii = `porter2#${P.name}@${NODE_ID}`;
     const ported = await json(`/v1/memory/__redirect__?agent=${encodeURIComponent(porterGaii)}`, { headers: auth(P.token) });
-    assert(ported.status === 200 && ported.body.data?.value?.target_node_url === 'https://other.example',
-        `the porting path's pointer: ${ported.status} ${JSON.stringify(ported.body.data?.value ?? ported.body.error)}`);
+    assert(ported.status === 404, `the pointer is in no agent's memory: ${ported.status} ${JSON.stringify(ported.body.data?.value ?? ported.body.error)}`);
 
     const ownerGhii = `${P.name}@${NODE_ID}`;
     const elsewhere = { target_node_url: 'https://acctdoor-redirect.example/landing?x=' };
@@ -571,12 +585,10 @@ await test('22b. Only the porting path writes the redirect pointer, and a self-w
     const agentOwn = await json('/v1/memory', { method: 'POST', headers: auth(writer.token), body: JSON.stringify({ key: '__redirect__', value: elsewhere }) });
     assert(agentOwn.status === 403 && agentOwn.body.error?.code === 'RESERVED_KEY', `an agent into its own namespace: ${agentOwn.status} ${JSON.stringify(agentOwn.body.error)}`);
 
-    // Rewriting the pointer the porting path wrote is the same act. The version is the stored one,
-    // so nothing but the key itself stands in the way.
-    const rewrite = await json('/v1/memory/__redirect__', { method: 'PUT', headers: auth(P.token), body: JSON.stringify({ value: elsewhere, version: ported.body.data?.version }) });
-    assert(rewrite.status === 403 && rewrite.body.error?.code === 'RESERVED_KEY', `rewriting the ported pointer: ${rewrite.status} ${JSON.stringify(rewrite.body.error)}`);
-    const unchanged = await json(`/v1/memory/__redirect__?agent=${encodeURIComponent(porterGaii)}`, { headers: auth(P.token) });
-    assert(unchanged.body.data?.value?.target_node_url === 'https://other.example', `the ported pointer is unchanged: ${JSON.stringify(unchanged.body.data?.value)}`);
+    // The key stays reserved on every write route, so a pointer an older node left under it cannot be
+    // rewritten either.
+    const rewrite = await json('/v1/memory/__redirect__', { method: 'PUT', headers: auth(P.token), body: JSON.stringify({ value: elsewhere, version: 1 }) });
+    assert(rewrite.status === 403 && rewrite.body.error?.code === 'RESERVED_KEY', `rewriting the pointer key: ${rewrite.status} ${JSON.stringify(rewrite.body.error)}`);
 });
 
 // ─── Phase 6 — scopes and federate ───
@@ -1430,8 +1442,8 @@ await test('62. When an account is deleted, every credential it issued is refuse
                 if (wrote.status !== 401) found.push(`${when}: the ${who} token wrote (${wrote.status}${wrote.body.data?.owner_gaii ? `, under ${wrote.body.data.owner_gaii}` : ''})`);
             }
             if (!secret) continue;
-            // An agent reads its owner's records with owner_scope; an owner session, an app grant and a
-            // full-access token read them as their own.
+            // An agent reads its owner's records with owner_scope (a private one with memory:read-as-owner);
+            // an owner session, an app grant and a full-access token read them as their own.
             const read = await json(`/v1/memory/${encodeURIComponent(secret)}${who === 'agent' || who === 'agent MCP' ? '?owner_scope=true' : ''}`, { headers: auth(token) });
             if (read.status !== 401) found.push(`${when}: the ${who} token read the new holder's record (${read.status}${read.body.data?.value ? `, ${JSON.stringify(read.body.data.value)}` : ''})`);
         }
@@ -1462,7 +1474,9 @@ await test('62. When an account is deleted, every credential it issued is refuse
     });
     if (approved.status !== 401) found.push(`(b) after the name is registered again: the owner token approved a device authorization for the new holder's account (${approved.status}${approved.body.data?.gaii ? `, ${approved.body.data.gaii}` : ''})`);
 
-    const sameName = await setupAgent(again, 'worker', scopes);
+    // The positive control reads the new holder's PRIVATE record with owner_scope, which takes
+    // memory:read-as-owner since 2026-10-15 (feature-list audit #42); the setup no longer matched.
+    const sameName = await setupAgent(again, 'worker', [...scopes, 'memory:read-as-owner']);
     assert(sameName.gaii === agent.gaii, `an agent of the same name gets the same identity: ${sameName.gaii}`);
     await tryAll('(c) after the new holder connects an agent of the same name', secret);
     const control = await json(`/v1/memory/${encodeURIComponent(secret)}?owner_scope=true`, { headers: auth(sameName.token) });

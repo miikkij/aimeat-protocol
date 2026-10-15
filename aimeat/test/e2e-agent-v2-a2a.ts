@@ -5,8 +5,9 @@
  *
  *   THE FOREIGN HALF IS THE PHASE'S OWN CRITERION, and it is written as one story rather than as a
  *   set of unit-ish probes: an agent that holds no account here reads the public card, proves it
- *   holds the key its own card names, is quoted a price, pays it, and reads the answer — never
- *   having learnt a GAII. Everything it must NOT reach is asserted with the same credential in the
+ *   holds the key its own card names, is quoted a price, pays it, and reads the answer. The agent's
+ *   GAII is public (the card's address names owner and agent); what the stranger must not get is any
+ *   account surface. Everything it must NOT reach is asserted with the same credential in the
  *   same session, because a fence proven with a different caller is not the fence.
  *
  *   THE STRANGER'S JWKS IS A REAL HTTP SERVER on loopback, not a stub. The node fetches it through
@@ -30,6 +31,9 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2-a2a
  * @version-history
+ *   2026-10-15 — The card's for-hire skill carries the offering's input schema; the assertion that the
+ *     card never names the GAII is replaced by one that the card's address names owner and agent,
+ *     because the identifier is public (feature-list audit #83).
  *   v1.3.0 — 2026-09-24 — A re-spelled copy of a spent assertion is refused as the same assertion
  *     (audit A4-3).
  *   v1.2.0 — 2026-09-16 — The payout address is set through its route and compared without case.
@@ -763,7 +767,8 @@ async function run(): Promise<void> {
 
     // ── 7. A STRANGER HIRES THE AGENT: the phase's own criterion ──────────────
     //
-    // A foreign agent finds the card, hires the agent, gets the result, and never learns a GAII.
+    // A foreign agent finds the card, hires the agent and gets the result. The agent's GAII is public
+    // (derivable from the card's address); no answer on this road needs to carry it.
     // The consent is the OFFERING: its owner published it, so it is for sale, and nothing else is.
 
     const SELLER_ADDR = `0x${'b'.repeat(40)}`;
@@ -817,8 +822,13 @@ async function run(): Promise<void> {
             'and the payment extension is declared');
         assert(!!card.securitySchemes?.foreignCard, 'and the stranger\'s way in is a declared scheme');
         assert(!!card.securitySchemes?.bearer, 'beside the account one, which has not moved');
-        // The whole point: nothing on the public card names the GAII.
-        assert(!JSON.stringify(card).includes(worker.gaii), 'and the card never names the agent\'s GAII');
+        // What to send, from the offering's input schema (feature-list audit #83): it was missing,
+        // so a stranger read the price and had to guess the body.
+        assert(String(forHire.description).includes('"required":["text"]'), `with the input schema on it, got ${forHire.description}`);
+        // This asserted that the card never names the GAII. The identifier is public: the card's own
+        // address names the owner and the agent on this node, which is the whole GAII (audit #83).
+        assert((card.supportedInterfaces as any[]).some(i => String(i.url).endsWith(`/v1/a2a/${a.owner}/${worker.name}`)),
+            'and the address the GAII is derived from is the card\'s own');
     });
 
     await test('a stranger with a valid card is quoted a price rather than let straight in', async () => {

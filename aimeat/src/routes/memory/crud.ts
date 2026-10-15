@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — GET /v1/memory (owner_scope or ?agent=) and GET /v1/memory/search (?agent=): an agent
+ *     without memory:read-as-owner gets another same-owner identity's records only when their
+ *     visibility admits a same-owner reader, the count included (feature-list audit #42).
  *   v1.12.0 -- 2026-10-08 -- POST /v1/memory takes an inline `ai_provenance` declaration, validated
  *     like every REST declaration and passed to the write service, and names the writer (the caller,
  *     resolveIdentity) rather than the namespace as the principal: with owner_scope the namespace is
@@ -77,6 +80,8 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import { warningField } from '../../services/classification-exits.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
+import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
+import { callerOf } from '../../middleware/caller.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -302,6 +307,12 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       gaii = agentParam;
     }
 
+    // Another same-owner identity's records (owner_scope, or ?agent= naming a sibling): a caller that
+    // does not read as the owner sees only what visibility admits a same-owner reader, on every path
+    // below including the count (memory:read-as-owner, feature-list audit #42).
+    const restricted = (ownerScope || !!agentParam) && !readsAsOwner(callerOf(req, config.nodeId, storage));
+    const self = resolveIdentity(req.auth!, config.nodeId);
+
     const prefix = req.query.prefix as string | undefined;
     const visibility = req.query.visibility as string | undefined;
     const tagsParam = req.query.tags as string | undefined;
@@ -333,7 +344,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // server-side (no record values loaded or transferred) for the common no-filter case (e.g. a
     // profile stats bar "🧠 N Muistit"). Tag/maxFlags filters fall through to the list-based count
     // below (countMemory supports prefix + visibility only).
-    if (req.query.count === 'true' && !tags?.length && maxFlags === undefined) {
+    if (req.query.count === 'true' && !tags?.length && maxFlags === undefined && !restricted) {
       // Cached per identity-set + filter (60s, dashboard TTL): the profile stats bar polls this on
       // every load / live-update; a COUNT(DISTINCT key) is cheap but recurs constantly. Invalidated
       // by the `domain:memory` tag (memory writes broadcast `emitChange('memory')`) so a write drops
@@ -369,10 +380,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // The classification reader (TARGET-082): a key this reader may not see is neither listed nor counted.
     const reader = readerFor({ storage, config }, req.auth);
     if (metaOnly) {
-      const allMeta = await reader.show((ownerScope && !agentParam)
+      const allMeta = ownerScopeView(await reader.show((ownerScope && !agentParam)
         ? await memoryDb.listOwnerScopeMeta(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived })
         : await storage.listMemoryMeta(gaii, { prefix, visibility, tags, maxFlags, archived }),
-        r => memoryTarget(r.ownerGaii, r.key));
+        r => memoryTarget(r.ownerGaii, r.key)), self, !restricted);
       // A count is a count of what MATCHES, never of what was returned — so it is answered before
       // the limit is applied, or `?count=true&limit=10` would report ten for a keyspace of a thousand.
       if (req.query.count === 'true') {
@@ -432,7 +443,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       loaded = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
     }
     // The one presentation of memory values: the classification reader plus the credential mask.
-    const allRecords = await presentMemories(reader, loaded);
+    const allRecords = await presentMemories(reader, ownerScopeView(loaded, self, !restricted));
 
     // ?count=true with tag/maxFlags filters — count from the materialized list (rare path). Before
     // the limit, like the meta path: a count answers "how many are there", not "how many did I ask for".
@@ -555,7 +566,9 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // half of why the same tool name meant two different searches (review item 6.4). Opt-IN, so
     // every REST caller that exists keeps the answer it has always had.
     const includeVersions = req.query.include_versions !== 'false';
-    const all: MemoryRecord[] = hits.map(h => h.record);
+    // ?agent= naming a sibling: without memory:read-as-owner only what visibility admits (audit #42).
+    const all: MemoryRecord[] = ownerScopeView(hits.map(h => h.record), resolveIdentity(req.auth!, config.nodeId),
+      !agentParam || readsAsOwner(callerOf(req, config.nodeId, storage)));
     const kept = includeVersions ? all : all.filter(r => !isVersionKey(r.key));
     // Typed against the stored value, then presented: the classification reader plus the credential
     // mask (TARGET-082). A hit this reader may not see is not in the answer or the total.

@@ -40,6 +40,8 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-15 — canManageSchedule: an app manages only the schedule it made under its own grant, never
+ *     an agent's; the comment says agents of the same owner manage each other's (feature-list audit #85).
  *   2026-10-05 — An app's schedule records its grant (`createdByApp`), so it fires as that app and
  *     stops with the grant (services/schedule-actor.ts; secaudit 2026-10, AI-2).
  *   2026-09-29 — The `refinery` kind: create and edit check input.prefix, the definition, and that its
@@ -92,6 +94,8 @@ export interface ScheduleWriteCaller {
     /** The app grant an app's token was issued under (`req.auth.app_grant`): the schedule fires as
      *  that app, while the grant is live (services/schedule-actor.ts). */
     appGrant?: string;
+    /** True for an app's session (CallerContext kind 'app'): it manages only its own schedules. */
+    isApp?: boolean;
 }
 
 export type ScheduleWriteErrorCode =
@@ -199,13 +203,17 @@ async function checkConnectionsPublishInput(
 }
 
 /**
- * Owner manages every schedule they own; an agent only the ones it created. Exported because "run it
- * now" answers to the same rule as editing and cancelling, and a second copy of it in the router is
- * how the three would drift.
+ * Who may edit, cancel or run one schedule. The owner manages every schedule they own. Any agent of
+ * the same owner manages every schedule an agent of that owner made, its siblings' included (decision
+ * "Core 2026-11 open questions", 2026-10-12, Q4). An app manages only the schedule it made under its
+ * own grant: an app grant is limited to its own purpose, so it reaches no agent's schedule and no
+ * other app's (feature-list audit #85). Exported because "run it now" answers to the same rule as
+ * editing and cancelling, and a second copy of it in the router is how the three would drift.
  */
 export function canManageSchedule(caller: ScheduleWriteCaller, ownerScope: string, job: ScheduledJobRecord): boolean {
     if (job.ownerScope !== ownerScope) return false;
     if (caller.isOwnerSession) return true;
+    if (caller.isApp || caller.appGrant) return !!caller.appGrant && job.createdByApp === caller.appGrant;
     return job.createdByAgent === true;
 }
 

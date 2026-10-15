@@ -5,6 +5,9 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   2026-10-15 — Tests 41–43: an agent holding messages:send saves and removes a contact on REST in its
+ *     owner's book, without the word it is refused, and another owner's agent removes nothing of H's
+ *     (feature-list audit #127).
  *   v1.8.1 — 2026-10-06 — The code-key accounts get their address verified by helpers/verified-email.ts:
  *     a key's account starts unverified (secaudit 2026-10 follow-up, A1).
  *   v1.8.0 — 2026-10-01 — Tests 34–40: contacts:read (the developer's ruling of 2026-10-01). An app of
@@ -843,6 +846,38 @@ await test('40. Cross-owner: another owner\'s agent holding contacts:read reads 
     // No parameter names whose book is read: a query naming H changes nothing.
     const named = await listAs(theirs.token, `?owner=${encodeURIComponent(H.ghii)}&q=${encodeURIComponent('Hanna')}`);
     assert(named.status === 200 && named.body.data.contacts.length === 0, `a query naming H: ${JSON.stringify(named.body.data?.contacts)}`);
+});
+
+// -- Feature-list audit #127: saving and removing a contact answers alike on every door. The node's
+//    aimeat_contact_add and aimeat_contact_remove took an agent holding messages:send, while the REST
+//    route the connector's tool and /local/call go through took the owner in person only. --
+
+await test('41. An agent holding messages:send saves and removes a contact on REST, in its owner\'s book', async () => {
+    const saver = await agentOf(H, 'booksaver', ['messages:send']);
+    const saved = await json('/v1/contacts', { method: 'POST', headers: auth(saver.token), body: JSON.stringify({ contact_id: C.name }) });
+    assert(saved.status === 201, `the agent's save: ${saved.status} ${JSON.stringify(saved.body.error)}`);
+    const id = saved.body.data.contact_id as string;
+    assert((await contactsOf(H.token)).some(c => c.contact_id === id), `the contact is in the OWNER's book: ${id}`);
+    const removed = await json(`/v1/contacts/${encodeURIComponent(id)}`, { method: 'DELETE', headers: auth(saver.token) });
+    assert(removed.status === 200, `the agent's removal: ${removed.status} ${JSON.stringify(removed.body.error)}`);
+    assert(!(await contactsOf(H.token)).some(c => c.contact_id === id && c.origin === 'saved'), 'the contact is gone from the owner\'s book');
+});
+
+await test('42. An agent without messages:send is refused the save and the removal (403), and the book does not change', async () => {
+    const reader = await agentOf(H, 'booknosend', ['contacts:read']);
+    const before = ids(await contactsOf(H.token));
+    const save = await json('/v1/contacts', { method: 'POST', headers: auth(reader.token), body: JSON.stringify({ contact_id: C.name }) });
+    assert(save.status === 403, `save without the word: ${save.status} ${JSON.stringify(save.body.error)}`);
+    const del = await json(`/v1/contacts/${encodeURIComponent(hPersonId)}`, { method: 'DELETE', headers: auth(reader.token) });
+    assert(del.status === 403, `removal without the word: ${del.status}`);
+    assert(JSON.stringify(ids(await contactsOf(H.token))) === JSON.stringify(before), 'the book changed');
+});
+
+await test('43. Cross-owner: another owner\'s agent holding messages:send removes nothing from H\'s book', async () => {
+    const theirs = await agentOf(B, 'bookremoverb', ['messages:send']);
+    const del = await json(`/v1/contacts/${encodeURIComponent(hPersonId)}`, { method: 'DELETE', headers: auth(theirs.token) });
+    assert(del.status === 404, `B's agent acts on B's own book, where the person is not: ${del.status}`);
+    assert((await contactsOf(H.token)).some(c => c.contact_id === hPersonId), 'H\'s saved person is still there');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

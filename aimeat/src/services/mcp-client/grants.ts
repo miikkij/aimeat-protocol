@@ -27,6 +27,8 @@
  * @structure McpGrant · putMcpGrant · listMcpGrants · removeMcpGrant · resolveMcpAccess
  * @usage const verdict = await resolveMcpAccess({ storage, owner, server, grantee, tool, scopes });
  * @version-history
+ *   2026-10-15 — A grant written as `app:{owner}/{file}` matches the app's GEAI; grantCannotNarrow
+ *     names a server whose grants nobody reads, for the grant-writing endpoints (feature-list audit #12).
  *   2026-10-15 — The call cap counts with countUsageCalls plus the unflushed usage buffer, and an end date
  *     that does not parse counts as passed (feature-list audit 13).
  *   v1.2.0 — 2026-10-08 — `readOnly`: only tools the server marks readOnlyHint in its cached list,
@@ -40,6 +42,22 @@ import type { McpServerRecord } from '../../models/mcp-server-schemas.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { logger } from '../../utils/logger.js';
 import { pendingUsageCalls } from '../usage/usage-buffer.js';
+import { appGranteeAsGeai } from '../../utils/gaii.js';
+
+/**
+ * Why a grant on this server would narrow nobody, or null when it would.
+ *
+ * resolveMcpAccess reads the grants stored under the server's own owner, so a grant written by
+ * anybody else (every owner a node-wide server admits, whose `ownerGhii` is null) is stored and
+ * never read. Both grant-writing endpoints (PUT /v1/mcp-servers/:id/grants, aimeat_mcp_grant_set)
+ * refuse it instead of answering 200 (feature-list audit #12).
+ */
+export function grantCannotNarrow(server: McpServerRecord, writerGhii: string): string | null {
+  if (server.ownerGhii === writerGhii) return null;
+  return server.ownerGhii === null
+    ? `"${server.slug}" is offered by this node to every owner it admits, so a permission written here would limit nobody. To limit what your agents and apps do, attach a server of your own, or ask the node operator.`
+    : `"${server.slug}" belongs to someone else, so a permission written here would limit nobody. Its owner sets who may use it.`;
+}
 
 /**
  * System namespace — server-side only, never surfaced as a readable memory key.
@@ -181,7 +199,10 @@ export async function resolveMcpAccess(input: AccessInput): Promise<McpAccess> {
   const grants = await listMcpGrants(storage, server.ownerGhii ?? '', server.slug);
   // No grant for this pair at all: the scope already said yes, and that is the phase-1 default the
   // first grant replaces.
-  const exact = grants.find((g) => g.grantee === grantee);
+  // A grant written in the documented app form `app:{owner}/{file}` names the GEAI the app calls
+  // with, so it is compared in that form (feature-list audit #12).
+  const callerNode = grantee.slice(grantee.lastIndexOf('@') + 1);
+  const exact = grants.find((g) => g.grantee === grantee || appGranteeAsGeai(g.grantee, callerNode) === grantee);
   const wildcard = grants.find((g) => g.grantee === '*');
   const grant = exact ?? wildcard;
   if (!grant) return { allowed: true };

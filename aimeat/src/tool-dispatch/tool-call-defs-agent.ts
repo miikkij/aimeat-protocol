@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 -- aimeat_task_request_changes removed: the route admits only the owner in person and the
+ *     connector calls as the agent, so every call answered 403 (feature-list audit #79).
  *   2026-10-11 -- aimeat_agent_stop and aimeat_agent_start move unchanged to
  *     tool-call-defs-agent-standing.ts (max-file-lines), where aimeat_agent_workplace_set joins them.
  *   2026-10-11 -- aimeat_agent_stop and aimeat_agent_start.
@@ -614,17 +616,10 @@ export const agentTools: ConnectCliToolDefinition[] = [
     },
     // Stop, start and where its work goes: tool-call-defs-agent-standing.ts (max-file-lines).
     ...agentStandingCliTools,
-    {
-        name: 'aimeat_task_request_changes',
-        description: "Owner-only: ask an agent to revise its proposed TODO plan. Marks the existing todos as outdated, flips the task status to 'revision_requested', and pushes a linked message carrying the owner's free-text change request.",
-        input: {
-            task_id: { type: 'string', required: true, description: 'Task identifier (must be a queued task with existing proposed todos).' },
-            message: { type: 'string', required: true, description: "Owner's free-text change request." },
-        },
-        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/request-changes`, {
-            message: requiredString(input, 'message'),
-        }),
-    },
+    // aimeat_task_request_changes is gone from here (2026-10-15, feature-list audit #79): the route
+    // admits only the owner in person, and connect serve calls with the agent's identity, so the tool
+    // answered 403 to every call. An agent does not ask for changes to its own plan; the owner reviews
+    // on the task card (POST /v1/agents/:name/tasks/:id/request-changes).
     {
         name: 'aimeat_task_event',
         description: 'Append a progress event to a task.',

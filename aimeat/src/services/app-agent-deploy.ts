@@ -22,6 +22,7 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-10-15 — The principal comment says an install set gives its owner and proposes too (feature-list audit #90).
  *   v1.4.0 — 2026-10-11 — An instance's public offers carry `toll_morsels` (the pacing amount) and the old
  *     `price` as its deprecated mirror: a morsel is pacing, never a price.
  *   v1.3.1 — 2026-10-11 — A task for a stopped runner is not activated on deploy; it waits (agent-stop-rules.ts).
@@ -245,7 +246,8 @@ export async function deployAppAgent(
     /**
      * Who is asking, as the proposal service needs it. Given by the route and the MCP tool: a deploy
      * that names no runner, for an owner who has no crew-forge runner, becomes a proposal the owner
-     * approves (app-agent-propose.ts). An install set gives none and keeps waiting for a runner.
+     * approves (app-agent-propose.ts). An install set gives its owner, so a bundled agent with no
+     * runner reaches the owner as a proposal too (install-set-apply.ts, feature-list audit #90).
      */
     principal?: ProposerPrincipal;
   },

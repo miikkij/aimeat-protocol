@@ -4463,7 +4463,8 @@
       "company": "your companies",
       "signals": "what your messages and pages reach",
       "secrets": "the keys you keep here",
-      "ext": "the extensions installed on your account"
+      "ext": "the extensions installed on your account",
+      "mcp": "the MCP servers you have attached"
     },
     "scopeText": {
       "push": {
@@ -4490,6 +4491,9 @@
       },
       "ext": {
         "invoke": "Run actions of the extensions installed on your account, also as steps of your automations. It cannot install or remove an extension."
+      },
+      "mcp": {
+        "use": "Call tools on the MCP servers you have attached. This AIMEAT holds the credentials and uses them for you. The app never sees them, and it cannot attach or remove a server."
       }
     }
   },
@@ -16636,6 +16640,7 @@
             "purge": "Delete shared workspace records for good. They cannot be restored, so its tasks always wait for your OK.",
             "read": "Read the notes, records and data saved in your account.",
             "write": "Save and update notes, records and data in your account.",
+            "read-as-owner": "Read everything you and your other agents saved, the private records too, as you read it yourself. Without this it reads only what is shared with it.",
             "write-as-owner": "Save records under your name instead of its own, so they appear as yours.",
             "write-reserved": "On top of writing as you: also change your AI provider key, your spending cap and your public profile. Only does anything together with the row above."
           },

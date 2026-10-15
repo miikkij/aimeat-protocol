@@ -11,6 +11,8 @@
  *   aimeat_organism_invitations, aimeat_organism_invitation_respond.
  * @usage registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-10-15 — aimeat_organism_invitation_respond accepts only for the person in person (isOwnerPrincipal),
+ *     as the REST route and the emailed link do; declining stays open (feature-list audit #57).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-08-25 — aimeat_organism_member_remove: removal existed on the web door only, so an
  *     owner asking their own AI to take someone out of an organism had no tool for it while
@@ -28,10 +30,13 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { isOrganismOwner, addOrganismOwner, removeOrganismOwner } from '../services/organism-ownership.js';
 import {
     InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
-    acceptNameInvitation, declineNameInvitation, addOrganismMember,
+    acceptNameInvitation, declineNameInvitation, addOrganismMember, NAMED_INVITE_ACCEPT_REFUSAL,
 } from '../services/invitations.js';
 import { removeOrganismMember, MemberRemoveError } from '../services/organism-member-remove.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { toolError } from './tool-error.js';
+import { isOwnerPrincipal } from '../auth/account-security.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerOrganismNameInviteTools(
     mcp: McpServer,
@@ -40,6 +45,8 @@ export function registerOrganismNameInviteTools(
     getOwnerName: () => string,
     agentGaii: string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
+    /** The session's caller: accepting asks whether it is the person in person (isOwnerPrincipal). */
+    caller?: () => CallerContext,
 ): void {
     /** Creator/admin gate shared by the invite/add/edit tools. Returns the organism or an error string. */
     type InviteGate = { err: string; organism?: never; ownerName?: never } | { err?: never; organism: OrganismRecord; ownerName: string };
@@ -249,6 +256,12 @@ export function registerOrganismNameInviteTools(
                     return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
                 }
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'declined', organism_id }, null, 2) }] };
+            }
+            // THE PERSON ACCEPTS IN PERSON, as on POST /:id/invitations/accept and the emailed link
+            // (routes/invite-accept.ts): joining an organism is the account holder's own decision. An
+            // agent session passes only holding account:security (feature-list audit #57).
+            if (!caller || !isOwnerPrincipal(caller().auth)) {
+                return toolError('ACCESS_DENIED', NAMED_INVITE_ACCEPT_REFUSAL);
             }
             // Shared accept core: activates the row, syncs members/admins, applies invite-time ws grants.
             const workspaces = await acceptNameInvitation(storage, config, { organism, membership });

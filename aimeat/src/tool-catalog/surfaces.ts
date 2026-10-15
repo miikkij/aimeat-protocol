@@ -24,6 +24,7 @@
  *   import { toolsForSurface } from './surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-10-15 — aimeat_task_request_changes leaves V2_EXCLUDED with the tool (feature-list audit #79).
  *   2026-10-05 — MCP_SURFACES is each catalog entry's `surfaces` plus the lists here, which only
  *     shrink as each catalog group carries its own (secaudit 2026-10, M3). SurfaceRole moved to
  *     definitions/types.ts and is re-exported.
@@ -127,11 +128,9 @@ export const CHAT_ONLY: readonly string[] = ['aimeat_tools_find'];
 /**
  * Catalog tools intentionally NOT exposed on any v2 server surface:
  *  - instance_* : auto-created session meta, not an agent capability
- *  - task_request_changes : connector-only owner tool (never registered on the server /v1/mcp)
  */
 export const V2_EXCLUDED: readonly string[] = [
     'aimeat_instance_list', 'aimeat_instance_create', 'aimeat_instance_status',
-    'aimeat_task_request_changes',
     // Connector-CLI-only convenience (no v2 MCP surface) — see definitions.ts.
     'aimeat_agent_statistics',
     // Authoring a package by hand and pruning its history stay on the connector doors: publish

@@ -3405,7 +3405,8 @@
       "company": "tus empresas",
       "signals": "el alcance de tus mensajes y páginas",
       "secrets": "las claves que guardas aquí",
-      "ext": "las extensiones instaladas en tu cuenta"
+      "ext": "las extensiones instaladas en tu cuenta",
+      "mcp": "los servidores MCP que has conectado"
     },
     "scopeText": {
       "push": {
@@ -3432,6 +3433,9 @@
       },
       "ext": {
         "invoke": "Ejecutar acciones de las extensiones instaladas en tu cuenta, también como pasos de tus automatizaciones. No puede instalar ni quitar extensiones."
+      },
+      "mcp": {
+        "use": "Llamar a herramientas en los servidores MCP que has conectado. Este AIMEAT guarda las credenciales y las usa por ti. La aplicación nunca las ve y no puede conectar ni desconectar servidores."
       }
     }
   },
@@ -14866,6 +14870,7 @@
             "purge": "Eliminar para siempre registros de espacios de trabajo compartidos. No se pueden recuperar, así que sus tareas siempre esperan tu permiso.",
             "read": "Leer las notas, los registros y los datos guardados en tu cuenta.",
             "write": "Guardar y actualizar notas, registros y datos en tu cuenta.",
+            "read-as-owner": "Leer todo lo guardado por ti y por tus otros agentes, también los registros privados, como lo lees tú. Sin esto solo lee lo que se comparte con él.",
             "write-as-owner": "Guardar registros con tu nombre en vez del suyo, de modo que aparezcan como tuyos.",
             "write-reserved": "Además de escribir como tú: cambiar también la clave de tu proveedor de IA, tu tope de gasto y tu perfil público. Solo hace algo junto con la línea de arriba."
           },

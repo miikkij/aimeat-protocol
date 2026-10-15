@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-10-15 — Says whose schedules update, trigger and delete reach: any agent-made one of the owner,
+ *     never the owner's own; an app only its own (feature-list audit #85).
  *   v1.8.1 — 2026-10-13 — Section 4: the approval page asks which model the agent thinks with, and
  *     with no pick the computer's own setting applies, which can be a small model.
  *   v1.8.0 — 2026-10-11 — Section 5, putting the work on a clock: the schedule kinds and fields, the
@@ -208,7 +210,9 @@ sees every schedule and can pause or delete any of them.
 It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you made (\`detail: true\` adds
 each one's prompt), \`aimeat_schedule_update\` pauses (\`enabled: false\`), resumes, or changes the
 cron, the timezone, the name or the prompt, \`aimeat_schedule_trigger\` runs one now, and
-\`aimeat_schedule_delete\` removes it. A clock you run yourself, outside the node, can still be shown
+\`aimeat_schedule_delete\` removes it. These three reach any schedule an agent of your owner made, a
+sibling's included; a schedule the owner made is theirs, and an app reaches only the ones it made
+itself. A clock you run yourself, outside the node, can still be shown
 to the owner: \`aimeat_schedule_report_internal\` lists it beside theirs, and the node does not run it.
 
 **Over REST, for an agent with no model in the loop.** \`POST /v1/agents/{name}/schedules\` puts a

@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-15 — signRequest takes the credential origin: method "session" is refused for an owner-level personal access token, which is a program and not the person at the node's page (feature-list audit #37).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Wallet signatures: the sealing step is shared (sealInto), a request keeps
  *     the newest wallet-signed PDF's place and hash, and any party reads that PDF
@@ -418,7 +419,13 @@ export interface SignInput {
   signature?: string;
 }
 
-export async function signRequest(ctx: DocsignCtx, caller: CallerContext, id: string, input: SignInput): Promise<DocSignRecord> {
+/**
+ * How the caller's credential was made, where that decides a method. `via: 'pat'` is set where a
+ * personal access token is resolved (auth/middleware.ts, the PAT-backed refresh in routes/auth.ts).
+ */
+export interface SignCredential { via?: string }
+
+export async function signRequest(ctx: DocsignCtx, caller: CallerContext, id: string, input: SignInput, credential: SignCredential = {}): Promise<DocSignRecord> {
   refuseVisitor(caller);
   return withLock(id, async () => {
     const rec = await getRequest(ctx, caller, id);
@@ -452,6 +459,13 @@ export async function signRequest(ctx: DocsignCtx, caller: CallerContext, id: st
       // A press inside an app is not proof that the person pressed it: an app signs with a passkey.
       if (caller.kind === 'app') throw new DocsignError('METHOD_NOT_ALLOWED', 400, 'From an app, a person signs with a passkey.');
       if (caller.kind === 'owner' && !caller.inPerson) throw new DocsignError('METHOD_NOT_ALLOWED', 400, 'Sign in person, or use a passkey.');
+      // An owner-level personal access token is a program the person made, not the person at this
+      // node's page, so its press proves no more than an app's does (decision "Document signing:
+      // memory scopes, passkey for people", 2026-10-09; feature-list audit #37).
+      if (caller.kind === 'owner' && credential.via === 'pat') {
+        throw new DocsignError('METHOD_NOT_ALLOWED', 400,
+          'A personal access token is a program acting for you, so it cannot sign with your session. Sign with a passkey, or press Sign on the request while signed in to this node.');
+      }
     } else {
       throw new DocsignError('INVALID_INPUT', 400, 'method is passkey, key or session.');
     }

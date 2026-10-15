@@ -39,6 +39,8 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   2026-10-15 — PUT /:id/grants answers 409 GRANT_NOT_APPLICABLE on a server whose grants nobody
+ *     reads (a node-wide one) instead of storing it with 200 (feature-list audit #12).
  *   2026-10-15 — Comment: the node-wide door admits the operator in person and the operator's own agent holding operator:admin (feature-list audit 18).
  *   2026-10-15 — A grant's end date that is not a date is refused with 400 (feature-list audit 13).
  *   v1.5.0 — 2026-10-09 — POST /:id/authorize binds the round to the owner's browser when the owner
@@ -88,7 +90,7 @@ import { callRemoteTool, listRemoteTools, statusForRemoteRefusal } from '../serv
 import { startMcpOAuth, finishMcpOAuth } from '../services/mcp-client/oauth.js';
 import { requireEncryptionKey } from '../services/mcp-client/credential.js';
 import {
-  listMcpGrants, putMcpGrant, removeMcpGrant, type McpGrant,
+  listMcpGrants, putMcpGrant, removeMcpGrant, grantCannotNarrow, type McpGrant,
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
@@ -403,6 +405,11 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
       if (!server) return notFound(res);
+      // A grant on a server whose grants nobody reads (a node-wide one) is refused, not stored.
+      const cannot = grantCannotNarrow(server, ownerOf(req));
+      if (cannot) {
+        return res.status(409).json(error(config.nodeId, 'GRANT_NOT_APPLICABLE', cannot, 409, { server: server.slug }));
+      }
 
       const b = (req.body ?? {}) as Record<string, unknown>;
       const grantee = typeof b.grantee === 'string' ? b.grantee.trim() : '';

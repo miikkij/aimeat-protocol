@@ -19,6 +19,9 @@
  *   sale, while the books keep the amount, the date and the app.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-store-license
  * @version-history
+ *   2026-10-15 — A single licence opens the version bought and answers 402 on the next version, for
+ *     the buyer and their agent, and license-check says false; a lifetime licence opens the update
+ *     (feature-list audit #110).
  *   v1.5.1 — 2026-10-12 — The four paid apps are published with toll_morsels instead of price_morsels,
  *     which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; every test after the setup had failed only
  *     because the paid app never existed. The purchase's deprecated price_morsels mirror is asserted
@@ -194,6 +197,34 @@ await test('Someone who has NOT bought it is still refused (402)', async () => {
     const dl = await json(`/v1/apps/${sellerName}/${PAID}`, auth(stranger.token));
     assert(dl.status === 402, `an unpaid caller must be refused, got ${dl.status}: ${JSON.stringify(dl.body).slice(0, 200)}`);
     await json(`/v1/owners/apstr${ts}`, { ...auth(stranger.token), method: 'DELETE' });
+});
+
+// Feature-list audit #110 (Jouni, 2026-10-15). A SINGLE licence is locked to the version bought. The
+// download asked the licence without a version, so a single licence opened every later version, like
+// a lifetime one. A later version needs an active update service (a separate wish, not built here).
+const SINGLE = `single-licensed-${ts}.html`;
+await test('A single licence opens the version bought, and not the next one; a lifetime licence opens both', async () => {
+    if (!marketplaceOn) return;
+    const pub = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: SINGLE, content: b64('<h1>v1</h1>'), name: 'Single App', description: 'single licence', category: 'utility', tags: [], toll_morsels: 10, license_type: 'single' }) });
+    assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
+    const buy = await json('/v1/app-store/purchase', { ...auth(buyerTok), method: 'POST', body: JSON.stringify({ app_filename: SINGLE, app_owner: sellerName }) });
+    assert(buy.status === 200 || buy.status === 201, `purchase: ${buy.status} ${JSON.stringify(buy.body.error)}`);
+    const v1 = await json(`/v1/apps/${sellerName}/${SINGLE}`, auth(buyerTok));
+    assert(v1.status === 200, `the version bought: ${v1.status} ${JSON.stringify(v1.body).slice(0, 200)}`);
+
+    const update = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: SINGLE, content: b64('<h1>v2</h1>'), name: 'Single App', description: 'single licence', category: 'utility', tags: [], toll_morsels: 10, license_type: 'single' }) });
+    assert(update.status === 200 || update.status === 201, `update: ${update.status} ${JSON.stringify(update.body.error)}`);
+    const v2 = await json(`/v1/apps/${sellerName}/${SINGLE}`, auth(buyerTok));
+    assert(v2.status === 402 && v2.body.error?.code === 'PURCHASE_REQUIRED', `a later version must not open: ${v2.status} ${JSON.stringify(v2.body).slice(0, 200)}`);
+    const agentV2 = await json(`/v1/apps/${sellerName}/${SINGLE}`, auth(buyerAgent.token));
+    assert(agentV2.status === 402, `nor for the buyer's agent: ${agentV2.status}`);
+    const chk = await json(`/v1/app-store/license-check?app_filename=${SINGLE}&app_owner=${sellerName}`, auth(buyerTok));
+    assert(chk.body.data?.has_license === false, `license-check answers for the version served: ${JSON.stringify(chk.body.data)}`);
+
+    const lifeUpdate = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: PAID, content: b64('<h1>licensed v2</h1>'), name: 'Licensed App', description: 'costs morsels', category: 'utility', tags: [], toll_morsels: 50, license_type: 'lifetime' }) });
+    assert(lifeUpdate.status === 200 || lifeUpdate.status === 201, `lifetime update: ${lifeUpdate.status}`);
+    const life = await json(`/v1/apps/${sellerName}/${PAID}`, auth(buyerTok));
+    assert(life.status === 200, `a lifetime licence opens the later version: ${life.status}`);
 });
 
 // secaudit 2026-10-10 C1. With anonymous mode on (this suite's default), a request with no

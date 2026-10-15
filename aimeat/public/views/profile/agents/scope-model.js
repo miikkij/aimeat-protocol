@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-10-15 — memory:read-as-owner, outside every wildcard: reading the owner's and the sibling
+ *     agents' private records with owner_scope (feature-list audit #42).
  *   v1.15.0 — 2026-10-15 — connections:read-as-owner, outside every wildcard: reading what is in the
  *     owner's connected accounts (feature-list audit 128).
  *   v1.19.0 — 2026-10-13 — organism:direct, inside the wildcard and in neither preset: writing a
@@ -175,6 +177,10 @@ export const NOT_IN_WILDCARD = [
   // them. Only an operator's own agent can be given it at all.
   'operator:admin',
   // ── Added 2026-10-15 ─────────────────────────────────────────────────────────────────────────
+  // Reading memory as the owner: with owner_scope, every record the owner and their other agents
+  // hold, private ones included. Without it the agent sees what visibility gives it. A read leaves
+  // nothing behind for the owner to see, so it costs its own tick (feature-list audit #42).
+  'memory:read-as-owner',
   // Reading what is in the owner's connected accounts, as the owner: their mail and its attachments.
   // An agent's connections are its own; this is what lets the owner's AI read the mailbox the owner
   // connected, and it costs its own tick for the reason messages:read-as-owner does.
@@ -210,7 +216,9 @@ export const SCOPE_DOMAINS = [
   // on its own it lifts a block on writes the agent is not making.
   // purge — delete shared workspace records for good (2026-10-02). `delete` can be undone for a grace
   //   window and `purge` cannot, so they are two ticks; an agent holding `purge` has every task wait.
-  { key: 'memory',    permissions: ['read', 'write', 'delete', 'purge', 'write-as-owner', 'write-reserved'] },
+  // read-as-owner — read the owner's and the sibling agents' records as the owner, private ones
+  //   included (2026-10-15). `read` with owner_scope gives only what visibility allows.
+  { key: 'memory',    permissions: ['read', 'write', 'delete', 'purge', 'read-as-owner', 'write-as-owner', 'write-reserved'] },
   { key: 'storage',   permissions: ['read', 'write'] },
   { key: 'ai',        permissions: ['use'] },
   { key: 'work',      permissions: ['request', 'read', 'accept', 'publish'] },

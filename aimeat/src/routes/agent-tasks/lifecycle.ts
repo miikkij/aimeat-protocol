@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-15 — The request-changes comment no longer says an agent inherits the owner role; it says
+ *     why the agent is refused (feature-list audit #79).
  *   v1.5.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.5.0 — 2026-10-02 — /start: every push carries its own delivery id (taskWakeId), so Start on a
  *     proposed task wakes the agent at once; another of the owner's agents holding task:write may
@@ -411,10 +413,11 @@ export function registerTaskLifecycleRoutes(
    * that endpoint flips the task back to 'queued' for owner review.
    */
   router.post('/v1/agents/:name/tasks/:id/request-changes', requireAuth(), async (req, res) => {
-    // Owner-session only -- agents inherit the owner role in their JWT (see
-    // /v1/auth/token), so requireRole('owner') alone would let an agent
-    // self-request-changes on its own proposed plan, which makes no sense.
-    // The same test as /start gates this: isOwnerInPerson (utils/gaii.ts).
+    // The owner in person only: isOwnerInPerson (utils/gaii.ts), the same test /start uses. An agent
+    // does not ask for changes to its own proposed plan; the owner reviews it. An agent's token carries
+    // the agent role and never the owner's (a role is granted, never inherited at mint time), so this
+    // refuses every agent, and the connector, which always calls with the agent's identity, offers no
+    // tool for it (feature-list audit #79, Jouni 2026-10-14).
     if (!isOwnerInPerson(req.auth)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner can request changes on a task'));
       return;

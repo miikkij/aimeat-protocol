@@ -18,6 +18,8 @@
  *   Both are pinned by value rather than by shape: a test asserting "the description mentions the
  *   price" passes on 1500000 as happily as on 1.50.
  * @version-history
+ *   2026-10-15 — A for-hire skill carries the offering's input schema, or names where to read a long one
+ *     (feature-list audit #83).
  *   v1.1.0 — 2026-10-11 — The morsel cases assert the pacing line ("free, pacing N morsels per use"):
  *     they asserted the old morsel price model, which the ruling on pacing replaced.
  *   v1.0.0 — 2026-09-04 — Initial, with the fix it exists to hold.
@@ -86,6 +88,22 @@ describe('the price on an agent card', () => {
   it('drops the trailing zeros on a whole amount', () => {
     expect(priceSentence(offering({ unit: 'money', basePrice: 2_000_000, currency: 'USD' })))
       .toContain('2 USD per task');
+  });
+});
+
+describe('what a stranger sends to an offering (feature-list audit #83)', () => {
+  it('carries the offering\'s input schema on its skill', () => {
+    const text = priceSentence(offering({
+      unit: 'money', basePrice: 1_000_000, currency: 'EUR',
+      taskSpec: { inputSchema: { type: 'object', required: ['text'], properties: { text: { type: 'string' } } }, outputSchema: {} },
+    }));
+    expect(text).toContain('JSON Schema: {"type":"object","required":["text"]');
+  });
+
+  it('names where to read a schema too long for the card, and says nothing when there is none', () => {
+    const big = { type: 'object', properties: Object.fromEntries(Array.from({ length: 400 }, (_, i) => [`field${i}`, { type: 'string' }])) };
+    expect(priceSentence(offering({ taskSpec: { inputSchema: big, outputSchema: {} } }))).toContain('GET /v1/exchange/offerings/off-1');
+    expect(priceSentence(offering({}))).not.toContain('Schema');
   });
 });
 

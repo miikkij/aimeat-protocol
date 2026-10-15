@@ -15,6 +15,8 @@
  *   itself. The last part checks return_url on aimeat_organism_invite_email.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-agent-access
  * @version-history
+ *   2026-10-15 — A plain member, signed in, is refused listing their own agent: only the organism's
+ *     owner or an admin adds to the list (feature-list audit #58).
  *   v1.1.0 — 2026-09-30 — aimeat_workspace_comment_delete: a listed agent deletes its own comment and,
  *     acting for the creator, the creator's; an unlisted agent is refused on DELETE /comments.
  *   v1.0.0 — 2026-09-28 — Initial.
@@ -307,6 +309,16 @@ async function run() {
     await test('a listed agent may not widen the setting back to "all"', async () => {
         const r = await callTool(A, 'aimeat_organism_update', { organism_id: orgId, agent_access: 'all' });
         assert(r.isError && /signed in/i.test(r.text), `an agent widened the setting: ${r.text.slice(0, 300)}`);
+    });
+
+    await test('a member who is neither owner nor admin may not list their own agent, even in person (audit #58)', async () => {
+        // Until 2026-10-15 a member signed in as a person put their own agent on the list, so the
+        // organism's list admitted whatever each member chose to add.
+        const r = await json(`/v1/organisms/${orgId}/agents`, {
+            method: 'POST', headers: bearer(B.ownerToken), body: JSON.stringify({ agent_gaii: B.agent.gaii }),
+        });
+        assert(r.status === 403 && r.body?.error?.code === 'ACCESS_DENIED' && /owner or an admin/.test(r.body?.error?.message ?? ''),
+            `a plain member listed their own agent: ${r.status} ${JSON.stringify(r.body?.error)}`);
     });
 
     await test('another member\'s agent is refused until an organism owner lists it', async () => {

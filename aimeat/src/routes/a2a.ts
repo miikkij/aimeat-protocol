@@ -29,8 +29,11 @@
  *   others, on these terms, at this price", and that listing is the whole of what a stranger may
  *   ask for. Its price is settled through x402 before the work starts.
  *
- *   AND IT NEVER LEARNS A GAII. A stranger holds a work id and reads an offering; the agent behind
- *   it stays an address on a public card.
+ *   THE AGENT'S IDENTIFIER IS PUBLIC. The address `/v1/a2a/:owner/:agent` on this node names the
+ *   owner and the agent, so the GAII (`agent#owner@node`) can be derived from it, and the directory
+ *   lists it. What a stranger does not get is anything the identifier would open: it holds a work id
+ *   and reads an offering, and every account surface stays behind the bearer road (feature-list
+ *   audit #83 corrected the earlier claim that a stranger never learns a GAII).
  *
  *   WHY THE SDK IS HERE AT ALL. It owns the JSON-RPC framing, the method names, the error codes and
  *   the protobuf serialisation — the parts where being subtly wrong means a client fails in a way
@@ -40,6 +43,8 @@
  * @structure a2aRouter(config, storage)
  * @usage app.use(a2aRouter(config, storage));
  * @version-history
+ *   2026-10-15 — The header and the directory comment say the agent's identifier is public (derivable
+ *     from the card's address); they said a stranger never learns a GAII (feature-list audit #83).
  *   v1.4.0 — 2026-10-06 — The account road builds its caller with callerOf (middleware/caller.ts), so
  *     the caller carries `federated` and a visitor is refused by name as well as by the owner
  *     comparison (secaudit 2026-10 follow-up, A3; no defect was found: verifyJWT names a visitor by
@@ -149,6 +154,8 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
       agents: published.map(({ agent, offerings }) => ({
         name: agent.name,
         owner: agent.owner,
+        // Public: the agent card's address names the owner and the agent on this node, which is the
+        // whole GAII. Listing it gives away nothing a stranger cannot derive (feature-list audit #83).
         gaii: agent.gaii,
         display_name: agent.displayName ?? agent.name,
         description: directoryDescriptionFor(agent.description, offerings),

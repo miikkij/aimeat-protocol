@@ -6,17 +6,22 @@
  *   (services/agent-port-redirect.ts): only to an active federation peer, at an address built from
  *   the peer record rather than from the string the pointer holds.
  * @version-history
+ *   2026-10-15 — The fake storage holds the pointer where the porting route writes it now (NS_AGENT_PORT);
+ *     on a real SQLite store the pointer is served after the agent is deleted, the old location went
+ *     with the agent, and a pointer past its 30 days is not served (feature-list audit #35).
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { portRedirectFor } from '../../src/services/agent-port-redirect.js';
+import { portRedirectFor, putPortRedirect, NS_AGENT_PORT } from '../../src/services/agent-port-redirect.js';
+import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 
 const GAII = 'scout#alice@aimeat-test-001-dev';
 
+/** A pointer where the porting route writes it since 2026-10-15: the system namespace, keyed by the GAII. */
 function storageWith(pointer: unknown, peers: Array<{ nodeId: string; url: string; status: string }>) {
     return {
-        getMemory: async (gaii: string, key: string) => (gaii === GAII && key === '__redirect__' && pointer !== undefined
-            ? { key, ownerGaii: gaii, value: pointer } : null),
+        getMemory: async (owner: string, key: string) => (owner === NS_AGENT_PORT && key === GAII && pointer !== undefined
+            ? { key, ownerGaii: owner, value: pointer } : null),
         listFederationPeers: async () => peers,
     } as never;
 }
@@ -57,5 +62,49 @@ describe('portRedirectFor', () => {
             expect(await portRedirectFor(storageWith({ target_node_url: target }, [PEER]), GAII), String(target)).toBeNull();
         }
         expect(await portRedirectFor(storageWith('https://peer.example', [PEER]), GAII)).toBeNull();
+    });
+});
+
+describe('the pointer outlives the agent (feature-list audit #35)', () => {
+    async function nodeWithAgent() {
+        const storage = new SqliteStorage(':memory:');
+        const now = new Date().toISOString();
+        await storage.createAgent({
+            name: 'scout', owner: 'alice', gaii: GAII, publicKey: 'pk', trustScore: 50,
+            morselBalance: 0, capabilities: [], createdAt: now, lastSeen: now,
+        } as never);
+        // The peer list is the federation registry's; this test is about where the pointer lives.
+        const withPeer = Object.assign(Object.create(storage), { listFederationPeers: async () => [PEER] }) as SqliteStorage;
+        return { storage, withPeer };
+    }
+
+    it('is still served after the agent and its memory are deleted', async () => {
+        const { storage, withPeer } = await nodeWithAgent();
+        await putPortRedirect(storage, GAII, { targetNodeUrl: 'https://peer.example', targetNodeId: PEER.nodeId });
+        expect(await storage.deleteAgent(GAII)).toBe(true);
+        const moved = await portRedirectFor(withPeer, GAII);
+        expect(moved?.location).toBe(`https://peer.example/v1/agents/${encodeURIComponent(GAII)}`);
+    });
+
+    it('where the pointer used to live, the agent\'s deletion took it along (the defect)', async () => {
+        const { storage, withPeer } = await nodeWithAgent();
+        const now = new Date().toISOString();
+        await storage.setMemory({
+            key: '__redirect__', ownerGaii: GAII, value: { target_node_url: 'https://peer.example' }, visibility: 'public',
+            tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+        });
+        expect(await portRedirectFor(withPeer, GAII)).not.toBeNull();   // read while the agent exists
+        await storage.deleteAgent(GAII);
+        expect(await portRedirectFor(withPeer, GAII)).toBeNull();
+    });
+
+    it('is not served once its 30 days have run out', async () => {
+        const { storage, withPeer } = await nodeWithAgent();
+        const longAgo = new Date(Date.now() - 31 * 24 * 3_600_000).toISOString();
+        await storage.setMemory({
+            key: GAII, ownerGaii: NS_AGENT_PORT, value: { target_node_url: 'https://peer.example' }, visibility: 'private',
+            tags: [], ttlHours: 30 * 24, version: 1, createdAt: longAgo, updatedAt: longAgo,
+        });
+        expect(await portRedirectFor(withPeer, GAII)).toBeNull();
     });
 });

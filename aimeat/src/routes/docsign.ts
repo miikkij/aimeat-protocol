@@ -23,6 +23,7 @@
  *   - the wallet signing endpoints                    routes/docsign-wallet.ts, mounted here
  * @usage router.use(docsignRouter(config, storage));
  * @version-history
+ *   2026-10-15 — POST /requests/:id/sign hands the credential origin (req.auth.via) to signRequest, so a personal access token cannot sign with method "session" (feature-list audit #37).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Mounts docsignWalletRouter: signing with an EU Digital Identity Wallet
  *     (wish-allekirjoitus-eudi-lompakolla).
@@ -139,7 +140,9 @@ export function docsignRouter(config: AimeatConfig, storage: Storage): Router {
     const parsed = SignSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.message)); return; }
     try {
-      const request = await signRequest(ctx, callerOf(req, config.nodeId, storage), req.params.id as string, parsed.data);
+      // The credential's origin: method "session" is for the node's own page, never a PAT (audit #37).
+      const request = await signRequest(ctx, callerOf(req, config.nodeId, storage), req.params.id as string, parsed.data,
+        { via: req.auth?.via });
       res.json(success(config.nodeId, { request, checks: await verifyRecordSignatures(ctx, request) }));
     } catch (err) { fail(res, err); }
   });

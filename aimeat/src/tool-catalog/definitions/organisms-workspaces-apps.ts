@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-15 — aimeat_organism_invitation_respond says accepting is the person's own (feature-list audit #57).
  *   2026-10-15 — aimeat_organism_create names `workspaces_not_created` in its description (feature-list audit #56).
  *     aimeat_organism_export says any active member may export, as GET /v1/organisms/:id/export
  *     decides, and names the row spaces and `truncated` (feature-list audit #68).
@@ -267,7 +268,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_organism_invitation_respond',
-        description: 'Accept or decline an invitation to an organism that was extended to you. Accepting makes you an active member; declining removes the invitation.',
+        description: 'Accept or decline an invitation to an organism that was extended to your owner. Declining removes the invitation. Accepting makes the account an active member, and only the person decides that: an agent session is refused ACCESS_DENIED, so tell the person to accept it themselves, signed in, from their notifications or the organism\'s page.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Respond to Invitation', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
