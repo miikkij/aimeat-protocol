@@ -11,6 +11,7 @@
  *   import { registerMemoryExtendedTools } from './memory-extended.js';
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-15 — aimeat_memory_search reads storage.searchText, as GET /v1/memory/search does: word-start over the values, no longer a substring match (feature-list audit #52).
  *   2026-10-08 — aimeat_memory_search names each hit's ai_provenance_id; aimeat_memory_read_public
  *     answers with the public record's id and block, as the REST public read does (aiprov E14).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -97,7 +98,11 @@ export function registerMemoryExtendedTools(
             }
             // Pull a bounded candidate set from storage (safety net over a pathological store), then drop
             // version history in-tool and cap to `cap` non-version hits.
-            const candidates = await storage.searchMemory(agentGaii, effectiveQuery, { visibility, limit: cap * 4 });
+            // storage.searchText, the primitive GET /v1/memory/search uses for an agent session: the
+            // word-start match over the indexed values. storage.searchMemory matched a substring,
+            // so the same query found different records on the two surfaces (feature-list audit #52).
+            const candidates = (await storage.searchText(effectiveQuery, { ownerGaiis: [agentGaii], visibility, limit: cap * 4 }))
+                .map(h => h.record);
             // Typed against the stored value, then presented: the classification reader plus the
             // credential mask (TARGET-082). A hit this agent may not see is not in the answer.
             const typed = await presentMemories(readerForAgent({ storage, config }, agentGaii),

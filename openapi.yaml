@@ -17688,6 +17688,12 @@ paths:
     get:
       operationId: searchMemory
       summary: Search memory
+      description: |
+        Full-text search over the caller's memory. Each word of `q` matches a word that begins with
+        it, and the words are joined with OR, ranked best first. The searched text is the key (and its
+        segments split at `.`, `_`, `:`, `/` and `-`), the tags and the scalar values inside the value
+        to six levels deep. Field names are not searched. Both storage backends and the
+        `aimeat_memory_search` MCP tool apply this rule.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -23510,6 +23516,9 @@ paths:
         classification is on, the copy keeps the source's label, never lower: the answer's
         `classification` names the label set on the copy, and a source label the copy's policy does
         not have refuses the copy with 403 CLASSIFIED.
+
+        The copy is validated against the schema lock of its key, like every memory write: a value
+        that does not match answers 422 SCHEMA_VALIDATION_FAILED and nothing is stored.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -23557,7 +23566,16 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '413':
           description: The copy would put the caller over its memory quota (QUOTA_EXCEEDED), the same answer every memory write gives.
-        '422': { $ref: '#/components/responses/OdpsFieldTooLong' }
+        '422':
+          description: |
+            Two refusals, nothing written. SCHEMA_VALIDATION_FAILED: the copied value does not match the
+            schema lock on its key, the check POST /v1/memory makes (`error.details` is
+            `{ key, violations, schema_url }`). ODPS_FIELD_TOO_LONG: the copy would publish an EXCHANGE
+            listing past an ODPS length cap (see the OdpsFieldTooLong response).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/memory/pull:
     post:
@@ -25343,7 +25361,10 @@ paths:
     post:
       operationId: acceptFault
       summary: Provider accepts fault
-      description: Provider acknowledges the dispute. Escrow returned to requester.
+      description: |
+        Provider acknowledges the dispute. Escrow returned to requester. The dispute is resolved with
+        the ruling `requester_wins` (reason "The provider accepted fault."), which GET
+        /v1/work/{tc}/dispute shows and which counts as a dispute the provider lost in its trust score.
       tags: [Disputes]
       security:
         - BearerAuth: []
@@ -25464,6 +25485,11 @@ paths:
     post:
       operationId: operatorRule
       summary: Operator rules on dispute
+      description: |
+        The operator resolves an escalated dispute and shares out the escrow. `ruling` is one of
+        `requester_wins`, `provider_wins` or `split`; any other value answers 400 VALIDATION_ERROR and
+        nothing is written. A `requester_wins` ruling counts as a dispute the provider lost in the
+        provider's trust score, and the stored score is updated when the ruling is made.
       tags: [Disputes]
       security:
         - BearerAuth: []
@@ -25482,6 +25508,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
   /v1/admin/disputes/{id}/audit-log:
     get:
@@ -35571,14 +35599,21 @@ paths:
     get:
       operationId: listSchemas
       summary: List all schemas
-      description: List all registered schema locks on this node. No authentication required.
+      description: |
+        List all registered schema locks on this node, or those whose key pattern starts with
+        `prefix`. No authentication required. The list is not paged: every matching lock is in one
+        answer, with `total` its length. The schema body and its semantic context are read per lock
+        with GET /v1/memory/{key}/schema.
       tags: [Schema]
       parameters:
-        - $ref: '#/components/parameters/Pagination'
-        - $ref: '#/components/parameters/PerPage'
+        - name: prefix
+          in: query
+          required: false
+          schema: { type: string }
+          description: Only the locks whose key pattern starts with this text.
       responses:
         '200':
-          description: List of schema locks
+          description: 'The schema locks: { schemas, total }'
           content:
             application/json:
               schema:
@@ -35587,20 +35622,30 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: array
-                        items:
-                          type: object
-                          properties:
-                            key:
-                              type: string
-                            apply_to:
-                              type: string
-                            schema_mode:
-                              type: string
-                            schema:
+                        type: object
+                        properties:
+                          schemas:
+                            type: array
+                            items:
                               type: object
-                            semantic_context:
-                              $ref: '#/components/schemas/SemanticAnnotation'
+                              properties:
+                                key:
+                                  type: string
+                                  description: The key pattern the lock applies to.
+                                apply_to:
+                                  type: string
+                                schema_mode:
+                                  type: string
+                                locked_by:
+                                  type: string
+                                set_at:
+                                  type: string
+                                  format: date-time
+                                has_semantic:
+                                  type: boolean
+                                  description: Whether the lock carries a semantic context.
+                          total:
+                            type: integer
 
   # --- Phase 0.2: CSM (Community Service Manifest) ---
 
@@ -70842,7 +70887,7 @@ paths:
       operationId: createFinanceFiscalYear
       tags: [Finance]
       summary: Create a fiscal year
-      description: Calendar years are auto-created on first booking; this endpoint exists for non-calendar fiscal years. Overlaps are rejected (409).
+      description: Calendar years are auto-created on first booking; this endpoint exists for non-calendar fiscal years. A year belongs to one company (`organism_id`, or none for the owner's own books), and a year that overlaps another year of the same company is rejected (409 FISCAL_YEAR_OVERLAP). Two companies may have years for the same days.
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true

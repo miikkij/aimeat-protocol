@@ -6,6 +6,11 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-disputes
  * @version-history
+ *   2026-10-15 — Tests 18 and 19 send the verdicts openapi.yaml names (requester_wins, provider_wins):
+ *     their free-text verdicts no longer matched the contract, which the route now enforces (setup no
+ *     longer matched production). 18a: a free-text verdict is refused with nothing written (feature-list
+ *     audit #143). The stored trust score follows a delivery, and accept-fault records requester_wins
+ *     (feature-list audit #144).
  *   v1.2.1 — 2026-10-12 — The dispute action is published with its pacing amount as
  *     pricing.toll_morsels; node 4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), which left
  *     nothing in escrow, and the new field means the same on 3.x.
@@ -219,9 +224,30 @@ await test('Provider auth token', async () => {
     providerToken = body.data.token;
 });
 
+/** The provider's STORED trust score, as listings read it (no recomputation on this read). */
+async function storedProviderTrust(): Promise<number> {
+    const { body } = await json(`/v1/owners/${provOwnerName}`, { headers: { Authorization: `Bearer ${provOwnerToken}` } });
+    const row = (body.data.agents as any[]).find(a => a.gaii === providerGaii);
+    return Number(row?.trust_score);
+}
+
+let providerTrustAtRegistration = 0;
+await test('Provider starts at the registration score', async () => {
+    providerTrustAtRegistration = await storedProviderTrust();
+    assert(providerTrustAtRegistration === 50, `a new agent's stored score: ${providerTrustAtRegistration}`);
+});
+
 await test('Create delivered work item for Phase 1-3', async () => {
     const tc = await createDeliveredWork();
     trackingCodes.push(tc); // trackingCodes[0]
+});
+
+// Feature-list audit #144: the stored score was written only when someone opened the agent's profile.
+// A delivery is an event the score depends on, so the stored score follows it: one requester only,
+// so the score is held at the 40 a provider with under three counterparties can reach.
+await test('A delivery updates the provider\'s stored trust score', async () => {
+    const after = await storedProviderTrust();
+    assert(after === 40, `stored score after one delivery to one requester: ${after} (was ${providerTrustAtRegistration})`);
 });
 
 // aiprov D8: the output the requester disputes over says how it was made. The provider is an agent,
@@ -383,6 +409,11 @@ await test('10. Provider accepts fault', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
     assert(body.data.outcome === 'requester_refunded', `outcome: ${body.data.outcome}`);
+
+    // Feature-list audit #144: accepting fault is a dispute the provider lost, recorded as the verdict
+    // the trust score counts. It was resolved with no ruling at all.
+    const view = await json(`/v1/work/${tc}/dispute`, { headers: { Authorization: `Bearer ${requesterToken}` } });
+    assert(view.body.data.ruling?.ruling === 'requester_wins', `ruling after accept-fault: ${JSON.stringify(view.body.data.ruling)}`);
 });
 
 await test('11. Verify requester wallet refund', async () => {
@@ -570,6 +601,25 @@ async function walletOf(token: string): Promise<number> {
     return Number(body.data.balance);
 }
 
+// Feature-list audit #143: openapi.yaml allows three verdicts and the route stored any text. Refuse
+// before you write: the refused ruling moves no money and leaves the dispute open for test 18.
+await test('18a. A verdict outside requester_wins, provider_wins and split is refused', async () => {
+    const disputeId = disputeIds[4];
+    const reqBefore = await walletOf(requesterToken);
+    const { status, body } = await json(`/v1/admin/disputes/${disputeId}/rule`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            ruling: 'Requester wins — full refund',
+            distribution: { to_requester: 10, to_provider: 0, burned: 0 },
+        }),
+    });
+    assert(status === 400 && body.error?.code === 'VALIDATION_ERROR', `free-text verdict: ${status} ${JSON.stringify(body.error)}`);
+    assert(await walletOf(requesterToken) === reqBefore, 'a refused ruling moved money');
+    const log = await json(`/v1/admin/disputes/${disputeId}/audit-log`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(!log.body.data.entries.some((e: any) => e.event === 'operator_ruled'), 'a refused ruling was written to the log');
+});
+
 await test('18. Operator rules in favor of requester', async () => {
     const disputeId = disputeIds[4];
     // A ruling DISTRIBUTES the escrow, and until now that was asserted from
@@ -584,7 +634,7 @@ await test('18. Operator rules in favor of requester', async () => {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
-            ruling: 'Requester wins — full refund',
+            ruling: 'requester_wins',
             distribution: { to_requester: 10, to_provider: 0, burned: 0 },
             reason: 'Provider failed to deliver quality output',
         }),
@@ -633,7 +683,7 @@ await test('19. Operator rules in favor of provider', async () => {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
-            ruling: 'Provider wins — work was acceptable',
+            ruling: 'provider_wins',
             distribution: { to_requester: 0, to_provider: 10, burned: 0 },
             reason: 'Requester complaint not substantiated',
         }),

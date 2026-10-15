@@ -13,6 +13,7 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-15 — aimeat_admin_stats counts morsels in circulation with morselsInCirculation(), the function the admin dashboard uses: every account holder, with or without an agent (feature-list audit #169).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 — 2026-09-29 — aimeat_admin_config reports the classification switch (classification_mode)
  *     and names aimeat_classification switch_set, which sets it (TARGET-082). This tool stays read-only.
@@ -41,7 +42,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { hasSealedKeys, sealedView } from '../services/config-sealing.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { mintMorsels } from '../services/morsel.js';
+import { mintMorsels, morselsInCirculation } from '../services/morsel.js';
 import { addOrganismOwner, organismOwners } from '../services/organism-ownership.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
@@ -85,18 +86,15 @@ export function registerCoreAdminTools(
             const actions = await storage.listActions();
             const boards = await storage.listBoards();
             const allWork = await storage.listAllWork();
-            let totalMorsels = 0;
             let activeAgents = 0;
             const now = Date.now();
-            const seenOwners = new Set<string>();
             for (const a of agents) {
-                if (!seenOwners.has(a.owner)) {
-                    seenOwners.add(a.owner);
-                    const ghii = await storage.getGHIIByOwner(a.owner);
-                    totalMorsels += ghii?.morselBalance ?? 0;
-                }
                 if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) activeAgents++;
             }
+            // The supply GET /v1/admin/dashboard reports, from one function: every account holder's
+            // balance, including a person with no agent, whom the per-agent loop left out
+            // (feature-list audit #169).
+            const totalMorsels = await morselsInCirculation(storage);
             return {
                 content: [{
                     type: 'text' as const,

@@ -20,6 +20,7 @@
  *       reason the numbering is split in two rather than simply made per-company.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=finance-per-company
  * @version-history
+ *   2026-10-15 — 8b: two companies take a fiscal year for the same days, one company cannot overlap its own (feature-list audit #148).
  *   v1.0.0 — 2026-08-23 — Initial (TARGET-072).
  */
 
@@ -274,6 +275,22 @@ await test('8. the fiscal-year list narrows too', async () => {
   assert(scoped.body.data.fiscal_years.length < all.body.data.fiscal_years.length,
     `scoping must narrow: all ${all.body.data.fiscal_years.length}, scoped ${scoped.body.data.fiscal_years.length}`);
   assert(scoped.body.data.fiscal_years.every((y: any) => y.organismId === acme.org), 'a scoped year list leaked');
+});
+
+await test('8b. a second company creates a fiscal year for the same days; the same company cannot', async () => {
+  // Feature-list audit #148: the overlap check read every year of the owner, so Beta was refused the
+  // dates Acme already had, although a year belongs to one company.
+  const create = (org: string) => json('/v1/finance/fiscal-years', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ label: 'FY 2031/32', start_date: '2031-07-01', end_date: '2032-06-30', organism_id: org }),
+  });
+  const first = await create(acme.org);
+  assert(first.status === 201, `Acme's year: ${first.status} ${JSON.stringify(first.body.error)}`);
+  const second = await create(beta.org);
+  assert(second.status === 201, `Beta's year for the same days: ${second.status} ${JSON.stringify(second.body.error)}`);
+  const again = await create(acme.org);
+  assert(again.status === 409 && again.body.error?.code === 'FISCAL_YEAR_OVERLAP',
+    `Acme's second year over its own: ${again.status} ${JSON.stringify(again.body.error)}`);
 });
 
 console.log('\nPhase 4 — sending, per company');

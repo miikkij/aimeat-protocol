@@ -18,6 +18,7 @@
  *   - mintMorsels: operator mint against the daily cap, for every door that mints
  *
  * @version-history
+ *   2026-10-15 — morselsInCirculation(): the sum of the account holders' balances, for the admin dashboard and aimeat_admin_stats (feature-list audit #169).
  *   2026-10-15 — mintMorsels reads the shared daily ceiling, addedToday: mints and sold pacing packs,
  *     summed by the database (feature-list audit 176).
  *   v1.3.0 — 2026-10-11 — calculateWorkCost names the escrowed amount `toll`, the action's pacing
@@ -398,6 +399,21 @@ export async function mintMorsels(
         mintedToday: mintedToday + amount,
         dailyCap: config.maxOperatorMintPerDay,
     };
+}
+
+/**
+ * Morsels in circulation: the sum of every account holder's balance. A balance lives on the person's
+ * GHII (GHIIRecord.morselBalance); agent and ecosystem rows always hold 0, so the dashboard's sum over
+ * agent rows answered 0 on every node. GET /v1/admin/dashboard and aimeat_admin_stats both read this
+ * (feature-list audit #169).
+ */
+export async function morselsInCirculation(storage: Storage): Promise<number> {
+    const owners = new Set((await storage.listOwners()).map(o => o.name));
+    let total = 0;
+    for (const g of await storage.listGHIIs()) {
+        if (owners.has(g.ownerName)) total += g.morselBalance ?? 0;
+    }
+    return total;
 }
 
 /**

@@ -20,6 +20,7 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-15 — deleteMemoryRecord records the delete in the memory write tally (recordMemoryTouch, kind 'delete'), so the hands answer counts it (feature-list audit #50).
  *   v1.7.0 — 2026-10-13 — The organism namespace rule is asked with the session's scopes, which the
  *     fenced-space rule reads: a session that covers organism:direct removes and puts back a record
  *     of a space that names extensions (ruled by the developer on 2026-10-13).
@@ -53,6 +54,7 @@ import { isServiceOwnedKey, isReservedServerKey, serverWrittenKeyRefusal } from 
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
 import { isSecretRecordKey, secretRecordBinRefusal } from './secret-records.js';
+import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
@@ -249,6 +251,10 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
   // of its doors told the screen anything. A record only its owner read is told to that owner's
   // streams alone (event-bus.ts emitRecordChange).
   emitRecordChange('memory', found, visibility);
+  // A delete is a hand on the key, and GET /v1/memory/:key/hands reports `deletes` from this tally.
+  // Only the extension delete recorded one, so the count stayed 0 for every delete made over REST
+  // or MCP (feature-list audit #50).
+  recordMemoryTouch({ ownerGaii: found, key: req.key, writerPrincipal: req.caller, kind: 'delete' });
   const graceDays = deps.config.memoryDeleteGraceDays;
   return {
     ok: true, key: req.key, ownerGaii: found, graceDays,

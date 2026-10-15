@@ -11,6 +11,7 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-10-15 — The dashboard counts morsels in circulation from the account holders' balances (morselsInCirculation), not from agent rows, which are always 0; the ledger figures are summed in the database (sumTransactionsByType), not from the newest 10 000 rows (feature-list audit #169).
  *   v1.12.1 — 2026-10-12 — The economy figures count the burned share of pacing (`pacing_burn`) as burned
  *     and pacing packs bought with money as created; the page said "0 burned" while pacing burned.
  *   v1.12.0 — 2026-10-11 — The dashboard's commerce block names the morsel volume pacing_volume_*,
@@ -43,6 +44,8 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { TransactionTypeSum } from '../storage/repositories/wallet.repository.js';
+import { morselsInCirculation } from '../services/morsel.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -345,76 +348,57 @@ export function adminRouter(
         const allWork = await storage.listAllWork();
         const allDisputes = await storage.listAllDisputes();
 
-        let totalMorsels = 0;
         let activeAgents = 0;
         const now = Date.now();
         const dayStart = new Date();
         dayStart.setUTCHours(0, 0, 0, 0);
 
         for (const a of agents) {
-            totalMorsels += a.morselBalance;
             if (a.lastSeen && now - new Date(a.lastSeen).getTime() < 86_400_000) {
                 activeAgents++;
             }
         }
+        // A balance lives on the person, never on an agent row (which is always 0), so the supply is
+        // the account holders' balances, as aimeat_admin_stats counts it (feature-list audit #169).
+        const totalMorsels = await morselsInCirculation(storage);
 
-        // §14.2 / §14.3: Compute full economy metrics from transaction history
-        const allTx = await storage.listAllTransactions();
+        // §14.2 / §14.3: economy metrics from the transaction ledger, summed in the database per type
+        // for all time, the last 30 days and today. Summed from listAllTransactions, the "all time"
+        // figures covered only its newest 10 000 rows (feature-list audit #169).
         const thirtyDaysAgo = new Date(now - 30 * 86_400_000);
+        const [sumsAll, sums30d, sumsToday] = await Promise.all([
+            storage.sumTransactionsByType(),
+            storage.sumTransactionsByType(thirtyDaysAgo.toISOString()),
+            storage.sumTransactionsByType(dayStart.toISOString()),
+        ]);
+        const sumOf = (rows: TransactionTypeSum[], types: readonly string[], field: 'total' | 'absTotal' | 'count'): number =>
+            rows.filter(r => types.includes(r.type)).reduce((s, r) => s + r[field], 0);
 
-        let totalMinted = 0;
-        let totalBurned = 0;
-        let minted30d = 0;
-        let burned30d = 0;
-        // Daily metrics (§14.2)
-        let transactionsToday = 0;
-        let morselsTransactedToday = 0;
-        let networkFeesToday = 0;
-        let burnedToday = 0;
-        let dailyAllowancesIssuedToday = 0;
+        // Supply in: mints, grants and pacing capacity bought with money. Supply out: every burn,
+        // the work network fee's (`burn`) and the burned share of a pacing charge (`pacing_burn`).
+        const MINT_TYPES = ['mint', 'welcome_bonus', 'daily_allowance', 'pacing_pack'] as const;
+        const BURN_TYPES = ['burn', 'pacing_burn'] as const;
         // Pacing volume: what users' owners were debited in morsels for uses. A morsel is pacing, not a
         // price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa), so this is not a
         // sales figure. It counts the pacing legs (pacing_charge + pacing_burn) and the spend legs the
         // 3.26.x morsel-price flows wrote, so history before the ruling stays in the total. The fee leg
         // (marketplace_fee) is the operator's share of that pacing.
-        const PACING_SPEND_TYPES = new Set(['pacing_charge', 'pacing_burn', 'commerce_spend', 'offer_spend', 'org_offer_spend', 'app_purchase']);
-        let pacingVolumeAllTime = 0;
-        let pacingVolumeToday = 0;
-        let operatorFeesAllTime = 0;
-        let operatorFeesToday = 0;
+        const PACING_SPEND_TYPES = ['pacing_charge', 'pacing_burn', 'commerce_spend', 'offer_spend', 'org_offer_spend', 'app_purchase'] as const;
 
-        for (const tx of allTx) {
-            const txDate = new Date(tx.timestamp);
-            const isToday = txDate >= dayStart;
-
-            // Supply in: mints, grants and pacing capacity bought with money. Supply out: every burn,
-            // the work network fee's (`burn`) and the burned share of a pacing charge (`pacing_burn`).
-            if (tx.type === 'mint' || tx.type === 'welcome_bonus' || tx.type === 'daily_allowance' || tx.type === 'pacing_pack') {
-                totalMinted += tx.amount;
-                if (txDate >= thirtyDaysAgo) minted30d += tx.amount;
-            }
-            if (tx.type === 'burn' || tx.type === 'pacing_burn') {
-                totalBurned += Math.abs(tx.amount);
-                if (txDate >= thirtyDaysAgo) burned30d += Math.abs(tx.amount);
-            }
-            if (PACING_SPEND_TYPES.has(tx.type)) {
-                pacingVolumeAllTime += Math.abs(tx.amount);
-                if (isToday) pacingVolumeToday += Math.abs(tx.amount);
-            }
-            if (tx.type === 'marketplace_fee') {
-                operatorFeesAllTime += tx.amount;
-                if (isToday) operatorFeesToday += tx.amount;
-            }
-
-            // Daily aggregations
-            if (isToday) {
-                transactionsToday++;
-                morselsTransactedToday += Math.abs(tx.amount);
-                if (tx.type === 'network_fee') networkFeesToday += Math.abs(tx.amount);
-                if (tx.type === 'burn' || tx.type === 'pacing_burn') burnedToday += Math.abs(tx.amount);
-                if (tx.type === 'daily_allowance') dailyAllowancesIssuedToday++;
-            }
-        }
+        const totalMinted = sumOf(sumsAll, MINT_TYPES, 'total');
+        const totalBurned = sumOf(sumsAll, BURN_TYPES, 'absTotal');
+        const minted30d = sumOf(sums30d, MINT_TYPES, 'total');
+        const burned30d = sumOf(sums30d, BURN_TYPES, 'absTotal');
+        const pacingVolumeAllTime = sumOf(sumsAll, PACING_SPEND_TYPES, 'absTotal');
+        const pacingVolumeToday = sumOf(sumsToday, PACING_SPEND_TYPES, 'absTotal');
+        const operatorFeesAllTime = sumOf(sumsAll, ['marketplace_fee'], 'total');
+        const operatorFeesToday = sumOf(sumsToday, ['marketplace_fee'], 'total');
+        // Daily metrics (§14.2)
+        const transactionsToday = sumsToday.reduce((s, r) => s + r.count, 0);
+        const morselsTransactedToday = sumsToday.reduce((s, r) => s + r.absTotal, 0);
+        const networkFeesToday = sumOf(sumsToday, ['network_fee'], 'absTotal');
+        const burnedToday = sumOf(sumsToday, BURN_TYPES, 'absTotal');
+        const dailyAllowancesIssuedToday = sumOf(sumsToday, ['daily_allowance'], 'count');
 
         // Checkout-session lifecycle counts (commerce.session.* memory records, buyer-side truth) +
         // real-money (EUR/USD) volume per currency, kept entirely separate from morsels.

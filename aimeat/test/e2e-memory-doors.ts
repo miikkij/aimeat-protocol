@@ -24,6 +24,8 @@
  *     test/run-e2e-ci.ts --test=memory-doors
  *
  * @version-history
+ *   2026-10-15 — A copy past a schema lock is refused with 422 (feature-list audit #51). The hands on a
+ *     key count a delete and come back newest first across the owner's namespaces (feature-list audit #50).
  *   v1.2.0 — 2026-10-05 — A schema lock with the aimeat-validate formats (fi-business-id, iban) and
  *     the x- keywords registers, accepts a right value and refuses a wrong check digit and a differing
  *     x-same-as with 422.
@@ -537,6 +539,34 @@ await test('PUT of a value the key\'s schema refuses → 422 SCHEMA_VALIDATION_F
   assert(still.body.data?.value?.n === 1, `the refused PUT stored the bad value: ${JSON.stringify(still.body.data?.value)}`);
 });
 
+// Feature-list audit #51: POST /v1/memory/copy wrote the copied value past the schema lock of its key.
+await test('copy of a value the key\'s schema refuses → 422 SCHEMA_VALIDATION_FAILED, and nothing is stored', async () => {
+  const prefix = `memdoorscopylock${Date.now()}`;
+  const key = `${prefix}.note`;
+  // The public source is written before the lock exists, so the copy is the only write the lock sees.
+  const src = await json('/v1/memory', {
+    method: 'POST', headers: strangerAuth(),
+    body: JSON.stringify({ key, value: { text: 'no number here' }, visibility: 'public' }),
+  });
+  assert(src.status === 201, `public source ${src.status}: ${JSON.stringify(src.body?.error)}`);
+  const lock = await json(`/v1/memory/${encodeURIComponent(prefix)}/schema`, {
+    method: 'PUT', headers: ownerAuth(),
+    body: JSON.stringify({ apply_to: 'prefix', schema_mode: 'open', schema: { type: 'object', properties: { n: { type: 'number' } }, required: ['n'] } }),
+  });
+  assert(lock.status === 200, `schema lock ${lock.status}: ${JSON.stringify(lock.body?.error)}`);
+  try {
+    const { status, body } = await json('/v1/memory/copy', {
+      method: 'POST', headers: agentAuth(), body: JSON.stringify({ source_gaii: strangerGhii, key }),
+    });
+    assert(status === 422 && body.error?.code === 'SCHEMA_VALIDATION_FAILED', `expected 422 SCHEMA_VALIDATION_FAILED, got ${status} ${JSON.stringify(body?.error)}`);
+    assert(Array.isArray(body.error?.details?.violations) && body.error.details.violations.length > 0, `violations: ${JSON.stringify(body.error?.details)}`);
+    const read = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: agentAuth() });
+    assert(read.status === 404, `the refused copy was stored: ${read.status}`);
+  } finally {
+    await json(`/v1/memory/${encodeURIComponent(prefix)}/schema`, { method: 'DELETE', headers: ownerAuth() });
+  }
+});
+
 await test('a schema lock with the aimeat-validate formats and x- keywords: a right write passes, a wrong check digit → 422 naming the field', async () => {
   // The schema an app's form checks with AIMEAT.validate, unchanged. Before input-formats.ts the
   // node refused to register it at all (Ajv strict: unknown format, unknown keyword).
@@ -720,6 +750,34 @@ await test('DELETE with ?owner= given twice is no override: the operator\'s own 
   const theirs = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: strangerAuth() });
   assert(theirs.status === 200, `the other owner's key stays: ${theirs.status}`);
   await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: strangerAuth() });
+});
+
+// Feature-list audit #50: a delete through the memory routes recorded no hand, so `deletes` was always
+// 0, and the hands of the owner's several namespaces came back in namespace order, not newest first.
+await test('the hands on a key count a delete, and come back newest first across namespaces', async () => {
+  const key = `memdoors.hands${Date.now()}`;
+  const own = await json('/v1/memory', { method: 'POST', headers: ownerAuth(), body: JSON.stringify({ key, value: { n: 1 }, visibility: 'private' }) });
+  assert(own.status === 201, `owner write ${own.status}`);
+  await sleep(30);
+  const agents = await json('/v1/memory', { method: 'POST', headers: agentAuth(), body: JSON.stringify({ key, value: { n: 2 }, visibility: 'private' }) });
+  assert(agents.status === 201, `agent write ${agents.status}`);
+  await sleep(30);
+  // The first delete takes the owner's own copy; the second reaches the agent's copy, a hand the
+  // owner never had on that namespace before, so it is written at once rather than at the next flush.
+  for (const n of [1, 2]) {
+    const d = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: ownerAuth() });
+    assert(d.status === 200, `delete ${n}: ${d.status} ${JSON.stringify(d.body?.error)}`);
+  }
+  await sleep(200);
+
+  const { status, body } = await json(`/v1/memory/${encodeURIComponent(key)}/hands`, { headers: ownerAuth() });
+  assert(status === 200, `hands ${status}: ${JSON.stringify(body?.error)}`);
+  const hands = body.data.hands as Array<{ writer: string; writes: number; deletes: number; last_at: string; namespace: string }>;
+  const deleter = hands.find(h => h.namespace === agentGaii && h.writer === ownerGhii);
+  assert(deleter?.deletes === 1, `the owner's delete of the agent's copy is a hand: ${JSON.stringify(hands)}`);
+  const times = hands.map(h => h.last_at);
+  assert(JSON.stringify(times) === JSON.stringify([...times].sort().reverse()), `newest first: ${JSON.stringify(times)}`);
+  assert(hands[hands.length - 1].namespace === ownerGhii, `the owner's own first write is the oldest: ${JSON.stringify(hands)}`);
 });
 
 await test('the bin route is not reached by a caller with no token (401)', async () => {

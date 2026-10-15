@@ -27,6 +27,7 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-15 — The consent_granted and consent_revoked account events go to the owner's GHII (ownerGhiiOf) on both REST and MCP; the consent record keeps the identity it was filed under (feature-list audit #44).
  *   v1.3.0 — 2026-10-15 — accountHoldsConsent and listAccountConsents: a consent is the account's on both
  *     doors, and revokeConsent admits the account for a consent filed under one of its agents
  *     (feature-list audit 40).
@@ -47,7 +48,7 @@ import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isSameOwner, localAccountName } from '../utils/gaii.js';
+import { isSameOwner, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
 import {
     CONSENT_REACH_ALIAS_REMOVED_IN, CONSENT_REACH_INPUTS, consentReachOf, defaultConsentReach, isConsentReachAlias,
 } from '../utils/consent-reach.js';
@@ -206,9 +207,12 @@ export async function grantConsent(
     emitChange('consent');
 
     // Giving someone access to your data is exactly the kind of thing you want a durable record of,
-    // and the audit trail above is the operator's copy rather than the person's.
+    // and the audit trail above is the operator's copy rather than the person's. The feed belongs to
+    // the PERSON: REST resolves an agent session to the agent's GAII and the MCP tool to the owner's
+    // GHII, so the event is filed under ownerGhiiOf() on both, whichever identity the consent itself
+    // is filed under (feature-list audit #44).
     void recordAccountEvent(storage, {
-        ownerGhii: caller.ownerGaii,
+        ownerGhii: ownerGhiiOf(caller.ownerGaii),
         kind: 'consent_granted',
         actorGaii: caller.ownerGaii,
         subject: consent.id,
@@ -245,7 +249,7 @@ export async function revokeConsent(
     if (consent.scope === 'federation' && onDirectoryChange) onDirectoryChange();
     emitChange('consent');
     void recordAccountEvent(storage, {
-        ownerGhii: consent.ownerGaii,
+        ownerGhii: ownerGhiiOf(consent.ownerGaii),
         kind: 'consent_revoked',
         actorGaii: caller.ownerGaii,
         subject: consent.id,

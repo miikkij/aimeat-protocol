@@ -8,6 +8,7 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-10-15 — setMemory and createMemoryIfAbsent write searchValues (the text the FTS index holds, storage/search-text.ts); searchMemory is one owner's searchText (feature-list audit #52).
  *   v1.1.0 — 2026-10-12 — bulkBinMemory: many rows into the bin in one transaction.
  *   v1.0.0 — 2026-10-05 — 27 methods (setMemory, listMemoryHistory, createMemoryIfAbsent, …) moved here from
  *     owner.ts; getMemoryByKeys, getMemoryByKeysAnyOwner, bulkSetMemory, deleteMemorySubtree,
@@ -20,6 +21,7 @@ import type {
   MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord, MemoryMetaRow,
 } from '../../../repositories/memory.repository.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
+import { searchValueText } from '../../../search-text.js';
 import type { SqliteStorage } from '../index.js';
 import {
   searchTextMemory, countMemory as countMemoryRepo, countMemoryWithOrigins as countMemoryWithOriginsRepo,
@@ -80,6 +82,8 @@ export const memoryMethods = {
     record.groupId = groupId ?? undefined;
     const valueStr = JSON.stringify(record.value);
     const byteSize = Buffer.byteLength(valueStr, 'utf8');   // cached for the O(1) total-size quota sum + ?include=meta
+    // What the FTS index holds for this row: the scalar values to six levels, the PostgreSQL rule.
+    const searchValues = searchValueText(record.value);
     if (existing) {
       if (existing.trackable) {
         // Archive the about-to-be-overwritten version into the separate history table (append-only).
@@ -97,7 +101,7 @@ export const memoryMethods = {
       this.db.prepare(
         `UPDATE memory SET value = ?, visibility = ?, groupId = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
          createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ?, byteSize = ?,
-         aiProvenanceId = ?, deletedAt = NULL, deletedBy = NULL WHERE ownerGaii = ? AND key = ?`
+         aiProvenanceId = ?, searchValues = ?, deletedAt = NULL, deletedBy = NULL WHERE ownerGaii = ? AND key = ?`
       ).run(
         valueStr, record.visibility, groupId, record.workspaceRef ?? null,
         JSON.stringify(record.tags), record.ttlHours,
@@ -108,12 +112,13 @@ export const memoryMethods = {
         // Write-through, deliberately NOT inherited from `existing`: a new value is new content, and
         // keeping the old provenance id would assert something about bytes that no longer exist.
         record.aiProvenanceId ?? null,
+        searchValues,
         record.ownerGaii, record.key,
       );
     } else {
       this.db.prepare(
-        `INSERT INTO memory (ownerGaii, key, value, visibility, groupId, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO memory (ownerGaii, key, value, visibility, groupId, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId, searchValues)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ownerGaii, record.key,
         valueStr, record.visibility, groupId, record.workspaceRef ?? null,
@@ -123,6 +128,7 @@ export const memoryMethods = {
         record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
         trackable ? 1 : 0, byteSize,
         record.aiProvenanceId ?? null,
+        searchValues,
       );
     }
     return record;
@@ -155,14 +161,14 @@ export const memoryMethods = {
     // with the new value and a clean tombstone, as setMemory does; a live row still wins.
     const valueStr = JSON.stringify(record.value);
     const result = this.db.prepare(
-      `INSERT INTO memory (ownerGaii, key, value, visibility, groupId, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO memory (ownerGaii, key, value, visibility, groupId, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId, searchValues)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(ownerGaii, key) DO UPDATE SET
          value = excluded.value, visibility = excluded.visibility, groupId = excluded.groupId,
          workspaceRef = excluded.workspaceRef, tags = excluded.tags, ttlHours = excluded.ttlHours,
          version = excluded.version, createdAt = excluded.createdAt, updatedAt = excluded.updatedAt,
          flagCount = excluded.flagCount, allowedOrigins = excluded.allowedOrigins, trackable = excluded.trackable,
-         byteSize = excluded.byteSize, aiProvenanceId = excluded.aiProvenanceId,
+         byteSize = excluded.byteSize, aiProvenanceId = excluded.aiProvenanceId, searchValues = excluded.searchValues,
          deletedAt = NULL, deletedBy = NULL
        WHERE memory.deletedAt IS NOT NULL`
     ).run(
@@ -174,6 +180,7 @@ export const memoryMethods = {
       record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
       record.trackable ? 1 : 0, Buffer.byteLength(valueStr, 'utf8'),
       record.aiProvenanceId ?? null,
+      searchValueText(record.value),
     );
     return result.changes === 0 ? null : record;
   },
@@ -389,43 +396,13 @@ export const memoryMethods = {
   },
 
   async searchMemory(this: SqliteStorage, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter; limit?: number }): Promise<MemoryRecord[]> {
-    const q = query.toLowerCase();
-    let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
-    const params: unknown[] = [ownerGaii];
-
-    if (opts?.visibility) {
-      sql += ' AND visibility = ?';
-      params.push(opts.visibility);
-    }
-
-    if (opts?.prefix) {
-      sql += ' AND key LIKE ?';
-      params.push(opts.prefix + '%');
-    }
-    sql += archivedSql(opts?.archived);
-
-    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
-    const results: MemoryRecord[] = [];
-    for (const row of rows) {
-      const record = this.deserializeMemory(row);
-      if (this.isMemoryExpired(record)) {
-        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
-        continue;
-      }
-      if (opts?.maxFlags !== undefined && (record.flagCount ?? 0) > opts.maxFlags) continue;
-      const valStr = typeof record.value === 'string' ? record.value : JSON.stringify(record.value);
-      if (
-        record.key.toLowerCase().includes(q) ||
-        valStr.toLowerCase().includes(q) ||
-        record.tags.some(t => t.toLowerCase().includes(q))
-      ) {
-        results.push(record);
-        // Optional result cap (additive; callers that omit it keep the full result set). The substring
-        // match is applied in JS, so the cap is enforced here — post-filter — not as a SQL LIMIT.
-        if (opts?.limit !== undefined && results.length >= opts.limit) break;
-      }
-    }
-    return results;
+    // One owner's searchText: the FTS word-start match over the indexed values, as on PostgreSQL. A
+    // substring scan over the raw JSON (field names included) here gave the MCP tool a second search
+    // rule (feature-list audit #52).
+    return searchTextMemory(this.db, query, {
+      ownerGaiis: [ownerGaii], keyPrefix: opts?.prefix, visibility: opts?.visibility,
+      maxFlags: opts?.maxFlags, archived: opts?.archived, limit: opts?.limit ?? 100,
+    }).map(h => h.record);
   },
 
   async searchText(this: SqliteStorage, query: string, opts?: MemoryTextSearchOpts): Promise<MemoryTextHit[]> {

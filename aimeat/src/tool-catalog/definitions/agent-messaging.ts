@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-15 — aimeat_message_send's metadata takes `prompt` (MessagePromptSchema, the route's schema), which the description promised and the schema dropped (feature-list audit #126).
  *   2026-10-12 — aimeat_agents_list and aimeat_agent_basics_get name agent:read, the word their REST twins
  *     GET /v1/agents and GET /v1/agents/v2/basic-agents ask; enforced from 4.0.0 (scopeEnforcedFrom),
  *     counted before it (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 11).
@@ -61,6 +62,7 @@
 
 import { OWNER_REPORTS } from '../../models/tool-input-vocabulary.js';
 import { InteractiveQuestionSchema, MessageAttachmentInputSchema } from '../../models/message-schemas.js';
+import { MessagePromptSchema } from '../../models/agent-message-schemas.js';
 import { CONVERSATION_ID, InboxRuleInputSchema } from '../../models/inbox-organize-schemas.js';
 import { LinkSchema } from '../input-schemas.js';
 import { z } from 'zod';
@@ -407,6 +409,9 @@ export const agentMessagingTools = [
                     title: z.string().min(1).max(256),
                     description: z.string().max(10_000),
                 }).optional().describe('Propose a task for user approval'),
+                // The route's own schema (AgentMessageCreateSchema), so the two surfaces accept the
+                // same prompt. Absent here, the MCP schema dropped it (feature-list audit #126).
+                prompt: MessagePromptSchema.optional().describe('A single-select question for the owner: {prompt_id, question, options[2..10], allow_other}. Do not add "Other" to options; the UI offers it.'),
             }) },
         },
     },

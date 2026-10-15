@@ -37,6 +37,7 @@
  *   const out = await acceptWork({ storage, config }, providerGaii, trackingCode);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-15 — deliverWork() stores the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   v1.1.0 — 2026-10-08 — deliverWork() stamps the delivered output with its provenance record and
  *     stores the id on the work item (migration 0098, aiprov D8).
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8): the accept/deliver write moved out of
@@ -51,6 +52,7 @@ import { fireHook } from '../utils/fire-hook.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import { provenanceForWrite } from './ai-provenance.js';
+import { refreshTrustScore } from './trust.js';
 
 export interface WorkDeps {
     storage: Storage;
@@ -245,6 +247,9 @@ export async function deliverWork(
     fireHook(config, storage, 'post_work_delivery', {
         tracking_code: trackingCode, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
     });
+
+    // A delivery changes the provider's score; the stored one follows now (feature-list audit #144).
+    await refreshTrustScore(storage, work.providerGaii);
 
     emitChange('work');
     return { ok: true, work: updated! };

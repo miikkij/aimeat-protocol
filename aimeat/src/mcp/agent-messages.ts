@@ -8,6 +8,7 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   2026-10-15 — aimeat_message_send passes metadata.prompt (the choice prompt) to the send service, as POST /v1/agents/:name/messages does (feature-list audit #126).
  *   2026-10-08 — aimeat_message_send hands the session's scopes to the send service (aiprov D5).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 -- 2026-08-11 -- aimeat_message_send calls services/agent-message-send.ts, the same
@@ -109,6 +110,9 @@ export function registerAgentMessageTools(
                             tokens_used: metadata.tokens_used,
                             processing_ms: metadata.processing_ms,
                             proposed_task: metadata.proposed_task,
+                            // The choice prompt the description promises, passed as REST passes it
+                            // (feature-list audit #126).
+                            prompt: metadata.prompt,
                         } : undefined,
                     },
                     pipeline: 'mcp.message_send',

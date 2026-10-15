@@ -7,6 +7,7 @@
  * @structure describe('organism lifecycle') — create, update, join, leave.
  * @usage cd aimeat && pnpm exec vitest run test/unit/organism-lifecycle.test.ts
  * @version-history
+ *   2026-10-15 — Join and leave record their account events under the full identity (feature-list audit #44).
  *   v1.1.0 — 2026-08-29 — The type is free text: the create case asserts the word is kept (trimmed,
  *     cut at 40) instead of replaced by "community"; a blank one still falls back.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 MCP audit step 8).
@@ -230,5 +231,21 @@ describe('organism lifecycle (shared by /v1/organisms and the aimeat_organism_* 
         const stored = await storage.getOrganism(organism.id);
         expect(stored?.members).not.toContain(JOINER);
         expect(stored?.admins).not.toContain(JOINER);
+    });
+
+    // Feature-list audit #44: the account feed reads by the full identity (GHII), and these three
+    // events were stored under the bare account name, so the person never saw them.
+    it('join and leave record their account events under the full identity the feed reads by', async () => {
+        const organism = await makeOrganism('open');
+        await joinOrganism({ storage, config }, organism, JOINER);
+        await leaveOrganism({ storage, config }, (await storage.getOrganism(organism.id))!, JOINER);
+        await new Promise(r => setTimeout(r, 20));
+
+        const joinerFeed = await storage.listAccountEvents({ ownerGhii: `${JOINER}@${NODE}`, limit: 50 });
+        expect(joinerFeed.map(e => e.kind).sort()).toEqual(['organism_joined', 'organism_left']);
+        expect(joinerFeed.every(e => e.actorGaii === `${JOINER}@${NODE}`)).toBe(true);
+        const creatorFeed = await storage.listAccountEvents({ ownerGhii: `${CREATOR}@${NODE}`, limit: 50 });
+        expect(creatorFeed.map(e => e.kind)).toContain('organism_member_joined');
+        expect(await storage.listAccountEvents({ ownerGhii: JOINER, limit: 50 })).toEqual([]);
     });
 });

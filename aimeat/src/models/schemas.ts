@@ -15,6 +15,7 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Dispute verdict — 2026-10-15 — OperatorRulingSchema.ruling is one of DISPUTE_VERDICTS (requester_wins, provider_wins, split), as openapi.yaml states; it took any text (feature-list audit #143).
  *   Consent reach — 2026-10-12 — ConsentCreateSchema takes `local`, `federation`, `auth` and the
  *     deprecated aliases `private` and `dmz`, with no default: the service decides it by version
  *     (utils/consent-reach.ts, Core 2026-11 AUTHZ-18).
@@ -248,8 +249,13 @@ export const PartialOfferSchema = z.object({
     message: z.string().max(10_000).optional(),
 });
 
+/** The three verdicts an operator ruling may give, as openapi.yaml OperatorRuling states. The trust
+ *  score reads `requester_wins` as a dispute the provider lost, so free text here was a verdict the
+ *  score could not see (feature-list audit #143). */
+export const DISPUTE_VERDICTS = ['requester_wins', 'provider_wins', 'split'] as const;
+
 export const OperatorRulingSchema = z.object({
-    ruling: z.string().min(1),
+    ruling: z.enum(DISPUTE_VERDICTS),
     distribution: z.object({
         to_requester: z.number().int().nonnegative().optional(),
         to_provider: z.number().int().nonnegative().optional(),

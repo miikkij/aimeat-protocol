@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   v1.3.3 — 2026-10-15 — A copy is held to the key's schema lock; the hands come newest first, deletes counted (feature-list audit #50, #51).
  *   2026-10-15 — Section 1: an organism or workspace export carries the row spaces and names a limit
  *     it reached under `truncated` (feature-list audit #68).
  *   v1.3.2 — 2026-10-14 — Section 4: an agent that holds organism:direct deletes, restores and
@@ -112,10 +113,11 @@ What an export leaves out, and why:
   trust score is capped on the way in, so a moved agent earns the rest again on its new node.
 - **One public record of someone else**, copied into the person's own records:
   \`POST /v1/memory/copy\` (an agent's call). It keeps the source's classification and never lowers it.
+  A schema lock on the key holds for the copy too: a value that does not match is refused (422).
 
 ## 3. Who wrote this
 
-- \`aimeat_memory_hands\` with \`key\`: who wrote and deleted that record, how many times and when,
+- \`aimeat_memory_hands\` with \`key\`: who wrote and deleted that record, how many times and when, newest first,
   across the person and all their agents and apps: what they saved themselves, what their agents
   saved, workspace writes, extensions and scheduled jobs. The answer's \`not_covered\` says what it
   cannot see: writes from before counting started, and writes the node makes on its own behalf.
