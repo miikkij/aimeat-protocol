@@ -24,6 +24,7 @@
  *   import { revokeByGaii } from './connect-tunnel-revocation.js';
  *   revokeByGaii(this.connections, (ws, f) => this.send(ws, f), gaii);
  * @version-history
+ *   2026-10-16 — revokeByGaii takes 'rekeyed': an agent whose key was rotated loses its socket, with no reason on the frame, so its connector reports it refused and keeps it (QA audit F03b-01).
  *   2026-10-11 — revokeByGaii takes the reason ('deleted' by default, 'moved' from the enrolment of
  *     a move) and puts it on the frame with a message that names it. A moved agent's old connector
  *     was told "Agent deleted".
@@ -107,11 +108,17 @@ export function revokeByToken(connections: Map<string, Closable>, send: Send, de
  * five agents sharing the daemon. Same mechanism as both, with the predicate this case needs —
  * and `connections` is keyed by the GAII, so it is one lookup rather than a scan.
  */
-export function revokeByGaii(connections: Map<string, Closable>, send: Send, detach: Detach, gaii: string, reason: 'moved' | 'deleted' = 'deleted'): void {
+/** Why one principal's socket is cut: the agent was deleted, moved to another connector, or its key was rotated. */
+export type GaiiCutReason = 'moved' | 'deleted' | 'rekeyed';
+
+export function revokeByGaii(connections: Map<string, Closable>, send: Send, detach: Detach, gaii: string, reason: GaiiCutReason = 'deleted'): void {
   const conn = connections.get(gaii);
   if (!conn) return;
   // The frame says which of the two it is: a connector removes a moved agent from its home, and
   // the message is what its log shows a person.
+  // A rotated key sends no reason: the connector must not forget the agent, only stop using the old
+  // token, as it does for a revoked one (QA audit F03b-01).
+  if (reason === 'rekeyed') { cut(send, detach, conn, 'Agent key rotated: tokens issued before it no longer work', 'closeForGaii'); return; }
   cut(send, detach, conn, reason === 'moved' ? 'Agent moved to another connector' : 'Agent deleted', 'closeForGaii', reason);
 }
 

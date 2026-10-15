@@ -41,6 +41,7 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-10-16 — The password reset limit is one bucket per address: a fourth reset carrying another identity's token is refused (QA audit F02a-02).
  *   2026-10-15 — The registration invite on a mailing node answers `sent`, and GET / offers it in getting_started (feature-list audit #23).
  *   v1.3.0 -- 2026-09-30 -- The organism invitation names the inviter by display name, is written in
  *     the language the inviter asks for (`locale`), and refuses a language it has no template for
@@ -339,6 +340,18 @@ async function run(): Promise<void> {
         assert(reset.status === 200, `the newest mail's code must work: ${reset.status} ${short(reset.body)}`);
         const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: recName, password: newPassword }) });
         assert(login.status === 200, `the new password must sign in: ${login.status} ${short(login.body)}`);
+    });
+
+    // QA audit F02a-02. The reset limit (three per ten minutes) was keyed on the identity of whatever
+    // token came with the request, so each identity a caller held had a bucket of its own. The three
+    // resets above came from this address with no token; a fourth from the same address carrying the
+    // operator's token is the same bucket and is refused.
+    await test('the reset limit counts per address: a fourth reset with another identity\'s token is refused', async () => {
+        const r = await json('/v1/ghii/password/reset', {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({ username: recName, code: '000000', newPassword: 'NotApplied9x' }),
+        });
+        assert(r.status === 429, `the fourth reset from one address must be refused whatever token it carries, got ${r.status} ${short(r.body)}`);
     });
 
     await test('account recovery mails a notification carrying the username', async () => {

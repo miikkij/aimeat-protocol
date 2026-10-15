@@ -10,19 +10,21 @@
  * @structure startRegistrationEmailVerification(storage, emailService, ownerName, email, locale?).
  * @usage const { verificationId, emailSent } = await startRegistrationEmailVerification(...);
  * @version-history
+ *   2026-10-16 — The code comes from crypto.randomInt (utils/one-time-code.ts), not Math.random (QA audit F02a-02).
  *   v1.0.0 — 2026-08-07 — Lifted out of routes/ghii/register-login.ts when attach-email was split off,
  *     so both callers share one definition instead of the route file owning it.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { EmailService } from './email.js';
+import { sixDigitCode } from '../utils/one-time-code.js';
 
 export async function startRegistrationEmailVerification(
     storage: Storage, emailService: EmailService | undefined,
     ownerName: string, email: string, locale?: string,
 ): Promise<{ verificationId: string; emailSent: boolean }> {
     const clean = email.toLowerCase().trim();
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const code = sixDigitCode();
     const verificationId = randomBytes(16).toString('hex');
     const now = new Date().toISOString();
     await storage.createEmailVerification({

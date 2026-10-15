@@ -7,6 +7,9 @@
  *   the prev-token-after-grace reuse path is testable without a 60s wait.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-session-refresh
  * @version-history
+ *   2026-10-16 — Phase 6 asserts that an owner bearer (access token, owner-level access token, the
+ *     token it exchanges for, a signed-out session's token) is refused at POST /v1/auth/refresh
+ *     without the cookie. It asserted the old renewal as expected (QA audit S1-01).
  *   v1.1.0 — 2026-07-29 — Register a second owner and assert that a session id belonging to another
  *            owner cannot be revoked (batch 01, hole 4).
  */
@@ -249,12 +252,45 @@ async function main() {
             `the attacker must not even see the victim's session: ${JSON.stringify(list.data.data.sessions.map((x: any) => x.session_id))}`);
     });
 
-    console.log('\nPhase 6 — Legacy Bearer refresh still works');
-    await test('refresh with Bearer and no cookie falls back to legacy path', async () => {
+    // QA audit S1-01. This phase asserted the opposite until 2026-10-16: an owner access token renewed
+    // itself at POST /v1/auth/refresh with no cookie, minted from the OWNER RECORD's roles. That made
+    // an owner-level access token of an operator's account come back carrying 'operator', and let any
+    // owner access token renew itself for ever, past the sign-out of the session it came from.
+    console.log('\nPhase 6 — An owner bearer is not renewed without the cookie');
+    await test('an owner access token with no cookie is refused, and no token comes back', async () => {
         const l = await login(username, password);
         const r = await call('/v1/auth/refresh', { jwt: l.token }); // no cookie, no csrf
-        assert(r.status === 200 && r.data?.ok, `legacy bearer refresh should work, got ${r.status} ${r.data?.error?.message}`);
-        assert(typeof r.data.data.token === 'string', 'legacy refresh should return a token');
+        assert(r.status === 403 && r.data?.error?.code === 'OWNER_REFRESH_USES_COOKIE',
+            `an owner bearer refresh must be refused, got ${r.status} ${r.data?.error?.code}`);
+        assert(!r.data?.data?.token, 'no token may come back');
+        // The cookie path is the owner's way, and it still works for the same session.
+        const viaCookie = await call('/v1/auth/refresh', { cookie: l.rt, csrf: true });
+        assert(viaCookie.status === 200 && typeof viaCookie.data?.data?.token === 'string', `cookie refresh ${viaCookie.status}`);
+    });
+
+    await test('an owner-level access token is refused, so it never comes back with the operator role', async () => {
+        const l = await login(username, password);
+        const roles: string[] = decodeJwt(l.token).roles ?? [];
+        const made = await call('/v1/access/tokens', { jwt: l.token, body: { label: 's1-01 owner level', grant_owner: true } });
+        assert(made.status === 201 && typeof made.data?.data?.token === 'string', `create owner-level token: ${made.status} ${made.data?.error?.message}`);
+        const pat: string = made.data.data.token;
+        const asPat = await call('/v1/auth/refresh', { jwt: pat });
+        assert(asPat.status === 403 && !asPat.data?.data?.token,
+            `an owner-level access token must not renew here (account roles ${JSON.stringify(roles)}), got ${asPat.status} ${JSON.stringify(asPat.data?.data?.token ? decodeJwt(asPat.data.data.token).roles : asPat.data?.error?.code)}`);
+        // The short token the access token exchanges for is the same principal, and is refused the same way.
+        const x = await call('/v1/auth/token/exchange', { jwt: pat });
+        assert(x.status === 200 && typeof x.data?.data?.access_token === 'string', `exchange ${x.status}`);
+        const exchanged = await call('/v1/auth/refresh', { jwt: x.data.data.access_token });
+        assert(exchanged.status === 403 && !exchanged.data?.data?.token, `the exchanged token must not renew either, got ${exchanged.status}`);
+    });
+
+    await test('a signed-out owner session cannot be kept alive by its old access token', async () => {
+        const l = await login(username, password);
+        const out = await call('/v1/auth/revoke', { jwt: l.token, cookie: l.rt, csrf: true });
+        assert(out.status === 200, `sign out ${out.status}`);
+        const r = await call('/v1/auth/refresh', { jwt: l.token });
+        assert(r.status === 401 || r.status === 403, `the old access token must not renew, got ${r.status}`);
+        assert(!r.data?.data?.token, 'no token may come back');
     });
 
     console.log('\nPhase 7 — Agent legacy refresh must NOT escalate to owner/operator (security)');

@@ -25,8 +25,9 @@
  *   presenting a vp_token, and the FTN OIDC authorize/callback pair against tunnistautuminen.suomi.fi
  *   — are left alone. They need a credential signed by an issuer this node trusts and a live bank-ID
  *   session, neither of which a test may fabricate. What is asserted instead is every refusal on the
- *   way in and the one path that takes no proof at all: POST /v1/ghii/verify/ftn accepts any
- *   callback_token and stamps level 3, which is itself worth pinning.
+ *   way in, including POST /v1/ghii/verify/ftn, which took any callback_token and stamped level 3
+ *   until 2026-10-15 and now refuses and names the checked flow (test 13), and the runtime setting
+ *   that could switch EUDIW on past the boot refusal (test 15b).
  *
  *   ONE SIDE EFFECT IS MANAGED. POST /v1/setup/init writes an .env into the package root when none
  *   is there. This suite creates a placeholder first and removes it afterwards, unless the developer
@@ -42,6 +43,7 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-setup-verification.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-and-verification
  * @version-history
+ *   2026-10-16 — Test 15b: PUT /v1/admin/config refuses eudiw.enabled=true and the wallet routes stay off (QA audit D6-01, F21b-01).
  *   2026-10-15 — Test 22: the receipt's collection method and language follow how and by whom the
  *     consent was given (feature-list audit #161).
  *   v1.3.0 — 2026-10-11 — Test 19: the credential names https://aimeat.io/ns/credentials/v1 and the
@@ -519,6 +521,25 @@ try {
             method: 'POST', headers: authed(opToken), body: JSON.stringify({ callback_token: 'x' }),
         });
         assert(ftn.status === 503, `ftn: expected 503, got ${ftn.status}`);
+    });
+
+    // QA audit D6-01, F21b-01. The boot refusal of test 14 reads the environment; the same switch is a
+    // runtime setting, and PUT /v1/admin/config turned it on at once and stored it for every later
+    // start, past the boot refusal. The setting refuses `true` now, and nothing changes.
+    await test('15b. The operator cannot switch EUDIW on at run time: the config change is refused and nothing changes', async () => {
+        const put = await json('/v1/admin/config', {
+            method: 'PUT', headers: authed(opToken), body: JSON.stringify({ changes: [{ path: 'eudiw.enabled', value: true }] }),
+        });
+        assert(put.status === 400, `the change must be refused, got ${put.status} ${JSON.stringify(put.body).slice(0, 300)}`);
+        const reasons = (put.body.error?.details?.errors ?? []) as Array<{ path: string; reason: string }>;
+        const mine = reasons.find(e => e.path === 'eudiw.enabled');
+        assert(!!mine && /cannot be switched on/.test(mine.reason), `the refusal says why: ${JSON.stringify(reasons)}`);
+        const still = await json('/v1/ghii/verify/eudiw/request', { headers: authed(opToken) });
+        assert(still.status === 503 && still.body.error?.code === 'FEATURE_DISABLED', `the wallet routes stay off: ${still.status} ${still.body.error?.code}`);
+        const cfg = await json('/v1/admin/config', { headers: authed(opToken) });
+        const row = cfg.body.data?.schema?.['eudiw.enabled'];
+        assert(cfg.status === 200 && row?.value === false && row?.source !== 'database',
+            `the setting reads off and nothing was stored: ${cfg.status} ${JSON.stringify(row)}`);
     });
 
     await test('16. POST /v1/trusted-issuers refuses an incomplete issuer and an unknown type', async () => {

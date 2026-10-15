@@ -6,6 +6,7 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The emailed code comes from crypto.randomInt (utils/one-time-code.ts), not Math.random (QA audit F02a-02).
  *   2026-10-15 — The registration hooks run here too (ownerRegistrationRefusal before any row,
  *     announceOwnerRegistered after); only POST /v1/owners ran them (feature-list audit 89).
  *   2026-10-15 — register-web asks createdAccountIsOperator, the rule POST /v1/ghii asks, and writes the
@@ -71,6 +72,7 @@ import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
+import { sixDigitCode } from '../../utils/one-time-code.js';
 import { registrationRefusal, creditWelcomeBonus, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../../services/owner-provisioning.js';
 
 /**
@@ -298,7 +300,7 @@ export function registerWebVerifyRoutes(
         // Send verification email if email is provided and email service is enabled
         let verificationId: string | undefined;
         if (typeof email === 'string' && email.length > 0 && emailService?.enabled) {
-            const code = String(Math.floor(100000 + Math.random() * 900000));
+            const code = sixDigitCode();
             const codeHash = createHash('sha256').update(code).digest('hex');
             const verId = randomBytes(16).toString('hex');
             await storage.createEmailVerification({

@@ -370,6 +370,31 @@ await test('13. One owner, one agent, no attach — behaves exactly as before', 
   await solo.close();
 });
 
+// QA audit F03b-01. A rekey revoked the agent's sessions, but a tunnel checks its bearer once, at
+// upgrade, so the socket opened with the old token kept working. The rekey now cuts it, and the
+// frame carries no reason, so a connector does not forget the agent (that is for 'deleted').
+await test('13b. Rotating an agent\'s key cuts the socket opened with its old token', async () => {
+  const { body } = await json('/v1/agents', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerBTok}` },
+    body: JSON.stringify({ name: 'rekeyed', owner: ownerB, capabilities: ['memory'], scopes: ['*'] }),
+  });
+  const gaii = body.data.agent.gaii as string;
+  const client = await TunnelClient.connect(BASE, await getToken(gaii, body.data.private_key));
+  assert(client.welcome !== null, 'welcomed');
+  const rekey = await json(`/v1/agents/${encodeURIComponent(gaii)}/rekey`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerBTok}` }, body: '{}',
+  });
+  assert(rekey.status === 200, `rekey ${rekey.status}`);
+  for (let i = 0; i < 40 && client.authRevokeds.length === 0; i++) await sleep(100);
+  const rev = client.authRevokeds[0] as { agent?: string; reason?: string; message?: string } | undefined;
+  assert(!!rev, 'an auth_revoked frame arrived');
+  assert(rev!.agent === gaii, `it names the agent: ${rev!.agent}`);
+  assert(rev!.reason === undefined, `no reason, so the connector keeps the agent: ${rev!.reason}`);
+  for (let i = 0; i < 30 && client.isOpen; i++) await sleep(100);
+  assert(!client.isOpen, 'the socket that carried only this identity is closed');
+  await client.close();
+});
+
 await hub?.close();
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

@@ -312,7 +312,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | SEC-01 | met | `aimeat/src/utils/gaii.ts:383-414` | |
 | SEC-02 | met | `aimeat/src/utils/reserved-keys.ts:123,333-393`; `aimeat/src/utils/scope-coverage.ts:86` | |
 | SEC-03 | **met (4.0.0)** | Same as AUTHZ-01: every authenticated route that changes data asks a scope word (`requireScope`, `requireRestScope`), admits only the person (`requireOwnerPrincipal`, the owner or operator role), or carries a recorded reason in `aimeat/security/route-scope-exemptions.json`; `pnpm check:route-scopes` holds it. | |
-| SEC-04 | met | `aimeat/src/utils/url-validator.ts:53-160,234-320` | DNS rebinding remains possible, as the code notes (`:230-232`). |
+| SEC-04 | met | `aimeat/src/utils/url-validator.ts`, `aimeat/src/utils/outbound-connect-guard.ts`, `aimeat/src/utils/blocked-ip.ts` | Every validated hop connects through a dispatcher whose lookup checks the address the socket opens to, so DNS rebinding is refused at connect time; the loopback exception is decided on an address, never on host text (QA audit S4-01, S4-02, 2026-10-16). |
 | SEC-05 | met | `aimeat/src/services/signed-node-request.ts:99-136`; `aimeat/src/routes/federation-auth.ts:104-108` | |
 | SEC-06 | met | `aimeat/src/services/owner-session.ts:63-70`; `aimeat/src/middleware/oauth-round-cookie.ts:72-74`; `aimeat/src/services/external-login.ts:159-168` | No check script enforces it. |
 | SEC-07 | met | TOTP secret AES-256-GCM (`aimeat/src/services/totp.ts`); provider keys decrypted at call time only (`aimeat/src/services/ai/call-guards.ts:75-92`) | |

@@ -10,6 +10,10 @@
  *   the request to an internal target.
  * @usage const resp = await safeFetch(url, { method, headers, body });
  * @version-history
+ *   2026-10-16 — The loopback exception is decided on an address (a literal, or what a name resolves to),
+ *     not on host text starting with "127." (QA audit S4-01), and safeFetch connects every validated hop
+ *     through the connect-time guard, so the socket opens only to an address that was checked (QA audit
+ *     S4-02). blockedIpReason moved to utils/blocked-ip.ts unchanged.
  *   v2.8.0 — 2026-10-14 — An IPv6 literal is checked and looked up without its brackets, so it is
  *     refused by the literal check on every operating system. The bracketed form reached the lookup,
  *     which Windows resolved and Linux refused: the address was refused on both, with two wordings,
@@ -48,53 +52,8 @@
 import { URL } from 'node:url';
 import { lookup } from 'node:dns/promises';
 import { logger } from '../utils/logger.js';
-
-/**
- * Return a reason string if `ip` (a literal IPv4 or IPv6 address) is in a
- * private/reserved/loopback range, else null. Normalises IPv4-mapped IPv6
- * (`::ffff:127.0.0.1`) down to its IPv4 form first.
- */
-function blockedIpReason(ipRaw: string): string | null {
-  let ip = ipRaw.toLowerCase();
-
-  // IPv4-mapped / -compatible IPv6 → test as the embedded IPv4 (e.g. ::ffff:127.0.0.1, ::ffff:7f00:1).
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
-  if (mapped) ip = mapped[1];
-  const mappedHex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(ip);
-  if (mappedHex) {
-    const hi = parseInt(mappedHex[1], 16), lo = parseInt(mappedHex[2], 16);
-    ip = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
-  }
-
-  // ── IPv4 ──
-  const v4 = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(ip);
-  if (v4) {
-    const o = v4.slice(1).map(Number);
-    if (o.some(n => n > 255)) return 'Malformed IPv4 address';
-    const [a, b, c, d] = o;
-    if (a === 127) return 'Loopback address';
-    if (a === 10) return 'Private (10/8) address';
-    if (a === 172 && b >= 16 && b <= 31) return 'Private (172.16/12) address';
-    if (a === 192 && b === 168) return 'Private (192.168/16) address';
-    if (a === 169 && b === 254) return 'Link-local / cloud-metadata address';
-    if (a === 100 && b >= 64 && b <= 127) return 'Carrier-grade NAT (100.64/10) address';
-    if (a === 0) return 'Unspecified (0/8) address';
-    if (a === 192 && b === 0 && c === 2) return 'Reserved TEST-NET-1 address';
-    if (a === 198 && b === 51 && c === 100) return 'Reserved TEST-NET-2 address';
-    if (a === 203 && b === 0 && c === 113) return 'Reserved TEST-NET-3 address';
-    if (a >= 224) return 'Multicast/reserved/broadcast address';
-    void d;
-    return null;
-  }
-
-  // ── IPv6 ──
-  if (ip === '::1') return 'IPv6 loopback';
-  if (ip === '::') return 'IPv6 unspecified';
-  if (/^f[cd][0-9a-f]{2}:/.test(ip)) return 'IPv6 unique-local (fc00::/7)';
-  if (/^fe[89ab][0-9a-f]:/.test(ip)) return 'IPv6 link-local (fe80::/10)';
-  if (/^ff[0-9a-f]{2}:/.test(ip)) return 'IPv6 multicast (ff00::/8)';
-  return null;
-}
+import { blockedIpReason, isLoopbackIp, isLoopbackLiteral, loopbackEgressAllowed } from './blocked-ip.js';
+import { guardedDispatcher, connectRefusal } from './outbound-connect-guard.js';
 
 /**
  * Whether an address is link-local (169.254/16, fe80::/10). The cloud metadata service lives there,
@@ -136,8 +95,13 @@ export async function validateOutboundUrl(
   // AIMEAT_ALLOW_PRIVATE_EGRESS from the security profile at boot (`local` default true so a dev
   // node can reach a local Ollama / webhook; `public` default false); AIMEAT_DEV_MODE stays a
   // back-compat alias. RFC1918/link-local/cloud-metadata remain blocked below regardless.
-  const allowPrivate = process.env.AIMEAT_ALLOW_PRIVATE_EGRESS === 'true' || process.env.AIMEAT_DEV_MODE === 'true';
-  if (allowPrivate && (hostname === 'localhost' || host === '::1' || /^127\./.test(hostname))) {
+  //
+  // Decided on the ADDRESS: `localhost`, `::1` or a literal 127.0.0.0/8 address passes here, and any
+  // other name is resolved below, where a loopback answer passes and every other blocked answer is
+  // refused. The test was a pattern on the host text, so a DNS name starting with "127." skipped the
+  // lookup and could resolve to a private or metadata address (QA audit S4-01).
+  const allowPrivate = loopbackEgressAllowed();
+  if (allowPrivate && isLoopbackLiteral(host)) {
     return { valid: true };
   }
 
@@ -158,7 +122,7 @@ export async function validateOutboundUrl(
     if (records.length === 0) return { valid: false, reason: 'DNS resolution returned no records' };
     for (const { address } of records) {
       const reason = blockedIpReason(address);
-      if (reason) return { valid: false, reason: `Resolved to ${reason}` };
+      if (reason && !(allowPrivate && isLoopbackIp(address))) return { valid: false, reason: `Resolved to ${reason}` };
     }
   } catch {
     return { valid: false, reason: 'DNS resolution failed' };
@@ -235,9 +199,10 @@ export function setOutboundRequestSigner(signer: OutboundRequestSigner | null): 
  * validation cannot 3xx-redirect the request to an internal address. Throws
  * `Fetch blocked: <reason>` on a blocked URL/hop or on exceeding the redirect cap.
  *
- * Residual: a determined DNS-rebind between the validating lookup and the fetch
- * connect remains possible (full closure needs connection pinning); the redirect
- * vector — the practically exploitable one — is closed.
+ * Every validated hop connects through guardedDispatcher() (utils/outbound-connect-guard.ts), whose
+ * lookup checks the addresses the socket is opened to, so a name that answers differently between
+ * the check and the connect (DNS rebinding) is refused at connect time. An origin the operator named
+ * in `allowOrigins` connects without it: the operator's own word decides that host.
  */
 export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promise<Response> {
   const { maxRedirects = 5, sensitiveHeaders = [], allowOrigins, allowHosts, ...fetchInit } = init;
@@ -286,7 +251,13 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
         });
       }
     }
-    let hopInit: RequestInit = { ...fetchInit, method, body, headers: hopHeaders, redirect: 'manual' };
+    // The connection is pinned to the checked address (QA audit S4-02), except for an origin the
+    // operator listed for this caller, which may be a private address on purpose.
+    const operatorOrigin = !!allowOrigins?.includes(originOf(target));
+    let hopInit: RequestInit = {
+      ...fetchInit, method, body, headers: hopHeaders, redirect: 'manual',
+      ...(operatorOrigin ? {} : { dispatcher: guardedDispatcher() } as Record<string, unknown>),
+    };
     if (outboundSigner) {
       try {
         const sigHeaders = await outboundSigner(target);
@@ -299,7 +270,15 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
         }
       } catch (err) { logger.warn('safeFetch: unsigned is fine — signing is additive, never a gate', { error: String(err) }); }
     }
-    const resp = await fetch(target, hopInit);
+    let resp: Response;
+    try {
+      resp = await fetch(target, hopInit);
+    } catch (err) {
+      // A refusal at connect time arrives as fetch's "fetch failed" with the reason as its cause.
+      const refused = connectRefusal(err);
+      if (refused) throw new Error(refused.message, { cause: err });
+      throw err;
+    }
     if (resp.status >= 300 && resp.status < 400 && resp.headers.has('location')) {
       const next = new URL(resp.headers.get('location') as string, target).toString();
       // THE BODY. Every hop repeated the method and the body, so an OAuth token call's client_secret

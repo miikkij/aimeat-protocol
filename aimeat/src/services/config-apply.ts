@@ -11,6 +11,7 @@
  * @structure ConfigChange · ConfigApplyResult · applyConfigChanges(deps, changes)
  * @usage const r = await applyConfigChanges({ config, storage, provenance }, [{ path, value }]);
  * @version-history
+ *   2026-10-16 — A refused value is answered with the row's `refusal` when it has one (eudiw.enabled; QA audit D6-01).
  *   v1.4.0 — 2026-10-11 — A list setting is normalized to a list before its check and stored as
  *     comma-separated text; it was written as the text the request sent. The rate-limit settings are
  *     copied into the limiter tiers after a save (config-rate-limit-sync.ts).
@@ -72,7 +73,7 @@ export async function applyConfigChanges(
             const min = rangeKindOf(mapping) === 'recommended' ? numericRangeOf(mapping)?.min : undefined;
             const hint = min !== undefined ? ` (the minimum is ${min}; ${mapping.range} is the recommended range)`
                 : mapping.range ? ` (range ${mapping.range})` : '';
-            errors.push({ path, reason: `Invalid value for ${path}${hint}` });
+            errors.push({ path, reason: mapping.refusal ?? `Invalid value for ${path}${hint}` });
             continue;
         }
         const oldValue = readConfigField(config, mapping);

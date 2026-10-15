@@ -10,6 +10,10 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-10-16 — POST /v1/auth/refresh answers 403 OWNER_REFRESH_USES_COOKIE to an owner bearer (an
+ *     owner JWT or an owner-level access token) without the refresh cookie. It minted a new one-hour
+ *     token from the owner record's roles, so an owner-level token of an operator's account came back
+ *     with 'operator', and an owner access token renewed itself with no end (QA audit S1-01).
  *   2026-10-15 — The challenge answer says what POST /v1/auth/token signs: the GAII and a timestamp, not the challenge (feature-list audit 33).
  *   v1.14.0 -- 2026-10-14 -- The connectivity-key mint (routes/auth-otk.ts) is removed with the
  *     unauthenticated POST /v1/agents/connect it fed (Jouni, feature-list audit row 202).
@@ -412,8 +416,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/auth/refresh
   // Two modes: (1) owner session refresh via the httpOnly aimeat_rt cookie with token
-  // rotation + reuse detection; (2) legacy Bearer-based refresh for agents / pre-cookie
-  // clients. optionalAuth() resolves a Bearer if present without rejecting cookie clients.
+  // rotation + reuse detection; (2) Bearer-based refresh for agents and ecosystem apps only (an
+  // owner bearer is refused, QA audit S1-01). optionalAuth() resolves a Bearer if present without
+  // rejecting cookie clients.
   router.post('/v1/auth/refresh', optionalAuth(), async (req, res) => {
     // (1) Cookie-based owner session refresh (rotation + reuse detection).
     if (readRefreshCookie(req)) {
@@ -462,7 +467,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // (2) Legacy Bearer-based refresh (agents / pre-cookie clients).
+    // (2) Bearer-based refresh (agents and ecosystem apps; an owner bearer is refused below).
     if (!req.auth || req.auth.anonymous) {
       res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required'));
       return;
@@ -546,7 +551,18 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         "This kind of access is renewed somewhere else. Use the app's own renewal address instead."));
       return;
     } else {
-      freshRoles = ownerRecord.roles ?? ['owner'];
+      // An owner session is renewed with its refresh cookie, which is rotated on every use and ends
+      // the whole session when an old one comes back (services/owner-session.ts; Core 2026-11
+      // AUTH-04). This branch minted from the OWNER RECORD's roles for whatever bearer reached it,
+      // so an owner-level access token of an operator's account came back carrying 'operator', and
+      // any owner access token renewed itself for ever with a fresh session row, outliving the
+      // sign-out and the access token it came from. An owner credential has nothing to renew here:
+      // a browser uses the cookie, a program holds an access token (POST /v1/access/tokens) or signs
+      // in again (QA audit S1-01).
+      res.status(403).json(error(config.nodeId, 'OWNER_REFRESH_USES_COOKIE',
+        'An owner session is renewed with its sign-in cookie, not with the access token. Sign in again, or use an access token made on the Access page for a program.',
+        403, { principal: req.auth!.sub }));
+      return;
     }
 
     // P3-7: Create new session record for refreshed token
