@@ -11,6 +11,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-10-15 — POST /v1/owners/:name/recover is removed: it replaced the Ed25519 owner key, whose sign-in was removed in 4.0.0, and nothing called it (feature-list audit 171).
  *   2026-10-15 — The registration hooks go through ownerRegistrationRefusal / announceOwnerRegistered, the
  *     helpers every account-creating route uses (feature-list audit 89).
  *   2026-10-15 — Who becomes operator is createdAccountIsOperator (feature-list audit 19).
@@ -43,11 +44,10 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
-import { requireAuth, requireOwnerPrincipal, requireOperator, requireLocalSession } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, isForeignPrincipal } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
-import { fireHook } from '../utils/fire-hook.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
 import { registrationRefusal, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../services/owner-provisioning.js';
 import { emitChange } from '../services/event-bus.js';
@@ -313,40 +313,6 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       owner: name,
       agents_deleted: agentsDeleted,
       deletion_log: deletionLog,
-    }));
-    emitChange('owners');
-  });
-
-  // POST /v1/owners/:name/recover — Owner key recovery (operator-assisted)
-  router.post('/v1/owners/:name/recover', requireAuth(), requireOperator(storage), async (req, res) => {
-    const name = req.params.name as string;
-    const owner = await storage.getOwner(name);
-    if (!owner) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${name}`));
-      return;
-    }
-
-    // The operator replaces another person's sign-in key: the act goes to the operator trail and the
-    // person's account feed before anything changes (secaudit 2026-10, C2). requireOperator already
-    // admitted the caller, so this asks the same question again and writes the record.
-    if (!(await operatorOverride(storage, config, req.auth, { ownerOf: name, area: 'account', action: 'recover', subject: name }))) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Node operator required'));
-      return;
-    }
-
-    // Generate new keypair for the owner
-    const keyPair = await generateKeyPair();
-    await storage.updateOwner(name, { publicKey: keyPair.publicKey });
-
-    // Extension hook: owner_recovery (fire-and-forget)
-    fireHook(config, storage, 'owner_recovery', { owner: name });
-
-    res.json(success(config.nodeId, {
-      recovered: true,
-      owner: name,
-      private_key: keyPair.privateKey,
-      public_key: keyPair.publicKey,
-      note: 'New keys generated. Store the private key securely. Old keys are invalidated.',
     }));
     emitChange('owners');
   });

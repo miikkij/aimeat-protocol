@@ -10,6 +10,7 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-10-15 — The challenge answer says what POST /v1/auth/token signs: the GAII and a timestamp, not the challenge (feature-list audit 33).
  *   v1.14.0 -- 2026-10-14 -- The connectivity-key mint (routes/auth-otk.ts) is removed with the
  *     unauthenticated POST /v1/agents/connect it fed (Jouni, feature-list audit row 202).
  *   v1.13.0 -- 2026-10-12 -- The owner-key branch of POST /v1/auth/token is a version gate: from
@@ -167,7 +168,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       expires_at: new Date(expiresAt).toISOString(),
     }, [
       {
-        description: 'Sign the challenge with your private key and submit to get a JWT',
+        description: 'Get a JWT: sign your GAII followed by an ISO timestamp with your private key. POST /v1/auth/token does not read this challenge value.',
         method: 'POST',
         url: '/v1/auth/token',
         example_body: {

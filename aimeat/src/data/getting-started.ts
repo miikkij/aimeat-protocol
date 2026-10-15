@@ -19,6 +19,7 @@
  * @structure buildGettingStarted(base, instruction, anonymousMode, canSendMail)
  * @usage import { buildGettingStarted } from '../data/getting-started.js';
  * @version-history
+ *   2026-10-15 — The keypair sign-in signs the identity and a timestamp; no nonce is fetched, and the token lasts the node's token lifetime (feature-list audit 33).
  *   2026-10-15 — The no-account path offers POST /v1/registration-invites only when the node can send mail; otherwise it gives the portal link (feature-list audit #23).
  *   v1.0.0 — 2026-08-07 — Extracted from routes/bootstrap.ts and rewritten off the removed
  *     connectivity-key flow onto device authorization + the registration invite (remake 4b).
@@ -90,12 +91,11 @@ export function buildGettingStarted(
       } : {}),
 
       step_3_authenticate: {
-        description: 'Device authorization already handed you a token. This is the OTHER way in: when you hold an agent keypair (from POST /v1/agents), sign a challenge for a JWT.',
+        description: 'Device authorization already handed you a token. This is the OTHER way in: when you hold an agent keypair (from POST /v1/agents), sign your identity and a timestamp for a JWT. No nonce is fetched.',
         flow: [
-          `1. GET ${base}/v1/auth/challenge → receive a challenge nonce`,
-          '2. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp)',
-          `3. POST ${base}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }`,
-          '4. Receive JWT. Include in all future requests as: Authorization: Bearer <jwt>',
+          '1. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp)',
+          `2. POST ${base}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }`,
+          '3. Receive JWT. Include in all future requests as: Authorization: Bearer <jwt>. It lasts the node token lifetime, 3600 seconds by default.',
         ],
         token_lifetime: `24 hours. Refresh before expiry via POST ${base}/v1/auth/refresh`,
       },

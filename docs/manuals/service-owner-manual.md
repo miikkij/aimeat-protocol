@@ -287,7 +287,7 @@ and, for the AI that writes one, the built-in skill `aimeat-extension-builder` (
 A hook is the node stopping to ask an outside service whether an action is allowed, or telling it
 that one happened. This is where "your own backend, in any language" belongs.
 
-There are eleven hook points, and they divide into two kinds:
+There are ten hook points that fire, and they divide into two kinds (an eleventh, `owner_recovery`, is still accepted in a binding but nothing fires it since its route was removed on 2026-10-15):
 
 **Blocking.** The node waits for the answer and abandons the operation if any attached action says no.
 
@@ -301,7 +301,7 @@ There are eleven hook points, and they divide into two kinds:
 
 **Fire and forget.** The node tells you and carries on; a failure is logged, never propagated.
 
-`post_owner_registration` · `post_agent_registration` · `owner_recovery` · `agent_rekey` ·
+`post_owner_registration` · `post_agent_registration` · `agent_rekey` ·
 `post_work_delivery` · `post_settlement`
 
 ### How a hook runs

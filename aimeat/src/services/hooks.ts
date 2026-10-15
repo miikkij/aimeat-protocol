@@ -44,6 +44,7 @@
  *   const r = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
  *   if (!r.allowed) return refuse(r.reason);
  * @version-history
+ *   v1.3.2 — 2026-10-15 — owner_recovery stays listed with nothing firing it, since its route was removed (feature-list audit 171).
  *   v1.3.1 — 2026-10-05 — A hook action's answer is read under a ceiling (secaudit 2026-10, C6).
  *   v1.3.0 — 2026-09-26 — SECURITY (audit A8-3): resolveHookRef(). When a hook runs, only an id#provider
  *     reference names an action. A bare id names none, whatever is published at that moment: the
@@ -78,6 +79,8 @@ import { recordHookRun, type HookAnswer } from './hook-log.js';
 export const HOOK_NAMES: HookName[] = [
   'pre_owner_registration', 'post_owner_registration',
   'pre_agent_registration', 'post_agent_registration',
+  // owner_recovery: nothing fires it since POST /v1/owners/:name/recover was removed on 2026-10-15
+  // (feature-list audit 171). It stays listed so a binding stored for it still loads.
   'owner_recovery', 'agent_rekey',
   'pre_work_request', 'post_work_delivery', 'post_settlement',
   'pre_board_post', 'pre_federation_peer',
