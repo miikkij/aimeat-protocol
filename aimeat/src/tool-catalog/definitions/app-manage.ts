@@ -21,6 +21,7 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-15 — audit_keep: a number is set by an agent holding account:security, as the route allows; the text said it was always refused (feature-list audit 105).
  *   2026-10-13 — scope_allowance and scope_allowance_remove, with the `words` field: the permissions an
  *     app kept when the node moved to 4.0, and the owner taking one away (services/app-scope-allowance.ts).
  *   2026-10-12 — settings takes `listing` (listed, community, unlisted); `parked` stays as its older
@@ -140,7 +141,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     offset: { type: 'number', description: 'For members: how many people to skip on each list, for the next page. Default 0.', zod: z.number().int().min(0) },
     before: { type: 'string', description: 'For member_audit: the time of the oldest entry you already have, to read the page before it. For audit_archive: a date or ISO time; the entries older than it move into the archive.' },
     year: { type: 'string', description: 'For audit: read that year\'s archived entries (four digits, e.g. "2026") instead of the active log. The audit answer lists the archived years.', zod: z.string().regex(/^\d{4}$/) },
-    keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number is the account holder\'s own decision: it is refused here and set on the app page, signed in.', zod: z.string().max(20) },
+    keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number deletes, so it takes the account:security permission: without it the number is refused, and the account holder sets it on the app page, signed in.', zod: z.string().max(20) },
     invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
     // design spec (routes/apps/design-spec.ts)
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },

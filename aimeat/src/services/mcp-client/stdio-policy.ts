@@ -25,7 +25,8 @@
  *
  *   AND THE RECORD ITSELF IS OPERATOR-ONLY, which is a fourth condition this file does not enforce
  *   because it is not this file's to enforce: a stdio transport can only be written through the
- *   node-wide attach door, which stands behind requireOperatorPrincipal. An owner's attach door and
+ *   node-wide attach door, which stands behind requireOperatorPrincipal (the operator in person, or
+ *   the operator's own agent holding operator:admin). An owner's attach door and
  *   the agent tools build an http or sse transport and have no way to name a command.
  *
  *   NO SHELL, ever. The SDK's StdioClientTransport spawns with an argument ARRAY, so nothing in the
@@ -34,6 +35,7 @@
  * @structure StdioVerdict · checkStdioPolicy(config, transport)
  * @usage const v = checkStdioPolicy(config, t); if (!v.ok) throw new Error(v.message);
  * @version-history
+ *   2026-10-15 — Comment: the node-wide door admits the operator in person and the operator's own agent holding operator:admin (feature-list audit 18).
  *   v1.0.0 — 2026-09-16 — Phase 7 of the MCP proxy.
  */
 import type { AimeatConfig } from '../../config.js';

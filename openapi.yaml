@@ -8950,48 +8950,6 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
-  /v1/owners/{name}/recover:
-    post:
-      operationId: recoverOwnerKeys
-      summary: Recovery key rotation
-      description: |
-        Operator-assisted owner key recovery. Generates a new Ed25519 keypair,
-        replacing the owner's existing public key. Old JWTs are invalidated.
-      tags: [Identity]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: New keypair generated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          recovered:
-                            type: boolean
-                          owner:
-                            type: string
-                          private_key:
-                            type: string
-                            description: New Ed25519 private key (hex). Store securely.
-                          public_key:
-                            type: string
-                            description: New Ed25519 public key (hex)
-        '404':
-          $ref: '#/components/responses/NotFound'
-
   # ── Device Authorization Flow (RFC 8628) ──────────────────
   /v1/capabilities/node:
     get:

@@ -30,7 +30,7 @@ Every fact on this page was read from the code. If the code and this page disagr
   const ok = await verify(publicKey, message, signature);      // false on any error, never throws
   ```
 
-- **Owner keys are generated on the server.** `POST /v1/owners` (`src/routes/owners.ts`) and `POST /v1/ghii` (`src/routes/ghii/register-login.ts`) call `generateKeyPair()`, store the public key on the owner record and return the private key once in the response. The node keeps no copy of the private key. `POST /v1/owners/:name/recover` (operator only) issues a new pair.
+- **Owner keys are generated on the server.** `POST /v1/owners` (`src/routes/owners.ts`) and `POST /v1/ghii` (`src/routes/ghii/register-login.ts`) call `generateKeyPair()`, store the public key on the owner record and return the private key once in the response. The node keeps no copy of the private key. The owner key no longer signs anyone in (removed in 4.0.0), and the operator route that issued a new pair was removed on 2026-10-15.
 - **Owner-key sign-in is removed in 4.0.0.** `POST /v1/auth/token` with an owner name and a signature made with that key answers `410 OWNER_KEY_LOGIN_OFF` from 4.0.0 and points to `POST /v1/ghii/login`, whatever `AIMEAT_OWNER_KEY_LOGIN` says (`OWNER_KEY_LOGIN_REMOVED_IN` in `src/config-security.ts`). On a 3.x node the setting still switches it on or off, and an account with two-step sign-in armed is refused even when it is on. New code signs owners in with a password session, never with the account key.
 - The node's own key pair signs JWTs and federation messages. `AIMEAT_KEY_PASSPHRASE` encrypts the node key on disk. It is read in `src/auth/node-keys.ts`, not in a config file, so it is not on the Config tab.
 

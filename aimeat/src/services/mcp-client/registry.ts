@@ -28,6 +28,7 @@
  *   detachMcpServer
  * @usage const server = await requireUsableServer(storage, ownerGhii, idOrSlug);
  * @version-history
+ *   2026-10-15 — Comment: the node-wide door admits the operator in person and the operator's own agent holding operator:admin (feature-list audit 18).
  *   v1.6.0 — 2026-10-09 — The three attach doors store the row through sealServerRowSecrets: a stdio env and transport headers are sealed at rest (secrets audit 2026-10-09).
  *   v1.5.0 — 2026-09-26 — A group's server compares whole identities on every road: attaching one takes
  *     the caller's owner GHII instead of a name, and organismAdmits and requireManageableServer ask the
@@ -731,7 +732,7 @@ export async function requireUsableServer(
  * An owner's server is its owner's. A group's server is its owners' and admins', the people who may
  * attach one there. A node-wide server is nobody's through these doors, although it admits every
  * owner it is offered to: the operator changes it at /v1/mcp-servers/node/:id, which admits the
- * operator in person and nothing acting for them. Until 2026-09-24 the write doors asked
+ * operator in person and the operator's own agent holding operator:admin. Until 2026-09-24 the write doors asked
  * requireUsableServer instead, and any owner on the list could switch the server off for everybody.
  */
 export async function requireManageableServer(

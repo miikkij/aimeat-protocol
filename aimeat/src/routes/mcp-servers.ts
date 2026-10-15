@@ -39,6 +39,7 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   2026-10-15 — Comment: the node-wide door admits the operator in person and the operator's own agent holding operator:admin (feature-list audit 18).
  *   2026-10-15 — A grant's end date that is not a date is refused with 400 (feature-list audit 13).
  *   v1.5.0 — 2026-10-09 — POST /:id/authorize binds the round to the owner's browser when the owner
  *     starts it from a page of this node; an agent gets the node's confirmation page as authorize_url
@@ -268,9 +269,9 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       const name = typeof b.name === 'string' ? b.name : '';
       const url = typeof b.url === 'string' ? b.url : '';
       // A LOCAL PROCESS, and this is the only door in the system that can write one. It stands
-      // behind requireOperatorPrincipal, which admits the operator IN PERSON and refuses everything
-      // acting in their name; what then runs is decided again by the node's own allowlist at the
-      // line that spawns. Neither the owner's attach door nor any agent tool can name a command.
+      // behind requireOperatorPrincipal, which admits the operator in person and the operator's own
+      // agent holding operator:admin (decision 2026-10-05), and refuses everything else acting in
+      // their name; what then runs is decided again by the node's own allowlist at the line that spawns. Neither the owner's attach door nor any agent tool can name a command.
       const command = typeof b.command === 'string' ? b.command.trim() : '';
       if (!name || (!url && !command)) {
         return res.status(400).json(error(

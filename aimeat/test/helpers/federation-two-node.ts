@@ -29,6 +29,7 @@
  *   const fake = await startFakePeer();
  *   await addPeer(A, 'aimeat-fake-001', fake.url, peerPublicKey);
  * @version-history
+ *   2026-10-15 — The fake peer refuses /v1/work/request without a credential, as a real node does (feature-list audit 165).
  *   v1.3.0 — 2026-09-26 — `modes.work` makes the fake peer answer POST /v1/work/request with a 500, so
  *     a suite can route a call to a far end that answers with an error.
  *   v1.2.0 — 2026-09-26 — The fake peer records the relay claim it received (`relayClaim`, the claim's
@@ -229,6 +230,10 @@ export function startFakePeer(): Promise<{ server: Server; url: string }> {
             if (path === '/v1/federation/templates') { send(res, 404, { ok: false, error: { code: 'NOT_FOUND' } }); return; }
             if (path === '/v1/work/request') {
                 if (modes.work === 'fail') { send(res, 500, { ok: false, error: { code: 'PEER_BROKEN' } }); return; }
+                // A real node answers this route only to a signed-in caller (requireAuth), and a node
+                // forwarding work carries no credential of the far node's. Answering 201 to anything
+                // made cross-node work look built (feature-list audit 165).
+                if (!req.headers.authorization) { send(res, 401, { ok: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } }); return; }
                 send(res, 201, { ok: true, data: { tracking_code: 'tc-fake-001' } });
                 return;
             }

@@ -6,6 +6,7 @@
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history
+ *   2026-10-15 — Step 3 of the portal prompt: no nonce is fetched, and the token lasts the node's token lifetime, not 24 hours (feature-list audit 33).
  *   v1.1.0 — 2026-08-31 — site-portal gains the two things an operator had to find out by trying:
  *     the front page is normally BLOCKS arranged with the layout editor and a template replaces all
  *     of them (they cannot be embedded, so the AI asks which of the two the person means before it
@@ -188,11 +189,10 @@ If you cannot make POST requests at all, say so plainly and immediately, and sen
 
 Step 3 — Authenticate (only when you hold an agent KEYPAIR):
 Device authorization already handed you a token, so most agents skip this. It applies when you were registered via POST /v1/agents and hold a private key:
-1. GET {{node_url}}/v1/auth/challenge -> receive a challenge nonce
-2. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp)
-3. POST {{node_url}}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }
-4. Receive JWT. Include in all future requests as: Authorization: Bearer <jwt>
-Token lifetime: 24 hours. Refresh before expiry via POST {{node_url}}/v1/auth/refresh
+1. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp). No nonce is fetched.
+2. POST {{node_url}}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }
+3. Receive JWT. Include in all future requests as: Authorization: Bearer <jwt>
+Token lifetime: the node's token lifetime, 3600 seconds by default. Refresh before expiry via POST {{node_url}}/v1/auth/refresh
 
 Step 4 — What Now:
 You are connected. Now help your user with what they want to accomplish. Browse the capability sections in the response to find the right endpoints.`,

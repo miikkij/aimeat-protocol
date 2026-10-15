@@ -44,6 +44,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   2026-10-15 — The fake peer refuses /v1/work/request without a credential, as a real node does: cross-node
+ *     work is refused today and the routing fee goes back (feature-list audit 165).
  *   v1.7.0 -- 2026-10-12 -- The positive memory-inventory request carries the audience proof for B.
  *     Node 4.0.0 refuses one without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), and the
  *     proof is not this test's subject.
@@ -556,12 +558,16 @@ async function run(): Promise<void> {
         assert(miss.status === 404 && miss.body.error?.code === 'NOT_FOUND', `miss: ${miss.status} ${JSON.stringify(miss.body)}`);
     });
 
-    await test('an agent submits cross-node work, and the request that arrives is signed', async () => {
+    // CROSS-NODE WORK IS NOT BUILT YET (feature-list audit 165). The far node's /v1/work/request asks
+    // for a signed-in caller and the forwarding node carries no credential of the far node's, so a real
+    // node refuses it. The fake peer answered 201 to anything until 2026-10-15, which made it look
+    // built; it now refuses as a real node does, and these tests hold what arrives and what is answered.
+    await test('an agent submits cross-node work: the request that arrives is signed, and the far node refuses it', async () => {
         const { status, body } = await A.json('/v1/federation/cross-node/work', {
             method: 'POST', headers: auth(agentToken),
             body: JSON.stringify({ target_node: FAKE_ID, action_id: 'act-1', provider_gaii: 'provider@elsewhere', input: { q: 'hello' } }),
         });
-        assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+        assert(status === 401, `the far node's refusal is passed on: ${status} ${JSON.stringify(body)}`);
         assert(body.data.routed_to === FAKE_ID, `routed_to: ${JSON.stringify(body.data)}`);
         const arrived = seen.filter(s => s.path === '/v1/work/request').pop();
         assert(arrived?.body?.origin_node === A_ID && arrived?.body?.cross_node_requester === agentGaii,
@@ -578,7 +584,7 @@ async function run(): Promise<void> {
             method: 'POST', headers: auth(A.ownerToken),
             body: JSON.stringify({ target_node: FAKE_ID, action_id: 'act-2', provider_gaii: 'provider@elsewhere', input: { q: 'in person' } }),
         });
-        assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+        assert(status === 401, `the far node's refusal is passed on: ${status} ${JSON.stringify(body)}`);
         const arrived = seen.filter(s => s.path === '/v1/work/request').pop();
         assert(arrived?.body?.cross_node_requester === A.ownerGhii,
             `the peer is told the person's full identity: ${JSON.stringify(arrived?.body?.cross_node_requester)}`);
@@ -642,17 +648,15 @@ async function run(): Promise<void> {
         assert(back.length === 1 && back[0].amount === 1, `the fee went back with a line of its own: ${JSON.stringify(back)}`);
     });
 
-    await test('work asked of a provider on a peer: the fee stays when the peer takes the work, and goes back on an error answer', async () => {
+    await test('work asked of a provider on a peer: the far node refuses it, and the fee goes back on every error answer', async () => {
         const before = await walletOf(A.ownerToken);
         const made = await A.json('/v1/work/request', {
             method: 'POST', headers: auth(A.ownerToken),
             body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'made' } }),
         });
-        assert(made.status === 201, `the peer takes the work: ${made.status} ${JSON.stringify(made.body)}`);
+        assert(made.status === 401, `the far node refuses work without its credential: ${made.status} ${JSON.stringify(made.body)}`);
         const afterMade = await walletOf(A.ownerToken);
-        assert(afterMade === before - 1, `a route that was made takes one morsel: ${before} → ${afterMade}`);
-        const taken = (await linesOf(A.ownerToken, 'routing_fee')).filter((t: any) => t.tracking_code === `route:${FAKE_ID}`);
-        assert(taken.length === 1 && taken[0].amount === -1, `one routing fee line: ${JSON.stringify(taken)}`);
+        assert(afterMade === before, `a refused route keeps no morsel: ${before} → ${afterMade}`);
 
         modes.work = 'fail';
         try {
@@ -666,8 +670,8 @@ async function run(): Promise<void> {
         assert(afterRefused === afterMade, `an error answer kept the routing fee: ${afterMade} → ${afterRefused}`);
         const fees = (await linesOf(A.ownerToken, 'routing_fee')).filter((t: any) => t.tracking_code === `route:${FAKE_ID}`);
         const back = (await linesOf(A.ownerToken, 'routing_fee_return')).filter((t: any) => t.tracking_code === `route:${FAKE_ID}`);
-        assert(fees.length === 2 && back.length === 1 && back[0].amount === 1,
-            `two fees taken and the second given back: ${JSON.stringify({ fees, back })}`);
+        assert(fees.length === 2 && back.length === 2 && back.every((t: any) => t.amount === 1),
+            `two fees taken and both given back: ${JSON.stringify({ fees, back })}`);
     });
 
     await test('a route and cross-node work whose target answers with an error are not charged', async () => {
