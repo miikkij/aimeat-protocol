@@ -15466,7 +15466,9 @@ paths:
 
         1. The response is IDENTICAL whether the address is new, already has an account, or already
            has a live invitation — it always answers `sent`. Anything else would make this an
-           address-checking machine open to the internet.
+           address-checking machine open to the internet. A node whose email service is disabled
+           answers `not_sent` with the portal link for every address, which is a fact about the
+           node and not about the address.
         2. One LIVE invitation per address at a time, so an inbox cannot be buried by repeating the
            call. This holds even against a caller rotating IPs.
         3. A per-IP limit (`AIMEAT_RL_REGISTRATION_INVITES`, default 5 per HOUR).
@@ -15500,8 +15502,8 @@ paths:
       responses:
         '202':
           description: >-
-            Accepted. Says `sent` whether or not a message actually went out — see the
-            non-enumeration property above.
+            Accepted, on a node that sends email. Says `sent` whether or not a message actually
+            went out to this address — see the non-enumeration property above.
           content:
             application/json:
               schema:
@@ -15521,6 +15523,29 @@ paths:
                             type: string
                             nullable: true
                             description: The /v1/ai-tools id the claimed client resolved to, or null.
+                          next: { type: string }
+        '200':
+          description: >-
+            Not sent. This node's email service is disabled, so no message goes to any address and
+            no invitation is stored. The answer is the same for every address, so it reveals
+            nothing about one. `register_url` is the portal, where the person registers themselves;
+            the AI hands that link to the person.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status: { type: string, enum: [not_sent] }
+                          email_sent: { type: boolean, enum: [false] }
+                          register_url: { type: string, format: uri }
+                          tell_the_person:
+                            type: string
+                            description: What the AI should say next, with the link in it.
                           next: { type: string }
         '400':
           description: A malformed address, or `agent.model` missing
@@ -24515,15 +24540,21 @@ paths:
         THAN THE CLIENT ASKED FOR, and the client puts them in a report as the answer. There is no
         symptom — the numbers are simply wrong. A visibly missing feature is cheap by comparison.
 
-        `$count=true` reports what the FILTER matched, before `$top`/`$skip`, which is what the option
-        means and what a paging client needs.
+        `$count=true` reports what the FILTER matched over the whole table, before `$top`/`$skip`,
+        which is what the option means and what a paging client needs.
+
+        SERVER-DRIVEN PAGING. One response carries at most 5 000 rows. When the answer is longer,
+        the response carries `@odata.nextLink`: the same request with `$skip` moved on, `$top`
+        reduced by what this page carried, and `version` pinned to the content hash the page was
+        read from, so every page of one answer comes from the same rows. Excel, Power BI and
+        Tableau follow it by themselves; a client that does not reads only the first page.
       tags: [Data Packages]
       security: []
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
         - { name: resource, in: path, required: true, schema: { type: string }, description: 'The entity set name from the service document.' }
-        - { name: version, in: query, required: false, schema: { type: string } }
+        - { name: version, in: query, required: false, schema: { type: string }, description: 'A content hash (sha256:…) that pins the feed to one version. Every @odata.nextLink carries one.' }
         - { name: $select, in: query, required: false, schema: { type: string } }
         - { name: $top, in: query, required: false, schema: { type: integer } }
         - { name: $skip, in: query, required: false, schema: { type: integer } }
@@ -24532,7 +24563,7 @@ paths:
         - { name: $count, in: query, required: false, schema: { type: boolean } }
       responses:
         '200':
-          description: '{ "@odata.context": …, "@odata.count": …, "value": [ … ] }'
+          description: '{ "@odata.context": …, "@odata.count": …, "value": [ … ], "@odata.nextLink": … }. `@odata.count` only with `$count=true`; `@odata.nextLink` only when more rows follow.'
         '400':
           description: A named property does not exist, or an option is malformed
         '404':
@@ -24868,7 +24899,14 @@ paths:
     get:
       operationId: discoverActions
       summary: Discover actions
-      description: Browse all available actions on this node (and peered nodes). No auth required.
+      description: |
+        Browse all available actions on this node (and peered nodes). No auth required.
+
+        Every action carries `visibility` (always `public`: a published action is listed here for
+        anyone) and `status` (always `active`: it can be called while it exists). With `provider`,
+        the list holds that provider's actions only, matched on the exact identity; when the caller
+        is that provider, or the owner of that provider agent signed in as themselves, each action
+        also carries `call_count`, the number of work requests made on it.
       tags: [Actions]
       parameters:
         - name: category
@@ -24880,6 +24918,11 @@ paths:
           schema:
             type: string
           description: Search query
+        - name: provider
+          in: query
+          schema:
+            type: string
+          description: Only the actions of this provider, by its full identity (GHII or agent GAII).
         - $ref: '#/components/parameters/Pagination'
         - $ref: '#/components/parameters/PerPage'
       responses:
@@ -24941,6 +24984,10 @@ paths:
     delete:
       operationId: unpublishAction
       summary: Unpublish action
+      description: |
+        Without `provider`, removes the caller's own action. With `provider`, removes that
+        provider's action: the provider itself may, and so may the owner of a provider agent
+        signed in as themselves (the agent's Services tab). Anyone else gets 403.
       tags: [Actions]
       security:
         - BearerAuth: []
@@ -24950,9 +24997,19 @@ paths:
           required: true
           schema:
             type: string
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The provider's full identity (an agent GAII). Defaults to the caller's own identity.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: ACCESS_DENIED. `provider` is neither the caller nor an agent of the caller's account.
+        '404':
+          description: ACTION_NOT_FOUND. No action with this id under that provider.
 
   # ── Work Queue ─────────────────────────────────────────────
   /v1/work/request:
@@ -28262,8 +28319,10 @@ paths:
           description: Session not open or expired / SESSION_REPRICED (an open session stored in currency 'morsel' before 2026-10-11)
         '422':
           description: PAYMENT_HANDLER_REQUIRED (a money session without payment.handler, or with io.aimeat.morsels; the message lists the handlers that settle its currency) / UNKNOWN_PAYMENT_HANDLER / CURRENCY_MISMATCH / seller has no x402 payout address
+        '429':
+          description: PACING_PACK_CAP. A pacing pack would take the node past its daily mint ceiling; the money and the pacing went back and the session stays open, so the buyer can try again the next day. Any limit a fulfilment refuses on with 429 keeps its own code here.
         '502':
-          description: FULFILLMENT_FAILED. A line could not be fulfilled; the money and the pacing went back. A pacing pack past the node's daily mint ceiling ends here, with the reason in the message.
+          description: FULFILLMENT_FAILED. A line could not be fulfilled; the money and the pacing went back and the session stays open.
 
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:

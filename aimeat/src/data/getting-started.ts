@@ -14,10 +14,12 @@
  *     - the person HAS an account → device authorization (RFC 8628), then prove the connection by
  *       writing the Hello MCP key through it;
  *     - the person has NO account → POST /v1/registration-invites with their email, and they finish
- *       it from the link. The AI never picks the username.
- * @structure buildGettingStarted(base, instruction, anonymousMode)
+ *       it from the link. The AI never picks the username. That path is offered only when the
+ *       node can send mail; a node without mail sends the person to the portal to register.
+ * @structure buildGettingStarted(base, instruction, anonymousMode, canSendMail)
  * @usage import { buildGettingStarted } from '../data/getting-started.js';
  * @version-history
+ *   2026-10-15 — The no-account path offers POST /v1/registration-invites only when the node can send mail; otherwise it gives the portal link (feature-list audit #23).
  *   v1.0.0 — 2026-08-07 — Extracted from routes/bootstrap.ts and rewritten off the removed
  *     connectivity-key flow onto device authorization + the registration invite (remake 4b).
  */
@@ -27,9 +29,11 @@
  * @param base the node's base URL, no trailing slash
  * @param instruction the operator-configurable opening line (a managed prompt)
  * @param anonymousMode whether this node also offers an anonymous identity
+ * @param canSendMail whether the node's email service is enabled. Without it the registration
+ *   invite sends nothing, so the narrative must not offer it.
  */
 export function buildGettingStarted(
-  base: string, instruction: string, anonymousMode: boolean,
+  base: string, instruction: string, anonymousMode: boolean, canSendMail: boolean,
 ): Record<string, unknown> {
   return {
       instruction,
@@ -55,7 +59,7 @@ export function buildGettingStarted(
             next: 'You are connected. Use the token only within the approved scopes.',
             standard: 'OAuth 2.0 device authorization, RFC 8628. The owner approves every agent and picks its scopes.',
           },
-          no_account: {
+          no_account: canSendMail ? {
             action: `POST ${base}/v1/registration-invites`,
             body: '{ "email": "<ask them for it>", "agent": { "model": "<your model>", "vendor": "<who made you>", "client": "<the app you are running in>" } }',
             result: 'We email them a link. They press it, choose a username, and the account exists. There is no code for them to type, and you never choose the username.',
@@ -63,6 +67,11 @@ export function buildGettingStarted(
             tell_them: 'The message shows the IP address this call came from and which AI made it, so they can see it was you and not someone else.',
             next: 'Once they have the account, come back to the has_account path and connect yourself as their agent.',
             if_you_cannot_post: `Say so plainly and send them to ${base}/v1/portal to register themselves. A silent failure leaves them waiting.`,
+          } : {
+            action: `Give them this link: ${base}/v1/portal`,
+            result: 'This node does not send email, so it cannot mail them a link. They open the portal, choose a username and a password, and the account exists. You never choose the username.',
+            tell_them: `Open ${base}/v1/portal and create your account there. Tell me when it is done.`,
+            next: 'Once they have the account, come back to the has_account path and connect yourself as their agent.',
           },
         },
         note: 'The connectivity-key flow this step used to describe was removed in v1.1.0. There is no key to ask for.',

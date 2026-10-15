@@ -16,6 +16,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-15 — A fulfilment that refuses on a limit (CommerceError 429, e.g. PACING_PACK_CAP) is refunded and answered with its own code and status, not 502 FULFILLMENT_FAILED (feature-list audit #137).
  *   v3.1.0 — 2026-10-14 — Completion compares each line's quote with the live price and the session
  *     total with the sum of its lines before charging, and refuses a difference with 409
  *     PRICE_CHANGED (the session stays open). The record itself is service-owned now
@@ -657,6 +658,12 @@ async function completeSessionInner(
     }
     await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
+    // A limit the fulfilment refuses on (429, e.g. the pacing pack's daily PACING_PACK_CAP) keeps its
+    // own code and status, so the buyer learns which limit it was and that a later try can succeed.
+    // Any other failure stays FULFILLMENT_FAILED 502.
+    if (err instanceof CommerceError && err.statusCode === 429) {
+      throw new CommerceError(err.code, err.statusCode, `${err.message} The payment was refunded.`);
+    }
     const e = err as { message?: string };
     throw new CommerceError('FULFILLMENT_FAILED', 502, `Payment refunded — fulfillment task creation failed: ${e.message ?? 'unknown error'}`);
   }

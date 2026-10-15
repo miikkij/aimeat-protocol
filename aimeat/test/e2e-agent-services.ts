@@ -2,6 +2,7 @@
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-services.ts
 //
 // @version-history
+//   2026-10-15 — Phase 6: the owner lists the agent's services by exact identity with the real fields, unpublishes one (it answered 404), and another owner is refused 403 (feature-list audit #80).
 //   v1.1.1 — 2026-10-12 — The two actions are published with pricing.toll_morsels; node 4.0.0 refuses
 //     pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the same on 3.x.
 //   v1.1.0 — 2026-08-17 — E2E quality, agent-services:257. The three agents in this file never crossed:
@@ -420,6 +421,78 @@ await test('10. No task created for agent without directives', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const bridgedTask = body.data.tasks.find((t: any) => t.workTrackingCode === noDirectivesTrackingCode);
     assert(bridgedTask === undefined, 'no task should be created for agent without directives');
+});
+
+// ─── Phase 6: The owner manages the agent's services (feature-list audit #80) ───
+console.log('\nPhase 6 -- The owner manages the agent\'s services');
+
+let twinGaii = '';
+
+await test('11. Setup: another owner has an agent with the SAME name, publishing a service', async () => {
+    const ag = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${requesterOwnerToken}` },
+        body: JSON.stringify({ name: providerAgentName, owner: requesterOwnerName, capabilities: ['memory', 'actions'] }),
+    });
+    assert(ag.status === 201, `twin agent ${ag.status}: ${JSON.stringify(ag.body)}`);
+    twinGaii = ag.body.data.agent.gaii;
+    const twinToken = await getToken(twinGaii, ag.body.data.private_key);
+    const pub = await json('/v1/actions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${twinToken}` },
+        body: JSON.stringify({
+            id: 'twin-service', display_name: 'Twin', description: 'Same agent name, other owner',
+            input_schema: { type: 'object' }, output_schema: { type: 'object' }, pricing: { toll_morsels: 0 },
+        }),
+    });
+    assert(pub.status === 201, `twin publish ${pub.status}: ${JSON.stringify(pub.body)}`);
+});
+
+await test('12. ?provider lists the agent\'s own services by exact identity, with the real fields', async () => {
+    // The page filtered the whole list by a substring of the agent's name, so the twin above showed
+    // as this agent's, and it showed public, active and 0 calls because the server sent none of them.
+    const { status, body } = await json(`/v1/actions?provider=${encodeURIComponent(providerGaii)}`, {
+        headers: { Authorization: `Bearer ${providerOwnerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const actions = body.data.actions as any[];
+    assert(actions.length === 1 && actions[0].id === 'test-scrape', `only provbot's own: ${JSON.stringify(actions.map(a => [a.id, a.provider_gaii]))}`);
+    assert(actions.every(a => a.provider_gaii === providerGaii), 'every listed action is this provider\'s');
+    assert(actions[0].visibility === 'public' && actions[0].status === 'active', `fields: ${JSON.stringify(actions[0])}`);
+    assert(typeof actions[0].call_count === 'number' && actions[0].call_count >= 1,
+        `the owner sees how often it was called: ${actions[0].call_count}`);
+});
+
+await test('12b. Someone else asking the same list does not see the call count', async () => {
+    const anon = await json(`/v1/actions?provider=${encodeURIComponent(providerGaii)}`);
+    assert(anon.status === 200 && anon.body.data.actions.length === 1, `anonymous list ${anon.status}`);
+    assert(anon.body.data.actions[0].call_count === undefined, 'no call count for an anonymous caller');
+    const other = await json(`/v1/actions?provider=${encodeURIComponent(providerGaii)}`, {
+        headers: { Authorization: `Bearer ${requesterOwnerToken}` },
+    });
+    assert(other.body.data.actions[0].call_count === undefined, 'no call count for another owner');
+});
+
+await test('13. FAILURE MODE: another owner cannot unpublish this agent\'s service (403)', async () => {
+    const { status, body } = await json(`/v1/actions/test-scrape?provider=${encodeURIComponent(providerGaii)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${requesterOwnerToken}` },
+    });
+    assert(status === 403 && body.error?.code === 'ACCESS_DENIED', `expected 403 ACCESS_DENIED, got ${status} ${JSON.stringify(body.error)}`);
+    const still = await json(`/v1/actions/${encodeURIComponent(providerGaii)}/test-scrape`);
+    assert(still.status === 200, 'the service is still published');
+});
+
+await test('14. The owner unpublishes the agent\'s service (it answered 404 before)', async () => {
+    const { status, body } = await json(`/v1/actions/test-scrape?provider=${encodeURIComponent(providerGaii)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${providerOwnerToken}` },
+    });
+    assert(status === 200 && body.data.deleted === true, `expected 200, got ${status} ${JSON.stringify(body.error ?? body.data)}`);
+    const gone = await json(`/v1/actions/${encodeURIComponent(providerGaii)}/test-scrape`);
+    assert(gone.status === 404, `the service is gone: ${gone.status}`);
+    const twin = await json(`/v1/actions/${encodeURIComponent(twinGaii)}/twin-service`);
+    assert(twin.status === 200, 'the twin\'s service is untouched');
 });
 
 // ─── Cleanup ───

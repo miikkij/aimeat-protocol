@@ -9,6 +9,7 @@
  *   - AgentServicesSubtab (default export) -- main component
  *   - ServiceCard -- individual service display card
  * @version-history
+ *   2026-10-15 — The list is the agent's own by exact GAII; visibility, status and calls come from the server and are left out when it does not send them (they showed public, active and 0 as defaults); Unpublish names the agent as the provider, so the owner's call no longer answers 404 (feature-list audit #80).
  *   v1.10.0 -- 2026-10-11 -- A service's price line is its money price (or Free) and its pacing amount (pricing.toll_morsels, 3.x base_morsels or cost as fallback); a morsel count is not a price.
  *   v1.9.0 -- 2026-09-26 -- A service is the List's row (page group G1a): the state dot before its name,
  *     the state word after it, what it does under it, price, visibility, calls, success and time on
@@ -46,9 +47,11 @@ function ServiceCard({ service, onUnpublish }) {
   const desc = service.description || '';
   // The money price (or Free) and the pacing amount; a 3.x `cost` number is the pacing amount.
   const cost = priceAndPacing(pacingOf(service) > 0 || service.cost == null ? service : { tollMorsels: service.cost }, t);
-  const visibility = t('profile.agents.services.visibility.' + (service.visibility || 'public'));
-  const isActive = service.active !== false && service.status !== 'inactive';
-  const calls = service.invocation_count || service.call_count || 0;
+  // The server says the visibility, the status and the call count (GET /v1/actions?provider=); a
+  // value it did not send is left out of the line rather than shown as a default.
+  const visibility = service.visibility ? t('profile.agents.services.visibility.' + service.visibility) : null;
+  const isActive = service.status === 'active';
+  const calls = service.call_count;
   const successRate = service.success_rate != null ? `${Math.round(service.success_rate)}%` : null;
   const avgResponse = service.avg_response_ms != null ? `${Math.round(service.avg_response_ms)}ms` : null;
 
@@ -57,7 +60,7 @@ function ServiceCard({ service, onUnpublish }) {
   const meta = [
     cost,
     visibility,
-    `${calls} ${t('profile.agents.services.calls')}`,
+    calls != null && `${calls} ${t('profile.agents.services.calls')}`,
     successRate && `${successRate} ${t('profile.agents.activity.successRate')}`,
     avgResponse && `${avgResponse} ${t('profile.agents.services.avg')}`,
   ].filter(Boolean).join(' · ');
@@ -76,14 +79,14 @@ function ServiceCard({ service, onUnpublish }) {
   `;
 }
 
-export default function AgentServicesSubtab({ agentName, session, showToast }) {
+export default function AgentServicesSubtab({ agentName, agentGaii, session, showToast }) {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function loadServices({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
     try {
-      const res = await getAgentServices(agentName);
+      const res = await getAgentServices(agentGaii);
       setServices(res.actions || []);
     } catch (err) {
       if (showSpinner) showToast(err.message || t('profile.agents.services.loadError'), true);
@@ -94,7 +97,9 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
   async function handleUnpublish(service) {
     try {
       const actionId = service.action_id || service.id;
-      const resp = await fetch(`/v1/actions/${encodeURIComponent(actionId)}`, {
+      // The action is the agent's, so the owner names the agent as its provider.
+      const provider = service.provider_gaii || agentGaii;
+      const resp = await fetch(`/v1/actions/${encodeURIComponent(actionId)}?provider=${encodeURIComponent(provider)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${session?.token}` },
       });
@@ -114,14 +119,14 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
   // Reload when the selected agent changes. loadServices is recreated each render (it closes over the
   // showToast prop); depending on it would refetch on every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadServices(); }, [agentName]);
+  useEffect(() => { loadServices(); }, [agentName, agentGaii]);
 
   useEffect(() => {
     // Silent refetch on live-update so the tab doesn't flash blank.
-    return onLiveUpdate(['agents'], () => loadServices({ showSpinner: false }));
+    return onLiveUpdate(['agents', 'actions'], () => loadServices({ showSpinner: false }));
     // Re-subscribe only on agent switch; loadServices is recreated each render (see above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentName]);
+  }, [agentName, agentGaii]);
 
   if (loading) {
     return html`<${Note} kind="loading" />`;

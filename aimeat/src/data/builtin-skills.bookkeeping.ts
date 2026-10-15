@@ -27,6 +27,7 @@
  * @structure BOOKKEEPING_SKILL_ENTRY
  * @usage import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
  * @version-history
+ *   2026-10-15 — The OData passage says a table over 5 000 rows is paged with @odata.nextLink (feature-list audit #151, #193).
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5a).
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -141,7 +142,9 @@ programs read it:
 - \`aimeat_datapackage_export\` reads a package back as CSV, JSON or an address.
 - **The OData feed** is \`/v1/odata/{owner}/{name}\`: one entity set per table, with \`$metadata\`, and
   \`$select\`, \`$top\`, \`$skip\`, \`$filter\`, \`$orderby\`, \`$count\` and \`$format\`. Excel, Power BI
-  and other OData clients read it directly. **It needs no sign-in**: it is as open as the package.
+  and other OData clients read it directly. A table over 5 000 rows comes in pages: each answer
+  carries \`@odata.nextLink\` to the next one, and the clients follow it by themselves.
+  **It needs no sign-in**: it is as open as the package.
   Never publish anything private there, and tell the person that before you publish.
 
 ## How it goes stale

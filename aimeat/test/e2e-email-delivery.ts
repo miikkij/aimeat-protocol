@@ -41,6 +41,7 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-10-15 — The registration invite on a mailing node answers `sent`, and GET / offers it in getting_started (feature-list audit #23).
  *   v1.3.0 -- 2026-09-30 -- The organism invitation names the inviter by display name, is written in
  *     the language the inviter asks for (`locale`), and refuses a language it has no template for
  *     before storing or sending anything.
@@ -446,6 +447,12 @@ async function run(): Promise<void> {
         assert(again.status === 200, `the emailed password must sign in: ${again.status} ${short(again.body)}`);
     });
 
+    await test('a mailing node offers the registration invite in getting_started', async () => {
+        const r = await json('/', { headers: { Accept: 'application/json' } });
+        const noAccount = JSON.stringify(r.body.data?.getting_started?.step_2_connect_to_user?.paths?.no_account ?? {});
+        assert(noAccount.includes('/v1/registration-invites'), `no_account must name the invite: ${noAccount.slice(0, 300)}`);
+    });
+
     await test('the agent registration door mails a traceable invitation naming the model that asked', async () => {
         smtp!.clear();
         const r = await json('/v1/registration-invites', {
@@ -454,6 +461,12 @@ async function run(): Promise<void> {
             body: JSON.stringify({ email: regInviteEmail, agent: { model: 'claude-opus-5', vendor: 'Anthropic', client: 'Claude Code' } }),
         });
         assert(r.status === 202, `registration-invites ${r.status}: ${short(r.body)}`);
+        // On a node that sends mail the answer is `sent` and the AI is told to send the person to
+        // their inbox; the no-mail answer (not_sent + register_url) is e2e-registration-invites'.
+        assert(r.body.data.status === 'sent' && /email/i.test(r.body.data.tell_the_person),
+            `a mailing node answers sent: ${short(r.body.data)}`);
+        assert(r.body.data.mcp_client_recognised === 'claude-code',
+            `a known client should be recognised: ${r.body.data.mcp_client_recognised}`);
 
         const mail = await smtp!.waitForMail(regInviteEmail, /v1\/invite\?token=/);
         assert(mail.subject === 'Someone asked us to set up an AIMEAT account for this address', `subject: ${mail.subject}`);

@@ -17,6 +17,7 @@
  *   whose rows it serves, and no more.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=datapackage-odata
  * @version-history
+ *   2026-10-15 — Test 15: a table over 5 000 rows arrives whole through @odata.nextLink, and @odata.count is the whole table (feature-list audit #151, #193).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, the OData surface).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -248,6 +249,50 @@ await test('14. A feed for a package that does not exist is a 404 in OData\'s ow
   // "something went wrong", which is the same as saying nothing.
   assert(body.error?.code === 'NotFound' && typeof body.error.message === 'string',
     `OData error shape: ${JSON.stringify(body)}`);
+});
+
+await test('15. A table over 5 000 rows arrives whole: pages, @odata.nextLink and the true @odata.count', async () => {
+  // feature-list audit #151, #193: the feed returned the first 5 000 rows of a larger table and
+  // nothing to say there were more, and @odata.count said 5 000 too.
+  const BIG = 5003;
+  const pub = await json('/v1/datapackages', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({
+      name: 'big-odata', changes: 'More rows than one page.',
+      resources: [{ name: 'rows', rows: Array.from({ length: BIG }, (_, i) => ({ n: i, even: i % 2 === 0 })) }],
+    }),
+  });
+  assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+  const hash = pub.body.data.content_hash as string;
+  const bigRoot = `${BASE}/v1/odata/${encodeURIComponent(owner.name)}/big-odata`;
+
+  const first = JSON.parse(await (await fetch(`${bigRoot}/rows?$count=true`)).text());
+  assert(first['@odata.count'] === BIG, `@odata.count is the whole table: ${first['@odata.count']}`);
+  assert(first.value.length === 5000, `first page 5 000 rows, got ${first.value.length}`);
+  // The link is absolute on the node's configured base URL; it is followed here on the suite's own.
+  const onBase = (l: string) => { const u = new URL(l); return `${BASE}${u.pathname}${u.search}`; };
+  const link = first['@odata.nextLink'] as string;
+  assert(typeof link === 'string' && new URL(link).pathname === new URL(`${bigRoot}/rows`).pathname, `nextLink: ${link}`);
+  assert(new URL(link).searchParams.get('version') === hash, 'the nextLink pins the version the page was read from');
+
+  const second = JSON.parse(await (await fetch(onBase(link))).text());
+  assert(second.value.length === BIG - 5000, `second page ${BIG - 5000} rows, got ${second.value.length}`);
+  assert(second['@odata.nextLink'] === undefined, 'the last page has no nextLink');
+  const ids = [...first.value, ...second.value].map((r: any) => r.RowId);
+  assert(new Set(ids).size === BIG, `every row once: ${new Set(ids).size} distinct of ${ids.length}`);
+
+  // A filter over the whole table counts the whole table, not the first window of it.
+  const evens = JSON.parse(await (await fetch(`${bigRoot}/rows?$filter=even eq true&$count=true&$top=1`)).text());
+  assert(evens['@odata.count'] === Math.ceil(BIG / 2), `filtered count over the whole table: ${evens['@odata.count']}`);
+
+  // $top above one page is honoured across pages and not exceeded.
+  const topped = JSON.parse(await (await fetch(`${bigRoot}/rows?$top=5001`)).text());
+  assert(topped.value.length === 5000 && typeof topped['@odata.nextLink'] === 'string', 'first 5 000 of 5 001, then a link');
+  const rest = JSON.parse(await (await fetch(onBase(topped['@odata.nextLink']))).text());
+  assert(rest.value.length === 1 && rest['@odata.nextLink'] === undefined, `the one row still owed: ${rest.value.length}`);
+
+  // A table that fits one page carries no nextLink.
+  assert(JSON.parse((await feed('/rows')).text)['@odata.nextLink'] === undefined, 'a small table has no nextLink');
 });
 
 await test('Cleanup', async () => {

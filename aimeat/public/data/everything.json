@@ -380,10 +380,10 @@
      "slug": "g-2-invitation-by-an-ai",
      "cells": [
       "<strong>Invitation by an AI</strong>",
-      "Your AI emails someone a link; they pick a username and get an account. The AI never creates the account itself.",
+      "Your AI emails someone a link; they pick a username and get an account. The AI never creates the account itself. Limits: only on a node that sends email; on a node without email the call says no message was sent and gives the AI the portal link to hand on, and the node's discovery document offers the portal instead.",
       "<code>/v1/registration-invites</code>, <code>/v1/invitations/:token</code>"
      ],
-     "plain": "Invitation by an AI Your AI emails someone a link; they pick a username and get an account. The AI never creates the account itself. /v1/registration-invites, /v1/invitations/:token"
+     "plain": "Invitation by an AI Your AI emails someone a link; they pick a username and get an account. The AI never creates the account itself. Limits: only on a node that sends email; on a node without email the call says no message was sent and gives the AI the portal link to hand on, and the node's discovery document offers the portal instead. /v1/registration-invites, /v1/invitations/:token"
     },
     {
      "slug": "g-2-signed-in-devices",
@@ -1304,10 +1304,10 @@
      "slug": "g-7-agent-service-management",
      "cells": [
       "<strong>Agent service management</strong>",
-      "Inspect an agent's published actions, their prices, visibility, status and reported use. Unpublish an action when it should stop being offered. Workspace contract engagements have their own Contracts tab.",
+      "Inspect an agent's published actions, their prices, visibility, status and how often each was called; the list holds only this agent's actions, matched on its full identity. Unpublish an action when it should stop being offered: you can unpublish your own agent's actions, and nobody else's. Workspace contract engagements have their own Contracts tab.",
       "Agents &gt; Services and Contracts, <code>/v1/actions</code>, <code>/v1/actions/:id</code>"
      ],
-     "plain": "Agent service management Inspect an agent's published actions, their prices, visibility, status and reported use. Unpublish an action when it should stop being offered. Workspace contract engagements have their own Contracts tab. Agents > Services and Contracts, /v1/actions, /v1/actions/:id"
+     "plain": "Agent service management Inspect an agent's published actions, their prices, visibility, status and how often each was called; the list holds only this agent's actions, matched on its full identity. Unpublish an action when it should stop being offered: you can unpublish your own agent's actions, and nobody else's. Workspace contract engagements have their own Contracts tab. Agents > Services and Contracts, /v1/actions, /v1/actions/:id"
     },
     {
      "slug": "g-7-crew-builder",
@@ -2681,10 +2681,10 @@
      "slug": "g-14-buy-more-pacing",
      "cells": [
       "<strong>Buy more pacing</strong>",
-      "When your morsels run out, take the daily allowance, or buy a pacing pack with money when the operator sells one: your wallet shows the pack's size and price, and you buy it through the ordinary checkout. A refusal for want of morsels says both ways. Limits: off until the operator sets a pack size and a price (<code>morsel_policy.pacing_pack_morsels</code>, <code>morsel_policy.pacing_pack_price</code>, <code>morsel_policy.pacing_pack_currency</code>); bought morsels count against the node's daily ceiling for new morsels together with operator mints, and past it the purchase fails and the money goes back.",
+      "When your morsels run out, take the daily allowance, or buy a pacing pack with money when the operator sells one: your wallet shows the pack's size and price, and you buy it through the ordinary checkout. A refusal for want of morsels says both ways. Limits: off until the operator sets a pack size and a price (<code>morsel_policy.pacing_pack_morsels</code>, <code>morsel_policy.pacing_pack_price</code>, <code>morsel_policy.pacing_pack_currency</code>); bought morsels count against the node's daily ceiling for new morsels together with operator mints, and past it the purchase fails with <code>PACING_PACK_CAP</code> (429), the money goes back and the checkout stays open for the next day.",
       "<code>GET /v1/wallet</code> (<code>pacing_pack</code>), <code>POST /v1/wallet/request</code>, <code>/v1/commerce/checkout-sessions</code> (<code>kind: &quot;pacing-pack&quot;</code>), <code>aimeat_checkout_*</code>"
      ],
-     "plain": "Buy more pacing When your morsels run out, take the daily allowance, or buy a pacing pack with money when the operator sells one: your wallet shows the pack's size and price, and you buy it through the ordinary checkout. A refusal for want of morsels says both ways. Limits: off until the operator sets a pack size and a price (morsel_policy.pacing_pack_morsels, morsel_policy.pacing_pack_price, morsel_policy.pacing_pack_currency); bought morsels count against the node's daily ceiling for new morsels together with operator mints, and past it the purchase fails and the money goes back. GET /v1/wallet (pacing_pack), POST /v1/wallet/request, /v1/commerce/checkout-sessions (kind: \"pacing-pack\"), aimeat_checkout_*"
+     "plain": "Buy more pacing When your morsels run out, take the daily allowance, or buy a pacing pack with money when the operator sells one: your wallet shows the pack's size and price, and you buy it through the ordinary checkout. A refusal for want of morsels says both ways. Limits: off until the operator sets a pack size and a price (morsel_policy.pacing_pack_morsels, morsel_policy.pacing_pack_price, morsel_policy.pacing_pack_currency); bought morsels count against the node's daily ceiling for new morsels together with operator mints, and past it the purchase fails with PACING_PACK_CAP (429), the money goes back and the checkout stays open for the next day. GET /v1/wallet (pacing_pack), POST /v1/wallet/request, /v1/commerce/checkout-sessions (kind: \"pacing-pack\"), aimeat_checkout_*"
     },
     {
      "slug": "g-14-usd-usage-ledger",
@@ -2920,10 +2920,10 @@
      "slug": "g-15-odata-feeds",
      "cells": [
       "<strong>OData feeds</strong>",
-      "Connect Excel, Power BI or Tableau to published tables, inspect OData v4 metadata and refresh the data. Follow the latest version or pin one. This feed is public and unmetered; it is not an authenticated paid feed.",
+      "Connect Excel, Power BI or Tableau to published tables, inspect OData v4 metadata and refresh the data. Follow the latest version or pin one. A table larger than 5 000 rows comes in pages that the connector fetches one after another, and the row count covers the whole table. This feed is public and unmetered; it is not an authenticated paid feed.",
       "<code>/v1/odata/:owner/:name</code>, <code>/v1/odata/:owner/:name/$metadata</code>"
      ],
-     "plain": "OData feeds Connect Excel, Power BI or Tableau to published tables, inspect OData v4 metadata and refresh the data. Follow the latest version or pin one. This feed is public and unmetered; it is not an authenticated paid feed. /v1/odata/:owner/:name, /v1/odata/:owner/:name/$metadata"
+     "plain": "OData feeds Connect Excel, Power BI or Tableau to published tables, inspect OData v4 metadata and refresh the data. Follow the latest version or pin one. A table larger than 5 000 rows comes in pages that the connector fetches one after another, and the row count covers the whole table. This feed is public and unmetered; it is not an authenticated paid feed. /v1/odata/:owner/:name, /v1/odata/:owner/:name/$metadata"
     }
    ]
   },
