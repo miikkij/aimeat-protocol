@@ -30,9 +30,13 @@
  *   With those three, delete this file and its call in `loadConfig`, and the flag means what it
  *   says. Anything less and the flag is a way to turn on a replayable login.
  *
- * @structure assertEudiwNotHalfBuilt()
- * @usage called from loadConfig(), beside the node-type refusal
+ * @structure assertEudiwNotHalfBuilt() · eudiwSettingAllowed() · EUDIW_SETTING_REFUSAL
+ * @usage called from loadConfig(), beside the node-type refusal; eudiwSettingAllowed is the
+ *   `eudiw.enabled` row's check in services/config-schema.ts
  * @version-history
+ *   2026-10-16 — eudiwSettingAllowed: the runtime setting refuses `true` at PUT /v1/admin/config and when
+ *     a stored or Consul value is applied at start, so the switch cannot be turned on past the boot
+ *     refusal (QA audit D6-01, F21b-01).
  *   v1.0.0 — 2026-09-01 — Initial. Named during the Agent v2 A2A review as a replay-adjacent path
  *     outside that work; closed as "cannot be enabled" rather than by implementing holder binding.
  */
@@ -43,6 +47,21 @@
  * Reads `process.env` directly rather than a resolved config, for the same reason the node-type
  * refusal does: this has to fire before anything is constructed from the value it is refusing.
  */
+/**
+ * The check of the `eudiw.enabled` setting (services/config-schema.ts): `false` only. The boot
+ * refusal above reads the environment, and the setting is also written by PUT /v1/admin/config and
+ * read back from the database and Consul at every start, after this refusal has run. Every one of
+ * those paths runs the row's check, so this is where the same rule holds for them: the switch cannot
+ * be turned on at run time either (QA audit D6-01, F21b-01).
+ */
+export function eudiwSettingAllowed(v: unknown): boolean {
+  return v === false;
+}
+
+/** What the operator is told when the setting is refused (services/config-apply.ts). */
+export const EUDIW_SETTING_REFUSAL =
+  'EU wallet identity verification cannot be switched on in this release: its credential check does not yet tie a presented credential to the wallet it was issued to, so a credential seen once could be presented again. Nothing was changed.';
+
 export function assertEudiwNotHalfBuilt(): void {
   if (process.env.AIMEAT_EUDIW_ENABLED !== 'true') return;
   throw new Error([

@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-16 — eudiw.enabled refuses true on every write path (the config route, a stored value and Consul at start), with the reason in `refusal` (QA audit D6-01, F21b-01).
  *   2026-10-15 — metrics.enabled is immutable (restart-required): server-bootstrap/routes-loader.ts reads it once at start to mount the metrics middleware (feature-list audit #181).
  *   v1.33.0 — 2026-10-15 — connections.facebook_*, instagram_* and reddit_* client settings; the provider
  *     client rows moved to config-schema-connections.ts (max-file-lines), in the same place in the list.
@@ -103,6 +104,7 @@ import type { SiteLinksConfig } from '../config-types-site-links.js';
 import type { OperatorConfig } from '../config-types.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf, isStringList, asList, relayClaimSetting, REMOVAL_SWITCHES } from './config-schema-validators.js';
+import { eudiwSettingAllowed, EUDIW_SETTING_REFUSAL } from '../config-eudiw-guard.js';
 import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
 import { VISIBILITY_CONFIG_FIELDS } from './config-schema-visibility.js';
 import { DOCSIGN_CONFIG_FIELDS } from './config-schema-docsign.js';
@@ -359,7 +361,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'vapidPrivateKey', dotPath: 'push.vapid_private_key', envVar: 'AIMEAT_VAPID_PRIVATE_KEY', type: 'string', validate: () => true, immutable: true, description: 'VAPID private key (secret)', adminDisplay: 'hidden' },
 
   // ── EUDIW / Identity (Phase 3.3, mutable) ──
-  { key: 'eudiwEnabled', dotPath: 'eudiw.enabled', envVar: 'AIMEAT_EUDIW_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'EUDIW identity verification enabled' },
+  { key: 'eudiwEnabled', dotPath: 'eudiw.enabled', envVar: 'AIMEAT_EUDIW_ENABLED', type: 'boolean', validate: eudiwSettingAllowed, refusal: EUDIW_SETTING_REFUSAL, immutable: false, description: 'EUDIW identity verification. Cannot be switched on in this release: the node refuses to start with it on, and a change here to on is refused (config-eudiw-guard.ts)' },
   { key: 'ftnEnabled', dotPath: 'eudiw.ftn_enabled', envVar: 'AIMEAT_FTN_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Finnish Trust Network enabled' },
   ...DOCSIGN_CONFIG_FIELDS,
 

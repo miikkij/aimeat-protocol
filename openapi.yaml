@@ -8351,7 +8351,13 @@ paths:
             A session whose account is gone, or was made after the session because the name was
             registered again, answers `401 SESSION_REVOKED` and ends; a deactivated account's
             answers `403 ACCOUNT_DISABLED`.
-          * **Legacy (Bearer):** send a valid Bearer access token (agents / pre-cookie clients).
+          * **Agent (Bearer):** an agent sends its valid Bearer access token and gets a new one with
+            roles `['agent']` and its current stored scopes.
+          * **Owner bearer (refused):** an owner access token, an owner-level personal access token,
+            or the token one exchanges for, sent with no refresh cookie, answers
+            `403 OWNER_REFRESH_USES_COOKIE`. An owner session renews only with its cookie; a program
+            holds a personal access token instead. An app grant answers `403` and renews at
+            `POST /v1/app-grants/token`; a session from another node answers `403` and signs in again.
           * **Ecosystem app (Bearer + key proof):** a GEAI token renews only with proof that the app
             still holds the key it pinned at hello: `{ timestamp, signature }` in the body, where
             `signature` is the base64 Ed25519 signature of `<geai><timestamp>` and the timestamp is
@@ -8394,6 +8400,8 @@ paths:
           description: Cookie refresh missing the X-AIMEAT-Refresh header
         '401':
           description: Not authenticated, or for an ecosystem app ECO_KEY_PROOF_REQUIRED, ECO_KEY_PROOF_INVALID or ECO_REAPPROVAL_REQUIRED
+        '403':
+          description: OWNER_REFRESH_USES_COOKIE for an owner bearer without the refresh cookie; FORBIDDEN for an app grant or a session from another node; ACCOUNT_DISABLED for a deactivated account
 
   /v1/auth/revoke:
     post:
@@ -63668,6 +63676,19 @@ paths:
                                   active: { type: boolean }
                                   zone: { type: string, enum: [healthy, critical] }
                                   message: { type: string, nullable: true }
+                              test_switches:
+                                type: object
+                                description: >-
+                                  The other test-only settings in force on a node whose public URL is not a loopback
+                                  address: AIMEAT_X402_TEST_FACILITATOR (with x402 on), AIMEAT_TEST_MODE,
+                                  AIMEAT_DEV_MODE, AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR,
+                                  AIMEAT_FINVOICE_OPERATOR=mock and AIMEAT_CONNECT_FAKE_BASE_URL. Each keeps working; zone
+                                  critical with one sentence per setting when any is on, healthy and empty on a loopback
+                                  test node.
+                                properties:
+                                  active: { type: array, items: { type: string } }
+                                  zone: { type: string, enum: [healthy, critical] }
+                                  messages: { type: array, items: { type: string } }
                           refusals:
                             type: object
                             description: Bounded sample filtered to the last 24 hours, grouped by door, source, credential kind and fingerprint; count_kind=sample, sample_limit=1000, window_total=null; the readable span and its mean per day; the newest 200 lines
@@ -67908,7 +67929,9 @@ paths:
         Sends a password reset code to the account's verified email (no auth). Always returns the
         same response regardless of whether the account exists, to avoid account enumeration.
         The code is valid for 10 minutes, and only the newest code works: a new request expires
-        the codes sent before it. The username is taken case-insensitively.
+        the codes sent before it, and the new code keeps their failed attempts, so asking again does
+        not reset the five-attempt cap. The username is taken case-insensitively. Three requests per
+        ten minutes per client address, whatever token the request carries.
       requestBody:
         required: false
         content:
@@ -67937,7 +67960,11 @@ paths:
       operationId: resetGhiiPassword
       tags: [GHII]
       summary: Reset password with a code
-      description: Resets the account password using a valid reset code (no auth). The new password is strength-validated.
+      description: >-
+        Resets the account password using a valid reset code (no auth). The new password is
+        strength-validated. Five failed attempts end the code (429 TOO_MANY_ATTEMPTS), counted across
+        the codes a new request replaces. Three requests per ten minutes per client address, whatever
+        token the request carries (429 RATE_LIMITED).
       requestBody:
         required: true
         content:
@@ -67976,6 +68003,7 @@ paths:
       description: |
         Emails the account's username to its verified notification email (no auth). Always returns
         the same response regardless of whether the email matches an account, to avoid enumeration.
+        Three requests per ten minutes per client address.
       requestBody:
         required: false
         content:

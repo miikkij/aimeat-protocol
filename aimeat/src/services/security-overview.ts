@@ -27,6 +27,8 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *   2026-10-16 -- `now.test_switches`: the other test-only settings in force on a non-loopback node,
+ *     critical with one sentence each (utils/test-switches.ts; QA audit D8-01).
  *   v1.3.0 -- 2026-10-13 -- `now.test_money_handler` follows the ruling
  *     decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s: the flag is in force on any
  *     node; critical, with the sentence that any buyer can complete a money checkout without paying,
@@ -50,6 +52,7 @@ import { listSecurityIncidents, type SecurityIncidentValue } from './security-in
 import { getStats } from './stats.js';
 import { appIsolationStatus, type AppIsolationStatus } from './app-isolation-status.js';
 import { testMoneyHandlerActive, testMoneyHandlerOnPublicNode } from '../utils/test-money-guard.js';
+import { testSwitchesOnPublicNode } from '../utils/test-switches.js';
 
 /** The rolling window the headline counts cover. */
 export const REFUSAL_WINDOW_HOURS = 24;
@@ -112,6 +115,8 @@ export interface SecurityOverview {
     log: { enabled: boolean; path: string; bytes: number; max_bytes: number; rotated_bytes: number };
     /** AIMEAT_TEST_MONEY_HANDLER: in force whenever it is set; critical on a node whose base URL is not loopback. */
     test_money_handler: { requested: boolean; active: boolean; zone: Zone; message: string | null };
+    /** The other test-only settings in force on a node whose base URL is not loopback: their names, critical, one sentence each. */
+    test_switches: { active: string[]; zone: Zone; messages: string[] };
   };
   refusals: RefusalSummary;
   incidents: { items: SecurityIncidentValue[]; open: number; total: number };
@@ -250,6 +255,8 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
   const owners = await storage.listOwners();
   const ghiis = await storage.listGHIIs();
 
+  // The other test-only settings in force on a node others reach (utils/test-switches.ts; QA audit D8-01).
+  const testSwitches = testSwitchesOnPublicNode(config);
   const topSource = refusals.by_source[0] ?? null;
   const topShare = topSource && refusals.in_window > 0 ? topSource.count / refusals.in_window : null;
   const zones = {
@@ -259,6 +266,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
     scope: counterZone(scopeDenials),
     open: (incidents.open > 0 ? 'critical' : 'healthy') as Zone,
     testMoney: (testMoneyHandlerOnPublicNode(config) ? 'critical' : 'healthy') as Zone,
+    testSwitches: (testSwitches.length > 0 ? 'critical' : 'healthy') as Zone,
   };
   const testMoneyActive = testMoneyHandlerActive(config);
   // A loopback test node (the E2E runner, `pnpm sandbox`) runs with the flag as a matter of course: no warning there.
@@ -279,6 +287,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
       uptime_seconds: snap?.uptime_seconds ?? null,
       log,
       test_money_handler: { requested: config.testMoneyHandler, active: testMoneyActive, zone: zones.testMoney, message: testMoneyMessage },
+      test_switches: { active: testSwitches.map(s => s.env), zone: zones.testSwitches, messages: testSwitches.map(s => s.message) },
     },
     refusals,
     incidents,

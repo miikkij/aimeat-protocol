@@ -1029,6 +1029,7 @@
         "lineOpenOne": "Yksi tapahtuma on auki ja odottaa sinua osiossa 03.",
         "lineOpenMany": "{n} tapahtumaa on auki ja odottaa sinua osiossa 03.",
         "lineTestMoneyPublic": "AIMEAT_TEST_MONEY_HANDLER on päällä, ja tämä on julkinen palvelin. Niin kauan kuin se on päällä, kuka tahansa ostaja voi viedä euro- tai dollarikaupan kassan loppuun ilman maksua. Kytke se pois: poista muuttuja palvelimen ympäristöstä ja käynnistä palvelin uudelleen.",
+        "lineTestSwitchesPublic": "Testikäyttöön tarkoitettuja asetuksia on päällä, ja tämä on julkinen palvelin: {names}. Jokainen niistä muuttaa sitä, miten palvelin kohtelee oikeita ihmisiä. Käynnistysloki kertoo, mitä kukin tekee. Kytke asetus pois: poista se palvelimen ympäristöstä ja käynnistä palvelin uudelleen.",
         "lineWalledOne": "Yksi IP-osoite, {source}, estettiin kirjautumisen päätepisteessä {n} kertaa viimeisen vuorokauden aikana.",
         "lineWalledMany": "{sources} IP-osoitetta estettiin kirjautumisen päätepisteissä {n} kertaa viimeisen vuorokauden aikana.",
         "logOn": "Epäysloki päällä · vaihtuu {mb} MB:n kohdalla",

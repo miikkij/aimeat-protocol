@@ -6,6 +6,9 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The emailed codes come from crypto.randomInt (utils/one-time-code.ts), not Math.random;
+ *     the reset, reset-request and account-recover limits count per client address; a new reset code
+ *     keeps the failed attempts of the live code it replaces (QA audit F02a-02).
  *   v1.6.0 — 2026-10-09 — A password reset and a password change replace the owner's signing key, so
  *     the deprecated owner-key sign-in does not outlive them (secrets audit 2026-10-09, S2).
  *   v1.5.0 — 2026-10-05 — The password change checks the current password with checkPassword
@@ -47,6 +50,7 @@ import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
 import { generateKeyPair } from '../../auth/keypair.js';
+import { sixDigitCode } from '../../utils/one-time-code.js';
 
 /**
  * Replace the owner's Ed25519 signing key and hand the new private half to nobody. The key signs in
@@ -96,7 +100,7 @@ export function registerRecoveryRoutes(
 
         const normalizedEmail = email.toLowerCase().trim();
         const emailHash = createHash('sha256').update(normalizedEmail).digest('hex');
-        const code = String(Math.floor(100000 + Math.random() * 900000));
+        const code = sixDigitCode();
         const codeHash = createHash('sha256').update(code).digest('hex');
         const now = new Date().toISOString();
         const verId = randomBytes(16).toString('hex');
@@ -227,7 +231,10 @@ export function registerRecoveryRoutes(
     });
 
     // POST /v1/ghii/password/reset-request — Request password reset (NO auth)
-    router.post('/v1/ghii/password/reset-request', rateLimit({ max: 3, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    // The three unauthenticated routes here count requests per client address (keyBy 'ip'). Without
+    // it the limiter keyed on the token's identity, so every identity a caller held had its own
+    // bucket, and with anonymous mode on every caller shared one (QA audit F02a-02).
+    router.post('/v1/ghii/password/reset-request', rateLimit({ max: 3, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
         const rawUsername = (req.body ?? {}).username;
 
         if (!rawUsername || typeof rawUsername !== 'string') {
@@ -245,7 +252,7 @@ export function registerRecoveryRoutes(
         const ghiiRecord = await storage.getGHII(ghii);
 
         if (ghiiRecord && ghiiRecord.notificationEmail && ghiiRecord.emailVerifiedAt && emailService?.enabled) {
-            const code = String(Math.floor(100000 + Math.random() * 900000));
+            const code = sixDigitCode();
             const codeHash = createHash('sha256').update(code).digest('hex');
             const now = new Date().toISOString();
             const verId = randomBytes(16).toString('hex');
@@ -254,9 +261,15 @@ export function registerRecoveryRoutes(
             // the reset reads one pending code: SQLite took the OLDEST (no ORDER BY), so the code in
             // the newest mail was refused as INVALID_CODE (found on a sold customer node,
             // 2026-09-29). Earlier codes expire here, so the answer is the same on both backends.
+            //
+            // THE FAILED GUESSES STAY WITH THE ACCOUNT. The new code starts with the failed attempts
+            // of the codes it replaces while they were still live (ten minutes), so asking again does
+            // not reset the five-guess cap. It reset to zero with every request (QA audit F02a-02).
+            let carriedAttempts = 0;
             for (let i = 0; i < 20; i++) {
                 const older = await storage.getActiveEmailVerification(username, 'password_reset');
                 if (!older) break;
+                carriedAttempts = Math.max(carriedAttempts, older.attempts ?? 0);
                 await storage.updateEmailVerification(older.id, { status: 'expired' });
             }
 
@@ -267,7 +280,7 @@ export function registerRecoveryRoutes(
                 code: codeHash,
                 purpose: 'password_reset',
                 status: 'pending',
-                attempts: 0,
+                attempts: carriedAttempts,
                 expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 min
                 createdAt: now,
                 verifiedAt: null,
@@ -295,7 +308,7 @@ export function registerRecoveryRoutes(
     });
 
     // POST /v1/ghii/password/reset — Reset password with code (NO auth)
-    router.post('/v1/ghii/password/reset', rateLimit({ max: 3, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    router.post('/v1/ghii/password/reset', rateLimit({ max: 3, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
         const { username: rawUsername, code, newPassword } = req.body ?? {};
 
         if (!rawUsername || typeof rawUsername !== 'string') {
@@ -430,7 +443,7 @@ export function registerRecoveryRoutes(
     });
 
     // POST /v1/ghii/account/recover — Send username to verified email (NO auth)
-    router.post('/v1/ghii/account/recover', rateLimit({ max: 3, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    router.post('/v1/ghii/account/recover', rateLimit({ max: 3, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
         const { email } = req.body ?? {};
 
         if (email && typeof email === 'string') {

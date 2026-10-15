@@ -25,6 +25,7 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   2026-10-16 -- closeForGaii takes 'rekeyed' (connect-tunnel-revocation.ts; QA audit F03b-01).
  *   v2.7.0 -- 2026-10-12 -- A connection carries what its connector's crew runtime honours (X-AIMEAT-Features), and a record is not sent to an agent retired from the workspace (connect-tunnel-push.ts).
  *   v2.6.0 -- 2026-10-11 -- A stopped agent: wake deliveries are held, setStopped() and stoppedOf() (agent-stop-rules.ts).
  *   v2.5.0 -- 2026-10-10 -- A connection carries the name its connector reported (X-AIMEAT-Install-Name),
@@ -133,7 +134,7 @@ export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
 export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import { spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
-import { revokeByToken, revokeByGaii, revokeByOwner } from './connect-tunnel-revocation.js';
+import { revokeByToken, revokeByGaii, revokeByOwner, type GaiiCutReason } from './connect-tunnel-revocation.js';
 // One identity's entry in the connection map: a pure extraction (max-file-lines, 2026-10-02).
 import type { ConnectConnection } from './connect-tunnel-connection.js';
 import { emitTunnelSocketOpened, emitTunnelSocketClosed } from './connect-tunnel-hooks.js';
@@ -676,7 +677,7 @@ export class ConnectTunnelManager {
   stoppedOf(gaii: string): boolean | undefined { return this.connections.get(gaii)?.stopped; }
   setStopped(gaii: string, stopped: boolean): void { const c = this.connections.get(gaii); if (!c) return; c.stopped = stopped; if (!stopped) void sendBacklog(this.pushCtx(), c); }
 
-  closeForGaii(gaii: string, reason: 'moved' | 'deleted' = 'deleted'): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
+  closeForGaii(gaii: string, reason: GaiiCutReason = 'deleted'): void { revokeByGaii(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), gaii, reason); }
 
   /** Deactivating an account: every principal acting for that owner. */
   closeForOwner(owner: string): void { revokeByOwner(this.connections, (ws, f) => this.send(ws, f), (s, p, r) => this.detachIdentity(s, p, r), owner); }

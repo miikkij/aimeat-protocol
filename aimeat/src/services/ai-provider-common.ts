@@ -18,18 +18,24 @@
  *   const id = providerIdOf(req.params.id);
  *   const origins = egressOriginsOf(config.decideProviderEgress, 'decide', 'AIMEAT_DECIDE_PROVIDER_EGRESS');
  * @version-history
+ *   2026-10-16 — isLoopbackHost reads a literal address: a DNS name starting with "127." no longer counts as this machine (QA audit S4-01).
  *   v1.1.0 — 2026-10-09 — isProviderKeyEnvName: an operator's provider may name only a provider key
  *     variable as its key, on both systems (secrets audit 2026-10-09, S1).
  *   v1.0.0 — 2026-09-28 — Initial: moved from services/decide/providers.ts, unchanged.
  */
 import { logger } from '../utils/logger.js';
 import { isLinkLocalHost } from '../utils/url-validator.js';
+import { isLoopbackLiteral } from '../utils/blocked-ip.js';
 import { keyEnvProblem } from './crew-llm-guard.js';
 
 export const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
-/** This machine, for the one word that decides whether the data leaves it. */
-export const isLoopbackHost = (host: string): boolean => host === 'localhost' || host === '::1' || host === '[::1]' || /^127\./.test(host);
+/**
+ * This machine, for the one word that decides whether the data leaves it: `localhost`, `::1` or a
+ * literal 127.0.0.0/8 address. A DNS name that starts with "127." is a name and can resolve anywhere,
+ * so it is not this machine (QA audit S4-01).
+ */
+export const isLoopbackHost = (host: string): boolean => isLoopbackLiteral(host);
 
 export const PROVIDER_ID_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
 export const PROVIDER_ID_PROBLEM = "id: lower-case letters, digits and '-', 2 to 63 characters.";

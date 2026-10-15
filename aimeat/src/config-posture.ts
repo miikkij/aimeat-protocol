@@ -14,6 +14,9 @@
  *   import { securityPostureWarnings } from './config-posture.js';
  *   for (const w of securityPostureWarnings(config)) logger.warn(w);
  * @version-history
+ *   2026-10-16 — The other test-only settings (x402 test facilitator, test mode, dev mode, admin setup
+ *     open, Finvoice mock, fake connection address) are reported as ACTIVE on a non-loopback node, as
+ *     the test money handler is (utils/test-switches.ts; QA audit D8-01).
  *   v1.4.0 — 2026-10-13 — AIMEAT_TEST_MONEY_HANDLER on a non-loopback node is reported as ACTIVE, not
  *     refused: the flag is in force on any node (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v1.3.0 — 2026-10-12 — AIMEAT_AI_PROVENANCE=false on a public node is reported: refused from 4.0.0,
@@ -26,6 +29,7 @@
  */
 import type { AimeatConfig } from './config-types.js';
 import { testMoneyHandlerOnPublicNode } from './utils/test-money-guard.js';
+import { testSwitchesOnPublicNode } from './utils/test-switches.js';
 import { PROVENANCE_SWITCH_LOCAL_ONLY_IN } from './config-ai-label.js';
 
 /**
@@ -40,6 +44,8 @@ export function securityPostureWarnings(config: AimeatConfig): string[] {
   if (testMoneyHandlerOnPublicNode(config)) {
     w.push(`AIMEAT_TEST_MONEY_HANDLER=true is ACTIVE on a public node — ${config.baseUrl} is not a loopback address, and any buyer can complete a EUR or USD checkout without paying through test.money. To turn it off, remove the variable from this node's environment and restart.`);
   }
+  // The other test-only settings, the same way and for the same reason (utils/test-switches.ts; QA audit D8-01).
+  for (const s of testSwitchesOnPublicNode(config)) w.push(s.message);
   if (config.securityProfile !== 'public') return w;
   if (config.anonymousMode) w.push('AIMEAT_ANONYMOUS=true — anyone can act as the shared anonymous identity.');
   if (config.allowPrivateEgress) w.push('AIMEAT_ALLOW_PRIVATE_EGRESS=true — server-side fetches can reach loopback/internal services (SSRF).');

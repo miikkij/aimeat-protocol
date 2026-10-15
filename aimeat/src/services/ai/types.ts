@@ -14,6 +14,7 @@
  *   - adapterTypeOf() — the owner's legacy provider setting mapped to an adapter type
  *   - CostSource — where the cost recorded for a call came from
  * @version-history
+ *   2026-10-16 — isLoopback reads a literal 127.0.0.0/8 address, not any host text starting with "127." (QA audit S4-01).
  *   v1.2.0 — 2026-09-28 — The `extension` adapter type and ExtensionOpRunner on the target (V6).
  *   v1.1.1 — 2026-09-28 — CostSource comment: `catalog` and `table` are in use (V4).
  *   v1.1.0 — 2026-09-28 — The provider types of V3 (openai, anthropic, mistral, xai), their fixed
@@ -80,7 +81,9 @@ export interface AiTarget {
 function isLoopback(baseUrl: string): boolean {
   if (!URL.canParse(baseUrl)) return false;
   const host = new URL(baseUrl).hostname.toLowerCase();
-  return host === 'localhost' || host === '[::1]' || host === '::1' || /^127\./.test(host);
+  // A literal 127.0.0.0/8 address, not any name starting with "127.": such a name can resolve
+  // anywhere, so it is not this machine (QA audit S4-01).
+  return host === 'localhost' || host === '[::1]' || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
 }
 
 /**

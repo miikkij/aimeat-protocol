@@ -9,6 +9,7 @@
  * @structure ConfigFieldShape<K>
  * @usage import type { ConfigFieldDef } from './config-schema.js';
  * @version-history
+ *   2026-10-16 — `refusal`: the reason a row's check gives for a value it refuses on principle (QA audit D6-01).
  *   v1.2.0 — 2026-10-11 — `list`: a setting whose running value is a list of strings.
  *   v1.1.0 — 2026-09-29 — `choices`: the fixed values of a string setting, for the Config tab's pick.
  *   v1.0.0 — 2026-09-24 — Moved from config-schema.ts; the key's type became a parameter.
@@ -25,6 +26,11 @@ export interface ConfigFieldShape<K extends string> {
   type: 'number' | 'boolean' | 'string' | 'float' | 'object';
   /** Validation function */
   validate: (v: unknown) => boolean;
+  /**
+   * What the operator is told when `validate` refuses a value for a reason other than its type or
+   * range, in place of "Invalid value". A switch that a release does not allow on says why here.
+   */
+  refusal?: string;
   /** true = cannot be changed after startup */
   immutable: boolean;
   /** Human-readable description */

@@ -14,6 +14,8 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   2026-10-16 — The status sentence names the other test-only settings in force on a public node
+ *     (now.test_switches; QA audit D8-01).
  *   v3.4.2 — 2026-10-13 — The status sentence starts with AIMEAT_TEST_MONEY_HANDLER only on a public
  *     node, where it is in force and any buyer can complete a money checkout without paying; a
  *     loopback test node gets no line (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
@@ -72,6 +74,9 @@ export function alertLine(ov) {
   // Only on a public node: on a loopback test node (E2E, sandbox) the flag is ordinary and the server marks it healthy.
   const tm = ov.now.test_money_handler;
   if (tm?.zone === 'critical') parts.push(S('now.lineTestMoneyPublic'));
+  // The other test-only settings in force on a public node, named (QA audit D8-01).
+  const ts = ov.now.test_switches;
+  if (ts?.zone === 'critical' && ts.active?.length) parts.push(S('now.lineTestSwitchesPublic', { names: ts.active.join(', ') }));
   const open = ov.now.open_incidents.value;
   if (open === 1) parts.push(S('now.lineOpenOne'));
   else if (open > 1) parts.push(S('now.lineOpenMany', { n: num(open) }));

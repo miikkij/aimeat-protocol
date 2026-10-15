@@ -416,10 +416,10 @@
      "slug": "g-2-identity-verification",
      "cells": [
       "<strong>Identity verification</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "Finnish Trust Network: the bank sign-in through Suomi.fi raises the account's verification level, when the operator has configured it. EU Digital Identity Wallet verification (OpenID4VP, SD-JWT) is not available: the node refuses to start with it switched on, because its sign-in can be replayed.",
+      "Finnish Trust Network: the bank sign-in through Suomi.fi raises the account's verification level, when the operator has configured it. EU Digital Identity Wallet verification (OpenID4VP, SD-JWT) is not available in this release, because its check does not yet tie a credential to the wallet it was issued to: the node refuses to start with it switched on, and the admin setting refuses to turn it on.",
       "<code>/v1/ghii/verify/eudiw/*</code>, <code>/v1/ghii/verify/ftn/*</code>"
      ],
-     "plain": "Identity verification off Finnish Trust Network: the bank sign-in through Suomi.fi raises the account's verification level, when the operator has configured it. EU Digital Identity Wallet verification (OpenID4VP, SD-JWT) is not available: the node refuses to start with it switched on, because its sign-in can be replayed. /v1/ghii/verify/eudiw/*, /v1/ghii/verify/ftn/*"
+     "plain": "Identity verification off Finnish Trust Network: the bank sign-in through Suomi.fi raises the account's verification level, when the operator has configured it. EU Digital Identity Wallet verification (OpenID4VP, SD-JWT) is not available in this release, because its check does not yet tie a credential to the wallet it was issued to: the node refuses to start with it switched on, and the admin setting refuses to turn it on. /v1/ghii/verify/eudiw/*, /v1/ghii/verify/ftn/*"
     },
     {
      "slug": "g-2-verifiable-credential",
@@ -531,10 +531,10 @@
      "slug": "g-3-key-rotation",
      "cells": [
       "<strong>Key rotation</strong>",
-      "Rotate an agent's keypair; its old tokens stop working.",
+      "Rotate an agent's keypair; its old tokens stop working, and a connector connection opened with one is closed.",
       "<code>/v1/agents/:gaii/rekey</code>"
      ],
-     "plain": "Key rotation Rotate an agent's keypair; its old tokens stop working. /v1/agents/:gaii/rekey"
+     "plain": "Key rotation Rotate an agent's keypair; its old tokens stop working, and a connector connection opened with one is closed. /v1/agents/:gaii/rekey"
     },
     {
      "slug": "g-3-agent-portability",
@@ -3498,10 +3498,10 @@
      "slug": "g-20-outbound-request-guard",
      "cells": [
       "<strong>Outbound request guard</strong>",
-      "An outbound request whose address is not fixed in the code goes through one guard that refuses internal addresses, at every redirect too. The calls that do not go through it are listed, each with its written reason: requests to federation peers the operator linked (a peer on a private network must work), calls to the AI provider address an owner set, which the operator's provider allowlist checks instead, the node calling itself, addresses from the operator's own configuration, and code that runs in a browser or on a person's own machine. A check refuses any new one.",
+      "An outbound request whose address is not fixed in the code goes through one guard that refuses internal addresses, at every redirect too. The calls that do not go through it are listed, each with its written reason: requests to federation peers the operator linked (a peer on a private network must work), calls to the AI provider address an owner set, which the operator's provider allowlist checks instead, the node calling itself, addresses from the operator's own configuration, and code that runs in a browser or on a person's own machine. A check refuses any new one. The address is checked again when the connection opens, so a name that answers differently the second time cannot reach inside.",
       "<code>safeFetch</code>"
      ],
-     "plain": "Outbound request guard An outbound request whose address is not fixed in the code goes through one guard that refuses internal addresses, at every redirect too. The calls that do not go through it are listed, each with its written reason: requests to federation peers the operator linked (a peer on a private network must work), calls to the AI provider address an owner set, which the operator's provider allowlist checks instead, the node calling itself, addresses from the operator's own configuration, and code that runs in a browser or on a person's own machine. A check refuses any new one. safeFetch"
+     "plain": "Outbound request guard An outbound request whose address is not fixed in the code goes through one guard that refuses internal addresses, at every redirect too. The calls that do not go through it are listed, each with its written reason: requests to federation peers the operator linked (a peer on a private network must work), calls to the AI provider address an owner set, which the operator's provider allowlist checks instead, the node calling itself, addresses from the operator's own configuration, and code that runs in a browser or on a person's own machine. A check refuses any new one. The address is checked again when the connection opens, so a name that answers differently the second time cannot reach inside. safeFetch"
     },
     {
      "slug": "g-20-host-only-cookies-and-app-isolation",

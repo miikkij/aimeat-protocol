@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 -- POST /v1/agents/:gaii/rekey also cuts the agent's live connector socket, which had verified the old token once at upgrade (QA audit F03b-01).
  *   2026-10-15 -- POST /v1/agents/:gaii/port keeps the redirect pointer in a system namespace the agent's
  *     deletion does not touch (services/agent-port-redirect.ts), and a refusal for want of morsels names
  *     the owner's balance, which the fee is drawn from, not the agent's, which is always 0
@@ -337,6 +338,10 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // leaked, and the answer below, openapi.yaml and the feature list all say they are invalidated;
     // they worked until they expired (feature-list audit row 34).
     await storage.revokeSessionsByGaii(gaii);
+    // A tunnel verifies its bearer once, at upgrade, so a connector holding the old token kept its
+    // live socket after the rotation. It is cut here, as agent delete does, without a reason the
+    // connector would read as "forget this agent" (QA audit F03b-01).
+    try { getActiveConnectTunnelManager()?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('rekey: tunnel close failed', { gaii, error: String(err) }); }
 
     // Extension hook: agent_rekey (fire-and-forget)
     fireHook(config, storage, 'agent_rekey', { gaii, owner: agent.owner });

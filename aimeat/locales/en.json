@@ -1029,6 +1029,7 @@
         "lineOpenOne": "An incident is open and waits for you in section 03.",
         "lineOpenMany": "{n} incidents are open and wait for you in section 03.",
         "lineTestMoneyPublic": "AIMEAT_TEST_MONEY_HANDLER is on, and this is a public server. While it is on, any buyer can complete a euro or dollar checkout without paying. To turn it off, remove the variable from the server's environment and restart the server.",
+        "lineTestSwitchesPublic": "Test-only settings are on, and this is a public server: {names}. Each one changes how the server treats real people, and the start log says what each one does. To turn one off, remove it from the server's environment and restart the server.",
         "lineWalledOne": "One IP address, {source}, was blocked at a sign-in endpoint {n} times in the last 24 hours.",
         "lineWalledMany": "{sources} IP addresses were blocked at sign-in endpoints {n} times in the last 24 hours.",
         "logOn": "Refusal log on · rotates at {mb} MB",
