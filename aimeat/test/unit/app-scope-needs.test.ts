@@ -8,6 +8,7 @@
  *   that 4.0.0 does not gate, an app that never signs in).
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-scope-needs.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-15 — cortexLibRefs: a subfolder path, and linear time on a repeated prefix.
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -66,6 +67,18 @@ describe('a call shape the 4.0.0 gates check', () => {
         const out = undeclaredScopeNeeds(html, [lib]);
         expect(out.missing).toEqual(['ext:invoke']);
         expect(out.evidence[0].source).toBe('/v1/cortex/foo-cortex/libs/foo.js');
+    });
+
+    it('a lib in a subfolder and a name with a dot keep their whole path', () => {
+        const html = `<script src="/v1/cortex/foo/libs/sub/a.json.js"></script>`;
+        expect(cortexLibRefs(html)).toEqual([{ name: 'foo', file: 'sub/a.json.js', path: '/v1/cortex/foo/libs/sub/a.json.js' }]);
+    });
+
+    it('stays linear on a page that repeats the cortex prefix without a .js (CodeQL alert 1736)', () => {
+        const html = '/v1/cortex/!/libs/' + '/v1/cortex/!/libs/!'.repeat(20_000);
+        const started = performance.now();
+        expect(cortexLibRefs(html)).toEqual([]);
+        expect(performance.now() - started).toBeLessThan(1000);
     });
 });
 

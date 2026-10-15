@@ -31,6 +31,8 @@
  *   const libs = await loadLibs(cortexLibRefs(html));
  *   const { missing } = undeclaredScopeNeeds(html, libs);
  * @version-history
+ *   v1.0.1 — 2026-10-15 — cortexLibRefs bounds the cortex name and the file path in its pattern
+ *     (CodeQL js/polynomial-redos).
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -154,7 +156,9 @@ export function scanScopeNeeds(sources: ReadonlyArray<{ source: string; text: st
 /** The cortex libs an app loads, as the paths a `<script src>` or a loader names. */
 export function cortexLibRefs(html: string): Array<{ name: string; file: string; path: string }> {
   const out = new Map<string, { name: string; file: string; path: string }>();
-  for (const m of html.matchAll(/\/v1\/cortex\/([^/'"\x60\s?#]+)\/libs\/([^'"\x60\s?#)]+\.js)/g)) {
+  // Both parts are bounded: an unbounded file part runs to the end of the text from every
+  // `/v1/cortex/` before it fails, which is quadratic on a page that repeats the prefix.
+  for (const m of html.matchAll(/\/v1\/cortex\/([^/'"\x60\s?#]{1,128})\/libs\/([^'"\x60\s?#)]{1,256}\.js)/g)) {
     const name = decodeURIComponent(m[1]);
     const file = decodeURIComponent(m[2]);
     out.set(`${name}/${file}`, { name, file, path: `/v1/cortex/${m[1]}/libs/${m[2]}` });

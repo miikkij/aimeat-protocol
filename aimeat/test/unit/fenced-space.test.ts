@@ -17,6 +17,7 @@
  *   over and read as a removal where it does not.
  * @usage cd aimeat && pnpm exec vitest run test/unit/fenced-space.test.ts
  * @version-history
+ *   v1.1.1 — 2026-10-15 — fencesMet: trailing dots, and linear time on a run of dots.
  *   v1.1.0 — 2026-10-13 — organism:direct, mayChangeFence, protectedFenceChanges and
  *     fenceChangeRefusal, and the manifest record as a target of the rule.
  *   v1.0.0 — 2026-10-13 — Initial.
@@ -154,6 +155,14 @@ describe('fencesMet: the match by namespace prefix', () => {
         for (const subtree of [`${ROOT}.shared.notes`, `${ROOT}.app.decisionsx`, `${ROOT}.ap`]) {
             expect(fencesMet(fences, ROOT, { subtree }).length, subtree).toBe(0);
         }
+    });
+
+    it('trims any number of trailing dots, and a run of dots inside the subtree costs linear time (CodeQL alert 1735)', () => {
+        expect(fencesMet(fences, ROOT, { subtree: `${ROOT}.app.decisions...` }).length).toBe(1);
+        const subtree = `${ROOT}.app.` + '.'.repeat(150_000) + 'x';
+        const started = performance.now();
+        expect(fencesMet(fences, ROOT, { subtree }).length).toBe(0);
+        expect(performance.now() - started).toBeLessThan(1000);
     });
 
     it('names what an archive touches: a record or a space, never a whole workspace or organism', () => {

@@ -23,6 +23,8 @@
  * @structure Reply · RepliesOutcome · readReplies · REPLY_READERS_FOR_TEST
  * @usage const out = await readReplies({ provider, connection, credential, externalRef });
  * @version-history
+ *   v1.0.1 — 2026-10-15 — htmlToText strips tags to a fixed point and decodes entities in one pass
+ *     (CodeQL js/incomplete-multi-character-sanitization, js/double-escaping).
  *   v1.0.0 — 2026-10-15 — Mastodon, Bluesky, YouTube, X, Facebook Page, Instagram, Reddit; LinkedIn
  *     refuses with the reason.
  */
@@ -76,15 +78,23 @@ type Reader = (input: RepliesInput & { limit: number }) => Promise<RepliesOutcom
 const s = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '');
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-/** Mastodon sends HTML. A reader wants the words; links keep their text, paragraphs a line break. */
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'", apos: "'", nbsp: ' ' };
+
+/**
+ * Mastodon sends HTML. A reader wants the words; links keep their text, paragraphs a line break.
+ * The result is plain text: whoever shows it escapes it, as for any other text from a stranger.
+ */
 export function htmlToText(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>\s*<p>/gi, '\n\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
-    .trim();
+  let text = html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>\s*<p>/gi, '\n\n');
+  // Strip until nothing changes, so a tag that one pass assembles from the pieces around another
+  // does not survive.
+  let before: string;
+  do {
+    before = text;
+    text = text.replace(/<[^>]*>/g, '');
+  } while (text !== before);
+  // Entities in ONE pass: `&amp;lt;` is the text `&lt;`, and a second pass would turn it into `<`.
+  return text.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (_m, name: string) => ENTITIES[name]).trim();
 }
 
 async function body(res: Response, provider: string): Promise<Record<string, unknown>> {

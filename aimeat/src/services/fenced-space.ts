@@ -103,6 +103,8 @@
  *   if (fenced) return res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));
  *   const changed = fenceChangeRefusal(manifestBefore, manifestAfter, { principal, roles, scopes });
  * @version-history
+ *   v1.1.1 — 2026-10-15 — fencesMet trims a subtree's trailing dots with a scan, not a regular
+ *     expression (CodeQL js/polynomial-redos).
  *   v1.1.0 — 2026-10-13 — The permission `organism:direct`: a session that covers it writes a
  *     fenced space directly (the caller carries `scopes`), and a change to a fenced space's list,
  *     object type, namespace or backing is accepted only from the account holder in person or from
@@ -294,7 +296,11 @@ export function fencesOf(manifest: WorkspaceManifest | null | undefined): SpaceF
 /** The fences a target meets. `root` is `organism.<org>.w.<ws>`. */
 export function fencesMet(fences: readonly SpaceFence[], root: string, target: FenceTarget): SpaceFence[] {
     if ('subtree' in target) {
-        const at = target.subtree.replace(/\.+$/, '');
+        // Trailing dots off with a scan: `replace(/\.+$/, '')` retries from every dot in a run, so a
+        // subtree of thousands of dots someone sent costs quadratic time.
+        let end = target.subtree.length;
+        while (end > 0 && target.subtree.charCodeAt(end - 1) === 46 /* '.' */) end -= 1;
+        const at = target.subtree.slice(0, end);
         return fences.filter(f => {
             const space = `${root}.${f.namespace}`;
             return at === space || at.startsWith(`${space}.`) || space.startsWith(`${at}.`);
