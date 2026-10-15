@@ -245,7 +245,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:5850d3f941b006acde25d4dd"
+      "digest": "sha256:7a150ad52af5caef3b58b14b"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-11",
@@ -327,7 +327,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:1a0ad3133e4fdb1ba1950323"
+      "digest": "sha256:d3ad48067972dde905f4a315"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-15",
@@ -341,7 +341,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:f11f557110886893ee9fe3f0",
+      "digest": "sha256:35c5c10f222c18c13640621b",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -353,7 +353,7 @@
         "aimeat/src/services/mcp-client/invoke.ts",
         "aimeat/src/mcp/mcp-proxy.ts"
       ],
-      "digest": "sha256:297b600e9a9e98a15b9af5b1"
+      "digest": "sha256:bf29ef683ff5b47f82b52800"
     },
     "node:aimeat-workflow-decisions": {
       "reviewedOn": "2026-10-15",
@@ -591,7 +591,7 @@
       "aimeat/src/mcp/core-admin.ts": "890a5b5be7cd077e"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "29e29ec8d2f46348",
+      "aimeat/src/mcp/core.ts": "f360ff7b76ea4153",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "32e3066324d96e34"
     },
     "node:manage-my-profile-data": {
@@ -724,12 +724,12 @@
       "aimeat/src/routes/owners/export.ts": "9ed397ed069b2735",
       "aimeat/src/services/owner-erasure.ts": "18e38187bc10c89d",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
-      "aimeat/src/mcp/organisms.ts": "ddbde4cdad67c883"
+      "aimeat/src/mcp/organisms.ts": "6e78ed1ff0dd9a6a"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "46e7160d2a579e7b",
       "aimeat/src/services/mcp-client/grants.ts": "f0e61241060c356a",
-      "aimeat/src/services/mcp-client/registry.ts": "522531c154dc10bd",
+      "aimeat/src/services/mcp-client/registry.ts": "804ea44a9115d001",
       "aimeat/src/services/mcp-client/invoke.ts": "851e02be17abd315",
       "aimeat/src/mcp/mcp-proxy.ts": "8da033aa90ec71db"
     },
