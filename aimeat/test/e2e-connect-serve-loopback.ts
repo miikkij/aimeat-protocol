@@ -100,7 +100,9 @@ async function registerOwnerAndAgent(base: string, _nodeId: string, ownerName: s
   const ownerToken = (await registerOwner(base, ownerName)).token;
   const ag = await json(base, '/v1/agents', {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-    body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*'] }),
+    // memory:read-as-owner, outside the wildcard: the owner_scope tests read the owner's private record
+    // through the connector, which takes that word since feature-list audit 42.
+    body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*', 'memory:read-as-owner'] }),
   });
   assert(ag.status === 201, `agent status ${ag.status}: ${JSON.stringify(ag.body)}`);
   const agentToken = await getAuthToken(base, ag.body.data.agent.gaii, ag.body.data.private_key);
@@ -365,7 +367,7 @@ await test('A scope change reaches the RUNNING daemon, in both directions, with 
   await settlesAt(403, 'a removed permission');
 
   // GRANT it back. This is the direction crewaimeat reported, and the whole point: no restart.
-  await patchScopes(['*']);
+  await patchScopes(['*', 'memory:read-as-owner']);
   await settlesAt(200, 'a granted permission');
 });
 
