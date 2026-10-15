@@ -29,14 +29,15 @@
  *   - GET /v1/odata/:owner/:name/:resource  the entity set
  * @usage app.use(odataRouter(config, storage))
  * @version-history
+ *   2026-10-15 — The entity set reads every row and pages the answer: at most 5 000 rows per response, @odata.nextLink to the rest, @odata.count over the whole table. It used to return the first 5 000 rows of a larger table as if they were all of it (feature-list audit #151, #193).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, the OData surface).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { openPackage, readRows } from '../services/datapackage/store.js';
-import { toCsdl, parseQuery, applyQuery, edmName, ODATA_SUPPORTED } from '../services/datapackage/odata.js';
+import { openPackage, readAllRows } from '../services/datapackage/store.js';
+import { toCsdl, parseQuery, applyQueryPaged, nextLinkFor, edmName, ODATA_SUPPORTED } from '../services/datapackage/odata.js';
 import type { Descriptor } from '../services/datapackage/contract.js';
 
 /**
@@ -112,7 +113,8 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        const parsed = parseQuery(new URLSearchParams(req.url.split('?')[1] ?? ''), resource.schema);
+        const params = new URLSearchParams(req.url.split('?')[1] ?? '');
+        const parsed = parseQuery(params, resource.schema);
         if (!parsed.ok) {
             // 501 for "this feed does not do that", 400 for "you asked for something that is not
             // there". Both are refusals; neither quietly returns the unfiltered set.
@@ -121,18 +123,25 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // The whole resource is read and filtered here. That is honest for the sizes this format is
-        // built for and it is the thing to revisit first when a package outgrows it: the query is
-        // parsed into a shape a storage-side implementation could execute, so the seam already exists.
-        const all = await readRows(store, ref, config.nodeId, resource.name, { offset: 0, limit: 5000 });
+        // The whole resource is read and filtered here, then split into pages of ODATA_PAGE_SIZE
+        // rows. It used to read a 5 000-row window and return it as the whole table, with
+        // @odata.count saying 5 000 too. The read is pinned to the content hash just opened, so a
+        // version published between the two calls cannot mix into this answer, and the nextLink
+        // carries the same hash. Filtering in the process is honest for the sizes this format is
+        // built for; the query is parsed into a shape a storage-side implementation could execute.
+        const contentHash = opened.descriptor.aimeat.contentHash;
+        const pinnedRef = `pkg:${req.params.owner}/${req.params.name}@${contentHash}`;
+        const all = await readAllRows(store, pinnedRef, config.nodeId, resource.name);
         if (!all) { odataError(res, 404, 'NotFound', `Could not read ${resource.name} of ${ref}`); return; }
 
-        const page = applyQuery(all.rows, parsed.value, resource.schema);
+        const page = applyQueryPaged(all.rows, parsed.value, resource.schema);
         odataHeaders(res, !!req.query.version);
+        const entitySetUrl = `${serviceRoot(req)}/${encodeURIComponent(edmName(resource.name))}`;
         const body: Record<string, unknown> = {
             '@odata.context': `${serviceRoot(req)}/$metadata#${edmName(resource.name)}`,
             ...(parsed.value.count ? { '@odata.count': page.matched } : {}),
             value: page.rows,
+            ...(page.next ? { '@odata.nextLink': nextLinkFor(entitySetUrl, params, page.next, contentHash) } : {}),
         };
         res.type('application/json;odata.metadata=minimal').send(JSON.stringify(body, null, 2));
     });

@@ -20,6 +20,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-registration-invites
  * @version-history
+ *   2026-10-15 — This E2E server sends no mail, so the call must answer 200 not_sent with the portal link and GET / must not offer the invite; the old assertions required 202 "sent" and "check your email" where nothing was sent (feature-list audit #23).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4b).
  */
 
@@ -77,8 +78,14 @@ await test('GET / no longer teaches the removed connectivity-key flow', async ()
         assert(/removed in v1\.1\.0|no key to ask for/i.test(gs),
             'the only allowed mention is the deprecation note itself');
     }
-    assert(gs.includes('/v1/registration-invites'),
-        'the no-account path must point at the registration invite');
+    // The E2E server sends no mail (AIMEAT_SMTP_HOST is pinned empty), so the no-account path must
+    // NOT offer the invite: it sends nothing there. It gives the portal link instead. A mailing
+    // node's offer is asserted in e2e-email-delivery. (feature-list audit #23: this assertion
+    // used to require the invite on a node that cannot send it.)
+    const noAccount = JSON.stringify(body.data?.getting_started?.step_2_connect_to_user?.paths?.no_account ?? {});
+    assert(!noAccount.includes('/v1/registration-invites'),
+        `a node without mail must not offer the registration invite: ${noAccount.slice(0, 300)}`);
+    assert(noAccount.includes('/v1/portal'), 'the no-account path must give the portal link');
     assert(gs.includes('device-authorize'), 'the has-account path must be device authorization');
     assert(/hello_mcp/.test(gs), 'the narrative must say the connection has to be PROVEN');
 });
@@ -98,17 +105,22 @@ console.log('\nPhase 1: the call');
 
 let firstEmail = '';
 
-await test('An AI can ask for an account with one unauthenticated call', async () => {
+let firstAnswer = '';
+
+await test('On a node without mail, the call says nothing was sent and gives the portal link', async () => {
+    // feature-list audit #23: this node sends no mail, and the call used to answer 202 "sent" with
+    // "Check your email". The happy path with mail is asserted in e2e-email-delivery.
     firstEmail = `door${stamp}@example.org`;
     const { status, body } = await invite(firstEmail, { model: 'claude-opus-5', vendor: 'anthropic', client: 'claude.ai' });
-    assert(status === 202, `expected 202, got ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.status === 'sent', `status: ${JSON.stringify(body.data)}`);
-    assert(typeof body.data.tell_the_person === 'string' && body.data.tell_the_person.length > 20,
-        'the AI must be told what to say to the person');
-    // It cannot see the mailbox, so it is told what happens next rather than left to invent it.
-    assert(/email|inbox/i.test(body.data.tell_the_person), 'it must mention the email');
-    assert(body.data.mcp_client_recognised === 'claude-web',
-        `a known client should be recognised: ${body.data.mcp_client_recognised}`);
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.status === 'not_sent', `status: ${JSON.stringify(body.data)}`);
+    assert(body.data.email_sent === false, 'email_sent must be false');
+    assert(typeof body.data.register_url === 'string' && body.data.register_url.endsWith('/v1/portal'),
+        `register_url: ${body.data.register_url}`);
+    assert(typeof body.data.tell_the_person === 'string' && body.data.tell_the_person.includes(body.data.register_url),
+        'the AI must be given the link to hand to the person');
+    assert(!/check your email/i.test(body.data.tell_the_person), 'it must not send the person to an inbox');
+    firstAnswer = JSON.stringify(body.data);
 });
 
 await test('FAILURE MODE: the model is required — the email has to say what asked', async () => {
@@ -128,18 +140,18 @@ console.log('\nPhase 2: the open door cannot be used to test addresses');
 await test('A REPEAT for the same address answers exactly as the first call did', async () => {
     // The per-address cap suppresses the send, and the caller must not be able to tell.
     const { status, body } = await invite(firstEmail, { model: 'claude-opus-5' });
-    assert(status === 202, `expected 202, got ${status}`);
-    assert(body.data.status === 'sent', `a suppressed send must still say sent: ${JSON.stringify(body.data)}`);
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(JSON.stringify(body.data) === firstAnswer, `a repeat must answer as the first call did: ${JSON.stringify(body.data)}`);
     const s = JSON.stringify(body).toLowerCase();
     for (const leak of ['already', 'exists', 'pending', 'suppress', 'duplicate']) {
         assert(!s.includes(leak), `the response leaks "${leak}" — that makes this an enumeration oracle`);
     }
 });
 
-await test('A DIFFERENT address still goes through (the cap is per address, not global)', async () => {
+await test('A DIFFERENT address gets the same answer (the node fact, not the address)', async () => {
     const { status, body } = await invite(`other${stamp}@example.org`, { model: 'gpt-5', client: 'ChatGPT' });
-    assert(status === 202, `expected 202, got ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.mcp_client_recognised === 'chatgpt', `ChatGPT should resolve: ${body.data.mcp_client_recognised}`);
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(JSON.stringify(body.data) === firstAnswer, `answer differs by address: ${JSON.stringify(body.data)}`);
 });
 
 await test('An address that ALREADY has an account gets the same answer as one that does not', async () => {
@@ -153,8 +165,8 @@ await test('An address that ALREADY has an account gets the same answer as one t
     assert(reg.status === 201, `setup register ${reg.status}: ${JSON.stringify(reg.body)}`);
 
     const { status, body } = await invite(email, { model: 'claude-opus-5' });
-    assert(status === 202, `expected 202, got ${status}`);
-    assert(body.data.status === 'sent', 'the answer must not change for a known address');
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(JSON.stringify(body.data) === firstAnswer, 'the answer must not change for a known address');
     assert(!JSON.stringify(body).toLowerCase().includes('taken'),
         'the response must never say an address is taken');
 });

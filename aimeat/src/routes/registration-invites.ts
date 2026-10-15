@@ -24,6 +24,7 @@
  * @structure registrationInvitesRouter(config, storage): POST /v1/registration-invites
  * @usage app.use(registrationInvitesRouter(config, storage));
  * @version-history
+ *   2026-10-15 — A node whose email service is disabled answers 200 status not_sent with the portal link to register, instead of 202 "sent" and "Check your email" when nothing was sent (feature-list audit #23).
  *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): the self-service door is direct, refused in invite AND closed modes.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4b).
  */
@@ -102,6 +103,26 @@ export function registrationInvitesRouter(config: AimeatConfig, storage: Storage
                     return;
                 }
                 throw err;
+            }
+
+            // A node without mail sends nothing, for any address. Saying so is a fact about the
+            // node, not about the address, so the non-enumeration property still holds; telling
+            // the AI "check your email" here would leave the person waiting for a message that
+            // never comes. The portal is where the person registers instead.
+            if (result.mailUnavailable) {
+                const registerUrl = `${config.baseUrl}/v1/portal`;
+                res.status(200).json(success(config.nodeId, {
+                    status: 'not_sent',
+                    email_sent: false,
+                    register_url: registerUrl,
+                    tell_the_person: `This service does not send email, so no message is on its way. `
+                        + `Open ${registerUrl} and create your account there. Tell me when it is done.`,
+                    next: 'After they have the account, connect yourself as their agent with device authorization.',
+                }, [
+                    { description: 'Where the person registers', method: 'GET', url: '/v1/portal' },
+                    { description: 'How to connect yourself as an agent afterwards', method: 'GET', url: '/auth.md' },
+                ]));
+                return;
             }
 
             // Whether an address is new, already has an account, or already has a live invite, the

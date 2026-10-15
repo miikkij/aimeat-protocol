@@ -12,6 +12,7 @@
  *   - ALLOWED_CATEGORIES: whitelist validated on publish/update
  *
  * @version-history
+ *   2026-10-15 — DELETE takes ?provider so the owner in person can remove their agent's action (it answered 404); GET takes ?provider for an exact-identity filter and returns visibility, status and, for the provider or its owner, call_count (feature-list audit #80).
  *   v1.5.0 -- 2026-10-11 -- An action's morsel amount is pacing, not a price (ruling
  *     decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa). Publish and update take
  *     pricing.toll_morsels; the old base_morsels is read as pacing until 4.0.0 and refused after
@@ -33,7 +34,7 @@ import { success, error } from '../middleware/envelope.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { ActionPublishSchema, ActionUpdateSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, mayActOnAgent } from '../utils/gaii.js';
 import { actionPricingFromRequest, presentActionPricing } from '../services/action-pacing.js';
 
 const ALLOWED_CATEGORIES = [
@@ -126,9 +127,21 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
-  // DELETE /v1/actions/:id — remove an action (agent auth)
+  // DELETE /v1/actions/:id[?provider=<identity>] — remove an action. Without `provider` it is the
+  // caller's own action. With it, the caller's own agent's action: the owner signed in as themselves
+  // may remove what their agent published (mayActOnAgent), which the Unpublish button on the agent's
+  // Services tab needs. Before this, the owner's call looked for the action under the owner's GHII
+  // and answered 404.
   router.delete('/v1/actions/:id', requireAuth(), requireExternalPrincipal(), requireScope('work:publish'), async (req, res) => {
-    const gaii = resolveIdentity(req.auth!, config.nodeId);
+    const self = resolveIdentity(req.auth!, config.nodeId);
+    const asked = typeof req.query.provider === 'string' ? req.query.provider.trim() : '';
+    const gaii = asked || self;
+    if (gaii !== self && !mayActOnAgent(req.auth, gaii, config.nodeId)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+        'You can remove only your own actions and the actions of your own agents. Sign in as the owner of that agent to remove it.',
+        403, { provider: gaii }));
+      return;
+    }
     const deleted = await storage.deleteAction(req.params.id as string, gaii);
     if (!deleted) {
       res.status(404).json(error(config.nodeId, 'ACTION_NOT_FOUND', `Action not found: ${req.params.id}`));
@@ -142,15 +155,30 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/actions — discover actions (Tier 0, no auth)
+  // `provider` narrows the list to one provider by its exact identity. The agent's Services tab
+  // used to filter the whole list in the browser by a substring of the agent's name, so another
+  // owner's agent with the same name showed up as this one's.
   router.get('/v1/actions', async (req, res) => {
     const q = req.query.q as string | undefined;
     const category = req.query.category as string | undefined;
+    const provider = typeof req.query.provider === 'string' && req.query.provider.trim()
+      ? req.query.provider.trim() : null;
     const page = Math.max(1, parseInt(req.query.page as string ?? '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string ?? '50', 10)));
 
-    const actions = await storage.listActions({ search: q, category });
+    const listed = await storage.listActions({ search: q, category });
+    const actions = provider ? listed.filter(a => a.providerGaii === provider) : listed;
     const start = (page - 1) * perPage;
     const paged = actions.slice(start, start + perPage);
+
+    // How often each action was called is the provider's business: counted only for the provider
+    // itself or the owner of the provider agent, and only when the list is narrowed to it.
+    const self = req.auth ? resolveIdentity(req.auth, config.nodeId) : null;
+    const mayCount = !!provider && (self === provider || mayActOnAgent(req.auth, provider, config.nodeId));
+    const calls = new Map<string, number>();
+    if (mayCount) {
+      for (const w of await storage.listWorkByProvider(provider)) calls.set(w.actionId, (calls.get(w.actionId) ?? 0) + 1);
+    }
 
     res.json(success(config.nodeId, {
       actions: paged.map(a => ({
@@ -163,6 +191,11 @@ export function actionsRouter(config: AimeatConfig, storage: Storage): Router {
         tags: a.tags,
         semantic: a.semantic,
         federate: a.federate ?? false,
+        // A published action is listed here for anyone and can be called while it exists: there is
+        // no private or paused action, so these two are facts, not defaults.
+        visibility: 'public',
+        status: 'active',
+        ...(mayCount ? { call_count: calls.get(a.id) ?? 0 } : {}),
       })),
       total: actions.length,
     }, [

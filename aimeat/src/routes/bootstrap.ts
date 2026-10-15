@@ -8,6 +8,7 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-10-15 — getting_started is told whether the email service is enabled, so a node without mail does not offer the registration invite (feature-list audit #23).
  *   v1.7.0 — 2026-10-12 — GET / this_node carries what /.well-known/aimeat says about the protocol:
  *     protocol_version and profiles from node 4.0.0, payment_bindings always (Core 2026-11 DISC-01).
  *   v1.6.0 — 2026-10-11 — GET /v1/health carries `build`: the commit the node runs and whether the
@@ -84,6 +85,7 @@ import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } f
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
 import { buildLlmsHumanPages, buildLlmsOptionalPages } from '../data/public-pages.js';
 import { buildGettingStarted } from '../data/getting-started.js';
+import { getActiveEmailService } from '../services/email.js';
 import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
 import { buildFirstSteps } from '../services/first-steps.js';
 import { apexOnly } from './agent-docs.js';
@@ -604,7 +606,8 @@ export function bootstrapRouter(
         full_api_spec: `${base}/v1/spec`,
       },
 
-      getting_started: buildGettingStarted(base, bootstrapInstruction, config.anonymousMode),
+      getting_started: buildGettingStarted(base, bootstrapInstruction, config.anonymousMode,
+        !!getActiveEmailService()?.enabled),
 
       ...BOOTSTRAP_ENDPOINT_CATALOGUE,
 

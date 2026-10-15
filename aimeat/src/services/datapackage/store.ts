@@ -23,11 +23,12 @@
  *   value the closed union already has — `data-package` is not in it) so the package appears where a
  *   person and an agent look for knowledge. The catalogue points at the bytes; it never holds them,
  *   because a knowledge package is a collection of memory entries and memory does not carry files.
- * @structure publishPackage · openPackage · readRows · recordFailure · listPackages
+ * @structure publishPackage · openPackage · readRows · readAllRows · recordFailure · listPackages
  * @usage
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-10-15 — readAllRows: every row of one resource, for the OData feed, which pages the answer itself instead of reading a 5 000-row window (feature-list audit #151, #193).
  *   v1.2.0 -- 2026-10-13 -- The catalogue manifest names its pacing amount sharing.toll_morsels, the
  *     4.0.0 name (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.1.0 -- 2026-10-08 -- The provenance record hashes the exact stored descriptor bytes (held until the
@@ -504,16 +505,9 @@ export async function openPackage(deps: StoreDeps, ref: string, nodeId: string):
 export async function readRows(
     deps: StoreDeps, ref: string, nodeId: string, resource: string, opts: { offset?: number; limit?: number; select?: string[] } = {},
 ): Promise<{ rows: Array<Record<string, unknown>>; total: number; schema: TableSchema } | null> {
-    const parsed = parseRef(ref, nodeId);
-    const opened = await openPackage(deps, ref, nodeId);
-    if (!parsed || !opened) return null;
-    const res = opened.descriptor.resources.find(r => r.name === resource);
-    if (!res) return null;
-    const hash = opened.descriptor.aimeat.contentHash;
-    const file = await deps.storage.getStorageFile(parsed.ownerGhii, resourceKey(parsed.name, hash, resource));
-    if (!file) return null;
-
-    const all = fromCsv(file.data, res.schema);
+    const loaded = await loadResourceRows(deps, ref, nodeId, resource);
+    if (!loaded) return null;
+    const { all, res } = loaded;
     const offset = Math.max(0, opts.offset ?? 0);
     const limit = Math.min(Math.max(1, opts.limit ?? 500), 5000);
     let rows = all.slice(offset, offset + limit);
@@ -524,6 +518,35 @@ export async function readRows(
         schema = { ...res.schema, fields: res.schema.fields.filter(f => keep.has(f.name)) };
     }
     return { rows, total: all.length, schema };
+}
+
+/**
+ * Every row of one resource, unwindowed. For the OData feed only: it applies $filter and $orderby to
+ * the whole table and splits the answer into pages with @odata.nextLink, so a 5 000-row window here
+ * would make a larger table look complete when it is not. The CSV is parsed whole in readRows too,
+ * so this reads nothing more than a windowed read does.
+ */
+export async function readAllRows(
+    deps: StoreDeps, ref: string, nodeId: string, resource: string,
+): Promise<{ rows: Array<Record<string, unknown>>; total: number; schema: TableSchema } | null> {
+    const loaded = await loadResourceRows(deps, ref, nodeId, resource);
+    if (!loaded) return null;
+    return { rows: loaded.all, total: loaded.all.length, schema: loaded.res.schema };
+}
+
+/** The parsed CSV of one resource of one package version, with the resource's descriptor entry. */
+async function loadResourceRows(
+    deps: StoreDeps, ref: string, nodeId: string, resource: string,
+): Promise<{ all: Array<Record<string, unknown>>; res: DescriptorResource } | null> {
+    const parsed = parseRef(ref, nodeId);
+    const opened = await openPackage(deps, ref, nodeId);
+    if (!parsed || !opened) return null;
+    const res = opened.descriptor.resources.find(r => r.name === resource);
+    if (!res) return null;
+    const hash = opened.descriptor.aimeat.contentHash;
+    const file = await deps.storage.getStorageFile(parsed.ownerGhii, resourceKey(parsed.name, hash, resource));
+    if (!file) return null;
+    return { all: fromCsv(file.data, res.schema), res };
 }
 
 /** Every package one owner has, newest version each, with any recorded failure. */

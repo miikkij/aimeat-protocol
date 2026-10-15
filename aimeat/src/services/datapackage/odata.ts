@@ -20,13 +20,16 @@
  *   ONE SCHEMA, MANY PROJECTIONS. The Table Schema in the descriptor is the only place columns and
  *   types are declared. The CSDL here, the CSV header, the ODPS product sheet and an agent's view of
  *   the package are all derived from it, so none of them can drift from the data.
- * @structure toCsdl · parseQuery · applyQuery · ODATA_SUPPORTED
+ * @structure toCsdl · parseQuery · applyQuery · applyQueryPaged · nextLinkFor · ODATA_SUPPORTED ·
+ *   ODATA_PAGE_SIZE
  * @usage
  *   const xml = toCsdl(descriptor, 'https://…/v1/odata/alice/pkg');
  *   const q = parseQuery(searchParams, resource.schema);
  *   if (!q.ok) return 501;
- *   const page = applyQuery(rows, q.value);
+ *   const page = applyQueryPaged(rows, q.value, schema);
+ *   if (page.next) body['@odata.nextLink'] = nextLinkFor(entitySetUrl, searchParams, page.next, contentHash);
  * @version-history
+ *   2026-10-15 — Server-driven paging: applyQueryPaged caps a response at ODATA_PAGE_SIZE rows and says where the rest is, and nextLinkFor builds the @odata.nextLink ($skip, the remaining $top, the pinned version) (feature-list audit #151, #193).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, the OData surface).
  */
 import type { Descriptor, DescriptorResource, FieldType, TableSchema } from './contract.js';
@@ -324,4 +327,49 @@ export function applyQuery(rows: Array<Record<string, unknown>>, q: ParsedQuery,
         rows: out.map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [rename.get(k) ?? k, v]))),
         matched,
     };
+}
+
+/** The most rows one feed response carries. A larger answer is split into pages, each pointing at
+ *  the next with `@odata.nextLink`, which Excel, Power BI and Tableau follow by themselves. */
+export const ODATA_PAGE_SIZE = 5000;
+
+/** Where the rest of the answer starts: the `$skip` and the `$top` still owed, if one was asked. */
+export interface NextPage { skip: number; top?: number }
+
+export interface PagedQueryPage extends QueryPage {
+    /** Null when this page ends the answer the client asked for. */
+    next: NextPage | null;
+}
+
+/**
+ * applyQuery with server-driven paging (OData v4 Part 1, 11.2.6.7). A response never carries more
+ * than `pageSize` rows; when the client's answer is longer, `next` says where the following page
+ * starts. Without it a client got the first window of a large table and nothing to say the table
+ * went on, and put part of the table in a report as if it were the whole.
+ */
+export function applyQueryPaged(
+    rows: Array<Record<string, unknown>>, q: ParsedQuery, schema: TableSchema, pageSize: number = ODATA_PAGE_SIZE,
+): PagedQueryPage {
+    const take = q.top === undefined ? pageSize : Math.min(q.top, pageSize);
+    const page = applyQuery(rows, { ...q, top: take }, schema);
+    const end = q.skip + take;
+    const owedMore = q.top === undefined || q.top > take;
+    const next = owedMore && end < page.matched
+        ? { skip: end, ...(q.top !== undefined ? { top: q.top - take } : {}) }
+        : null;
+    return { ...page, next };
+}
+
+/**
+ * The `@odata.nextLink` for the following page: the same request with `$skip` moved on, `$top`
+ * reduced by what this page carried, and `version` pinned to the content hash this page was read
+ * from, so every page of one answer comes from the same rows even if a new version is published
+ * while the client is still paging.
+ */
+export function nextLinkFor(entitySetUrl: string, params: URLSearchParams, next: NextPage, contentHash: string): string {
+    const p = new URLSearchParams(params);
+    p.set('$skip', String(next.skip));
+    if (next.top !== undefined) p.set('$top', String(next.top)); else p.delete('$top');
+    p.set('version', contentHash);
+    return `${entitySetUrl}?${p.toString()}`;
 }

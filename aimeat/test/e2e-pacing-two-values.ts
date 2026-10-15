@@ -16,6 +16,7 @@
  *   (f) ACP, UCP and the feed show money only
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=pacing-two-values
  * @version-history
+ *   2026-10-15 — A pack past the daily mint ceiling answers 429 PACING_PACK_CAP, refunded, session open (feature-list audit #137).
  *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses price.morsels (MORSEL_PRICE_REMOVED), and the setup's PUT
  *     offers carried the old client's offer, so the whole setup was refused there. That offer moved to
  *     the test whose subject it is, on an agent of its own, and the test is version-aware: stored as
@@ -301,6 +302,21 @@ await test('(e) the pacing pack is bought with money and adds 50 morsels', async
   const again = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(poor.token), body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'paced' }] }) });
   const ok = await json(`/v1/commerce/checkout-sessions/${again.body.data.session.id}/complete`, { method: 'POST', headers: auth(poor.token), body: JSON.stringify({}) });
   assert(ok.status === 200, `the use goes through after the purchase: ${ok.status} ${JSON.stringify(ok.body.error)}`);
+});
+
+await test('(e) a pack past the daily mint ceiling answers 429 PACING_PACK_CAP, refunds and adds nothing', async () => {
+  // feature-list audit #137: the ceiling refused correctly and refunded, but the buyer got 502
+  // FULFILLMENT_FAILED. 201 packs of 50 is 10 050 morsels, past the default ceiling of 10 000.
+  const before = await balance(poor.token);
+  const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(poor.token), body: JSON.stringify({ items: [{ kind: 'pacing-pack', quantity: 201 }] }) });
+  assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body.error)}`);
+  const id = open.body.data.session.id;
+  const done = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(poor.token), body: JSON.stringify({ payment: { handler: 'test.money', instrument: 'pm_test' } }) });
+  assert(done.status === 429 && done.body.error?.code === 'PACING_PACK_CAP', `expected 429 PACING_PACK_CAP, got ${done.status} ${JSON.stringify(done.body.error)}`);
+  assert(/refunded/i.test(String(done.body.error.message)), `the message says the payment went back: ${done.body.error.message}`);
+  assert(await balance(poor.token) === before, 'no morsels added past the ceiling');
+  const back = await json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(poor.token) });
+  assert(back.body.data.session.status === 'open', 'the session stays open');
 });
 
 await test('(e) a signed-out caller cannot buy a pack (401)', async () => {

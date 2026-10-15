@@ -20,6 +20,7 @@
  *   createRegistrationInvitation
  * @usage const result = await createRegistrationInvitation(storage, config, { email, agent, observed });
  * @version-history
+ *   2026-10-15 — A node whose email service is disabled writes no invitation and returns mailUnavailable, so the route can say nothing was sent (feature-list audit #23).
  *   v1.0.0 — 2026-09-12 — Extracted from invitations.ts (max-file-lines), unchanged.
  */
 import { randomBytes } from 'node:crypto';
@@ -67,6 +68,9 @@ export interface RegistrationInviteResult {
     emailSent: boolean;
     /** Why nothing was sent, for the node's own logs. NEVER returned to the caller. */
     suppressed: 'already-pending' | null;
+    /** True when the node's email service is disabled. This is a property of the NODE, the same
+     *  for every address, so the caller may learn it without learning anything about an address. */
+    mailUnavailable: boolean;
 }
 
 /**
@@ -92,6 +96,14 @@ export async function createRegistrationInvitation(
     if (!cleanEmail || !isValidEmail(cleanEmail)) {
         throw new InvitationError(400, 'INVALID_INPUT', 'A valid "email" is required');
     }
+    // A node without mail cannot deliver the link, and the raw token exists nowhere else, so an
+    // invitation written here could never be accepted. Refuse before the write and say so: the
+    // answer is the same for every address, so it reveals nothing about any of them.
+    const emailSvc = getActiveEmailService();
+    if (!emailSvc?.enabled) {
+        return { invitation: null, acceptUrl: null, emailSent: false, suppressed: null, mailUnavailable: true };
+    }
+
     const emailHash = inviteEmailHash(cleanEmail);
 
     // Per-address cap: one live invitation at a time, so repeating the call cannot bury an address
@@ -99,7 +111,7 @@ export async function createRegistrationInvitation(
     const existing = await storage.listInvitationsByEmailHash(emailHash, { status: 'pending', type: 'registration' });
     const live = existing.filter(i => new Date(i.expiresAt) > new Date());
     if (live.length > 0) {
-        return { invitation: null, acceptUrl: null, emailSent: false, suppressed: 'already-pending' };
+        return { invitation: null, acceptUrl: null, emailSent: false, suppressed: 'already-pending', mailUnavailable: false };
     }
 
     const now = Date.now();
@@ -136,22 +148,18 @@ export async function createRegistrationInvitation(
 
     const acceptUrl = `${config.baseUrl}/v1/invite?token=${rawToken}`;
 
-    const emailSvc = getActiveEmailService();
-    let emailSent = false;
-    if (emailSvc?.enabled) {
-        const { subject, html, text } = registrationInviteEmail({
-            acceptUrl,
-            agent: invitation.meta!.agent as AgentSelfReport,
-            observed: input.observed,
-            // Deliberately NOT formatForPerson. This door writes to an address with no account on
-            // this node — that is what it is for — so there is no stored preference to honour and
-            // no browser to ask. A stable, zone-marked string beats a format borrowed from the
-            // host's own locale, which is what an empty preference would fall through to.
-            expiresLabel: invitation.expiresAt.slice(0, 16).replace('T', ' ') + ' UTC',
-            reportUrl: `${config.baseUrl}/v1/transparency`,
-        }, input.locale);
-        emailSent = await emailSvc.sendRaw(cleanEmail, subject, html, text);
-    }
+    const { subject, html, text } = registrationInviteEmail({
+        acceptUrl,
+        agent: invitation.meta!.agent as AgentSelfReport,
+        observed: input.observed,
+        // Deliberately NOT formatForPerson. This door writes to an address with no account on
+        // this node — that is what it is for — so there is no stored preference to honour and
+        // no browser to ask. A stable, zone-marked string beats a format borrowed from the
+        // host's own locale, which is what an empty preference would fall through to.
+        expiresLabel: invitation.expiresAt.slice(0, 16).replace('T', ' ') + ' UTC',
+        reportUrl: `${config.baseUrl}/v1/transparency`,
+    }, input.locale);
+    const emailSent = await emailSvc.sendRaw(cleanEmail, subject, html, text);
 
-    return { invitation, acceptUrl, emailSent, suppressed: null };
+    return { invitation, acceptUrl, emailSent, suppressed: null, mailUnavailable: false };
 }
