@@ -6,6 +6,8 @@
  *   simulation, and per-key effective rules (the UI's sharing-rules popover).
  * @structure permissionsRouter() — GET /v1/permissions/summary, /check, /memory/:key
  * @version-history
+ *   2026-10-15 — GET /v1/permissions/check takes `key` and `accessor` only as single strings; a
+ *     repeated parameter (an array) is refused as missing (CodeQL js/type-confusion-through-parameter-tampering).
  *   2026-10-15 — GET /v1/permissions/check asks authorizeRead, the reads' own guard, as a simulation
  *     (noAudit), instead of checkConsentForRead (feature-list audit 43).
  *   v1.1.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
@@ -68,8 +70,9 @@ export function permissionsRouter(config: AimeatConfig, storage: Storage): Route
 
     // GET /v1/permissions/check — simulate an access check
     router.get('/v1/permissions/check', requireAuth(), requireScope('consent:manage'), async (req, res) => {
-        const key = req.query.key as string;
-        const accessor = req.query.accessor as string;
+        // `?accessor=a&accessor=b` arrives as an array; only a single string is a question.
+        const key = typeof req.query.key === 'string' ? req.query.key : '';
+        const accessor = typeof req.query.accessor === 'string' ? req.query.accessor : '';
 
         if (!key || !accessor) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',

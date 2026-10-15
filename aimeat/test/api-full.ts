@@ -5,6 +5,7 @@
  *   broad happy-path sweep across the core API surface.
  * @usage cd aimeat && pnpm exec tsx test/api-full.ts
  * @version-history
+ *   v1.3.1 — 2026-10-15 — GET /v1/permissions/check refuses a repeated accessor parameter.
  *   v1.3.0 — 2026-10-12 — The 4.0.0 forms: actions carry pricing.toll_morsels, each introduction
  *     carries the audience proof `aimeat federation join` sends, and the maintenance test switches
  *     maintenance off in a finally, so one failed assertion inside it no longer leaves the node down
@@ -2337,6 +2338,16 @@ await test('GET /v1/permissions/check — denied case (no consent)', async () =>
     });
     assert(status === 200, `expected 200, got ${status}`);
     assert(body.data?.allowed === false, `expected allowed=false, got ${body.data?.allowed}`);
+});
+
+// CodeQL alert 1741: a repeated query parameter arrives as an array and reached the access guard
+// as one. Only a single string is a question.
+await test('GET /v1/permissions/check — a repeated accessor parameter is refused with 400', async () => {
+    const a = encodeURIComponent(agent2bGaii);
+    const { status } = await json(`/v1/permissions/check?key=no-consent-key&accessor=${a}&accessor=${a}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 400, `expected 400, got ${status}`);
 });
 
 // Feature-list audit row 43: the check asked a different function than the reads, so a record the
