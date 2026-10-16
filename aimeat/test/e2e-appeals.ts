@@ -33,6 +33,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-appeals.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-appeals
  * @version-history
+ *   v1.4.0 — 2026-10-16 — Tests 32-33: the queue follows the same rule; an attached agent lists none of the
+ *     organism's appeals, the creator's own agent lists them (Jouni, 2026-10-16).
  *   v1.3.0 — 2026-10-16 — Phase 4 (tests 26-31): an attached agent of the creator, a plain member and an
  *     outside owner are refused the review of an organism's appeal; the creator's own agent and an
  *     admin in person decide it (Jouni, 2026-10-16).
@@ -593,6 +595,20 @@ await test('31. An admin of the organism decides in person', async () => {
     const { status, body } = await review(aToken, appealBudget);
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
     assert(body.data.status === 'overturned' && body.data.reviewedBy === OWNER_A, `decided: ${JSON.stringify(body.data)}`);
+});
+
+await test('32. The queue: an agent attached to the organism lists none of its appeals', async () => {
+    const { status, body } = await json('/v1/appeals?per_page=100', { headers: authed(attachedAgentOfC.token) });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body.data ?? body.error)}`);
+    assert(body.error?.code === 'FORBIDDEN', `code: ${body.error?.code}`);
+});
+
+await test('33. The queue: the creator\'s own agent lists the organism\'s appeals, and only those', async () => {
+    const { status, body } = await json('/v1/appeals?per_page=100', { headers: authed(ownAgentOfC.token) });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
+    const ids = (body.data.appeals as any[]).map(a => a.id);
+    for (const id of [appealMemoryOrg, appealAgenda, appealBudget]) assert(ids.includes(id), `the organism's appeal ${id} is listed: ${JSON.stringify(ids)}`);
+    assert(!ids.includes(appealAgent) && !ids.includes(appealBoard), `nothing outside the organism: ${JSON.stringify(ids)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

@@ -15,13 +15,17 @@
  *   warn level: the status says the code is needed; the start log carries the code and the wizard's
  *   address; a setup without the code is refused (SETUP_CODE_REQUIRED) and creates nothing; a wrong
  *   code is refused (SETUP_CODE_INVALID); the right code creates the operator once; the same code a
- *   second time is refused. On a node with a loopback base URL: no code in the log, and the setup
- *   works without one.
+ *   second time is refused. On a second such node, the first account made by registration: POST
+ *   /v1/ghii, POST /v1/ghii/register-web and POST /v1/owners refuse it without the code, a wrong code
+ *   is refused, with the code it is the operator, and a second registration needs no code. On a node
+ *   with a loopback base URL: no code in the log, and the first registration works without one.
  *
- *   It runs its own two nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 40533
- *   (public base URL) and 40534 (loopback base URL).
+ *   It runs its own three nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 40533
+ *   (public base URL, setup), 40535 (public base URL, registration) and 40534 (loopback base URL).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-code
  * @version-history
+ *   2026-10-16 — A third node on 40535: the registration routes refuse the first account without the code
+ *     and make it the operator with it; the loopback node's first account is registered (Jouni, 2026-10-16).
  *   2026-10-16 — Initial (Jouni, 2026-10-16: first-owner setup needs a one-time code on a public node).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -35,6 +39,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 
 const PUBLIC_PORT = 40533;
 const LOOPBACK_PORT = 40534;
+const REGISTER_PORT = 40535;
 const STAMP = Date.now().toString(36).slice(-6);
 const PASSWORD = `Setup-Code-${STAMP}-Pw!`;
 
@@ -44,7 +49,7 @@ async function test(name: string, fn: () => Promise<void>): Promise<void> {
     try { await fn(); passed++; console.log(`  ✅ ${name}`); } catch (err) { failed++; console.error(`  ❌ ${name}: ${(err as Error).message}`); }
 }
 function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new Error(msg); }
-const short = (v: unknown): string => JSON.stringify(v).slice(0, 300);
+const short = (v: unknown): string => String(JSON.stringify(v)).slice(0, 300);
 
 interface OwnNode { base: string; child: ChildProcess | null; log: string }
 
@@ -95,6 +100,7 @@ const init = (node: OwnNode, username: string, setupCode?: string) => json(node,
 });
 
 let pub: OwnNode | null = null;
+let reg: OwnNode | null = null;
 let loop: OwnNode | null = null;
 
 // POST /v1/setup/init writes an .env into the package root when none is there. A placeholder is
@@ -157,6 +163,49 @@ try {
     await stopNode(pub);
     pub = null;
 
+    console.log('\nA node with a public base URL, its first account made by registration');
+    // The shipped registration limit is five a minute per address; this node takes seven.
+    reg = await startNode(REGISTER_PORT, 'https://register.example', { AIMEAT_SECURITY_PROFILE: 'public', AIMEAT_LOG_LEVEL: 'warn', AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '20' });
+    const rnode = reg;
+    const rcode = /Setup code: ([0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4})/.exec(rnode.log)?.[1] ?? '';
+    const register = (username: string, extra: Record<string, unknown> = {}) => json(rnode, '/v1/ghii', {
+        method: 'POST', body: JSON.stringify({ username, display_name: username, password: PASSWORD, ...extra }),
+    });
+
+    await test('the first registration without the code is refused on every account-creating route, and creates nothing', async () => {
+        assert(rcode, 'no "Setup code:" line in the start log');
+        const ghii = await register(`regnocode${STAMP}`);
+        assert(ghii.status === 403 && ghii.body.error?.code === 'SETUP_CODE_REQUIRED', `POST /v1/ghii: ${ghii.status} ${short(ghii.body.error)}`);
+        const web = await json(rnode, '/v1/ghii/register-web', { method: 'POST', body: JSON.stringify({ username: `webnocode${STAMP}`, display_name: 'Web No Code', email: `web${STAMP}@example.test` }) });
+        assert(web.status === 403 && web.body.error?.code === 'SETUP_CODE_REQUIRED', `POST /v1/ghii/register-web: ${web.status} ${short(web.body.error)}`);
+        const owners = await json(rnode, '/v1/owners', { method: 'POST', body: JSON.stringify({ name: `ownnocode${STAMP}`, public_key: 'MCowBQYDK2VwAyEAo4y5GmJ8ehxJ6rD1u8eBuOqGQ0Vs1RO8kfxeDqhnYrM=' }) });
+        assert(owners.status === 403 && owners.body.error?.code === 'SETUP_CODE_REQUIRED', `POST /v1/owners: ${owners.status} ${short(owners.body.error)}`);
+        const s = await json(rnode, '/v1/setup/status');
+        assert(s.body.data.needsSetup === true, 'a refused registration created an account');
+    });
+
+    await test('the first registration with a wrong code is refused', async () => {
+        const wrong = (rcode[0] === 'A' ? 'B' : 'A') + rcode.slice(1);
+        const r = await register(`regwrong${STAMP}`, { setupCode: wrong });
+        assert(r.status === 403 && r.body.error?.code === 'SETUP_CODE_INVALID', `${r.status} ${short(r.body.error)}`);
+    });
+
+    await test('the first registration with the code is the operator, and the code is spent', async () => {
+        const r = await register(`regfirst${STAMP}`, { setupCode: rcode });
+        assert(r.status === 201, `expected 201, got ${r.status} ${short(r.body.error)}`);
+        assert(r.body.data.owner.roles.includes('operator'), `roles: ${short(r.body.data.owner.roles)}`);
+        const again = await init(rnode, `regsetup${STAMP}`, rcode);
+        assert(again.status === 403 && again.body.error?.code === 'ALREADY_CONFIGURED', `setup with the spent code: ${again.status} ${short(again.body.error)}`);
+    });
+
+    await test('a second registration needs no code and is not the operator', async () => {
+        const r = await register(`regsecond${STAMP}`);
+        assert(r.status === 201, `expected 201, got ${r.status} ${short(r.body.error)}`);
+        assert(!r.body.data.owner.roles.includes('operator'), `roles: ${short(r.body.data.owner.roles)}`);
+    });
+    await stopNode(reg);
+    reg = null;
+
     console.log('\nA node with a loopback base URL');
     loop = await startNode(LOOPBACK_PORT, `http://127.0.0.1:${LOOPBACK_PORT}`, { AIMEAT_LOG_LEVEL: 'warn' });
     const local = loop;
@@ -167,13 +216,14 @@ try {
         assert(s.body.data.needsSetup === true && s.body.data.setupCodeRequired === false, `status: ${short(s.body.data)}`);
     });
 
-    await test('a loopback node creates the first owner without a code', async () => {
-        const r = await init(local, `localowner${STAMP}`);
+    await test('a loopback node registers its first account without a code, as the operator', async () => {
+        const r = await json(local, '/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `localowner${STAMP}`, display_name: 'Local Owner', password: PASSWORD }) });
         assert(r.status === 201, `expected 201, got ${r.status} ${short(r.body)}`);
         assert(r.body.data.owner.roles.includes('operator'), `roles: ${short(r.body.data.owner.roles)}`);
     });
 } finally {
     await stopNode(pub);
+    await stopNode(reg);
     await stopNode(loop);
     if (!HAD_ENV && existsSync(PACKAGE_ENV)) unlinkSync(PACKAGE_ENV);
 }

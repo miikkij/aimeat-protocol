@@ -24,6 +24,8 @@
  *   It runs its own node, on the run's backend (test/helpers/own-node-db.ts), on port 40479.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-production-posture
  * @version-history
+ *   2026-10-16 — The first account is registered with the one-time setup code from the start log, and a
+ *     first registration without it is refused (Jouni, 2026-10-16).
  *   2026-10-16 — The self-check names nothing: memory:delete in the shipped default agent scopes is no
  *     longer a risky setting (invariant 8 as ruled by the developer on 2026-10-16). The test asserted
  *     the open question being reported, which was the right behaviour until the ruling.
@@ -110,7 +112,17 @@ try {
         assert(!/AIMEAT_(TEST|DEV)_MODE=true|AIMEAT_ANONYMOUS=true/.test(log), 'a test switch is reported active');
     });
 
-    const operator = await registerOwner(BASE, `postop${STAMP}`);
+    // The first account of a public node needs the one-time setup code the start log printed
+    // (services/setup-code.ts; Jouni, 2026-10-16).
+    const setupCode = /Setup code: ([0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4})/.exec(log)?.[1] ?? '';
+
+    await test('the first registration without the setup code is refused', async () => {
+        assert(setupCode, 'the start log carries no "Setup code:" line');
+        const r = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `postnocode${STAMP}`, display_name: 'No Code', password: 'Another-Pass-2026' }) });
+        assert(r.status === 403 && r.body.error?.code === 'SETUP_CODE_REQUIRED', `expected 403 SETUP_CODE_REQUIRED, got ${r.status} ${short(r.body)}`);
+    });
+
+    const operator = await registerOwner(BASE, `postop${STAMP}`, { body: { setupCode } });
 
     await test('the first account is the operator', async () => {
         assert(operator.roles.includes('operator'), `roles: ${short(operator.roles)}`);

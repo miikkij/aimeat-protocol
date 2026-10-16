@@ -7,9 +7,14 @@
  *   profile (optionally with a password hash, a verified email, and/or a linked external identity),
  *   and records the welcome-bonus transaction. Used by the OIDC signup finalize path and the email
  *   invitation accept path so account creation stays identical across entry points.
- * @structure emailHashOf; ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
+ * @structure emailHashOf; ProvisionEmailTakenError; SetupCodeRefusedError; claimFirstOwnerSetupCode; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.10.0 — 2026-10-16 — claimFirstOwnerSetupCode and SetupCodeRefusedError: on a node whose base URL is
+ *     not loopback and that has no owner, an account that would be the first owner and operator needs the
+ *     one-time setup code; createAccountRows asks before its transaction and spends the code after it, and
+ *     provisionOwner passes opts.setupCode. Registration made the first account the operator for anyone
+ *     who reached a fresh public node first (Jouni, 2026-10-16).
  *   2026-10-16 — createdAccountIsOperator asks storage.operatorAccountState (two EXISTS queries) instead of
  *     loading every owner on each registration (QA audit P7-10).
  *   v1.9.0 — 2026-10-16 — createAccountRows(): the owner row, the profile row and the welcome bonus in
@@ -51,6 +56,7 @@ import { promoteContactsForVerifiedEmail } from './contacts.js';
 import { applyAppInvitesForVerifiedEmail } from './app-member-invites.js';
 import { executeHooks } from './hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
+import { setupCodeGateFor, setupCodeRefusal, setupCodeRequired, SETUP_CODE_USED_MESSAGE } from './setup-code.js';
 
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
 export function emailHashOf(email: string): string {
@@ -90,6 +96,42 @@ export class RegistrationClosedError extends Error {
 export class RegistrationHookRefusedError extends RegistrationClosedError {
   override readonly code: string = 'HOOK_REJECTED';
   constructor(message: string) { super(message); this.name = 'RegistrationHookRefusedError'; }
+}
+
+/** Thrown before any row exists when the account would be the first owner, and so the operator, of a
+ *  node whose base URL is not loopback, and the request lacks the valid one-time setup code. It is a
+ *  RegistrationClosedError, so every caller that maps that one to a 403 answers its code too:
+ *  SETUP_CODE_REQUIRED or SETUP_CODE_INVALID, as POST /v1/setup/init does (Jouni, 2026-10-16). */
+export class SetupCodeRefusedError extends RegistrationClosedError {
+  override readonly code: string;
+  constructor(code: string, message: string) { super(message); this.name = 'SetupCodeRefusedError'; this.code = code; }
+}
+
+/** What claimFirstOwnerSetupCode hands back: spend the code once the owner exists, or put it back. */
+export interface FirstOwnerClaim { commit(): void; release(): void }
+const NO_CLAIM: FirstOwnerClaim = { commit: () => {}, release: () => {} };
+
+/**
+ * The setup code an account needs when it would be this node's FIRST owner with the operator role on
+ * a node others can reach (services/setup-code.ts). On a loopback node, for an account that is not
+ * the operator, or once any owner exists, nothing is asked and nothing is used. Otherwise the code is
+ * checked and taken in one synchronous step, so of two requests only one creates the first owner;
+ * the caller commits after the rows are written and releases when they are not.
+ * @throws SetupCodeRefusedError when the code is missing, wrong or was used a moment ago
+ */
+export async function claimFirstOwnerSetupCode(
+  storage: Storage, config: AimeatConfig, roles: readonly string[], setupCode: unknown,
+): Promise<FirstOwnerClaim> {
+  // The role list the new account is minted with, not a check of the caller (that is isOperatorCaller).
+  const makesOperator = roles.indexOf('operator') >= 0;
+  if (!makesOperator || !setupCodeRequired(config)) return NO_CLAIM;
+  const { anyOwner } = await storage.operatorAccountState();
+  if (anyOwner) return NO_CLAIM;
+  const refusal = setupCodeRefusal(config, setupCode);
+  if (refusal) throw new SetupCodeRefusedError(refusal.code, refusal.message);
+  const gate = setupCodeGateFor(config);
+  if (!gate.take(setupCode)) throw new SetupCodeRefusedError('SETUP_CODE_INVALID', SETUP_CODE_USED_MESSAGE);
+  return { commit: () => gate.commit(), release: () => gate.release() };
 }
 
 /**
@@ -178,19 +220,33 @@ export async function creditWelcomeBonus(
  * to find it (QA audit E6-02). Every route that creates an account calls this; what each route does
  * before (its gates) and after (best-effort extras) stays outside, because a swallowed error inside
  * a PostgreSQL transaction would abort it.
+ *
+ * The first owner of a node others can reach needs the one-time setup code (claimFirstOwnerSetupCode):
+ * `opts.setupCode` is the code the request carried. Asked here, before the transaction, so no route
+ * that creates an account through this function can make the first operator without it.
+ * @throws SetupCodeRefusedError before any row exists, when that code is missing or wrong
  */
 export async function createAccountRows(
   storage: Storage,
   config: AimeatConfig,
   ownerRow: OwnerRecord,
   profileRow: Omit<GHIIRecord, 'ownerName'>,
+  opts: { setupCode?: unknown } = {},
 ): Promise<ProvisionedOwner> {
-  return storage.transaction(async () => {
-    const owner = await storage.createOwner(ownerRow);
-    const ghii = await storage.createGHII({ ...profileRow, ownerName: owner.name } as GHIIRecord);
-    await creditWelcomeBonus(storage, config, ghii.ghii, profileRow.createdAt);
-    return { owner, ghii };
-  });
+  const claim = await claimFirstOwnerSetupCode(storage, config, ownerRow.roles, opts.setupCode);
+  try {
+    const rows = await storage.transaction(async () => {
+      const owner = await storage.createOwner(ownerRow);
+      const ghii = await storage.createGHII({ ...profileRow, ownerName: owner.name } as GHIIRecord);
+      await creditWelcomeBonus(storage, config, ghii.ghii, profileRow.createdAt);
+      return { owner, ghii };
+    });
+    claim.commit();
+    return rows;
+  } catch (err) {
+    claim.release();
+    throw err;
+  }
 }
 
 export interface ProvisionOwnerOpts {
@@ -212,6 +268,10 @@ export interface ProvisionOwnerOpts {
   externalIdentities?: Record<string, string>;
   /** Fast/back-compat mirror of externalIdentities.google. */
   googleSub?: string;
+  /** The one-time setup code the request carried, needed when this account would be the first owner
+   *  of a node others can reach (claimFirstOwnerSetupCode). An identity provider's redirect carries
+   *  none, so a first sign-in there is refused until the first owner exists. */
+  setupCode?: unknown;
 }
 
 export interface ProvisionedOwner {
@@ -302,7 +362,7 @@ export async function provisionOwner(
     loginCount: 0,
     createdAt: now,
     updatedAt: now,
-  });
+  }, { setupCode: opts.setupCode });
 
   // An account created with an ALREADY-proven address is the third way a verified binding comes
   // into being, so it links address-book entries exactly as the two verification routes do

@@ -11,6 +11,9 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-10-16 — POST /v1/owners takes `setupCode`: the first account on a node whose base URL is not
+ *     loopback needs the one-time setup code (claimFirstOwnerSetupCode) and is refused 403
+ *     SETUP_CODE_REQUIRED / SETUP_CODE_INVALID without it (Jouni, 2026-10-16).
  *   2026-10-16 — The owner row, the profile row and the welcome bonus are written in one transaction
  *     (QA audit E6-02).
  *   2026-10-15 — POST /v1/owners/:name/recover is removed: it replaced the Ed25519 owner key, whose sign-in was removed in 4.0.0, and nothing called it (feature-list audit 171).
@@ -51,7 +54,7 @@ import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, isForeignPrincipal } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
-import { registrationRefusal, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../services/owner-provisioning.js';
+import { registrationRefusal, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, claimFirstOwnerSetupCode, SetupCodeRefusedError, type FirstOwnerClaim } from '../services/owner-provisioning.js';
 import { emitChange } from '../services/event-bus.js';
 import { eraseOwner } from '../services/owner-erasure.js';
 import { logger } from '../utils/logger.js';
@@ -102,6 +105,18 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // The owner row, the GHII profile and the welcome bonus commit together or not at all: a failure
     // between them had left a taken name with no profile (QA audit E6-02).
     const ghii = `${name}@${config.nodeId}`;
+    // The first owner of a node others can reach needs the one-time setup code from the start log
+    // (`setupCode`), refused before any row (services/owner-provisioning.ts; Jouni, 2026-10-16).
+    let claim: FirstOwnerClaim;
+    try {
+      claim = await claimFirstOwnerSetupCode(storage, config, roles, req.body?.setupCode);
+    } catch (err) {
+      if (err instanceof SetupCodeRefusedError) {
+        res.status(403).json(error(config.nodeId, err.code, err.message));
+        return;
+      }
+      throw err;
+    }
     const owner = await storage.transaction(async () => {
       const created = await storage.createOwner({
         name,
@@ -140,7 +155,8 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
         });
       }
       return created;
-    });
+    }).catch((err: unknown) => { claim.release(); throw err; });
+    claim.commit();
 
     // Which onboarding path this account was created on (05-mittaus.md). BOTH creation doors write
     // it — an account created through this programmatic one and left untracked would be missing

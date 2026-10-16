@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — POST /v1/ghii/register-web takes `setupCode`: the first account on a node whose base URL
+ *     is not loopback needs the one-time setup code and is refused 403 SETUP_CODE_REQUIRED /
+ *     SETUP_CODE_INVALID without it (Jouni, 2026-10-16).
  *   2026-10-16 — The owner row, the profile row and the welcome bonus are written in one transaction
  *     (createAccountRows) (QA audit E6-02).
  *   2026-10-16 — The emailed code comes from crypto.randomInt (utils/one-time-code.ts), not Math.random (QA audit F02a-02).
@@ -75,7 +78,7 @@ import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invit
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
-import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../../services/owner-provisioning.js';
+import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
 
 /**
  * The agent credential both mailbox proofs hand out (a verified e-mail code, a clicked sign-in link):
@@ -255,27 +258,39 @@ export function registerWebVerifyRoutes(
         // bonus commit together or not at all (QA audit E6-02).
         const now = new Date().toISOString();
         const ghii = `${username}@${config.nodeId}`;
-        const { owner, ghii: ghiiRecord } = await createAccountRows(storage, config, {
-            name: username,
-            displayName: display_name,
-            publicKey: keyPair.publicKey,
-            roles,
-            createdAt: now,
-        }, {
-            username,
-            nodeId: config.nodeId,
-            ghii,
-            displayName: display_name,
-            locale: typeof locale === 'string' ? locale : undefined,
-            verificationLevel: 0,
-            totpEnabled: false,
-            // emailHash + magicLinkEnabled are set by /v1/ghii/verify-email once the email is proven.
-            notificationEmail: (typeof email === 'string' && email.length > 0) ? email.toLowerCase().trim() : undefined,
-            morselBalance: config.welcomeBonus,
-            loginCount: 0,
-            createdAt: now,
-            updatedAt: now,
-        });
+        // The first owner of a node others can reach needs the one-time setup code from the start
+        // log (`setupCode`); createAccountRows refuses without it, before any row (Jouni, 2026-10-16).
+        let created: Awaited<ReturnType<typeof createAccountRows>>;
+        try {
+            created = await createAccountRows(storage, config, {
+                name: username,
+                displayName: display_name,
+                publicKey: keyPair.publicKey,
+                roles,
+                createdAt: now,
+            }, {
+                username,
+                nodeId: config.nodeId,
+                ghii,
+                displayName: display_name,
+                locale: typeof locale === 'string' ? locale : undefined,
+                verificationLevel: 0,
+                totpEnabled: false,
+                // emailHash + magicLinkEnabled are set by /v1/ghii/verify-email once the email is proven.
+                notificationEmail: (typeof email === 'string' && email.length > 0) ? email.toLowerCase().trim() : undefined,
+                morselBalance: config.welcomeBonus,
+                loginCount: 0,
+                createdAt: now,
+                updatedAt: now,
+            }, { setupCode: req.body?.setupCode });
+        } catch (err) {
+            if (err instanceof SetupCodeRefusedError) {
+                res.status(403).json(error(config.nodeId, err.code, err.message));
+                return;
+            }
+            throw err;
+        }
+        const { owner, ghii: ghiiRecord } = created;
         announceOwnerRegistered(storage, config, owner, 'direct');
 
         // Store interest profile in memory if interests provided
