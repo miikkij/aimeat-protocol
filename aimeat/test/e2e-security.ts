@@ -5,6 +5,7 @@
  *   Security tab composite (owner-only) with GHII CORS input validation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-security
  * @version-history
+ *   2026-10-16 — 9d: an invalid JWT answers 401 INVALID_TOKEN, not AUTH_REQUIRED (QA audit F1-01).
  *   v1.3.1 — 2026-10-12 — The actions are published with pricing.toll_morsels; node 4.0.0 refuses
  *            pricing.base_morsels (MORSEL_PRICE_REMOVED), so the same-owner work tests failed at the
  *            publish instead of at the refusal they assert. toll_morsels 0 means the same on 3.x.
@@ -624,7 +625,8 @@ await test('9d. Anonymous bypass: Invalid JWT token returns 401', async () => {
         headers: { Authorization: 'Bearer invalid.jwt.token' },
     });
     assert(status === 401, `expected 401 for invalid JWT, got ${status}`);
-    assert(body.error?.code === 'AUTH_REQUIRED', `expected AUTH_REQUIRED, got ${body.error?.code}`);
+    // A refused token answers INVALID_TOKEN on every route, public ones too (QA audit F1-01).
+    assert(body.error?.code === 'INVALID_TOKEN', `expected INVALID_TOKEN, got ${body.error?.code}`);
 });
 
 // ─── Test 10: Idempotency Key Format ───

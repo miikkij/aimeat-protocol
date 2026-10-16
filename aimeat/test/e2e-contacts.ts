@@ -5,6 +5,8 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   2026-10-16 — A tool the session was not offered answers SCOPE_DENIED with the word it needs (QA audit E5-04);
+ *     the not-offered assertions read that answer as well as the SDK's "not found".
  *   2026-10-15 — Tests 41–43: an agent holding messages:send saves and removes a contact on REST in its
  *     owner's book, without the word it is refused, and another owner's agent removes nothing of H's
  *     (feature-list audit #127).
@@ -601,9 +603,9 @@ await test('29. An agent without messages:read is refused on both doors', async 
     const reader = await agentOf(A, 'noresolvebot', ['memory:read']);
     const rest = await lookup(reader.token, 'probe@example.com');
     assert(rest.status === 403, `the REST door answered an agent without the word: ${rest.status} ${JSON.stringify(rest.body.data ?? rest.body.error)}`);
-    // The tool is not registered for a session without the word, and the SDK answers "not found".
+    // The tool is not registered for a session without the word: SCOPE_DENIED names the word (or the SDK's "not found").
     const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_resolve_email', { email: 'probe@example.com' });
-    assert(over.result?.isError === true && String(over.result?.content?.[0]?.text).includes('not found'),
+    assert(over.result?.isError === true && /not found|so the tool is offered/.test(String(over.result?.content?.[0]?.text)),
         `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
 });
 
@@ -704,9 +706,9 @@ await test('33. An agent holding messages:send invites on REST as over MCP, in i
 
     const refused = await invite(reader.token, `g-reader-${Date.now()}@example.com`);
     assert(refused.status === 403, `an agent without messages:send on REST: ${refused.status} ${JSON.stringify(refused.body.data ?? refused.body.error)}`);
-    // The tool is not registered for a session without the word, and the SDK answers "not found".
+    // The tool is not registered for a session without the word: SCOPE_DENIED names the word (or the SDK's "not found").
     const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_invite', { email: `g-reader-mcp-${Date.now()}@example.com` });
-    assert(over.result?.isError === true && String(over.result?.content?.[0]?.text).includes('not found'),
+    assert(over.result?.isError === true && /not found|so the tool is offered/.test(String(over.result?.content?.[0]?.text)),
         `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
 
     // The account's allowance: the agent's invitation above was one, the owner's lookups make it 20.
@@ -832,7 +834,7 @@ await test('39. An agent without contacts:read is refused on REST, and aimeat_co
     const r = await listAs(reader.token);
     assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${r.body.error?.code}`);
     const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_list', {});
-    assert(over.result?.isError === true && String(over.result?.content?.[0]?.text).includes('not found'),
+    assert(over.result?.isError === true && /not found|so the tool is offered/.test(String(over.result?.content?.[0]?.text)),
         `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
 });
 
