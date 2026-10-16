@@ -9,6 +9,8 @@
  *   cookie + access overview.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-access-tokens
  * @version-history
+ *   2026-10-16 — Phase 6's last case follows the owner-bearer refusal (QA audit S1-01): an owner access
+ *     token, operator or not, gets 403 OWNER_REFRESH_USES_COOKIE and no token.
  *   2026-10-16 — Phase 6: a Bearer refresh of an owner PAT without grant_operator on an operator account, or of its exchanged JWT, never gains operator and is sent to the exchange; a revoked PAT's JWT cannot be renewed; an operator session still refreshes to operator (QA audit P3-03).
  *   v1.2.0 — 2026-10-09 — Phase 1c: a replayed PAT mint (same Idempotency-Key) is answered 409 and
  *            never carries the token again (secrets audit 2026-10-09, finding 1.8).
@@ -352,15 +354,15 @@ async function main() {
     assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.data?.error)}`);
   });
 
-  await test('an ordinary operator session still refreshes to operator, and a non-operator session to owner only', async () => {
-    const op = await api('/v1/auth/refresh', { bearer: jwtA });
-    assert(op.status === 200, `operator session refresh: ${op.status} ${JSON.stringify(op.data?.error)}`);
-    const opRoles = jwtRoles(op.data.data.token);
-    assert(opRoles.includes('owner') && opRoles.includes('operator'), `the operator session keeps operator: ${opRoles}`);
-    const plain = await api('/v1/auth/refresh', { bearer: jwtB });
-    assert(plain.status === 200, `owner session refresh: ${plain.status}`);
-    const plainRoles = jwtRoles(plain.data.data.token);
-    assert(plainRoles.includes('owner') && !plainRoles.includes('operator'), `the owner session stays owner: ${plainRoles}`);
+  // An owner session renews with its refresh cookie only (QA audit S1-01): a Bearer refresh of an
+  // owner access token, operator or not, is refused and mints nothing, so it cannot widen either.
+  await test('an owner access token, operator or not, is not renewed by Bearer and is sent to the cookie', async () => {
+    for (const [what, bearer] of [['operator session', jwtA], ['owner session', jwtB]] as const) {
+      const r = await api('/v1/auth/refresh', { bearer });
+      assert(r.status === 403 && r.data?.error?.code === 'OWNER_REFRESH_USES_COOKIE',
+        `${what} Bearer refresh: ${r.status} ${JSON.stringify(r.data?.error)}`);
+      assert(!r.data?.data?.token, `${what}: no token is minted`);
+    }
   });
 
   console.log('\n─────────────────────────────────────');
