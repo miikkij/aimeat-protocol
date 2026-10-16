@@ -13,6 +13,7 @@
  *   6. the reach gate counts the reads it missed.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-exits-review.test.ts
  * @version-history
+ *   2026-10-16 — The auth fixtures carry `scopes`, as every real token does: the by-identity read now asks the caller for memory:read (QA audit S3-03), and an owner fixture without the field was not a token the node issues.
  *   v1.2.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
  *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.1.0 — 2026-09-30 — The GDPR export takes the person's organism records and names them in
@@ -45,7 +46,7 @@ const ORG = 'o1';
 const ORG_KEY = `organism.${ORG}.w.ws1.notes.a`;
 const stamp = '2026-09-29T12:00:00.000Z';
 const alice: LabelActor = { principal: ALICE, ownerGhii: ALICE, ownerName: 'alice', kind: 'human' };
-const ownerAuth = { sub: 'alice', owner: 'alice', roles: ['owner'] };
+const ownerAuth = { sub: 'alice', owner: 'alice', roles: ['owner'], scopes: [] };
 const agentAuth = { sub: AGENT, owner: 'alice', roles: ['agent'], scopes: ['memory:read', 'memory:write'] };
 /** A visitor signed in from another node, whose home can never be reached from the test. */
 const VISITOR = 'dora@home-node';
@@ -94,7 +95,7 @@ describe('TARGET-082 review: what leaves, and what the answer says stayed', () =
         if (who === 'owner') req.auth = ownerAuth as never;
         if (who === 'agent') req.auth = agentAuth as never;
         if (who === 'visitor') req.auth = visitorAuth as never;
-        if (who === 'bob' || who === 'carol') req.auth = { sub: who, owner: who, roles: ['owner'] } as never;
+        if (who === 'bob' || who === 'carol') req.auth = { sub: who, owner: who, roles: ['owner'], scopes: [] } as never;
         next();
       });
       app.use(memoryRouter(config, storage));
