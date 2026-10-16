@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The posture header says "this node": the test and dev mode warnings are reported on
+ *     any node whose public URL is not a loopback address, not only on the public profile (QA audit S1-08).
  *   2026-10-16 — The shutdown handler stops the workflow engine's sweep and the scheduler, and waits
  *     up to 4 s for scheduled runs in progress (Scheduler.shutdown; QA audit E4-07).
  *   2026-10-15 — The shutdown handler flushes the write buffers through flushProcessBuffers, which
@@ -199,7 +201,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     // insecure on the internet is a conscious choice. Warn-only. See security-development-dna.md.
     const postureWarnings = securityPostureWarnings(config);
     if (postureWarnings.length > 0) {
-      logger.warn(`SECURITY: public-profile node has ${postureWarnings.length} risky setting(s) — override deliberately or harden:`);
+      logger.warn(`SECURITY: this node has ${postureWarnings.length} risky setting(s) — override deliberately or harden:`);
       for (const msg of postureWarnings) logger.warn(`  • ${msg}`);
     }
 

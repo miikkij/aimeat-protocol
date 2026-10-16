@@ -17,6 +17,11 @@
  *   2026-10-16 — The other test-only settings (x402 test facilitator, test mode, dev mode, admin setup
  *     open, Finvoice mock, fake connection address) are reported as ACTIVE on a non-loopback node, as
  *     the test money handler is (utils/test-switches.ts; QA audit D8-01).
+ *   2026-10-16 — AIMEAT_TEST_MODE and AIMEAT_DEV_MODE on a non-loopback node are reported as ACTIVE
+ *     (QA audit S1-08, P1-01); on a public node the rest of the DNA knob table is reported too:
+ *     metrics access, extension install role, admin setup after the first operator, an empty AI
+ *     provider allowlist, and a powerful scope in the default agent scopes (QA audit S10-05, F7d-05).
+ *     POWERFUL_AGENT_SCOPES names invariant 8's list once.
  *   v1.4.0 — 2026-10-13 — AIMEAT_TEST_MONEY_HANDLER on a non-loopback node is reported as ACTIVE, not
  *     refused: the flag is in force on any node (ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v1.3.0 — 2026-10-12 — AIMEAT_AI_PROVENANCE=false on a public node is reported: refused from 4.0.0,
@@ -31,6 +36,13 @@ import type { AimeatConfig } from './config-types.js';
 import { testMoneyHandlerOnPublicNode } from './utils/test-money-guard.js';
 import { testSwitchesOnPublicNode } from './utils/test-switches.js';
 import { PROVENANCE_SWITCH_LOCAL_ONLY_IN } from './config-ai-label.js';
+
+/**
+ * The scopes invariant 8 calls powerful: explicit and separately consented, never part of the
+ * ambient default an agent gets when nobody names a list (security-development-dna.md, invariant 8).
+ * scripts/check-posture-defaults.ts holds the shipped default against this list.
+ */
+export const POWERFUL_AGENT_SCOPES: readonly string[] = ['ai:use', 'task:write', 'memory:delete'];
 
 /**
  * Startup posture self-check. When the resolved security profile is `public`, return a list of
@@ -53,6 +65,13 @@ export function securityPostureWarnings(config: AimeatConfig): string[] {
   if (!config.encryptionKey) w.push('AIMEAT_ENCRYPTION_KEY is unset — secrets (AI keys, TOTP) cannot be encrypted at rest.');
   if (config.corsAllowedOrigins.includes('*')) w.push('AIMEAT_CORS_ALLOWED_ORIGINS=* — with credentials this is a CSRF / data-exfil footgun.');
   if (config.statsAccess === 'public') w.push('AIMEAT_STATS_ACCESS=public — internal metrics are exposed to anyone.');
+  // The rest of the knob table in security-development-dna.md §3 (QA audit S10-05, F7d-05).
+  if (config.metricsAccess === 'public') w.push('AIMEAT_METRICS_ACCESS=public — the Prometheus metrics are exposed to anyone.');
+  if (config.extInstallRole !== 'operator') w.push(`AIMEAT_EXT_INSTALL_ROLE=${config.extInstallRole} — any account may install a sandboxed extension. A public node should set operator.`);
+  if (config.adminSetupOpenAfterFirstOperator) w.push('AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=true — the admin password alone makes another operator account after the first one.');
+  if ((config.aiProviderAllowlist ?? []).length === 0) w.push('AIMEAT_AI_PROVIDER_ALLOWLIST is empty — an AI provider address may point at any host, and the decrypted key is sent there.');
+  const powerful = (config.defaultAgentScopes ?? []).filter(s => s === '*' || POWERFUL_AGENT_SCOPES.includes(s));
+  if (powerful.length > 0) w.push(`AIMEAT_DEFAULT_AGENT_SCOPES holds ${powerful.join(', ')} — an agent approved without a named list gets a scope invariant 8 keeps explicit and separately consented.`);
   // Not "you chose something unsafe" but "your choice was not honoured" — the one entry here that
   // reports a coercion rather than a risk, so an operator who set it never believes it took effect.
   if (process.env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase() === 'off') {

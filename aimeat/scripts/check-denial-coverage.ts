@@ -38,6 +38,9 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-10-16 — AIMEAT_DENIAL_ROUTES=off runs the suite question alone, for a fixture tree with no
+ *     openapi.yaml; without it the route question read a missing file and crashed, so every fixture
+ *     case exited 1 whatever the suite asserted.
  *   2026-10-16 — denialKind answers the same two kinds as one word; the separate
  *     denial-coverage-no-second-principal.json list of a parallel P3-08 change is folded into
  *     `anonymous_only` here.
@@ -266,7 +269,10 @@ function main(): void {
         else if (!k.second) anonymousOnly.push({ suite, sha: sha(source) });
     }
 
-    const authenticated = authenticatedOperations(OPENAPI);
+    // AIMEAT_DENIAL_ROUTES=off asks the suite question alone: a fixture tree for the detector's own
+    // unit test has no openapi.yaml and no route list (test/unit/security-gates-fail.test.ts).
+    const routesOn = process.env.AIMEAT_DENIAL_ROUTES !== 'off';
+    const authenticated = routesOn ? authenticatedOperations(OPENAPI) : [];
     const refused = refusedRoutes(sources, routeMatchers(authenticated));
     const unrefused = authenticated.filter(k => !refused.has(k));
 
@@ -355,8 +361,8 @@ function main(): void {
     if (routeFresh.length) problems.push(`${routeFresh.length} authenticated route(s) without a refusal test`);
     if (routeNowRefused.length) problems.push(`${routeNowRefused.length} listed route(s) now refused`);
     if (routeGone.length) problems.push(`${routeGone.length} listed route(s) not in the contract`);
-    if (routeKeys.length > ROUTE_CEILING) problems.push(`the route list holds ${routeKeys.length} entries and the ceiling is ${ROUTE_CEILING}`);
-    if (routeKeys.length < ROUTE_CEILING) problems.push(`the route list holds ${routeKeys.length} entries: lower ROUTE_CEILING in scripts/check-denial-coverage.ts from ${ROUTE_CEILING} to ${routeKeys.length}`);
+    if (routesOn && routeKeys.length > ROUTE_CEILING) problems.push(`the route list holds ${routeKeys.length} entries and the ceiling is ${ROUTE_CEILING}`);
+    if (routesOn && routeKeys.length < ROUTE_CEILING) problems.push(`the route list holds ${routeKeys.length} entries: lower ROUTE_CEILING in scripts/check-denial-coverage.ts from ${ROUTE_CEILING} to ${routeKeys.length}`);
 
     if (problems.length) {
         for (const p of problems) console.log(`  ✖ ${p}`);
