@@ -14,6 +14,9 @@
  *   // … the share gate …
  *   const docs = await found.release(readerFor({ storage, config }, req.auth));
  * @version-history
+ *   v1.3.0 — 2026-10-16 — A share's end dates count (isDocPublicAt). An HTML page is handed out with
+ *     `kind`, `namespace` and `html`, from which the route makes its frame address. One page asked
+ *     for by id is read by its key instead of listing its whole space.
  *   v1.2.0 — 2026-10-08 — Every collected doc and record keeps its row's aiProvenanceId, which the
  *     share routes serve as the item's `ai_provenance` block; it was dropped here (aiprov E1).
  *   v1.1.0 — 2026-09-29 — TARGET-082 review: the public collectors return a SharePending, whose
@@ -28,6 +31,9 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import type { ContentReader } from '../../services/classification/reader.js';
 import { leftOutOf } from '../../services/classification-exits.js';
 import { logger } from '../../utils/logger.js';
+import { isDocPublicAt } from '../../services/workspace-share.js';
+import { findWorkspaceRecord } from '../../services/workspace-write.js';
+import { isHtmlPageValue } from '../../services/html-page.js';
 import type { ResolvedShare, PublicDoc, PublicRecord } from './share-types.js';
 
 /** What a public read found, held until the share's access gate has admitted the caller. */
@@ -39,11 +45,20 @@ export interface SharePending<O> {
 }
 
 export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
-  const isDocPublic = (share: ResolvedShare, typeName: string, docId: string): boolean => {
-    const docKey = `${typeName}/${docId}`;
-    if (docKey in share.docs) return !!share.docs[docKey];
-    if (typeName in share.spaces) return !!share.spaces[typeName];
-    return !!share.public;
+  // The page's own setting, then its space's, then the workspace's, each with its end date
+  // (services/workspace-share.ts, the rule the page frame asks too).
+  const isDocPublic = (share: ResolvedShare, typeName: string, docId: string): boolean => isDocPublicAt(share, typeName, docId);
+
+  /** One published page as a share hands it out; an HTML page carries what its frame address is made from. */
+  const toPublicDoc = (name: string, namespace: string, docId: string, r: MemoryRecord): PublicDoc => {
+    const v = r.value as Record<string, unknown> | null;
+    return {
+      type: name, id: docId,
+      title: (v && typeof v.title === 'string') ? v.title : docId,
+      markdown: (v && typeof v.markdown === 'string') ? v.markdown : '',
+      aiProvenanceId: r.aiProvenanceId ?? null,
+      ...(isHtmlPageValue(v) ? { kind: 'html' as const, namespace, html: v.html } : {}),
+    };
   };
 
   /** Read a workspace's manifest value, the copy that counts whoever holds it (public path — no auth). */
@@ -87,6 +102,15 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
       const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
       if (!name || !namespace || ot.mode !== 'document') continue;
       if (filter && filter.type !== name) continue;
+      // One page: its published key, read directly. A space of a thousand pages, each with its
+      // version history, was listed in full to find it, and the image and frame reads of a shared
+      // page ask for exactly one.
+      if (filter?.id !== undefined) {
+        if (!isDocPublic(share, name, filter.id)) continue;
+        const r = await findWorkspaceRecord(storage, `${root}.${namespace}.${filter.id}.latest`);
+        if (r) found.push({ rec: r, doc: toPublicDoc(name, namespace, filter.id, r) });
+        continue;
+      }
       const nsPrefix = `${root}.${namespace}.`;
       const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
       for (const r of items) {
@@ -94,15 +118,8 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
         const parts = r.key.slice(nsPrefix.length).split('.');
         const docId = parts[0];
         if (parts.slice(1).join('.') !== 'latest') continue;   // only published
-        if (filter?.id !== undefined && filter.id !== docId) continue;
         if (!isDocPublic(share, name, docId)) continue;
-        const v = r.value as Record<string, unknown> | null;
-        found.push({ rec: r, doc: {
-          type: name, id: docId,
-          title: (v && typeof v.title === 'string') ? v.title : docId,
-          markdown: (v && typeof v.markdown === 'string') ? v.markdown : '',
-          aiProvenanceId: r.aiProvenanceId ?? null,
-        } });
+        found.push({ rec: r, doc: toPublicDoc(name, namespace, docId, r) });
       }
     }
     return pending(found, id, ws, f => f.doc);

@@ -7,6 +7,10 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.19.0 -- 2026-10-16 -- PUT …/workspace/share runs setWorkspaceShareOp (services/workspace-share.ts),
+ *     the code the MCP tool aimeat_workspace_share runs; the share takes end dates (`until`). The
+ *     public document reads give an HTML page its `frame_url` (services/page-frame.ts) and record
+ *     the day each page was opened (services/workspace-opened.ts).
  *   v1.18.0 -- 2026-10-13 -- PUT /v1/organisms/:id/workspace hands the session to updateWorkspaceMeta,
  *     which refuses a change to the list of extensions of a space an app closed to agents unless the
  *     account holder makes it in person or the session covers organism:direct (403 ACCESS_DENIED,
@@ -66,11 +70,13 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner, localAccountName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
-import { recordPublicActivity } from '../../services/public-activity.js';
-import { hashPassword, verifyPassword } from '../../services/password.js';
+import { verifyPassword } from '../../services/password.js';
+import { setWorkspaceShareOp, type SetShareBody } from '../../services/workspace-share.js';
+import { servePublicDocs } from '../../services/page-frame.js';
+import { markPageOpened, markPagesOpened } from '../../services/workspace-opened.js';
 import { generateShareToken, shareTokenVersionOf, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
-import { recordsToIcs, newIcsKey, icsKeyMatches } from '../../services/calendar-feed.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, workspaceMetaReader, readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
+import { recordsToIcs, icsKeyMatches } from '../../services/calendar-feed.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, workspaceMetaReader } from '../../services/workspace-meta.js';
 import { provisionWorkspace, WorkspaceProvisionError } from '../../services/workspace-provision.js';
 import { deriveWorkspaceEvents } from '../../services/workspace-enrichment.js';
 import { activateEngagement, retireEngagement, listByWorkspace as listEngagementsByWorkspace } from '../../services/workspace-engagements.js';
@@ -83,7 +89,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { withItemProvenance } from './share-provenance.js';
 import { loadServedProvenance, setProvenanceHeaders, envelopeMeta } from '../../services/ai-provenance-marks.js';
-import type { OrganismHelpers, ShareMeta, ResolvedShare } from './shared.js';
+import type { OrganismHelpers } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -432,14 +438,17 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const docs = await found.release(readerFor({ storage, config }, req.auth));
     if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
+    void markPagesOpened(storage, config, id, ws, docs.map(d => ({ space: d.type, id: d.id })));
     if (req.query.format === 'md') {
       const entry = await findWsEntry(id, ws);
       res.type('text/markdown; charset=utf-8').send(docsToMarkdown(entry?.name, docs));
       return;
     }
     // Each document carries its own record, `ai_provenance` (aiprov E1): a page of documents is
-    // not one piece of content, so there is no page-level header.
-    res.json(success(config.nodeId, { organism_id: id, ws, documents: await withItemProvenance(storage, config, docs) }));
+    // not one piece of content, so there is no page-level header. An HTML page carries its frame
+    // address, minted here because this caller has just passed the share's gate.
+    const served = await servePublicDocs(config, await withItemProvenance(storage, config, docs), { orgId: id, ws, withHtml: false });
+    res.json(success(config.nodeId, { organism_id: id, ws, documents: served }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/public/document?ws=&type=&id=&format= — NO AUTH. A single
@@ -462,11 +471,12 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     // both formats, `meta.provenance` and the item's block in JSON (aiprov E1).
     const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId);
     setProvenanceHeaders(res, prov);
+    void markPageOpened(storage, config, id, ws, doc.type, doc.id);
     if (req.query.format === 'md') {
       res.type('text/markdown; charset=utf-8').send(`# ${doc.title}\n\n${doc.markdown.trim()}\n`);
       return;
     }
-    const [served] = await withItemProvenance(storage, config, [doc]);
+    const [served] = await servePublicDocs(config, await withItemProvenance(storage, config, [doc]), { orgId: id, ws, withHtml: true });
     res.json(success(config.nodeId, { organism_id: id, ws, document: served }, undefined, envelopeMeta(prov)));
   });
 
@@ -557,88 +567,18 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     res.json(success(config.nodeId, { organism_id: id, ws, share: redactShare(await readShareMeta(id, ws)) }));
   });
 
-  /* ── PUT /v1/organisms/:id/workspace/share?ws= — set the share state. Body { public?, spaces?, docs? }
-   * is MERGED into the existing meta.share. The workspace creator or an org admin only. The record is
-   * stored under the workspace creator's GHII so there is exactly one canonical share record. ── */
+  /* ── PUT /v1/organisms/:id/workspace/share?ws= — set the share state. Body { public?, spaces?, docs?,
+   * access?, password?, ics_key?, until? } is MERGED into the existing meta.share. The workspace creator
+   * or an org admin only. services/workspace-share.ts holds the whole rule, end dates and the HTML page
+   * default included, and the MCP tool aimeat_workspace_share runs it too. ── */
   router.put('/v1/organisms/:id/workspace/share', requireAuth(), requireScope('memory:write'), async (req, res) => {
-    const id = req.params.id as string;
-    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    if (!ws) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ws is required')); return; }
-    const role = await memberRole(req, organism, id);
-    if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
-    const entry = await findWsEntry(id, ws);
-    if (!entry) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Workspace not found')); return; }
-    const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
-    if (createdBy !== (req.auth!.owner as string) && role !== 'creator' && role !== 'admin') {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can change sharing')); return;
-    }
-    const body = (req.body ?? {}) as ShareMeta & { password?: string | null; ics_key?: true | null };
-    const isBoolMap = (m: unknown): m is Record<string, boolean> =>
-      !!m && typeof m === 'object' && !Array.isArray(m) && Object.values(m).every(v => typeof v === 'boolean');
-    if (body.spaces !== undefined && !isBoolMap(body.spaces)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'spaces must be a map of name → boolean')); return; }
-    if (body.docs !== undefined && !isBoolMap(body.docs)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'docs must be a map of key → boolean')); return; }
-    if (body.access !== undefined && body.access !== 'open' && body.access !== 'password' && body.access !== 'account') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', "access must be 'open', 'password' or 'account'")); return;
-    }
-    if (body.password !== undefined && body.password !== null && typeof body.password !== 'string') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password must be a string (set) or null (clear)')); return;
-    }
-    if (typeof body.password === 'string' && (body.password.length < 4 || body.password.length > 128)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password must be 4–128 characters')); return;
-    }
-    if (body.ics_key !== undefined && body.ics_key !== true && body.ics_key !== null) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ics_key is true (make a new feed key; it ends the one before) or null (clear it)')); return;
-    }
-    const prev = await readShareMeta(id, ws);
-    // password: string sets a new scrypt hash, null clears it, absent keeps the previous one.
-    const nextHash = typeof body.password === 'string' ? await hashPassword(body.password)
-      : body.password === null ? null : prev.passwordHash;
-    // ics_key: true makes a new feed key (shown once, in this answer), null clears it, absent keeps it.
-    const feedKey = body.ics_key === true ? newIcsKey() : null;
-    const next: ResolvedShare = {
-      public: typeof body.public === 'boolean' ? body.public : prev.public,
-      spaces: { ...prev.spaces, ...(body.spaces ?? {}) },
-      docs: { ...prev.docs, ...(body.docs ?? {}) },
-      access: body.access ?? prev.access,
-      passwordHash: nextHash,
-      icsKeyHash: feedKey ? feedKey.hash : body.ics_key === null ? null : prev.icsKeyHash,
-    };
-    if (next.access === 'password' && !next.passwordHash) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', "access 'password' requires a password to be set")); return;
-    }
-    const key = `organism.${id}.w.${ws}.meta.share`;
-    // This write replaces the copy the readers take (services/workspace-meta.ts); with none yet, it is
-    // stored under the identity that registered the workspace, as it always was.
-    const existing = await readWorkspaceMetaRecord(storage, id, ws, 'meta.share', config.nodeId);
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key, ownerGaii: existing?.ownerGaii ?? entry.ownerGaii, value: next, visibility: 'private', tags: ['share'], ttlHours: null,
-      version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+    const r = await setWorkspaceShareOp({ storage, config }, { sub: req.auth!.sub, owner: req.auth!.owner as string | undefined }, {
+      orgId: req.params.id as string,
+      ws: typeof req.query.ws === 'string' ? req.query.ws : '',
+      body: (req.body ?? {}) as SetShareBody,
     });
-    emitChange('organisms');
-    // A new feed key is in this answer and in no later one: only its hash is kept.
-    res.json(success(config.nodeId, {
-      organism_id: id, ws, share: redactShare(next),
-      ...(feedKey ? { ics_key: feedKey.key, ics_url: `/v1/organisms/${id}/workspace/public/records?ws=${encodeURIComponent(ws)}&space=<space>&format=ics&key=${feedKey.key}` } : {}),
-    }));
-    // Public landing feed — fire once on the FIRST public edge of this PUT: the whole
-    // workspace, any space, or any document transitioning private→public ("publish to feed").
-    const newlyPublic = (
-      (next.public === true && prev.public === false) ||
-      Object.entries(next.spaces).some(([k, v]) => v === true && prev.spaces[k] !== true) ||
-      Object.entries(next.docs).some(([k, v]) => v === true && prev.docs[k] !== true)
-    );
-    if (newlyPublic) {
-      void recordPublicActivity(storage, config, {
-        category: 'organisms',
-        actor: req.auth!.owner as string,
-        summary: `Workspace "${entry.name ?? ws}" published publicly`,
-        detail: organism.name ? `In organism "${organism.name}"` : '',
-        link: `/v1/publicworkspaceviewer?org=${encodeURIComponent(id)}&ws=${encodeURIComponent(ws)}`,
-      }).catch(err => { logger.warn('newlyPublic: feed is best-effort', { error: String(err) }); });
-    }
+    if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
+    res.json(success(config.nodeId, r.data));
   });
 
   /* ── POST /v1/organisms/:id/workspace/share/unlock — NO AUTH. Exchange the share password for a

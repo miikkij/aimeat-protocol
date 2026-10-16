@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — aimeat_workspace_share → PUT /v1/organisms/:id/workspace/share, its body built by
+ *     services/workspace-share-input.ts as the node tool builds it.
  *   2026-10-08 — aimeat_workspace_comment forwards ai_provenance and ai_provenance_id, which
  *     POST /v1/organisms/:id/comments records (aiprov E8).
  *   2026-10-01 — aimeat_organism_create forwards `shape` and `lang` (starting shapes).
@@ -32,6 +34,7 @@ import { randomUUID } from 'node:crypto';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalNumber, optionalArray, optionalBoolean, requiredArray, coerceObject, wsRoot } from './tool-call-helpers.js';
 import { unfileThroughDoor, sectionsFromRead } from './workspace-section-filing.js';
+import { shareBodyFromToolInput } from '../services/workspace-share-input.js';
 
 export const organismTools: ConnectCliToolDefinition[] = [
     {
@@ -397,6 +400,18 @@ export const organismTools: ConnectCliToolDefinition[] = [
             // made here.
             const expected = optionalNumber(input, 'expected_version'); if (expected !== undefined) body.expected_version = expected;
             return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/publish`, body);
+        },
+    },
+    {
+        name: 'aimeat_workspace_share',
+        // → PUT /v1/organisms/:id/workspace/share: setWorkspaceShareOp(), the node MCP tool's own
+        // function. The body is built by the same function the node tool builds it with.
+        handler: ({ client }, input) => {
+            const built = shareBodyFromToolInput({
+                space: input.space, id: input.id, shared: input.shared, access: input.access, password: input.password, until: input.until,
+            });
+            if ('error' in built) throw new Error(built.error);
+            return client.put(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace/share${query({ ws: requiredString(input, 'ws') })}`, built.body as JsonObject);
         },
     },
     {

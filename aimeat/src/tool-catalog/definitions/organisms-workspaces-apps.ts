@@ -5,6 +5,9 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-16 — aimeat_workspace_share: share a page, a space or the workspace outside the organism
+ *     and get its link (PUT /v1/organisms/:id/workspace/share, services/workspace-share.ts).
+ *     aimeat_workspace_write takes an HTML page, { title, html, files? }.
  *   2026-10-16 — aimeat_organism_export names the export ceiling it now has, 200 000 memory records (QA audit F06c-01).
  *   2026-10-15 — aimeat_organism_invitation_respond says accepting is the person's own (feature-list audit #57).
  *   2026-10-15 — aimeat_organism_create names `workspaces_not_created` in its description (feature-list audit #56).
@@ -458,7 +461,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_write',
-        description: "Create or overwrite DRAFT items in a workspace — records OR documents — in one tool. ONE item: pass `space` + `value`. MANY: pass `items: [{ value, space?, id?, section? }]` (up to 50) and they are all written in a SINGLE call — do this for any migration or multi-page import, because your client asks the human to approve every tool CALL, so twenty separate writes are twenty approval prompts and one unanswered prompt leaves the job half-done. A batch is all-or-nothing: every item is checked first, and one bad item writes nothing (the error names its index). Items inherit the top-level `space`/`section` unless they carry their own. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Document markdown renders rich: ```mermaid fenced blocks become diagrams, and ```aimeat-memory fenced blocks become LIVE data (body lines `key: <memory key>`, optional `view: table|props|list`, `fields: a,b`, `title: …`) — the document shows the key's CURRENT value on every open, so for data that changes, write it with aimeat_memory_write as an array of objects and embed the key instead of pasting a static table. Drafts are NOT live until published (aimeat_workspace_publish). Embed images by uploading with aimeat_storage_upload and using the embed_markdown / embed_url it returns (the owner-addressed /v1/pub form) — NOT a hand-written /v1/storage/<key> path, which loads only for you. On save the embedded image is scoped to this workspace's members (not the public internet). Member-only." + AI_PROVENANCE_TOOL_NOTE,
+        description: "Create or overwrite DRAFT items in a workspace — records OR documents — in one tool. ONE item: pass `space` + `value`. MANY: pass `items: [{ value, space?, id?, section? }]` (up to 50) and they are all written in a SINGLE call — do this for any migration or multi-page import, because your client asks the human to approve every tool CALL, so twenty separate writes are twenty approval prompts and one unanswered prompt leaves the job half-done. A batch is all-or-nothing: every item is checked first, and one bad item writes nothing (the error names its index). Items inherit the top-level `space`/`section` unless they carry their own. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. An HTML PAGE (a presentation or a page with pictures and script) is { title, html, files? }: `html` is one whole HTML document, `files` maps the file names it uses (\"kuva.png\") to stored files (the embed_url aimeat_storage_upload answers), and the node writes the page's text into `markdown` itself; the page runs isolated, with no network, so libraries come only from cdnjs, jsdelivr or unpkg (skill aimeat-html-page has the rules). Document markdown renders rich: ```mermaid fenced blocks become diagrams, and ```aimeat-memory fenced blocks become LIVE data (body lines `key: <memory key>`, optional `view: table|props|list`, `fields: a,b`, `title: …`) — the document shows the key's CURRENT value on every open, so for data that changes, write it with aimeat_memory_write as an array of objects and embed the key instead of pasting a static table. Drafts are NOT live until published (aimeat_workspace_publish). Embed images by uploading with aimeat_storage_upload and using the embed_markdown / embed_url it returns (the owner-addressed /v1/pub form) — NOT a hand-written /v1/storage/<key> path, which loads only for you. On save the embedded image is scoped to this workspace's members, and to whoever a share of the page admits (aimeat_workspace_share), never to the open internet. Member-only." + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Write Workspace Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -469,7 +472,7 @@ export const organismsWorkspacesAppsTools = [
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id.' },
             space: { type: 'string', description: "The objectType (space) NAME from the manifest, e.g. 'feature' or 'notes'. Required for a single write; with `items` it is the default each item inherits." },
-            value: { type: 'object', description: 'The content object for a SINGLE write. Records: the record (matching its schema). Documents: { title, markdown }. Omit when using `items`.', zod: z.any() },
+            value: { type: 'object', description: 'The content object for a SINGLE write. Records: the record (matching its schema). Documents: { title, markdown }, or an HTML page { title, html, files? }. Omit when using `items`.', zod: z.any() },
             id: { type: 'string', description: 'Instance id. Required for a records space (or include id in value); auto-generated for a document.' },
             section: { type: 'string', description: 'Document spaces only: section id/name to file the document under.' },
             items: { type: 'array', description: 'BATCH: [{ value, space?, id?, section? }] — up to 50 items written in one call (one approval prompt for the whole migration). All-or-nothing.', zod: z.any() },
@@ -490,6 +493,26 @@ export const organismsWorkspacesAppsTools = [
             namespace: { type: 'string', required: true, description: 'The instance namespace.' },
             id: { type: 'string', required: true, description: 'The instance id whose .draft to publish.' },
             expected_version: { type: 'number', description: 'The optimistic lock: the version you read. Required by a namespace whose manifest sets requires_expected_version; a publish over an edit made in between is refused.' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_share',
+        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person. Only the workspace creator or an organism admin, or their own agent, may change sharing.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Share Workspace Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        // The word PUT /v1/organisms/:id/workspace/share asks.
+        scope: 'memory:write',
+        surfaces: ['appdev', 'agent', 'service'],
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id.' },
+            space: { type: 'string', description: 'The document space NAME. Alone, it shares the whole space; with `id`, one page of it.' },
+            id: { type: 'string', description: 'The page id (from aimeat_workspace_read). Needs `space`.' },
+            shared: { type: 'boolean', required: true, description: 'true shares it, false stops sharing it.' },
+            access: { type: 'string', enum: ['open', 'account', 'password'], description: 'Who may open the link: open (anyone with it), account (anyone signed in to this node), password (with `password`).' },
+            password: { type: 'string', description: 'The share password, 4–128 characters, when access is "password". Tell the person; the node keeps only its hash.' },
+            until: { type: 'string', description: 'When the share ends, as an ISO date such as 2027-01-31; "none" removes the end. Left out: no change, and an HTML page newly shared ends after 90 days.' },
         },
     },
     {

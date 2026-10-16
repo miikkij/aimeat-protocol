@@ -15,6 +15,8 @@
  *     mint, emailed code = its password; per-inviter quota; app-origin callable via organism:invite scope)
  * @usage app.use(organismsRouter(config, storage));
  * @version-history
+ *   2026-10-16 -- POST /:id/workspace/documents/:space/:docId/frame and …/opened (organisms/workspace-pages.ts):
+ *     an HTML page's frame address for a member, and the day a page was last opened.
  *   2026-10-13 -- POST /:id/workspace/spaces/:space/extensions (organisms/workspace-space-extensions.ts):
  *     a hosted app, the account holder or an agent holding organism:direct names an installed
  *     extension of its own account on one space of a workspace (ruled by the developer on 2026-10-13).
@@ -122,6 +124,7 @@ import { registerOrganismWorkspaceOpsRoutes } from './organisms/workspace-ops.js
 import { registerOrganismWorkspaceTransferRoutes } from './organisms/workspace-transfer.js';
 import { registerOrganismWorkspaceRowRoutes } from './organisms/workspace-rows.js';
 import { registerOrganismWorkspaceDocumentRoutes } from './organisms/workspace-documents.js';
+import { registerOrganismWorkspacePageRoutes } from './organisms/workspace-pages.js';
 import { registerOrganismWorkspaceMemberChangeRoutes } from './organisms/workspace-member-changes.js';
 import { registerOrganismWorkspaceSpaceExtensionRoutes } from './organisms/workspace-space-extensions.js';
 import { registerOrganismWorkspaceToolRoutes } from './organisms/workspace-tool-routes.js';
@@ -166,6 +169,8 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   registerOrganismWorkspaceRowRoutes(router, config, storage);
   // In-place document edits, for the same reason and in the same place in the order.
   registerOrganismWorkspaceDocumentRoutes(router, config, storage);
+  // A member's frame address of an HTML page, and the day a page was last opened.
+  registerOrganismWorkspacePageRoutes(router, config, storage, H);
   // A member's change to a workspace (a space, the sections) and the decision on a member's suggestion.
   registerOrganismWorkspaceMemberChangeRoutes(router, config, storage);
   // Name an extension of the caller's own account on one space of a workspace (add-only).

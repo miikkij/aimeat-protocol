@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-10-16 — pageHostRouter (routes/page-host.ts), the page frame of HTML pages, ahead of the subdomain router.
  *   2026-10-15 — The extended-features guard is requireExtendedFeatures (middleware/extended-features-gate.ts),
  *     which answers with the shared error() envelope (feature-list audit #186).
  *   v1.22.1 — 2026-10-13 — test.money registers whenever AIMEAT_TEST_MONEY_HANDLER is on, on any node
@@ -259,6 +260,7 @@ import { agentOnboardingRouter } from '../routes/agent-onboarding.js';
 import { connectTunnelRouter } from '../routes/connect-tunnel.js';
 import { connectInstallRouter } from '../routes/connect-install.js';
 import { subdomainServeRouter } from '../routes/subdomains.js';
+import { pageHostRouter } from '../routes/page-host.js';
 import { subdomainAdminRouter } from '../routes/subdomain-admin.js';
 import { appsBackupRouter } from '../routes/apps-backup.js';
 
@@ -352,6 +354,8 @@ export async function mountRoutes(
   app.use(discoveryLinkHeaders());
   // The X-Robots-Tag middleware is mounted in server.ts, ahead of the static files (2026-09-30).
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));
+  // The page frame (routes/page-host.ts); it answers only on the page host.
+  app.use(pageHostRouter(config, storage));
   // Subdomain root serving MUST come before bootstrapRouter — its GET / handles
   // mapped `<sub>.<apex>` requests; apex requests fall through untouched.
   app.use(subdomainServeRouter(config, storage));

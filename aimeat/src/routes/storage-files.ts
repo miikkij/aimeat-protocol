@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — GET /v1/pub/:gaii/{key}?share=<org>/<ws>/<space>/<id>: a workspace-scoped image of a
+ *     page shared outside its organism, for whoever the share admits (routes/organisms/share-file-pass.ts).
  *   2026-10-16 — GET /v1/pub/:gaii/{key}: a file that is not public needs storage:read from a
  *     signed-in caller that is not the account holder in person (QA audit S3-03).
  *   v1.2.0 -- 2026-10-05 -- Every classification read passes the file's workspace binding to fileTarget,
@@ -134,6 +136,8 @@ import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/
 // Named apart from this file's own byte `readerFor` below: this one is the classification reader.
 import { readerFor as contentReaderFor } from '../services/classification/reader.js';
 import { fileTarget } from '../services/classification/labels.js';
+import { createOrganismHelpers, type OrganismHelpers } from './organisms/shared.js';
+import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
 
 /** F11: max bytes returned inline (base64) from handle/inline download mode — keeps big binaries out of the model context. */
 const INLINE_MAX_BYTES = 32 * 1024;
@@ -185,6 +189,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         setProvenanceHeaders(res, p);
         return p;
     };
+
+    /** The share helpers a shared page's image is decided with, made on first use. */
+    let helpers: OrganismHelpers | null = null;
+    const organismHelpers = (): OrganismHelpers => (helpers ??= createOrganismHelpers(config, storage));
 
     // GET /v1/download/:token — presigned download (F11). No agent auth: the token IS the
     // capability and is scoped to one owner+key with a TTL. Lets binary bytes be fetched
@@ -502,6 +510,19 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // internet reaches it, the bytes come back from the apex origin, and their type is
             // whatever the uploader said it was, so an uploaded page would run as the portal. Images,
             // media, PDFs and plain text still render; everything else is saved rather than shown.
+            if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            }
+            return;
+        }
+
+        // A workspace-scoped image of a page shared outside the organism, asked for with the page it is
+        // in (?share=<org>/<ws>/<space>/<id>): served to whoever that page's share admits
+        // (routes/organisms/share-file-pass.ts). The file keeps its visibility.
+        if (req.query.share !== undefined && await sharedPageAdmitsFile(organismHelpers(), { storage, config }, req, file, gaii, key)) {
+            if (await hiddenFromCaller()) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found')); return; }
+            await markProvenance(res, file, false);
+            res.setHeader('Cache-Control', 'private, max-age=300');
             if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             }

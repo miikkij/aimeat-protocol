@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-16 — aimeat_workspace_share runs setWorkspaceShareOp (services/workspace-share.ts), the code
+ *     PUT /v1/organisms/:id/workspace/share runs: an AI that published a page can now hand out its link.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-13 — The permission organism:direct (services/fenced-space.ts, ruled by the developer on
  *     2026-10-13). The workspace operations' caller is built on every call with the request's own
@@ -199,6 +201,8 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { fencedSpaceRefusal } from '../services/fenced-space.js';
 import { toolError } from './tool-error.js';
+import { setWorkspaceShareOp } from '../services/workspace-share.js';
+import { shareBodyFromToolInput } from '../services/workspace-share-input.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -434,6 +438,20 @@ export function registerWorkspaceTools(
             // /v1/organisms/:id/publish calls, the decision-log entry and the timeline snapshot.
             const r = await publishWorkspaceOp({ storage, config }, opsCaller(), { organismId: organism_id, ws, namespace, id, expectedVersion: expected_version ?? null });
             return r.ok ? ok(r.data) : failRefusal(r);
+        });
+
+    // ── aimeat_workspace_share ──
+    mcp.tool('aimeat_workspace_share', descriptionFor('aimeat_workspace_share'),
+        zodShapeFor('aimeat_workspace_share'),
+        annotationsFor('aimeat_workspace_share'),
+        async ({ organism_id, ws, space, id, shared, access, password, until }): Promise<TextResult> => {
+            // services/workspace-share.ts: membership, the creator-or-admin rule, the merge, the end
+            // dates and the HTML page default, the same code PUT /v1/organisms/:id/workspace/share runs.
+            const input = shareBodyFromToolInput({ space, id, shared, access, password, until });
+            if ('error' in input) return toolError('INVALID_INPUT', input.error);
+            const session = caller();
+            const r = await setWorkspaceShareOp({ storage, config }, { sub: session.principal, owner: session.owner }, { orgId: organism_id, ws, body: input.body });
+            return r.ok ? ok(r.data) : toolError(r.code, r.message);
         });
 
     // ── aimeat_workspace_revert_to_draft ──
