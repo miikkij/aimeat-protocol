@@ -18,9 +18,11 @@
  *   Runs on SQLite in memory, and on Postgres too when DATABASE_URL is set (names carry a run tag there).
  * @usage cd aimeat && pnpm exec vitest run test/unit/entitlement-erasure.test.ts
  * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.0.0 — 2026-10-01 — Initial: erasure left exchange contracts and grants active for a reused name.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
@@ -29,6 +31,8 @@ import {
   authorizeAndCharge, entitlementKey, grantKey, issueGrant, persistEntitlement, readContractForCall,
   readEntitlementForCall, readGrantForCall, NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement,
 } from '../../src/services/metered-entitlements.js';
+
+requirePostgresWhenAsked('entitlement-erasure');
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 const names = ['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])];

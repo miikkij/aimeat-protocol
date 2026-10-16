@@ -33,6 +33,7 @@
  *   cd aimeat && node --import tsx test/e2e-own-key-roads.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=own-key-roads
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.3.0 -- 2026-10-12 -- Node 4.0.0 removes /v1/openrouter/settings (the 4.0.0 sweep). 1b0 is about
  *     the legacy key-only save, so on 4.0.0 it asserts 410 GONE and that nothing was stored. 1b and 1i
  *     keep the legacy route on 3.x and on 4.0.0 save the key on a provider of the owner's own (its
@@ -57,6 +58,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { startFakeAiProvider, type FakeAiProvider, type RecordedRequest } from './helpers/fake-ai-provider.js';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
@@ -95,8 +97,9 @@ async function startNode(port: number, tag: string, sharedChatKey: string): Prom
     const dbDir = mkdtempSync(join(tmpdir(), `aimeat-ownkey-${tag}-`));
     const peerLog = join(dbDir, 'peer.jsonl');
     const base = `http://127.0.0.1:${port}`;
+    const db = await ownNodeDb(String(port), { sqlitePath: join(dbDir, 'n.db') });
     const proc = spawn(process.execPath, [
-        'src/index.ts', 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'n.db'), '--port', String(port),
+        'src/index.ts', 'start', ...db.args, '--port', String(port),
     ], {
         cwd: process.cwd(),
         env: {
@@ -108,8 +111,7 @@ async function startNode(port: number, tag: string, sharedChatKey: string): Prom
             AIMEAT_PORT: String(port),
             AIMEAT_BASE_URL: base,
             AIMEAT_NODE_ID: NODE_ID,
-            AIMEAT_DB: 'sqlite',
-            AIMEAT_DB_PATH: join(dbDir, 'n.db'),
+            ...db.env,
             AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY
                 ?? '0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20',
             AIMEAT_DEFAULT_AGENT_SCOPES: '*',

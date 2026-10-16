@@ -3,15 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Batch provenance and I/O contracts on both real providers.
- * @version-history 1.0.0 2026-09-27 Accepted rows, constant lookup counts and rollback.
+ * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
+ *   1.0.0 2026-09-27 Accepted rows, constant lookup counts and rollback.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig } from '../../src/config.js';
 import { createMemoryDbService } from '../../src/services/db/index.js';
 import { writeMemoryBatch } from '../../src/services/memory-batch-write.js';
+
+requirePostgresWhenAsked('memory-batch-write');
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 const names = ['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])] as const;

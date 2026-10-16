@@ -14,6 +14,7 @@
  *     - standalone_url is advertised on /v1/portfolio/config and data/:username.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-portfolio-origin.ts
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-07-03 — Initial (portfolio origin phases 0–5).
  *   v1.1.0 — 2026-08-12 — Every request that claims the portfolio origin now addresses one.
  *     subdomain.ts v1.5.0 honours `x-portfolio-origin` only on a Host in the portfolio family,
@@ -29,6 +30,7 @@ import { resolve } from 'node:path';
 import { hostRequest, type HostResponse } from './helpers/host-request.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const PORT = process.env.E2E_PORTFOLIO_ORIGIN_PORT ?? '40263';
 const BASE = `http://localhost:${PORT}`;
@@ -74,8 +76,10 @@ function cleanupDb() {
 
 async function startServer(): Promise<ChildProcess> {
     cleanupDb();
+    const db = await ownNodeDb(String(PORT), { sqlitePath: DB_PATH });
     const env = {
         ...process.env,
+        ...db.env,
         AIMEAT_PORT: PORT,
         AIMEAT_BASE_URL: BASE,
         AIMEAT_NODE_ID: NODE_ID,
@@ -85,7 +89,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_MEMORY: '1000', AIMEAT_RL_BOARDS: '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the portfolio-origin node' });
 }

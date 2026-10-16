@@ -21,16 +21,16 @@
  *
  *   WHY IT OWNS ITS SERVER. The stub's port has to be in the owner's settings before the first call,
  *   the AI job slot count is a boot-time number (one slot, so a second job is reachably `queued`),
- *   and loopback egress has to be allowed. None of that is true of the shared runner's node. SQLite
- *   on a temporary file, because the point here is the provider transport and not the storage layer;
- *   the backend-sensitive AI assertions live in e2e-ai-jobs, which follows the runner's backend.
+ *   and loopback egress has to be allowed. None of that is true of the shared runner's node. The
+ *   node's database follows the run's backend (test/helpers/own-node-db.ts): a temporary SQLite file
+ *   on a SQLite run, a PostgreSQL database of its own on a PostgreSQL run.
  *
  *   HOW THE STUB IS AIMED. Every scripted reply is bound to a MARKER in the prompt rather than to
  *   its position in a queue. The scheduler runs core:living-pulse every five minutes, so a reply
  *   pinned to arrival order can be eaten by a background derive that happened to fire first; a reply
  *   pinned to its own prompt cannot.
  * @structure
- *   - the node under test: temp SQLite, own port, pinnedEnv plus the pins only this suite needs
+ *   - the node under test: the run's backend, own port, pinnedEnv plus the pins only this suite needs
  *   - phase 1: the doors refuse (401 unauthenticated, 403 wrong scope) before the provider is touched
  *   - phase 2-3: the chat proxy whole and streamed; both model catalogues
  *   - phase 4-6: transcription, image generation, /v1/ai/complete's error and multimodal branches
@@ -39,6 +39,7 @@
  *   - phase 9: the living-document pulse's derive loop, its gate, its stop and its guards
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-provider-stub.ts
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.7.0 -- 2026-10-12 -- Node 4.0.0 removes /v1/openrouter/settings and /v1/openrouter/models (the
  *     4.0.0 sweep). 1d's owner key is a provider of the owner's own at the stub (PUT /v1/ai/providers/:id,
  *     its key, one text test, the routing), and the agent's key is set for that provider; the key
@@ -80,6 +81,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pinnedEnv } from './run-e2e-server.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import {
     startFakeAiProvider, chatJson, chatErrorBody, sseChat, modelsJson, transcriptionJson,
@@ -129,14 +131,16 @@ const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-ai-stub-'));
 const DB_PATH = join(dbDir, 'ai-stub.db');
 
 async function startServer(): Promise<ChildProcess> {
+    const db = await ownNodeDb(PORT, { sqlitePath: DB_PATH });
     const target = {
-        port: PORT, baseUrl: BASE, dbType: 'sqlite', dbPath: DB_PATH, dbUrl: '', external: false,
+        port: PORT, baseUrl: BASE, dbType: db.provider, dbPath: db.sqlitePath, dbUrl: db.dbUrl, external: false,
     };
     const env: Record<string, string | undefined> = {
         ...process.env,
         // The runner's own pin list, so this node behaves like every other test node: no real SMTP,
         // no developer .env leaking a live OAuth client, generous ceilings, a fixed operator.
         ...pinnedEnv(target),
+        ...db.env,
         AIMEAT_DEV_MODE: 'true',
         AIMEAT_TEST_MODE: 'true',
         // The stub lives on loopback, which outbound validation refuses on a public node and must.
@@ -157,7 +161,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_MODEL_DEFAULT_IMAGE: 'stub/node-image-model',
         AIMEAT_MODEL_DEFAULT_STT: '',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     // The stderr tail and the exit check that used to live here are the helper now, so the other
     // sixteen suites that spawn a node get them too.

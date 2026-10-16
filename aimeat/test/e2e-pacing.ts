@@ -11,6 +11,7 @@
  *   provider (chargePacing).
  * @usage cd aimeat && pnpm exec tsx test/e2e-pacing.ts
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-11 — Pacing is charged through chargePacing (decision-morseli-on-tahdistus-ei-
  *     hinta-tarjouksen-kaksi-arvoa): the "toll is a burn" case reads a share burned and the rest, at
  *     most, credited to the provider, with the burn on the caller's ledger as pacing_burn.
@@ -22,6 +23,7 @@
 import { spawn } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const PORT = process.env.E2E_PACING_PORT ?? '40488';
 const BASE = `http://localhost:${PORT}`;
@@ -52,10 +54,11 @@ async function balance(token: string) {
   return Number(r.body.data.balance ?? 0);
 }
 
-const dbPath = `test/.pacing-${Date.now()}.db`;
-const server = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', dbPath], {
+const db = await ownNodeDb(String(PORT));
+const server = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
   env: {
     ...process.env,
+    ...db.env,
     AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_EXTENSIONS_ENABLED: 'true',
     AIMEAT_PACING_TOLL_DEFAULT: String(TOLL),          // the whole point: a node-wide floor
     AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '5000',

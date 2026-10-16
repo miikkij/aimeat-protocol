@@ -15,10 +15,13 @@
  *   import { markEmailVerified } from './helpers/verified-email.js';
  *   await markEmailVerified('alice', 'alice@example.test');
  *   await markEmailVerified('alice', 'alice@example.test', { sqlitePath });   // a suite's own node
+ *   await markEmailVerified('alice', 'alice@example.test', { sqlitePath: db.dbUrl || db.sqlitePath }); // own node on either backend
  *
  *   seedEmailVerification() writes a pending verification with a code the suite knows, for a suite
  *   whose subject is what POST /v1/ghii/verify-email hands out (e2e-agent-token-revocation).
  * @version-history
+ *   2026-10-16 — storageFor() takes a PostgreSQL URL in place of a SQLite path, for a suite whose own
+ *     node follows the run's backend (test/helpers/own-node-db.ts, QA audit P1-02).
  *   v1.2.0 — 2026-10-12 — storageFor() is exported, for seed-password.ts.
  *   v1.1.0 — 2026-10-12 — seedEmailVerification() (Core 2026-11 ID-10).
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 follow-up, A1).
@@ -33,12 +36,18 @@ import { pinnedSqlitePath, serverDbUrl } from './server-db.js';
 
 const handles = new Map<string, Promise<Storage>>();
 
-/** One storage handle per database, opened on first use: the runner's server's, or a suite's own. */
+/**
+ * One storage handle per database, opened on first use: the runner's server's, or a suite's own.
+ * `sqlitePath` names a suite's own database: a SQLite file, or a PostgreSQL URL when that node
+ * follows a PostgreSQL run (own-node-db.ts).
+ */
 export function storageFor(sqlitePath?: string): Promise<Storage> {
     const key = sqlitePath ?? '(runner)';
     let h = handles.get(key);
     if (!h) {
-        if (sqlitePath) {
+        if (sqlitePath && /^postgres(?:ql)?:/.test(sqlitePath)) {
+            h = createStorage({ provider: 'postgres-kysely', dbUrl: sqlitePath });
+        } else if (sqlitePath) {
             h = createStorage({ provider: 'sqlite', sqlitePath });
         } else {
             const provider = (process.env.AIMEAT_DB ?? 'memory') as StorageProvider;

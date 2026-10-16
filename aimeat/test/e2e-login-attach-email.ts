@@ -12,6 +12,7 @@
  *   delivered over SMTP (absent here), so it is covered by the unchanged verify-email path + the wrong-code
  *   assertion below.
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-06 — A code key's holder under the gate: signing in with the key answers
  *     EMAIL_NOT_VERIFIED with has_email true, and attach-email takes the key as the password and sends a
  *     code to the key's own address, so the holder can sign in on a node that requires a confirmed
@@ -31,11 +32,15 @@ import { resolve } from 'node:path';
 import { markEmailVerified } from './helpers/verified-email.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 
 const PORT = process.env.E2E_ATTACH_EMAIL_PORT ?? '40402';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const DB_PATH = resolve(process.cwd(), 'test/.test-attach-email.db');
+// Asked for once: the restart in Phase 1 reuses the same database, and a second ownNodeDb() on
+// PostgreSQL would empty it.
+let db: OwnNodeDb | null = null;
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -58,8 +63,10 @@ function cleanupDb() {
 
 async function startServer(gateOn: boolean, freshDb: boolean): Promise<ChildProcess> {
     if (freshDb) cleanupDb();               // first boot wipes; the restart REUSES the same DB file
+    db ??= await ownNodeDb(String(PORT), { sqlitePath: DB_PATH });
     const env = {
         ...process.env,
+        ...db.env,
         AIMEAT_PORT: PORT,
         AIMEAT_BASE_URL: BASE,
         AIMEAT_NODE_ID: NODE_ID,
@@ -69,7 +76,7 @@ async function startServer(gateOn: boolean, freshDb: boolean): Promise<ChildProc
         AIMEAT_RL_MEMORY: '1000', AIMEAT_RL_BOARDS: '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the login-attach node' });
 }
@@ -122,7 +129,7 @@ async function main() {
             });
             assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
             // A key's address starts unverified since 2026-10-06 (secaudit 2026-10 follow-up, A1).
-            await markEmailVerified(emailOwner, takenEmail, { sqlitePath: DB_PATH, nodeId: NODE_ID });
+            await markEmailVerified(emailOwner, takenEmail, { sqlitePath: db!.dbUrl || db!.sqlitePath, nodeId: NODE_ID });
             // A second key, left as the recipient gets it: its address unverified.
             const second = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
                 method: 'POST', headers: { Authorization: `Bearer ${token}` },

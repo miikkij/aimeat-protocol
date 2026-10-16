@@ -21,13 +21,17 @@
  *   payload · the UTF-8 verdict settled on write
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-file-range.test.ts
  * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.1.0 — 2026-10-10 — A value larger than one database read (33 MB) comes back whole and exact.
  *   v1.0.0 — 2026-08-15 — Initial (TARGET-063: the streaming read path).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
+
+requirePostgresWhenAsked('storage-file-range');
 
 const SQLITE_PATH = `./test/.filerange-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';

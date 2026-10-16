@@ -9,6 +9,7 @@
  *   Node B: port 40271, aimeat-node-001-msgb
  *
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 -- 2026-06-16 -- Initial cross-node direct messaging tests (layer 3: federation delivery).
  *   v1.1.0 -- 2026-06-23 -- Phase 5: cross-node interactive message (federated AskUserQuestion) — the
  *     question spec rides the signed wire payload and the structured answer round-trips back.
@@ -23,6 +24,7 @@ import { loadConfig } from '../src/config.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { registerOwner } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -83,7 +85,6 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     config.port = port;
@@ -92,7 +93,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
+    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
     config.federationAuthPolicy = 'all_peers';
 
     const { app } = await createServer(config);

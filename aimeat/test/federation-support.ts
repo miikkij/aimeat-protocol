@@ -14,6 +14,7 @@
  *   Nodes: V (vendor) 40288, two operators. C (customer) 40289, one owner who IS its operator, plus
  *   an agent — the principal that actually writes to support when something breaks.
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-08-23 — Initial.
  */
 
@@ -25,6 +26,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -57,7 +59,6 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     config.port = port;
@@ -66,7 +67,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
+    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
 
     const { app } = await createServer(config);
     const server = await new Promise<Server>(resolve => { const s = app.listen(port, '127.0.0.1', () => resolve(s)); });

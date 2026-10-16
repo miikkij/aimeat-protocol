@@ -10,6 +10,7 @@
  *   Nodes: A 40273 aimeat-test-001-fedvisa (open join on); C 40274 aimeat-test-001-fedvisc (off).
  *   Virtual joiner B: aimeat-peer-001-visitb (keypair only; not a running server).
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 -- 2026-10-12 -- The introduces of tests 1, 5 and 8 carry the audience proof for the node
  *     they knock on (introduceProof). Node 4.0.0 refuses an introduce without it (401
  *     AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), and the proof is not this suite's subject. The
@@ -32,6 +33,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -64,7 +66,6 @@ async function bootNode(port: number, nodeId: string, openJoin: boolean): Promis
   process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
   process.env.AIMEAT_NODE_ID = nodeId;
   process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-  process.env.AIMEAT_STORAGE = 'memory';
 
   const { config } = loadConfig({});
   config.port = port;
@@ -73,7 +74,7 @@ async function bootNode(port: number, nodeId: string, openJoin: boolean): Promis
   config.devMode = true;
   config.testMode = true;
   config.adminPassword = adminPw;
-  config.storageProvider = 'memory';
+  Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
   config.federationOpenJoin = openJoin;
 
   const { app } = await createServer(config);

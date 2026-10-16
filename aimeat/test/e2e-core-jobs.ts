@@ -18,8 +18,8 @@
  *   which need SMTP), the retention windows are read from the environment, and the usage archive
  *   reads its hot window at module load. The shared E2E node has email off and every window at its
  *   production default, so on it these rows either do not exist or the sweep provably does nothing.
- *   SQLite whichever backend the runner used: what is under test is a set of service functions, and
- *   no storage provider changes which rows a sweep moves.
+ *   On the run's backend (test/helpers/own-node-db.ts): the sweeps call provider methods that are
+ *   written twice, once per provider, and PostgreSQL is the one production runs.
  *
  *   THE CRONS ARE TURNED OFF FIRST. Five of these jobs are seeded on a five-minute cron, so a run
  *   that crosses a five-minute boundary would have the job fire behind the assertion and make "it
@@ -45,6 +45,10 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   2026-10-16 -- The node follows the run's backend: a database of its own beside the run's on
+ *     PostgreSQL, a SQLite file on SQLite. It was SQLite on both (QA audit P1-02, D4-02). Two things
+ *     only PostgreSQL showed: the seeding is read until it is done, and the nonce count is read under
+ *     either provider's table name.
  *   v1.2.2 -- 2026-10-12 -- The capability probe action is published with pricing.toll_morsels; node
  *     4.0.0 refuses pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the same on 3.x.
  *   v1.2.1 -- 2026-10-09 -- Comment only: core:nonce-cleanup is seeded on every node now.
@@ -65,6 +69,7 @@ import { startFakeSmtp, type FakeSmtp, type ParsedMail } from './helpers/fake-sm
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner as registerPasswordOwner, ownerToken as passwordToken, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { seedPassword } from './helpers/seed-password.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -134,7 +139,7 @@ async function registerOwner(name: string): Promise<{ name: string; token: strin
  * signs in with it (helpers/seed-password.ts).
  */
 async function webAccountToken(owner: string): Promise<string> {
-    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'core-jobs.db') });
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: db.dbUrl || db.sqlitePath });
     return passwordToken(BASE, owner);
 }
 
@@ -182,9 +187,10 @@ let node: ChildProcess | null = null;
 let nodeLog = '';
 let smtp: FakeSmtp | null = null;
 const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-corejobs-'));
+const db = await ownNodeDb('core-jobs', { sqlitePath: join(dbDir, 'core-jobs.db') });
 
 async function startNode(): Promise<void> {
-    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'core-jobs.db'), '--port', String(PORT)], {
+    node = spawn('node', [...nodeEntryArgs(), 'start', ...db.args, '--port', String(PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,
@@ -192,9 +198,7 @@ async function startNode(): Promise<void> {
             AIMEAT_BASE_URL: BASE,
             AIMEAT_NODE_ID: NODE_ID,
             AIMEAT_NODE_TYPE: 'full',
-            AIMEAT_STORAGE: 'sqlite',
-            AIMEAT_SQLITE_PATH: join(dbDir, 'core-jobs.db'),
-            DATABASE_URL: '',
+            ...db.env,
             AIMEAT_DEV_MODE: 'true',
             AIMEAT_TEST_MODE: 'true',
             AIMEAT_ANONYMOUS: 'true',
@@ -300,8 +304,6 @@ async function run(): Promise<void> {
     });
 
     await test('every job this suite fires was seeded, including the four behind a flag', async () => {
-        const jobs = await json('/v1/admin/scheduler/jobs', { headers: bearer(opToken) });
-        const ids = new Set((jobs.body.data.jobs as Array<{ id: string }>).map(j => j.id));
         const wanted = [
             'core:daily-allowance', 'core:usage-rollup', 'core:usage-archive', 'core:usage-visit-retention', 'core:ai-job-log-prune',
             'core:execution-log-prune', 'core:consent-audit-prune', 'core:classification-audit-prune', 'core:invitation-expiry',
@@ -309,7 +311,16 @@ async function run(): Promise<void> {
             'core:designbook-aging', 'core:capability-aggregation', 'core:dispute-timeout',
             'core:mcp-onboarding-rescue', 'core:inactivity-nudge',
         ];
-        const missing = wanted.filter(id => !ids.has(id));
+        // The node seeds its jobs after it starts answering (background-jobs.ts does not await it), so
+        // the list is read until the seeding is done. On PostgreSQL it ends seconds after the first
+        // answer, and the cron step below would otherwise miss the rows seeded behind it.
+        let missing = wanted;
+        for (let i = 0; i < 60 && missing.length > 0; i++) {
+            if (i > 0) await sleep(500);
+            const jobs = await json('/v1/admin/scheduler/jobs', { headers: bearer(opToken) });
+            const ids = new Set((jobs.body.data.jobs as Array<{ id: string }>).map(j => j.id));
+            missing = wanted.filter(id => !ids.has(id));
+        }
         // consent-expiry / consent-audit-prune, mailbox-cleanup, nonce-cleanup and the two mailers
         // exist ONLY because this node was booted with consent, personal nodes, EUDIW and SMTP on.
         assert(missing.length === 0, `not seeded: ${missing.join(', ')}`);
@@ -594,7 +605,9 @@ async function run(): Promise<void> {
         const nonceRows = async (): Promise<number> => {
             const r = await json('/v1/admin/storage-stats?limit=1', { headers: bearer(opToken) });
             assert(r.status === 200, `storage stats: ${r.status} ${short(r.body)}`);
-            return r.body.data.current.counts.verification_nonces as number;
+            // The table is verification_nonces on SQLite and "VerificationNonce" on PostgreSQL.
+            const counts = r.body.data.current.counts;
+            return (counts.verification_nonces ?? counts.VerificationNonce) as number;
         };
         for (let i = 0; i < 2; i++) {
             const started = await json('/v1/connections/start', {

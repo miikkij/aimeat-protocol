@@ -23,11 +23,13 @@
  *   - describe blocks: the cutoff · the cut table · the fold, per provider
  * @usage cd aimeat && pnpm exec vitest run test/unit/visit-retention.test.ts
  * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.1.0 — 2026-09-26 — An app's member list forgets a signed-in visitor thirteen months after
  *     their last visit (A6-14). Failed on the code before the fix: both guests stayed.
  *   v1.0.0 — 2026-09-25 — Initial, with the thirteen-month rule in the privacy notice.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { randomBytes } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
 import type BetterSqlite3 from 'better-sqlite3';
@@ -42,6 +44,8 @@ import {
   runVisitRetentionJob, visitNameCutoffDay, ACCOUNT_ACTIVITY_CUTS,
 } from '../../src/services/usage/visit-retention.js';
 import { noteVisit, listVisits } from '../../src/services/app-members.js';
+
+requirePostgresWhenAsked('visit-retention');
 
 const SQLITE_PATH = `./test/.visit-retention-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';

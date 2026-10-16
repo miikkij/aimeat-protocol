@@ -23,6 +23,7 @@
  *   block above it says why a second node is the only way to reach that state.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-agent-tasks
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.4.0 — 2026-10-04 — The first plan carries the nulls CrewAI sends for left-out optional fields;
  *     aimeat_task_decline ends the agent's own task as declined and refuses another agent's.
  *   v1.3.0 — 2026-08-14 — The completion, which was the last tool surface still writing its own
@@ -65,6 +66,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -222,10 +224,7 @@ async function siblingSession(base: Awaited<ReturnType<typeof setup>>, name: str
 // because every other suite's active task would stall with it. So proving that a stalled task can be
 // completed means a node started with the threshold at zero, and that is a second server.
 //
-// It runs on SQLite regardless of which backend the sweep targets, and that is an acceptable trade
-// rather than a hidden gap: what is under test is a status string that both providers write through
-// the same updateAgentTask, and the gate being proven is a shared constant in
-// services/agent-task-fanout.ts. Everything storage-shaped in this suite still runs on both.
+// It follows the run's backend (test/helpers/own-node-db.ts), like the shared node.
 const STALL_PORT = process.env.E2E_MCP_TASK_STALL_PORT ?? '40413';
 const STALL_BASE = `http://localhost:${STALL_PORT}`;
 const STALL_DB = resolve(process.cwd(), 'test/.test-mcp-task-stall.db');
@@ -238,7 +237,8 @@ function removeStallDb() {
 
 async function startStallNode(): Promise<ChildProcess> {
     removeStallDb();
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', STALL_DB], {
+    const db = await ownNodeDb(String(STALL_PORT), { sqlitePath: STALL_DB });
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
         // The suite process is handed the runner's pins, so inheriting them is how this node gets the
         // same rate limits, ceilings and pinned-shut credentials the shared one has.
         env: {
@@ -246,7 +246,7 @@ async function startStallNode(): Promise<ChildProcess> {
             AIMEAT_PORT: STALL_PORT,
             AIMEAT_BASE_URL: STALL_BASE,
             AIMEAT_NODE_ID: NODE_ID,
-            AIMEAT_DB_PATH: STALL_DB,
+            ...db.env,
             // The whole reason this node exists.
             AIMEAT_TASK_STALL_THRESHOLD_MINUTES: '0',
         },

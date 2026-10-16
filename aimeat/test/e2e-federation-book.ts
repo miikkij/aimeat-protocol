@@ -5,8 +5,11 @@
  *   (pull → signature-verify → version-gate → cache). Three in-process nodes:
  *   G (primary, no genesisUrl), P1 (leaf, listed), P2 (leaf, opted-out).
  *
- *   Ports: G 40278, P1 40279, P2 40280.
+ *   Ports: G 40278, P1 40279, P2 40280. Each node has a database of its own on the run's backend
+ *   (test/helpers/own-node-db.ts), one per port.
  * @version-history
+ *   v1.0.1 — 2026-10-16 — The nodes this suite starts follow the run's backend
+ *     (test/helpers/own-node-db.ts); they were SQLite in memory on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-06-19 — Initial federation-book tests (node-card, assembly, opt-out, mirror).
  */
 
@@ -18,6 +21,7 @@ import * as http from 'node:http';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -39,9 +43,10 @@ function makeJson(baseUrl: string) {
 async function bootNode(port: number, nodeId: string, opts: { genesisUrl?: string; bookListed?: boolean }): Promise<NodeState> {
   const adminPw = randomBytes(16).toString('base64url');
   process.env.AIMEAT_PORT = String(port); process.env.AIMEAT_DEV_MODE = 'true'; process.env.AIMEAT_TEST_MODE = 'true';
-  process.env.AIMEAT_ADMIN_PASSWORD = adminPw; process.env.AIMEAT_NODE_ID = nodeId; process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`; process.env.AIMEAT_STORAGE = 'memory';
+  process.env.AIMEAT_ADMIN_PASSWORD = adminPw; process.env.AIMEAT_NODE_ID = nodeId; process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
   const { config } = loadConfig({});
-  config.port = port; config.nodeId = nodeId; config.baseUrl = `http://127.0.0.1:${port}`; config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'memory';
+  Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
+  config.port = port; config.nodeId = nodeId; config.baseUrl = `http://127.0.0.1:${port}`; config.devMode = true; config.testMode = true; config.adminPassword = adminPw;
   config.genesisUrl = opts.genesisUrl ?? null;
   config.federationBookListed = opts.bookListed !== false;
   const { app } = await createServer(config);
@@ -182,7 +187,7 @@ await test('7. a book that is unsigned or tampered is refused, and the mirrored 
       `a tampered book must not apply: ${JSON.stringify(tampered.body?.data ?? tampered.body)}`);
 
     // UNSIGNED: the same widened book with the signature stripped.
-    const { signature: _drop, ...bare } = served as Record<string, unknown>;
+    const bare = Object.fromEntries(Object.entries(served as Record<string, unknown>).filter(([k]) => k !== 'signature'));
     served = bare;
     const unsigned = await pullFromStub();
     assert(unsigned.body?.data?.applied !== true,

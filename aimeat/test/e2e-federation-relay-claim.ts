@@ -18,6 +18,8 @@
  *
  *   Node R (receiver) 40293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
  * @version-history
+ *   v1.5.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite on both runs (QA audit P1-02).
  *   v1.5.0 -- 2026-10-12 -- Node 4.0.0 removes the relay-claim setting `optional`
  *     (RELAY_CLAIM_OPTIONAL_REMOVED_IN). The four tests whose subject is `optional` ask the node its
  *     release: before 4.0.0 they assert what they asserted; from 4.0.0 the node and the peer setting
@@ -47,6 +49,7 @@ import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../src/config-federation.js';
 import { removedOn } from './helpers/node-release.js';
 import type { Server } from 'node:http';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -61,8 +64,9 @@ function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 // 40293: free, and checked against every other suite before it was picked. A port two suites share
 // makes a red run that reads exactly like a regression — e2e-sealed-config already holds 40291.
 const PORT = 40293;
-/** Its own file, and sqlite rather than memory: PUT /v1/admin/config refuses without persistence,
- *  and the strict setting has to be reachable at runtime for the test that turns it on. */
+/** Its own database on the run's backend (test/helpers/own-node-db.ts), and on SQLite a file rather
+ *  than memory: PUT /v1/admin/config refuses without persistence, and the strict setting has to be
+ *  reachable at runtime for the test that turns it on. */
 const DB_PATH = `./test/.relay-claim-${process.pid}.db`;
 const NODE_ID = 'aimeat-test-001-relayrx';
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -123,11 +127,10 @@ await test('Setup: a receiving node, an owner, and two peers — one permitted t
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = NODE_ID;
     process.env.AIMEAT_BASE_URL = BASE;
-    process.env.AIMEAT_STORAGE = 'sqlite';
-    process.env.AIMEAT_SQLITE_PATH = DB_PATH;
     const { config } = loadConfig({});
+    Object.assign(config, (await ownNodeDb(String(PORT), { sqlitePath: DB_PATH })).config);
     config.port = PORT; config.nodeId = NODE_ID; config.baseUrl = BASE;
-    config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'sqlite'; config.sqlitePath = DB_PATH;
+    config.devMode = true; config.testMode = true; config.adminPassword = adminPw;
     const { app } = await createServer(config);
     server = await new Promise<Server>(resolve => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });
 

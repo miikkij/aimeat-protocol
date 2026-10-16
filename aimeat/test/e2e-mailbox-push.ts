@@ -32,9 +32,8 @@
  *
  *   IT RUNS ITS OWN NODE. VAPID keys, SMTP and the two sweep timers are boot-time configuration, so
  *   this spawns a node of its own on 40312 with the SMTP sink on 40313 (both written out here so
- *   the runner's fixedPorts() sees them and keeps this suite in lane 0) and its own SQLite file. That node
- *   is SQLite whichever backend the runner was started with: what is under test is a service, a
- *   template and two timers, and no storage provider changes any of them.
+ *   the runner's fixedPorts() sees them and keeps this suite in lane 0) and its own database. That node
+ *   follows the run's backend (test/helpers/own-node-db.ts).
  * @structure
  *   - Phase 0: the node, the SMTP sink, the HTTPS push receiver, three owners
  *   - Phase 1: the sweep owner's fixtures, written first because the timers fire at 60 s and 120 s
@@ -46,6 +45,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-mailbox-push.ts
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 -- 2026-09-25 -- The two held notifications are written into the node's own database. The
  *     suite wrote them through POST /v1/memory, which refuses a `notif.` key to every principal now:
  *     its setup no longer matched production, where only the node writes a notification.
@@ -65,6 +65,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { createStorage } from '../src/storage/storage-factory.js';
 import { ownerToken as passwordToken, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { seedPassword } from './helpers/seed-password.js';
+import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 
 const require = createRequire(import.meta.url);
 const webPush = require('web-push') as typeof import('web-push');
@@ -116,7 +117,7 @@ async function json(path: string, opts: RequestInit = {}): Promise<Res> {
  * signs in with it (helpers/seed-password.ts).
  */
 async function ownerToken(owner: string): Promise<string> {
-    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'mailbox-push.db'), nodeId: NODE_ID });
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: db!.dbUrl || db!.sqlitePath, nodeId: NODE_ID });
     return passwordToken(BASE, owner);
 }
 
@@ -159,9 +160,11 @@ let rx: FakePushReceiver | null = null;
 let bootedAt = 0;
 const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-mbxpush-'));
 const vapid = webPush.generateVAPIDKeys();
+let db: OwnNodeDb | null = null;
 
 async function startNode(): Promise<void> {
-    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'mailbox-push.db'), '--port', String(PORT)], {
+    db = await ownNodeDb(String(PORT), { sqlitePath: join(dbDir, 'mailbox-push.db') });
+    node = spawn('node', [...nodeEntryArgs(), 'start', ...db.args, '--port', String(PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,
@@ -169,9 +172,7 @@ async function startNode(): Promise<void> {
             AIMEAT_BASE_URL: BASE,
             AIMEAT_NODE_ID: NODE_ID,
             AIMEAT_NODE_TYPE: 'full',
-            AIMEAT_STORAGE: 'sqlite',
-            AIMEAT_SQLITE_PATH: join(dbDir, 'mailbox-push.db'),
-            DATABASE_URL: '',
+            ...db.env,
 
             // The whole point: a node that can actually sign and send a web push.
             AIMEAT_PUSH_ENABLED: 'true',
@@ -354,7 +355,9 @@ async function run(): Promise<void> {
         // only the node writes a notification record (utils/reserved-keys.ts refuses `notif.` on
         // every memory door), and no door writes one that is two hours old and already held.
         const old = new Date(Date.now() - 2 * 3_600_000).toISOString();
-        const store = await createStorage({ provider: 'sqlite', sqlitePath: join(dbDir, 'mailbox-push.db') });
+        const store = await createStorage(db!.provider === 'postgres-kysely'
+            ? { provider: 'postgres-kysely', dbUrl: db!.dbUrl }
+            : { provider: 'sqlite', sqlitePath: db!.sqlitePath });
         try {
             for (const tag of ['aaaaaaaa', 'bbbbbbbb']) {
                 const value = {
@@ -699,8 +702,15 @@ async function run(): Promise<void> {
         assert(!mail.text.includes('too young for the digest'),
             'a notification younger than the cutoff must not be in the digest');
         assert(mail.text.includes('/v1/profile?tab=notifications'), `the digest links to the page: ${mail.text.slice(0, 400)}`);
-        // lastDigestAt is stamped so the next hourly run sends nothing, and the send is logged.
-        const settings = await json('/v1/notifications/settings', { headers: bearer(sweepToken) });
+        // lastDigestAt is stamped so the next hourly run sends nothing, and the send is logged. The
+        // sink holds the message before the node's sendRaw() resolves, and the sweep writes the
+        // bookmark after that, so the read is retried for up to 10 s (on PostgreSQL the write lands
+        // after the first read).
+        let settings = await json('/v1/notifications/settings', { headers: bearer(sweepToken) });
+        for (let i = 0; i < 20 && settings.status === 200 && typeof settings.body.data.settings?.lastDigestAt !== 'string'; i++) {
+            await sleep(500);
+            settings = await json('/v1/notifications/settings', { headers: bearer(sweepToken) });
+        }
         assert(settings.status === 200, `settings ${settings.status}: ${short(settings.body)}`);
         assert(typeof settings.body.data.settings?.lastDigestAt === 'string',
             `lastDigestAt must be stamped after a digest: ${short(settings.body.data)}`);

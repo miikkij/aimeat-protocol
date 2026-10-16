@@ -3,9 +3,12 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Patch omission/clear parity and a recovery-address change through the real router.
- * @version-history 1.0.0 2026-09-27 Real SQLite and PostgreSQL regressions.
+ * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
+ *   1.0.0 2026-09-27 Real SQLite and PostgreSQL regressions.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
@@ -14,6 +17,8 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, MemoryRecord } from '../../src/storage/interface.js';
 import { registerProfileRoutes } from '../../src/routes/ghii/profile.js';
 import { loadConfig } from '../../src/config.js';
+
+requirePostgresWhenAsked('storage-patch-contract');
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 const names = ['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])];

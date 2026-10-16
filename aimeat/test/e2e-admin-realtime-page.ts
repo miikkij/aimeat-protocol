@@ -13,6 +13,8 @@
  *   Nothing has ever sent that key, so the figure was zero on every node in every state; the
  *   assertion below says the key is absent and the documents are in `rooms[].yjs_docs`.
  * @version-history
+ *   v1.0.1 — 2026-10-16 — The second node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-09-12 — Initial (the Realtime page in the poster face).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=admin-realtime-page
@@ -20,6 +22,7 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { registerOwner } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -121,18 +124,17 @@ await test('Closing the room takes it out of the overview and counts it closed',
         `roomsClosed should move: ${closedBefore} → ${after.body.data.stats.roomsClosed}`);
 });
 
-// ─── Switched off: a node of its own, so nothing here touches the suite's database ───
+// ─── Switched off: a node of its own on a database of its own (test/helpers/own-node-db.ts), so
+// nothing here touches the suite's database ───
 await test('With realtime switched off the overview answers 200 and says so', async () => {
     process.env.AIMEAT_REALTIME_ENABLED = 'false';
-    process.env.AIMEAT_STORAGE = 'memory';
     process.env.AIMEAT_DEV_MODE = 'true';
     process.env.AIMEAT_TEST_MODE = 'true';
-    process.env.AIMEAT_SQLITE_PATH = ':memory:';
-    delete process.env.DATABASE_URL;
 
     const { loadConfig } = await import('../src/config.js');
     const { createServer } = await import('../src/server.js');
     const { config } = loadConfig({});
+    Object.assign(config, (await ownNodeDb('realtime-off', { memory: true })).config);
     assert(config.realtimeEnabled === false, 'the second node should have realtime off');
 
     const { app } = await createServer(config);

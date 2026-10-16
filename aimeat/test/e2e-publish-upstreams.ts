@@ -20,11 +20,13 @@
  *   because a dashboard that averages invented zeros lies confidently.
  *
  *   IT BOOTS THE NODE IN PROCESS, the pattern of e2e-mail-connections, on its own port and its own
- *   SQLite file in a temp directory. Nothing here touches a shared node.
+ *   database on the run's backend (test/helpers/own-node-db.ts). Nothing here touches a shared node.
  * @structure boot (env, node, fake upstreams) · helpers · 15 phases, from the Mastodon media upload
  *   to who may publish at all
  * @usage cd aimeat && node --import tsx test/e2e-publish-upstreams.ts
  * @version-history
+ *   v1.0.3 — 2026-10-16 — The node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite on both runs (QA audit P1-02).
  *   v1.0.2 — 2026-10-15 — Mastodon with no file now posts the text (the source was the gap: a text
  *     status was refused); the refusal case became a publish case.
  *   v1.0.1 — 2026-10-09 — A round starts as the owner's browser does and finishes with its cookie
@@ -38,6 +40,7 @@ import { join } from 'node:path';
 import type { Server } from 'node:http';
 import type { RecordedCall } from './helpers/fake-mail-upstreams.js';
 import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const PORT = parseInt(process.env.E2E_PUBLISH_PORT ?? '40317', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -55,8 +58,6 @@ Object.assign(process.env, {
   // The logger reads LOG_LEVEL, not the AIMEAT_ one beside it, so both are set: this suite drives
   // failure paths that log a warning each, and the assertions are the report.
   LOG_LEVEL: process.env.LOG_LEVEL ?? 'error',
-  AIMEAT_STORAGE: 'sqlite',
-  AIMEAT_SQLITE_PATH: join(TMP, 'publish.db'),
   AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
   AIMEAT_CONNECTIONS_ENABLED: 'true',
   AIMEAT_CONNECT_GOOGLE_CLIENT_ID: 'google-client-id',
@@ -89,6 +90,7 @@ type ConnectionRecord = import('../src/models/connection-schemas.js').Connection
 type PublishAttempt = import('../src/models/connection-schemas.js').PublishAttempt;
 
 const { config } = loadConfig({});
+Object.assign(config, (await ownNodeDb(String(PORT), { sqlitePath: join(TMP, 'publish.db') })).config);
 config.port = PORT;
 const NODE_ID = config.nodeId;
 const { app, storage } = await createServer(config);

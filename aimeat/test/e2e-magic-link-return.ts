@@ -22,11 +22,12 @@
  *   POST /v1/ghii/login/attach-email asks such an account for its code too.
  *
  *   It runs its own node, with email on (a real SMTP sink) and app origins on, because the shared
- *   E2E server has neither. SQLite whichever backend the runner started with: what is under test is
- *   how a route reads an address, which no storage provider changes. `E2E_MAGIC_RETURN_PORT` moves
+ *   E2E server has neither. That node follows the run's backend (test/helpers/own-node-db.ts).
+ *   `E2E_MAGIC_RETURN_PORT` moves
  *   it (default 40454, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-return
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 — 2026-10-09 — Two-step sign-in: the link, the code step and attach-email (secaudit
  *     2026-10-09, S1).
  *   v1.0.0 — 2026-09-29 — Initial (the emailed link returns to the place it was asked from).
@@ -41,6 +42,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeSmtp, type FakeSmtp } from './helpers/fake-smtp.js';
 import { registerOwner, ownerToken as passwordToken, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { seedPassword } from './helpers/seed-password.js';
+import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 
 const PORT = Number(process.env.E2E_MAGIC_RETURN_PORT ?? 40454);
 const SMTP_PORT = PORT + 1;
@@ -87,7 +89,7 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
  * signs in with it (helpers/seed-password.ts). Done before two-step sign-in is armed.
  */
 async function ownerToken(owner: string): Promise<string> {
-    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'magic.db') });
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: db!.dbUrl || db!.sqlitePath });
     return passwordToken(BASE, owner);
 }
 
@@ -121,12 +123,15 @@ let node: ChildProcess | null = null;
 let nodeLog = '';
 let smtp: FakeSmtp | null = null;
 const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-magicreturn-'));
+let db: OwnNodeDb | null = null;
 
 async function startNode(): Promise<void> {
-    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'magic.db'), '--port', String(PORT)], {
+    db = await ownNodeDb(String(PORT), { sqlitePath: join(dbDir, 'magic.db') });
+    node = spawn('node', [...nodeEntryArgs(), 'start', ...db.args, '--port', String(PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,
+            ...db.env,
             AIMEAT_PORT: String(PORT),
             AIMEAT_BASE_URL: BASE,
             AIMEAT_DEFAULT_AGENT_SCOPES: '*',

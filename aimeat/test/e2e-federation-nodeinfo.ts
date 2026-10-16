@@ -7,6 +7,8 @@
  *
  *   Node: 40277 aimeat-test-001-nodeinfo.
  * @version-history
+ *   v1.1.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02).
  *   v1.1.0 -- 2026-10-12 -- Test 3's ping carries the audience proof (audienceProof). Node 4.0.0 refuses
  *     a ping without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), and the proof is not this
  *     suite's subject; tests 4 and 5 had failed only because test 3 stamped nothing.
@@ -21,6 +23,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -47,9 +50,10 @@ console.log('\n=== AIMEAT Federation Node-Info E2E ===\n');
 
 await test('Boot node + register operator', async () => {
   process.env.AIMEAT_PORT = String(PORT); process.env.AIMEAT_DEV_MODE = 'true'; process.env.AIMEAT_TEST_MODE = 'true';
-  process.env.AIMEAT_ADMIN_PASSWORD = adminPw; process.env.AIMEAT_NODE_ID = NODE_ID; process.env.AIMEAT_BASE_URL = BASE; process.env.AIMEAT_STORAGE = 'memory';
+  process.env.AIMEAT_ADMIN_PASSWORD = adminPw; process.env.AIMEAT_NODE_ID = NODE_ID; process.env.AIMEAT_BASE_URL = BASE;
   const { config } = loadConfig({});
-  config.port = PORT; config.nodeId = NODE_ID; config.baseUrl = BASE; config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'memory';
+  Object.assign(config, (await ownNodeDb(String(PORT), { memory: true })).config);
+  config.port = PORT; config.nodeId = NODE_ID; config.baseUrl = BASE; config.devMode = true; config.testMode = true; config.adminPassword = adminPw;
   const { app } = await createServer(config);
   server = await new Promise<Server>(r => { const s = app.listen(PORT, '127.0.0.1', () => r(s)); });
   const opName = `niop${Date.now()}`;

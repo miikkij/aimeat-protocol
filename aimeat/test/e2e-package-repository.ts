@@ -14,6 +14,7 @@
  *   - Phase 5: auto-update off reports instead of updating; the updates end
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-repository
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 — 2026-10-02 — A note-only grant keeps the date; Phase 7: the author quota counts package
  *     groups that are not archived (package sale design, phase 1).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 3).
@@ -26,6 +27,7 @@ import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -61,7 +63,6 @@ async function bootNode(port: number, nodeId: string, repository: boolean): Prom
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     config.port = port;
@@ -70,7 +71,7 @@ async function bootNode(port: number, nodeId: string, repository: boolean): Prom
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
+    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
     config.packagesEnabled = true;
     config.packageFederationEnabled = true;
     config.packageCreateRole = 'owner';

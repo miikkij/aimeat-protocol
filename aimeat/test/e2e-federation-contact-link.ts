@@ -17,6 +17,7 @@
  *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.6.0 -- 2026-10-12 -- Node 4.0.0 refuses a federation message without the audience or delivery
  *     proof (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN). asPeer and the introduces of node I
  *     add the proof a node of this version sends (delivery proof for receipt, replicate and catalogue
@@ -49,6 +50,7 @@ import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
 import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config-federation.js';
 import { removedOn } from './helpers/node-release.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -82,7 +84,6 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     config.port = port;
@@ -91,8 +92,8 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
-    config.packageFederationEnabled = true;   // so /templates answers rather than 403-ing on a config flag
+    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
+    config.packageFederationEnabled = true;  // so /templates answers rather than 403-ing on a config flag
 
     const { app } = await createServer(config);
     const server = await new Promise<Server>(resolve => { const s = app.listen(port, '127.0.0.1', () => resolve(s)); });

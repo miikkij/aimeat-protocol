@@ -25,6 +25,10 @@
  *   routes the sweep found · cleanup
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-peer-registration-proof
  * @version-history
+ *   v1.2.2 -- 2026-10-16 -- The node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02). Phase 6
+ *     reads the incident list until the PEER_ID_HELD entry is there: the route records it after it
+ *     answers, and on PostgreSQL the write lands after the 409.
  *   v1.2.1 -- 2026-10-12 -- The introductions of Phase 7 and the peer message carry the audience proof
  *     for this node. Node 4.0.0 refuses either without it (401 AUDIENCE_REQUIRED,
  *     UNPROVEN_FORMAT_REMOVED_IN), so the refusals these tests name (a held id, a pending request, an
@@ -48,6 +52,7 @@ import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 let passed = 0;
 let failed = 0;
@@ -187,11 +192,12 @@ await test('Boot the repository and its owners, and publish one private package'
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
     const { config } = loadConfig({});
+    // The port is a free one, so the database is named for the node's role rather than its port.
+    Object.assign(config, (await ownNodeDb('proof-repo', { memory: true })).config);
     Object.assign(config, {
         port, nodeId, baseUrl: `http://127.0.0.1:${port}`, devMode: true, testMode: true, adminPassword: adminPw,
-        storageProvider: 'memory', packagesEnabled: true, packageFederationEnabled: true, packageCreateRole: 'owner',
+        packagesEnabled: true, packageFederationEnabled: true, packageCreateRole: 'owner',
         packageRepository: true, federationAuthPolicy: 'all_peers', federationTimeoutMs: 3000,
     } satisfies Partial<AimeatConfig>);
     const { app } = await createServer(config);
@@ -411,7 +417,13 @@ await test('A node introducing itself under an id held by another key is refused
     const heldId = squat.nodeId;   // held since Phase 5 by the real node's key
     const r = await introduce(heldId, 'http://127.0.0.1:9', await generateKeyPair());
     assert(r.status === 409, `refused: ${r.status} ${JSON.stringify(r.body)}`);
-    const held = (await incidents()).find(i => i.code === 'PEER_ID_HELD' && String(i.detail).includes(heldId));
+    // introduce.ts records the incident after it answers (`void reportPeerIncident`), and on PostgreSQL
+    // the write lands after the 409 does, so the list is read until the entry is there (up to 5 s).
+    let held: any;
+    for (let i = 0; i < 50 && !held; i++) {
+        held = (await incidents()).find(x => x.code === 'PEER_ID_HELD' && String(x.detail).includes(heldId));
+        if (!held) await new Promise(res => setTimeout(res, 100));
+    }
     assert(!!held && String(held.detail).includes('emergency=true') && held.source === 'introduce', `the incident names the release: ${JSON.stringify(held)}`);
 });
 

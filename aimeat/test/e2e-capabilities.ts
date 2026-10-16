@@ -6,6 +6,7 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-13 — The pacing amount is cost.toll_morsels: the new name is taken as it is, the
  *     old cost.morsels is taken on POST and PUT with the Deprecation headers, counted and stored under
  *     the new name, and two names that disagree are 400 TOLL_MORSELS_MISMATCH. The app tool's discovery
@@ -59,6 +60,7 @@ async function json(path: string, opts: RequestInit = {}, base = BASE) {
 }
 
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -702,7 +704,7 @@ await test('Execute extension action directly', async () => {
 });
 
 await test('Trigger aggregator picks up extension', async () => {
-    const { status, body } = await json('/v1/admin/capabilities/aggregate', {
+    const { status } = await json('/v1/admin/capabilities/aggregate', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${ownerToken}` },
     });
@@ -987,9 +989,11 @@ function cleanupAltDb() {
 
 async function startAllowlistNode(): Promise<ChildProcess> {
     cleanupAltDb();
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', ALT_DB], {
+    const db = await ownNodeDb(ALT_PORT, { sqlitePath: ALT_DB });
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
         env: {
             ...process.env,
+            ...db.env,
             AIMEAT_PORT: ALT_PORT,
             AIMEAT_BASE_URL: ALT_BASE,
             // The whole point of this node: webhooks admitted only from one named domain.

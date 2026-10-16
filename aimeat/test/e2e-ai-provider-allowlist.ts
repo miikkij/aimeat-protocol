@@ -20,6 +20,7 @@
  *   "got past the gate" is proved by a connection failure rather than by reaching a real provider.
  * @usage cd aimeat && pnpm exec node --import tsx test/run-e2e-ci.ts --test=e2e-ai-provider-allowlist
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 -- 2026-10-12 -- Node 4.0.0 removes /v1/openrouter/settings and /models (the 4.0.0 sweep).
  *     The write half saves through PUT /v1/ai/providers/:id, which asks the same allowlist, and
  *     "wrote nothing" reads GET /v1/ai/providers (it had passed on 4.0.0 only because the legacy read
@@ -35,6 +36,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pinnedEnv } from './run-e2e-server.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
@@ -73,10 +75,12 @@ const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-ai-allowlist-'));
 const DB_PATH = join(dbDir, 'ai-allowlist.db');
 
 async function startServer(): Promise<ChildProcess> {
-    const target = { port: PORT, baseUrl: BASE, dbType: 'sqlite', dbPath: DB_PATH, dbUrl: '', external: false };
+    const db = await ownNodeDb(PORT, { sqlitePath: DB_PATH });
+    const target = { port: PORT, baseUrl: BASE, dbType: db.provider, dbPath: db.sqlitePath, dbUrl: db.dbUrl, external: false };
     const env: Record<string, string | undefined> = {
         ...process.env,
         ...pinnedEnv(target),
+        ...db.env,
         AIMEAT_DEV_MODE: 'true',
         AIMEAT_TEST_MODE: 'true',
         // The point of this suite. Empty is the default everywhere else, and an empty list allows
@@ -87,7 +91,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_AUTH: '1000', AIMEAT_RL_MEMORY: '1000',
         AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '1000',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the allowlisted AI node' });
 }

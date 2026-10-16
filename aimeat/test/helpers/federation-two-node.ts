@@ -29,6 +29,7 @@
  *   const fake = await startFakePeer();
  *   await addPeer(A, 'aimeat-fake-001', fake.url, peerPublicKey);
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-16 — `modes.trust`: the fake peer answers POST /v1/federation/trust-advisory with 201, or
  *     403 when set to 'refuse', so a suite can see a peer refuse a trust notice (QA audit S6-06).
  *   2026-10-15 — The fake peer refuses /v1/work/request without a credential, as a real node does (feature-list audit 165).
@@ -48,6 +49,7 @@ import { createServer } from '../../src/server.js';
 import { loadConfig } from '../../src/config.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
+import { ownNodeDb } from './own-node-db.js';
 
 export type Json = (p: string, o?: RequestInit) => Promise<{ status: number; body: any }>;
 
@@ -98,7 +100,6 @@ export async function bootNode(
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://localhost:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
     // A suite makes far more calls than a person would, and one 429 mid-run hides every assertion
     // after it. Same reasoning as the AIMEAT_RL_* block in .env.test.sqlite.
     process.env.AIMEAT_RL_GLOBAL = '100000';
@@ -112,7 +113,8 @@ export async function bootNode(
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
+    // The node follows the run's backend, one database per port (test/helpers/own-node-db.ts).
+    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
     Object.assign(config, overrides);
 
     const { app, storage } = await createServer(config);

@@ -3,9 +3,12 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Existing-install fixtures for create-only schema/template/job seeds.
- * @version-history 1.0.0 2026-09-27 Preserve edits and add missing defaults on both providers.
+ * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
+ *   1.0.0 2026-09-27 Preserve edits and add missing defaults on both providers.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { seedProfileSchemas } from '../../src/services/profile-schemas.js';
@@ -13,6 +16,8 @@ import { seedCsmTemplates } from '../../src/services/csm-seed.js';
 import { seedTemplateBundles } from '../../src/services/template-bundles.js';
 import { seedCoreScheduledJobs } from '../../src/services/job-seeding.js';
 import { loadConfig } from '../../src/config.js';
+
+requirePostgresWhenAsked('existing-install-seeds');
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 const names = ['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])];

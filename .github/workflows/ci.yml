@@ -271,11 +271,14 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # The unit job has no Postgres service. Run the cross-provider assertions here, and refuse
-      # both a missing URL and a failed connection instead of accepting a SQLite-only result.
-      - name: Storage conformance (SQLite and PostgreSQL) — blocking
+      # The unit job has no Postgres service. Run every unit file with a PostgreSQL half here (the
+      # list is derived from the files: every test/unit/*.test.ts that reads DATABASE_URL), and
+      # refuse both a missing URL and a failed connection instead of accepting a SQLite-only result.
+      # It named storage-conformance.test.ts alone until 2026-10-16, and the Postgres half of fifteen
+      # other files, two of them regression tests for production incidents, ran nowhere.
+      - name: Unit tests with a PostgreSQL half (SQLite and PostgreSQL) — blocking
         working-directory: aimeat
         env:
           DATABASE_URL: postgresql://appuser:devpassword123@localhost:5432/aimeat_kysely_e2e
           AIMEAT_CONFORMANCE_REQUIRE_POSTGRES: 'true'
-        run: pnpm exec vitest run test/unit/storage-conformance.test.ts
+        run: pnpm test:unit:postgres

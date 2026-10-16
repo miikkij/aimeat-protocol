@@ -14,15 +14,19 @@
  *   A plain local run without DATABASE_URL checks SQLite only, as storage-conformance.test.ts does.
  * @usage cd aimeat && pnpm exec vitest run test/unit/account-records-erasure.test.ts
  * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.0.0 — 2026-10-14 — Initial (QA audit 2026-10-14, K3).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { randomUUID } from 'node:crypto';
 import { rmSync, existsSync } from 'node:fs';
 import type pg from 'pg';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { ERASED_ACCOUNT_RECORDS, type ErasedAccountRecordRule } from '../../src/storage/erased-account-records.js';
+
+requirePostgresWhenAsked('account-records-erasure');
 
 const SQLITE_PATH = `./test/.account-erasure-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';

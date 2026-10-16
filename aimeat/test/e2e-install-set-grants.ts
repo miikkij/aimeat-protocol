@@ -25,6 +25,7 @@
  *     trusted package source (I18)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-set-grants
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.3.0 — 2026-10-10 — Phase 7: a repository node, for secaudit 2026-10-10 I17 and I18.
  *   v1.2.0 — 2026-10-05 — Phase 3: an apply into an account that existed before leaves the operator
  *     trail (operator_acted) in its feed, and the first apply, which created it, leaves none
@@ -43,6 +44,7 @@ import { setActiveEmailService, type EmailService } from '../src/services/email.
 import { hostRequest } from './helpers/host-request.js';
 import { sign } from '../src/auth/keypair.js';
 import { installSetRepositories } from '../src/services/install-set-trust.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 let passed = 0;
 let failed = 0;
@@ -151,11 +153,10 @@ await test('Boot a node with an app origin, an operator and a vendor', async () 
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = NODE_ID;
     process.env.AIMEAT_BASE_URL = BASE;
-    process.env.AIMEAT_STORAGE = 'memory';
     ({ config } = loadConfig({}));
     Object.assign(config, {
         port: PORT, nodeId: NODE_ID, baseUrl: BASE, devMode: true, testMode: true, adminPassword: adminPw,
-        storageProvider: 'memory', packagesEnabled: true, packageCreateRole: 'owner',
+        ...(await ownNodeDb(String(PORT), { memory: true })).config, packagesEnabled: true, packageCreateRole: 'owner',
         appHost: APP_HOST, appOriginEnabled: true, appOriginSignInRefuse: true,
         // Phase 6 makes six accounts through the admin setup routes, which allow five a minute.
         adminAuthRateLimitMax: 100,
@@ -460,7 +461,7 @@ await test('Boot a repository node R that serves a public app package and a publ
     const { config: rConfig } = loadConfig({});
     Object.assign(rConfig, {
         port: R_PORT, nodeId: R_ID, baseUrl: R_BASE, devMode: true, testMode: true, adminPassword: rAdminPw,
-        storageProvider: 'memory', packagesEnabled: true, packageFederationEnabled: true, packageRepository: true,
+        ...(await ownNodeDb(String(R_PORT), { memory: true })).config, packagesEnabled: true, packageFederationEnabled: true, packageRepository: true,
         packageCreateRole: 'owner', adminAuthRateLimitMax: 100,
     });
     const made = await createServer(rConfig);

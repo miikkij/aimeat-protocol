@@ -7,6 +7,7 @@
  *
  *   Nodes: A 40275 aimeat-test-001-pola; P 40276 aimeat-test-001-polp.
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 -- 2026-10-12 -- introduce() adds the audience proof for the node it knocks on. Node 4.0.0
  *     refuses an introduce without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), which left
  *     no visiting peer for tests 2 to 5; the proof is not this suite's subject.
@@ -30,6 +31,7 @@ import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import { recordHeartbeatOutcome } from '../src/services/federation-availability.js';
 import type { PeerInfo } from '../src/services/federation.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -41,7 +43,6 @@ async function test(name: string, fn: () => Promise<void>) {
   catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
-function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 interface NodeState { server: Server; baseUrl: string; nodeId: string; adminPw: string; ownerToken: string; json: (p: string, o?: RequestInit) => Promise<{ status: number; body: any }>; }
 
@@ -70,10 +71,10 @@ async function bootNode(port: number, nodeId: string, openJoin: boolean): Promis
   process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
   process.env.AIMEAT_NODE_ID = nodeId;
   process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-  process.env.AIMEAT_STORAGE = 'memory';
   const { config } = loadConfig({});
   config.port = port; config.nodeId = nodeId; config.baseUrl = `http://127.0.0.1:${port}`;
-  config.devMode = true; config.testMode = true; config.adminPassword = adminPw; config.storageProvider = 'memory';
+  config.devMode = true; config.testMode = true; config.adminPassword = adminPw;
+  Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
   config.federationOpenJoin = openJoin;
   const { app } = await createServer(config);
   // Bound to the loopback ADDRESS, and talked to by the same address. `listen(port)` binds every
@@ -247,7 +248,7 @@ await test('8. a policy that is unsigned or tampered is refused, and the local c
       `a tampered policy must not apply: ${JSON.stringify(tampered.body?.data ?? tampered.body)}`);
 
     // UNSIGNED: same widened document with the signature stripped.
-    const { signature: _drop, ...bare } = served as Record<string, unknown>;
+    const bare = Object.fromEntries(Object.entries(served as Record<string, unknown>).filter(([k]) => k !== 'signature'));
     served = bare;
     const unsigned = await pullFromStub();
     assert(unsigned.body?.data?.applied !== true,
