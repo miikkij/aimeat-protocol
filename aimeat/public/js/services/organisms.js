@@ -13,6 +13,7 @@
  *   `getConfigStrict`, …, in organisms.records.js) through readForWrite (/js/load-state.js), so a
  *   failed read stops the write (docs/pitfalls.md section 84).
  * @version-history
+ *   v1.12.0 — 2026-10-16 — The share carries `until`, its end dates.
  *   v1.11.0 — 2026-10-16 — The registry, config, colour and source reads and writes move to
  *     organisms.records.js (max-file-lines) with a strict read beside each forgiving one, re-exported
  *     here. createWorkspace and deleteWorkspace read the registry strictly: a failed read stops the
@@ -527,7 +528,7 @@ export async function retireEngagement(orgId, ws, agent, contract) {
  * readable by ANYONE with the public viewer link (no login). Creator/admin manages it. ── */
 
 const normalizeShare = (s) => ({
-  public: !!s.public, spaces: s.spaces || {}, docs: s.docs || {},
+  public: !!s.public, spaces: s.spaces || {}, docs: s.docs || {}, until: s.until || {},
   access: s.access === 'password' || s.access === 'account' ? s.access : 'open',
   has_password: !!s.has_password,
 });

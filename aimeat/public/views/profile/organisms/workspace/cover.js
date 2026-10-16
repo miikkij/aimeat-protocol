@@ -15,6 +15,7 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   v1.14.0 -- 2026-10-16 -- A document space's head offers "+ HTML page" beside "+ New document".
  *   v1.13.0 -- 2026-09-26 -- Every part is a library component that takes data: the cover and every page
  *     are the SettingsPage (the crumb's steps, the head's marks, the For-your-AI slab and the doors,
  *     the FigureStrip, the objectives and the search line in its strip slot, the rail as groups of
@@ -372,7 +373,8 @@ export function renderWorkspaceView(ctx) {
     const sub = html`<span>${kind}</span><span>${memory ? n : '·'}</span>${u > 0 ? newChip(u) : null}`;
     const doors = !memory ? null : docMode ? html`
         <${Action} small soft onClick=${() => addSection(ot.name, null)}>${'+ '}${tr('organisms.section', 'Section')}<//>
-        <${Action} small onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${tr('organisms.newPage', 'New document')}<//>`
+        <${Action} small onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', markdown: '' } })}>${'+ '}${tr('organisms.newPage', 'New document')}<//>
+        <${Action} small onClick=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: { id: '', title: '', html: '' } })}>${'+ '}${tr('htmlPage.newPage', 'HTML page')}<//>`
       : (ot.append ? null : html`<${Action} small onClick=${() => startAdd(ot)}>${'+ '}${tr('organisms.addDraft', 'Add draft')}<//>`);
     return renderPage(ctx, { id: activeTab, last: spaceLabel(ctx, ot), title: spaceLabel(ctx, ot), sub, doors, desc: ctx.spaceDesc(ot) || null,
       children: !memory ? renderSpaceNotice(ot) : (docMode ? renderDocSpace(ctx, ot) : renderRecordSpace(ctx, ot)) });

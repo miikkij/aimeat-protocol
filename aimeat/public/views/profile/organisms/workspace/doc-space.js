@@ -10,6 +10,8 @@
  * @structure renderDocSpace
  * @usage import { renderDocSpace } from '/views/profile/organisms/workspace/doc-space.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-16 -- An HTML page (a document with `html`) opens in its frame (HtmlPageView) and
+ *     is edited as HTML (HtmlPageEditor); opening a Markdown page records the day it was opened.
  *   v1.12.0 -- 2026-09-30 -- The comment thread is told whether the viewer is the organism's creator or
  *     an admin (canModerate), so it offers Delete on every comment for them.
  *   v1.11.0 -- 2026-09-26 -- The tree is the library's DocTree (components/DocTree.js), given as data: its
@@ -45,6 +47,8 @@ import { slugifyHeading } from '/components/Markdown.js';
 import { DocTree } from '/components/DocTree.js';
 import { Note } from '/components/Note.js';
 import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
+import { HtmlPageView, HtmlPageEditor } from '/views/profile/organisms/html-page.js';
+import * as htmlPages from '/js/services/html-pages.js';
 import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
 import { groupDocs } from './helpers.js';
 
@@ -59,8 +63,11 @@ export function renderDocSpace(ctx, ot) {
     showArchived, busy, setRecordArchived, removeObject, moveDocToSection, expandedSeries,
     setExpandedSeries, editingSec, setEditingSec, setSecName, commitSecName, setSectionColor,
     addSection, removeSection, orgId, savePage, publish, popOut, showToast, wsId,
-    commentsByKey, cKey, reloadComments, wsCanEdit,
+    commentsByKey, cKey, reloadComments, wsCanEdit, ws,
   } = ctx;
+  // An HTML page carries `html` beside its text (src/services/html-page.ts).
+  const isHtml = (p) => !!p && typeof p.html === 'string';
+  const openedOf = (id) => ws?.opened?.[`${ot.name}/${id}`];
   const secs = sectionsByType[ot.name] || [];
   const docs = mergedDocs(ot);
   const docById = {}; docs.forEach(d => { docById[d.id] = d; });
@@ -97,7 +104,11 @@ export function renderDocSpace(ctx, ot) {
     <${DocTree} key=${ot.name} sections=${childrenOf(null).map(sectionOf)} unsorted=${unsorted.length ? itemsOf(unsorted) : null}
       empty=${docs.length === 0 && secs.length === 0 ? (t('organisms.noneYet') || 'none yet') : null}
       editing=${editingSec} archived=${showArchived} busy=${busy} words=${words}
-      onOpen=${(id) => setActiveDoc({ type: ot.name, mode: 'view', page: docOf(id) })}
+      onOpen=${(id) => {
+        setActiveDoc({ type: ot.name, mode: 'view', page: docOf(id) });
+        // An HTML page's frame address records the open itself; a Markdown page is rendered here.
+        if (!isHtml(docOf(id))) htmlPages.markPageOpened(orgId, wsId, ot.name, id);
+      }}
       onDocColour=${(id, c) => setItemColor(ot.name, id, c)}
       onArchive=${(id) => setRecordArchived(ot, id, !showArchived)}
       onDelete=${(id) => removeObject(ot.namespace, id, docOf(id).title || id)}
@@ -116,8 +127,18 @@ export function renderDocSpace(ctx, ot) {
             // a live-update / F5 restore that only kept the id) the view shows the current draft —
             // with its correct draft badge, published copy, and Draft/Published toggle.
             const livePage = (activeDoc.page && activeDoc.page.id && docById[activeDoc.page.id]) || activeDoc.page;
-            if (activeDoc.mode === 'edit') return html`
-              <${DocumentEditor} key=${'ed-' + (livePage.id || 'new')} orgId=${orgId} page=${livePage} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />`;
+            if (activeDoc.mode === 'edit') return isHtml(livePage)
+              ? html`<${HtmlPageEditor} key=${'hed-' + (livePage.id || 'new')} page=${livePage} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />`
+              : html`<${DocumentEditor} key=${'ed-' + (livePage.id || 'new')} orgId=${orgId} page=${livePage} busy=${busy} onSave=${(p) => savePage(ot, p, activeDoc.sectionId)} onCancel=${() => setActiveDoc(null)} />`;
+            if (isHtml(livePage)) return html`
+              <${HtmlPageView} key=${'hview-' + livePage.id} orgId=${orgId} wsId=${wsId} space=${ot.name} page=${livePage} busy=${busy} inPage
+                lastOpened=${openedOf(livePage.id)}
+                onEdit=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: livePage })}
+                onPublish=${() => publish(ot, livePage.id)}
+                onPopOut=${() => popOut(ot.name, livePage.id)}
+                onArchive=${() => setRecordArchived(ot, livePage.id, true)} />
+              <${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${livePage.id} showToast=${showToast}
+                batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, livePage.id)]} onReload=${reloadComments} canModerate=${wsCanEdit} />`;
             return html`
               <${DocumentView} key=${'view-' + livePage.id} page=${livePage} busy=${busy} inPage
                 onEdit=${() => setActiveDoc({ type: ot.name, mode: 'edit', page: livePage })}

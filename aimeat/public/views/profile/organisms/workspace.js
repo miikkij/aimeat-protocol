@@ -10,6 +10,7 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   2026-10-16 — An HTML page is saved through the drafts route (js/services/html-pages.js), which checks it and writes its text.
  *   2026-10-16 — A failed read of the workspace is its own state with Retry and no set-up button (the
  *     button replaced the manifest and README of a workspace the page could not read); a colour change
  *     goes on top of a strict read of the colour map (QA audit F6-02, F6-04).
@@ -82,6 +83,7 @@ import { PageSection } from '/components/PageSection.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { Row as Line } from '/components/Layout.js';
 import * as orgService from '/js/services/organisms.js';
+import * as htmlPages from '/js/services/html-pages.js';
 import { getGhii } from '/js/services/auth.js';
 import { copyToClipboard } from '/js/utils.js';
 import { recordRecent } from '/js/recents.js';
@@ -428,7 +430,10 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     const id = (String(page.id || '').trim() || `doc-${Date.now().toString(36)}`).replace(/[^a-zA-Z0-9_-]/g, '-');
     setBusy(true);
     try {
-      const r = await orgService.writeDraft(orgId, wsId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
+      // An HTML page goes through the drafts route, which checks it and writes its text (src/services/html-page.ts).
+      const r = typeof page.html === 'string'
+        ? await htmlPages.writeHtmlPage(orgId, wsId, ot.name, id, { title: page.title, html: page.html, ...(page.files ? { files: page.files } : {}) })
+        : await orgService.writeDraft(orgId, wsId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
       if (r?.ok === false) { showToast(r?.error?.message || 'Document rejected'); }
       else {
         // Filing it under the section is a change to the workspace's sections: the door says whether it

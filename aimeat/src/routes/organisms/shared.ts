@@ -107,7 +107,7 @@ import { isOrganismOwner } from '../../services/organism-ownership.js';
 export type { ShareAccess, ShareMeta, ResolvedShare, PublicDoc, PublicRecord } from './share-types.js';
 import type { ResolvedShare } from './share-types.js';
 import { readShareMetaOf, redactShareOf, memberRoleOf } from '../../services/workspace-share.js';
-import { htmlPageRetention, isHtmlPageValue } from '../../services/html-page.js';
+import { htmlPageRetention, isHtmlPageValue, schemaViewOfDocument } from '../../services/html-page.js';
 
 export type OrganismHelpers = ReturnType<typeof createOrganismHelpers>;
 
@@ -226,7 +226,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // scopeDocImagesToWorkspace). The rewritten URL is identical either way.
     const draftValue = await normalizeDocValueImages(storage, config, draft.value, localAccountName(ownerGhii));
 
-    const validation = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion });
+    // An HTML page is checked without the node's own page fields (services/html-page.ts).
+    const docSpace = pubOt?.mode === 'document' || (!pubOt?.mode && pubOt?.kind === 'document');
+    const validation = await validateMemoryWrite(`${base}.latest`, schemaViewOfDocument(draftValue, docSpace), storage, { viaPublish: true, expectedVersion });
     if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
 
     // Past the refusal: the document is being published, so its images may be scoped to the members
@@ -273,7 +275,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       });
       // Retention: prune history beyond the space's window (append-only spaces never pruned). An HTML
       // page keeps at most five: it can fill a whole memory value, and every version is a full copy.
-      await pruneVersionsAfterPublish(storage, config, { refs: versionRefs, publishedN: n, ot: isHtmlPageValue(draftValue) ? htmlPageRetention(pubOt, config) : pubOt });
+      await pruneVersionsAfterPublish(storage, config, { refs: versionRefs, publishedN: n, ot: docSpace && isHtmlPageValue(draftValue) ? htmlPageRetention(pubOt, config) : pubOt });
     }
     // .latest (current state) is owned by a member's GHII — ONE owner per key, so it never forks into
     // per-agent duplicates a read then has to disambiguate. Preserve the record's existing owner
@@ -337,6 +339,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const versioned = pubOt?.versioned !== false;
     // Retention window for this namespace (0 = keep all; append-only spaces resolve to 0).
     const pruneWindow = effectiveMaxVersions(config, pubOt);
+    const docSpace = pubOt?.mode === 'document' || (!pubOt?.mode && pubOt?.kind === 'document');
 
     // AMORTISE the per-record validation: the write-guard policy and the applicable schema are the SAME
     // for every record in one namespace, so resolve them ONCE (was a manifest read + a .latest read + a
@@ -437,14 +440,16 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       }
       // Schema (in-memory, from the ONCE-compiled schema) — no per-record findApplicableSchema round-trip.
       if (schemaToValidate) {
-        const sv = validateValueAgainstSchema(draftValue, schemaToValidate);
+        // An HTML page is checked without the node's own page fields (services/html-page.ts).
+        const sv = validateValueAgainstSchema(schemaViewOfDocument(draftValue, docSpace), schemaToValidate);
         if (!sv.ok) { results.push({ instance, ok: false, code: 'INVALID', violations: sv.violations ?? (sv.errors ?? []).map(m => ({ message: m })) }); continue; }
       }
       const n = maxN + 1;
       if (versioned) {
         toUpsert.push({ key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue, ...(provenanceId ? { aiProvenanceId: provenanceId } : {}), visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
-        // Retention: history rows beyond the window ride the batch's ONE bulk delete.
-        for (const r of versionRefsToPrune(versionsByBase.get(base) ?? [], n, pruneWindow)) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
+        // Retention: history rows beyond the window ride the batch's ONE bulk delete; an HTML page keeps at most five.
+        const window = docSpace && isHtmlPageValue(draftValue) ? effectiveMaxVersions(config, htmlPageRetention(pubOt, config)) : pruneWindow;
+        for (const r of versionRefsToPrune(versionsByBase.get(base) ?? [], n, window)) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
       }
       // .latest is owned by a member GHII (never a raw agent GAII) — ONE owner per key. A brand-new
       // record is owned by the publisher's GHII; an existing one keeps its (GHII-normalised) owner. The

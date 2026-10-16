@@ -26,8 +26,9 @@
  *   - isHtmlPageValue() — does a document value carry a page
  *   - htmlToText() — the readable text of a page, written by a scanner rather than a regex
  *   - normalizeHtmlPageValue() — check a page value and give it its text
+ *   - schemaViewOfDocument() — the page as a document space's locked schema checks it (no html, no files)
  *   - htmlPageRetention() — the version window of an HTML page (5, or less when the space keeps fewer)
- *   - pageFrameCsp() · PAGE_PERMISSIONS_POLICY · isServablePageFileType() · pageFileNameOk()
+ *   - pageFrameCsp() · pageHolderCsp() · PAGE_PERMISSIONS_POLICY · isServablePageFileType() · pageFileNameOk()
  *   - pageOriginOf() — the origin the page frame is served from, or null when the node has none
  * @usage
  *   const n = normalizeHtmlPageValue(value); if (!n.ok) refuse(n.message); value = n.value;
@@ -179,6 +180,25 @@ export function normalizeHtmlPageValue(value: unknown): HtmlPageNormalized {
 }
 
 /**
+ * The document as a document space's schema checks it: an HTML page without `html` and `files`.
+ *
+ * Those two fields are the node's, the way `id` is: they make a document a page, whatever space it
+ * is in. A workspace's schemas are locked strict (additionalProperties false), so a space created
+ * with { title, markdown } refused every page with "must NOT have additional properties: html",
+ * and the decision that an HTML page is a page kind of every document space (Jouni, 2026-10-16)
+ * would have held only in spaces made after it. What the schema governs, the title and the text,
+ * it still checks; `markdown` is always there, because normalizeHtmlPageValue writes it. Only for
+ * a DOCUMENT space: a records space whose own schema declares an `html` field keeps it checked.
+ */
+export function schemaViewOfDocument(value: unknown, isDocSpace: boolean): unknown {
+    if (!isDocSpace || !isHtmlPageValue(value)) return value;
+    const rest: Record<string, unknown> = { ...value };
+    delete rest.html;
+    delete rest.files;
+    return rest;
+}
+
+/**
  * The retention window an HTML page publishes under: the space's own, and never more than
  * HTML_PAGE_MAX_VERSIONS. A space that keeps everything (0) keeps five of a page. An append-only
  * space is left as it is: its history is its record.
@@ -203,8 +223,8 @@ const LIBRARY_HOSTS = 'https://cdnjs.cloudflare.com https://cdn.jsdelivr.net htt
  * The page frame's content policy. The sandbox gives the page an opaque origin: no cookie, no
  * storage, no session, no read of the node or of another page. Nothing leaves the page:
  * connect-src, form-action and frame-src are 'none', and images and media load only from the page's
- * own files or data. Only the node's own pages may frame it. Fixed per node: no page, owner or count
- * of anything changes its length.
+ * own files or data. It is framed by its holder (the page host) inside the node's own page, so
+ * `frameAncestors` names both. Fixed per node: no page, owner or count of anything changes its length.
  */
 export function pageFrameCsp(pageOrigin: string, frameAncestors: string): string {
     return [
@@ -223,6 +243,28 @@ export function pageFrameCsp(pageOrigin: string, frameAncestors: string): string
         "object-src 'none'",
         "base-uri 'none'",
         `frame-ancestors ${frameAncestors}`,
+    ].join('; ');
+}
+
+/**
+ * The holder's content policy (src/static/page-frame-holder.html). Its frame-src is the page host
+ * alone, and that is the whole point of the holder: a frame navigates only where its parent's
+ * frame-src allows, so the page inside can go nowhere else (not to another site, not to an app that
+ * would read what was typed from the address). Its one script is its own file; it loads nothing else.
+ * Only the node's own pages may frame it.
+ */
+export function pageHolderCsp(pageOrigin: string, apexOrigin: string): string {
+    return [
+        "default-src 'none'",
+        `script-src ${pageOrigin}/p/_/holder.js`,
+        "style-src 'unsafe-inline'",
+        `frame-src ${pageOrigin}`,
+        "connect-src 'none'",
+        "img-src 'none'",
+        "form-action 'none'",
+        "base-uri 'none'",
+        "object-src 'none'",
+        `frame-ancestors ${apexOrigin}`,
     ].join('; ');
 }
 

@@ -11,6 +11,7 @@
  * @structure buildBreadcrumb, buildWorkspaceModel
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
+ *   v1.5.0 -- 2026-10-16 -- isDocPublic reads the share's end dates (`until`), as the node does.
  *   v1.4.0 -- 2026-09-26 -- buildBreadcrumb returns the crumb's steps as data for the library's Crumb
  *     (components/Crumb.js); the module writes no markup (page migration G2b).
  *   v1.3.0 -- 2026-09-25 -- The breadcrumb shown while a workspace loads is the crumb trail (.og-crumb, css/components/crumb-trail.css), as every page head draws it (a unification: the look most tabs use).
@@ -84,13 +85,15 @@ export function buildWorkspaceModel(ctx) {
     catch (e) { showToast((e && e.message) || (t('organisms.shareFailed') || 'Failed to update sharing')); }
     finally { setShareBusy(false); }
   };
-  // Effective public state of one doc — mirrors the backend: doc override → space flag → workspace flag.
+  // Effective public state of one doc — mirrors the backend (services/workspace-share.ts isDocPublicAt):
+  // doc override → space flag → workspace flag, each closed once its end date has passed.
   const isDocPublic = (typeName, id) => {
     if (!share) return false;
     const dk = `${typeName}/${id}`;
-    if (Object.prototype.hasOwnProperty.call(share.docs || {}, dk)) return !!share.docs[dk];
-    if (Object.prototype.hasOwnProperty.call(share.spaces || {}, typeName)) return !!share.spaces[typeName];
-    return !!share.public;
+    const open = (on, key) => !!on && !(share.until?.[key] && Date.parse(share.until[key]) <= Date.now());
+    if (Object.prototype.hasOwnProperty.call(share.docs || {}, dk)) return open(share.docs[dk], dk);
+    if (Object.prototype.hasOwnProperty.call(share.spaces || {}, typeName)) return open(share.spaces[typeName], `space:${typeName}`);
+    return open(share.public, '*');
   };
   const anythingPublic = () => !!share && (!!share.public
     || Object.values(share.spaces || {}).some(Boolean) || Object.values(share.docs || {}).some(Boolean));

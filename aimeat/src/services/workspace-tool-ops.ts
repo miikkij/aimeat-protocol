@@ -138,7 +138,7 @@ import { memoryContentBytes, documentContentBytes } from '../utils/memory-conten
 import { directValueProvenance, type DeclarationParser } from './workspace-direct-provenance.js';
 import { instanceFromKey } from './workspace-record-key.js';
 import { logger } from '../utils/logger.js';
-import { normalizeHtmlPageValue, isHtmlPageValue } from './html-page.js';
+import { normalizeHtmlPageValue, isHtmlPageValue, schemaViewOfDocument } from './html-page.js';
 import { isPageStale } from './workspace-opened.js';
 
 /** What the index says of a page's life: an HTML page's kind, the day it was last opened, and whether it went stale. */
@@ -405,7 +405,7 @@ export async function writeWorkspaceDraftsOp(
         // that decides whether to write at all. The rewritten URL is identical either way; the
         // visibility is applied below, once nothing can still refuse.
         if (item.isDoc) v = await normalizeDocValueImages(storage, config, v, caller.ownerName);
-        const valid = await validateMemoryWrite(key, v, storage);
+        const valid = await validateMemoryWrite(key, schemaViewOfDocument(v, item.isDoc), storage);
         if (!valid.valid) return refuse(422, 'SCHEMA_VALIDATION_FAILED', `${batch ? `items[${i}]: ` : ''}Draft rejected by schema: ` + JSON.stringify(valid.errors), { violations: valid.errors });
         planned.push({ key, v, item });
     }

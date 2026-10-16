@@ -48,6 +48,7 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.7.0 — 2026-10-16 — The page host is on, at pages.localhost: an HTML page of a workspace runs in its frame.
  *   v1.6.1 — 2026-10-14 — AIMEAT_SANDBOX_TUNNEL=false starts the node with the connector tunnel off.
  *   v1.6.0 — 2026-10-12 — Owners are registered with POST /v1/ghii and a password and signed in with
  *     POST /v1/ghii/login, on the first run and on every refresh. The owner-key sign-in this used is
@@ -219,6 +220,9 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         // does on aimeat.io. Off, an app ran in an opaque frame (origin null) whose sign-in the
         // browser refused, and an app could only be checked after it reached production.
         AIMEAT_APP_ORIGIN_ENABLED: 'true', AIMEAT_APP_HOST: 'apps.localhost',
+        // THE PAGE HOST, at pages.localhost: the HTML pages of workspaces run in their frame there, as
+        // they do on pages.aimeat.io (routes/page-host.ts).
+        AIMEAT_PAGE_HOST: 'pages.localhost',
         // THE TEST MAILBOX: outbound connections on, and the test providers pointed at the local
         // server this script starts (fake-mail, a Gmail-shaped mailbox of sample messages). Private
         // egress is allowed because that server is on 127.0.0.1; it reaches nothing else.

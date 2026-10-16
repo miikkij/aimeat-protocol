@@ -12,14 +12,15 @@
  *   FRAME_SUPPORT_MARK · withFrameShim(body) — the support script put in front of an app's markup,
  *   under the attribute services/app-serve-marks-strip.ts recognises it by.
  *   pageFrameShimSource() · withPageFrameShim(html) — the same for an HTML page in the page frame
- *   (src/static/page-frame-shim.js, routes/page-host.ts).
+ *   (src/static/page-frame-shim.js, routes/page-host.ts); pageFrameHolderHtml() · pageFrameHolderScript()
+ *   — the holder the viewer frames, which frames the page (src/static/page-frame-holder.*).
  * @usage
  *   import { appFrameHostHtml } from '../utils/app-frame-assets.js';
  *   const html = appFrameHostHtml(); if (html) res.send(html);
  * @version-history
  *   v1.2.0 — 2026-10-16 — The page frame's support script (src/static/page-frame-shim.js), put in
  *     front of an HTML page the same way: pageFrameShimSource() · withPageFrameShim(html). The two
- *     share one insertion rule (insertFirst).
+ *     share one insertion rule (insertFirst). The page frame's holder and its script.
  *   v1.1.0 — 2026-09-26 — appFrameCoreScript(): the grant and consent module app-frame.js imports.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
@@ -103,6 +104,17 @@ function insertFirst(raw: string, tag: string): string {
     .find((m): m is RegExpExecArray => m !== null);
   const cut = at ? at.index + at[0].length : 0;
   return raw.slice(0, cut) + tag + raw.slice(cut);
+}
+
+/** The page frame's holder: the document the viewer frames, which frames the page (src/static/page-frame-holder.html). */
+export function pageFrameHolderHtml(): string | null {
+  return staticFile('page-frame-holder.html');
+}
+
+/** The holder's script, served at /p/_/holder.js, without its leading comment block. */
+export function pageFrameHolderScript(): string | null {
+  const text = staticFile('page-frame-holder.js');
+  return text === null ? null : text.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, '');
 }
 
 /** The script put in front of an HTML page in the page frame, without its leading comment block. */

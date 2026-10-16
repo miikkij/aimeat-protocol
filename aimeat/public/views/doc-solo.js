@@ -10,6 +10,7 @@
  *   live-updates on its own (profile.js, which normally bridges SSE, is not mounted here).
  * @structure DocSolo (default export)
  * @version-history
+ *   2026-10-16 — An HTML page opens in its frame and is edited as HTML (views/profile/organisms/html-page.js).
  *   2026-10-16 — A failed read says the document could not be loaded, with Retry, instead of
  *     "Document not found." (QA audit F6-02).
  *   2026-09-27 — The window is the SoloWindow component, its sentences the quiet line, its toast
@@ -28,6 +29,8 @@ import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import * as orgService from '/js/services/organisms.js';
 import { DocumentView, DocumentEditor } from './profile/organisms/document.js';
+import { HtmlPageView, HtmlPageEditor } from './profile/organisms/html-page.js';
+import * as htmlPages from '/js/services/html-pages.js';
 import { SoloWindow } from '/components/SoloWindow.js';
 import { ToastBox } from '/components/Toast.js';
 import { swallowed } from '/js/swallowed.js';
@@ -92,7 +95,10 @@ export default function DocSolo() {
     const docId = String(page.id || id || '').trim().replace(/[^a-zA-Z0-9_-]/g, '-');
     setBusy(true);
     try {
-      const r = await orgService.writeDraft(org, ws, ot.namespace, docId, { id: docId, title: page.title, markdown: page.markdown });
+      // An HTML page goes through the drafts route, which checks it and writes its text.
+      const r = typeof page.html === 'string'
+        ? await htmlPages.writeHtmlPage(org, ws, ot.name, docId, { title: page.title, html: page.html, ...(page.files ? { files: page.files } : {}) })
+        : await orgService.writeDraft(org, ws, ot.namespace, docId, { id: docId, title: page.title, markdown: page.markdown });
       if (r?.ok === false) showToast(r?.error?.message || (t('organisms.docRejected') || 'Document rejected'));
       else { showToast(t('organisms.pageSaved') || 'Document saved'); await load(); setMode('view'); }
     } catch (e) { showToast((e && e.message) || 'Failed to save'); }
@@ -112,11 +118,16 @@ export default function DocSolo() {
   if (doc === 'failed') return html`<${SoloWindow}><${LoadFailed} onRetry=${load} /><//>`;
   if (doc === null || !ot) return html`<${SoloWindow} message=${t('organisms.docNotFound2') || 'Document not found.'} />`;
 
+  const isHtml = typeof doc.html === 'string';
   return html`
     <${SoloWindow}>
       ${mode === 'edit'
-        ? html`<${DocumentEditor} key=${'ed-' + doc.id} orgId=${org} page=${doc} busy=${busy} onSave=${save} onCancel=${() => setMode('view')} />`
-        : html`<${DocumentView} key=${'view-' + doc.id} page=${doc} busy=${busy} onEdit=${() => setMode('edit')} onPublish=${publish} onWikiLink=${() => { }} />`}
+        ? (isHtml
+          ? html`<${HtmlPageEditor} key=${'hed-' + doc.id} page=${doc} busy=${busy} onSave=${save} onCancel=${() => setMode('view')} />`
+          : html`<${DocumentEditor} key=${'ed-' + doc.id} orgId=${org} page=${doc} busy=${busy} onSave=${save} onCancel=${() => setMode('view')} />`)
+        : (isHtml
+          ? html`<${HtmlPageView} key=${'hview-' + doc.id} orgId=${org} wsId=${ws} space=${type} page=${doc} busy=${busy} onEdit=${() => setMode('edit')} onPublish=${publish} />`
+          : html`<${DocumentView} key=${'view-' + doc.id} page=${doc} busy=${busy} onEdit=${() => setMode('edit')} onPublish=${publish} onWikiLink=${() => { }} />`)}
       <${ToastBox} toast=${toast ? { msg: toast, type: 'info' } : null} />
     <//>`;
 }

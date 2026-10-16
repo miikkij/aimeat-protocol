@@ -49,6 +49,8 @@
  *   v1.8.0 — 2026-09-25 — The workspace read carries `rules` (how the workspace takes a member's
  *     change) and `sections` (each document space's section index, the copy that counts) to a caller
  *     who can read the workspace.
+ *   v1.13.0 — 2026-10-16 — The workspace read carries `opened`, the day each page was last opened
+ *     (services/workspace-opened.ts), to a caller who can read the workspace.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -77,6 +79,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { logger } from '../../utils/logger.js';
+import { readOpened } from '../../services/workspace-opened.js';
 
 export function registerOrganismWorkspaceReadRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/workspace — Manifest-driven workspace read ──
@@ -246,9 +249,13 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // the schema store rather than in the manifest, so without this a caller could replace a schema
     // it had no way of reading first. Empty when the caller cannot read the workspace.
     const schemas = canReadWorkspace ? await readWorkspaceSchemas(storage, id, ws) : {};
+    // The day each page was last opened (services/workspace-opened.ts): the page view marks one
+    // nobody opened or changed for six months and offers to archive it.
+    const opened = ws && canReadWorkspace ? await readOpened(storage, config, id, ws) : {};
 
     res.json(success(config.nodeId, {
       manifest, readme, apps, objects, drafts, decisions, resources, todos,
+      ...(Object.keys(opened).length ? { opened } : {}),
       // Every warning-classified record this read showed an AI, the manifest and readme included.
       ...(contentReader.warnings.length ? { classificationWarnings: contentReader.warnings } : {}),
       ...(rules ? { rules, sections } : {}),
