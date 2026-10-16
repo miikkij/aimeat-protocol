@@ -262,10 +262,6 @@
     "test/e2e-session-forgery.ts": {
       "reason": "ANSWERED 2026-10-16 (QA audit F20-01). The suite tests the session signature itself: a token signed with another key, with altered claims, expired, or with alg none is no principal at all, so 401 is the only right answer and there is no second signed-in principal to refuse. It runs with anonymous mode off (ANONYMOUS_OFF_SUITES), so a refused credential cannot fall back to the anonymous identity.",
       "sha": "b6f86159f1b5349b"
-    },
-    "test/e2e-federation-two-real-nodes.ts": {
-      "reason": "ANSWERED 2026-10-16 (QA audit W30). The suite's refusals are node to node: the far node refuses forwarded work, the caller gets PEER_REFUSED with the far node's status (401) and the routing fee back, and no work item exists on either node. Each node has one owner and no second signed-in principal by design; the cross-owner fences of the work routes are not this suite's subject.",
-      "sha": "2f66850e377e55e8"
     }
   }
 }

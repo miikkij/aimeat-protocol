@@ -18,8 +18,8 @@
  *       refused by B and reported by A with B's status.
  *     - Cross-node work is refused today, and says so: work asked on A of a provider on B (POST
  *       /v1/work/request by a person, POST /v1/federation/cross-node/work by an agent) reaches B, B
- *       refuses it because a forwarding node holds no credential of B's, A answers PEER_REFUSED with
- *       B's status, the 1-morsel routing fee comes back with a ledger line, and B holds no work item.
+ *       refuses it because a forwarding node holds no credential of B's, A answers 502 PEER_REFUSED
+ *       with B's status (401) in details.peer_status, the 1-morsel routing fee comes back with a ledger line, and B holds no work item.
  *       The feature list's "Cross-node work and settlement" row states this limit.
  *     - The three outbound senders are accepted by a real receiver: catalogue sync lands A's federable
  *       action in B's catalogue, memory replication lands a replica of A's record on B, and a
@@ -31,10 +31,20 @@
  *   test is what crosses the wire, and the storage of both is the same code either way.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-two-real-nodes
  * @version-history
+ *   2026-10-16 — A's refusal is HTTP 502 with B's 401 in details.peer_status, on POST /v1/work/request and
+ *     POST /v1/federation/cross-node/work; new: aimeat_action_execute over MCP names B, B's status and
+ *     B's answer (decision 2026-10-16).
+ *   2026-10-16 — The service summary request in the 4.0.4 window: unsigned to a peer on 4.0.2 and to one
+ *     of unknown version, signed to a peer on 4.0.3, and B (a real node on this code) takes the signed
+ *     one and refuses the unsigned one (decision 2026-10-16).
  *   2026-10-16 — Initial (QA audit F14b-01, F18-01, F18-03).
  */
 import { randomUUID } from 'node:crypto';
-import type { Server } from 'node:http';
+import { createServer, type Server, type IncomingHttpHeaders } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import type { ServiceSummary } from '../src/utils/service-summary.js';
+import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../src/config-federation.js';
+import { getSoftwareVersion, versionAtLeast } from '../src/utils/version.js';
 import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import { runHeartbeatCycle } from '../src/services/federation.js';
@@ -43,6 +53,7 @@ import { replicateMemoryToPeer } from '../src/services/memory-replication.js';
 import { bootNode, setupOperator, addPeer, auth, type NodeState } from './helpers/federation-two-node.js';
 import { suitePort } from './helpers/free-port.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { openSession, callTool } from './helpers/mcp-session.js';
 
 const RUNNER_BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now().toString(36);
@@ -152,7 +163,8 @@ try {
             method: 'POST', headers: auth(personToken),
             body: JSON.stringify({ action_id: 'real-act', provider_gaii: providerGaii, input: { q: 'hello' } }),
         });
-        assert(r.body.ok === false && r.body.error?.code === 'PEER_REFUSED', `answer: ${r.status} ${JSON.stringify(r.body)}`);
+        // 502, never B's 401: a client that signs out on any 401 would end its own session (decision 2026-10-16).
+        assert(r.status === 502 && r.body.ok === false && r.body.error?.code === 'PEER_REFUSED', `answer: ${r.status} ${JSON.stringify(r.body)}`);
         assert(r.body.error?.details?.routed_to === B_ID && r.body.error?.details?.peer_status === 401, `details: ${JSON.stringify(r.body.error?.details)}`);
         assert(await walletOf(A, personToken) === before, 'the routing fee was kept');
         const fee = (await linesOf(A, personToken, 'routing_fee')).filter(t => t.tracking_code === `route:${B_ID}`);
@@ -171,7 +183,21 @@ try {
             method: 'POST', headers: auth(agentToken),
             body: JSON.stringify({ target_node: B_ID, action_id: 'real-act', provider_gaii: providerGaii, input: { q: 'hi' } }),
         });
-        assert(r.body.ok === false && r.body.error?.code === 'PEER_REFUSED' && r.body.error?.details?.routed_to === B_ID, `answer: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.status === 502 && r.body.ok === false && r.body.error?.code === 'PEER_REFUSED' && r.body.error?.details?.routed_to === B_ID, `answer: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.body.error?.details?.peer_status === 401, `B's own status is in details: ${JSON.stringify(r.body.error?.details)}`);
+        assert(await walletOf(A, A.ownerToken) === before, 'the routing fee was kept');
+        const onB = await B.storage.listWorkByProvider(providerGaii);
+        assert(onB.length === 0, `B holds a work item: ${JSON.stringify(onB)}`);
+    });
+
+    await test('the same work asked over MCP (aimeat_action_execute): the tool says B refused it, with B\'s status and B\'s answer', async () => {
+        const before = await walletOf(A, A.ownerToken);
+        const s = await openSession(A.baseUrl, agentToken, 'e2e-two-real-nodes');
+        const r = await callTool(s, 'aimeat_action_execute', { action_id: 'real-act', provider_gaii: providerGaii, input: { q: 'mcp' } });
+        assert(r.isError && r.offered, `the tool must refuse: ${r.text}`);
+        assert(r.text.startsWith('PEER_REFUSED: '), `the code comes first: ${r.text}`);
+        assert(r.text.includes(`The other node (${B_ID}) refused it with HTTP 401`), `names B and B's status: ${r.text}`);
+        assert(/and answered: [A-Z_]+/.test(r.text), `carries B's own answer: ${r.text}`);
         assert(await walletOf(A, A.ownerToken) === before, 'the routing fee was kept');
         const onB = await B.storage.listWorkByProvider(providerGaii);
         assert(onB.length === 0, `B holds a work item: ${JSON.stringify(onB)}`);
@@ -218,6 +244,63 @@ try {
         let after = await seenByB();
         for (let i = 0; i < 50 && !(after > before); i++) { await new Promise(r => setTimeout(r, 20)); after = await seenByB(); }
         assert(after > before, `B did not stamp A as seen: ${before} → ${after}`);
+    });
+
+    // THE ONE-RELEASE WINDOW FOR THE SIGNED SERVICE SUMMARY (decision 2026-10-16). Node 4.0.4 sends the
+    // older form (x-source-node alone) to a peer whose signed heartbeat named 4.0.2 or older and to a
+    // peer of unknown version, and the signed form to a newer one; from 4.0.5 every peer gets the signed
+    // form. The expectation follows the version this node runs, so the test stays true past the window.
+    const windowOpen = !versionAtLeast(getSoftwareVersion(), UNSIGNED_SERVICE_SUMMARY_REMOVED_IN);
+
+    await test('the service summary request: unsigned to a peer on 4.0.2 and to one of unknown version, signed to a peer on 4.0.3', async () => {
+        const seen = new Map<string, IncomingHttpHeaders>();
+        const fake = createServer((req, res) => {
+            const [, tag, ...rest] = (req.url ?? '').split('/');
+            const path = '/' + rest.join('/');
+            res.setHeader('Content-Type', 'application/json');
+            if (path === '/v1/federation/ping') { res.end(JSON.stringify({ ok: true, data: { pong: true, service_summary_hash: `h-${tag}-${stamp}` } })); return; }
+            if (path === '/v1/federation/service-summary') {
+                seen.set(tag, req.headers);
+                res.end(JSON.stringify({ ok: true, data: { actions: [], agents: [], boards: [], csms: [] } }));
+                return;
+            }
+            res.statusCode = 404; res.end('{}');
+        });
+        await new Promise<void>(r => fake.listen(0, '127.0.0.1', () => r()));
+        servers.push(fake);
+        const port = (fake.address() as AddressInfo).port;
+        const peerAt = (tag: string, softwareVersion: string | null): PeerInfo =>
+            ({ ...peerInfo(B), nodeId: `aimeat-${tag}-${stamp}`, url: `http://127.0.0.1:${port}/${tag}`, softwareVersion });
+        const cases: Array<[string, string | null]> = [['old', '4.0.2'], ['unknown', null], ['new', '4.0.3']];
+        const peers = new Map<string, PeerInfo>(cases.map(([tag, v]) => [`aimeat-${tag}-${stamp}`, peerAt(tag, v)]));
+        const directory = new Map<string, ServiceSummary>();
+        await runHeartbeatCycle(A.config, A.storage, peers, directory, { everyPeer: true });
+        for (const [tag, v] of cases) {
+            const h = seen.get(tag);
+            assert(!!h, `no service summary request reached the ${tag} peer`);
+            assert(h!['x-source-node'] === A_ID, `the ${tag} peer is told the sending node: ${JSON.stringify(h)}`);
+            const expectSigned = windowOpen ? tag === 'new' : true;
+            assert(serviceSummaryForm(v).form === (expectSigned ? 'signed' : 'unsigned'), `serviceSummaryForm disagrees for the ${tag} peer`);
+            if (expectSigned) {
+                assert(typeof h!['x-signature'] === 'string' && h!['x-audience'] === `aimeat-${tag}-${stamp}`,
+                    `the ${tag} peer gets the signed form, for it: ${JSON.stringify(h)}`);
+            } else {
+                assert(h!['x-signature'] === undefined && h!['x-timestamp'] === undefined && h!['x-audience'] === undefined,
+                    `the ${tag} peer gets the unsigned form: ${JSON.stringify(h)}`);
+            }
+            assert(directory.has(`aimeat-${tag}-${stamp}`), `the ${tag} peer's summary is in the network directory`);
+        }
+    });
+
+    await test('B, a node on this code, takes the signed service summary request and refuses the unsigned one', async () => {
+        const directory = new Map<string, ServiceSummary>();
+        // Unknown version first: in the window A sends the unsigned form, which B refuses, so B stays
+        // out of the directory until its version is known (its next signed heartbeat to A).
+        await runHeartbeatCycle(A.config, A.storage, new Map([[B_ID, peerInfo(B, { softwareVersion: null })]]), directory, { everyPeer: true });
+        assert(directory.has(B_ID) === !windowOpen,
+            `unknown version: B ${directory.has(B_ID) ? 'took' : 'refused'} the request (window open: ${windowOpen})`);
+        await runHeartbeatCycle(A.config, A.storage, new Map([[B_ID, peerInfo(B, { softwareVersion: '4.0.3' })]]), directory, { everyPeer: true });
+        assert(directory.has(B_ID), 'B refused the signed service summary request from A');
     });
 
     await test('a peer nothing answers at goes degraded after 3 failed cycles and offline after 10; a de-peered peer past its grace is purged', async () => {

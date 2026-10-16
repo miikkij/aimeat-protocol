@@ -5,6 +5,8 @@
  * @description System prompts (SystemPrompt + SystemPromptVersion) and the federation replication queue
  *   (ReplicationQueue) for the Postgres+Kysely backend. Translated to match the Prisma provider.
  * @version-history
+ *   2026-10-16 — replicationQueueSize counts only pending rows, on both providers; the prune still removes sent
+ *     rows (decision 2026-10-16, test/unit/replication-queue-parity.test.ts).
  *   2026-10-16 — listSystemPrompts by group and name, as on SQLite (QA audit D4-04).
  *   v1.1.0 — 2026-10-16 — The replication queue answers as the SQLite provider does: a payload comes
  *     back decoded from its JSON text, the depth counts every row on the queue, and a prune also removes
@@ -128,8 +130,9 @@ export const replicationQueueMethods = {
     return Number(r.numDeletedRows ?? 0);
   },
   async replicationQueueSize(this: PostgresKyselyStorage): Promise<number> {
-    // Every row on the queue, as on SQLite (sync-health reads it as the queue depth).
-    const r = await this.db.selectFrom('ReplicationQueue').select(sql<number>`count(*)`.as('n')).executeTakeFirst();
+    // The rows not yet sent, as on SQLite: a sent or failed row is not waiting, and sync-health reads
+    // the depth as the backlog it throttles on (decision 2026-10-16).
+    const r = await this.db.selectFrom('ReplicationQueue').select(sql<number>`count(*)`.as('n')).where('status', '=', 'pending').executeTakeFirst();
     return Number(r?.n ?? 0);
   },
 };

@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-16 — aimeat_action_execute says, on PEER_REFUSED, which node refused the work, the HTTP status it answered and its own answer (workErrorText), since the MCP result carries no details (decision 2026-10-16).
  *   2026-10-16 — aimeat_memory_list reads through listMemoryMetaFor (services/memory-query.ts), the
  *     listing GET /v1/memory uses: with owner_scope one query over the owner, every agent and every
  *     ecosystem app, one row per key. It looped over the agents by hand, left the ecosystem apps out
@@ -182,7 +183,7 @@ import { presentMemory, classificationWarningOf } from '../services/classificati
 import { readerForAgent } from '../services/classification/reader.js';
 import { memoryTarget } from '../services/classification/labels.js';
 import { registerCoreResources } from './core-resources.js';
-import { createWorkItem } from '../routes/work.js';
+import { createWorkItem, workErrorText } from '../routes/work.js';
 // Imported, not restated. The route ENFORCES this cap and this surface only announces it; the two
 // disagreeing is how a published number becomes a promise nobody keeps.
 import { MEMORY_LIST_MAX_LIMIT } from '../routes/memory/shared.js';
@@ -640,7 +641,7 @@ export function registerCoreTools(
                 peers,
             );
             if ('error' in result) {
-                return { content: [{ type: 'text' as const, text: `${result.code}: ${result.error}` }], isError: true };
+                return { content: [{ type: 'text' as const, text: workErrorText(result) }], isError: true };
             }
             const { work } = result;
             if (!work) {

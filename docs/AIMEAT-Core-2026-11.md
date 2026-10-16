@@ -1148,6 +1148,12 @@ Totals: 209 lines. 205 carry at least one MUST or MUST NOT; 4 are SHOULD only (A
 | Consent reach values `private` and `dmz` | accepted as other names for `local` through the 4.x releases of the reference node; a later edition removes them | node 4.0.0: a consent made without a reach is `local`, not `federation` | the node stores and answers `local` (AUTHZ-18) |
 | A knowledge package's `sharing.morsel_price` and a capability's `cost.morsels`, the old names of `toll_morsels` (PACE-11) | accepted through the 4.x releases of the reference node; refused from node 5.0.0 | node 4.0.0: the node stores and answers `toll_morsels` | `Deprecation` and `X-AIMEAT-Removed-In: 5.0.0` headers and a usage counter; 400 `TOLL_MORSELS_MISMATCH` when the two names disagree |
 
+**Sent for one more release.** The service summary request (`GET /v1/federation/service-summary`) is signed under §9.3 from node 4.0.3, with the purpose `service-summary` among the signed fields, and the reference node answers only a signed request from that release. Nodes on 4.0.2 or older send `x-source-node` alone. So that a peer on 4.0.2 or older gets the request in the form it knows while it upgrades, node 4.0.4 sends the older form to a peer whose last signed heartbeat named version 4.0.2 or older, and to a peer whose version it has not heard yet, and logs each request of the second kind. It sends the signed form to every other peer.
+
+| What | Sent from 2026-10-16 by | Stops in |
+|---|---|---|
+| The unsigned service summary request to a peer on 4.0.2 or older, or to a peer of unknown version | node 4.0.4 | node 4.0.5: from that release the node sends only the signed form, to every peer |
+
 **Removed earlier**, listed so that a v4.0 reader finds them.
 
 | What | Removed in |
