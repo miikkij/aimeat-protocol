@@ -6,6 +6,9 @@
  *   without notifications:send gets 403), mark-read, the inline-actions security invariant (a
  *   client-supplied actions field is rejected), and the DM reply action end-to-end.
  * @version-history
+ *   2026-10-16 — 31–34: DELETE /v1/notifications from an agent puts the rows in the bin and the owner
+ *     restores one; an agent without memory:delete is refused; the owner in person still clears for
+ *     good (invariant 8 as ruled by the developer on 2026-10-16).
  *   2026-10-16 — 14b: mark read finds a newer owner's rows on a node holding more than 500; 14c: an owner
  *     holding more than 1000 sees the newest, and the count and mark read reach every row (QA audit F13-01).
  *   v1.4.0 — 2026-09-25 — A notification's buttons are the node's own (tests 24–30). No principal
@@ -551,6 +554,69 @@ await test('30. ...a workspace access request, approved from the notification', 
     assert(n.actions.map((a: any) => a.id).join(',') === 'approve,deny', `buttons: ${JSON.stringify(n.actions.map((a: any) => a.id))}`);
     const r = await runAs(A.token, n.actions.find((a: any) => a.id === 'approve'));
     assert(r.status === 200 && r.body.data.status === 'approved', `approve from the notification: ${r.status} ${JSON.stringify(r.body.error)}`);
+});
+
+// ── An agent's clear goes to the bin (invariant 8 as ruled by the developer on 2026-10-16) ──
+// memory:delete is in every agent's default scopes because what it removes can be put back. This
+// route removed the owner's notifications for good on that word, so an agent on the default could
+// clear a notification the owner had not read yet, and nothing brought it back.
+const notifyA = async (title: string): Promise<string> => {
+    const r = await json('/v1/notifications', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ title, type: 'report' }) });
+    assert(r.status === 201, `notify ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const list = await json('/v1/notifications?limit=200', { headers: auth(A.token) });
+    const n = (list.body.data.notifications || []).find((x: any) => x.title === title);
+    assert(!!n, `${title} is listed`);
+    return n.id as string;
+};
+const listedIds = async (): Promise<string[]> =>
+    ((await json('/v1/notifications?limit=200', { headers: auth(A.token) })).body.data.notifications || []).map((x: any) => x.id as string);
+const binKeyOf = async (id: string): Promise<string | undefined> =>
+    ((await json('/v1/memory/deleted', { headers: auth(A.token) })).body.data.items || [])
+        .map((i: any) => i.key as string).find((k: string) => k.startsWith('notif.') && k.endsWith(`.${id.slice(0, 8)}`));
+
+let binAgentToken = '', narrowAgentToken = '';
+await test('31. Setup: an agent of A on the default memory words, and one without memory:delete', async () => {
+    const mk = async (name: string, scopes: string[]): Promise<string> => {
+        const ag = await json('/v1/agents', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name, owner: A.name, capabilities: ['memory'], scopes }) });
+        assert(ag.status === 201, `register ${name} ${ag.status}: ${JSON.stringify(ag.body.error)}`);
+        const gaii = ag.body.data.agent.gaii as string;
+        const ts = new Date().toISOString();
+        const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(ag.body.data.private_key, gaii + ts) }) });
+        assert(tok.body.ok === true, `${name} token: ${JSON.stringify(tok.body.error)}`);
+        return tok.body.data.token as string;
+    };
+    binAgentToken = await mk(`notifbin${Date.now() % 100000}`, ['memory:read', 'memory:write', 'memory:delete']);
+    narrowAgentToken = await mk(`notifnarrow${Date.now() % 100000}`, ['memory:read', 'memory:write']);
+});
+
+await test('32. Refused: an agent without memory:delete clears nothing (403 SCOPE_DENIED)', async () => {
+    const id = await notifyA('Keep me');
+    const r = await json('/v1/notifications', { method: 'DELETE', headers: auth(narrowAgentToken), body: JSON.stringify({ ids: [id] }) });
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert((await listedIds()).includes(id), 'the notification must still be listed');
+    await json('/v1/notifications', { method: 'DELETE', headers: auth(A.token), body: JSON.stringify({ ids: [id] }) });
+});
+
+await test('33. An agent with memory:delete clears a notification into the bin, and the owner puts it back', async () => {
+    const id = await notifyA('Bin me');
+    const r = await json('/v1/notifications', { method: 'DELETE', headers: auth(binAgentToken), body: JSON.stringify({ ids: [id] }) });
+    assert(r.status === 200 && r.body.data.cleared === 1, `clear ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    assert(r.body.data.in_bin === true && typeof r.body.data.restorable_until === 'string', `the answer says it is in the bin: ${JSON.stringify(r.body.data)}`);
+    assert(!(await listedIds()).includes(id), 'a cleared notification leaves the bell');
+    const key = await binKeyOf(id);
+    assert(!!key, 'the cleared notification is in the owner\'s bin');
+    const back = await json(`/v1/memory/${encodeURIComponent(key!)}/restore`, { method: 'POST', headers: auth(A.token) });
+    assert(back.status === 200 && back.body.data.restored === true, `restore ${back.status}: ${JSON.stringify(back.body.error)}`);
+    assert((await listedIds()).includes(id), 'the restored notification is back in the bell');
+    await json('/v1/notifications', { method: 'DELETE', headers: auth(A.token), body: JSON.stringify({ ids: [id] }) });
+});
+
+await test('34. The owner in person still clears for good: nothing of it waits in the bin', async () => {
+    const id = await notifyA('Gone for good');
+    const r = await json('/v1/notifications', { method: 'DELETE', headers: auth(A.token), body: JSON.stringify({ ids: [id] }) });
+    assert(r.status === 200 && r.body.data.cleared === 1 && r.body.data.in_bin === undefined, `owner clear ${r.status}: ${JSON.stringify(r.body.data)}`);
+    assert(!(await listedIds()).includes(id), 'cleared');
+    assert(!(await binKeyOf(id)), 'an owner\'s own clear does not fill the bin');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

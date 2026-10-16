@@ -67,6 +67,18 @@ Documentation = "https://github.com/miikkij/aimeat-protocol/tree/main/python/aim
 Issues = "https://github.com/miikkij/aimeat-protocol/issues"
 Changelog = "https://github.com/miikkij/aimeat-protocol/blob/main/python/aimeat-crewai/CHANGELOG.md"
 
+[tool.uv]
+# Versions forced over what a dependency asks for, in uv.lock only (the CI test job installs from
+# it); the published package's own requirements above are unchanged. Each line says why, and goes
+# when the dependency's own pin moves past it.
+#
+# crewai (1.15.17, and 1.15.28, the newest on 2026-10-16) pins mcp~=1.28.1, and every mcp before
+# 1.30.0 carries GHSA-84m7-p3x7-pcfv (moderate: the StreamableHTTP SERVER transport keeps sessions
+# without a bound). This package and crewai use mcp as a client only, so the newer minor release is
+# safe for what they run. Kept below 2, which is a new major line. An override replaces the whole
+# requirement, so the [ws] extra that mcpadapt asks for is repeated here.
+override-dependencies = ["mcp[ws]>=1.30.0,<2"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/aimeat_crewai"]
 

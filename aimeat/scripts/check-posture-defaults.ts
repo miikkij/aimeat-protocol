@@ -15,7 +15,10 @@
  *       start-up (securityPostureWarnings in src/config-posture.ts), so an unsafe default is never
  *       silent.
  *   INVARIANT 8: the scopes an agent gets when nobody names any (SHIPPED_DEFAULT_AGENT_SCOPES) hold
- *   none of the powerful scopes the invariant keeps explicit (POWERFUL_AGENT_SCOPES).
+ *   none of the powerful scopes the invariant keeps explicit (POWERFUL_AGENT_SCOPES). A delete that
+ *   moves a record to the deleted-memory bin may be a default (`memory:delete`); a permanent purge
+ *   and deleting an organism may not (`memory:purge`), and neither may ending an agent with its
+ *   records (`agent:delete`).
  *
  *   Both invariants were held by review only until 2026-10-16, and the audit found the file and the
  *   code disagreeing in four places (QA audit S10-05). A finding listed in ALLOWED is not a
@@ -25,6 +28,9 @@
  * @usage
  *   cd aimeat && pnpm check:posture-defaults
  * @version-history
+ *   2026-10-16 — The owed invariant 8 decision is answered: memory:delete stays in the default and
+ *     leaves POWERFUL_AGENT_SCOPES, because every delete it opens goes to the bin; the ALLOWED entry
+ *     for it is removed (ruled by the developer on 2026-10-16).
  *   2026-10-16 — Initial (QA audit S10-05, S10-09).
  */
 import { readFileSync } from 'node:fs';
@@ -128,12 +134,6 @@ export const ALLOWED: Record<string, string> = {
         'DECISION OWED (2026-10-16): the DNA table asks a public node to restrict the first-owner setup '
         + 'wizard to loopback, the code default is open, and no warning names it. Either the self-check '
         + 'reports it, or this sentence says what closes the wizard on a public node.',
-    'inv8:memory:delete':
-        'DECISION OWED (2026-10-16): invariant 8 names memory:delete as a scope that is explicit and '
-        + 'separately consented, and SHIPPED_DEFAULT_AGENT_SCOPES has carried it since the default list '
-        + 'was written. Either the default drops it (agents approved without a named list stop deleting '
-        + 'memory), or invariant 8 says memory:delete is part of the default. The start-up self-check '
-        + 'reports it on a public node meanwhile.',
 };
 
 /** A config resolved on the public profile with no AIMEAT_* variable and no config file. */

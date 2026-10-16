@@ -16659,8 +16659,8 @@
             "write": "Kirjoita ja lähetä laskuja sekä kirjaa tositteita sinun nimissäsi."
           },
           "memory": {
-            "delete": "Poista tallennettuja muistiinpanoja, tietueita ja dataa.",
-            "purge": "Poista jaetun työtilan tietueita lopullisesti. Niitä ei voi palauttaa, joten sen tehtävät odottavat aina lupaasi.",
+            "delete": "Poista tallennettuja muistiinpanoja, tietueita ja dataa. Poistettu menee ensin roskakoriin, joten voit palauttaa sen.",
+            "purge": "Poista tietueita lopullisesti: jaetun työtilan tietueita, kokonainen työtila tai kokonainen jaettu tila. Niitä ei voi palauttaa, joten sen tehtävät odottavat aina lupaasi.",
             "read": "Lue tilillesi tallennetut muistiinpanot, tietueet ja data.",
             "write": "Tallenna ja päivitä muistiinpanoja, tietueita ja dataa tilillesi.",
             "read-as-owner": "Lue kaikki, mitä sinä ja muut agenttisi olette tallentaneet, myös yksityiset tietueet, samoin kuin itse luet ne. Ilman tätä agentti lukee vain sen, mikä on jaettu sille.",

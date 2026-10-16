@@ -14,9 +14,8 @@
  *   (test/run-e2e-production-lane.ts) runs the guard tier with the modes off; this suite adds the
  *   public profile, which a loopback lane cannot have.
  *
- *   WHAT IT ASSERTS. The start-up self-check names nothing but the one setting whose decision is
- *   still open (the default agent scopes hold memory:delete, scripts/check-posture-defaults.ts);
- *   registering a taken name answers 409 NAME_TAKEN and the account keeps working (QA audit P1-01,
+ *   WHAT IT ASSERTS. The start-up self-check names nothing (the default agent scopes hold
+ *   memory:delete, which may be a default since the developer's ruling of 2026-10-16); registering a taken name answers 409 NAME_TAKEN and the account keeps working (QA audit P1-01,
  *   S1-08); a request with no credential gets 401, not the anonymous identity, and the anonymous
  *   token route answers 403 (QA audit F7d-02); an agent registered with no scopes named gets the
  *   shipped default (QA audit P7-03); a plain-http peer address is refused (FED-13); the node
@@ -25,6 +24,9 @@
  *   It runs its own node, on the run's backend (test/helpers/own-node-db.ts), on port 40479.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-production-posture
  * @version-history
+ *   2026-10-16 — The self-check names nothing: memory:delete in the shipped default agent scopes is no
+ *     longer a risky setting (invariant 8 as ruled by the developer on 2026-10-16). The test asserted
+ *     the open question being reported, which was the right behaviour until the ruling.
  *   2026-10-16 — Initial (QA audit P7-05, P1-01, S1-08, F7d-02, P7-03).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -98,12 +100,13 @@ console.log('\n=== A node started with production settings, on the public profil
 try {
     await startNode();
 
-    await test('the start-up self-check names only the setting whose decision is still open', async () => {
+    await test('the start-up self-check names nothing on a node with production settings', async () => {
+        // index-start.ts prints a SECURITY header with the count, then one line per setting. Until
+        // the developer's ruling of 2026-10-16 the shipped default agent scopes were named here
+        // (memory:delete); a delete into the bin may be a default, so the list is now empty.
         const security = log.split(/\r?\n/).filter(l => l.includes('SECURITY'));
-        // index-start.ts prints a header with the count, then one line per setting.
-        const named = security.filter(l => !l.includes('AIMEAT_DEFAULT_AGENT_SCOPES') && !/this node has 1 risky setting/.test(l));
-        assert(log.includes('AIMEAT_DEFAULT_AGENT_SCOPES holds memory:delete'), 'the open decision is not reported');
-        assert(named.length === 0, `unexpected SECURITY lines: ${short(named)}`);
+        assert(security.length === 0, `unexpected SECURITY lines: ${short(security)}`);
+        assert(!log.includes('AIMEAT_DEFAULT_AGENT_SCOPES holds'), 'the shipped default agent scopes are reported as risky');
         assert(!/AIMEAT_(TEST|DEV)_MODE=true|AIMEAT_ANONYMOUS=true/.test(log), 'a test switch is reported active');
     });
 

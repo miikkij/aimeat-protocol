@@ -14890,8 +14890,8 @@
             "write": "Escribir y enviar facturas, y contabilizar asientos en tu nombre."
           },
           "memory": {
-            "delete": "Eliminar notas, registros y datos guardados.",
-            "purge": "Eliminar para siempre registros de espacios de trabajo compartidos. No se pueden recuperar, así que sus tareas siempre esperan tu permiso.",
+            "delete": "Eliminar notas, registros y datos guardados. Lo eliminado va primero a la papelera, así que puedes recuperarlo.",
+            "purge": "Eliminar registros para siempre: registros de un espacio de trabajo compartido, un espacio de trabajo entero o un espacio compartido entero. No se pueden recuperar, así que sus tareas siempre esperan tu permiso.",
             "read": "Leer las notas, los registros y los datos guardados en tu cuenta.",
             "write": "Guardar y actualizar notas, registros y datos en tu cuenta.",
             "read-as-owner": "Leer todo lo guardado por ti y por tus otros agentes, también los registros privados, como lo lees tú. Sin esto solo lee lo que se comparte con él.",

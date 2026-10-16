@@ -92,9 +92,18 @@ log line. The **destination** a secret is transmitted to must be an allowlisted 
 `AIMEAT_ENCRYPTION_KEY` must be set on any node holding secrets (keys, TOTP). A public node without it must fail loudly.
 
 ### 8. Least privilege by default; consent text must convey real capability
-App/agent default scopes stay minimal; powerful scopes (`ai:use`, `task:write`, `memory:delete`) are
-explicit and separately consented. When a scope's real blast radius exceeds its label ("write your data"
-also lets an app redirect your AI key), fix the boundary (Invariant 2); don't rely on the label.
+App/agent default scopes stay minimal; powerful scopes (`ai:use`, `task:write`, `memory:purge`,
+`agent:delete`) are explicit and separately consented. **Moving a record to the deleted-memory bin may
+be a default; a permanent purge and deleting an organism are explicit and separately consented.** So
+`memory:delete` is in the default agent scopes: every delete it opens puts the record in the bin, where
+the owner restores it for `AIMEAT_MEMORY_DELETE_GRACE_DAYS` (seven by default). A removal that cannot
+come back asks `memory:purge`: wiping a workspace, removing workspace rows, deleting an organism (beside
+`organism:write`, which alone also renames, archives and leaves) and removing a Design Book part. A
+door that `memory:delete` opens and that removes for good is a breach of this invariant, whatever its
+label says (Jouni, 2026-10-16). Two hard deletes stay outside it on purpose: a record's own time to
+live, which the writer chose, and erasing an account or an agent, which removes the identity with its
+records. When a scope's real blast radius exceeds its label ("write your data" also lets an app
+redirect your AI key), fix the boundary (Invariant 2); don't rely on the label.
 
 ### 9. Prove multi-tenant isolation with a test, every time
 Every feature touching identity ships with two E2E checks: **cross-owner** ("B touches A's

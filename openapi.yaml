@@ -33257,7 +33257,9 @@ paths:
         node operator, or to the proposer on their own part. A part any build has adopted
         answers 409 PART_IN_USE — its address must keep meaning something, so it is retired
         instead. This exists because a system that can be littered but never cleaned drifts
-        toward a graveyard nobody can read.
+        toward a graveyard nobody can read. The part does not go to the deleted-memory bin, so a
+        token needs `memory:purge`, the permission for a removal that cannot be undone;
+        `memory:delete` is not enough.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -39570,8 +39572,11 @@ paths:
       operationId: deleteOrganism
       summary: Delete organism
       description: |
-        Delete an organism. Only organism admins or node operators can delete.
-        This removes all memberships and the associated board.
+        Delete an organism. Only an owner of the organism can delete it.
+        This removes all memberships, the associated board and every record keyed under the
+        organism, every member's included. Nothing goes to the deleted-memory bin, so an agent or
+        app token needs `memory:purge` beside `organism:write`: deleting an organism is consented
+        separately from changing one.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -42520,6 +42525,11 @@ paths:
         POST /v1/notifications/read (which only marks them read), this REMOVES the rows. Owner-scoped:
         only the caller's own notifications are affected. Omit the body (or send `{}`) to clear ALL;
         pass `{ ids: [...] }` to delete just those.
+
+        Needs `memory:delete`. The account holder in person clears for good. An agent or an app
+        grant moves the rows to the deleted-memory bin instead: the answer carries `in_bin: true`
+        and `restorable_until`, and the owner puts a notification back with
+        POST /v1/memory/{key}/restore (its key is listed by GET /v1/memory/deleted) until then.
       tags: [Notifications]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -42531,8 +42541,9 @@ paths:
               properties:
                 ids: { type: array, items: { type: string }, description: Notification ids to clear (omit to clear all) }
       responses:
-        '200': { description: "Count cleared ({ cleared })" }
+        '200': { description: "Count cleared ({ cleared }); from an agent or an app grant also { in_bin: true, restorable_until }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "SCOPE_DENIED: the token does not hold memory:delete" }
 
   /v1/notifications/settings:
     get:

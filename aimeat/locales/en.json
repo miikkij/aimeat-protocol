@@ -16660,8 +16660,8 @@
             "write": "Write and send invoices, and book accounting entries in your name."
           },
           "memory": {
-            "delete": "Delete saved notes, records and data.",
-            "purge": "Delete shared workspace records for good. They cannot be restored, so its tasks always wait for your OK.",
+            "delete": "Delete saved notes, records and data. What it deletes goes to the bin first, so you can take it back.",
+            "purge": "Delete records for good: records of a shared workspace, a whole workspace, or a whole shared space. They cannot be restored, so its tasks always wait for your OK.",
             "read": "Read the notes, records and data saved in your account.",
             "write": "Save and update notes, records and data in your account.",
             "read-as-owner": "Read everything you and your other agents saved, the private records too, as you read it yourself. Without this it reads only what is shared with it.",
