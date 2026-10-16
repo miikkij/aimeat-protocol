@@ -16,7 +16,7 @@
  *     - the owner's compliance report: the shared pages counted public, the rule stated
  *       (`shares-open-only`), and another owner's report not counting them;
  *     - the front page's layout read carries `freeform_provenance`; a Design Book part its record.
- *   A non-member is refused the member read (403).
+ *   A non-member is refused the member read (403), and an anonymous caller the report (401).
  * @version-history
  *   v1.0.0 — 2026-10-16 — Initial (the AI label on every public page).
  */
@@ -162,6 +162,8 @@ await test('another owner\'s report counts none of them, and a non-member is ref
   assert(r.status === 200 && r.body.data?.derived?.ai_transparency?.public_total === 0, `B's report: ${JSON.stringify(r.body.data?.derived?.ai_transparency)}`);
   const read = await call(`/v1/organisms/${orgId}/workspace?ws=${ws}`, { token: B.token });
   assert(read.status === 403, `non-member read: ${read.status}`);
+  const anonymous = await call('/v1/compliance/report/mine');
+  assert(anonymous.status === 401, `anonymous report: ${anonymous.status}`);
 });
 
 console.log('\nA share behind a password');
