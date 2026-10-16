@@ -10,6 +10,7 @@
  * @structure USE_OF — { [entryId]: UiUse[] }
  * @usage import { USE_OF } from './entries-use.js';
  * @version-history
+ *   v1.75.0 — 2026-10-16 — HtmlPageFrame: view, open.
  *   v1.74.0 — 2026-10-06 — StoreDoor: navigate, status.
  *   v1.73.0 — 2026-10-03 — PageStart: explain, copy, open.
  *   v1.72.0 — 2026-09-30 — NodeUpdateNotice: notify, explain, copy.
@@ -121,7 +122,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     // The older shared parts
     'card-menu': ['act'], markdown: ['view'], 'ai-label': ['explain', 'status'], 'voice-recorder': ['converse', 'act'],
     'image-deliverable': ['view'], 'install-cta': ['notify', 'act'], 'managed-env': ['explain'], 'mcp-install': ['copy', 'explain'],
-    'instruction-block': ['explain', 'copy'], 'contact-picker': ['pick', 'search'], tags: ['pick', 'list'], 'app-sandbox': ['view', 'open'],
+    'instruction-block': ['explain', 'copy'], 'contact-picker': ['pick', 'search'], tags: ['pick', 'list'], 'app-sandbox': ['view', 'open'], 'html-page-frame': ['view', 'open'],
     'own-aimeat': ['explain', 'navigate'],
     'store-door': ['navigate', 'status'],
     // The shell and the parts catalogued on 2026-09-24

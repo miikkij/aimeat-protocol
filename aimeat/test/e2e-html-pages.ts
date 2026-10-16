@@ -14,6 +14,8 @@
  *   form-action, the holder's frame-src against a navigation) was proven in a real browser on the
  *   sandbox and is not repeated here; this suite asserts the headers that make the browser do it.
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The frame and opened routes refuse an agent without organism:read (403) and
+ *     an anonymous caller (401) (check:denial-coverage).
  *   v1.0.0 — 2026-10-16 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-html-pages
@@ -228,6 +230,18 @@ await test('a member gets a frame address for the draft or the published page; a
   assert(theirs.status === 404, `outsider: ${theirs.status}`);
   const md = await call(`/v1/organisms/${orgId}/workspace/documents/pages/${mdId}/frame?ws=${ws}`, { token: A.token, body: {} });
   assert(md.status === 404 && md.body.error?.code === 'NOT_AN_HTML_PAGE', `markdown page frame: ${md.status} ${JSON.stringify(md.body.error)}`);
+});
+
+await test('a frame address and an opened mark need a signed-in caller who may read organisms', async () => {
+  const narrow = await makeAgent(BASE, A, ['memory:read']);
+  const frameNarrow = await call(`/v1/organisms/${orgId}/workspace/documents/pages/${pageId}/frame?ws=${ws}`, { method: 'POST', token: narrow.token, body: {} });
+  assert(frameNarrow.status === 403, `frame, agent without organism:read: ${frameNarrow.status}`);
+  const openedNarrow = await call(`/v1/organisms/${orgId}/workspace/documents/pages/${pageId}/opened?ws=${ws}`, { method: 'POST', token: narrow.token, body: {} });
+  assert(openedNarrow.status === 403, `opened, agent without organism:read: ${openedNarrow.status}`);
+  const frameAnon = await call(`/v1/organisms/${orgId}/workspace/documents/pages/${pageId}/frame?ws=${ws}`, { method: 'POST', body: {} });
+  assert(frameAnon.status === 401, `frame, anonymous: ${frameAnon.status}`);
+  const openedAnon = await call(`/v1/organisms/${orgId}/workspace/documents/pages/${pageId}/opened?ws=${ws}`, { method: 'POST', body: {} });
+  assert(openedAnon.status === 401, `opened, anonymous: ${openedAnon.status}`);
 });
 
 await test('the day a page was opened is recorded, and the workspace read and index carry it', async () => {

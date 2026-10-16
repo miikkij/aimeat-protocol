@@ -68,10 +68,19 @@ classification (`aimeat_classification` action `get`) before you look for anythi
 
 Pages' share modal offers both, as "Copy Pages link" and "Copy viewer link".
 
+An **HTML page** (a document whose value holds `html`) uses the same viewer link. The viewer shows it
+in a sandboxed frame served from the node's page host (pages.aimeat.io), and a shared HTML page
+ends after 90 days unless its share names another end date.
+
 ## Turning sharing on when you have no browser
 
-There is no MCP or CLI tool for the workspace share state, on any of the three agent surfaces
-(checked 2026-09-08). The route exists and only the UI calls it:
+Use the MCP tool `aimeat_workspace_share` (all three agent surfaces since 2026-10-16): `organism_id`,
+`ws`, `space` and `id` for one page (`space` alone for a whole space, neither for the workspace),
+`shared: true`, and `access`. Its answer carries `viewer_url`, the link to hand out. `until` takes an
+ISO date for the end of the share, or `"none"` to remove the end. Only the workspace creator, an
+organism admin or their own agent may change sharing, and only published pages are shown.
+
+Without MCP, the tool runs the same route:
 
 ```bash
 # token: POST https://aimeat.io/v1/ghii/login with the owner credentials (docs/internal/TESTING.md or docs/internal/prod-login-*.json; both are gitignored and exist only in the MAIN checkout on the developer's main machine, never in a worktree, so ask the developer when they are absent)
@@ -81,7 +90,9 @@ curl -s -X PUT "https://aimeat.io/v1/organisms/<org>/workspace/share?ws=<ws>" \
 # share.json: {"docs":{"<spaceName>/<docId>":true},"access":"account"}
 ```
 
-The `docs` map is keyed **`spaceName/docId`**. `access` is `open` (the internet), `account` (any
+The `docs` map is keyed **`spaceName/docId`**. `until` is a map of end dates keyed the same way
+(`*` for the workspace, `space:<name>` for a space, `<spaceName>/<docId>` for a page), each an ISO
+date or `null` to remove it. `access` is `open` (the internet), `account` (any
 signed-in identity on this node) or `password`. For anything developer-facing use `account`; `open`
 puts it on the internet and posts a line to the node's public activity feed.
 
