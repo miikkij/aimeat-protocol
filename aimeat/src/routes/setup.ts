@@ -14,6 +14,8 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   v1.7.2 -- 2026-10-16 -- ALREADY_CONFIGURED no longer clears the setup code: while the node has no
+ *     operator the self-heal paths still need it (Jouni, 2026-10-16).
  *   v1.7.1 -- 2026-10-16 -- The code refusal is setupCodeRefusal (services/setup-code.ts), the one the
  *     registration routes answer for the first account too (Jouni, 2026-10-16).
  *   v1.7.0 -- 2026-10-16 -- On a node whose base URL is not loopback, POST /v1/setup/init takes
@@ -142,7 +144,8 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             // Guard: only works when no owners exist
             const existingOwners = (await storage.listOwners()).filter(o => o.name !== 'anonymous');
             if (existingOwners.length > 0) {
-                codeGate.clear();
+                // The code stays: while the node has no operator, the self-heal that makes the next
+                // account or sign-in the operator still needs it (services/owner-provisioning.ts).
                 res.status(403).json(error(config.nodeId, 'ALREADY_CONFIGURED', 'This node is already configured. Setup can only run once.'));
                 return;
             }
@@ -227,7 +230,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             // The code is used here, checked and taken in one synchronous step, so of two requests
             // carrying it (this route or a registration route, services/owner-provisioning.ts) only
             // one creates the first owner. Taken from the gate itself rather than through
-            // claimFirstOwnerSetupCode, because this route makes an operator whatever the owner count
+            // claimOperatorSetupCode, because this route makes an operator whatever the owner count
             // says by now. It waits again if the owner cannot be created.
             const codeNeeded = setupCodeRequired(config);
             if (codeNeeded && !codeGate.take(req.body?.setupCode)) {

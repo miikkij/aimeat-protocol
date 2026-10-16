@@ -17,13 +17,19 @@
  *   code is refused (SETUP_CODE_INVALID); the right code creates the operator once; the same code a
  *   second time is refused. On a second such node, the first account made by registration: POST
  *   /v1/ghii, POST /v1/ghii/register-web and POST /v1/owners refuse it without the code, a wrong code
- *   is refused, with the code it is the operator, and a second registration needs no code. On a node
- *   with a loopback base URL: no code in the log, and the first registration works without one.
+ *   is refused, with the code it is the operator, and a second registration needs no code. On a third
+ *   whose first owner was written without the operator role (as a directory sync makes one): the
+ *   start log still carries a code, that owner signs in as a plain owner without it, a registration
+ *   that would self-heal to operator is refused without the code and is the operator with it, and a
+ *   later one is a plain owner. On a node with a loopback base URL: no code in the log, and the first
+ *   registration works without one.
  *
- *   It runs its own three nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 40533
- *   (public base URL, setup), 40535 (public base URL, registration) and 40534 (loopback base URL).
+ *   It runs its own four nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 40533
+ *   (public, setup), 40535 (public, registration), 40536 (public, no operator) and 40534 (loopback).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-code
  * @version-history
+ *   2026-10-16 — A node on 40536 with an owner but no operator: the code is printed, sign-in and
+ *     registration self-heal need it (Jouni, 2026-10-16).
  *   2026-10-16 — A third node on 40535: the registration routes refuse the first account without the code
  *     and make it the operator with it; the loopback node's first account is registered (Jouni, 2026-10-16).
  *   2026-10-16 — Initial (Jouni, 2026-10-16: first-owner setup needs a one-time code on a public node).
@@ -34,12 +40,16 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { ownNodeDb } from './helpers/own-node-db.js';
+import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { tokenRoles } from './helpers/owner-login.js';
+import { createStorage } from '../src/storage/storage-factory.js';
+import { hashPassword } from '../src/services/password.js';
 
 const PUBLIC_PORT = 40533;
 const LOOPBACK_PORT = 40534;
 const REGISTER_PORT = 40535;
+const NO_OPERATOR_PORT = 40536;
 const STAMP = Date.now().toString(36).slice(-6);
 const PASSWORD = `Setup-Code-${STAMP}-Pw!`;
 
@@ -53,8 +63,9 @@ const short = (v: unknown): string => String(JSON.stringify(v)).slice(0, 300);
 
 interface OwnNode { base: string; child: ChildProcess | null; log: string }
 
-async function startNode(port: number, baseUrl: string, extra: Record<string, string>): Promise<OwnNode> {
-    const db = await ownNodeDb(String(port));
+async function startNode(port: number, baseUrl: string, extra: Record<string, string>, given?: OwnNodeDb): Promise<OwnNode> {
+    // A database handed in is kept as it is (a restart); a new one is emptied first.
+    const db = given ?? await ownNodeDb(String(port));
     // Nothing from the runner's relaxed pins reaches this node: every AIMEAT_* variable is dropped
     // first, and only what a deployment sets is given back.
     const env: Record<string, string | undefined> = { ...process.env };
@@ -101,6 +112,7 @@ const init = (node: OwnNode, username: string, setupCode?: string) => json(node,
 
 let pub: OwnNode | null = null;
 let reg: OwnNode | null = null;
+let noop: OwnNode | null = null;
 let loop: OwnNode | null = null;
 
 // POST /v1/setup/init writes an .env into the package root when none is there. A placeholder is
@@ -206,6 +218,66 @@ try {
     await stopNode(reg);
     reg = null;
 
+    console.log('\nA node with a public base URL whose first owner is not the operator (a directory sync)');
+    // Booted once so the schema exists, then an owner WITHOUT the operator role is written straight
+    // into the store, as a SCIM sync makes one, and the node is started again on the same database.
+    const noOpDb = await ownNodeDb(String(NO_OPERATOR_PORT));
+    const publicNoOp = { AIMEAT_SECURITY_PROFILE: 'public', AIMEAT_LOG_LEVEL: 'warn', AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '20' };
+    noop = await startNode(NO_OPERATOR_PORT, 'https://directory.example', publicNoOp, noOpDb);
+    const noOpNodeId = `aimeat-test-001-setupcode${NO_OPERATOR_PORT}${STAMP}`;
+    await stopNode(noop);
+    const synced = `synced${STAMP}`;
+    const store = noOpDb.provider === 'postgres-kysely'
+        ? await createStorage({ provider: 'postgres-kysely', dbUrl: noOpDb.dbUrl })
+        : await createStorage({ provider: 'sqlite', sqlitePath: noOpDb.sqlitePath });
+    try {
+        const now = new Date().toISOString();
+        await store.createOwner({ name: synced, displayName: 'Synced Person', publicKey: '', roles: ['owner'], createdAt: now });
+        await store.createGHII({
+            username: synced, nodeId: noOpNodeId, ghii: `${synced}@${noOpNodeId}`, displayName: 'Synced Person',
+            passwordHash: await hashPassword(PASSWORD), verificationLevel: 0, ownerName: synced, totpEnabled: false,
+            createdAt: now, updatedAt: now,
+        });
+    } finally {
+        await (store as unknown as { close?: () => unknown }).close?.();
+    }
+    noop = await startNode(NO_OPERATOR_PORT, 'https://directory.example', publicNoOp, noOpDb);
+    const nnode = noop;
+    const ncode = /Setup code: ([0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4})/.exec(nnode.log)?.[1] ?? '';
+    const nregister = (username: string, extra: Record<string, unknown> = {}) => json(nnode, '/v1/ghii', {
+        method: 'POST', body: JSON.stringify({ username, display_name: username, password: PASSWORD, ...extra }),
+    });
+
+    await test('a node with an owner but no operator still prints a setup code at start', async () => {
+        assert(ncode, `no "Setup code:" line in the start log:\n${nnode.log.split(/\r?\n/).slice(-20).join('\n')}`);
+        assert(/no operator/.test(nnode.log), 'the line does not say the node has no operator');
+    });
+
+    await test('the synced owner signs in without the code and stays a plain owner', async () => {
+        const r = await json(nnode, '/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: synced, password: PASSWORD }) });
+        assert(r.status === 200, `sign-in ${r.status} ${short(r.body)}`);
+        assert(!tokenRoles(r.body.data.token).includes('operator'), `the sign-in made the operator without the code: ${short(tokenRoles(r.body.data.token))}`);
+    });
+
+    await test('a registration that would self-heal to operator is refused without the code', async () => {
+        const r = await nregister(`healnocode${STAMP}`);
+        assert(r.status === 403 && r.body.error?.code === 'SETUP_CODE_REQUIRED', `${r.status} ${short(r.body)}`);
+    });
+
+    await test('with the code that registration becomes the operator', async () => {
+        const r = await nregister(`healer${STAMP}`, { setupCode: ncode });
+        assert(r.status === 201, `expected 201, got ${r.status} ${short(r.body)}`);
+        assert(r.body.data.owner.roles.includes('operator'), `roles: ${short(r.body.data.owner.roles)}`);
+    });
+
+    await test('a later registration is a plain owner, without any code', async () => {
+        const r = await nregister(`healafter${STAMP}`);
+        assert(r.status === 201, `expected 201, got ${r.status} ${short(r.body)}`);
+        assert(!r.body.data.owner.roles.includes('operator'), `roles: ${short(r.body.data.owner.roles)}`);
+    });
+    await stopNode(noop);
+    noop = null;
+
     console.log('\nA node with a loopback base URL');
     loop = await startNode(LOOPBACK_PORT, `http://127.0.0.1:${LOOPBACK_PORT}`, { AIMEAT_LOG_LEVEL: 'warn' });
     const local = loop;
@@ -224,6 +296,7 @@ try {
 } finally {
     await stopNode(pub);
     await stopNode(reg);
+    await stopNode(noop);
     await stopNode(loop);
     if (!HAD_ENV && existsSync(PACKAGE_ENV)) unlinkSync(PACKAGE_ENV);
 }

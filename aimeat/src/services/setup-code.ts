@@ -20,23 +20,26 @@
  *   with timingSafeEqual. take() checks and clears in one synchronous step, so of two requests that
  *   carry the right code only one creates the owner; release() puts it back when the owner could not
  *   be created, so the operator can try again without a restart. A restart issues a new code while
- *   the node still has no owner. Once an owner exists the setup answers ALREADY_CONFIGURED before it
- *   asks for the code, and the code is cleared.
+ *   the node still has no OPERATOR: an owner without the operator role (a directory sync, an old
+ *   node) does not end the need, because the self-heal would make the next account the operator.
  *
  *   THE CODE. Twelve characters of Crockford base32 (60 bits), printed in three groups of four. The
  *   comparison ignores case, spaces and hyphens, and reads O as 0 and I or L as 1, so a code copied
  *   from a terminal by hand still matches.
  *
- *   WHICH ROUTES. Every route that can create the first owner, and so the operator: POST /v1/setup/init
- *   and, through claimFirstOwnerSetupCode (services/owner-provisioning.ts), POST /v1/ghii,
- *   POST /v1/ghii/register-web, POST /v1/owners and provisionOwner (an identity provider's first
- *   sign-in, an invitation). Once the node has an owner none of them asks for the code.
+ *   WHICH ROUTES. Every path that grants the operator role by the first-owner or the no-operator rule:
+ *   POST /v1/setup/init and, through claimOperatorSetupCode (services/owner-provisioning.ts),
+ *   POST /v1/ghii, POST /v1/ghii/register-web, POST /v1/owners, provisionOwner (an identity
+ *   provider's first sign-in, an invitation) and the sign-in self-heal (routes/ghii/owner-session.ts).
+ *   Once the node has an operator none of them asks for the code.
  * @structure setupCodeRequired(config) · SetupCodeGate · setupCodeGateFor(config) · setupCodeRefusal(config, input) ·
  *   SETUP_CODE_USED_MESSAGE · normalizeSetupCode(input)
  * @usage
- *   if (setupCodeRequired(config) && !hasOwner) logger.warn(`Setup code: ${setupCodeGateFor(config).issue()} ...`);
+ *   if (setupCodeRequired(config) && !hasOperator) logger.warn(`Setup code: ${setupCodeGateFor(config).issue()} ...`);
  *   const gate = setupCodeGateFor(config); if (!gate.matches(body.setupCode)) refuse();
  * @version-history
+ *   v1.2.0 — 2026-10-16 — The code is needed while the node has no operator, not only no owner; the
+ *     refusals say "operator" (Jouni, 2026-10-16).
  *   v1.1.0 — 2026-10-16 — setupCodeRefusal and SETUP_CODE_USED_MESSAGE moved here from routes/setup.ts, so
  *     the registration routes refuse the first account with the same codes and sentences (Jouni, 2026-10-16).
  *   v1.0.0 — 2026-10-16 — Initial (Jouni, 2026-10-16: first-owner setup needs a one-time code on a public node).
@@ -125,7 +128,7 @@ export class SetupCodeGate {
 }
 
 /** The refusal when the right code was used by another request a moment before this one took it. */
-export const SETUP_CODE_USED_MESSAGE = 'The setup code was used a moment ago by another request, so this node now has its first owner. Reload the page and sign in, or register as a new account.';
+export const SETUP_CODE_USED_MESSAGE = 'The setup code was used a moment ago by another request, so this node now has its operator. Reload the page and sign in, or register as a new account.';
 
 /**
  * Why a request that would create this node's first owner is refused, or null when it may go on:
@@ -137,10 +140,10 @@ export function setupCodeRefusal(config: Pick<AimeatConfig, 'baseUrl'> & object,
   if (!setupCodeRequired(config)) return null;
   const gate = setupCodeGateFor(config);
   if (!gate.pending) {
-    return { code: 'SETUP_CODE_REQUIRED', message: 'This node needs a one-time setup code to create its first owner, and none is waiting. Restart the node, then enter the code its start log prints.' };
+    return { code: 'SETUP_CODE_REQUIRED', message: 'This node needs a one-time setup code to make its first operator, and none is waiting. Restart the node, then use the code its start log prints.' };
   }
   if (typeof input !== 'string' || input.trim() === '') {
-    return { code: 'SETUP_CODE_REQUIRED', message: 'This node has no owner yet, and creating its first owner needs the one-time setup code. Look in the node\'s start log for the line that starts with "Setup code", and enter that code in the setup wizard or send it as setupCode.' };
+    return { code: 'SETUP_CODE_REQUIRED', message: 'This node has no operator yet, and this account would become its operator, which needs the one-time setup code. Look in the node\'s start log for the line that starts with "Setup code", and enter that code in the setup wizard or send it as setupCode.' };
   }
   if (!gate.matches(input)) {
     return { code: 'SETUP_CODE_INVALID', message: 'That setup code is not right. Copy the code from the node\'s start log, from the line that starts with "Setup code", and try again.' };

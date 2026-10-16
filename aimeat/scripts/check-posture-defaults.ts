@@ -133,9 +133,9 @@ export const ALLOWED: Record<string, string> = {
     'unwarned:AIMEAT_SETUP_ALLOWED_IPS':
         'DECIDED (Jouni, 2026-10-16): the address allowlist stays empty by default and unwarned, because '
         + 'what closes the first-owner setup on a node whose base URL is not loopback is the one-time setup '
-        + 'code (services/setup-code.ts): the node prints it in its start log while it has no owner, and '
-        + 'POST /v1/setup/init and every registration route refuse the first owner without it. The allowlist '
-        + 'is an extra restriction an operator may add.',
+        + 'code (services/setup-code.ts): the node prints it in its start log while it has no operator, and '
+        + 'every path that would grant the operator role (setup, registration, the sign-in self-heal) needs it. '
+        + 'The allowlist is an extra restriction an operator may add.',
 };
 
 /** A config resolved on the public profile with no AIMEAT_* variable and no config file. */

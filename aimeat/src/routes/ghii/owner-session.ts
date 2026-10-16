@@ -17,6 +17,10 @@
  * @structure completeOwnerLogin(config, storage, req, res, args) -> writes the response itself
  * @usage await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
  * @version-history
+ *   2026-10-16 — On a node whose base URL is not loopback, the no-operator self-heal promotes the account
+ *     only with the one-time setup code (`setupCode` in the sign-in body, claimOperatorSetupCode); without
+ *     it the sign-in goes on as a plain owner. The promotion is decided again in one transaction with
+ *     the claim read (rolesAtWrite), so two sign-ins at once do not both become the operator (Jouni, 2026-10-16).
  *   2026-10-16 — The no-operator self-heal asks storage.operatorAccountState instead of loading every owner
  *     on each sign-in of an account that is not an operator (QA audit P7-10).
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
@@ -27,6 +31,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, GHIIRecord } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
+import { claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type OperatorClaim } from '../../services/owner-provisioning.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { establishOwnerSession } from '../../services/owner-session.js';
@@ -101,8 +106,39 @@ export async function completeOwnerLogin(
     // operator asks this (QA audit P7-10).
     const { anyOperator: hasOperator } = await storage.operatorAccountState();
     if (!hasOperator) {
-      roles.push('operator');
-      await storage.updateOwner(loginName, { roles: [...ownerRecord.roles, 'operator'] });
+      // On a node others can reach, the promotion needs the one-time setup code from the start log
+      // (`setupCode` in the sign-in body). Without a valid one the person signs in as the owner they
+      // are, and nothing is refused: a sign-in is not the place to fail a correct password (Jouni,
+      // 2026-10-16). On a loopback node the claim asks nothing.
+      let claim: OperatorClaim | null = null;
+      try {
+        claim = await claimOperatorSetupCode(storage, config, ['operator'], (req.body as { setupCode?: unknown } | undefined)?.setupCode);
+      } catch (err) {
+        if (!(err instanceof SetupCodeRefusedError)) throw err;
+      }
+      if (claim) {
+        const held = claim;
+        let promoted: boolean;
+        try {
+          // Decided again inside one transaction with the claim read (services/owner-provisioning.ts
+          // rolesAtWrite), so two sign-ins at once do not both become the operator.
+          promoted = await storage.transaction(async () => {
+            const granted = await rolesAtWrite(storage, [...ownerRecord.roles, 'operator'], held);
+            if (granted.indexOf('operator') < 0) return false;
+            await storage.updateOwner(loginName, { roles: granted });
+            return true;
+          });
+        } catch (err) {
+          held.release();
+          throw err;
+        }
+        if (promoted) {
+          held.commit();
+          roles.push('operator');
+        } else {
+          held.release();
+        }
+      }
     }
   }
 
