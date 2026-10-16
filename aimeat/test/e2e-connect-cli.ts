@@ -35,6 +35,8 @@
  *   2026-10-16 — `aimeat backup` and `aimeat restore` against this node: no token, a bad token and a
  *     non-operator token exit 1 and write no file; an operator PAT writes the accounts and agents; a
  *     restore with a failed row exits 1 and the route answers restored: false (QA audit P6-07, F19b-01).
+ *   2026-10-16 — The package case deletes its two fixture apps, so the screenshot-worker dry run still
+ *     counts zero apps and launches no browser.
  *   2026-10-16 — `connect call` drives aimeat_package_versions and aimeat_package_delete, the two
  *     connector-only package tools: the author archives a version, another author's is refused (QA audit W27).
  *   2026-10-15 — The `client --home` DEFECT test is inverted: the credential lands in --home
@@ -350,7 +352,7 @@ await test('call refuses an unknown tool and a missing tool name', async () => {
 // src/tool-catalog/surfaces.ts: pruning a package's history is keyboard maintenance), so this CLI
 // dispatch is the one place an agent calls them (QA audit W27).
 await test('call aimeat_package_versions lists the author\'s versions; aimeat_package_delete archives one, and refuses another author\'s', async () => {
-  const publishAndCompose = async (token: string, tag: string): Promise<{ groupId: string; version: string }> => {
+  const publishAndCompose = async (token: string, tag: string): Promise<{ groupId: string; version: string; app: string }> => {
     const app = `cli-pkg-${tag}-${stamp}.html`;
     const up = await json('/v1/apps', {
       method: 'POST', ...auth(token),
@@ -359,7 +361,7 @@ await test('call aimeat_package_versions lists the author\'s versions; aimeat_pa
     assert(up.status === 201, `publish ${app}: ${up.status} ${JSON.stringify(up.body?.error)}`);
     const pkg = await json('/v1/packages/compose', { method: 'POST', ...auth(token), body: JSON.stringify({ name: `cli-pkg-${tag}-${stamp}`, apps: [app] }) });
     assert(pkg.status === 201, `compose: ${pkg.status} ${JSON.stringify(pkg.body?.error)}`);
-    return { groupId: pkg.body.data.packageGroupId, version: pkg.body.data.version };
+    return { groupId: pkg.body.data.packageGroupId, version: pkg.body.data.version, app };
   };
   const mine = await publishAndCompose(acc.ownerToken, 'mine');
   const other = await registerOwner(BASE, `clipkgother${stamp}`);
@@ -379,6 +381,13 @@ await test('call aimeat_package_versions lists the author\'s versions; aimeat_pa
   exited(archived, 0);
   const rest = await json(`/v1/packages/${encodeURIComponent(mine.groupId)}/versions/${mine.version}`, auth(acc.ownerToken));
   assert(rest.status === 200 && rest.body.data.status === 'archived', `the version is archived on the node: ${rest.status} ${JSON.stringify(rest.body.data?.status)}`);
+
+  // The two fixture apps go again: the screenshot-worker dry run below counts this node's apps and
+  // asserts zero, so it never launches a browser.
+  for (const [token, app] of [[acc.ownerToken, mine.app], [other.token, theirs.app]] as const) {
+    const del = await json(`/v1/apps/${encodeURIComponent(app)}`, { method: 'DELETE', ...auth(token) });
+    assert(del.status === 200, `delete fixture app ${app}: ${del.status} ${JSON.stringify(del.body?.error)}`);
+  }
 });
 
 await test('call from an unconfigured home says what to run, and exits 1', async () => {
