@@ -11,6 +11,8 @@
  *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-10-16 — aimeat_commerce_psp_delete is screen-only like psp_set: it refuses and returns the Wallet
+ *     page link (decision D5; QA audit D2-02).
  *   2026-10-16 — aimeat_checkout_complete says it carries no payment instrument, when the invoice handler
  *     is refused (INVOICE_NOT_ACCEPTED, QA audit S8-03) and that a second completion is refused
  *     (SESSION_NOT_OPEN, QA audit S8-04).
@@ -225,7 +227,7 @@ export const commerceTools = [
     },
     {
         name: 'aimeat_commerce_psp_delete',
-        description: 'Delete YOUR OWNER\'s stored PSP credentials (commerce.psp). Money-currency checkouts of your offers/app-tools stop working until new credentials are set; free offers and their pacing are unaffected.',
+        description: 'SCREEN ONLY: refuses for an agent, and returns the link to the Wallet page where the owner removes their payment-provider secret themselves. Removing it stops every money-currency checkout of the owner\'s offers and app-tools until new credentials are set, so it is the owner\'s act in person, like setting it (aimeat_commerce_psp_set). Call it only to get that link. aimeat_commerce_psp_status shows whether a key is set.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Delete Seller PSP Credentials', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },

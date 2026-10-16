@@ -119,7 +119,7 @@
     "src/mcp/commerce.ts": {
       "reads": {
         "listMemory": 1,
-        "getMemory": 4
+        "getMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Payment settings (the secret is never returned), a manifest read-to-update, app-id key names, and a tool manifest returned only when it is the caller's own or public."
     },
@@ -560,17 +560,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organisms.ui preferences record."
     },
-    "src/routes/organisms/intake.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Intake form configuration records."
-    },
     "src/routes/organisms/intake-thread.ts": {
       "reads": {
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-10-13, the node's own read: the thread record and the reply record of ONE conversation, by the record id that is the hash of the visitor's token. They are read to append the visitor's next message, to decide the caps, and to answer the visitor the turns of their own conversation: the visitor's own words and the answers the owner's side wrote for that visitor (role, text and time only; no other field of either record leaves). A classification label on a reply record does not hide an answer from the visitor it was written to. 2026-10-15 (feature-list audit #64): the expiry sweep and the forget deletion moved to services/intake-thread-retention.ts, so two reads left this file."
+    },
+    "src/routes/organisms/intake.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Intake form configuration records."
     },
     "src/routes/organisms/record-helpers.ts": {
       "reads": {
@@ -954,6 +954,12 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App membership, plan, request and roadmap system records."
+    },
+    "src/services/app-scope-allowance-store.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-13, the node's own read: an app's scope allowance record under the node's app-scope-allowance namespace (the permission words the app kept at the move to 4.0, and the code lines that need them), which the grant routes and the app's owner read. Not the owner's content."
     },
     "src/services/app-seo.ts": {
       "reads": {
@@ -2016,12 +2022,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The refinery config record, read for its connection id."
     },
-    "src/services/app-scope-allowance-store.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-13, the node's own read: an app's scope allowance record under the node's app-scope-allowance namespace (the permission words the app kept at the move to 4.0, and the code lines that need them), which the grant routes and the app's owner read. Not the owner's content."
-    },
     "src/services/rest-scope-gates-migration.ts": {
       "reads": {
         "getMemory": 2
@@ -2260,6 +2260,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
+    "src/services/workflow/engine-coalesce.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-13, the node's own read: the system index of events that wait for a workflow's live run to end (workflows.waitingevents). It holds ids, a count and row ids, never record content, and no caller is handed it."
+    },
     "src/services/workflow/engine-human.ts": {
       "reads": {
         "getMemory": 2
@@ -2273,12 +2279,6 @@
         "getOwnerScopeMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Export-out and the data package step pass leave; the other reads are read-to-update and the fresh clear. 2026-10-08: the extension step's input_from read passes the system reader's show() before the value enters the owner's own extension, and the saver needs memory:read for it (step-authority.ts)."
-    },
-    "src/services/workflow/engine-coalesce.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-13, the node's own read: the system index of events that wait for a workflow's live run to end (workflows.waitingevents). It holds ids, a count and row ids, never record content, and no caller is handed it."
     },
     "src/services/workflow/engine.ts": {
       "reads": {
@@ -2345,12 +2345,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
-    "src/services/workspace-transfer-rows.ts": {
-      "reads": {
-        "listWorkspaceRows": 1
-      },
-      "why": "Reviewed 2026-10-15 (feature-list audit #68): the rows of a workspace's row spaces for its export. Every page passes the exporter's classification reader, show and then leave with the destination export (rowTarget, as readRows addresses a row), before a row enters the bundle; what leave keeps back is named in leftOut."
-    },
     "src/services/workspace-import.ts": {
       "reads": {
         "getMemory": 2,
@@ -2389,6 +2383,12 @@
         "listMemoryKeysByPrefix": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-06: the batch delete's key-only scan and its value-scan fallback moved here from routes/organisms/workspace-ops.ts; they find the addresses a delete removes, and no value reaches the caller."
+    },
+    "src/services/workspace-transfer-rows.ts": {
+      "reads": {
+        "listWorkspaceRows": 1
+      },
+      "why": "Reviewed 2026-10-15 (feature-list audit #68): the rows of a workspace's row spaces for its export. Every page passes the exporter's classification reader, show and then leave with the destination export (rowTarget, as readRows addresses a row), before a row enters the bundle; what leave keeps back is named in leftOut."
     },
     "src/services/workspace-versions.ts": {
       "reads": {

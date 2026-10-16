@@ -13528,7 +13528,11 @@ paths:
     patch:
       operationId: updateAgentScopes
       summary: Update agent scopes
-      description: Update the default scopes for an agent. Owner auth required.
+      description: >-
+        Update the default scopes for an agent. The owner in person sets any list the node allows. The
+        owner's agent holding `agent:permissions` and `agent:write` (the words of
+        aimeat_operator_agent_configure) may only narrow another agent's list: a word the target does not
+        already hold is refused with 403 SCOPE_ADDITION_REFUSED. An app grant and an ecosystem app are refused.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -13573,6 +13577,8 @@ paths:
                               type: string
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          description: The caller is not the owner or their agent, lacks a word, or (an agent) asked to add a permission (SCOPE_ADDITION_REFUSED, details.added).
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -17463,8 +17469,9 @@ paths:
       summary: Take a deleted entry back
       description: >
         Put a deleted memory entry back, whole, as long as the grace window has
-        not closed. Refused with NOT_RESTORABLE once it has been removed for
-        good — which is also the answer when it was never deleted or was never
+        not closed. Refused with NOT_RESTORABLE once the window has closed,
+        whether or not the hourly sweep has removed the row yet (with a grace of
+        0, at once) — which is also the answer when it was never deleted or was never
         yours, because telling those apart would make this a way to ask whether
         somebody else's key exists.
 
@@ -21490,7 +21497,9 @@ paths:
         Any authenticated principal, and what comes back is its own owner's slice: an agent asking on
         behalf of somebody sees exactly what that person sees. The scope is taken from the token via
         resolveIdentity() and from nothing else - there is no `owner` parameter, and adding one would
-        undo the point of the route.
+        undo the point of the route. An agent needs the permission `wallet:read` (the owner in person
+        needs none) and is refused 403 without it; the MCP tool aimeat_compliance_report with
+        scope "mine" asks the same word.
 
         Same shape as the operator report, with `scope.ring` set to `owner` and `scope.owner_ghii`
         naming the account. `register.usecases` holds only the entries that name this account, plus
@@ -21526,6 +21535,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/ai-transparency/mine:
     get:
@@ -27723,7 +27734,7 @@ paths:
   /v1/commerce/payout:
     get:
       operationId: commercePayoutStatus
-      summary: Which payout rails can pay you, and what each needs (owner) (TARGET-042)
+      summary: Which payout rails can pay you, and what each needs (owner, or their agent with commerce:sell) (TARGET-042)
       description: >
         The seller's settlement rails reported apart, because they are different things: **Stripe** moves
         real currency (EUR/USD) onto YOUR OWN Stripe account using the secret key you brought (you are
@@ -27739,12 +27750,15 @@ paths:
         really settle: `assets` carries `{ currency, symbol, address, decimals }` per settleable
         currency (USD → USDC, EUR → EURC on the Base networks). ONE payout address receives every asset.
         A money sale over x402 with no address fails with SELLER_NO_X402_ADDRESS — this is the read that
-        tells you before it happens.
+        tells you before it happens. The owner in person, or their agent holding `commerce:sell` (the
+        word of aimeat_commerce_psp_status), which reads the owner's record; the key is only ever a
+        last-four hint. An app grant and an ecosystem app are refused. The writes below stay the owner's.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
 
   /v1/commerce/payout/x402:
     put:
@@ -38876,10 +38890,14 @@ paths:
   /v1/flags/{id}:
     put:
       operationId: updateFlag
-      summary: Update flag status (operator only)
+      summary: Review a flag (operator, or the admin of the flagged organism)
       description: |
-        Update the status of a quality flag. Operator-only endpoint.
-        Used for reviewing, dismissing, or actioning flags.
+        Set a flag to dismissed or actioned. Allowed for the node operator (in person, or the
+        operator's agent holding operator:admin), and for an admin of the organism whose memory the
+        flag points at (a memory flag whose key starts with organism.<id>.), signed in as the account
+        holder in person. An organism admin's agent, an app, an ecosystem principal and a visitor
+        signed in from another node get 403 on the organism branch. The reviewer and the time are
+        stored on the flag (reviewedBy, reviewedAt).
       tags: [Flags]
       security:
         - BearerAuth: []
@@ -38900,12 +38918,8 @@ paths:
               properties:
                 status:
                   type: string
-                  enum: [reviewed, dismissed, actioned]
-                  description: New flag status
-                reviewNote:
-                  type: string
-                  maxLength: 1000
-                  description: Optional operator review note
+                  enum: [dismissed, actioned]
+                  description: New flag status. Any other value is refused with 400 VALIDATION_ERROR.
       responses:
         '200':
           description: Flag updated
@@ -38918,6 +38932,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/FlagRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -53259,6 +53275,12 @@ paths:
       operationId: capabilityCreate
       tags: [Capabilities]
       summary: Create a manual capability
+      description: >-
+        The owner in person, or their agent holding `capability:write` (the word of
+        aimeat_capabilities_create). An agent's capability is stored under its own GAII, as the MCP tool
+        stores it. An app grant and an ecosystem app are refused with 403. The node's publishing policy
+        decides the rest (403 PUBLISHING_DISABLED, 403 PUBLIC_DISABLED); the operator, or the operator's
+        agent holding `operator:admin`, is exempt from it. The same caller rule holds on PUT and DELETE.
       security:
         - BearerAuth: []
       requestBody:
@@ -53295,6 +53317,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: Not the owner or their agent, the agent lacks capability:write, or the publishing policy refuses.
 
   /v1/capabilities/{id}:
     get:
@@ -53330,6 +53354,10 @@ paths:
         or 400 INVALID_WEBHOOK_URL. It is asked on a CHANGE of the address the node would call, so
         sending the whole record back with webhookUrl untouched is accepted whatever the policy, and
         clearing it is always accepted.
+
+
+        The owner, or their agent holding `capability:write`, on a capability stored under the
+        caller's own identity (403 FORBIDDEN otherwise, unless the operator's override applies).
       security:
         - BearerAuth: []
       parameters:
@@ -53344,10 +53372,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner.
     delete:
       operationId: capabilityDelete
       tags: [Capabilities]
       summary: Delete own manual capability
+      description: The owner, or their agent holding `capability:write`, on a capability stored under the caller's own identity.
       security:
         - BearerAuth: []
       parameters:
@@ -53362,6 +53393,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner.
 
   /v1/capabilities/{id}/invoke:
     post:
@@ -61823,7 +61856,10 @@ paths:
     post:
       operationId: createSharingGroup
       summary: Create a sharing group
-      description: Create a new sharing group. The creator is automatically added as an admin member.
+      description: >-
+        Create a new sharing group owned by the account. The owner in person, or their agent holding
+        `consent:groups` (the word of aimeat_group_create); the group belongs to the owner's GHII
+        whoever creates it. An app grant and an ecosystem app are refused with 403.
       tags: [Sharing Groups]
       security:
         - BearerAuth: []
@@ -61855,6 +61891,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     get:
       operationId: listSharingGroups
       summary: List sharing groups
@@ -61982,7 +62020,10 @@ paths:
     post:
       operationId: addSharingGroupMember
       summary: Add a member to a sharing group
-      description: Add a user or agent to the sharing group with a specified role. Requires admin role.
+      description: >-
+        Add a user or agent to a sharing group the account owns. The owner in person, or their agent
+        holding `consent:groups` (the word of aimeat_group_add_member). An app grant and an ecosystem app
+        are refused with 403.
       tags: [Sharing Groups]
       security:
         - BearerAuth: []
@@ -62081,7 +62122,10 @@ paths:
     delete:
       operationId: removeSharingGroupMember
       summary: Remove a member from a sharing group
-      description: Remove a user or agent from the sharing group. Requires admin role or the member themselves.
+      description: >-
+        Remove a user or agent from a sharing group the account owns. The owner in person, or their agent
+        holding `consent:groups` (the word of aimeat_group_remove_member). An app grant and an ecosystem
+        app are refused with 403.
       tags: [Sharing Groups]
       security:
         - BearerAuth: []
@@ -68561,8 +68605,10 @@ paths:
       tags: [Capabilities]
       summary: Vouch for a capability
       description: |
-        Increment the trust vouch count for a capability. Requires the `owner` role.
-        A caller cannot vouch for their own capability.
+        Increment the trust vouch count for a capability. The owner in person, or their agent holding
+        `capability:write` (the word of aimeat_capabilities_vouch); an app grant and an ecosystem app are
+        refused with 403. The vouch is the OWNER's whoever casts it, so a caller cannot vouch for a
+        capability of their own account (400 CANNOT_VOUCH_OWN).
       security:
         - BearerAuth: []
       parameters:
@@ -68588,13 +68634,15 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
       operationId: unvouchCapability
       tags: [Capabilities]
       summary: Remove a vouch from a capability
-      description: Decrement the trust vouch count for a capability. Requires the `owner` role.
+      description: Remove the caller's account's vouch from a capability. The owner in person, or their agent holding `capability:write`.
       security:
         - BearerAuth: []
       parameters:
@@ -68721,7 +68769,10 @@ paths:
       tags: [OpenRouter]
       summary: Update the owner's AI budget settings
       description: |
-        Update the daily budget, per-app quotas, and/or app allowlist. Requires the `owner` role.
+        Update the daily budget, per-app quotas, and/or app allowlist. The owner in person, or their
+        agent holding `memory:write-reserved` (outside every wildcard) and `memory:write-as-owner`, the
+        words aimeat_operator_ai_config asks; the agent writes the OWNER's settings. An agent without
+        either word is refused with 403 SCOPE_DENIED; an app grant and an ecosystem app with 403.
         `daily_budget_usd` must be between 0 and 1000.
       security:
         - BearerAuth: []
@@ -68761,6 +68812,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /v1/build:
     get:
       operationId: getBuildInfo

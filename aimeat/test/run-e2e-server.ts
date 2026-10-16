@@ -7,6 +7,8 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.9.2 -- 2026-10-16 -- e2e-session-forgery joins ANONYMOUS_OFF_SUITES (three green runs alone on
+ *            each backend with the setting off; QA audit F20-01).
  *   v1.10.0 -- 2026-10-16 -- startServer records the node's whole output per suite
  *            (helpers/runner-node-log.ts) for a red suite's summary and CI's artifact; the waits on
  *            real conditions moved unchanged to helpers/runner-ports.ts (QA audit P1-07).
@@ -206,6 +208,10 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
     // A planted secret searched for in every route as nobody: with anonymous mode on, "nobody" would
     // be the anonymous identity and the sweep would prove less (secrets audit 2026-10-09).
     'e2e-secret-canary-sweep',
+    // Forged session tokens: with anonymous mode on, a refused token on a route that also serves
+    // anonymous callers reads as the anonymous identity, so the refusal would be unprovable there
+    // (QA audit F20-01).
+    'e2e-session-forgery',
 ];
 
 /** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */

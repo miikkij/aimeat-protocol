@@ -22,6 +22,12 @@
 //     stays up. A request with no secret is refused with 401 as well.
 //
 // Version history:
+//   2026-10-16 — capabilities_create over /local/call now SAVES the agent's private capability: POST
+//     /v1/capabilities admits the owner's agent holding capability:write, as the node MCP tool always
+//     did. The assertion pinned the old owner-only answer (ACCESS_DENIED), which was the defect: the same
+//     agent got opposite answers on the two MCP surfaces (QA audit D2-02). group_add_member and
+//     group_remove_member accepted either answer; they now must succeed, for the same reason, so the
+//     daemon's agent holds consent:groups beside '*' (no wildcard carries that word).
 //   2026-10-12 — /local/call answers for tools that had a connector MCP handler only: a company is
 //     registered, corrected and listed, a notification reaches the owner, an email invitation is
 //     made, listed and cancelled; an undeclared parameter, a decision outside its routes, a
@@ -101,8 +107,9 @@ async function registerOwnerAndAgent(base: string, _nodeId: string, ownerName: s
   const ag = await json(base, '/v1/agents', {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
     // memory:read-as-owner, outside the wildcard: the owner_scope tests read the owner's private record
-    // through the connector, which takes that word since feature-list audit 42.
-    body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*', 'memory:read-as-owner'] }),
+    // through the connector, which takes that word since feature-list audit 42. consent:groups, outside
+    // the wildcard too: the group member writes through the dispatch ask it of an agent (QA audit D2-02).
+    body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory', 'actions'], scopes: ['*', 'memory:read-as-owner', 'consent:groups'] }),
   });
   assert(ag.status === 201, `agent status ${ag.status}: ${JSON.stringify(ag.body)}`);
   const agentToken = await getAuthToken(base, ag.body.data.agent.gaii, ag.body.data.private_key);
@@ -367,7 +374,7 @@ await test('A scope change reaches the RUNNING daemon, in both directions, with 
   await settlesAt(403, 'a removed permission');
 
   // GRANT it back. This is the direction crewaimeat reported, and the whole point: no restart.
-  await patchScopes(['*', 'memory:read-as-owner']);
+  await patchScopes(['*', 'memory:read-as-owner', 'consent:groups']);
   await settlesAt(200, 'a granted permission');
 });
 
@@ -474,10 +481,10 @@ await test('POST /local/call/:tool — the doors the catalog and the handler spe
   assert(Array.isArray(orgMembers.body.data?.members), `expected a member list, got ${JSON.stringify(orgMembers.body.data).slice(0, 200)}`);
 
   // ── Groups: get / add_member / remove_member took `id`; add_member never sent identifier_type.
-  //    Only the READ is reachable by an agent — POST /v1/groups and the member doors are owner-only
-  //    — so the group is created with the owner's own token and the agent then reads it. For the two
-  //    writes the node's 403 IS the proof: a dispatch refusal never leaves the process, so an answer
-  //    from the node means the parameter names line up and only the role stands in the way.
+  //    The group is created with the owner's own token and the agent reads it. The member routes
+  //    admit the owner's agent holding consent:groups (this one holds it beside '*', which does not
+  //    carry it), so both writes through the
+  //    dispatch succeed on the owner's group, as the node MCP tools do (QA audit D2-02).
   const grantee = `${account.ownerName}@${NODE_ID}`;
   const grp = await json(BASE, '/v1/groups', {
     method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
@@ -505,8 +512,8 @@ await test('POST /local/call/:tool — the doors the catalog and the handler spe
     const code = r.body.error?.code;
     assert(code !== 'UNKNOWN_PARAMETER' && code !== 'INVALID_INPUT',
       `${tool} was refused by the DISPATCH, not by the node: ${JSON.stringify(r.body).slice(0, 300)}`);
-    assert(code === 'ACCESS_DENIED' || r.body.ok !== false,
-      `${tool} reached the node but answered something unexpected: ${JSON.stringify(r.body).slice(0, 300)}`);
+    assert(r.status === 200 && r.body.ok !== false,
+      `${tool} must reach the node and succeed, as the node MCP tool does: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
   }
 
   // ── Consent: the door required `recipient` + `keys`, a pair nothing declares. Nothing was ever
@@ -543,8 +550,8 @@ await test('POST /local/call/:tool — the doors the catalog and the handler spe
     `the uploaded bytes did not come back: ${JSON.stringify(downloaded.body).slice(0, 300)}`);
 
   // ── Capabilities: the door required `description` + `type`; the route takes `summary`. POST
-  //    /v1/capabilities is owner-only, so the reachable half is the read — and for the write, the
-  //    node's own 403 is what separates a repaired door from a dead one.
+  //    /v1/capabilities admits the owner's agent holding capability:write (this one holds '*'), so the
+  //    write through the dispatch saves a private capability under the agent's GAII (QA audit D2-02).
   const cap = await json(BASE, '/v1/capabilities', {
     method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
     body: JSON.stringify({ name: `Loopback capability ${stamp}`, summary: 'dead-door probe', visibility: 'public' }),
@@ -562,8 +569,11 @@ await test('POST /local/call/:tool — the doors the catalog and the handler spe
     method: 'POST',
     body: JSON.stringify({ name: `Loopback capability ${stamp} b`, summary: 'dead-door probe', visibility: 'private', tags: ['loopback'] }),
   });
-  assert(capCreate.body.error?.code === 'ACCESS_DENIED',
-    `capabilities_create must reach the node and be refused by ROLE, not by the dispatch: ${JSON.stringify(capCreate.body).slice(0, 300)}`);
+  assert(capCreate.status === 200 && capCreate.body.ok !== false,
+    `capabilities_create must reach the node and save, as the node MCP tool does: ${capCreate.status} ${JSON.stringify(capCreate.body).slice(0, 300)}`);
+  const agentCap = (capCreate.body.data?.capability ?? capCreate.body.data) as { id?: string; ownerGhii?: string } | undefined;
+  assert(typeof agentCap?.id === 'string' && agentCap.ownerGhii?.includes('#') === true,
+    `the agent's capability must be stored under its own GAII: ${JSON.stringify(capCreate.body.data).slice(0, 300)}`);
 
   // ── Boards: the door required a `members` array; the route takes add/remove lists.
   const board = await json(loopbackBase, '/local/call/aimeat_board_create', {

@@ -35,6 +35,8 @@
  *   2026-10-16 — `aimeat backup` and `aimeat restore` against this node: no token, a bad token and a
  *     non-operator token exit 1 and write no file; an operator PAT writes the accounts and agents; a
  *     restore with a failed row exits 1 and the route answers restored: false (QA audit P6-07, F19b-01).
+ *   2026-10-16 — `connect call` drives aimeat_package_versions and aimeat_package_delete, the two
+ *     connector-only package tools: the author archives a version, another author's is refused (QA audit W27).
  *   2026-10-15 — The `client --home` DEFECT test is inverted: the credential lands in --home
  *     (feature-list audit #6).
  *   v1.0.0 — 2026-09-08 — Initial creation. No suite had ever run these commands.
@@ -342,6 +344,41 @@ await test('call refuses an unknown tool and a missing tool name', async () => {
   const missing = await runCli(['connect', 'call'], { home, timeoutMs: 30_000 });
   exited(missing, 1);
   said(missing, 'Usage: aimeat connect call', 'stderr');
+});
+
+// aimeat_package_versions and aimeat_package_delete are on the connector only (V2_EXCLUDED in
+// src/tool-catalog/surfaces.ts: pruning a package's history is keyboard maintenance), so this CLI
+// dispatch is the one place an agent calls them (QA audit W27).
+await test('call aimeat_package_versions lists the author\'s versions; aimeat_package_delete archives one, and refuses another author\'s', async () => {
+  const publishAndCompose = async (token: string, tag: string): Promise<{ groupId: string; version: string }> => {
+    const app = `cli-pkg-${tag}-${stamp}.html`;
+    const up = await json('/v1/apps', {
+      method: 'POST', ...auth(token),
+      body: JSON.stringify({ filename: app, content: Buffer.from(`<!DOCTYPE html><title>${tag}</title><h1>${tag}</h1>`).toString('base64'), name: tag, description: 'connect call package fixture', category: 'utility' }),
+    });
+    assert(up.status === 201, `publish ${app}: ${up.status} ${JSON.stringify(up.body?.error)}`);
+    const pkg = await json('/v1/packages/compose', { method: 'POST', ...auth(token), body: JSON.stringify({ name: `cli-pkg-${tag}-${stamp}`, apps: [app] }) });
+    assert(pkg.status === 201, `compose: ${pkg.status} ${JSON.stringify(pkg.body?.error)}`);
+    return { groupId: pkg.body.data.packageGroupId, version: pkg.body.data.version };
+  };
+  const mine = await publishAndCompose(acc.ownerToken, 'mine');
+  const other = await registerOwner(BASE, `clipkgother${stamp}`);
+  const theirs = await publishAndCompose(other.token, 'theirs');
+
+  const listed = await runCli(['connect', 'call', 'aimeat_package_versions', '--json', JSON.stringify({ group_id: mine.groupId })], { home, timeoutMs: 45_000 });
+  exited(listed, 0);
+  said(listed, mine.version);
+
+  const refused = await runCli(['connect', 'call', 'aimeat_package_delete', '--json', JSON.stringify({ group_id: theirs.groupId, version: theirs.version })], { home, timeoutMs: 45_000 });
+  exited(refused, 1);
+  const stillTheirs = await json(`/v1/packages/${encodeURIComponent(theirs.groupId)}/versions/${theirs.version}`, auth(other.token));
+  assert(stillTheirs.status === 200 && stillTheirs.body.data.status !== 'archived',
+    `another author's version must survive the refused call: ${stillTheirs.status} ${JSON.stringify(stillTheirs.body.data?.status)}`);
+
+  const archived = await runCli(['connect', 'call', 'aimeat_package_delete', '--json', JSON.stringify({ group_id: mine.groupId, version: mine.version })], { home, timeoutMs: 45_000 });
+  exited(archived, 0);
+  const rest = await json(`/v1/packages/${encodeURIComponent(mine.groupId)}/versions/${mine.version}`, auth(acc.ownerToken));
+  assert(rest.status === 200 && rest.body.data.status === 'archived', `the version is archived on the node: ${rest.status} ${JSON.stringify(rest.body.data?.status)}`);
 });
 
 await test('call from an unconfigured home says what to run, and exits 1', async () => {

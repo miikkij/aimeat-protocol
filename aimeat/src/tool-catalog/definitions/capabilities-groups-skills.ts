@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-16 — aimeat_capabilities_vouch declares capability:write; the operator tools' descriptions say
+ *     what the connector's routes now admit (QA audit D2-02).
  *   2026-10-12 — aimeat_skill_list names memory:read, the word GET /v1/skills asks; enforced from 4.0.0.
  *   2026-10-12 — aimeat_consent_grant: `scope` is the reach local, federation or auth (private and dmz
  *     kept as older names for local) and optional, the node picking the default (Core 2026-11 AUTHZ-18).
@@ -137,6 +139,9 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Vouch for Capability', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // A vouch speaks in the owner's name about a capability, which the scope model puts under
+        // capability:write; POST /v1/capabilities/:id/vouch asks an agent the same word (QA audit D2-02).
+        scope: 'capability:write',
         surfaces: ['service'],
         input: {
             id: { type: 'string', required: true, description: 'Capability identifier.' },
@@ -727,12 +732,13 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_operator_agent_configure',
-        description: 'Configure a same-owner agent with PROPOSE-THEN-CONFIRM. Without confirm_token nothing is applied: the tool returns the current state, the proposed state, a field-level diff, and a single-use confirm_token (10 min TTL) bound to exactly this change — show the diff to the owner. Calling again with the same arguments plus the token applies it; changing anything invalidates the token. Configurable: display_name, description, mode, tags, scopes. Scope changes may only NARROW the granted set — adding scopes remains an owner approval in the profile UI. (Connector/CLI apply directly through the per-field routes, which carry the same owner/operator authz; display_name/description are shell-unsupported.)',
+        description: 'Configure a same-owner agent with PROPOSE-THEN-CONFIRM. Without confirm_token nothing is applied: the tool returns the current state, the proposed state, a field-level diff, and a single-use confirm_token (10 min TTL) bound to exactly this change — show the diff to the owner. Calling again with the same arguments plus the token applies it; changing anything invalidates the token. Configurable: display_name, description, mode, tags, scopes. Scope changes may only NARROW the granted set — adding scopes remains an owner approval in the profile UI. (Connector/CLI apply directly through the per-field routes, which ask the same words and allow an agent only to narrow scopes; display_name/description are shell-unsupported.)',
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         // Rewriting an agent's PERMISSIONS is its own word, and no wildcard carries it. PATCH
-        // /v1/agents/:name/scopes is owner-only, and the propose-then-confirm dance here binds the
+        // /v1/agents/:name/scopes asks an agent the same two words and lets it only narrow (QA audit
+        // D2-02), and the propose-then-confirm dance here binds the
         // token to the CALLER — so the same agent mints and redeems it in two consecutive calls, and
         // the "show this diff to the owner" text is instruction rather than a gate.
         // The words PATCH /v1/agents/:name/mode asks (secaudit 2026-10 follow-up, A4).
@@ -750,7 +756,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_operator_ai_config',
-        description: 'Inspect or change the owner\'s AI routing + daily budget with PROPOSE-THEN-CONFIRM. With no fields: returns the current safe view (daily_budget_usd, model, reasoning_model, execution_model). With fields but no confirm_token: applies NOTHING — returns current/proposed/diff + a single-use token (10 min) bound to exactly this change; show the diff to the owner. With the token: applies. The API key is stored separately and can NEVER be read or changed through this tool. (Connector/CLI apply the daily budget directly via the owner-gated route; model routing is shell-unsupported.)',
+        description: 'Inspect or change the owner\'s AI routing + daily budget with PROPOSE-THEN-CONFIRM. With no fields: returns the current safe view (daily_budget_usd, model, reasoning_model, execution_model). With fields but no confirm_token: applies NOTHING — returns current/proposed/diff + a single-use token (10 min) bound to exactly this change; show the diff to the owner. With the token: applies. The API key is stored separately and can NEVER be read or changed through this tool. (Connector/CLI apply the daily budget directly through POST /v1/ai/settings, which asks an agent the same words (memory:write-reserved and memory:write-as-owner); model routing is shell-unsupported.)',
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Configure AI Routing & Budget (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

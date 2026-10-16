@@ -16,6 +16,9 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   2026-10-16 — GET /v1/commerce/payout admits the owner's agent holding commerce:sell and reads the owner's
+ *     record, as aimeat_commerce_psp_status does on the node MCP; the payout writes stay owner-only, and
+ *     aimeat_commerce_psp_delete now refuses an agent as DELETE /payout/stripe does (QA audit D2-02).
  *   2026-10-16 — PUT /v1/commerce/payout/invoice sets whether the seller takes invoice payment for items
  *     delivered as soon as a checkout completes (off by default); GET /v1/commerce/payout reports it as
  *     invoice.accept_immediate (QA audit S8-03).
@@ -192,9 +195,14 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
    * Which rails can actually pay this seller, and the one setting the seller owns for each. The two
    * rails are deliberately reported apart: Stripe moves fiat (EUR/USD) to a connected account, x402
    * moves a stablecoin on-chain to an address the seller controls. Reading tells you which of your money
-   * listings can settle at all — an x402 sale without an address fails with SELLER_NO_X402_ADDRESS. */
-  router.get('/v1/commerce/payout', requireAuth(), requireRole('owner'), async (req, res) => {
-    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
+   * listings can settle at all — an x402 sale without an address fails with SELLER_NO_X402_ADDRESS.
+   * WHO. The owner in person, or their agent holding commerce:sell, the word aimeat_commerce_psp_status
+   * declares: a seller's agent pricing an offer needs to know whether a money sale can settle. It is a
+   * read, and the secret is never in it (keyHint is the last four characters). The writes below stay
+   * the owner's in person (decision D5). requireRole('agent') keeps an app grant and an ecosystem app
+   * out (QA audit D2-02). */
+  router.get('/v1/commerce/payout', requireAuth(), requireRole('agent'), requireScope('commerce:sell'), async (req, res) => {
+    const ownerGhii = callerOf(req, config.nodeId, storage).ownerGhii;
     const psp = await readPsp(storage, ownerGhii);
     const address = payToOf(psp);
     // What the stablecoin rail can settle is READ FROM THE NETWORK REGISTRY, never hardcoded: the

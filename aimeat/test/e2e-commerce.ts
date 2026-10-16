@@ -8,6 +8,7 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   2026-10-16 — 37c: PUT /v1/commerce/payout/invoice without a credential is refused (QA audit W29).
  *   2026-10-16 — 6b: three completions of one session at the same moment complete once and charge the
  *     pacing once (QA audit S8-04). 37c: the invoice rail is refused for a callable app-tool, a line
  *     delivered at once, until the seller turns invoice.accept_immediate on, and nothing is charged or
@@ -946,6 +947,8 @@ await test('37c. The invoice rail is refused for a tool call until the seller ta
     assert(payout.body.data.invoice?.accept_immediate === false, `off by default: ${JSON.stringify(payout.body.data.invoice)}`);
     const bad = await json('/v1/commerce/payout/invoice', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ accept_immediate: 'yes' }) });
     assert(bad.status === 400, `a non-boolean is refused: ${bad.status}`);
+    const anon = await json('/v1/commerce/payout/invoice', { method: 'PUT', body: JSON.stringify({ accept_immediate: true }) });
+    assert(anon.status === 401, `no credential, no change to anyone's invoice setting: ${anon.status}`);
     const on = await json('/v1/commerce/payout/invoice', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ accept_immediate: true }) });
     assert(on.status === 200 && on.body.data.accept_immediate === true, `turn on: ${on.status} ${JSON.stringify(on.body)}`);
     assert((await json('/v1/commerce/payout', { headers: auth(seller.token) })).body.data.invoice?.accept_immediate === true, 'reported on');

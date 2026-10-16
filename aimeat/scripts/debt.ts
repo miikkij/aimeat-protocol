@@ -31,9 +31,8 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
- *   v1.5.0 — 2026-10-16 — The suites whose only refusal is a 401 join the report (QA audit P3-08).
- *   v1.5.0 — 2026-10-16 — The src/static silent catches (per file and per shape) and the silent-catch
- *     exemptions join the report (W25: check:silent-catch gates src/static and counts exemptions).
+ *   2026-10-16 — The catalog MCP tools no E2E suite calls, the suites whose only refusal is an
+ *     anonymous 401 and the authenticated routes no suite refuses join the report (QA audit W27, W29, P3-08).
  *   v1.4.0 — 2026-10-12 — The node MCP tools that `aimeat connect serve` does not offer join the report.
  *   v1.3.0 — 2026-10-05 — The single-entry ceilings join the report (secaudit 2026-10, C1, C2, C7).
  *   v1.2.0 — 2026-09-13 — The substitute-answering catches join the report. Their file is keyed by
@@ -81,9 +80,16 @@ const RATCHETS: Ratchet[] = [
     { file: 'aimeat/security/config-coverage-exemptions.json', label: 'Settings not in the Config tab', check: 'check:config-coverage', count: exemptMap },
     { file: 'aimeat/security/outbound-fetch-exemptions.json', label: 'Bare outbound fetches', check: 'check:outbound-fetch', count: exemptMap },
     { file: 'aimeat/security/denial-coverage-exemptions.json', label: 'Suites with no denial case', check: 'check:denial-coverage', count: exemptMap },
-    { file: 'aimeat/security/denial-coverage-no-second-principal.json', label: 'Suites refusing no signed-in second caller', check: 'check:denial-coverage', count: exemptMap },
+    {
+        file: 'aimeat/security/denial-coverage-exemptions.json',
+        label: 'Suites whose only refusal is an anonymous 401',
+        check: 'check:denial-coverage',
+        count: raw => Object.keys((JSON.parse(raw) as { anonymous_only?: object }).anonymous_only ?? {}).length,
+    },
+    { file: 'aimeat/security/route-refusal-exemptions.json', label: 'Authenticated routes no suite refuses', check: 'check:denial-coverage', count: exemptMap },
     { file: 'aimeat/security/storage-parity-exemptions.json', label: 'Tables outside the cascades', check: 'check:storage-parity', count: exemptMap },
     { file: 'aimeat/security/connect-serve-parity-exemptions.json', label: 'MCP tools not on connect serve', check: 'check:mcp-tools', count: exemptMap },
+    { file: 'aimeat/security/mcp-uncalled-tools.json', label: 'MCP tools no E2E suite calls', check: 'check:mcp-test-calls', count: exemptMap },
     {
         file: 'aimeat/security/silent-catch-substitutes.json',
         label: 'Catches answering a substitute',
@@ -91,21 +97,6 @@ const RATCHETS: Ratchet[] = [
         // Keyed by FILE with a per-file ceiling, not one key per site: a catch handler has no stable
         // name. The backlog is the sum of the ceilings, so it falls when a handler is fixed AND the
         // count is lowered.
-        count: raw => Object.values((JSON.parse(raw) as { files?: Record<string, { count: number }> }).files ?? {})
-            .reduce((n, e) => n + e.count, 0),
-    },
-    {
-        file: 'aimeat/security/silent-catch-static-baseline.json',
-        label: 'Silent catches in src/static',
-        check: 'check:silent-catch',
-        // Per file, per shape, a ceiling: the backlog is the sum of every shape's ceiling.
-        count: raw => Object.values((JSON.parse(raw) as { files?: Record<string, { counts: Record<string, number> }> }).files ?? {})
-            .reduce((n, e) => n + Object.values(e.counts ?? {}).reduce((m, c) => m + c, 0), 0),
-    },
-    {
-        file: 'aimeat/security/silent-catch-exemptions.json',
-        label: 'Silent-catch exemptions',
-        check: 'check:silent-catch',
         count: raw => Object.values((JSON.parse(raw) as { files?: Record<string, { count: number }> }).files ?? {})
             .reduce((n, e) => n + e.count, 0),
     },

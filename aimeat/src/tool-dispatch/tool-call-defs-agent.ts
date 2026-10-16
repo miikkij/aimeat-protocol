@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 -- The comments on aimeat_operator_agent_configure and aimeat_operator_ai_config say what the
+ *     routes now admit: PATCH /scopes an agent holding agent:permissions + agent:write (narrowing only),
+ *     POST /v1/ai/settings an agent holding memory:write-reserved + memory:write-as-owner (QA audit D2-02).
  *   2026-10-15 -- aimeat_task_request_changes removed: the route admits only the owner in person and the
  *     connector calls as the agent, so every call answered 403 (feature-list audit #79).
  *   2026-10-11 -- aimeat_agent_stop and aimeat_agent_start move unchanged to
@@ -735,9 +738,10 @@ export const agentTools: ConnectCliToolDefinition[] = [
     {
         // Operator config-enactment. The server MCP tool runs propose-then-confirm with no single REST
         // route; the shell path APPLIES DIRECTLY through the per-field routes that exist —
-        // PATCH /v1/agents/:name/{mode,tags,scopes}. Those routes carry the real authz (scopes is
-        // requireRole('owner'); mode/tags are same-owner), so only an owner/operator principal can enact
-        // a change — a plain agent token gets 403. display_name/description have no route (shell-unsupported).
+        // PATCH /v1/agents/:name/{mode,tags,scopes}. Those routes carry the real authz: scopes admits the
+        // owner, or an agent holding agent:permissions + agent:write that only narrows (the node MCP
+        // tool's rule); mode/tags are same-owner with agent:write. display_name/description have no
+        // route (shell-unsupported).
         name: 'aimeat_operator_agent_configure',
         handler: async ({ client }, input) => {
             const target = requiredString(input, 'agent_name');
@@ -764,7 +768,8 @@ export const agentTools: ConnectCliToolDefinition[] = [
         },
     },
     {
-        // Owner AI budget/routing. daily_budget_usd applies via POST /v1/ai/settings (owner-gated);
+        // Owner AI budget/routing. daily_budget_usd applies via POST /v1/ai/settings (the owner, or an
+        // agent holding memory:write-reserved + memory:write-as-owner, the node MCP tool's two words);
         // model routing has no REST route (shell-unsupported — set it via the profile UI or server MCP).
         name: 'aimeat_operator_ai_config',
         handler: async ({ client }, input) => {

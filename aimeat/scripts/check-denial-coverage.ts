@@ -8,33 +8,46 @@
  *   fence, so deleting a scope check leaves it green. Independently reproduced before this script
  *   was written: 89 of 234 registered E2E files contained no assertion about a 401 or a 403.
  *
- *   WHY THE EXEMPTION EXPIRES, which is the whole design. `check-route-scopes.ts` was seeded with
- *   340 offenders on 2026-08-10 so it could only ratchet down, and by 2026-08-15 it was still 340:
- *   every entry carried the same generated sentence, nobody owned any of them, and the gate was
- *   green the entire time. A backlog nobody is ever forced to look at is not a backlog. Here the
- *   exemption is pinned to the suite's CONTENT: edit the file and its exemption stops covering it.
- *   You are not asked to fix the backlog; you are asked to leave the file you touched better than
- *   you found it, which is the one moment you already have the context to do it.
+ *   THREE QUESTIONS, each with its own ratcheted list:
+ *   1. Does the suite assert that a SECOND principal is refused: a 403, or a refused MCP call
+ *      (`isError`)? A suite with neither is in `exempt`.
+ *   2. Is the only refusal it asserts an anonymous 401? That proves the sign-in check and nothing
+ *      about who else may act, so such a suite is in `anonymous_only` (QA audit 2026-10, P3-08: the
+ *      gate's label promised question 1 while a single 401 anywhere satisfied it).
+ *   3. Does every authenticated ROUTE of the contract have a refusal assertion in some suite?
+ *      A suite that refuses one route says nothing about the forty others it drives. The routes
+ *      with none are in security/route-refusal-exemptions.json (scripts/lib/route-refusals.ts says
+ *      how a refusal is tied to a route).
+ *
+ *   WHY THE SUITE EXEMPTION EXPIRES, which is the whole design. `check-route-scopes.ts` was seeded
+ *   with 340 offenders on 2026-08-10 so it could only ratchet down, and by 2026-08-15 it was still
+ *   340: every entry carried the same generated sentence, nobody owned any of them, and the gate was
+ *   green the entire time. Here a suite's exemption is pinned to the suite's CONTENT: edit the file
+ *   and its exemption stops covering it. You are not asked to fix the backlog; you are asked to leave
+ *   the file you touched better than you found it, which is the one moment you already have the
+ *   context to do it. The route list is pinned differently: an entry whose route a suite now refuses
+ *   fails until it is deleted, and ROUTE_CEILING is lowered in the same change, so it only shrinks.
  * @structure
  *   - registeredSuites(): the ALL_SUITES list in test/run-e2e-ci.ts, parsed as text (the runner is
  *     the source of truth for what actually executes; a file on no list is silent, not skipped)
- *   - denialKind(): which refusal the suite's assert CONDITIONS ask about: an authenticated second
- *     principal (a 403 or an MCP isError), only a caller with no credential (a 401), or none
- *   - main(): suites with no refusal at all against security/denial-coverage-exemptions.json, and
- *     suites with no refusal of an authenticated second principal against
- *     security/denial-coverage-no-second-principal.json; --strict exits 1
+ *   - denialKinds(): which refusals a suite asserts (second principal, anonymous)
+ *   - hasDenialAssertion(): kept for callers; true for either kind
+ *   - main(): the three lists; --strict exits 1
  * @usage
- *   cd aimeat && pnpm check:denial-coverage            # report
- *   cd aimeat && pnpm check:denial-coverage --strict   # the hook/CI gate
- *   cd aimeat && pnpm check:denial-coverage --seed     # rewrite the first file from today's state
- *   cd aimeat && pnpm exec tsx scripts/check-denial-coverage.ts --seed-second-principal   # the second
+ *   cd aimeat && pnpm check:denial-coverage            # the hook/CI gate (strict)
+ *   cd aimeat && pnpm check:denial-coverage:report     # report
+ *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
- *   v1.2.0 — 2026-10-16 — A 401 alone and a status compared with !== no longer count as asking what a
- *     second principal gets. The detector returned true on the first 401 or 403 in any condition, so
- *     an anonymous 401 or `assert(r.status !== 403)` passed a gate labelled "Every suite asks what a
- *     second principal gets". Those suites are a second ratchet,
- *     security/denial-coverage-no-second-principal.json, seeded once, sha-pinned like the first
- *     (QA audit P3-08, S2-03).
+ *   2026-10-16 — denialKind answers the same two kinds as one word; the separate
+ *     denial-coverage-no-second-principal.json list of a parallel P3-08 change is folded into
+ *     `anonymous_only` here.
+ *   v1.2.0 — 2026-10-16 — QA audit P3-08 and W29. A status refusal on the negated side of a
+ *     comparison (`r.status !== 403`) no longer counts, the way `!r.isError` never did. A suite whose
+ *     only refusal is an anonymous 401 is its own list (`anonymous_only`), because the label says
+ *     "what a second principal gets" and a 401 answers who is signed in. And the route question:
+ *     every authenticated operation in openapi.yaml needs a refusal assertion in some suite, or an
+ *     entry in security/route-refusal-exemptions.json; seeded 2026-10-16 with 504 of 1322 (513 on
+ *     the tree this change started from, the W29 suites refuse the other nine).
  *   v1.1.0 — 2026-08-15 — The detector reads an MCP refusal too, not only an HTTP status. A refused
  *     tools/call comes back as a JSON-RPC error, which every suite here reads as `isError`, so a
  *     status-only test reported twenty MCP suites as having no denial case while refusal was the only
@@ -50,13 +63,21 @@
  *     A gate that cannot go green on one of the platforms it runs on is a gate people route around.
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, relative } from 'node:path';
 import { createHash } from 'node:crypto';
+import { authenticatedOperations, isNegatedStatus, refusedRoutes, routeMatchers } from './lib/route-refusals.js';
 
 const ROOT = process.cwd();
 const RUNNER = join(ROOT, 'test', 'run-e2e-ci.ts');
 const EXEMPTIONS = join(ROOT, 'security', 'denial-coverage-exemptions.json');
+const ROUTE_EXEMPTIONS = join(ROOT, 'security', 'route-refusal-exemptions.json');
+const OPENAPI = join(ROOT, '..', 'openapi.yaml');
+
+/**
+ * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
+ * deletes entries; raising it is the developer's decision.
+ */
+export const ROUTE_CEILING = 495;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */
@@ -68,7 +89,11 @@ interface Exemption {
 interface ExemptionFile {
     note: string;
     exempt: Record<string, Exemption>;
+    /** Suites whose only refusal is an anonymous 401 (P3-08). Same shape, same expiry. */
+    anonymous_only?: Record<string, Exemption>;
 }
+
+interface RouteExemptionFile { note: string; exempt: Record<string, string> }
 
 /**
  * The suites the runner actually executes. Parsed from the array text rather than imported, because
@@ -102,44 +127,26 @@ function isNegatedAt(condition: string, at: number): boolean {
 }
 
 /**
- * Does this suite assert a refusal?
+ * Which refusals does this suite assert?
  *
  * The CONDITION of the assert has to mention the refusal, not the message. `assert(ok, 'expected 403
  * eventually')` is a sentence about a wish; `assert(r.status === 403, …)` is the test. Everything up
  * to the first top-level comma is the condition, so a message that happens to name a status cannot
  * make an unrelated assertion look like a denial case.
  *
- * TWO SHAPES COUNT, because this node has two surfaces and they refuse differently.
+ * `second`: a 403, or a refused MCP call. HTTP answers with a status; MCP does not send one, and a
+ * tools/call that is refused comes back as a JSON-RPC error, which every suite here reads as
+ * `isError`. A status-only detector once reported the MCP suites as having no denial case while they
+ * were doing nothing else (test/e2e-mcp-cross-owner.ts, seventeen refusals of owner B).
  *
- * HTTP answers with a status. 401 and 403 both count: which one a door sends is a design choice (a
- * 404 that refuses to confirm existence is a third), and this gate asks whether the suite ever asks
- * about refusal at all.
+ * `anonymous`: a 401. It proves the route asks for a credential, and nothing about whether another
+ * signed-in principal is kept out.
  *
- * MCP does not send a status. A tools/call that is refused comes back as a JSON-RPC error, which
- * every suite here reads as `isError`, so a status-only detector reported the MCP suites as having no
- * denial case while they were doing nothing else. It said so about test/e2e-mcp-cross-owner.ts — a
- * file that exists solely to prove owner B is refused seventeen ways — the first time that file was
- * edited after the seed. A gate that is wrong about its best example teaches people to route around
- * it, so it now measures the refusal rather than the transport that carries it.
+ * Either kind counts only on the asserted side of the comparison: `r.status !== 403` and
+ * `!r.isError` are positive controls.
  */
-export function hasDenialAssertion(source: string): boolean {
-    return denialKind(source) !== 'none';
-}
-
-/**
- * Is this status number compared with `!==` or `!=` (`r.status !== 403`), which asserts that the call
- * was NOT refused? Read the same way as a negated isError: it is the positive control.
- */
-function isNegatedStatusAt(condition: string, at: number): boolean {
-    let i = at - 1;
-    while (i >= 0 && /\s/.test(condition[i]!)) i--;
-    const op = condition.slice(Math.max(0, i - 2), i + 1);
-    return op.endsWith('!==') || op.endsWith('!=');
-}
-
-/** The conditions of every `assert(...)` in a suite: everything up to its first top-level comma. */
-function assertConditions(source: string): string[] {
-    const out: string[] = [];
+export function denialKinds(source: string): { second: boolean; anonymous: boolean } {
+    const kinds = { second: false, anonymous: false };
     const re = /\bassert\s*\(/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(source))) {
@@ -152,40 +159,29 @@ function assertConditions(source: string): string[] {
             else if (c === ')' || c === ']' || c === '}') depth--;
             else if (c === ',' && depth === 1) break;   // end of the condition
         }
-        out.push(source.slice(start, i));
-    }
-    return out;
-}
-
-/**
- * Which refusal a suite asks about (QA audit 2026-10-16, P3-08).
- *
- *   second-principal  a 403, or an MCP isError: an authenticated caller who is refused. This is what
- *                     the gate's label promises: what a second owner, or an agent without the scope,
- *                     gets.
- *   anonymous-only    the only refusal is a 401, a caller with no credential. It proves the door asks
- *                     for one, and nothing about whose data a signed-in caller reaches.
- *   none              no refusal at all.
- *
- * The first version counted the first 401 or 403 anywhere, including `assert(r.status !== 403)`, so a
- * suite whose only "denial" was an anonymous 401 or a positive control passed a gate labelled "Every
- * suite asks what a second principal gets". A status compared with !== or != does not count now, the
- * same way a negated isError never did.
- */
-export function denialKind(source: string): 'second-principal' | 'anonymous-only' | 'none' {
-    let anonymous = false;
-    for (const condition of assertConditions(source)) {
-        for (const hit of condition.matchAll(/\b403\b/g)) {
-            if (!isNegatedStatusAt(condition, hit.index)) return 'second-principal';
+        const condition = source.slice(start, i);
+        for (const hit of condition.matchAll(/\b40([13])\b/g)) {
+            if (isNegatedStatus(condition, hit.index)) continue;
+            if (hit[1] === '3') kinds.second = true; else kinds.anonymous = true;
         }
         for (const hit of condition.matchAll(/\bisError\b/g)) {
-            if (!isNegatedAt(condition, hit.index)) return 'second-principal';
+            if (!isNegatedAt(condition, hit.index)) kinds.second = true;
         }
-        for (const hit of condition.matchAll(/\b401\b/g)) {
-            if (!isNegatedStatusAt(condition, hit.index)) anonymous = true;
-        }
+        if (kinds.second && kinds.anonymous) break;
     }
-    return anonymous ? 'anonymous-only' : 'none';
+    return kinds;
+}
+
+/** Does this suite assert any refusal at all (either kind)? */
+export function hasDenialAssertion(source: string): boolean {
+    const k = denialKinds(source);
+    return k.second || k.anonymous;
+}
+
+/** The suite's strongest refusal as one word: a signed-in second caller, an anonymous 401 alone, or none. */
+export function denialKind(source: string): 'second-principal' | 'anonymous-only' | 'none' {
+    const k = denialKinds(source);
+    return k.second ? 'second-principal' : k.anonymous ? 'anonymous-only' : 'none';
 }
 
 /**
@@ -205,141 +201,171 @@ export function denialKind(source: string): 'second-principal' | 'anonymous-only
 const sha = (text: string): string =>
     createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex').slice(0, 16);
 
-/** The second ratchet: suites whose refusals never involve an authenticated second principal (P3-08). */
-const SECOND_PRINCIPAL = join(ROOT, 'security', 'denial-coverage-no-second-principal.json');
-
-function loadFile(path: string): ExemptionFile {
-    if (!existsSync(path)) return { note: '', exempt: {} };
-    return JSON.parse(readFileSync(path, 'utf-8')) as ExemptionFile;
+function loadExemptions(): ExemptionFile {
+    if (!existsSync(EXEMPTIONS)) return { note: '', exempt: {} };
+    return JSON.parse(readFileSync(EXEMPTIONS, 'utf-8')) as ExemptionFile;
 }
 
-interface Measured { suite: string; sha: string; kind: ReturnType<typeof denialKind> }
+function loadRouteExemptions(): RouteExemptionFile {
+    if (!existsSync(ROUTE_EXEMPTIONS)) return { note: '', exempt: {} };
+    return JSON.parse(readFileSync(ROUTE_EXEMPTIONS, 'utf-8')) as RouteExemptionFile;
+}
 
-/** Hold one class of offenders against its file: NEW when unlisted, EXPIRED when edited since. */
-function judge(offenders: Measured[], file: ExemptionFile): { fresh: string[]; expired: string[]; stale: string[] } {
+const SUITE_SEED_REASON = 'Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite '
+    + 'drives its surface with one principal and never asks what a second one gets. Either add a '
+    + 'cross-owner or cross-scope refusal, or replace this line with why the surface has no '
+    + 'refusal to test.';
+const ANONYMOUS_SEED_REASON = 'Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal '
+    + 'this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether '
+    + 'another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a '
+    + 'refused MCP call), or replace this line with why the surface has no second principal to refuse.';
+const ROUTE_PLACEHOLDER = 'NO REFUSAL TEST';
+const ROUTE_SEED_REASON = `${ROUTE_PLACEHOLDER}: no registered E2E suite asserted a 401 or 403 from this route on 2026-10-16 `
+    + '(QA audit W29). Add the refusal to the suite of its area, or replace this line with why the route has none to test.';
+
+/** Pin each suite to an exemption reason; keep a reason somebody already wrote while the sha still matches. */
+function pinned(rows: { suite: string; sha: string }[], previous: Record<string, Exemption> | undefined, reason: string): Record<string, Exemption> {
+    const out: Record<string, Exemption> = {};
+    for (const r of rows) {
+        const old = previous?.[r.suite];
+        out[r.suite] = old && old.sha === r.sha ? old : { reason, sha: r.sha };
+    }
+    return out;
+}
+
+/** Fresh, expired and now-covered entries of one sha-pinned list. */
+function compare(rows: { suite: string; sha: string }[], list: Record<string, Exemption>): { fresh: string[]; expired: string[]; stale: string[] } {
     const fresh: string[] = [];
     const expired: string[] = [];
-    for (const m of offenders) {
-        const e = file.exempt[m.suite];
-        if (!e) fresh.push(m.suite);
-        else if (e.sha !== m.sha) expired.push(m.suite);
+    for (const r of rows) {
+        const e = list[r.suite];
+        if (!e) fresh.push(r.suite);
+        else if (e.sha !== r.sha) expired.push(r.suite);
     }
-    const stale = Object.keys(file.exempt).filter(k => !offenders.some(m => m.suite === k));
+    const stale = Object.keys(list).filter(k => !rows.some(r => r.suite === k));
     return { fresh, expired, stale };
-}
-
-function report(title: string, fileName: string, offenders: Measured[], j: ReturnType<typeof judge>, advice: string[]): void {
-    console.log(`  ${title}`);
-    console.log(`    listed in ${fileName}: ${offenders.length - j.fresh.length - j.expired.length}   EXPIRED (file edited): ${j.expired.length}   NEW: ${j.fresh.length}${j.stale.length ? `   now fixed: ${j.stale.length}` : ''}`);
-    if (j.fresh.length || j.expired.length) {
-        for (const line of advice) console.log(`    ${line}`);
-        for (const s of j.fresh) console.log(`      NEW      ${s}`);
-        for (const s of j.expired) console.log(`      EXPIRED  ${s}`);
-    }
-    if (j.stale.length) {
-        console.log(`    Now covered, so these entries can go from security/${fileName}:`);
-        for (const s of j.stale.sort()) console.log(`      ${s}`);
-    }
-    console.log('');
 }
 
 function main(): void {
     const strict = process.argv.includes('--strict');
     const seed = process.argv.includes('--seed');
-    const seedSecond = process.argv.includes('--seed-second-principal');
+    const seedAnonymous = process.argv.includes('--seed-anonymous');
+    const seedRoutes = process.argv.includes('--seed-routes');
 
     const suites = registeredSuites(readFileSync(RUNNER, 'utf-8'));
-    const measured: Measured[] = [];
+    const none: { suite: string; sha: string }[] = [];
+    const anonymousOnly: { suite: string; sha: string }[] = [];
+    const sources: string[] = [];
     for (const suite of suites) {
         const full = join(ROOT, suite);
         if (!existsSync(full)) continue;   // check:e2e-registry owns "the list names a file that is gone"
         const source = readFileSync(full, 'utf-8');
-        measured.push({ suite, sha: sha(source), kind: denialKind(source) });
+        sources.push(source);
+        const k = denialKinds(source);
+        if (!k.second && !k.anonymous) none.push({ suite, sha: sha(source) });
+        else if (!k.second) anonymousOnly.push({ suite, sha: sha(source) });
     }
-    const exemptions = loadFile(EXEMPTIONS);
-    // No refusal at all, and listed in the first file: that file's backlog, as before.
-    const none = measured.filter(m => m.kind === 'none' && exemptions.exempt[m.suite]);
-    // Every other suite that never asks what an authenticated second principal gets: a 401 alone, a
-    // status compared with !==, or nothing at all on a suite the first detector counted as covered.
-    const noSecond = measured.filter(m => m.kind !== 'second-principal' && !none.includes(m));
 
-    if (seed) {
-        const exempt: Record<string, Exemption> = {};
-        for (const m of measured.filter(x => x.kind === 'none')) {
-            exempt[m.suite] = {
-                reason: 'Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite '
-                    + 'drives its surface with one principal and never asks what a second one gets. Either add a '
-                    + 'cross-owner or cross-scope refusal, or replace this line with why the surface has no '
-                    + 'refusal to test.',
-                sha: m.sha,
-            };
-        }
+    const authenticated = authenticatedOperations(OPENAPI);
+    const refused = refusedRoutes(sources, routeMatchers(authenticated));
+    const unrefused = authenticated.filter(k => !refused.has(k));
+
+    const file = loadExemptions();
+    if (seed || seedAnonymous) {
         const out: ExemptionFile = {
-            note: 'Registered E2E suites with no assertion about a 401 or 403. Seeded from the state on '
-                + '2026-08-15 so the gate can only ratchet down. The `sha` pins the reason to the file it was '
-                + 'written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is '
-                + 'the one person who has the context to add the missing case. Re-stamping the sha without '
-                + 'adding a denial is available and is a decision someone has to write down.',
-            exempt,
+            note: 'Registered E2E suites with no refusal of a second principal. `exempt`: suites that assert no refusal at all '
+                + '(seeded 2026-08-15). `anonymous_only`: suites whose only refusal is an anonymous 401 (seeded 2026-10-16, QA audit '
+                + 'P3-08). Both were seeded from the state of their day so the gate can only ratchet down. The `sha` pins the reason '
+                + 'to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the '
+                + 'one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available '
+                + 'and is a decision someone has to write down.',
+            exempt: seed ? pinned(none, undefined, SUITE_SEED_REASON) : file.exempt,
+            anonymous_only: seedAnonymous ? pinned(anonymousOnly, file.anonymous_only, ANONYMOUS_SEED_REASON) : (file.anonymous_only ?? {}),
         };
         writeFileSync(EXEMPTIONS, JSON.stringify(out, null, 2) + '\n');
-        console.log(`Seeded ${Object.keys(exempt).length} exemptions into ${relative(ROOT, EXEMPTIONS)}`);
-        return;
+        console.log(`Wrote ${relative(ROOT, EXEMPTIONS)}: exempt ${Object.keys(out.exempt).length}, anonymous_only ${Object.keys(out.anonymous_only ?? {}).length}`);
     }
-    if (seedSecond) {
-        const exempt: Record<string, Exemption> = {};
-        for (const m of noSecond) {
-            exempt[m.suite] = {
-                reason: `Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is ${m.kind === 'anonymous-only'
-                    ? 'a 401 for a caller with no credential' : 'none the stricter detector reads (a status compared with !== is a positive control)'}; `
-                    + 'it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an '
-                    + 'authenticated second principal, or replace this line with why the surface has none (a 404 that hides '
-                    + "another owner's object is a refusal; say so here).",
-                sha: m.sha,
-            };
-        }
-        const out: ExemptionFile = {
-            note: 'Registered E2E suites that ask about no refusal of an AUTHENTICATED second principal: their only refusal is a '
-                + '401 for a caller with no credential, or a status compared with !== (a positive control). The first version '
-                + 'of check:denial-coverage counted any 401 or 403 in a condition, so these passed a gate labelled "Every suite '
-                + 'asks what a second principal gets" (QA audit 2026-10-16, P3-08). Seeded so the gate can only ratchet down; '
-                + 'the `sha` pins each reason to the file it was written about, and editing the suite expires it.',
+    if (seedRoutes) {
+        const previous = loadRouteExemptions().exempt;
+        const exempt: Record<string, string> = {};
+        for (const k of unrefused) exempt[k] = previous[k] ?? ROUTE_SEED_REASON;
+        const out: RouteExemptionFile = {
+            note: 'Authenticated routes of openapi.yaml (a non-empty `security` list without the empty alternative) that no registered '
+                + 'E2E suite asserts a refusal from: no `test(` block both names the route and asserts a 401 or 403 that is not negated '
+                + '(scripts/lib/route-refusals.ts; pnpm check:denial-coverage). Seeded 2026-10-16 from the QA audit (W29). An entry '
+                + `that starts with ${ROUTE_PLACEHOLDER} is a QUESTION: nobody has written the refusal yet. An ANSWER says why the route `
+                + 'has no refusal to test. The list only shrinks: an entry whose route a suite now refuses fails the gate until it is '
+                + 'deleted, and ROUTE_CEILING in scripts/check-denial-coverage.ts is lowered in the same change. A new entry or a higher '
+                + 'ceiling is the developer\'s decision.',
             exempt,
         };
-        writeFileSync(SECOND_PRINCIPAL, JSON.stringify(out, null, 2) + '\n');
-        console.log(`Seeded ${noSecond.length} entries into ${relative(ROOT, SECOND_PRINCIPAL)}`);
+        writeFileSync(ROUTE_EXEMPTIONS, JSON.stringify(out, null, 2) + '\n');
+        console.log(`Wrote ${relative(ROOT, ROUTE_EXEMPTIONS)}: ${unrefused.length} routes. Set ROUTE_CEILING = ${unrefused.length}.`);
+    }
+    if (seed || seedAnonymous || seedRoutes) return;
+
+    const suiteCmp = compare(none, file.exempt);
+    const anonCmp = compare(anonymousOnly, file.anonymous_only ?? {});
+    const routeList = loadRouteExemptions().exempt;
+    const routeKeys = Object.keys(routeList);
+    const routeFresh = unrefused.filter(k => !(k in routeList));
+    const routeNowRefused = routeKeys.filter(k => refused.has(k));
+    const routeGone = routeKeys.filter(k => !authenticated.includes(k));
+    const routeQuestions = routeKeys.filter(k => String(routeList[k]).startsWith(ROUTE_PLACEHOLDER)).length;
+
+    console.log('');
+    console.log('  Denial coverage — does the suite ask what a second principal gets, and is every route refused?');
+    console.log('  ' + '─'.repeat(62));
+    console.log(`  registered suites      ${String(suites.length).padStart(5)}`);
+    console.log(`  refuse a 2nd principal ${String(suites.length - none.length - anonymousOnly.length).padStart(5)}`);
+    console.log(`  only an anonymous 401  ${String(anonymousOnly.length).padStart(5)}   (anonymous_only, may only shrink)`);
+    console.log(`  no refusal at all      ${String(none.length).padStart(5)}   (exempt, may only shrink)`);
+    console.log(`  EXPIRED (file edited)  ${String(suiteCmp.expired.length + anonCmp.expired.length).padStart(5)}`);
+    console.log(`  NEW, not exempt        ${String(suiteCmp.fresh.length + anonCmp.fresh.length).padStart(5)}`);
+    console.log(`  authenticated routes   ${String(authenticated.length).padStart(5)}`);
+    console.log(`  with a refusal test    ${String(refused.size).padStart(5)}`);
+    console.log(`  without one            ${String(unrefused.length).padStart(5)}   (listed ${routeKeys.length}, ceiling ${ROUTE_CEILING}, still ${ROUTE_PLACEHOLDER} ${routeQuestions})`);
+    console.log('');
+
+    const problems: string[] = [];
+    const listing = (title: string[], tag: string, items: string[]): void => {
+        if (!items.length) return;
+        for (const line of title) console.log(`  ${line}`);
+        console.log('');
+        for (const s of items) console.log(`    ${tag.padEnd(9)}${s}`);
+        console.log('');
+    };
+
+    listing(['A suite that drives a surface with ONE principal proves the feature and cannot prove',
+        'the fence: delete a scope check and it stays green. Add a cross-owner or cross-scope',
+        'refusal, or record in security/denial-coverage-exemptions.json why there is none.'], 'NEW', suiteCmp.fresh);
+    listing(['The only refusal these suites assert is an anonymous 401. Add a refusal of a signed-in',
+        'second principal (a 403 or a refused MCP call), or record in `anonymous_only` why there is none.'], 'NEW 401', anonCmp.fresh);
+    listing(['These suites were EDITED while still carrying no refusal of a second principal. The exemption',
+        'was pinned to the old content on purpose: you are in the file, you have the context, add the case.',
+        'If the surface genuinely has no refusal to test, rewrite the reason and re-seed its sha.'], 'EXPIRED', [...suiteCmp.expired, ...anonCmp.expired]);
+    listing(['Now covered, so these entries can go from security/denial-coverage-exemptions.json:'], 'COVERED', [...suiteCmp.stale, ...anonCmp.stale].sort());
+    listing(['An authenticated route no suite asserts a refusal from: remove its check and every suite stays',
+        'green. Add the refusal to the suite of its area.'], 'NEW ROUTE', routeFresh);
+    listing([`Now refused by a suite, so delete these entries from ${relative(ROOT, ROUTE_EXEMPTIONS)}:`], 'REFUSED', routeNowRefused);
+    listing(['Listed routes the contract no longer has (delete the entries):'], 'GONE', routeGone);
+
+    if (suiteCmp.fresh.length || anonCmp.fresh.length) problems.push(`${suiteCmp.fresh.length + anonCmp.fresh.length} new suite(s) without a refusal of a second principal`);
+    if (suiteCmp.expired.length || anonCmp.expired.length) problems.push(`${suiteCmp.expired.length + anonCmp.expired.length} edited suite(s) still without one`);
+    if (routeFresh.length) problems.push(`${routeFresh.length} authenticated route(s) without a refusal test`);
+    if (routeNowRefused.length) problems.push(`${routeNowRefused.length} listed route(s) now refused`);
+    if (routeGone.length) problems.push(`${routeGone.length} listed route(s) not in the contract`);
+    if (routeKeys.length > ROUTE_CEILING) problems.push(`the route list holds ${routeKeys.length} entries and the ceiling is ${ROUTE_CEILING}`);
+    if (routeKeys.length < ROUTE_CEILING) problems.push(`the route list holds ${routeKeys.length} entries: lower ROUTE_CEILING in scripts/check-denial-coverage.ts from ${ROUTE_CEILING} to ${routeKeys.length}`);
+
+    if (problems.length) {
+        for (const p of problems) console.log(`  ✖ ${p}`);
+        if (strict) process.exit(1);
+        console.log('  (report only — pass --strict to gate)');
         return;
     }
-
-    const first = judge(none, exemptions);
-    // An entry of the first file whose suite now asserts a 401 moves to the second class: it is no
-    // longer "no refusal at all", and it is stale there.
-    const second = judge(noSecond, loadFile(SECOND_PRINCIPAL));
-
-    console.log('');
-    console.log('  Denial coverage — does the suite ever ask what a second principal gets?');
-    console.log('  ' + '─'.repeat(62));
-    console.log(`  registered suites                       ${String(measured.length).padStart(5)}`);
-    console.log(`  refuse an authenticated second caller   ${String(measured.filter(m => m.kind === 'second-principal').length).padStart(5)}   (a 403 or an MCP refusal)`);
-    console.log(`  refuse only a caller with no credential ${String(measured.filter(m => m.kind === 'anonymous-only').length).padStart(5)}   (a 401 alone)`);
-    console.log(`  assert no refusal at all                ${String(measured.filter(m => m.kind === 'none').length).padStart(5)}`);
-    console.log('');
-    report('No refusal at all', 'denial-coverage-exemptions.json', none, first, [
-        'These suites were EDITED while still carrying no denial case, or are new. You are in the file and have the',
-        'context: add a cross-owner or cross-scope refusal, or rewrite the reason and re-seed its sha.',
-    ]);
-    report('No refusal of an authenticated second principal', 'denial-coverage-no-second-principal.json', noSecond, second, [
-        'A 401 proves the door asks for a credential and nothing about whose data a signed-in caller reaches. Add a',
-        '403 or an MCP refusal for a second owner or an agent without the scope, or record in',
-        'security/denial-coverage-no-second-principal.json why the surface has none.',
-    ]);
-
-    const blocking = first.fresh.length + first.expired.length + second.fresh.length + second.expired.length;
-    if (strict && blocking) {
-        console.error(`✖ ${first.fresh.length + second.fresh.length} new and ${first.expired.length + second.expired.length} expired suite(s) that ask no second principal for a refusal.`);
-        process.exit(1);
-    }
-    console.log(blocking ? '  (report only — pass --strict to gate)' : '  ✓ every registered suite refuses a second principal or says why it does not');
+    console.log('  ✓ every registered suite refuses a second principal or says why not, and every authenticated route is refused or listed');
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+// Run when executed as a script; a unit test imports the detectors without running the gate.
+if (process.argv[1]?.replace(/\\/g, '/').endsWith('scripts/check-denial-coverage.ts')) main();

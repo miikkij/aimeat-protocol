@@ -21,6 +21,8 @@
  * @structure sweepMemoryBin(storage, config)
  * @usage started by server-bootstrap/service-init.ts on a timer
  * @version-history
+ *   2026-10-16 — The cutoff is computed inside the try, so a grace that is not a number logs a warning
+ *     and removes nothing instead of throwing from the timer (QA audit F05a-02).
  *   v1.0.0 — 2026-09-03 — Initial, with the delete it exists to complete.
  */
 import type { AimeatConfig } from '../config.js';
@@ -40,8 +42,10 @@ import { logger } from '../utils/logger.js';
  */
 export async function sweepMemoryBin(storage: Storage, config: AimeatConfig): Promise<number> {
   const graceMs = Math.max(0, config.memoryDeleteGraceDays) * 86_400_000;
-  const cutoff = new Date(Date.now() - graceMs).toISOString();
   try {
+    // Inside the try: a grace that is not a number (AIMEAT_MEMORY_DELETE_GRACE_DAYS=abc) makes
+    // toISOString throw, and this runs on a timer with nobody watching.
+    const cutoff = new Date(Date.now() - graceMs).toISOString();
     const removed = await storage.purgeDeletedMemory(cutoff);
     if (removed > 0) {
       logger.info('memory bin: records past the grace window removed for good', {

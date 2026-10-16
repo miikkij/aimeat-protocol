@@ -15,12 +15,16 @@
  *   - GET  /v1/ai/usage          — owner-only, today's spend per-app breakdown
  *   - GET  /v1/ai/usage/history  — owner-only, per-day spend series + 24h/7d/30d rollups (charts)
  *   - GET  /v1/admin/ai-usage    — operator-only, cross-user AI-spend aggregate (admin dashboard)
- *   - POST /v1/ai/settings       — owner-only, update budget/quotas/allowlist
+ *   - POST /v1/ai/settings       — owner, or the owner's agent with memory:write-reserved and
+ *                                  memory:write-as-owner; update budget/quotas/allowlist
  *   - GET  /v1/ai/settings       — owner-only, read budget/quotas/allowlist and the voice limit
  * @usage
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-10-16 — POST /v1/ai/settings admits the owner's agent holding memory:write-reserved and
+ *     memory:write-as-owner, the words aimeat_operator_ai_config asks on the node MCP, and writes the
+ *     owner's record (resolveWriteTarget); the connector's copy of the tool calls this route (QA audit D2-02).
  *   v1.x — 2026-10-13 — GET /v1/ai/settings also answers `limits.stt_max_mb`, the other limit the
  *     removed /v1/openrouter/settings served, so 4.0.0 serves both.
  *   v1.x — 2026-10-12 — GET and POST /v1/ai/settings are no longer deprecated and stay in node 4.0.0:
@@ -120,6 +124,7 @@ import { upsertPrivateRecord } from '../services/private-record.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { isOperatorCaller } from '../services/operator-override.js';
+import { resolveWriteTarget } from './memory/owner-target.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
  *  JSON body limit; anything real goes through storage. */
@@ -540,10 +545,18 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
     });
 
   // ── POST /v1/ai/settings ── update budget/quotas/allowlist (not removed in 4.0.0, as GET above)
+  // WHO. The owner in person, or their agent holding the two words aimeat_operator_ai_config asks on
+  // the node MCP: memory:write-reserved (openrouter.settings is a key the server itself trusts; the word
+  // is outside every wildcard) and memory:write-as-owner (the record is the owner's, so the write is
+  // redirected into the owner's namespace by resolveWriteTarget, the one place that decides it). The
+  // connector's copy of the tool calls this route, so an owner-only gate refused there what the node
+  // MCP allowed. requireRole('agent') keeps an app grant and an ecosystem app out (QA audit D2-02).
   router.post('/v1/ai/settings',
-    requireAuth(), requireRole('owner'),
+    requireAuth(), requireRole('agent'), requireScope('memory:write-reserved'),
     async (req: Request, res: Response) => {
-      const gaii = resolve(req);
+      const target = resolveWriteTarget(req, config, true);
+      if ('deny' in target) return res.status(403).json(error(config.nodeId, target.deny.code, target.deny.message));
+      const gaii = target.gaii;
       const { daily_budget_usd, app_quotas, app_allowlist } = req.body as {
         daily_budget_usd?: number;
         app_quotas?: Record<string, { daily_usd?: number }>;
