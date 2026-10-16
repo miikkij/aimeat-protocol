@@ -6,6 +6,9 @@
  *   permission checkboxes, read-only view for non-owners. Extracted from ../agents-tab.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-10-16 — A find field above the permission list: every typed word must appear in a
+ *     row's sentence, its scope string or its area's name; areas with no matching row drop out, the
+ *     count beside the field says how many rows show, and typing opens the folded editor.
  *   v1.15.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so names with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.15.0 — 2026-09-26 — Every part is a component that takes data (page group G1a): the dialog's
@@ -60,6 +63,7 @@ import { Code, Label, Mark, Marks } from '/components/Mark.js';
 import { Tabs, Tab } from '/components/Tabs.js';
 import { List, Row as ListRow, Name, Cell, Filter } from '/components/List.js';
 import { Row, Space, Split } from '/components/Layout.js';
+import { TextField } from '/components/TextField.js';
 
 // The envelope beside the agent's address: the door to its inbox thread.
 const MAIL_ICON = html`<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14"/><path d="M3 7l9 6 9-6"/></svg>`;
@@ -73,6 +77,7 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
   const [checked, setChecked] = useState(() => expandScopes(scopes));
   const [advanced, setAdvanced] = useState(() => detectTemplate(scopes) === 'custom');
   const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState('');
   // Read from what would be SAVED, not from the expanded checkbox set — otherwise a fully-ticked
   // editor never matches a template and "Full access" stays unlit while being exactly what it is.
   const currentTemplate = detectTemplate(collapseScopes(checked, scopes));
@@ -115,6 +120,30 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
 
   const isReadOnly = !(session.roles?.includes('owner') || session.roles?.includes('operator'));
 
+  // The find field: every typed word must appear in the row's sentence, its scope string or its
+  // area's name, so "muisti" lists the whole Memory area and "memory:write" one row.
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (...texts) => {
+    const hay = texts.join(' ').toLowerCase();
+    return words.every(w => hay.includes(w));
+  };
+  const shownDomains = SCOPE_DOMAINS.map(d => ({
+    d,
+    perms: d.permissions.filter(p => matches(domainLabel(d.key), permLabel(p, d.key), `${d.key}:${p}`)),
+  })).filter(x => x.perms.length > 0);
+  const shownUnknown = unknown.filter(s => matches(t('profile.agents.scopeUi.domainOther'), s));
+  const totalRows = SCOPE_DOMAINS.reduce((n, d) => n + d.permissions.length, 0) + unknown.length;
+  const shownRows = shownDomains.reduce((n, x) => n + x.perms.length, 0) + shownUnknown.length;
+  // The count stays beside the field from the start: TextField wraps the input in the search line
+  // only when a note is given, so a note that appeared on the first key would remount the input
+  // and drop the focus after one letter.
+  // Typing opens the folded editor and leaves it open, so a row ticked while filtered is still in
+  // view once the field is emptied.
+  function find(value) {
+    setQuery(value);
+    if (value.trim()) setAdvanced(true);
+  }
+
   return html`
     <${Modal} open=${true} onClose=${onCancel} size="md" title=${`${t('profile.agents.scopeUi.scopeProfile')}: ${agent.display_name || agent.name}`}
       footer=${isReadOnly ? html`
@@ -145,8 +174,15 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
             <//>
           <//>
 
+          <${Space} below="large">
+            <${TextField} search label=${t('profile.agents.scopeUi.find')} value=${query}
+              placeholder=${t('profile.agents.scopeUi.findPlaceholder')} onInput=${find}
+              note=${t('profile.agents.scopeUi.findCount', { shown: shownRows, total: totalRows })} />
+          <//>
+
           ${advanced && html`
-            ${SCOPE_DOMAINS.map(d => {
+            ${words.length > 0 && shownRows === 0 && html`<${Note}>${t('profile.agents.scopeUi.nothingMatches', { q: query.trim() })}<//>`}
+            ${shownDomains.map(({ d, perms }) => {
               const allChecked = bulkScopes(d).every(s => checked.has(s));
               const isCatalogue = d.key === 'catalogue';
               return html`
@@ -156,7 +192,7 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                     ${!isCatalogue && html`<${Filter} on=${allChecked} onClick=${() => toggleDomain(d.key)}>${allChecked ? '✓ ' : ''}${t('profile.agents.scopeUi.all')}<//>`}
                   <//>
                   <${List} cols="check-name-desc" keepCols dense>
-                    ${d.permissions.map(p => {
+                    ${perms.map(p => {
                       const scope = `${d.key}:${p}`;
                       const isLocked = isCatalogue && p === 'read';
                       const isExtra = NOT_IN_WILDCARD.includes(scope);
@@ -175,12 +211,12 @@ export default function ScopesModal({ agent, session, onSave, onCancel }) {
                 <//>`;
             })}
 
-            ${unknown.length > 0 && html`
+            ${shownUnknown.length > 0 && html`
               <${Split} heavy>
                 <${Label} block>${t('profile.agents.scopeUi.domainOther')}<//>
                 <${Note}>${t('profile.agents.scopeUi.otherScopesHint')}<//>
                 <${List} cols="check-name-desc" keepCols dense>
-                  ${unknown.map(scope => html`
+                  ${shownUnknown.map(scope => html`
                     <${ListRow} key=${scope} picked=${checked.has(scope)} pickLabel=${scope} onPick=${() => toggleScope(scope)}>
                       <${Name} code>${scope}<//>
                       <${Cell} />
