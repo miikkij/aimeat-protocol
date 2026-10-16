@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-10-16: check:posture-defaults (invariants 8 and 10) and check:own-node-backend (a suite's own node follows the run's backend) (QA audit S10-05, P1-02).
  *  - 1.20.0 (2026-10-16): check:mcp-test-calls, the ratchet on catalog MCP tools no E2E suite calls (QA audit W27); check:denial-coverage also asks every authenticated route for a refusal test (W29, P3-08).
  *  - 1.19.1 (2026-10-16): check:silent-catch's label names what it now holds: src/static per file and per shape, and every exemption counted with its reason (W25).
  *  - 1.19.0 (2026-10-11): check:doc-links, a served string never sends its reader to a repository docs/ file.
@@ -72,6 +73,12 @@ export const FAST_CHECKS = [
     // 2026-10-01, after the peer-registration incident: who writes a federation peer, and who trusts
     // its url or key, each with the proof it relies on (security/peer-paths.json).
     { script: 'check:peer-paths', label: 'Every federation peer writer and reader says on what proof' },
+    // QA audit 2026-10-16, S10-05: invariants 8 and 10 had no check, and .env.example, the code
+    // defaults and the start-up self-check disagreed in four places.
+    { script: 'check:posture-defaults', label: '.env.example, the code defaults and the start-up self-check agree; the default agent scopes hold no powerful scope' },
+    // QA audit 2026-10-16, P1-02 and W11: a suite's own node follows the run's backend, and the
+    // suites that still start a SQLite node of their own are counted and may only fall.
+    { script: 'check:own-node-backend', label: 'A suite that starts its own node follows the run\'s backend, or is listed with its reason' },
     { script: 'check:trusted-keys', label: 'Server-trusted memory keys are guarded, and each exemption says why' },
     // From the September 2026 audit's check of the fixes: a visitor from another node is named
     // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.

@@ -1,6 +1,11 @@
 // E2E test for aimeat-auth.js library flow (server-side simulation)
 // Tests the exact same API calls the browser auth library makes
 // Run: cd aimeat && AIMEAT_PORT=40251 npx tsx test/e2e-auth-lib.ts
+// @version-history
+//   2026-10-16 — Phase 8 asserts the answer of the node's own mode instead of accepting either: with
+//     test mode off (the production-settings lane) registering a taken name answers 409 NAME_TAKEN
+//     and the account keeps working; with test mode on it is re-created. The old test accepted 201
+//     or 409, so the production answer was tested nowhere (QA audit P1-01, S1-08).
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -544,28 +549,40 @@ await test('POST /v1/ghii/password/change — the account lock applies: once loc
     assert(right._status === 429 && right.error?.code === 'PASSWORD_LOCKED', `a locked account changed its password: ${right._status} ${right.error?.code}`);
 });
 
-// ─── Phase 8: Dev Mode Re-registration ───
-console.log('\nPhase 8 — Dev Mode Re-registration');
+// ─── Phase 8: Registering a taken name ───
+console.log('\nPhase 8 — Registering a taken name');
 
-await test('POST /v1/ghii — re-register same username (dev mode)', async () => {
-    const data = await api('/v1/ghii', {
-        method: 'POST',
-        body: JSON.stringify({ username, display_name: 'Re-registered User' }),
-    });
-    // In dev mode, should succeed (old account wiped)
-    // In production, would be 409
-    if (data.ok) {
-        assert(data._status === 201, `expected 201, got ${data._status}`);
-        assert(data.data.ghii.display_name === 'Re-registered User', 'display name should be updated');
-        // Old JWT should no longer work (agent was deleted)
-        const memData = await authApi('/v1/memory/e2e-test', agentJwt);
-        // Agent was wiped, memory might still work or might not — just verify we got a response
-        console.log(`    (old JWT after re-register: ok=${memData.ok})`);
-    } else {
+// The suite process gets the same pins as the node (run-e2e-server.ts pinnedEnv), so it knows which
+// answer this node owes: the production-settings lane runs test mode off.
+const TEST_MODE = process.env.AIMEAT_TEST_MODE === 'true';
+console.log(`    (test mode ${TEST_MODE ? 'on' : 'off'} on this node)`);
+
+if (!TEST_MODE) {
+    await test('POST /v1/ghii — a taken name answers 409 NAME_TAKEN on a production node', async () => {
+        const data = await api('/v1/ghii', {
+            method: 'POST',
+            body: JSON.stringify({ username, display_name: 'Someone Else' }),
+        });
         assert(data._status === 409, `expected 409, got ${data._status}`);
-        console.log('    (production mode — re-registration blocked as expected)');
-    }
-});
+        assert(data.error?.code === 'NAME_TAKEN', `expected NAME_TAKEN, got ${data.error?.code}`);
+        assert(data.data?.token === undefined, 'a refused registration must not hand out a token');
+    });
+
+    await test('the account whose name was asked for is untouched: its agent still reads its memory', async () => {
+        const memData = await authApi('/v1/memory/e2e-test', agentJwt);
+        assert(memData.ok === true, `the existing account's agent lost its access: ${memData._status} ${memData.error?.code}`);
+        assert(memData.data.value.message === 'auth library works', 'the existing account\'s memory changed');
+    });
+} else {
+    await test('POST /v1/ghii — with test mode on, a taken name re-creates the account (E2E isolation)', async () => {
+        const data = await api('/v1/ghii', {
+            method: 'POST',
+            body: JSON.stringify({ username, display_name: 'Re-registered User' }),
+        });
+        assert(data._status === 201, `expected 201 with test mode on, got ${data._status}`);
+        assert(data.data.ghii.display_name === 'Re-registered User', 'display name should be updated');
+    });
+}
 
 // ─── Cleanup ───
 console.log('\n─────────────────────────────────────');

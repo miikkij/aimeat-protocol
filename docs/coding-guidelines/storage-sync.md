@@ -109,7 +109,7 @@ pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci
 pnpm gate --postgres
 ```
 
-`pnpm gate --postgres` runs the static checks above, the unit tests the change reaches (the storage conformance test among them) and, because the change is under `src/storage/`, the guard tier on both backends. The full E2E sweep is not a routine step; see [testing-requirements.md](testing-requirements.md).
+`pnpm gate` runs the static checks above, the unit tests the change reaches and, because the change is under `src/storage/`, the guard tier on both backends and every unit file with a PostgreSQL half against the PostgreSQL test database (the storage conformance test among them); `--postgres` is no longer needed for a storage change, and forces the same for any other change. The full E2E sweep is not a routine step; see [testing-requirements.md](testing-requirements.md).
 
 ---
 

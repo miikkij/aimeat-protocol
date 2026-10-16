@@ -9,6 +9,7 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
+ *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
  *   2026-10-16 -- e2e-contract.ts joins the list (not the guard tier): selected operations answer what
  *     openapi.yaml declares, field by field (QA audit D3-01).
@@ -28,6 +29,11 @@
  *     exchange roster, signed service summary and resolve, and the package repository doors refusing
  *     unsigned, misaddressed and repeated requests, on its own node on 40393 (QA audit S6-02, S6-03,
  *     S6-04, S6-09, S10-02).
+ *   2026-10-16 -- e2e-production-posture.ts joins the list (not the guard tier): a node on the public
+ *     profile with production settings, its own node on 40479 (QA audit P7-05).
+ *   2026-10-16 -- --production-settings: every suite's node runs with the settings a production node
+ *     runs (test/run-e2e-production-lane.ts); `pnpm test:e2e:guards:*` pass it. run-e2e-production-lane.ts
+ *     is in NOT_SUITES (QA audit P1-01, P1-08, P7-03, P7-05, F03a-02, S1-08, F7d).
  *   2026-10-14 -- e2e-home-ideas.ts joins the list (not the guard tier): the ideas the home offers,
  *     in three languages, and an operator's broken edit.
  *   2026-10-13 -- e2e-workspace-fenced-space.ts joins the list (not the guard tier): a record space
@@ -353,6 +359,7 @@ import {
     reportEnvLeaks,
     resolveTarget,
 } from './run-e2e-server.js';
+import { PRODUCTION_LANE_ENV, PRODUCTION_LANE_EXCEPTIONS } from './run-e2e-production-lane.js';
 import { holdBasePort, lanePortFor } from '../scripts/lib/e2e-ports.js';
 import { classify, formatHeader, formatRow } from '../scripts/lib/e2e-results.js';
 import { runLane, type SuiteResult } from './run-e2e-lane.js';
@@ -801,6 +808,9 @@ const ALL_SUITES = [
     // Owns its server on 40477 and boots one database as 3.27.0, then twice as 4.0.0: the agents that
     // worked on 3.x keep the scope words 4.0.0 started to check, once, and only those agents.
     'test/e2e-rest-scope-keep-working.ts',
+    // A node started as a production deployment starts it: public profile, the three modes off,
+    // the shipped limits and scopes. Its own node on 40479, on the run's backend (QA audit P7-05).
+    'test/e2e-production-posture.ts',
     // Owns its server on 40478, the same three boots for a published app: an app that calls a gated
     // route its aimeat-scopes does not name keeps the word, and a new app gets a publish warning.
     'test/e2e-app-scope-allowance.ts',
@@ -1488,6 +1498,7 @@ const NOT_SUITES = new Map<string, string>([
     ['run-e2e-ci.ts', 'this runner'],
     ['run-e2e-server.ts', "the runner's server lifecycle, environment pins and database cleanup: imported, never spawned"],
     ['run-e2e-lane.ts', "the runner's lane loop (restart, run one suite under its time limit, read its result): imported, never spawned"],
+    ['run-e2e-production-lane.ts', 'the production-settings lane: the settings and the per-suite exceptions, imported by run-e2e-server.ts'],
     ['run-playwright-ci.ts', 'the Playwright runner; that suite is not run here, frontend changes are verified by driving a real browser'],
     ['manual-dm-helper.ts', 'manual helper for browser verification: it needs a person watching the Inbox tab, and it writes to whichever node DM_BASE names'],
     ['pg-kysely-memory.ts', 'storage-provider integration test: it drives a live Postgres over AIMEAT_TEST_PG_URL with no HTTP server, so it has nothing to say to BASE_URL'],
@@ -1547,6 +1558,8 @@ function reconcileSuiteList(filtered: boolean): void {
     process.exit(1);
 }
 
+// Before anything reads the pins: the lane decides what every suite's node is started with.
+if (process.argv.includes('--production-settings')) process.env[PRODUCTION_LANE_ENV] = '1';
 const TARGET = resolveTarget();
 const BASE_URL = TARGET.baseUrl;
 
@@ -1780,6 +1793,10 @@ async function main() {
     console.log(`  AIMEAT E2E Test Runner`);
     console.log(`  Server: ${TARGET.external ? BASE_URL + ' (external)' : `auto-start on :${TARGET.port}`}`);
     console.log(`  Storage: ${TARGET.dbType}${TARGET.dbType === 'sqlite' ? ` (${TARGET.dbPath})` : ''}`);
+    if (process.env[PRODUCTION_LANE_ENV] === '1') {
+        const kept = suites.filter(s => PRODUCTION_LANE_EXCEPTIONS[basename(s, '.ts')]).length;
+        console.log(`  Settings: production (test, dev and anonymous mode off, shipped agent scopes, admin setup closed, production rate limits); ${kept} suite(s) keep a relaxed setting`);
+    }
     // Before anything boots: is another run already on this port? A worktree that has not claimed a
     // port gets a hash of its name, and two names can hash alike; so can two runs of one worktree
     // be started at once. Either way the two would share a server and empty one database under
