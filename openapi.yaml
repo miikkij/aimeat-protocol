@@ -27995,7 +27995,7 @@ paths:
   /v1/commerce/payout/invoice:
     put:
       operationId: commercePayoutInvoiceSet
-      summary: Take invoice payment for items delivered at once, or not (owner)
+      summary: Take invoice payment for items delivered at once, or not (owner, or their agent with commerce:sell)
       description: >
         The invoice rail (io.aimeat.invoice) captures nothing: the order completes and what the buyer owes
         is booked for you to bill. A buyer may choose it for a task you can still decline. For an item
@@ -28003,6 +28003,9 @@ paths:
         pack) nothing can be withheld afterwards, so a buyer may choose it only when you set
         `accept_immediate: true` here; otherwise completion answers 422 INVOICE_NOT_ACCEPTED and nothing
         is charged or delivered. MERGED into your payment-settings record. Responds `{ accept_immediate }`.
+        Your own session, or one of your agents holding `commerce:sell` (the MCP tool
+        `aimeat_commerce_invoice_set` calls the same function); the setting is always yours. An agent
+        without the word answers 403 SCOPE_DENIED; an app grant or an ecosystem app answers 403.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -28013,6 +28016,7 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/AimeatError' }
         '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
 
   /v1/commerce/payout/stripe:
     put:

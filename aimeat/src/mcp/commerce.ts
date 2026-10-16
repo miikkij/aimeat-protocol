@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-16 — aimeat_commerce_invoice_set sets the owner's invoice credit for items delivered at
+ *     once through commerce/psp-record.ts, the function PUT /v1/commerce/payout/invoice calls.
  *   2026-10-16 — aimeat_commerce_beneficiary_earnings totals every entry and returns the newest `limit`,
  *     with `total` beside `count` (QA audit S8-10).
  *   2026-10-16 — aimeat_commerce_beneficiary_split_set calls declareSplit
@@ -90,6 +92,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import { pspSecretHint } from '../commerce/psp-secrets.js';
+import { setInvoiceAcceptImmediate } from '../commerce/psp-record.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { canonicalAppToolsId } from '../services/app-tools-key.js';
@@ -251,6 +254,20 @@ export function registerCommerceTools(
             // payout address and no card credentials at all.
             if (!v.secretKey) return ok({ configured: false, invoice_accept_immediate });
             return ok({ configured: true, provider: v.provider ?? 'unknown', key_hint: pspSecretHint(v.secretKey), updated_at: rec?.updatedAt, invoice_accept_immediate });
+        },
+    );
+
+    mcp.tool(
+        'aimeat_commerce_invoice_set',
+        descriptionFor('aimeat_commerce_invoice_set'),
+        zodShapeFor('aimeat_commerce_invoice_set'),
+        annotationsFor('aimeat_commerce_invoice_set'),
+        async ({ accept_immediate }) => {
+            // The function PUT /v1/commerce/payout/invoice calls (commerce/psp-record.ts): the owner's
+            // record, merged, so the card and stablecoin settings survive. The scope check is the
+            // registration filter on commerce:sell, the word the route asks.
+            const accept = await setInvoiceAcceptImmediate(storage, config, ownerGhii, accept_immediate);
+            return ok({ invoice_accept_immediate: accept });
         },
     );
 

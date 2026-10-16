@@ -7,6 +7,7 @@
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors
  *   MCP_SURFACES.commerce.
  * @version-history
+ *   2026-10-16 — aimeat_commerce_invoice_set is named among the selling tools.
  *   2026-10-16 — The invoice rail says when it is refused: an item delivered at once, unless the seller
  *     takes invoice credit for it (QA audit S8-03).
  *   v2.6.0 — 2026-10-11 — Two values per item: a money price and a pacing amount in morsels, which is
@@ -43,7 +44,9 @@ and never a currency, so say "5 morsels of pacing per use" to people, never "cos
 **Sell (scope commerce:sell).** \`aimeat_commerce_psp_status\` / \`_delete\` — your owner's OWN
 payment credentials; the secret is stored server-side and NEVER returned (status shows a masked
 hint). The owner enters the secret themselves on the Wallet page (/v1/profile?tab=wallet), never
-through a chat: \`aimeat_commerce_psp_set\` refuses and gives that link. \`aimeat_app_tools_publish\` / \`aimeat_app_tools_get\` — declare
+through a chat: \`aimeat_commerce_psp_set\` refuses and gives that link. \`aimeat_commerce_invoice_set\`
+— whether the owner takes invoice payment for items delivered at once (off by default; turning it on
+means giving credit, so confirm with your owner first). \`aimeat_app_tools_publish\` / \`aimeat_app_tools_get\` — declare
 agent-callable tools on the owner's published apps (priceMoney / pricesMoney micro-units and
 tollMorsels per use; action_id = instant capability call, agent = order becomes that agent's task).
 \`aimeat_offer_price_set\` — set an offer's money price (money_amount_micros + money_currency), its

@@ -11,6 +11,8 @@
  *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-10-16 — aimeat_commerce_invoice_set: the chat path for PUT /v1/commerce/payout/invoice
+ *     (commerce:sell, on all three interfaces).
  *   2026-10-16 — aimeat_commerce_psp_delete is screen-only like psp_set: it refuses and returns the Wallet
  *     page link (decision D5; QA audit D2-02).
  *   2026-10-16 — aimeat_checkout_complete says it carries no payment instrument, when the invoice handler
@@ -224,6 +226,18 @@ export const commerceTools = [
         scope: 'commerce:sell',
         surfaces: ['service', 'commerce'],
         input: {},
+    },
+    {
+        name: 'aimeat_commerce_invoice_set',
+        description: 'Set whether YOUR OWNER takes invoice payment for items delivered as soon as a checkout completes (a callable tool, a package, a pacing pack). Off by default: an invoice captures no money, and such an item cannot be taken back, so turning it on means your owner gives credit and bills afterwards. A task your owner can still decline takes invoice payment either way. Confirm the choice with your owner before you turn it on. aimeat_commerce_psp_status reports the current value as invoice_accept_immediate.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Set Invoice Credit for Instant Items', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'commerce:sell',
+        surfaces: ['service', 'commerce'],
+        input: {
+            accept_immediate: { type: 'boolean', required: true, description: 'true: take invoice payment for items delivered at once; false: refuse it (the default)', zod: z.boolean() },
+        },
     },
     {
         name: 'aimeat_commerce_psp_delete',
