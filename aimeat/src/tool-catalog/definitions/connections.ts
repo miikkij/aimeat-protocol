@@ -6,6 +6,9 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-16 — aimeat_connection_history and aimeat_connection_replies reach the owner's published
+ *     items on connections:read-as-owner, and the replies read allows one pass per run of an agent the
+ *     owner set up for it (Jouni, 2026-10-16).
  *   2026-10-15 — aimeat_connection_list names the owner's connections too, the mail tools read them on
  *     connections:read-as-owner, and aimeat_mail_send reads the owner's address book (feature-list audit 128-130).
  *   2026-10-15 — aimeat_connection_history and aimeat_connection_replies; aimeat_connection_start takes
@@ -82,7 +85,7 @@ export const connectionTools = [
     },
     {
         name: 'aimeat_connection_history',
-        description: "What YOU have published through your connected accounts, newest first. Each item says its status (done, failed, rejected, held, queued or in_flight), where it landed (externalRef, the post's address at the provider), the account it went out through, and the latest metric sample this node took of it, or null when nobody has asked yet. The item id is what aimeat_connection_replies takes. Only your own publishes are listed, the same as aimeat_connection_list lists only your own accounts.",
+        description: "What YOU have published through your connected accounts, newest first. Each item says its status (done, failed, rejected, held, queued or in_flight), where it landed (externalRef, the post's address at the provider), the account it went out through, and the latest metric sample this node took of it, or null when nobody has asked yet. The item id is what aimeat_connection_replies takes. Your own publishes are listed, marked holder 'own'. What your owner published, for example from LÄHETIN, appears too, marked holder 'owner', when you hold connections:read-as-owner, the permission your owner ticks by hand; without it you see only your own.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'What I Have Published', readOnlyHint: true },
@@ -97,7 +100,7 @@ export const connectionTools = [
     },
     {
         name: 'aimeat_connection_replies',
-        description: "Read what people answered to one item you published, from aimeat_connection_history (its id is attempt_id). Works for Mastodon, Bluesky, YouTube, X, a Facebook Page, Instagram and Reddit; LinkedIn refuses by design, because it lets only select partners read the comments on a member's post. It reads from the provider NOW and stores nothing, so every call spends a request against the account's own rate limit. On X every read costs money, and X search reaches back only seven days. Call it when someone asks what people said, never on a loop or a schedule. Then judge the replies and tell the person what matters: the questions that need an answer, the criticism worth taking seriously, the overall tone. Do not paste them all back. NOT_READABLE means the platform will never allow it (LinkedIn, comments turned off, a deleted post); REPLIES_UNAVAILABLE means it may work later.",
+        description: "Read what people answered to one item you published, or one your owner published when you hold connections:read-as-owner, from aimeat_connection_history (its id is attempt_id). Works for Mastodon, Bluesky, YouTube, X, a Facebook Page, Instagram and Reddit; LinkedIn refuses by design, because it lets only select partners read the comments on a member's post. It reads from the provider NOW and stores nothing, so every call spends a request against the account's own rate limit. On X every read costs money, and X search reaches back only seven days. Call it when someone asks what people said, or once per run of an agent your owner set up to read replies (each item once per run, X at most once a week); never in a loop. Then judge the replies and tell the person what matters: the questions that need an answer, the criticism worth taking seriously, the overall tone. Do not paste them all back. NOT_READABLE means the platform will never allow it (LinkedIn, comments turned off, a deleted post); REPLIES_UNAVAILABLE means it may work later.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Replies to a Published Item', readOnlyHint: true, openWorldHint: true },

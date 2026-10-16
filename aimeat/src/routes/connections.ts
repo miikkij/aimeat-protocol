@@ -29,6 +29,8 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   2026-10-16 — GET /v1/connections/attempts lists the owner's items too for an agent on
+ *     connections:read-as-owner, each marked `holder` (Jouni, 2026-10-16).
  *   2026-10-15 — GET /v1/connections lists an agent's owner's connections on connections:use, and
  *     POST /v1/connections/:id/read reads them on connections:read-as-owner (feature-list audit 128).
  *   v1.9.0 — 2026-10-15 — POST /start takes `account` (which Facebook Page), and the delegated
@@ -153,13 +155,15 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   // through this node, and nothing could read it. A person running accounts needs to see what went
   // out, where it landed, and how it did — otherwise "publish" is a write-only hole.
 
-  /** The caller's own history. Scoped by the query, so there is nothing to filter afterwards. */
+  /**
+   * The caller's history, and the owner's too for an agent on connections:read-as-owner (each item
+   * says whose). Scoped by the query, so there is nothing to filter afterwards.
+   */
   router.get('/v1/connections/attempts', requireAuth(), requireAnyScope('connections:read', 'connections:use'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
-    const principal = resolve(req);
     const limit = Math.min(Number(req.query.limit) || 50, 200);
-    // services/connections/history.ts, which the MCP door calls too (2026-10-15).
-    res.json(success(config.nodeId, { attempts: await listPublishHistory(storage, principal, limit) }));
+    // services/connections/history.ts, which the MCP tool calls too (2026-10-15).
+    res.json(success(config.nodeId, { attempts: await listPublishHistory(storage, holdersOf(req, 'read'), limit) }));
   });
 
   /** One item's whole series, oldest first, so a curve can be drawn rather than a single number. */

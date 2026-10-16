@@ -96,12 +96,12 @@
       "digest": "sha256:c21039590693b69a201dfc6a"
     },
     "node:aimeat-mail-to-data": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-16",
       "watches": [
         "aimeat/src/tool-catalog/definitions/connections.ts",
         "aimeat/src/services/connections/providers.ts"
       ],
-      "digest": "sha256:2592df2b285dab23ffcfe5eb"
+      "digest": "sha256:977904f5c23ec532e82cddcf"
     },
     "node:aimeat-app-workstation": {
       "reviewedOn": "2026-10-10",
@@ -506,7 +506,7 @@
       "aimeat/src/services/ai/completion.ts": "f6c2d7e866accea2"
     },
     "node:aimeat-mail-to-data": {
-      "aimeat/src/tool-catalog/definitions/connections.ts": "ff492c0dfffd25bf",
+      "aimeat/src/tool-catalog/definitions/connections.ts": "b93b07c806dd3a22",
       "aimeat/src/services/connections/providers.ts": "4b78d2b9ab98ae94"
     },
     "node:aimeat-app-workstation": {

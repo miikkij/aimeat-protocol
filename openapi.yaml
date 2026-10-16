@@ -5306,6 +5306,12 @@ components:
       properties:
         id:
           type: string
+        holder:
+          type: string
+          enum: [own, owner]
+          description: >
+            Whose item: `own` is the caller's; `owner` is the owner's, listed to an agent that holds
+            `connections:read-as-owner`.
         connectionId:
           type: string
         provider:
@@ -61368,6 +61374,11 @@ paths:
         Accepts `connections:use` as well as `connections:read`, because an app that may publish has
         to be able to see what it published. The MCP tool is aimeat_connection_history; an item's id
         is what POST /v1/connections/attempts/{id}/replies takes.
+
+
+        An agent sees its own items. An agent that also holds `connections:read-as-owner`, which
+        the owner ticks by hand and no wildcard covers, sees its owner's items too, each marked
+        `holder: owner`.
       tags: [Connections]
       security:
         - BearerAuth: []
@@ -61652,6 +61663,11 @@ paths:
 
         Accepts `connections:use` or `connections:read-through`. The MCP tool is
         aimeat_connection_replies.
+
+
+        An agent reads the replies to its own items, and to its owner's items when it also holds
+        `connections:read-as-owner`. The reply is read through the account the item went out on,
+        never through anyone else's.
       tags: [Connections]
       security:
         - BearerAuth: []
