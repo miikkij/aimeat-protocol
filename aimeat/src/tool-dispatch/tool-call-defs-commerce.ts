@@ -12,6 +12,8 @@
  * @structure commerceCliTools[] — the handler table, spread by tool-call.ts
  * @usage import { commerceCliTools } from './tool-call-defs-commerce.js';
  * @version-history
+ *   2026-10-16 — aimeat_commerce_psp_delete says the route is the owner's in person; GET /v1/commerce/payout,
+ *     which psp_status calls, now admits an agent holding commerce:sell (QA audit D2-02).
  *   v1.2.0 — 2026-10-11 — aimeat_offer_price_set writes the pacing amount (`toll_morsels`, `clear_toll`)
  *     and drops the deprecated `price` mirror the GET returns before writing back, so the pacing is not
  *     counted twice; price_morsels / clear_morsels are the 3.x names until 4.0.0. The checkout texts
@@ -50,8 +52,10 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
     },
     {
         // → DELETE /v1/commerce/payout/stripe — removes the card credentials and keeps the x402 address.
+        // The route is the owner's in person (requireRole('owner')), so an agent's call is refused
+        // there with ACCESS_DENIED, as the node MCP tool refuses it with SCREEN_ONLY (decision D5).
         name: 'aimeat_commerce_psp_delete',
-        description: 'Delete your owner\'s stored PSP credentials (commerce.psp).',
+        description: 'Delete your owner\'s stored PSP credentials (commerce.psp). The owner\'s own session only: an agent is refused and the owner removes the key on the Wallet page.',
         input: {},
         handler: ({ client }) => client.delete('/v1/commerce/payout/stripe'),
     },

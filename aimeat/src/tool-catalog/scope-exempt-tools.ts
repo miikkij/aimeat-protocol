@@ -7,6 +7,9 @@
  *   reading it from there.
  * @structure SCOPE_EXEMPT_TOOLS
  * @version-history
+ *   2026-10-16 — aimeat_capabilities_vouch leaves: it asks capability:write, the word the scope model gives
+ *     a vouch and POST /v1/capabilities/:id/vouch now asks an agent too. Its reason here named an operator
+ *     check the handler never had (QA audit D2-02).
  *   2026-10-15 — aimeat_task_request_changes leaves with the tool, which no surface offers any more (feature-list audit #79).
  *   v1.4.0 — 2026-10-12 — aimeat_organism_invitation_respond leaves: accepting puts the owner's account into
  *     an organism, and from 4.0.0 it asks organism:write like POST /v1/organisms/:id/invitations/accept.
@@ -52,7 +55,6 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     // (`llm`) about ITSELF without a word, a sibling's report needs agent:write, the handler checks.
     'aimeat_agent_runtime_report',
     'aimeat_agent_telemetry_report',                // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
-    'aimeat_capabilities_vouch',                     // gated in the handler on the operator role, not by a scope
     'aimeat_instance_create',                        // owner comes from ownerName() derived from the session GAII (chat-instances
     'aimeat_message_send',                           // agentGaii and senderGaii are both the session identity (agent-messages
     // The four onboarding tools confirm a STEP, which is the agent reporting its own progress: they

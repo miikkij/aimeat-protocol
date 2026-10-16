@@ -7,6 +7,11 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   v1.6.0 — 2026-10-16 — psp_delete is screen-only like psp_set (decision D5; QA audit D2-02): test 5
+ *     asserts its refusal and that the key stays, and the owner removes it through DELETE
+ *     /v1/commerce/payout/stripe; test 5b holds the merge on that route (the x402 address survives) and
+ *     that the refused tool removes neither. The old tests asserted the agent's delete, the very
+ *     difference from REST the finding named.
  *   v1.5.0 — 2026-10-12 — The seller manifest and the test 6 tool carry their morsel amounts as
  *     tollMorsels, and test 8 sets the offer's pacing with toll_morsels, instead of price.morsels and
  *     price_morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; tests 7 to 11 had failed in a
@@ -249,14 +254,18 @@ await test('4b. The webhook signing secret is stored encrypted beside the key, a
         `the webhook secret was not stored: ${text.slice(0, 300)}`);
 });
 
-await test('5. psp_delete removes the credentials', async () => {
+await test('5. FAILURE: psp_delete is screen-only: it refuses an agent, the key stays, and the owner removes it', async () => {
     const del = await mcp.call('aimeat_commerce_psp_delete', {});
-    assert(!del.isError && del.data.deleted === true, `delete: ${del.text}`);
+    assert(del.isError && /^SCREEN_ONLY/.test(del.text) && /tab=wallet/.test(del.text), `refusal: ${del.text}`);
+    const kept = await mcp.call('aimeat_commerce_psp_status', {});
+    assert(kept.data.configured === true, `the refused delete removed the key: ${kept.text}`);
+    const own = await json('/v1/commerce/payout/stripe', { method: 'DELETE', headers: auth(buyerOwner.token) });
+    assert(own.status === 200, `the owner's removal: ${own.status} ${JSON.stringify(own.body.error)}`);
     const st = await mcp.call('aimeat_commerce_psp_status', {});
-    assert(st.data.configured === false, `status after delete: ${st.text}`);
+    assert(st.data.configured === false, `status after the owner's removal: ${st.text}`);
 });
 
-await test('5b. psp_delete leaves the stablecoin payout address standing', async () => {
+await test('5b. removing the card key on the Wallet route leaves the stablecoin payout address standing', async () => {
     // commerce.psp holds BOTH rails: the card credentials and the seller's x402 payout address.
     // The tool used to drop the whole record, so removing a Stripe key also erased a hand-typed
     // on-chain address that four validation steps guard on the way in. DELETE
@@ -269,8 +278,13 @@ await test('5b. psp_delete leaves the stablecoin payout address standing', async
 
     const set = await setPsp({ provider: 'stripe', secret_key: SECRET });
     assert(set.status === 200, `owner sets the key: ${set.status}`);
-    const del = await mcp.call('aimeat_commerce_psp_delete', {});
-    assert(!del.isError && del.data.deleted === true, `delete: ${del.text}`);
+    const refused = await mcp.call('aimeat_commerce_psp_delete', {});
+    assert(refused.isError, `the agent's delete: ${refused.text}`);
+    const before = await json('/v1/commerce/payout', { headers: auth(buyerOwner.token) });
+    assert(before.body.data.stripe.configured === true && String(before.body.data.x402.address).toLowerCase() === ADDRESS,
+        `the refused tool changed the record: ${JSON.stringify(before.body.data)}`);
+    const del = await json('/v1/commerce/payout/stripe', { method: 'DELETE', headers: auth(buyerOwner.token) });
+    assert(del.status === 200, `the owner's removal: ${del.status}`);
 
     const payout = await json('/v1/commerce/payout', { headers: auth(buyerOwner.token) });
     assert(payout.status === 200, `payout read ${payout.status}`);

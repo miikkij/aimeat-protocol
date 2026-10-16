@@ -26,6 +26,9 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-16 — A read of the owner's mailbox by an agent that may name it but lacks
+ *     connections:read-as-owner answers READ_AS_OWNER_REQUIRED, naming the permission, instead of
+ *     "no such connection" for a connection aimeat_connection_list had just shown it (QA audit F12b-02).
  *   2026-10-15 — The owner's connections: aimeat_connection_list names them on connections:use, the read
  *     tools read them on connections:read-as-owner (connectionHoldersOf), and aimeat_mail_send sends from
  *     the owner's address book and mailbox as POST /v1/outbound/send does (feature-list audit 128-130).
@@ -90,6 +93,23 @@ export function registerConnectionTools(
      *  (services/connections/access.ts connectionHoldersOf; feature-list audit 128). */
     const holders = (purpose: 'name' | 'read'): string[] =>
         connectionHoldersOf(principal(), ownerGhiiOf(principal()), scopes, purpose);
+
+    /**
+     * The refusal for a connection this session may not read. When aimeat_connection_list already
+     * names it to this session (the owner's mailbox, listed on connections:use), "no such connection"
+     * is not true, and an agent told so stops instead of asking its owner for the permission. So that
+     * case names the missing word and where the owner gives it; it discloses nothing the list did not.
+     * Every other case keeps `fallback`, where absent and not-yours answer alike.
+     */
+    const unreadable = async (connectionId: string, fallback: string): Promise<TextResult> => {
+        const named = await requireUsableConnection(storage, holders('name'), connectionId);
+        if (named && named.principal !== principal()) {
+            return toolError('READ_AS_OWNER_REQUIRED',
+                'This mailbox is your owner\'s. You may see it and send through it, but reading what is in it needs '
+                + 'their separate permission (connections:read-as-owner). Ask them to allow it on your page under Agents.');
+        }
+        return fail(fallback);
+    };
 
     /**
      * The service context, or the reason there is none.
@@ -215,7 +235,7 @@ export function registerConnectionTools(
         // principal's connection must not confirm that it exists. The rule is the service's, not
         // this door's.
         const conn = await requireUsableConnection(storage, holders('read'), connectionId);
-        if (!conn) return fail('NOT_FOUND: no such connection of yours.');
+        if (!conn) return unreadable(connectionId, 'NOT_FOUND: no such connection of yours.');
         const out = await readResource(c, conn.id, resource, params);
         if (!out.ok) return fail(`${out.code}: ${out.message}`);
         return ok({ provider: out.provider, resource: out.resource, data: out.data });
@@ -231,7 +251,7 @@ export function registerConnectionTools(
         const c = ctx();
         if ('error' in c) return fail(c.error);
         const conn = await requireUsableConnection(storage, holders('read'), connectionId);
-        if (!conn) return fail('NOT_FOUND: no such connection of yours.');
+        if (!conn) return unreadable(connectionId, 'NOT_FOUND: no such connection of yours.');
         const out = await storeMailAttachment(c, { storage, config, emitResourceUpdated, emitResourceListChanged },
             principal(), conn.id, input);
         if (!out.ok) return fail(`${out.code}: ${out.message}`);
@@ -272,7 +292,7 @@ export function registerConnectionTools(
             if ('error' in c) return fail(c.error);
             // The aliases are read from the mailbox, so the reading holders decide which one it may be.
             const conn = await requireUsableConnection(storage, holders('read'), connection_id);
-            if (!conn) return fail('NO_SUCH_MAILBOX: No connected mailbox with that id.');
+            if (!conn) return unreadable(connection_id, 'NO_SUCH_MAILBOX: No connected mailbox with that id.');
             const res = await listSendAsAliases(c, conn.principal, connection_id);
             if ('code' in res) return fail(`${res.code}: ${res.message}`);
             return ok(res);

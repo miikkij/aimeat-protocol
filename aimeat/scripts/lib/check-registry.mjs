@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.20.0 (2026-10-16): check:mcp-test-calls, the ratchet on catalog MCP tools no E2E suite calls (QA audit W27); check:denial-coverage also asks every authenticated route for a refusal test (W29, P3-08).
  *  - 1.19.1 (2026-10-16): check:silent-catch's label names what it now holds: src/static per file and per shape, and every exemption counted with its reason (W25).
  *  - 1.19.0 (2026-10-11): check:doc-links, a served string never sends its reader to a repository docs/ file.
  *  - 1.18.0 (2026-10-11): lint, the pre-commit hook's cached ESLint, so the 800-line file limit refuses the gate and not only the commit after it.
@@ -62,7 +63,10 @@ export const FAST_CHECKS = [
     { script: 'check:protocol-versions', label: 'Protocol versions declared vs current' },
     { script: 'check:supply-chain', label: 'CI and model images: third-party code runs pinned, and never beside a secret or a write token' },
     { script: 'check:route-scopes', label: 'Route authorization gates' },
-    { script: 'check:denial-coverage', label: 'Every suite asks what a second principal gets' },
+    { script: 'check:denial-coverage', label: 'Every suite asks what a second principal gets, and every authenticated route has a refusal test' },
+    // QA audit 2026-10, W27: 138 of 431 catalog MCP tools were named by no E2E suite, so a handler's
+    // own access check could be removed with every suite green. The list may only shrink.
+    { script: 'check:mcp-test-calls', label: 'Every MCP tool is called by an E2E suite, or listed with a reason; the list only shrinks' },
     { script: 'check:suite-ports', label: 'No two E2E suites write down the same port' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
     // 2026-10-01, after the peer-registration incident: who writes a federation peer, and who trusts

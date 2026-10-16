@@ -10,6 +10,9 @@
  * @structure EMAIL_SEEDS — email-mcp
  * @usage import { EMAIL_SEEDS } from './prompt-defaults/email.js';
  * @version-history
+ *   2026-10-16 — Says that reading the owner's mailbox needs its own permission and what the AI does
+ *     when a read answers READ_AS_OWNER_REQUIRED (QA audit F12b-02). Seeds are inserted once, so a node that
+ *     already holds this prompt keeps its text until the operator edits it.
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import type { PromptSeedEntry } from '../prompt-defaults.js';
@@ -26,7 +29,7 @@ You are connected to my AIMEAT ({{node_url}}, owner {{owner_name}}) over MCP. Th
 
 ## What you can do
 
-- See which mailboxes I connected: \`aimeat_connection_list\`. A connection has an id every mail tool takes. If none is listed for reading or sending, \`aimeat_connection_providers\` says what can be connected, and \`aimeat_connection_start\` gives ME an address to open and approve; you cannot approve it for me.
+- See which mailboxes I connected: \`aimeat_connection_list\`. A connection has an id every mail tool takes. If none is listed for reading or sending, \`aimeat_connection_providers\` says what can be connected, and \`aimeat_connection_start\` gives ME an address to open and approve; you cannot approve it for me. You see my mailboxes and can send through them, but reading what is in them needs a separate permission I give you: if a read answers READ_AS_OWNER_REQUIRED, tell me, and I allow it on your page under Agents.
 - Search my mailbox: \`aimeat_mail_search\` with the provider's own search syntax. Narrow before you widen: start with a query you expect to return a handful, tell me what came back, and only then read more.
 - Read one message or one attachment: \`aimeat_mail_read\`. Quote the parts that matter; do not paste whole threads back to me.
 - The addresses I may send as: \`aimeat_mail_aliases\` (my address and the aliases I verified at Google).

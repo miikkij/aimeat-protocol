@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 -- PATCH /v1/agents/:name/scopes admits the owner's agent holding agent:permissions and
+ *     agent:write, the words aimeat_operator_agent_configure declares, and lets it only narrow a sibling's
+ *     list (SCOPE_ADDITION_REFUSED otherwise), as the MCP tool does (QA audit D2-02).
  *   2026-10-16 -- POST /v1/agents/:gaii/rekey also cuts the agent's live connector socket, which had verified the old token once at upgrade (QA audit F03b-01).
  *   2026-10-15 -- POST /v1/agents/:gaii/port keeps the redirect pointer in a system namespace the agent's
  *     deletion does not touch (services/agent-port-redirect.ts), and a refusal for want of morsels names
@@ -70,7 +73,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { callerOf } from '../../middleware/caller.js';
-import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
+import { scopeIsCovered, exceedsCeiling, uncoveredScopes } from '../../utils/scope-coverage.js';
 import { forgetAgentAccess } from '../../services/agent-refusals.js';
 import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
@@ -441,8 +444,14 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     }));
   });
 
-  // PATCH /v1/agents/:name/scopes — update agent scopes (owner only)
-  router.patch('/v1/agents/:name/scopes', requireAuth(), requireRole('owner'), async (req, res) => {
+  // PATCH /v1/agents/:name/scopes — update agent scopes.
+  // WHO. The owner in person sets any list the node's ceiling allows. Their agent holding the words
+  // aimeat_operator_agent_configure declares (agent:permissions, outside every wildcard, and
+  // agent:write) may only NARROW a sibling's list: every word it sends must already be covered by
+  // the target agent's current list, the rule the MCP tool and POST /scope-narrowing apply. The connector's copy
+  // of the tool calls this route, so an owner-only gate refused there what the node MCP allowed.
+  // requireRole('agent') keeps an app grant and an ecosystem app out (QA audit D2-02).
+  router.patch('/v1/agents/:name/scopes', requireAuth(), requireRole('agent'), requireScope('agent:permissions', 'agent:write'), async (req, res) => {
     const agentName = req.params.name as string;
     const ownerName = req.auth!.owner;
     const { scopes } = req.body ?? {};
@@ -471,6 +480,17 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     if (!agent) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found under owner "${ownerName}"`));
       return;
+    }
+
+    // An agent narrows only: adding a permission stays the owner's approval in person.
+    if (!callerOf(req, config.nodeId, storage).inPerson) {
+      const added = uncoveredScopes(agent.defaultScopes ?? [], scopes as string[]);
+      if (added.length > 0) {
+        res.status(403).json(error(config.nodeId, 'SCOPE_ADDITION_REFUSED',
+          "An agent can only take permissions away from another agent. Ask your owner to add the permission on that agent's page.",
+          403, { added }));
+        return;
+      }
     }
 
     const updated = await storage.updateAgent(agent.gaii, { defaultScopes: scopes });

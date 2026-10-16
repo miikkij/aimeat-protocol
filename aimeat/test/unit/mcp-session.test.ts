@@ -1,90 +1,53 @@
+/**
+ * @file test/unit/mcp-session.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The platform label of an MCP session (mcp/session-platform.ts), which names the
+ *   session's chat-instance row `mcp-<platform>#<owner>@<node>`: the client name approved at OAuth
+ *   consent wins over the User-Agent, and each known platform is recognised from either.
+ * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-session.test.ts
+ * @version-history
+ *   v2.0.0 — 2026-10-16 — Rewritten to run production code (QA audit F01a-01). Every case before
+ *     asserted on values the test itself wrote: a record literal (deleted, it tested no code), a
+ *     local `ownerExists = false` standing in for the -32003 owner check in mcp/index.ts (deleted; that
+ *     branch needs an agent whose owner record is gone, which no route can produce), and a copy of the
+ *     platform detection written inside the test, which had already drifted from the real one (it
+ *     knew no claude-code, claude-desktop or client-name branch). The detection moved to
+ *     mcp/session-platform.ts so these cases call it.
+ */
 import { describe, it, expect } from 'vitest';
+import { mcpSessionPlatform } from '../../src/mcp/session-platform.js';
 
-describe('MCP session tracking', () => {
-  describe('ChatInstanceRecord with MCP fields', () => {
-    it('accepts agentGaii and mcpClientId fields', () => {
-      const record = {
-        id: 'mcp-claude-1710000000#jouni@node',
-        platform: 'claude',
-        appName: 'mcp-claude',
-        ownerName: 'jouni',
-        ghii: 'jouni@node',
-        nodeId: 'node',
-        isAnonymous: false,
-        createdAt: '2026-03-11T00:00:00Z',
-        lastSeen: '2026-03-11T00:00:00Z',
-        agentGaii: 'app#jouni@node',
-        mcpClientId: 'mcp-client-abc123',
-      };
-      expect(record.agentGaii).toBe('app#jouni@node');
-      expect(record.mcpClientId).toBe('mcp-client-abc123');
-      expect(record.platform).toBe('claude');
-      expect(record.isAnonymous).toBe(false);
+describe('mcpSessionPlatform', () => {
+    it('reads the approved client name first, whatever the User-Agent says', () => {
+        expect(mcpSessionPlatform('Claude Code', 'ChatGPT-Plugin/1.0')).toBe('claude-code');
+        expect(mcpSessionPlatform('claude-desktop', undefined)).toBe('claude-desktop');
+        expect(mcpSessionPlatform('Claude Desktop', undefined)).toBe('claude-desktop');
+        expect(mcpSessionPlatform('Claude', undefined)).toBe('claude');
+        expect(mcpSessionPlatform('ChatGPT', undefined)).toBe('chatgpt');
+        expect(mcpSessionPlatform('OpenAI Codex', undefined)).toBe('chatgpt');
+        expect(mcpSessionPlatform('GitHub Copilot', undefined)).toBe('copilot');
+        expect(mcpSessionPlatform('Cursor', undefined)).toBe('cursor');
+        expect(mcpSessionPlatform('Gemini CLI', undefined)).toBe('gemini');
     });
 
-    it('allows optional MCP fields to be undefined', () => {
-      const record = {
-        id: 'mcp-unknown-1710000000#jouni@node',
-        platform: 'unknown',
-        appName: 'mcp-unknown',
-        ownerName: 'jouni',
-        ghii: 'jouni@node',
-        nodeId: 'node',
-        isAnonymous: false,
-        createdAt: '2026-03-11T00:00:00Z',
-        lastSeen: '2026-03-11T00:00:00Z',
-      };
-      expect(record.agentGaii).toBeUndefined();
-      expect(record.mcpClientId).toBeUndefined();
-    });
-  });
-
-  describe('Agent-owner enforcement', () => {
-    it('rejects agents without valid owners', () => {
-      // Simulates: storage.getOwner(agent.owner) returns null
-      const ownerExists = false;
-      expect(ownerExists).toBe(false);
-      // Server should return 403 "Agent has no valid owner profile"
+    it('keeps an unknown client name as its first 32 characters', () => {
+        expect(mcpSessionPlatform('My Own Agent', 'Claude-AI/1.0')).toBe('My Own Agent');
+        expect(mcpSessionPlatform('x'.repeat(40), undefined)).toBe('x'.repeat(32));
     });
 
-    it('accepts agents with valid owners', () => {
-      const agent = { owner: 'jouni', gaii: 'app#jouni@node' };
-      const ownerRecord = { name: 'jouni', displayName: 'Jouni' };
-      expect(ownerRecord).toBeTruthy();
-      expect(agent.owner).toBe(ownerRecord.name);
-    });
-  });
-
-  describe('Platform detection from User-Agent', () => {
-    const detectPlatform = (ua: string): string => {
-      const lower = ua.toLowerCase();
-      if (lower.includes('claude')) return 'claude';
-      if (lower.includes('chatgpt') || lower.includes('openai')) return 'chatgpt';
-      if (lower.includes('copilot')) return 'copilot';
-      if (lower.includes('cursor')) return 'cursor';
-      if (lower.includes('gemini')) return 'gemini';
-      return 'unknown';
-    };
-
-    it('detects Claude', () => {
-      expect(detectPlatform('Claude-AI/1.0')).toBe('claude');
-      expect(detectPlatform('Mozilla/5.0 claude-desktop')).toBe('claude');
+    it('falls back to the User-Agent without a client name', () => {
+        expect(mcpSessionPlatform(undefined, 'Claude-AI/1.0')).toBe('claude');
+        expect(mcpSessionPlatform('', 'Mozilla/5.0 claude-desktop')).toBe('claude');
+        expect(mcpSessionPlatform(undefined, 'OpenAI-Client/2.0')).toBe('chatgpt');
+        expect(mcpSessionPlatform(undefined, 'Copilot/1.0')).toBe('copilot');
+        expect(mcpSessionPlatform(undefined, 'Cursor-IDE/0.5')).toBe('cursor');
+        expect(mcpSessionPlatform(undefined, 'Google-Gemini/1.0')).toBe('gemini');
     });
 
-    it('detects ChatGPT', () => {
-      expect(detectPlatform('ChatGPT-Plugin/1.0')).toBe('chatgpt');
-      expect(detectPlatform('OpenAI-Client/2.0')).toBe('chatgpt');
+    it('answers unknown for a User-Agent that names no platform, or none at all', () => {
+        expect(mcpSessionPlatform(undefined, 'RandomBot/2.0')).toBe('unknown');
+        expect(mcpSessionPlatform(undefined, '')).toBe('unknown');
+        expect(mcpSessionPlatform(undefined, undefined)).toBe('unknown');
     });
-
-    it('detects other platforms', () => {
-      expect(detectPlatform('Copilot/1.0')).toBe('copilot');
-      expect(detectPlatform('Cursor-IDE/0.5')).toBe('cursor');
-      expect(detectPlatform('Google-Gemini/1.0')).toBe('gemini');
-    });
-
-    it('returns unknown for unrecognized agents', () => {
-      expect(detectPlatform('RandomBot/2.0')).toBe('unknown');
-      expect(detectPlatform('')).toBe('unknown');
-    });
-  });
 });

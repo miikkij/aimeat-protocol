@@ -18,6 +18,8 @@
  * @structure complianceTools — the four definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-10-16 — aimeat_compliance_snapshot's description says what the node MCP registration does:
+ *     the tool is offered on compliance:write, so listing there takes both words (QA audit F17-01).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-23 — aimeat_compliance_snapshot: what the installation has kept, and keeping
@@ -80,7 +82,7 @@ export const complianceTools = [
     },
     {
         name: 'aimeat_compliance_snapshot',
-        description: 'Operator-only. The reports this installation has KEPT, as opposed to the live one aimeat_compliance_report builds each time it is asked. action="list" is the index, newest first: each entry has an id, a generated_at, and a kind — "monthly" for the one the schedule writes on the first of each month, "manual" for a moment somebody chose to keep. action="read" with that id returns that report exactly as it was stored, which is the point of it: the numbers in it will never change again. action="save" keeps the report as it stands right now and returns its new id; use since_days to say what window it should cover, because a snapshot describes its own period and will be read a year later by somebody who was not there. Reading needs "compliance:read"; saving needs "compliance:write", since it adds a node-wide document to what the installation keeps.',
+        description: 'Operator-only. The reports this installation has KEPT, as opposed to the live one aimeat_compliance_report builds each time it is asked. action="list" is the index, newest first: each entry has an id, a generated_at, and a kind — "monthly" for the one the schedule writes on the first of each month, "manual" for a moment somebody chose to keep. action="read" with that id returns that report exactly as it was stored, which is the point of it: the numbers in it will never change again. action="save" keeps the report as it stands right now and returns its new id; use since_days to say what window it should cover, because a snapshot describes its own period and will be read a year later by somebody who was not there. Reading needs "compliance:read"; saving needs "compliance:write", since it adds a node-wide document to what the installation keeps. On the node MCP this tool is offered only to an agent holding "compliance:write", so an agent that lists or reads kept reports there holds both words.',
         caller: 'operator',
         visibility: agentEverywhere,
         // Not readOnly, because action="save" adds a record; not destructive, because it only ever adds

@@ -20,6 +20,10 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-16 — aimeat_commerce_psp_delete refuses with SCREEN_ONLY and the Wallet page link, as psp_set
+ *     does: removing the payment secret is the owner's act in person (decision D5), and DELETE
+ *     /v1/commerce/payout/stripe, which the connector and CLI tools call, refuses every agent. The two
+ *     surfaces now give one answer (QA audit D2-02).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-16 — aimeat_commerce_psp_status reports invoice_accept_immediate: whether the owner takes
  *     invoice payment for items delivered at once (QA audit S8-03).
@@ -79,8 +83,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
-import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
-import { getEncryptionKey } from '../services/encryption.js';
+import { pspSecretHint } from '../commerce/psp-secrets.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { canonicalAppToolsId } from '../services/app-tools-key.js';
@@ -250,26 +253,13 @@ export function registerCommerceTools(
         zodShapeFor('aimeat_commerce_psp_delete'),
         annotationsFor('aimeat_commerce_psp_delete'),
         async () => {
-            // MERGE, the same way DELETE /v1/commerce/payout/stripe does it. The record also holds
-            // the seller's x402 stablecoin payout address, so dropping the whole record threw away a
-            // hand-typed on-chain address that four validation steps guard on the way in — and
-            // psp_set a few lines above already merges for exactly that reason. What the tool says
-            // it removes is the credentials, so that is what it removes.
-            const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
-            if (!existing || (existing.secretKey === undefined && existing.provider === undefined)) {
-                return ok({ deleted: false, note: 'No PSP credentials were configured.' });
-            }
-            const cleared = { ...existing };
-            delete cleared.secretKey;
-            delete cleared.provider;
-            const encKey = getEncryptionKey(config);
-            const next = encKey ? sealPspRecord(encKey, cleared).record : cleared;
-            const { refusal: clearRefusal } = await putOwnerRecord(PSP_KEY, next, 'private', ['commerce'], 'commerce:psp');
-            if (clearRefusal) return { content: [{ type: 'text' as const, text: clearRefusal }], isError: true };
-            return ok({
-                deleted: true,
-                note: 'Card sales now fail until credentials are set again. Stablecoin and invoice settlement are unaffected.',
-            });
+            // SCREEN ONLY, as psp_set above (decision D5). A session here is always an agent record,
+            // and DELETE /v1/commerce/payout/stripe, which the connector and CLI tools call, refuses
+            // agents (requireRole('owner')). Removing the key stops every card sale of the owner, so
+            // it is the owner's act on the Wallet page, the same page that sets it; the tool refuses
+            // before anything is read or written (QA audit D2-02). The merge the route performs (the
+            // x402 address in the same record survives) stays in the route.
+            return fail(`SCREEN_ONLY: your payment provider's secret key is removed by you, signed in yourself, on the Wallet page: ${config.baseUrl.replace(/\/+$/, '')}/v1/profile?tab=wallet . Removing it stops card sales, so no agent does it.`);
         },
     );
 

@@ -10,6 +10,11 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   2026-10-16 — POST, PUT and DELETE /v1/capabilities admit the owner's agent holding capability:write, the
+ *     word aimeat_capabilities_create/_update/_delete declare, and POST/DELETE /:id/vouch admit the owner's
+ *     agent holding the same word, which aimeat_capabilities_vouch now declares too: the node MCP, the connector MCP and /local/call (which call
+ *     these routes) give one answer. An agent's capability is stored under its own GAII, as the MCP tools
+ *     store it. requireRole('agent') keeps an app grant and an ecosystem app out (QA audit D2-02).
  *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 - 2026-09-03 - The list's policy carries call_counting (whether direct extension calls
  *     are counted into stats); source_type filter accepts app-tool and offering.
@@ -243,9 +248,13 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     res.json(success(config.nodeId, cap));
   });
 
-  // ── CRUD (Owner, manages own capabilities) ──
+  // ── CRUD (the owner, or the owner's agent holding capability:write, manages its own capabilities) ──
+  // WHO. The word the three MCP tools declare, asked of an agent here too: the connector's tools and
+  // /local/call call these routes, so an owner-only gate refused there what the node MCP allowed.
+  // The identity is resolveIdentity's, so an agent's capability lands under its own GAII, as the MCP
+  // tools have always stored it, and ownership is compared on the same id (QA audit D2-02).
 
-  router.post('/v1/capabilities', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/capabilities', requireAuth(), requireRole('agent'), requireScope('capability:write'), async (req, res) => {
     const body = req.body;
     const created = await createCapability({ storage, config }, await caller(req), {
       id: body.id, name: body.name, summary: body.summary, visibility: body.visibility,
@@ -261,7 +270,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     res.status(201).json(success(config.nodeId, created.value));
   });
 
-  router.put('/v1/capabilities/:id', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.put('/v1/capabilities/:id', requireAuth(), requireRole('agent'), requireScope('capability:write'), async (req, res) => {
     // The body is the caller's, so the fields the node owns come out before it goes any further.
     const patch: Record<string, unknown> = { ...(req.body as Record<string, unknown> | null ?? {}) };
     for (const field of SERVER_OWNED_CAPABILITY_FIELDS) delete patch[field];
@@ -289,7 +298,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     res.json(success(config.nodeId, updated.value));
   });
 
-  router.delete('/v1/capabilities/:id', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.delete('/v1/capabilities/:id', requireAuth(), requireRole('agent'), requireScope('capability:write'), async (req, res) => {
     const removed = await deleteCapability({ storage, config }, await caller(req), req.params.id as string);
     if (!removed.ok) return res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
     res.json(success(config.nodeId, { deleted: true }));
@@ -368,8 +377,12 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   // ── Vouching ──
+  // WHO. The owner, or the owner's agent holding capability:write, the word the scope model gives a
+  // vouch (public/views/profile/agents/scope-model.js) and aimeat_capabilities_vouch now declares. A vouch is keyed on the OWNER GHII whoever casts it (voucherGhiiOf in
+  // services/capability-record.ts), so an agent vouches in its owner's name and can never vouch for a
+  // capability of its own owner (QA audit D2-02).
 
-  router.post('/v1/capabilities/:id/vouch', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.post('/v1/capabilities/:id/vouch', requireAuth(), requireRole('agent'), requireScope('capability:write'), async (req, res) => {
     const comment = typeof (req.body as Record<string, unknown> | undefined)?.comment === 'string'
       ? (req.body as Record<string, string>).comment : undefined;
     const vouched = await vouchCapability({ storage, config }, await caller(req), req.params.id as string, comment);
@@ -379,7 +392,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
 
   // Removes the CALLER'S vouch only — whose vouch goes is decided by who is asking, in the
   // service, never by the route decrementing a number.
-  router.delete('/v1/capabilities/:id/vouch', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.delete('/v1/capabilities/:id/vouch', requireAuth(), requireRole('agent'), requireScope('capability:write'), async (req, res) => {
     const out = await unvouchCapability({ storage, config }, await caller(req), req.params.id as string);
     if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
     res.json(success(config.nodeId, out.value));

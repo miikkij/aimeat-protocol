@@ -18,6 +18,11 @@
  *   - GET    /v1/shares/incoming     -- What has been shared WITH me
  *   - DELETE /v1/shares/:shareId     -- Stop sharing
  * @version-history
+ *   2026-10-16 -- POST /v1/groups, POST /v1/groups/:id/members and DELETE /v1/groups/:id/members/:identifier
+ *     admit the owner's agent holding consent:groups, the word aimeat_group_create, _add_member and
+ *     _remove_member declare, and act on groups owned by the OWNER's GHII, as the MCP tools do: the node
+ *     MCP, the connector MCP and /local/call (which call these routes) give one answer. requireRole('agent')
+ *     keeps an app grant and an ecosystem app out (QA audit D2-02).
  *   v1.2.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.2.0 -- 2026-08-11 -- Key-space shares. A group could only ever be pointed at one record at a
@@ -31,7 +36,7 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { randomUUID } from 'node:crypto';
 import {
   createSharingGroup,
@@ -50,6 +55,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
+import { callerOf } from '../middleware/caller.js';
 import {
   SharingGroupUpdateSchema,
   SharingGroupUpdateMemberSchema,
@@ -61,9 +67,14 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
   /** Resolve effective identity -- owner sessions use GHII, agents use GAII */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
-  /* ── POST /v1/groups -- Create a sharing group ── */
-  router.post('/v1/groups', requireAuth(), requireRole('owner'), async (req, res) => {
-    const ownerGaii = resolve(req);
+  /** The account a group write acts in: the owner's GHII, for the owner in person and for their agent
+   *  alike, which is the identity aimeat_group_create and its siblings have always used. */
+  const groupOwner = (req: Request) => callerOf(req, config.nodeId, storage).ownerGhii;
+
+  /* WHO. The owner in person, or their agent holding consent:groups, the word aimeat_group_create
+   * declares; the group belongs to the owner whoever creates it (QA audit D2-02). */
+  router.post('/v1/groups', requireAuth(), requireRole('agent'), requireScope('consent:groups'), async (req, res) => {
+    const ownerGaii = groupOwner(req);
 
     // Validation, the 50-group ceiling, the member's stored address, the record and the change
     // event are services/sharing-group-members.ts, because aimeat_group_create decides them too.
@@ -210,9 +221,10 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── POST /v1/groups/:id/members -- Add member ── */
-  router.post('/v1/groups/:id/members', requireAuth(), requireRole('owner'), async (req, res) => {
+  // WHO. As POST /v1/groups: the owner, or their agent holding consent:groups, on the owner's groups.
+  router.post('/v1/groups/:id/members', requireAuth(), requireRole('agent'), requireScope('consent:groups'), async (req, res) => {
     const id = req.params.id as string;
-    const ownerGaii = resolve(req);
+    const ownerGaii = groupOwner(req);
 
     // Ownership, the ceiling, the duplicate test, the member's stored address and the write are
     // services/sharing-group-members.ts, because aimeat_group_add_member decides them too.
@@ -276,10 +288,11 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── DELETE /v1/groups/:id/members/:identifier -- Remove member ── */
-  router.delete('/v1/groups/:id/members/:identifier', requireAuth(), requireRole('owner'), async (req, res) => {
+  // WHO. As POST /v1/groups: the owner, or their agent holding consent:groups, on the owner's groups.
+  router.delete('/v1/groups/:id/members/:identifier', requireAuth(), requireRole('agent'), requireScope('consent:groups'), async (req, res) => {
     const id = req.params.id as string;
     const identifier = req.params.identifier as string;
-    const ownerGaii = resolve(req);
+    const ownerGaii = groupOwner(req);
 
     const removed = await removeSharingGroupMember({ storage, config }, ownerGaii, id, identifier);
     if (!removed.ok) {

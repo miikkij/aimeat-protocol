@@ -20,6 +20,8 @@
  * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-16 — restoreMemoryRecord refuses a record whose grace window has closed (pastGraceWindow),
+ *     with the same NOT_RESTORABLE answer, before the hourly sweep has removed its row (QA audit F05a-02).
  *   2026-10-15 — restoreMemoryRecord applies the write path's old-morsel-price rule
  *     (legacyPacingWriteRefusal): 400 MORSEL_PRICE_REMOVED from 4.0.0 (feature-list audit #205).
  *   2026-10-15 — deleteMemoryRecord records the delete in the memory write tally (recordMemoryTouch, kind 'delete'), so the hands answer counts it (feature-list audit #50).
@@ -267,6 +269,17 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
 }
 
 /**
+ * Has the grace window of a record deleted at `deletedAt` closed? A grace of 0 is an immediate,
+ * final delete, so the window is closed at once. An unreadable date or grace leaves the record
+ * restorable: the sweep, not this check, is what removes rows.
+ */
+export function pastGraceWindow(deletedAt: string | null | undefined, graceDays: number, now = Date.now()): boolean {
+  const at = deletedAt ? Date.parse(deletedAt) : NaN;
+  if (!Number.isFinite(at) || !Number.isFinite(graceDays)) return false;
+  return now >= at + Math.max(0, graceDays) * 86_400_000;
+}
+
+/**
  * Out of the bin.
  *
  * ONE REFUSAL FOR THREE CAUSES, said as the one thing a person can act on: it was never deleted, it
@@ -284,6 +297,9 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
   let binned: unknown;
   const inBin = async (gaii: string) => {
     const record = (await deps.storage.listDeletedMemory(gaii)).find(r => r.key === req.key);
+    // Past the grace window the record is gone for good, whether or not the hourly sweep has
+    // removed its row yet: the delete answer promised "restorable until", not "until the timer runs".
+    if (record && pastGraceWindow(record.deletedAt, deps.config.memoryDeleteGraceDays)) return false;
     if (record) { visibility = record.visibility; binned = record.value; }
     return !!record;
   };

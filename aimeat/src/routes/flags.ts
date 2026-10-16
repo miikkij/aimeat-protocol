@@ -11,6 +11,7 @@
  *   - flagsRouter(config, storage): POST /v1/flags plus flag listing/review routes
  *
  * @version-history
+ *   v1.3.1 — 2026-10-16 — PUT /v1/flags/:id: the organism-admin branch compares admins[] with the bare owner name as well as the GHII. admins[] holds bare names, so the branch matched nobody and an organism admin in person got 403 on their organism's flags (QA audit F13-03, test/e2e-flag-review.ts).
  *   v1.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.2.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-14 — The organism-admin path asks which PRINCIPAL is calling, not whose name
@@ -149,8 +150,15 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
         if (!isOperator && isOwnerPrincipal(req.auth) && !isForeignPrincipal(req.auth)) {
             const organism = await resolveOrganismForFlag(storage, existing.targetType, existing.targetId);
             if (organism) {
+                // admins[] holds the bare owner name everywhere it is written (organism-lifecycle,
+                // membership, workspace-access), so the comparison with the GHII alone matched nobody
+                // and an organism admin got 403 here until 2026-10-16. The bare name is safe to
+                // compare only because the principal test above has already refused an agent, an app,
+                // an ecosystem principal and a visitor from another node. The GHII form stays for a
+                // record written in that form; routes/appeals.ts asks the same two questions.
                 const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);
-                if (ghiiRecord && organism.admins.includes(ghiiRecord.ghii)) {
+                if (organism.admins.includes(req.auth!.owner)
+                    || (ghiiRecord && organism.admins.includes(ghiiRecord.ghii))) {
                     isOrganismAdmin = true;
                 }
             }

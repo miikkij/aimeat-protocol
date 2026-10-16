@@ -193,6 +193,8 @@
     "check:suite-ports": "tsx scripts/check-suite-ports.ts",
     "check:denial-coverage:report": "tsx scripts/check-denial-coverage.ts",
     "check:denial-coverage:seed": "tsx scripts/check-denial-coverage.ts --seed",
+    "check:mcp-test-calls": "tsx scripts/check-mcp-test-calls.ts --strict",
+    "check:mcp-test-calls:report": "tsx scripts/check-mcp-test-calls.ts",
     "check:route-scopes:report": "tsx scripts/check-route-scopes.ts",
     "check:outbound-fetch": "tsx scripts/check-outbound-fetch.ts --strict",
     "check:peer-paths": "tsx scripts/check-peer-paths.ts --strict",

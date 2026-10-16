@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-16 — The session's platform label moves to mcp/session-platform.ts unchanged, so a unit
+ *     test runs it (QA audit F01a-01).
  *   2026-10-16 — Tools are registered through mcp/tool-registrar.ts, which adds the fault wrapper
  *     (mcp/tool-fault.ts): a tool that throws is logged, reported and answered with a sentence. A call
  *     to a tool the request's permissions do not allow answers SCOPE_DENIED and is noted for the owner
@@ -172,6 +174,7 @@ import { mcpRequestAuthority, sameMcpPrincipal, withRequestPermission } from './
 import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
 import { answerMovedTools } from './moved-tools-answer.js';
 import { treatNullAsAbsent } from './null-as-absent.js';
+import { mcpSessionPlatform } from './session-platform.js';
 export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from './resource-events.js';
 
 export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -595,25 +598,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
 
             // Upsert ChatInstanceRecord for session tracking
             // Prefer mcp_client from JWT (set during OAuth consent) over User-Agent sniffing
-            let platform = 'unknown';
-            if (mcpClientName) {
-                const cn = mcpClientName.toLowerCase();
-                if (cn.includes('claude code') || cn.includes('claude-code')) platform = 'claude-code';
-                else if (cn.includes('claude desktop') || cn.includes('claude-desktop')) platform = 'claude-desktop';
-                else if (cn.includes('claude')) platform = 'claude';
-                else if (cn.includes('chatgpt') || cn.includes('openai')) platform = 'chatgpt';
-                else if (cn.includes('copilot')) platform = 'copilot';
-                else if (cn.includes('cursor')) platform = 'cursor';
-                else if (cn.includes('gemini')) platform = 'gemini';
-                else platform = mcpClientName.slice(0, 32);
-            } else {
-                const ua = (req.headers['user-agent'] || '').toLowerCase();
-                if (ua.includes('claude')) platform = 'claude';
-                else if (ua.includes('chatgpt') || ua.includes('openai')) platform = 'chatgpt';
-                else if (ua.includes('copilot')) platform = 'copilot';
-                else if (ua.includes('cursor')) platform = 'cursor';
-                else if (ua.includes('gemini')) platform = 'gemini';
-            }
+            const platform = mcpSessionPlatform(mcpClientName, req.headers['user-agent']);
 
             // The id predates buildChatInstanceId and every session row in production is addressed
             // by it, so it is passed explicitly rather than derived.

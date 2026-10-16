@@ -1226,6 +1226,33 @@ const ALL_SUITES = [
     'test/e2e-public-activity.ts',
     'test/e2e-public-totals.ts',
     'test/e2e-cortex-upload-ownership.ts',
+    // QA audit 2026-10, W27: every MCP tool no E2E suite called gets a call and a refusal, through
+    // the node MCP endpoint with an agent that holds exactly the scopes the case needs
+    // (test/helpers/mcp-session.ts). scripts/check-mcp-test-calls.ts holds the count.
+    'test/e2e-mcp-organism-admin-tools.ts',
+    'test/e2e-mcp-workspace-content-tools.ts',
+    'test/e2e-mcp-memory-misc-tools.ts',
+    'test/e2e-mcp-operator-site-tools.ts',
+    'test/e2e-mcp-compliance-tools.ts',
+    'test/e2e-mcp-admin-tools.ts',
+    'test/e2e-mcp-ai-tools.ts',
+    'test/e2e-mcp-mail-connection-tools.ts',
+    'test/e2e-mcp-proxy-tools.ts',
+    'test/e2e-mcp-owner-only-parity.ts',
+    'test/e2e-mcp-agent-self-tools.ts',
+    'test/e2e-mcp-v2-tools.ts',
+    'test/e2e-mcp-crew-schedule-tools.ts',
+    'test/e2e-mcp-package-tools.ts',
+    // QA audit 2026-10, W29: the refusals and rows chapters 3.2 and 3.4 of the audit found untested.
+    'test/e2e-oauth-consent-refusals.ts',
+    'test/e2e-session-forgery.ts',
+    'test/e2e-scope-ceiling.ts',
+    'test/e2e-flag-review.ts',
+    'test/e2e-maintenance-access.ts',
+    'test/e2e-package-update-widening.ts',
+    'test/e2e-memory-bin-purge.ts',
+    'test/e2e-docsign-caller-refusals.ts',
+    'test/e2e-docsign-validation.ts',
 ];
 
 /**

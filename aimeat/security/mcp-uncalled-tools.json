@@ -1,0 +1,4 @@
+{
+  "note": "Catalog MCP tools that no E2E suite calls (scripts/check-mcp-test-calls.ts, pnpm check:mcp-test-calls). Written 2026-10-16 from the QA audit (W27): 138 of 431 catalog tools had no E2E call that day, and the change that wrote this file gave every one of them a call and a refusal, so it starts empty. An entry would be a QUESTION while it starts with UNCALLED (nobody has written the call yet) and an ANSWER when it says why an E2E suite on the test node cannot call the tool. The list only shrinks: an entry whose tool an E2E file now names fails the gate until it is deleted, and CEILING in the script is lowered in the same change. A new entry or a higher ceiling is the developer's decision.",
+  "exempt": {}
+}
