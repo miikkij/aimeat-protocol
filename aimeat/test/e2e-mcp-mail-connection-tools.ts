@@ -34,6 +34,9 @@
  *   - Phase 5: aimeat_connection_history and aimeat_connection_replies
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-mail-connection-tools
  * @version-history
+ *   2026-10-16 — 4b-rest, 4c and 4d also read over POST /v1/connections/:id/read/:resource: the owner's
+ *     mailbox without connections:read-as-owner is 403 READ_AS_OWNER_REQUIRED with the MCP sentence,
+ *     another owner's agent keeps 404 (Jouni, 2026-10-16).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F12b-02 and W27: the mail and connection tools called and refused).
  */
 import { randomBytes } from 'node:crypto';
@@ -332,15 +335,31 @@ try {
         const read = await callTool(sMail, 'aimeat_mail_read', { connection_id: ownerConn, message_id: 'm1' });
         assert(read.isError && /READ_AS_OWNER_REQUIRED/.test(read.text), `aimeat_mail_read: ${read.text}`);
     });
+    await test('4b-rest. the same read over REST answers 403 READ_AS_OWNER_REQUIRED with the MCP sentence (Jouni, 2026-10-16)', async () => {
+        const mark = up.mark();
+        const mcp = await callTool(sMail, 'aimeat_mail_search', { connection_id: ownerConn, query: 'x' });
+        const r = await api(`/v1/connections/${ownerConn}/read/messages`, { bearer: mailbot.token, body: { query: 'x' } });
+        assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.data?.error)}`);
+        assert(r.data?.error?.code === 'READ_AS_OWNER_REQUIRED', `code: ${r.data?.error?.code}`);
+        assert(r.data?.error?.details?.scope === 'connections:read-as-owner', `details: ${JSON.stringify(r.data?.error?.details)}`);
+        assert(mcp.text.includes(r.data.error.message), `REST and MCP say different things: REST "${r.data.error.message}" MCP "${mcp.text}"`);
+        const msg = await api(`/v1/connections/${ownerConn}/read/message`, { bearer: mailbot.token, body: { id: 'm1' } });
+        assert(msg.status === 403 && msg.data?.error?.code === 'READ_AS_OWNER_REQUIRED', `read/message: ${msg.status} ${JSON.stringify(msg.data?.error)}`);
+        assert(!up.since(mark).some((c) => c.host === 'gmail.googleapis.com'), 'the refused read reached Gmail');
+    });
     await test('4c. another owner\'s agent still gets "no such connection" for alice\'s mailbox', async () => {
         const r = await callTool(sBob, 'aimeat_mail_search', { connection_id: ownerConn, query: 'x' });
         assert(r.isError && /NOT_FOUND/.test(r.text) && !/READ_AS_OWNER_REQUIRED/.test(r.text), `bob's agent learned the mailbox exists: ${r.text}`);
+        const rest = await api(`/v1/connections/${ownerConn}/read/messages`, { bearer: bobbot.token, body: { query: 'x' } });
+        assert(rest.status === 404 && rest.data?.error?.code === 'NOT_FOUND', `REST told bob's agent the mailbox exists: ${rest.status} ${JSON.stringify(rest.data?.error)}`);
     });
     await test('4d. an agent holding connections:read-as-owner searches and reads the owner\'s mailbox', async () => {
         const r = await callTool(sOwnerReader, 'aimeat_mail_search', { connection_id: ownerConn, query: 'subject:invoice' });
         assert(!r.isError, `search refused: ${r.text}`);
         const read = await callTool(sOwnerReader, 'aimeat_mail_read', { connection_id: ownerConn, message_id: 'm3' });
         assert(!read.isError && read.text.includes('Invoice m3'), `read: ${read.text.slice(0, 300)}`);
+        const rest = await api(`/v1/connections/${ownerConn}/read/message`, { bearer: ownerreader.token, body: { id: 'm3' } });
+        assert(rest.status === 200 && JSON.stringify(rest.data?.data).includes('Invoice m3'), `REST read: ${rest.status} ${JSON.stringify(rest.data?.error)}`);
     });
 
     // ── Phase 5: what was published, and what came back ──

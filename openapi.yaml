@@ -38877,6 +38877,12 @@ paths:
                           needsSetup:
                             type: boolean
                             description: True if no owners have been registered yet
+                          setupCodeRequired:
+                            type: boolean
+                            description: |
+                              True when the node still needs setup and its base URL is not a loopback
+                              address: POST /v1/setup/init then needs `setupCode`, the one-time code the
+                              node printed in its start log.
                           nodeId:
                             type: string
                             description: Current node identifier
@@ -38923,6 +38929,12 @@ paths:
         created under the node id it runs as. A setting that differs from the running value is
         written to a new .env file and takes effect at the next start, or, when a .env file already
         exists, is not written at all. `settings` reports each one, and `message` says so.
+
+        On a node whose base URL is not a loopback address, the setup also needs `setupCode`: a
+        one-time code the node generates at start while it has no owner and prints in its start log,
+        on the line that starts with "Setup code". It is checked before anything else in the body,
+        used once, and kept in memory only as a hash. A restart issues a new code while the node still
+        has no owner. A node on a loopback address (local development) needs no code.
       tags: [Setup]
       security: []
       requestBody:
@@ -38933,6 +38945,11 @@ paths:
               type: object
               required: [owner]
               properties:
+                setupCode:
+                  type: string
+                  description: |
+                    The one-time code from the node's start log, needed when GET /v1/setup/status says
+                    `setupCodeRequired`. Case, spaces and hyphens do not matter.
                 locale:
                   type: string
                   description: Preferred language (e.g. "en", "fi")
@@ -39028,7 +39045,12 @@ paths:
         '400':
           description: Invalid input (missing username, short password, etc.)
         '403':
-          description: Node already configured (owners exist)
+          description: |
+            `ALREADY_CONFIGURED`: the node has an owner, so setup has run. `SETUP_CODE_REQUIRED`: the
+            node needs its one-time setup code and the request has none, or no code is waiting (restart
+            the node to get one). `SETUP_CODE_INVALID`: the code is not the one in the start log, or
+            another request used it a moment ago. `IP_RESTRICTED`: the setup address allowlist
+            (AIMEAT_SETUP_ALLOWED_IPS) does not include the caller.
 
   # ============================================================
   # Phase 1.5: Data Quality Flags
@@ -43125,11 +43147,14 @@ paths:
     post:
       x-aimeat-scope: { word: 'social:write', enforcedIn: '4.0.0' }
       operationId: reviewAppeal
-      summary: Review an appeal (operator only)
+      summary: Review an appeal (operator, or the organism's creator or an admin)
       description: |
-        Review a content moderation appeal. Operator-only endpoint.
-        The operator can uphold the original flag, overturn it, or dismiss
-        the appeal.
+        Decide a content moderation appeal: `upheld` leaves the flag standing, `overturned`
+        dismisses it. The operator decides any appeal. An appeal on an organism's content is also
+        decided by that organism's creator or an admin, in person or through one of their own
+        agents, by the rule archiving asks: an agent attached to the organism is a member there,
+        whoever its owner is, and is refused. A plain member and anyone outside the organism are
+        refused with 403 FORBIDDEN. An appeal already decided answers 409 ALREADY_REVIEWED.
       tags: [Appeals]
       security:
         - BearerAuth: []
@@ -43150,12 +43175,11 @@ paths:
               properties:
                 decision:
                   type: string
-                  enum: [uphold, overturn, dismiss]
+                  enum: [upheld, overturned]
                   description: Appeal review decision
-                reviewNote:
+                note:
                   type: string
-                  maxLength: 2000
-                  description: Operator review note
+                  description: The reviewer's note, stored as the appeal's reviewNote
       responses:
         '200':
           description: Appeal reviewed
@@ -61645,9 +61669,16 @@ paths:
           description: >
             Either this connection was made without the permission that resource needs, in which
             case connecting the account again and approving it is the fix, or the provider has since
-            withdrawn it.
+            withdrawn it. `READ_AS_OWNER_REQUIRED`: the connection is the agent's owner's, which GET
+            /v1/connections lists to it on `connections:use`, and reading what is in it needs
+            `connections:read-as-owner`, which the owner gives on the agent's page under Agents.
+            `details.scope` names that permission. The MCP mail tools answer the same code and
+            sentence. `SCOPE_DENIED`: the caller lacks `connections:read-through`.
         '404':
-          description: No such connection of yours. Somebody else's connection is this same 404.
+          description: >
+            No such connection of yours. Somebody else's connection is this same 404, except the
+            owner's connection read by their agent without `connections:read-as-owner`, which is 403
+            `READ_AS_OWNER_REQUIRED`.
         '409':
           description: The connection was revoked, or its stored permission can no longer be read.
         '413':
