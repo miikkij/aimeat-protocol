@@ -14,6 +14,7 @@
  *   owed and leaves no record; a rail that throws or answers nothing counts as `failed`.
  * @usage cd aimeat && pnpm exec vitest run test/unit/undelivered-payment.test.ts
  * @version-history
+ *   2026-10-16 — The session is stored before completion, as createSession stores it: completion now claims it in storage first (QA audit S8-04).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F5-01, F7e-01, S8-05).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -74,8 +75,16 @@ function openSession(id: string): CheckoutSessionRecord {
 }
 
 async function completeFailing(railId: string, sessionId: string): Promise<{ code: string; status: number; message: string }> {
+  // The session is stored first, as createSession stores it: completion claims it in storage
+  // (commerce/session-claim.ts, QA audit S8-04) before it collects.
+  const session = openSession(sessionId);
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: `commerce.session.${sessionId}`, ownerGaii: session.buyerGhii, value: session as unknown as Record<string, unknown>,
+    visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+  } as never);
   try {
-    await completeSession(storage, config, openSession(sessionId), railId, 'instrument');
+    await completeSession(storage, config, session, railId, 'instrument');
   } catch (e) {
     const err = e as { code: string; statusCode: number; message: string };
     return { code: err.code, status: err.statusCode, message: err.message };

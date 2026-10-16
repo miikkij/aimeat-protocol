@@ -11,6 +11,7 @@
  *   are the positive controls.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-organism-reads.test.ts
  * @version-history
+ *   2026-10-16 — The auth fixtures carry `scopes`, as every real token does: the by-identity read now asks the caller for memory:read (QA audit S3-03), and an owner fixture without the field was not a token the node issues.
  *   v1.0.0 — 2026-09-30 — TARGET-082 review, item 1. Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -45,9 +46,9 @@ const PERSONAL_KEY = 'notes.personal';
 const stamp = '2026-09-30T12:00:00.000Z';
 const alice: LabelActor = { principal: ALICE, ownerGhii: ALICE, ownerName: 'alice', kind: 'human' };
 const auths: Record<string, unknown> = {
-  alice: { sub: 'alice', owner: 'alice', roles: ['owner'] },
-  bob: { sub: 'bob', owner: 'bob', roles: ['owner'] },
-  anon: { sub: 'anonymous', owner: 'anonymous', roles: [], anonymous: true },
+  alice: { sub: 'alice', owner: 'alice', roles: ['owner'], scopes: [] },
+  bob: { sub: 'bob', owner: 'bob', roles: ['owner'], scopes: [] },
+  anon: { sub: 'anonymous', owner: 'anonymous', roles: [], scopes: [], anonymous: true },
 };
 
 function mem(key: string, value: unknown, visibility: MemoryRecord['visibility']): MemoryRecord {
