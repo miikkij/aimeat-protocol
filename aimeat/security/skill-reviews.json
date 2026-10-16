@@ -101,7 +101,7 @@
         "aimeat/src/tool-catalog/definitions/connections.ts",
         "aimeat/src/services/connections/providers.ts"
       ],
-      "digest": "sha256:977904f5c23ec532e82cddcf"
+      "digest": "sha256:504b2195cdb153867caff78b"
     },
     "node:aimeat-app-workstation": {
       "reviewedOn": "2026-10-10",
@@ -314,7 +314,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:4f61a6d668ddf0b14c7a898c"
+      "digest": "sha256:4b903e832155f9e55f11a9ed"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-16",
@@ -329,7 +329,7 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-16",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -339,7 +339,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:bd2411cc7d2b4c69c2a64b60"
+      "digest": "sha256:8ce8eda9413556d9aaf5915b"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-16",
@@ -483,7 +483,7 @@
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:dee4f0d3f7a0443b4faa0f06"
+      "digest": "sha256:ce6df61801b4aabfe8ac7dee"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -518,7 +518,7 @@
       "aimeat/src/services/ai/completion.ts": "f6c2d7e866accea2"
     },
     "node:aimeat-mail-to-data": {
-      "aimeat/src/tool-catalog/definitions/connections.ts": "b93b07c806dd3a22",
+      "aimeat/src/tool-catalog/definitions/connections.ts": "4ed56ffc46c5c924",
       "aimeat/src/services/connections/providers.ts": "4b78d2b9ab98ae94"
     },
     "node:aimeat-app-workstation": {
@@ -663,7 +663,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "00b9321b7b556ba7"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "88f12d046f64e676"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -714,7 +714,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/cli/connect/mcp/local-server.ts": "8843e486d97c7154",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "00b9321b7b556ba7",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "88f12d046f64e676",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "1d994833dc454b72",
       "aimeat/src/services/agent-task-rules.ts": "920bd83aa13aebf4"
@@ -764,7 +764,7 @@
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/services/workspace-rows/row-service.ts": "436bea50a33f2989",
       "aimeat/src/services/refinery/pipeline.ts": "e51d2a097f60fede",
-      "aimeat/src/routes/outbound.ts": "949e4deacd60ee41"
+      "aimeat/src/routes/outbound.ts": "d5e03c7e8dcc48ef"
     },
     "node:aimeat-html-page": {
       "aimeat/src/services/html-page.ts": "4017c2f005e63477",

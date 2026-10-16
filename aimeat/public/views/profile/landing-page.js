@@ -17,6 +17,9 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.20.0 — 2026-10-16 — The menu find also finds the person's own things by name (agents, shared
+ *     places and workspaces, apps, schedules, workflows, companies, contacts, skills, extensions),
+ *     first, and opens the page at the thing (js/services/your-things.js, js/open-item.js).
  *   v3.19.1 — 2026-10-16 — A pin toggle is refused with a toast until the stored pins have loaded: the
  *     toggle saves the whole list, and built on the defaults it replaced the person's pins (QA audit F6-04).
  *   v3.19.0 — 2026-10-14 — The menu find at the top of the side menu (components/MenuFind.js): typing
@@ -138,6 +141,7 @@ import { SettingsFrame, SettingsFrameHead, SettingsFrameBody } from '/components
 import { SideMenuHome, SideMenuItem, SideMenuGroup, SideMenuMore } from '/components/SideMenu.js';
 import { MenuFind } from '/components/MenuFind.js';
 import { loadPlaces, placeWords, sectionsOf, indexGroups, scrollToSectionSoon } from '/js/services/places.js';
+import { loadYourThings, openYourThing } from '/js/services/your-things.js';
 import {
   ProfileCard, WaitingForYou, NextSteps, UsageCard, AiSpendCard, AgentLedgerCard,
   CommerceCard, ContinueCard, AgentsCard, CortexSection, InboxNavButton,
@@ -295,7 +299,23 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   // aimeat_handbook_get { tier: "places" }): read before the first history sync rewrites the URL.
   const sectionAsked = useRef(new URLSearchParams(window.location.search).get('section'));
   useEffect(() => { if (sectionAsked.current) scrollToSectionSoon(sectionAsked.current); }, []);
+  // The person's own things (js/services/your-things.js), read at the first letter of a search and
+  // again when the last read is more than a minute old: Jouni searched an agent's name and the find,
+  // which searched pages only, found nothing (2026-10-16).
+  const [yours, setYours] = useState([]);
+  const [yoursBusy, setYoursBusy] = useState(false);
+  const yoursReadAt = useRef(0);
+  const readYours = useCallback(() => {
+    if (Date.now() - yoursReadAt.current < 60_000) return;
+    yoursReadAt.current = Date.now();
+    setYoursBusy(true);
+    loadYourThings(owner)
+      .then(setYours)
+      .catch((err) => swallowed('landing-page: your things', err))
+      .finally(() => setYoursBusy(false));
+  }, [owner]);
   const findGroups = [
+    { key: 'yours', title: t('menuFind.yours'), items: yours, byScore: true, max: 8 },
     { key: 'top', title: '', items: [{ id: 'messages', label: t('profile.tabs.inbox'), words: placeWords('settings', 'messages', 'profile.tabs.inbox') }] },
     ...SIDEBAR_GROUPS.filter(g => !g.adminOnly || isOperator).map(g => ({
       key: g.titleKey, title: t(g.titleKey),
@@ -310,6 +330,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     : [];
   const openFound = useCallback((row) => {
     if (row.place.data?.side === 'admin') { window.location.assign(`/v1/admin?tab=${encodeURIComponent(row.place.id)}`); return; }
+    if (row.place.data?.open) { setDrawerOpen(false); openYourThing(row.place); return; }
     if (openViewRef.current?.tabId !== row.place.id) open(row.place.id, 'main');
     setDrawerOpen(false);
     if (row.section) scrollToSectionSoon(row.section.id);
@@ -431,7 +452,8 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
 
         <${MenuFind} label=${t('menuFind.labelSettings')} placeholder=${t('menuFind.placeholderSettings')}
           groups=${findGroups} other=${findOther} otherTitle=${t('menuFind.otherOperator')}
-          hiddenNote=${t('menuFind.hiddenNote')} onOpen=${openFound} onWake=${wakeFind} onContentSearch=${searchContent}>
+          hiddenNote=${t('menuFind.hiddenNote')} onOpen=${openFound} onWake=${wakeFind} onContentSearch=${searchContent}
+          onSearchStart=${readYours} busyNote=${yoursBusy ? t('menuFind.readingYours') : ''}>
 
         <${SideMenuItem} active=${!openView} onClick=${() => { close(); setDrawerOpen(false); }}>
           ${t('profile.landing.home')}

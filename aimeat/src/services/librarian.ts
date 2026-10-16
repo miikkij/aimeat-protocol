@@ -27,6 +27,10 @@
  *     through presentMemories (TARGET-082): what the reader may not see is not a hit.
  *   v1.5.0 — 2026-09-30 — The public scope leaves out an organism's public record whose label keeps it
  *     inside the organism, for a viewer who is not a member (TARGET-082 review, item 1).
+ *   v1.6.0 — 2026-10-16 — A hit with no title field is named by its record's id or first short text
+ *     field, and the key's draft / latest / version ending is never the name (it showed "draft" and
+ *     bare UUIDs in the Search everything dialog). titleOf is exported for its test. The snippet is a
+ *     window of about 420 characters (was 200), so a record's note survives a long address before it.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -65,11 +69,23 @@ function queryTokens(query: string): string[] {
   return (query.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
 }
 
-/** Best-effort human title for a record value (schema-agnostic). */
-function titleOf(value: unknown, fallbackKey: string): string {
+/** A short string a person would call the record by: not an address, a timestamp or an identity. */
+function nameLike(s: unknown): s is string {
+  if (typeof s !== 'string') return false;
+  const t = s.trim();
+  return t.length > 0 && t.length <= 120 && !/^https?:\/\//i.test(t) && !/^\d{4}-\d{2}-\d{2}T/.test(t) && !/@[\w.-]+$/.test(t);
+}
+
+/**
+ * Best-effort human title for a record value (schema-agnostic): a named field, the document's first
+ * heading, then the record's own id or first short text field, and only then the key. The key's
+ * last segment was the title before 2026-10-16, which is how a workspace draft showed as "draft" and
+ * a meta record as a bare UUID in the search (Jouni: "näytä nimi").
+ */
+export function titleOf(value: unknown, fallbackKey: string): string {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const v = value as Record<string, unknown>;
-    for (const k of ['title', 'name', 'label', 'summary', 'heading', 'text']) {
+    for (const k of ['title', 'name', 'label', 'summary', 'heading', 'subject', 'company', 'text']) {
       const s = v[k];
       if (typeof s === 'string' && s.trim()) return clip(s.trim(), 80);
     }
@@ -77,11 +93,15 @@ function titleOf(value: unknown, fallbackKey: string): string {
       const h = firstHeading(v.markdown);
       if (h) return clip(h, 80);
     }
+    for (const k of ['id', 'slug', 'key']) if (nameLike(v[k])) return clip(String(v[k]).trim(), 80);
+    const first = Object.values(v).find(nameLike);
+    if (first) return clip(first.trim(), 80);
   } else if (typeof value === 'string' && value.trim()) {
     return clip(firstHeading(value) || value.trim(), 80);
   }
-  const seg = fallbackKey.split('.').pop();
-  return seg || fallbackKey;
+  // The key's own name, without the draft / latest / version ending a workspace record carries.
+  const bare = fallbackKey.replace(/\.(draft|latest|version\.\d+)$/, '');
+  return bare.split('.').pop() || fallbackKey;
 }
 
 function firstHeading(md: string): string | null {
@@ -120,10 +140,12 @@ function snippetOf(text: string, tokens: string[]): string {
     const i = lower.indexOf(t);
     if (i >= 0 && (at < 0 || i < at)) at = i;
   }
-  if (at < 0) return clip(text.slice(0, 180), 180);
-  const start = Math.max(0, at - 60);
-  const end = Math.min(text.length, at + 120);
-  return (start > 0 ? '…' : '') + clip(text.slice(start, end), 200) + (end < text.length ? '…' : '');
+  // A window of about 420 characters around the first found word: enough for a record's whole note,
+  // which a 180-character window lost behind a long address (Jouni: "tietohan siinä on tärkeää").
+  if (at < 0) return clip(text.slice(0, 420), 420);
+  const start = Math.max(0, at - 80);
+  const end = Math.min(text.length, at + 340);
+  return (start > 0 ? '…' : '') + clip(text.slice(start, end), 420) + (end < text.length ? '…' : '');
 }
 
 /**

@@ -37,11 +37,13 @@
  *   label is an identifier (a memory key), in the typewriter letters as written. `notice`: the
  *   label in coral, a line that asks for a look (a check that fails). `note: true`: small grey words
  *   under the item above it, indented to its label (a board poster's standing and since when).
- * @structure Rail({ title, groups, tone }) · scrollToSection(id) · openTab(tabId) · railSection(s)
+ * @structure Rail({ title, groups, tone }) · scrollToSection(id) · scrollToElement(el) · openTab(tabId) · railSection(s)
  * @usage html`<${Rail} title=${x('railTitle')} groups=${[
  *          { label: x('railTitle'), items: [{ section: 'sk-own', mark: '01', label: x('secOwn'), count: 12 }] },
  *          { label: x('pages'), items: [{ tab: 'agents', label: t('profile.tabs.agents') }] }]} />`
  * @version-history
+ *   v1.5.0 — 2026-10-16 — scrollToElement(el): scrollToSection's scroll for any element (the menu find
+ *     opens an agent's card, found by its data attribute).
  *   v1.4.1 — 2026-10-05 — The description of `tone="ink"` follows tab-page.css v1.7.0: the ink ground in
  *     both themes. No code change.
  *   v1.4.0 — 2026-09-27 — `tone="ink"`: the box in the text's own colour, so it turns light in the dark
@@ -76,8 +78,14 @@ export const openTab = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-o
  * Scrolling the content region by hand touches one element and cannot reach the bar.
  * @param {string} id
  */
-export const scrollToSection = (id) => {
-  const el = document.getElementById(id);
+export const scrollToSection = (id) => scrollToElement(document.getElementById(id));
+
+/**
+ * The same for any element (an agent's card found by its data attribute): its own scroll-margin-top
+ * says how much stays in sight above it.
+ * @param {Element|null} el
+ */
+export const scrollToElement = (el) => {
   if (!el) return;
   const box = el.closest('.page-content') || el.closest('.settings-frame-content') || null;
   if (!box) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }

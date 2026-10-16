@@ -11,6 +11,8 @@
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
  *   2026-10-16 — An HTML page is saved through the drafts route (js/services/html-pages.js), which checks it and writes its text.
+ *   2026-10-16 — Opening one document from elsewhere moves to workspace-open-doc.js (max-file-lines),
+ *     which also takes the record's whole key and opens it in a workspace already open.
  *   2026-10-16 — A failed read of the workspace is its own state with Retry and no set-up button (the
  *     button replaced the manifest and README of a workspace the page could not read); a colour change
  *     goes on top of a strict read of the colour map (QA audit F6-02, F6-04).
@@ -95,6 +97,7 @@ import { buildBreadcrumb, buildWorkspaceModel } from './workspace/model.js';
 import { swallowed } from '/js/swallowed.js';
 import { LoadFailed } from '/js/load-state.js';
 import { WS_FAILED, nextWorkspaceState } from './workspace-load.js';
+import { useWorkspaceOpenDoc } from './workspace-open-doc.js';
 
 /** A refusal from a member change door, as the page says it: with the node's own reason. */
 const refusedText = (e) => (t('organisms.change.refused') || 'Not saved: {reason}').replace('{reason}', (e && e.message) || '');
@@ -299,19 +302,9 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     try { const v = sessionStorage.getItem(k); if (v) { setWsQuery(v); sessionStorage.removeItem(k); } } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
   }, [orgId, wsId]);
 
-  // Deep-link from the librarian "Open" button: aimeat.ws.{org}.{ws}.openDoc = { namespace, id }.
-  // Once the manifest is loaded we resolve the namespace → object-type name, open that space tab and
-  // its document, then clear the key (one-shot).
-  const openDocKey = 'aimeat.ws.' + orgId + '.' + wsId + '.openDoc';
-  useEffect(() => {
-    if (!ws?.manifest) return;
-    let req = null;
-    try { req = JSON.parse(sessionStorage.getItem(openDocKey) || 'null'); } catch { req = null; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
-    if (!req || !req.namespace || !req.id) return;
-    const ot = (ws.manifest.objectTypes || []).find(o => o.namespace === req.namespace);
-    if (ot) { setTab('space:' + ot.name); setActiveDoc({ type: ot.name, mode: 'view', page: { id: req.id } }); }
-    try { sessionStorage.removeItem(openDocKey); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
-  }, [ws, openDocKey]);
+  // Open one document or record from elsewhere (the librarian's Open, the notebook, Discover, the
+  // Search everything dialog): workspace-open-doc.js.
+  useWorkspaceOpenDoc({ ws, orgId, wsId, setTab, setActiveDoc, setExpandedRec });
 
   // Persist the open document (id only) so an F5 returns to it. Skip unsaved new docs (no id yet).
   useEffect(() => {

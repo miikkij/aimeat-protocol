@@ -10,6 +10,7 @@
  * @structure ContactsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'contacts'.
  * @version-history
+ *   v2.3.0 — 2026-10-16 — The menu find opens one contact here (useOpenItem, js/open-item.js).
  *   v2.2.0 — 2026-10-16 — A failed load is drawn as one (contactsFailed: the could-not-load note with
  *     Retry), never as "nobody yet" (QA audit F6-05).
  *   v2.1.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
@@ -30,6 +31,7 @@ import * as contactsService from '/js/services/contacts.js';
 import * as messagesService from '/js/services/messages.js';
 import { listOrganisms, inviteMember } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { useOpenItem } from '/js/open-item.js';
 import { useLoadState } from '/js/load-state.js';
 import { c, nameOf, parts } from './contacts/frame.js';
 import { renderContactsView } from './contacts/cover.js';
@@ -113,6 +115,8 @@ export default function ContactsTab({ showToast }) {
     if (box) box.scrollTo({ top: 0 });
   }, []);
   const openPerson = (id) => pickView({ kind: 'person', id });
+  // The menu find opens one contact (js/open-item.js).
+  useOpenItem('contacts', openPerson, !loading);
   const setFold = (k, open) => setFolds(f => ({ ...f, [k]: open }));
   const openAdd = (which) => { setRoad(which); setFold('add', true); setTimeout(() => document.getElementById('ct-add')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30); };
   const resetForm = () => { setForm({ ...EMPTY_FORM }); setFormResolve(null); };

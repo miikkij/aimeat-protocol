@@ -11,6 +11,7 @@
  * @structure ExtensionsTab
  * @usage <ExtensionsTab session={session} showToast={showToast} />
  * @version-history
+ *   2026-10-16 — The menu find opens one extension or cortex here (useOpenItem, js/open-item.js).
  *   v1.x — 2026-02 → 2026-08 — Cards: cortexes with bundled installs and a maturity badge, server
  *     extensions with an inline detail view; a copied prompt built in the browser.
  *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Laajennukset-sivu", third round):
@@ -29,6 +30,7 @@ import { apiGet, apiPost } from '/js/api.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
 import { fetchServerExtensionPrompt, fetchCortexPrompt } from './extensions-tab.prompts.js';
 import { swallowed } from '/js/swallowed.js';
+import { useOpenItem } from '/js/open-item.js';
 import { renderPage } from './extensions/page.js';
 import { x, appName } from './extensions/frame.js';
 
@@ -103,6 +105,14 @@ export default function ExtensionsTab({ session, showToast }) {
     setExpanded(key);
     if (!details[key]) loadCortexDetail(cx);
   };
+  // The menu find opens one extension ('ext:<name>') or cortex ('cx:<name>') (js/open-item.js);
+  // an open one stays open.
+  useOpenItem('extensions', (key) => {
+    if (expanded === key) return;
+    const name = key.slice(key.indexOf(':') + 1);
+    if (key.startsWith('ext:')) { const ext = (extensions || []).find((e) => e.name === name); if (ext) toggleExt(ext); }
+    else if (key.startsWith('cx:')) { const cx = (cortexes || []).find((c) => c.name === name); if (cx) toggleCortex(cx); }
+  }, extensions !== null && cortexes !== null);
 
   /* ── Doors on a server extension ─────────────────────────────────────────────────────────── */
 

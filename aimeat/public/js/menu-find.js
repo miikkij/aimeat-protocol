@@ -13,6 +13,8 @@
  * @usage const found = findInMenu(groups, 'agent', { other, otherTitle: 'On the operator side' });
  *        found.groups[0].rows[0].cut → { before: '', hit: 'Agent', after: 's' }
  * @version-history
+ *   v1.1.0 — 2026-10-16 — A group may order its rows by fit (`byScore`) and show at most `max` of
+ *     them, counting the rest (`more`): the person's own things are many of one kind.
  *   v1.0.0 — 2026-10-14 — Initial (wish-pikahaku-settings-controls-ja-admin-sivuille).
  */
 
@@ -66,7 +68,9 @@ function nameScore(label, cut, queryLen) {
 /**
  * @typedef {{ id: string, num?: string, label: string, words?: string[], tail?: string, data?: any }} FindSection
  * @typedef {{ id: string, label: string, words?: string[], hidden?: boolean, tail?: string, sections?: FindSection[], data?: any }} FindPlace
- * @typedef {{ key: string, title: string, items: FindPlace[] }} FindGroup
+ * @typedef {{ key: string, title: string, items: FindPlace[], byScore?: boolean, max?: number }} FindGroup
+ *   `byScore`: the group's rows are ordered by how well they fit, not by the menu; `max`: at most so
+ *   many rows, the rest counted in the group's `more`
  * @typedef {{ key: string, kind: 'place'|'section'|'more', place: FindPlace, section: FindSection|null, group: FindGroup,
  *   other: boolean, label: string, cut: ReturnType<typeof cutLabel>, via: string, num: string, tail: string, score: number,
  *   index: number, more: number }} FindRow
@@ -79,7 +83,7 @@ function nameScore(label, cut, queryLen) {
  * @param {{ other?: FindGroup[], otherTitle?: string, maxSections?: number }} [opts] the other side's
  *   places, shown last under one title (their sections are not searched); and how many sections of
  *   one place are shown (8): past it, one row of kind 'more' says how many more there are
- * @returns {{ query: string, groups: Array<{ key: string, title: string, other: boolean, rows: FindRow[] }>,
+ * @returns {{ query: string, groups: Array<{ key: string, title: string, other: boolean, rows: FindRow[], more: number }>,
  *   rows: FindRow[], best: number, places: number, sections: number, hidden: number }}
  */
 export function findInMenu(groups, words, opts = {}) {
@@ -121,11 +125,17 @@ export function findInMenu(groups, words, opts = {}) {
   };
 
   for (const group of groups || []) {
-    const rows = collect(group, false);
-    if (rows.length) out.groups.push({ key: group.key, title: group.title, other: false, rows });
+    let rows = collect(group, false);
+    if (!rows.length) continue;
+    // A group of many things of one kind (the person's own agents, apps…) shows its best fits
+    // first, and only so many of them: the rest are counted, and more letters narrow them.
+    if (group.byScore) rows = [...rows].sort((a, b) => b.score - a.score);
+    const more = group.max && rows.length > group.max ? rows.length - group.max : 0;
+    if (more) rows = rows.slice(0, group.max);
+    out.groups.push({ key: group.key, title: group.title, other: false, rows, more });
   }
   const otherRows = (opts.other || []).flatMap((g) => collect(g, true));
-  if (otherRows.length) out.groups.push({ key: 'other', title: opts.otherTitle || '', other: true, rows: otherRows });
+  if (otherRows.length) out.groups.push({ key: 'other', title: opts.otherTitle || '', other: true, rows: otherRows, more: 0 });
 
   for (const g of out.groups) for (const r of g.rows) { r.index = out.rows.length; out.rows.push(r); }
   out.rows.forEach((r, i) => { if (out.best < 0 || r.score > out.rows[out.best].score) out.best = i; });
