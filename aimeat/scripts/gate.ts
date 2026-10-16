@@ -35,6 +35,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-10-17 -- A changed suite (or the list itself) runs test/unit/version-aware-suites.test.ts, which
+ *     `vitest --changed` cannot select because it reads suite text, not imports.
  *   v1.3.0 -- 2026-10-16 -- The plan prints main's CI state and the nightly sweep's state (QA audit
  *     P2-01, P4-01, P8-01, P2-03) and says when core.hooksPath is not .githooks (QA audit P2-07).
  *   2026-10-16 — The guard tier runs for every server source change but src/static, for the
@@ -160,6 +162,12 @@ function plan(files: string[], mergeBase: string): Step[] {
         steps.push({ name: 'unit suite, whole', cmd: ['pnpm', '-s', 'test'], why: '--full' });
     } else if (unitReach.length > 0) {
         steps.push({ name: `unit tests reaching ${unitReach.length} changed file(s)`, cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', '--changed', mergeBase, '--passWithNoTests'], why: unitReach.slice(0, 4).join(', ') + (unitReach.length > 4 ? ', …' : '') });
+    }
+    // test/unit/version-aware-suites.test.ts reads the suites' TEXT, so `vitest --changed` (an import
+    // graph) never selects it for a changed suite. A suite that started to name a *_REMOVED_IN constant
+    // reached main unlisted and turned CI's unit job red on 2026-10-16 (a5549bad6).
+    if (!FULL && (ownSuites.length > 0 || files.includes('aimeat/test/version-aware-suites.txt'))) {
+        steps.push({ name: 'version-aware suite list', cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', 'test/unit/version-aware-suites.test.ts'], why: 'a suite changed: test/version-aware-suites.txt must name every suite that branches on the release' });
     }
 
     if (ownSuites.length > 0) {
