@@ -26,6 +26,8 @@
  * @structure lookStage · layerStage · wornStage · lookForShape · StageBody
  * @usage const body = lookStage(part.id, part.title, tokens, preset);
  * @version-history
+ *   v1.1.0 — 2026-10-17 — A printed letter's stage (an issue's contents and the subscriber count),
+ *     for the kirjapaino look and any part whose words name a letter, a newsletter or a gazette.
  *   v1.0.0 — 2026-09-20 — Initial (wish-design-book-n-ytt-osansa-niin-ett-ne-erottuvat-toisistaan-ja).
  */
 
@@ -148,6 +150,24 @@ const STAGES: Stage[] = [
         { id: 'a3', title: 'Oda Lumen', sub: 'Closing set, lights low.' },
       ],
       'stage.door': [{ id: 'a', label: 'Sold', value: 184 }, { id: 'b', label: 'On the door', value: 36 }, { id: 'c', label: 'Guest list', value: 12 }],
+    },
+  },
+  {
+    // Ink on paper, quiet: a printed letter, a newsletter, a gazette. Before the loud print stage,
+    // whose words (press, print, ink, paper) a letterpress look would otherwise land on.
+    match: /kirjapaino|letterpress|newsletter|gazette|journal|letter\b/,
+    blocks: [
+      hero('The October letter', 'What changed this month, what you can try today, and what we build next. Once a month, no tracking.'),
+      { id: 'issue', component: 'list', props: { source: 'stage.issue', title: 'In this issue' }, span: 'main' },
+      { id: 'nums', component: 'statRow', props: { source: 'stage.nums', title: 'The list' }, span: 'side' },
+    ],
+    sources: {
+      'stage.issue': [
+        { id: 'i1', title: 'I. Three new channels', sub: 'You write a post once, and it goes to each channel in that channel\'s own form.' },
+        { id: 'i2', title: 'II. Replies read in the morning', sub: 'Once a day the agent reads what people answered and suggests a reply. You decide.' },
+        { id: 'i3', title: 'III. The letter from your own platform', sub: 'Subscribers, consents and cancellations stay in your own system.' },
+      ],
+      'stage.nums': [{ id: 'a', label: 'Subscribers', value: 412 }, { id: 'b', label: 'Confirmed', value: 388 }, { id: 'c', label: 'Issue', value: 1 }],
     },
   },
   {

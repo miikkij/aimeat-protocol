@@ -5,6 +5,7 @@
  * @description The stage a Design Book part is shown on, the ground the preview frame paints, the
  *   faces a look may name, and the kit rule that let a hero's picture collapse under an effect.
  * @version-history
+ *   v1.1.0 — 2026-10-17 — The printed letter's stage is among the stages the kit must accept.
  *   v1.0.0 — 2026-09-20 — Initial (wish-design-book-n-ytt-osansa-niin-ett-ne-erottuvat-toisistaan-ja).
  */
 import { describe, it, expect } from 'vitest';
@@ -41,7 +42,7 @@ describe('the stage a part is shown on', () => {
   });
 
   it('every stage is an arrangement the kit accepts, with rows for each source it names', () => {
-    for (const words of ['mtv', 'ledger', 'terminal', 'lit stage', 'riso poster', 'something else']) {
+    for (const words of ['mtv', 'ledger', 'terminal', 'lit stage', 'riso poster', 'kirjapaino letter', 'something else']) {
       const stage = lookStage(words, {});
       const { __sources, __theme, ...layout } = stage;
       expect(() => validateUiLayout(layout), words).not.toThrow();

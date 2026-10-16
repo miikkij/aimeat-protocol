@@ -14,6 +14,9 @@
  * @usage
  *   import { LOOKS } from '../data/atelier-looks.js';   // the composed list, worlds included
  * @version-history
+ *   v1.1.0 — 2026-10-17 — kirjapaino, the printed-letter world: the newsletter design Jouni chose
+ *     (paper, ink, Fraunces and Newsreader, the double rule), with the same grounds in both modes
+ *     so the paper stays paper in dark mode, the way terminal, stage and lounge stay night.
  *   v1.0.0 — 2026-09-05 — Pure extraction of the six worlds (wish-atelier-ambient-visuals).
  */
 import type { AtelierLook } from './atelier-look-shape.js';
@@ -434,5 +437,80 @@ export const WORLD_LOOKS: readonly AtelierLook[] = [
       '--ak-spring-mass': '1',
     },
     note: 'The workbench world, drawn for the mail intake app and approved on 2026-09-28: a cool grey desk under white cards, a solid bar, Archivo headings at 800, short entrances and no ambient. Pair it with app({ nav: "side" }) and the workbench pieces; the dark twin keeps the same order of steps.',
+  },
+  {
+    id: 'kirjapaino',
+    feel: 'a printed letter: black ink on warm paper, a Fraunces masthead over a double rule, Newsreader to read, square corners, one accent mark used sparingly, and the paper stays paper in dark mode',
+    imagery: 'letterpress and fine engraving, black linework on warm off-white paper, one small vermilion mark, no gradients, no photographs',
+    structures: ['press-rule'],
+    grounds: {
+      // The design Jouni chose for the AIMEAT newsletter (2026-10-16): page #E9E2D4 under a paper
+      // sheet #F3EEE4, a raised card #FBF8F2 on the sheet, ink #16130F, muted #5A5247. The sheet
+      // steps 1.12 off the page; the card on the sheet measures 1.09, under the matrix's 1.10, so
+      // the card is the nested ground (surface-2) and not the surface. Every line is structure,
+      // so the line is the ink. The SAME set in both modes: a printed letter does not turn dark.
+      light: {
+        '--ak-bg': '#e9e2d4',
+        '--ak-surface': '#f3eee4',
+        '--ak-surface-2': '#fbf8f2',
+        '--ak-ink': '#16130f',
+        '--ak-ink-dim': '#5a5247',
+        '--ak-line': '#16130f',
+      },
+      dark: {
+        '--ak-bg': '#e9e2d4',
+        '--ak-surface': '#f3eee4',
+        '--ak-surface-2': '#fbf8f2',
+        '--ak-ink': '#16130f',
+        '--ak-ink-dim': '#5a5247',
+        '--ak-line': '#16130f',
+      },
+    },
+    dusk: {
+      // Dark mode keeps the paper, but the palette's dark accent is a bright one with dark words
+      // on it, so the brand band leans toward the paper instead of the ink to stay readable, and
+      // accent-coloured words take more ink than in light mode.
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 46%, var(--ak-ink))',
+      '--ak-grad': 'linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-bg)), color-mix(in oklab, var(--ak-accent) 80%, var(--ak-bg)))',
+    },
+    tokens: {
+      '--ak-font-display': "Fraunces, Georgia, 'Times New Roman', serif",
+      '--ak-font': "Newsreader, Georgia, 'Times New Roman', serif",
+      '--ak-weight-display': '600',
+      '--ak-text-hero': 'clamp(2.25rem, 5.2vw, 4.125rem)',
+      '--ak-radius': '0px',
+      '--ak-radius-sm': '0px',
+      '--ak-radius-pill': '0px',
+      '--ak-line-w': '1px',
+      '--ak-elev-1': 'none',
+      '--ak-elev-2': 'none',
+      '--ak-surface-image': 'none',
+      '--ak-page-image': 'none',
+      '--ak-hero-image': 'none',
+      '--ak-grain': 'none',
+      '--ak-glass': 'var(--ak-bg)',
+      '--ak-blur': '0px',
+      '--ak-display-shadow': 'none',
+      '--ak-display-stroke': '0',
+      '--ak-tilt': '0deg',
+      '--ak-grad': 'linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)))',
+      // Re-declared on the look so they resolve against the paper's own ink: declared only at
+      // :root, a dark-mode page would mix them with the palette's light night ink.
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 74%, var(--ak-ink))',
+      '--ak-ok-text': 'color-mix(in oklab, var(--ak-ok) 42%, var(--ak-ink))',
+      '--ak-warn-text': 'color-mix(in oklab, var(--ak-warn) 36%, var(--ak-ink))',
+      '--ak-err-text': 'color-mix(in oklab, var(--ak-err) 42%, var(--ak-ink))',
+      // The focus ring is ink, as on the printed page; the accent stays for the one mark.
+      '--ak-focus': 'var(--ak-ink)',
+      '--ak-enter-distance': '0px',
+      '--ak-enter-stagger': '50ms',
+      '--ak-motion': 'var(--motion-slow, 320ms)',
+      '--ak-ambient': 'none',
+      // Paper settling: slow and heavy, no bounce.
+      '--ak-spring-stiffness': '120',
+      '--ak-spring-damping': '26',
+      '--ak-spring-mass': '1',
+    },
+    note: 'The printed-letter world Jouni chose for the AIMEAT newsletter on 2026-10-16: paper and ink that stay the same in dark mode, Fraunces for the masthead and titles, Newsreader for text, square corners, no shadow and no gradient. The press-rule structure draws the double rule under the bar and the hero and makes the loud action an ink slab; the accent is the palette\'s, or a Book look part\'s pair (the design\'s vermilion is #b3321c), and it is meant for one mark per screen.',
   },
 ];
