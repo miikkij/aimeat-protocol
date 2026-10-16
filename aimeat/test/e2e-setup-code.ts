@@ -28,6 +28,7 @@
  *   (public, setup), 40535 (public, registration), 40536 (public, no operator) and 40534 (loopback).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-code
  * @version-history
+ *   2026-10-16 — The password carries a fixed digit: a letters-only STAMP failed the password rule.
  *   2026-10-16 — A node on 40536 with an owner but no operator: the code is printed, sign-in and
  *     registration self-heal need it (Jouni, 2026-10-16).
  *   2026-10-16 — A third node on 40535: the registration routes refuse the first account without the code
@@ -51,7 +52,8 @@ const LOOPBACK_PORT = 40534;
 const REGISTER_PORT = 40535;
 const NO_OPERATOR_PORT = 40536;
 const STAMP = Date.now().toString(36).slice(-6);
-const PASSWORD = `Setup-Code-${STAMP}-Pw!`;
+// A fixed digit: STAMP is base36 and is sometimes letters only, and the password rule asks for a number.
+const PASSWORD = `Setup-Code-${STAMP}-Pw7!`;
 
 let passed = 0;
 let failed = 0;
