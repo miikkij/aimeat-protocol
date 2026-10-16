@@ -18,6 +18,9 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   2026-10-16 -- A setting changed (PUT) or a database override removed (DELETE) writes the operator
+ *     trail: a usage row in the operator's own stream naming the paths, and a log line. Never a value
+ *     (QA audit E2-04).
  *   v1.9.0 -- 2026-10-11 -- GET serves `rangeKind` on a number field with a range: `limit` when a
  *     larger value is refused, `recommended` when it is accepted (rangeKindOf). GET serves
  *     `restartPending` on a field whose database override was removed since start: its value is
@@ -68,6 +71,8 @@ import { applyConsulValues } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
 import { CLASSIFICATION_MODE_PATH, recordSwitchChange, switchRefusal } from '../services/classification/switch.js';
 import { logger } from '../utils/logger.js';
+import { recordOperatorNodeAct } from '../services/operator-access-audit.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 
 export function adminConfigRouter(
     config: AimeatConfig,
@@ -221,6 +226,15 @@ export function adminConfigRouter(
             emitChange('classification');
         }
 
+        if (applied.length > 0) {
+            // Who changed which setting, and when (QA audit E2-04). The paths only: a value can be a key.
+            const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+            recordOperatorNodeAct({
+                operatorGhii: ownerGhiiOf(actorGaii), actorGaii, area: 'config', action: 'set',
+                meta: { paths: applied.map(a => a.path).join(', '), count: applied.length },
+            });
+        }
+
         if (applied.length === 0 && errors.length > 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid changes applied', undefined, { errors }));
             return;
@@ -259,6 +273,8 @@ export function adminConfigRouter(
         }
 
         await storage.deleteConfigValue(path);
+        const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+        recordOperatorNodeAct({ operatorGhii: ownerGhiiOf(actorGaii), actorGaii, area: 'config', action: 'reset', meta: { paths: path, count: 1 } });
 
         // Recalculate provenance for this field
         if (provenance) {

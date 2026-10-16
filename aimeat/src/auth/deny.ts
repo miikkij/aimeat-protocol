@@ -22,6 +22,8 @@
  * @usage
  *   import { deny401, deny403 } from './deny.js';
  * @version-history
+ *   2026-10-16 — Each refusal marks the response it recorded, so middleware/refusal-recorder.ts does not
+ *     write it again; the envelope carries the request id (QA audit S1-02, E1-05).
  *   v1.4.0 — 2026-10-12 — denyInvalidToken: 401 INVALID_TOKEN with `Bearer error="invalid_token"`,
  *     for an MCP-bound token on a REST route from 4.0.0 (./mcp-token-on-rest.ts).
  *   v1.3.0 — 2026-09-30 — denyScope403 notes an agent's refusal (services/agent-refusals.ts), so it
@@ -36,7 +38,8 @@
 import type { Request, Response } from 'express';
 import { getStats } from '../services/stats.js';
 import { getPromMetrics } from '../services/prometheus.js';
-import { recordAuthFailure, type AuthFailureContext } from '../services/auth-audit.js';
+import { recordAuthFailure, markRefusalRecorded, type AuthFailureContext } from '../services/auth-audit.js';
+import { envelopeRequestId } from '../middleware/envelope.js';
 import { resourceMetadataUrl } from '../services/protected-resource.js';
 import { sessionConfig } from './node-auth.js';
 import { noteAgentRefusal } from '../services/agent-refusals.js';
@@ -88,6 +91,7 @@ export function deny401(req: Request, res: Response, message: string): void {
   const prom = getPromMetrics();
   if (prom) prom.authFailuresTotal.inc();
   recordAuthFailure(auditContext(req), { status: 401, code: 'AUTH_REQUIRED', reason: message });
+  markRefusalRecorded(res, { counted: true });
   const config = sessionConfig();
   if (config && !res.headersSent) {
     res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req, config)}"`);
@@ -107,6 +111,7 @@ export function denyInvalidToken(req: Request, res: Response, message: string): 
   const prom = getPromMetrics();
   if (prom) prom.authFailuresTotal.inc();
   recordAuthFailure(auditContext(req), { status: 401, code: 'INVALID_TOKEN', reason: message });
+  markRefusalRecorded(res, { counted: true });
   const config = sessionConfig();
   const parts = ['Bearer error="invalid_token"', `error_description="${message.replace(/"/g, '\'')}"`];
   if (config) parts.push(`resource_metadata="${resourceMetadataUrl(req, config)}"`);
@@ -124,6 +129,7 @@ export function denyInvalidToken(req: Request, res: Response, message: string): 
  */
 export function deny403(req: Request, res: Response, code: string, message: string): void {
   recordAuthFailure(auditContext(req), { status: 403, code, reason: message });
+  markRefusalRecorded(res);
   res.status(403).json(errorEnvelope(code, message));
 }
 
@@ -171,6 +177,7 @@ export function denyScope403(
   const prom = getPromMetrics();
   if (prom) prom.scopeDenialsTotal.inc();
   recordAuthFailure(auditContext(req), { status: 403, code: 'SCOPE_DENIED', reason: message });
+  markRefusalRecorded(res);
   // The route pattern, not the concrete path: `/v1/agents/:name/tags`, so one refused call is one
   // entry however many ids it was made with. A router-level guard has no route yet; its path stands.
   noteAgentRefusal(req.auth, needed, anyOf, `${req.method} ${req.baseUrl}${req.route?.path ?? req.path}`);
@@ -192,6 +199,7 @@ function errorEnvelope(code: string, message: string) {
     protocol: 'aimeat',
     version: 'v1',
     timestamp: new Date().toISOString(),
+    request_id: envelopeRequestId(),
     error: { code, message },
     hints: {
       next_actions: [

@@ -15,6 +15,7 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-08 — The result names the picture's provenance record: provenance_id and record_url.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.4.0 — 2026-09-28 — `role`, the AI role the call runs as, forwarded as on POST /v1/ai/image.
@@ -26,6 +27,7 @@
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -102,7 +104,7 @@ export function registerAiImageTool(
                 if (e instanceof AiCompletionError) {
                     return { content: [{ type: 'text' as const, text: `${e.code}: ${e.message}` }], isError: true };
                 }
-                return { content: [{ type: 'text' as const, text: `Image generation failed: ${(e as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Image generation failed: ${(e as Error).message}` }], isError: true }, e);
             }
         },
     );

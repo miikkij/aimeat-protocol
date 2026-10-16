@@ -24,23 +24,41 @@
  *
  *   It wraps res.json AFTER systemFaultReporter, so the fault report the operator receives carries
  *   the sentence the caller saw, not the exception text.
- * @structure KEEP_MESSAGE · keepErrorMessage() · internalErrorSentence() · hideInternalErrorText()
+ *   THE STACK. A route that caught the exception can pass it with carryError(envelope, err); the log
+ *   line then has its stack, which the message string alone cannot give (QA audit E1-06).
+ * @structure KEEP_MESSAGE · keepErrorMessage() · CAUGHT · carryError() · internalErrorSentence() · hideInternalErrorText()
  * @usage app.use(systemFaultReporter(config, storage)); app.use(hideInternalErrorText());
  * @version-history
+ *   2026-10-16 — carryError(): the caught exception rides on the envelope (a symbol, never in JSON) and
+ *     its stack is logged with the 500 line (QA audit E1-06).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, 07-side-channels d4).
  */
 import type { Request, Response, NextFunction } from 'express';
 import { audienceOf } from './message-audience.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 
 /** Marks an envelope whose 500 message the route wrote for the caller. A symbol, so JSON never carries it. */
 const KEEP_MESSAGE = Symbol.for('aimeat.keepErrorMessage');
+
+/** The exception a route caught, carried on its 500 envelope to the log line. A symbol, so JSON never carries it. */
+const CAUGHT = Symbol.for('aimeat.caughtError');
 
 interface ErrorEnvelope {
   ok?: boolean;
   request_id?: string;
   error?: { code?: string; message?: string };
   [KEEP_MESSAGE]?: true;
+  [CAUGHT]?: unknown;
+}
+
+/**
+ * Attach the exception a route caught to its error envelope, so the 500 log line carries the stack:
+ * `res.status(500).json(carryError(error(nodeId, 'INTERNAL_ERROR', String(err)), err))`.
+ */
+export function carryError<T extends object>(envelope: T, err: unknown): T {
+  (envelope as ErrorEnvelope)[CAUGHT] = err;
+  return envelope;
 }
 
 /**
@@ -70,6 +88,7 @@ export function hideInternalErrorText() {
         logger.error(`[500] ${req.method} ${typeof route === 'string' ? route : req.path}: ${err.code}`, {
           request_id: envelope!.request_id,
           reason: err.message,
+          ...(envelope![CAUGHT] !== undefined ? { stack: errorFields(envelope![CAUGHT]).stack } : {}),
         });
         const shown = { ...envelope, error: { ...err, message: internalErrorSentence(envelope!.request_id) } };
         return originalJson(shown);

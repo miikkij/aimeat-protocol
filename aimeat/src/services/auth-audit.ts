@@ -27,11 +27,15 @@
  *   NEVER IN THE WAY. Recording a refusal must not be able to change one. Every write is
  *   synchronous but tiny, and every failure is swallowed after one warning: a node that cannot
  *   write its log still has to be able to refuse people.
- * @structure AuthFailureContext · AuthFailureRecord · recordAuthFailure · readRecentAuthFailures · authLogStatus · credentialDigest · configureAuthAudit
+ * @structure AuthFailureContext · AuthFailureRecord · recordAuthFailure · markRefusalRecorded · refusalMarkOf ·
+ *   readRecentAuthFailures · authLogStatus · credentialDigest · configureAuthAudit
  * @usage
  *   configureAuthAudit(config);                       // once, at boot
  *   recordAuthFailure(ctx, { status: 401, code: 'AUTH_REQUIRED', reason: 'no credential' });
  * @version-history
+ *   2026-10-16 — markRefusalRecorded/refusalMarkOf: a writer marks the response it recorded, so the
+ *     response recorder (middleware/refusal-recorder.ts) writes every other 401 and 403 once; status
+ *     400 for a wrong one-time code, which that route answers with 400 (QA audit S1-02, E2-03).
  *   v1.2.0 — 2026-09-05 — authLogStatus: on or off, the file, its size and the older generation's,
  *     for the Security page's log line and its "how much history is readable" honesty.
  *   v1.1.0 — 2026-08-17 — readRecentAuthFailures: the operator-facing tail reader over both
@@ -70,12 +74,33 @@ export interface AuthFailureContext {
 
 /** One refused request. Written as a single JSON line so a file of them is both greppable and parsable. */
 export interface AuthFailureRecord {
-  /** 401 when no usable credential was presented, 403 when a real one lacked the authority. */
-  status: 401 | 403;
+  /** 401 when no usable credential was presented, 403 when a real one lacked the authority, 400 for
+   *  a wrong one-time code on a route that answers it with 400 (the password reset code). */
+  status: 400 | 401 | 403;
   /** The envelope code the caller received, so a line here matches what they saw. */
   code: string;
   /** Why, in the node's own words. The 401 message, or the role/scope that was missing. */
   reason: string;
+}
+
+const RECORDED = Symbol.for('aimeat.refusalRecorded');
+
+/** What a writer marked on the response it recorded: the line written, the 401 counter moved. */
+export interface RefusalMark { logged: boolean; counted: boolean }
+
+/**
+ * Mark a response whose refusal this writer recorded (auth/deny.ts, the tarpit), so the response
+ * recorder does not write it a second time. `counted`: auth_failures_total was moved too. Takes the
+ * response as an opaque object: this module reads no Express type.
+ */
+export function markRefusalRecorded(response: object, opts: { counted?: boolean } = {}): void {
+  const r = response as { [RECORDED]?: RefusalMark };
+  r[RECORDED] = { logged: true, counted: !!opts.counted || !!r[RECORDED]?.counted };
+}
+
+/** The mark markRefusalRecorded left on a response, or undefined. */
+export function refusalMarkOf(response: object): RefusalMark | undefined {
+  return (response as { [RECORDED]?: RefusalMark })[RECORDED];
 }
 
 let filePath = '';

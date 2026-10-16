@@ -9,6 +9,7 @@
  *   per-seller Stripe webhook (signature check, idempotent redelivery, invoice
  *   matching via metadata.aimeat_reference, payout as a transfer voucher).
  * @version-history
+ *   2026-10-16 — Case 22 also finds the refused delivery in the refusal log (QA audit E2-08).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
 
@@ -367,6 +368,14 @@ await test('21. an unconfigured owner answers 404 (no endpoint enumeration)', as
 await test('22. a bad signature is rejected 401', async () => {
   const r = await postWebhook(A.owner, { id: 'evt_bad', type: 'payment_intent.succeeded' }, 't=1,v1=deadbeef');
   assert(r.status === 401, `expected 401, got ${r.status}`);
+  // The trace (QA audit E2-08): the refused delivery is in the refusal log the operator reads. A is
+  // the first owner on this suite's node, so A is its operator.
+  await new Promise((res) => setTimeout(res, 50));
+  const log = await json('/v1/admin/auth-refusals?limit=200', { headers: authed(A.token) });
+  assert(log.status === 200, `refusal log read ${log.status}`);
+  const line = (log.body.data.items as any[]).find((l) => l.path === `/v1/commerce/webhooks/stripe/${A.owner}`);
+  assert(!!line && line.status === 401 && line.code === 'INVALID_SIGNATURE', `refusal-log line: ${JSON.stringify(line)}`);
+  assert(!JSON.stringify(line).includes('deadbeef'), 'the signature is never written');
 });
 
 await test('23. payment_intent.succeeded books an income voucher; redelivery is idempotent', async () => {

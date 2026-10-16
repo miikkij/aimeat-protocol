@@ -15,6 +15,7 @@
  * @structure registerDocsignTools(mcp, storage, config, caller)
  * @usage registerDocsignTools(mcp, storage, config, caller);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — aimeat_docsign_wallet_start and _wallet_status (services/docsign/eudi.ts):
  *     the AI prepares a wallet signature for the person, who confirms it in their own wallet
@@ -24,6 +25,7 @@
  *   v1.2.1 — 2026-10-10 — DOCUMENT_NEEDED says why in plain words, as the REST route does.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -50,7 +52,7 @@ export function registerDocsignTools(
   const ok = (obj: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(obj, null, 2) }] });
   const fail = (err: unknown) => {
     if (err instanceof DocsignError || err instanceof ValidationInputError) return toolError(err.code, err.message);
-    return toolError('DOCSIGN_ERROR', err instanceof Error ? err.message : String(err));
+    return withCaughtError(toolError('DOCSIGN_ERROR', err instanceof Error ? err.message : String(err)), err);
   };
   const off = () => (config.docsignEnabled ? null : toolError('FEATURE_DISABLED', 'Document signing is switched off on this node.'));
   const appLink = (id: string) => (config.docsignAppUrl ? `${config.docsignAppUrl}/?request=${encodeURIComponent(id)}` : null);

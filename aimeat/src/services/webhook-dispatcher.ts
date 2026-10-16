@@ -58,6 +58,7 @@
  *   See: docs/superpowers/specs/2026-05-23-agent-integration-architecture-design.md, Appendix A
  *
  * @version-history
+ *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.3.0 -- 2026-10-11 -- A stopped agent gets no task.queued, task.approved or message.inbound
  *     (./agent-stop-rules.ts); events about work in flight still go out.
  *   v1.2.0 -- 2026-09-06 -- Review item 4.2: dispatchWebhookEvent never rejects, and the delivery
@@ -70,6 +71,7 @@ import type { Storage, WebhookDeliveryLog } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 import { type WebhookEventType, buildWebhookEnvelope } from '../models/webhook-schemas.js';
 import { isStopped, isWakeWebhookEvent } from './agent-stop-rules.js';
 
@@ -312,7 +314,7 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
         webhookLastSuccess: new Date().toISOString(),
       });
     } catch (err) {
-      logger.error('Failed to update agent webhook success state', { agentGaii, error: err });
+      logger.error('Failed to update agent webhook success state', { agentGaii, ...errorFields(err) });
     }
   }
 
@@ -338,7 +340,7 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
 
       await storage.updateAgent(agentGaii, updates);
     } catch (err) {
-      logger.error('Failed to update agent webhook failure state', { agentGaii, error: err });
+      logger.error('Failed to update agent webhook failure state', { agentGaii, ...errorFields(err) });
     }
   }
 
@@ -368,7 +370,7 @@ export function createWebhookDispatcher({ config, storage }: DispatchOptions) {
       await storage.appendDeliveryLog(log);
       await storage.pruneDeliveryLog(agentGaii, DELIVERY_LOG_KEEP);
     } catch (err) {
-      logger.error('Failed to persist webhook delivery log', { agentGaii, event, error: err });
+      logger.error('Failed to persist webhook delivery log', { agentGaii, event, ...errorFields(err) });
     }
   }
 

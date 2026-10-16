@@ -134,6 +134,12 @@ export type AccountEventKind =
   | 'two_factor_reset_by_operator'
   | 'passkey_added'
   | 'passkey_removed'
+  // A password reset with an emailed code, changed, or set for the first time (an account made through
+  // Google or Entra sign-in): `data.how` is reset, changed or set (QA audit E2-03).
+  | 'password_changed'
+  // A sign-in token that had already been used was presented again, so the node ended that sign-in:
+  // either the person's own second device raced, or somebody else holds a copy (QA audit S1-02).
+  | 'session_token_reused'
   // Who reached into what you keep
   //
   // The operator opened, searched, deleted or restored one of your entries from the admin pages.

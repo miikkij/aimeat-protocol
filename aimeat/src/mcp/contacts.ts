@@ -13,6 +13,7 @@
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.7.0 — 2026-10-05 — aimeat_contact_list and aimeat_contact_resolve_email call the services the
@@ -44,6 +45,7 @@
  *   v1.0.0 — 2026-07-16 — Initial: list/add/remove/resolve_email over the shared contacts core.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -114,7 +116,7 @@ export function registerContactTools(
                 // With its code, as the REST door answers: an invitation counts as an address lookup
                 // and can be RATE_LIMITED, which an agent has to tell apart from a refused address.
                 if (e instanceof ContactInvitationError) return { ...toolError(e.code, e.message) };
-                return { content: [{ type: 'text' as const, text: errText(e) }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: errText(e) }], isError: true }, e);
             }
         },
     );
@@ -146,7 +148,7 @@ export function registerContactTools(
                 // With its code, as the REST door answers: a save by email can be RATE_LIMITED, which
                 // an agent has to tell apart from a bad address to know that waiting is the fix.
                 if (e instanceof ContactsError) return { ...toolError(e.code, e.message) };
-                return { content: [{ type: 'text' as const, text: errText(e) }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: errText(e) }], isError: true }, e);
             }
         },
     );
@@ -162,7 +164,7 @@ export function registerContactTools(
                 await removeContact(storage, ownerGhii(), contact_id);
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'removed', contact_id }, null, 2) }] };
             } catch (e) {
-                return { content: [{ type: 'text' as const, text: errText(e) }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: errText(e) }], isError: true }, e);
             }
         },
     );

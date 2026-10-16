@@ -16,6 +16,7 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-15 — aimeat_decide_rule_propose refuses an ecosystem app, as the REST route does
  *     (feature-list audit 95).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -30,6 +31,7 @@
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -65,7 +67,7 @@ export function registerDecideTools(
       return err(`${e.code}: ${e.message}${e.details ? `\n${JSON.stringify(e.details, null, 2)}` : ''}`);
     }
     if (e instanceof AiCompletionError) return err(`${e.code}: ${e.message}`);
-    return err(String((e as Error).message ?? e));
+    return withCaughtError(err(String((e as Error).message ?? e)), e);
   };
   const caller = (appId?: string): DecideCaller => ({
     gaii: ownerGhii, principal: agentGaii, isOwner: false, ...(appId ? { appId } : {}),

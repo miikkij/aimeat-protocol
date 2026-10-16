@@ -11,6 +11,7 @@
  * @structure registerAdminSsoTools(mcp, storage, config, getAgentGaii, scopes) — ten operator tools.
  * @usage registerAdminSsoTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-16 — Disabling and enabling an account writes the operator trail (QA audit E2-04).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName). The account alone
@@ -124,7 +125,7 @@ export function registerAdminSsoTools(
     async ({ name }) => {
       const by = await operatorName();
       if (!by) return refuse(OPERATOR_AGENT_REFUSAL);
-      const r = await deactivateOwnerByOperator(storage, name, by);
+      const r = await deactivateOwnerByOperator(storage, name, by, { config, actorGaii: agentGaii });
       if (!r.ok) return refuse(`${r.code}: ${r.message}`);
       emitChange('ghii');
       const result = r.result!;
@@ -139,8 +140,9 @@ export function registerAdminSsoTools(
     zodShapeFor('aimeat_admin_owner_enable'),
     annotationsFor('aimeat_admin_owner_enable'),
     async ({ name }) => {
-      if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
-      const r = await reactivateOwnerByOperator(storage, name);
+      const by = await operatorName();
+      if (!by) return refuse(OPERATOR_AGENT_REFUSAL);
+      const r = await reactivateOwnerByOperator(storage, name, by, { config, actorGaii: agentGaii });
       if (!r.ok) return refuse(`${r.code}: ${r.message}`);
       emitChange('ghii');
       return text({ name, disabled: false });

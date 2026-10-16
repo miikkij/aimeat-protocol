@@ -20,6 +20,7 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-16 — aimeat_commerce_psp_status reports invoice_accept_immediate: whether the owner takes
  *     invoice payment for items delivered at once (QA audit S8-03).
  *   2026-10-11 — aimeat_app_tools_publish stores an old `price.morsels` as the tool's `tollMorsels`,
@@ -76,6 +77,7 @@
  *   v1.0.0 — 2026-07-14 — Initial commerce MCP surface (PSP, app-tools, offer pricing, checkout)
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
@@ -118,7 +120,7 @@ function commerceFail(err: unknown) {
     if (err instanceof CommerceError || err instanceof PaymentError) {
         return fail(`${err.code}: ${err.message}`);
     }
-    return fail(`COMMERCE_ERROR: ${(err as { message?: string }).message ?? 'Unexpected commerce error'}`);
+    return withCaughtError(fail(`COMMERCE_ERROR: ${(err as { message?: string }).message ?? 'Unexpected commerce error'}`), err);
 }
 
 /**

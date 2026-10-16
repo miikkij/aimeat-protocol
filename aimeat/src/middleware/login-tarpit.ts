@@ -33,13 +33,15 @@
  * @structure loginTarpit(config) · noteCredentialOutcome (internal, via res 'finish')
  * @usage router.post('/v1/ghii/login', loginTarpit(config), rateLimit({...}), handler)
  * @version-history
+ *   2026-10-16 — Marks the response as recorded, so middleware/refusal-recorder.ts does not write the
+ *     same refusal twice (QA audit S1-02).
  *   v1.0.0 — 2026-08-17 — Initial: growing per-IP delay on the credential doors.
  */
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config-types.js';
 import { ipRateKey } from './rate-limit.js';
 import { getStats } from '../services/stats.js';
-import { recordAuthFailure, type AuthFailureContext } from '../services/auth-audit.js';
+import { recordAuthFailure, markRefusalRecorded, type AuthFailureContext } from '../services/auth-audit.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -127,6 +129,9 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 export function loginTarpit(config: AimeatConfig) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!config.loginTarpitEnabled) { next(); return; }
+    // This route's 401 and 403 are written below with the name tried, so the response recorder
+    // (middleware/refusal-recorder.ts) leaves them alone. It still counts a 401 in auth_failures_total.
+    markRefusalRecorded(res);
 
     const key = ipRateKey(req.ip ?? req.socket?.remoteAddress);
     const now = Date.now();

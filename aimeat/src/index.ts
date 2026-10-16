@@ -6,6 +6,7 @@
  * @description Main AIMEAT CLI entry point, including node management commands and agent connector dispatch.
  * @structure Parses top-level CLI flags, routes subcommands, starts the server, and delegates connector commands.
  * @usage Executed through the published `aimeat` binary.
+ * @version-history 2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  * @version-history v1.9.4 — 2026-05-28 — Allow agent connector flags and drain async auth handles before exit.
  * @version-history v1.9.5 — 2026-05-28 — Drain async handles before exiting one-shot connector commands on Windows.
  * @version-history v1.9.6 — 2026-05-28 — Print extracted skill bundle guidance after refresh.
@@ -26,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from './server.js';
 import { loadConfig } from './config.js';
 import { logger } from './utils/logger.js';
+import { errorFields } from './utils/error-fields.js';
 import { HELP_TEXT, CONNECT_HELP_TEXT } from './index-help.js';
 import { runConnectCli } from './index-connect.js';
 import { runStart } from './index-start.js';
@@ -289,7 +291,7 @@ if (subcommand === 'config') {
       writeFileSync(outArg, JSON.stringify(data, null, 2));
       logger.info(`Backup written to ${outArg}`);
     } catch (err) {
-      logger.error('Backup failed', { error: err });
+      logger.error('Backup failed', errorFields(err));
     } finally {
       server.close();
     }
@@ -321,7 +323,7 @@ if (subcommand === 'config') {
       const result = await resp.json();
       logger.info('Restore complete', result);
     } catch (err) {
-      logger.error('Restore failed', { error: err });
+      logger.error('Restore failed', errorFields(err));
     } finally {
       server.close();
     }

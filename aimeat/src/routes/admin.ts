@@ -11,6 +11,7 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-10-16 — Disabling and enabling an account writes the operator trail (QA audit E2-04).
  *   2026-10-15 — The dashboard counts morsels in circulation from the account holders' balances (morselsInCirculation), not from agent rows, which are always 0; the ledger figures are summed in the database (sumTransactionsByType), not from the newest 10 000 rows (feature-list audit #169).
  *   v1.12.1 — 2026-10-12 — The economy figures count the burned share of pacing (`pacing_burn`) as burned
  *     and pacing packs bought with money as created; the page said "0 burned" while pacing burned.
@@ -600,7 +601,8 @@ export function adminRouter(
     // must not be able to lock out the person holding its keys with one mistyped call.
     router.post('/v1/admin/owners/:name/disable', requireAuth(), requireOperator(storage), async (req, res) => {
         const name = req.params.name as string;
-        const r = await deactivateOwnerByOperator(storage, name, req.auth!.owner);
+        const r = await deactivateOwnerByOperator(storage, name, req.auth!.owner,
+            { config, actorGaii: resolveIdentity(req.auth!, config.nodeId) });
         if (!r.ok) {
             res.status(r.status).json(error(config.nodeId, r.code, r.message));
             return;
@@ -621,7 +623,8 @@ export function adminRouter(
     // by deactivation stay dead, the person signs in fresh.
     router.post('/v1/admin/owners/:name/enable', requireAuth(), requireOperator(storage), async (req, res) => {
         const name = req.params.name as string;
-        const r = await reactivateOwnerByOperator(storage, name);
+        const r = await reactivateOwnerByOperator(storage, name, req.auth!.owner,
+            { config, actorGaii: resolveIdentity(req.auth!, config.nodeId) });
         if (!r.ok) {
             res.status(r.status).json(error(config.nodeId, r.code, r.message));
             return;

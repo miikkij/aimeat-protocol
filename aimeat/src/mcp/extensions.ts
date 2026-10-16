@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   v2.9.1 — 2026-10-09 — aimeat_extension_invoke decrypts secret config for the field it is bound to
  *     (SecretBinding; secrets audit 2026-10-09, 1.1).
  *   v2.9.0 — 2026-10-09 — aimeat_extension_config_set (services/extension-config-set.ts).
@@ -70,6 +71,7 @@
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import { buildExtensionRecordFromManifest } from '../services/extension-manifest.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields } from '../services/extension-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
@@ -558,7 +560,7 @@ export function registerExtensionsTools(
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to ${update ? 'update' : 'install'} extension: ${(err as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Failed to ${update ? 'update' : 'install'} extension: ${(err as Error).message}` }], isError: true }, err);
             }
         },
     );
@@ -612,7 +614,7 @@ export function registerExtensionsTools(
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to activate extension: ${(err as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Failed to activate extension: ${(err as Error).message}` }], isError: true }, err);
             }
         },
     );
@@ -675,7 +677,7 @@ export function registerExtensionsTools(
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to deactivate extension: ${(err as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Failed to deactivate extension: ${(err as Error).message}` }], isError: true }, err);
             }
         },
     );
@@ -718,7 +720,7 @@ export function registerExtensionsTools(
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to delete extension: ${(err as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Failed to delete extension: ${(err as Error).message}` }], isError: true }, err);
             }
         },
     );

@@ -14,6 +14,7 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-08 — aimeat_skill_publish takes ai_provenance and ai_provenance_id, inline and in the ZIP
  *     upload's token, and answers with the record SKILL.md carries (aiprov E12).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -33,6 +34,7 @@
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry tools (node + user scopes).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
@@ -148,7 +150,7 @@ export function registerSkillsTools(
                 emitResourceListChanged(agentGaii);
                 return ok({ published: true, skill: summary, ...(await writeProvenanceEcho(storage, config, summary.aiProvenanceId)) });
             } catch (e) {
-                return err(`Skill publish failed: ${(e as Error).message}`);
+                return withCaughtError(err(`Skill publish failed: ${(e as Error).message}`), e);
             }
         },
     );
@@ -236,7 +238,7 @@ export function registerSkillsTools(
                 emitResourceListChanged(agentGaii);
                 return ok({ agent: agentName, links });
             } catch (e) {
-                return err(`Link failed: ${(e as Error).message}`);
+                return withCaughtError(err(`Link failed: ${(e as Error).message}`), e);
             }
         },
     );

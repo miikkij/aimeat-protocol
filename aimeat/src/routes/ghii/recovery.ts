@@ -6,6 +6,9 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — A completed password reset or change writes the account event password_changed (how:
+ *     reset, changed or set) and an info log line; a wrong reset code writes a refusal-log line (QA audit
+ *     E2-03, S1-02).
  *   2026-10-16 — The emailed codes come from crypto.randomInt (utils/one-time-code.ts), not Math.random;
  *     the reset, reset-request and account-recover limits count per client address; a new reset code
  *     keeps the failed attempts of the live code it replaces (QA audit F02a-02).
@@ -50,6 +53,9 @@ import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { applyAppInvitesForVerifiedEmail } from '../../services/app-member-invites.js';
 import { generateKeyPair } from '../../auth/keypair.js';
+import { recordAccountEvent } from '../../services/account-events.js';
+import { recordAuthFailure } from '../../services/auth-audit.js';
+import { auditContext } from '../../auth/deny.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
 
 /**
@@ -353,6 +359,12 @@ export function registerRecoveryRoutes(
         const codeHash = createHash('sha256').update(code).digest('hex');
         if (codeHash !== record.code) {
             await storage.updateEmailVerification(record.id, { attempts: record.attempts + 1 });
+            // A wrong code is a refused credential, answered 400 as it always was; the refusal log holds
+            // it with the name tried, so the guesses before a takeover are on record (QA audit E2-03).
+            recordAuthFailure(auditContext(req), {
+                status: 400, code: 'INVALID_CODE',
+                reason: `wrong password reset code for "${username}" (attempt ${record.attempts + 1} of 5)`,
+            });
             res.status(400).json(error(config.nodeId, 'INVALID_CODE', 'Invalid reset code'));
             return;
         }
@@ -371,6 +383,10 @@ export function registerRecoveryRoutes(
             status: 'verified',
             verifiedAt: new Date().toISOString(),
         });
+        // A change to how this account is entered is always news (storage/types/account-events.ts):
+        // the person reads it on their account feed, and the operator has a line to search.
+        logger.info('Password reset with an emailed code', { account: ghii });
+        void recordAccountEvent(storage, { ownerGhii: ghii, kind: 'password_changed', data: { how: 'reset' }, subject: 'password' }, config);
 
         res.json(success(config.nodeId, {
             ok: true,
@@ -434,6 +450,11 @@ export function registerRecoveryRoutes(
         await storage.updateGHII(ghii, { passwordHash: newHash });
         // Same as the reset above: a changed password retires the signing key that also signs in.
         await replaceOwnerSigningKey(storage, ownerName);
+        // `set` is the first password on an account made through Google or Entra sign-in: a new way in,
+        // which the person must be able to see even though no current password was asked for.
+        const how = ghiiRecord.passwordHash ? 'changed' : 'set';
+        logger.info(`Password ${how} by the account holder`, { account: ghii });
+        void recordAccountEvent(storage, { ownerGhii: ghii, kind: 'password_changed', actorGaii: ghii, data: { how }, subject: 'password' }, config);
 
         res.json(success(config.nodeId, {
             ok: true,

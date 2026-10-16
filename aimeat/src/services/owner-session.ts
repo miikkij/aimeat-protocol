@@ -12,6 +12,8 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-10-16 — A refresh token presented again after its rotation (reuse) writes a warn log line and the
+ *     account event session_token_reused, besides ending the session (QA audit S1-02).
  * v1.3.0 - 2026-10-05 - checkRefreshSession: the one read-only check of a refresh session (revoked,
  *   the account's age, expiry, a reused previous token). The refresh runs it and keeps its answers;
  *   the app-grant silent bridge runs it instead of its own shorter copy (secaudit 2026-10, AUTH-1).
@@ -29,6 +31,8 @@ import type { Storage } from '../storage/interface.js';
 import type { SessionRecord } from '../storage/repositories/session.repository.js';
 import { issueJWT, AccountDisabledError } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
+import { recordAccountEvent } from './account-events.js';
+import { logger } from '../utils/logger.js';
 
 /** Name of the httpOnly refresh-token cookie. Scoped to /v1/auth on the wire. */
 export const REFRESH_COOKIE = 'aimeat_rt';
@@ -232,6 +236,16 @@ export async function refreshOwnerSession(
   if (!check.ok) {
     // A refusal that names a session ends it (the cookie's row), except one already revoked.
     if (check.session && check.reason !== 'revoked') await storage.revokeSession(check.session.sessionId);
+    if (check.reason === 'reused' && check.session) {
+      // The code treats a reused refresh token as a copy in someone else's hands: the session ends,
+      // and the person and the operator are told, or the theft it guards against leaves no trace.
+      // An owner session's `owner` is the account name on this node.
+      const ownerGhii = `${check.session.owner}@${config.nodeId}`;
+      logger.warn('owner-session: a refresh token was presented again after rotation; the session was ended', {
+        account: ownerGhii, session: check.session.sessionId.slice(0, 8), ip: req.ip ?? '',
+      });
+      void recordAccountEvent(storage, { ownerGhii, kind: 'session_token_reused', subject: 'session' }, config);
+    }
     clearRefreshCookie(req, res);
     switch (check.reason) {
       case 'unknown': return { ok: false, status: 401, code: 'INVALID_GRANT', message: 'Invalid refresh token' };

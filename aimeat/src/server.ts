@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-16 — refusalRecorder() mounted after the request id: every 401 and 403 reaches the refusal
+ *     log (QA audit S1-02, E2-07, E2-08).
  *   2026-10-15 — The JSON 404 and the global error handler moved to middleware/fallback-handlers.ts and
  *     are built with the shared error() envelope, so they carry a request id and the support next step
  *     (feature-list audit #194); idempotency() takes the node id for its refusal envelopes (#186).
@@ -50,6 +52,7 @@ import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
+import { refusalRecorder } from './middleware/refusal-recorder.js';
 import { subdomainMiddleware } from './middleware/subdomain.js';
 import { robotsHeader } from './middleware/robots-header.js';
 import { apexPageRedirect } from './middleware/apex-page-redirect.js';
@@ -234,6 +237,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
 
   // Request ID — assigns a unique ID to every request (uses X-Request-Id if present)
   app.use(requestIdMiddleware());
+
+  // Every 401 and 403 reaches the refusal log, whichever code path answered it (QA audit S1-02,
+  // E2-07). Before optionalAuth, so a refusal that middleware answers is seen as well.
+  app.use(refusalRecorder());
 
   // optionalAuth() runs before CORS so req.auth is available for per-entity origin resolution
   app.use(optionalAuth());

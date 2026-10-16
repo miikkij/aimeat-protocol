@@ -671,10 +671,10 @@
      "slug": "g-4-account-event-log",
      "cells": [
       "<strong>Account event log</strong>",
-      "Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it.",
+      "Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it. A password reset or change, a sign-in ended because its token was used twice, and an operator turning your account off or on or giving you the operator role show here too.",
       "<code>/v1/account/events</code>"
      ],
-     "plain": "Account event log Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it. /v1/account/events"
+     "plain": "Account event log Your account's own history, including who changed what. Joining or leaving an organism and granting or revoking a consent show here, whether you or your agent did it. A password reset or change, a sign-in ended because its token was used twice, and an operator turning your account off or on or giving you the operator role show here too. /v1/account/events"
     }
    ]
   },
@@ -3322,10 +3322,10 @@
      "slug": "g-19-security-overview",
      "cells": [
       "<strong>Security overview</strong>",
-      "Door activity, the refusal log, and quarantined incidents to resolve. It also says how apps are kept apart from the sign-in of whoever opens them, and on a node several people share with no app addresses it warns and names the two settings that give every app its own address.",
+      "Door activity, the refusal log (every 401 and 403 the node answers, whichever route answered it), and quarantined incidents to resolve. It also says how apps are kept apart from the sign-in of whoever opens them, and on a node several people share with no app addresses it warns and names the two settings that give every app its own address.",
       "<code>/v1/admin/security/*</code>, <code>aimeat_admin_security_overview</code>"
      ],
-     "plain": "Security overview Door activity, the refusal log, and quarantined incidents to resolve. It also says how apps are kept apart from the sign-in of whoever opens them, and on a node several people share with no app addresses it warns and names the two settings that give every app its own address. /v1/admin/security/*, aimeat_admin_security_overview"
+     "plain": "Security overview Door activity, the refusal log (every 401 and 403 the node answers, whichever route answered it), and quarantined incidents to resolve. It also says how apps are kept apart from the sign-in of whoever opens them, and on a node several people share with no app addresses it warns and names the two settings that give every app its own address. /v1/admin/security/*, aimeat_admin_security_overview"
     },
     {
      "slug": "g-19-cors",

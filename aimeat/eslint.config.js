@@ -9,6 +9,7 @@
  *   pnpm lint
  *
  * @version-history
+ *   2026-10-16 — aimeat/no-error-object-log-field on src/ (QA audit E1-04, F5-07, S5-07).
  *   v1.0.0 — 2026-03-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-03-13 — Added custom aimeat plugin (file-header, max-file-lines)
  *   v1.2.0 — 2026-06-05 — Ignore src/generated/** (Prisma clients, openapi types)
@@ -118,6 +119,10 @@ export default tseslint.config(
     files: ['src/**/*.ts'],
     rules: {
       'aimeat/no-silent-catch': 'error',
+      // A caught error is logged through errorFields(err): JSON writes an Error object as {}, and 33
+      // calls had lost their reason that way (QA audit E1-04). Straight to 'error': the 33 were
+      // converted in the same change.
+      'aimeat/no-error-object-log-field': 'error',
     },
   },
   {

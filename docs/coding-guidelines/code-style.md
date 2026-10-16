@@ -253,11 +253,20 @@ Use the Winston logger from `src/utils/logger.ts`:
 
 ```typescript
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 
 logger.info('Server started', { port: config.port });
 logger.warn('Rate limit approaching', { owner, remaining: 5 });
-logger.error('Database connection failed', { error: err.message });
+logger.error('Database connection failed', { ...errorFields(err), host });
 ```
+
+A caught error goes in through `errorFields(err)`, which gives the message and the stack. The caught
+value itself as a field (`{ error: err }`) is refused by `aimeat/no-error-object-log-field`: JSON
+writes an Error as `{}`. Every line carries the request id and the caller by itself. A route that
+answers a caught exception with a 500 passes the error along so its stack reaches the log line:
+`res.status(500).json(carryError(error(config.nodeId, 'INTERNAL_ERROR', String(err)), err))`
+(`src/middleware/internal-error-text.ts`). An MCP tool that catches everything returns
+`withCaughtError(result, err)` (`src/mcp/tool-fault.ts`), and a throw is logged and reported for it.
 
 ---
 

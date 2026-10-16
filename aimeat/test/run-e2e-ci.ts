@@ -10,6 +10,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-16 -- e2e-recorded-events.ts joins the list (not the guard tier): the traces of refusals answered
+ *     inside a route, a password change, a setting change and operator acts on an account (QA audit W23).
  *   2026-10-16 -- e2e-federation-peer-limits.ts joins the list and GUARD_SUITES (140 → 141), measured
  *     alone three times on each backend: a member peer's replicate namespaces, broadcast sender, key
  *     exchange roster, signed service summary and resolve, and the package repository doors refusing
@@ -880,6 +882,9 @@ const ALL_SUITES = [
     'test/e2e-admin-storage-stats.ts',
     'test/e2e-metrics.ts',
     'test/e2e-auth-refusals.ts',
+    // Events that used to leave no trace: refusals answered inside a route, a password change, an
+    // operator's setting change, the operator role and an account turned off and on (QA audit W23).
+    'test/e2e-recorded-events.ts',
     'test/e2e-admin-security-page.ts',
     'test/e2e-admin-cors-page.ts',
     // The Discovery page's doors: the status with the key check and the notice log, the plan of a

@@ -10,6 +10,7 @@
  * @structure registerWorkspaceCreateTool(mcp, storage, config, deps)
  * @usage import { registerWorkspaceCreateTool } from './workspace-create.js';
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8. The four writes this tool made itself (the
  *     schema locks, the manifest, the readme, the registry entry) were a second copy of
@@ -20,6 +21,7 @@
  *   v1.0.0 — 2026-08-11 — Extracted from mcp/workspaces.ts (max-file-lines), no behaviour change.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -81,7 +83,7 @@ export function registerWorkspaceCreateTool(
                 return ok({ created: true, ...result });
             } catch (e) {
                 if (e instanceof WorkspaceProvisionError || e instanceof WorkspaceMetaError) return fail(e.message);
-                return fail((e as Error).message || 'Could not create the workspace');
+                return withCaughtError(fail((e as Error).message || 'Could not create the workspace'), e);
             }
         });
 }
