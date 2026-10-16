@@ -100,8 +100,8 @@
       "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off."
     },
     "src/routes/federation-sync/templates.ts": {
-      "count": 4,
-      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); the outbound sync moved to services/federation-remote-templates.ts (2026-10-16). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
+      "count": 5,
+      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); the outbound sync moved to services/federation-remote-templates.ts (2026-10-16); the listing GET reads the pinned key for its own signature, its audience check and its pin. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/ghii/register-login.ts": {
       "count": 8,
