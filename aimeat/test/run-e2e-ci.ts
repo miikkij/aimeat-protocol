@@ -11,6 +11,9 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-16 -- In GitHub Actions a red run writes its red suites as check-run annotations and a job
+ *     summary (scripts/lib/e2e-github-report.ts), which a reader without a GitHub sign-in can read; the
+ *     job log they were only in is served to signed-in readers only.
  *   2026-10-16 -- e2e-config-setting-fallback.ts joins the list (not the guard tier): a node started with
  *     a setting it does not accept runs the default and shows a Security page incident, on its own node
  *     on 40484 (Jouni, decision 2026-10-16).
@@ -360,7 +363,7 @@
  */
 
 import { execSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, readdirSync, readFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -374,6 +377,7 @@ import {
 import { PRODUCTION_LANE_ENV, PRODUCTION_LANE_EXCEPTIONS } from './run-e2e-production-lane.js';
 import { holdBasePort, lanePortFor } from '../scripts/lib/e2e-ports.js';
 import { classify, formatHeader, formatRow } from '../scripts/lib/e2e-results.js';
+import { githubAnnotations, githubSummary } from '../scripts/lib/e2e-github-report.js';
 import { runLane, type SuiteResult } from './run-e2e-lane.js';
 import { clearNodeLogs, nodeLogDir } from './helpers/runner-node-log.js';
 
@@ -1962,6 +1966,13 @@ async function main() {
     // Repeated from the start of the run, because the summary is the part anyone reads.
     if (unregistered.length > 0) {
         console.log(`  ${unregistered.length} file(s) in test/ are on no list and ran nowhere: ${unregistered.join(', ')}`);
+    }
+    if (process.env.GITHUB_ACTIONS === 'true') {
+        const red = results.filter(r => verdicts.get(r.name)!.red)
+            .map(r => ({ name: r.name, passed: r.passed, total: r.total, note: verdicts.get(r.name)!.note, failures: r.failures ?? [] }));
+        for (const line of githubAnnotations(red, TARGET.dbType)) console.log(line);
+        const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+        if (summaryFile) appendFileSync(summaryFile, githubSummary(red, TARGET.dbType, { passed: totalPassed, failed: totalFailed, total: totalTests }));
     }
 
     process.exit(anyFailed ? 1 : 0);

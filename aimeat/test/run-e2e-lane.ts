@@ -24,6 +24,8 @@
  * @structure SuiteResult · suiteTimeLimitMs() · runLane() · runTest() · endTree()
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.1.0 -- 2026-10-16 -- A red suite's result carries its first failed tests (failures), which the
+ *     runner writes as GitHub annotations in CI (scripts/lib/e2e-github-report.ts).
  *   v1.0.0 -- 2026-10-16 -- Extracted from run-e2e-ci.ts, with a per-suite time limit, a retried
  *     restart, the node's output for a red suite and a skip count (QA audit W12: P1-04, P1-06, P1-07,
  *     P1-09, F7b-01).
@@ -34,6 +36,7 @@ import { basename } from 'node:path';
 import { anonymousModeFor, cleanDatabase, pinnedEnv, startServer, stopServer, type RunnerTarget } from './run-e2e-server.js';
 import { acquirePortLocks, releasePortLocks, suiteOwnPorts } from '../scripts/lib/e2e-ports.js';
 import { classify, parseResults } from '../scripts/lib/e2e-results.js';
+import { failedTestLines } from '../scripts/lib/e2e-github-report.js';
 import { discardNodeLogOnClose, nodeLogPath, nodeLogTail } from './helpers/runner-node-log.js';
 
 export interface SuiteResult {
@@ -48,6 +51,8 @@ export interface SuiteResult {
     notRun?: string;
     /** Set when the lane's node exited while the suite ran. */
     nodeDied?: string;
+    /** A red suite's first lines that report a failed test (empty for a green one). */
+    failures?: string[];
 }
 
 /** A suite's source, or nothing when it cannot be read: such a suite has no port to lock. */
@@ -157,6 +162,7 @@ export async function runLane(lane: number, target: RunnerTarget, suites: string
                 ? `exit ${node.exitCode ?? node.signalCode}` : undefined;
             const result: SuiteResult = { name, ...parsed, time: `${elapsed}s`, exitCode, lane, cycleMs, anonymous, timedOut, nodeDied };
             const verdict = classify(result, { guard: opts.isGuard(name) });
+            if (verdict.red) result.failures = failedTestLines(output);
             if (!stream) {
                 console.log(`${tag}${verdict.mark} ${name}  ${parsed.passed}/${parsed.total}${parsed.skipped ? `, ${parsed.skipped} skipped` : ''} in ${elapsed}s, anonymous mode ${anonymous}${verdict.note ? `  ${verdict.note}` : ''}`);
                 // A green suite's output is what the summary already says; a red one's is the point.
