@@ -6,6 +6,7 @@
  * must retain changed suites, shared security code must select the guard tier, and a storage,
  * identity, door or runner change must select the PostgreSQL legs without being asked.
  * @version-history
+ *   2026-10-17 -- A changed suite or test/version-aware-suites.txt selects the version-aware suite list check.
  *   2026-10-16 -- Each case may take 30 s, above the child process's own 20 s limit: under load the
  *     first case timed out at vitest's 5 s default while the planner was still compiling.
  *   v1.1.0 -- 2026-10-16 -- The planner runs with AIMEAT_CI_STATE=off: the plan now prints main's CI
@@ -83,6 +84,11 @@ describe('the gate selects what the change can affect', { timeout: 30_000 }, () 
     });
     it('runs a changed registered suite that has no e2e- prefix', () => {
         expect(plan('aimeat/test/federation-messages.ts')).toContain('own E2E suite(s), SQLite: federation-messages');
+    });
+    it('checks the version-aware suite list when a suite or the list changes, and not for source alone', () => {
+        expect(plan('aimeat/test/e2e-example.ts')).toContain('version-aware suite list');
+        expect(plan('aimeat/test/version-aware-suites.txt')).toContain('version-aware suite list');
+        expect(plan('aimeat/src/services/board-ttl.ts')).not.toContain('version-aware suite list');
     });
     it('runs the unit tests a runner change reaches', () => {
         expect(plan('aimeat/test/run-e2e-server.ts')).toContain('unit tests reaching');
