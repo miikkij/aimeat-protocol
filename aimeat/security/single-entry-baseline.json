@@ -387,10 +387,6 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/routes/extensions/actions.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/routes/memory/crud.ts": {
         "count": 1,
         "why": "UNREVIEWED"
@@ -623,10 +619,6 @@
       },
       "src/routes/consent.ts": {
         "count": 2,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/extensions/actions.ts": {
-        "count": 6,
         "why": "UNREVIEWED"
       },
       "src/routes/memory/bulk.ts": {

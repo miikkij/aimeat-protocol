@@ -11,6 +11,10 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-16 — aimeat_memory_list reads through listMemoryMetaFor (services/memory-query.ts), the
+ *     listing GET /v1/memory uses: with owner_scope one query over the owner, every agent and every
+ *     ecosystem app, one row per key. It looped over the agents by hand, left the ecosystem apps out
+ *     and listed a key the owner and an agent both held twice (QA audit D2-06).
  *   2026-10-15 — aimeat_memory_read and aimeat_memory_list with owner_scope: without memory:read-as-owner
  *     only records whose visibility admits a same-owner reader (feature-list audit #42).
  *   2026-10-15 — aimeat_agents_list answers `refusals: null` and `refusals_unreadable: true` on every
@@ -155,6 +159,7 @@ import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { readsAsOwner, ownerScopeView } from '../services/owner-scope-read.js';
+import { listMemoryMetaFor } from '../services/memory-query.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
@@ -574,18 +579,13 @@ export function registerCoreTools(
                         }],
                     };
                 }
-                const ownerGhii = `${localAccountName(agentGaii)}@${config.nodeId}`;
-                const agents = await storage.getAgentsByOwner(localAccountName(agentGaii));
-                entries = [...await storage.listMemoryMeta(ownerGhii, { prefix, visibility, tags })];
-                // Stop accumulating once we exceed the cap — owner-scope can otherwise aggregate
-                // every agent's memory unbounded.
-                for (const agent of agents) {
-                    if (entries.length > cap) break;
-                    entries.push(...await storage.listMemoryMeta(agent.gaii, { prefix, visibility, tags }));
-                }
-                entries = ownerScopeView(entries, agentGaii, readsAsOwner(caller()));
+                // The owner-scope listing GET /v1/memory?owner_scope=true reads (services/memory-query.ts):
+                // the owner's GHII, every agent and every ecosystem app in one query, one row per key.
+                entries = ownerScopeView(
+                    await listMemoryMetaFor({ storage, config }, { ownerScopeOf: localAccountName(agentGaii), gaii: agentGaii, prefix, visibility, tags }),
+                    agentGaii, readsAsOwner(caller()));
             } else {
-                entries = await storage.listMemoryMeta(agentGaii, { prefix, visibility, tags });
+                entries = await listMemoryMetaFor({ storage, config }, { ownerScopeOf: null, gaii: agentGaii, prefix, visibility, tags });
             }
             // The classification reader (TARGET-082): a key this agent may not see is not listed.
             entries = await readerForAgent({ storage, config }, agentGaii).show(entries, e => memoryTarget(e.ownerGaii, e.key));

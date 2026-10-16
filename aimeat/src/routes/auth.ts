@@ -14,6 +14,7 @@
  *     owner JWT or an owner-level access token) without the refresh cookie. It minted a new one-hour
  *     token from the owner record's roles, so an owner-level token of an operator's account came back
  *     with 'operator', and an owner access token renewed itself with no end (QA audit S1-01).
+ *   2026-10-16 — The Bearer branch of POST /v1/auth/refresh never widens roles (it mints the roles both the presented token and the account hold) and refuses a credential made from a personal access token, which is renewed through the exchange or the PAT cookie branch, both of which re-check the PAT (QA audit P3-03).
  *   2026-10-15 — The challenge answer says what POST /v1/auth/token signs: the GAII and a timestamp, not the challenge (feature-list audit 33).
  *   v1.14.0 -- 2026-10-14 -- The connectivity-key mint (routes/auth-otk.ts) is removed with the
  *     unauthenticated POST /v1/agents/connect it fed (Jouni, feature-list audit row 202).
@@ -485,6 +486,19 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     if (isForeignPrincipal(req.auth)) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN',
         'A session from your home node is renewed by signing in again, not here.'));
+      return;
+    }
+
+    // A CREDENTIAL MADE FROM A PERSONAL ACCESS TOKEN IS RENEWED FROM THE TOKEN, NOT HERE. A raw PAT
+    // and a JWT minted from one carry `via: 'pat'` and no link back to the PAT row, so this branch
+    // cannot ask whether the PAT is still live. Renewing such a session here minted a JWT that
+    // outlived a revoke of the PAT, and every later refresh renewed it again. The exchange
+    // (POST /v1/auth/token/exchange) and the PAT-backed cookie branch above both call resolvePat,
+    // which refuses a revoked, expired or orphaned PAT.
+    if (req.auth.via === 'pat') {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+        'This session was made from an access token. Exchange the access token again to get a new session.',
+        undefined, { renew_at: '/v1/auth/token/exchange' }));
       return;
     }
 

@@ -6,6 +6,7 @@
  *   steps via simulated task completion (the onTaskTerminal hook). Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows
  * @version-history
+ *   2026-10-16 — The improve prompt refuses a principal without workflow:read and the chat prompt one without agent:read and memory:read; another owner reaches neither this owner's workflow nor offers (QA audit P3-03).
  *   v1.0.0 — 2026-06-13 — Initial Phase 4 coverage.
  *   v1.1.0 — 2026-06-15 — notify_on_finish: opt-in gate + success/failure finish-notification coverage.
  *   v1.2.0 — 2026-07-05 — resume: downstream re-gates on its own required_to_function (input present →
@@ -975,6 +976,43 @@ async function run() {
     assert(chat.status === 200, `chat: ${chat.status}`);
     assert(chat.body.data.prompt.includes(`${agentName} · fetch`), `the chat prompt lists the owner's offers: ${chat.body.data.prompt.slice(0, 200)}`);
     assert(!chat.body.data.prompt.includes('{{agents_and_offers}}'), 'no placeholder left in the chat prompt');
+  });
+
+  // QA audit P3-03: both prompts asked no scope. The improve prompt's 404 versus title told any
+  // principal of the owner whether a workflow id exists, and the chat prompt wrote every agent,
+  // offer id and write key into the text. They now ask the words of the routes that serve that data.
+  const none = await mintAgent('wf-tpl-none', ['task:read']);
+  const reader = await mintAgent('wf-tpl-reader', ['workflow:read']);
+  await test('the improve prompt asks workflow:read of anyone but the owner', async () => {
+    const improveRefused = await json('/v1/templates/workflow-improve-mcp?id=news', { headers: none.headers });
+    assert(improveRefused.status === 403 && improveRefused.body.error?.code === 'SCOPE_DENIED',
+      `improve without workflow:read: ${improveRefused.status} ${JSON.stringify(improveRefused.body.error ?? improveRefused.body.data)}`);
+    const unknownRefused = await json('/v1/templates/workflow-improve-mcp?id=no-such-workflow', { headers: none.headers });
+    assert(unknownRefused.status === 403, `an unknown id answers the same refusal, so the answer says nothing about which ids exist: ${unknownRefused.status}`);
+
+    const improve = await json('/v1/templates/workflow-improve-mcp?id=news', { headers: reader.headers });
+    assert(improve.status === 200 && improve.body.data.prompt.includes('news'), `improve with workflow:read: ${improve.status} ${JSON.stringify(improve.body.error)}`);
+  });
+
+  await test('the chat prompt asks agent:read and memory:read of anyone but the owner', async () => {
+    const agentOnly = await mintAgent('wf-tpl-agentread', ['agent:read']);
+    const memoryOnly = await mintAgent('wf-tpl-memread', ['memory:read']);
+    for (const [who, caller] of [['no word', none], ['workflow:read only', reader], ['agent:read only', agentOnly], ['memory:read only', memoryOnly]] as const) {
+      const refused = await json('/v1/templates/workflow-create-chat', { headers: caller.headers });
+      assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED', `chat prompt with ${who}: ${refused.status} ${JSON.stringify(refused.body.error ?? {})}`);
+      assert(!JSON.stringify(refused.body).includes(`${agentName} · fetch`), `the refusal with ${who} carries no offer`);
+    }
+    const both = await mintAgent('wf-tpl-both', ['agent:read', 'memory:read']);
+    const chat = await json('/v1/templates/workflow-create-chat', { headers: both.headers });
+    assert(chat.status === 200 && chat.body.data.prompt.includes(`${agentName} · fetch`), `chat prompt with agent:read and memory:read: ${chat.status} ${JSON.stringify(chat.body.error)}`);
+  });
+
+  await test('another owner cannot learn this owner\'s workflow through the improve prompt (cross-owner)', async () => {
+    const other = await registerOwner(BASE, `wftpl${Date.now()}`);
+    const r = await json('/v1/templates/workflow-improve-mcp?id=news', { headers: { Authorization: `Bearer ${other.token}` } });
+    assert(r.status === 404, `another owner finds no such workflow: ${r.status}`);
+    const chat = await json('/v1/templates/workflow-create-chat', { headers: { Authorization: `Bearer ${other.token}` } });
+    assert(chat.status === 200 && !chat.body.data.prompt.includes(`${agentName} · fetch`), 'another owner\'s chat prompt lists none of this owner\'s offers');
   });
 
   // ── the scope words on the workflow doors ──

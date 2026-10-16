@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-16 — registerExtensionsTools receives getToken: aimeat_extension_invoke gives an action's
+ *     ctx.buy the session's bearer, as POST /v1/ext/:extName/:actionId does (QA audit D2-05).
  *   2026-10-16 — registerAppsTools receives the session caller, for aimeat_app_get's visibility rule (QA audit W15).
  *   2026-10-09 — registerDocsignTools: aimeat_docsign_validate, _lookup, _request_create, _requests,
  *     _request_get, _sign and _cancel.
@@ -213,7 +215,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerComplianceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerDataMapTools(mcp, storage, config, agentGaii, () => scopes, caller);
     registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
-    registerExtensionsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
+    registerExtensionsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
     registerCatalogueTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerMemoryExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
     registerWalletExtendedTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);

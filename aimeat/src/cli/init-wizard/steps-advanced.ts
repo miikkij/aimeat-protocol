@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Economy + advanced-settings wizard steps (quotas, federation, consent, CORS, TOTP, marketplace, realtime, extensions, app/portfolio origin) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.1 — 2026-10-16 — A "No" to extensions or to the app origin writes false: the loader's default is on (for the app origin, on a public profile) (QA audit D8-03).
  *   v1.2.0 — 2026-08-08 — Ask whether THIS operator signed the EU Code of Practice and which
  *     sections (AIMEAT_AI_COP_SECTIONS / _SIGNED_ON). Defaults to no: it is a public compliance
  *     claim, so it has to be typed by the person who made it.
@@ -538,6 +539,9 @@ export async function askAllAdvancedSettings(
       t,
     );
     if (extTimeout !== '5000') settings.AIMEAT_EXT_TIMEOUT_MS = extTimeout;
+  } else {
+    // The loader's default is on, so a "No" that writes nothing would leave extensions on.
+    settings.AIMEAT_EXTENSIONS_ENABLED = 'false';
   }
 
   // ── App Origin Isolation (H-2) ──
@@ -575,6 +579,9 @@ export async function askAllAdvancedSettings(
       );
       settings.AIMEAT_APP_HOST = appHost.trim();
       settings.AIMEAT_APP_ORIGIN_ENABLED = 'true';
+    } else {
+      // On a public profile the loader turns the app origin on, so a "No" has to be written.
+      settings.AIMEAT_APP_ORIGIN_ENABLED = 'false';
     }
 
     // ── Portfolio Origin ──

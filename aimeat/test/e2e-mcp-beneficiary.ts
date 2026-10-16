@@ -10,6 +10,9 @@
  *   declares a split against somebody else's revenue.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-beneficiary
  * @version-history
+ *   2026-10-16 — The two split refusals assert INVALID_INPUT, the code POST /v1/commerce/beneficiary-splits
+ *     answers: the tool validates with the route's code now (commerce/beneficiary-split-declare.ts). The
+ *     old assertions pinned the tool's own codes, EMPTY_SPLIT and INVALID_GHII (QA audit D2-08).
  *   v1.1.0 — 2026-09-24 — The operator's two agents hold operator:admin. Their setup no longer matched
  *     the node: reading another account's approval state and recording one are asked of the agent
  *     now, so an operator's agent needs that tick (security audit A8-1). The bare agent keeps
@@ -228,14 +231,14 @@ await test('A split with no beneficiaries and not dynamic is refused', async () 
         ext: EXT, action: 'nothing', pool_percent: 50,
     });
     assert(r.isError, `expected an error, got ${r.text}`);
-    assert(/EMPTY_SPLIT/.test(r.text), `expected EMPTY_SPLIT, got ${r.text}`);
+    assert(/^INVALID_INPUT/.test(r.text) && /divide nothing/.test(r.text), `expected INVALID_INPUT, got ${r.text}`);
 });
 
 await test('A malformed beneficiary GHII is refused', async () => {
     const r = await provAgent.session.call('aimeat_commerce_beneficiary_split_set', {
         ext: EXT, action: 'lookup', pool_percent: 50, beneficiaries: [{ ghii: 'not-a-ghii' }],
     });
-    assert(r.isError && /INVALID_GHII/.test(r.text), `expected INVALID_GHII, got ${r.text}`);
+    assert(r.isError && /^INVALID_INPUT/.test(r.text) && /owner@node-id/.test(r.text), `expected INVALID_INPUT, got ${r.text}`);
 });
 
 await test('The agent lists its owner\'s splits, and only those', async () => {

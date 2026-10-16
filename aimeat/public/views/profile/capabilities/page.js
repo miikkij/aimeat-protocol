@@ -10,6 +10,7 @@
  * @structure renderPage · shelf · secOther · secAgent
  * @usage import { renderPage } from './capabilities/page.js';
  * @version-history
+ *   v1.19.1 -- 2026-10-16 -- The policy line no longer names who may publish: the node enforced no such setting (QA audit D8-05).
  *   v1.19.0 -- 2026-09-26 -- On the component kit (page group G7): the frame is the SettingsPage (crumb, head with its tags as data, the loud copy, the rail's sections and sibling pages), the strip the FigureStrip, a shelf's filters, search line, rows and more line the List, the hand-added form the FoldRow over the Fields, the rule an AI gets the Box, the facts the Facts. The vouches tag counts nothing yet in the dim tone again (main's og-chip--dim). The page writes no class.
  *   v1.18.0 -- 2026-09-26 -- "Public" beside its check box is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
  *   v1.17.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -173,7 +174,7 @@ function secOther(ctx, num, other, canCreate) {
         <//>
         <${Facts} wide rows=${[
           { k: x('manualK'), v: x('manualBody'), sub: canCreate ? x('manualOn') : x('manualOff', { policy: x('policy.' + (ctx.policy?.publishing || 'disabled')) }) },
-          { k: x('policyK'), v: x('policyBody', { publishing: x('policy.' + (ctx.policy?.publishing || 'disabled')), publishers: x('publishers.' + (ctx.policy?.publishers || 'all_users')), webhooks: x('webhooks.' + (ctx.policy?.webhooks || 'disabled')) }), sub: x('policySub') },
+          { k: x('policyK'), v: x('policyBody', { publishing: x('policy.' + (ctx.policy?.publishing || 'disabled')), webhooks: x('webhooks.' + (ctx.policy?.webhooks || 'disabled')) }), sub: x('policySub') },
         ]} />
         ${canCreate ? html`
           <${Space} above="large">

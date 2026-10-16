@@ -1,6 +1,7 @@
 # Developing AIMEAT
 
-Use Node.js 24 or later and pnpm 10. SQLite needs no database server.
+Use Node.js 24 or later and pnpm 10 (see [A new machine](#a-new-machine) for how to get them). SQLite
+needs no database server.
 PostgreSQL with Kysely is the production storage provider, and you need a running PostgreSQL only
 to test against it.
 
@@ -25,6 +26,40 @@ explicit port (40251 to 40499); `--force` rewrites existing files.
 
 [CONTRIBUTING.md](../../CONTRIBUTING.md) is the same path for an outside contributor, through to
 the pull request.
+
+## A new machine
+
+`pnpm machine:check` (from `aimeat/`) lists what this machine lacks for the tests and the gates,
+with the command for each. It changes nothing. It exits 1 only when something required is missing:
+Node, pnpm, this checkout's test settings or the pinned CodeQL. What a machine needs:
+
+- **Node 24 or later.** The root `.nvmrc` names it for `nvm use`.
+- **pnpm.** Both `package.json` files pin the same version in `packageManager`, and
+  `test/unit/toolchain-pins.test.ts` keeps them and the Dockerfile equal. `corepack enable` puts a
+  `pnpm` on PATH that runs that version. On Windows it may need an administrator shell. Without
+  it, put a script named `pnpm` that runs `corepack pnpm "$@"` on PATH, and a `pnpm.cmd` for
+  Windows child processes. The git hooks and the package scripts call bare `pnpm`, so `corepack
+  pnpm` alone is not enough.
+- **The git hooks.** `pnpm install` at the root sets `core.hooksPath` to `.githooks`.
+- **PostgreSQL 16 or 17**, only for the PostgreSQL suites. CI and `docker-compose.yml` run 16,
+  which is the oldest version the node supports, and the node logs a warning at start on an older
+  server. The test settings example carries the CI service's account (`appuser:devpassword123`).
+  When your server has another account, write yours together with this checkout's database:
+
+  ```bash
+  AIMEAT_TEST_DATABASE_URL=postgresql://<user>:<password>@localhost:5432/x pnpm test:env:init --force
+  ```
+
+  A run over existing files creates the database that the file names when it is missing.
+- **A port of the checkout's own.** `pnpm test:env:init` and `pnpm machine:check` warn when another
+  checkout's test settings name the same port, or a process holds it. Take a free one with
+  `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force`.
+- **CodeQL**, for `check:field-reach` in `pnpm check:fast`, which refuses without it.
+  `pnpm codeql:install` downloads the pinned bundle from the public GitHub release over HTTPS
+  (about 660 MB) and checks its sha256. It needs no GitHub CLI. `--from <codeql executable>`
+  registers a CLI that is already on the machine.
+- **Optional:** Playwright browsers for the browser checks (`pnpm exec playwright install
+  chromium`), and the GitHub CLI for `pnpm ci:stats`.
 
 ## Maintainer sessions
 
@@ -65,7 +100,9 @@ AIMEAT_SQLITE_PATH=./data/aimeat.db
 
 Use `AIMEAT_SQLITE_PATH=:memory:` for ephemeral SQLite storage.
 For PostgreSQL, set `AIMEAT_STORAGE=postgres-kysely` and `DATABASE_URL`.
-`pnpm dev` (from the root or `aimeat/`) starts the node from source and needs this file.
+`pnpm dev` (from the root or `aimeat/`) starts the node from source, and `pnpm start` starts the
+built node (`pnpm build` first); both need this file. The node refuses to start on a value it does
+not accept, and names the setting; `aimeat validate` checks the file without starting.
 
 Read [the configuration reference](../b-config.md) for precedence and sealed settings.
 `aimeat config` reports settings for the process that runs that command.

@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-16 — Section 5: an archived record refuses an update and a tag or visibility change too, now that PUT /v1/memory/:key writes through the shared write; only a creator or admin, in person or through their own agent, archives (QA audit D2-03, D2-08).
  *   2026-10-15 — The account export lists published apps, AI provenance, connections, agent messages
  *     and apps taken; a restore can answer MORSEL_PRICE_REMOVED (feature-list audit #160, #205).
  *   v1.3.3 — 2026-10-15 — A copy is held to the key's schema lock; the hands come newest first, deletes counted (feature-list audit #50, #51).
@@ -181,7 +182,11 @@ let knowledge age, and you should offer them, not wait to be asked:
   something fetched.
 - **Archiving.** \`aimeat_organism_archive\` with \`action: "archive"\` and a \`level\` (organism,
   workspace, space or one record) makes it read-only and takes it out of overviews, lists and search,
-  while it stays readable by key. \`action: "unarchive"\` brings it back as it was. Use it for a
+  while it stays readable by key. Read-only holds on every write: a write, an update of a version
+  (what the Memory page and an app's update use) and a tag or visibility change all answer
+  \`ARCHIVED\` until it is unarchived. \`action: "unarchive"\` brings it back as it was. Only the
+  organism's creator or an admin archives or brings back, in person or through one of their own
+  agents; an agent attached to the organism is refused whoever its owner is, on REST and over MCP alike. Use it for a
   finished project, not for something wrong; wrong things are deleted.
 - **Row retention.** A workspace row space can keep only the newest rows or only the last days
   (\`retention: { maxRows, maxDays }\` in the workspace's manifest); older rows go as new ones arrive.

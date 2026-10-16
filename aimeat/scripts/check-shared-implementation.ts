@@ -14,16 +14,26 @@
  *   stamp — each time in one place while the other surface kept the old behaviour. The August 2026
  *   audit then found two more of the same kind, and step 4 found eight more in the extension sandbox.
  *
- *   WHAT THIS COUNTS. A file under src/mcp/ that calls `storage.<something>` is doing the work
- *   itself. That is the number to drive to zero, and it is a ratchet: the seed is the count on the
- *   day this was written, and the gate fails only if the number GOES UP. Fixing one tool at a time
- *   is the intended way through, because each fix is local — one tool swaps a direct call for a
- *   shared service function that takes the caller and holds the gate.
- * @structure SEED — the count on 2026-08-10. main(): report, and gate on any increase.
+ *   WHAT THIS COUNTS. A line under src/mcp/ that calls `storage.<something>(` (the bare `storage`
+ *   or a member such as `deps.storage`) is a tool doing the work itself. Each file that still does
+ *   it has a CEILING, the number of such lines it held when the ceiling was last set, and the gate
+ *   fails in both directions: a file above its ceiling has a new direct call, and a file below it
+ *   asks for the ceiling to be lowered, so every conversion is locked in. A file with no ceiling
+ *   holds none. Fixing one tool at a time is the intended way through, because each fix is local —
+ *   one tool swaps a direct call for a shared service function that takes the caller and holds the gate.
+ *
+ *   The same files are listed in eslint-rules/no-storage-in-mcp.js EXEMPT, which reports a direct
+ *   call in the editor for every other file. The two lists are held to each other here.
+ * @structure CEILINGS — per file, the lines with a direct storage call. WRITE_SEED. main(): report,
+ *   and gate on a file above or below its ceiling, a new file, a stale entry and a list mismatch.
  * @usage
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.4.0 — 2026-10-16 — The file count (SEED 38) became a per-file ceiling of direct-call lines that
+ *     fails in both directions, and the ceilings are held to the lint rule's EXEMPT list. A new direct
+ *     read inside an exempt file passed until now; 155 lines in 38 tool-surface files when the
+ *     ceilings were set (QA audit P3-09).
  *   v1.3.0 — 2026-09-29 — SEED 38 → 39: src/mcp/core-resources.ts, a pure extraction out of core.ts.
  *   v1.2.0 — 2026-08-14 — SEED 39 → 38: src/mcp/feedback.ts is gone, and with it the last
  *     `storage.listFeedbackBySender()` call under src/mcp/. WRITE_SEED is untouched at 1.
@@ -50,7 +60,8 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
 ]);
 
 /**
- * The count on the day the rule got a measure. The gate fails only above this.
+ * HISTORY OF THE FILE COUNT the ceilings below replaced on 2026-10-16. It counted files, not calls,
+ * so a new direct call inside a file already counted passed unseen.
  *
  * 44 when the number was first taken (the diagram the developer asked for, commit 846f21f4).
  * 43 after aimeat_memory_write moved onto services/memory-write.ts — the capability whose same
@@ -89,7 +100,57 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * 38 on 2026-10-05: aimeat_app_manage's member actions call the services the routes call, and the new
  * mcp/app-manage-members.ts reads no storage (secaudit 2026-10, M6).
  */
-const SEED = 38;
+
+/**
+ * Per file, the lines with a direct storage call it may hold. Set on 2026-10-16 from the count that
+ * day (QA audit P3-09); appdev-pitfalls.ts held none and left the list. LOWER a number in the same
+ * change that converts a call, delete the entry (and the file's line in the lint rule's EXEMPT) when
+ * it reaches zero, and never add one: a tool written after the rule calls a service.
+ */
+const CEILINGS: Record<string, number> = {
+    'src/mcp/agent-capabilities.ts': 2,
+    'src/mcp/agent-messages.ts': 2,
+    'src/mcp/agent-onboarding.ts': 3,
+    'src/mcp/agent-schedules.ts': 1,
+    'src/mcp/agent-tasks.ts': 10,
+    'src/mcp/agent-telemetry.ts': 1,
+    'src/mcp/app-template-proposals.ts': 1,
+    'src/mcp/apps.ts': 7,
+    'src/mcp/apps-fork.ts': 2,
+    'src/mcp/boards.ts': 6,
+    'src/mcp/capabilities.ts': 3,
+    'src/mcp/catalogue.ts': 5,
+    'src/mcp/chat-instances.ts': 4,
+    'src/mcp/commerce.ts': 5,
+    'src/mcp/companies.ts': 2,
+    'src/mcp/consent.ts': 1,
+    'src/mcp/core-boards.ts': 2,
+    'src/mcp/core-admin.ts': 9,
+    'src/mcp/core-resources.ts': 4,
+    'src/mcp/core.ts': 10,
+    'src/mcp/cortex.ts': 1,
+    'src/mcp/exchange-run.ts': 3,
+    'src/mcp/exchange.ts': 3,
+    'src/mcp/extensions.ts': 9,
+    'src/mcp/index.ts': 4,
+    'src/mcp/knowledge.ts': 1,
+    'src/mcp/memory-extended.ts': 1,
+    'src/mcp/operator-config.ts': 2,
+    'src/mcp/organisms-email-invites.ts': 2,
+    'src/mcp/organisms-name-invites.ts': 7,
+    'src/mcp/organisms.ts': 21,
+    'src/mcp/prompts-managed.ts': 2,
+    'src/mcp/prompts.ts': 3,
+    'src/mcp/sharing-groups.ts': 4,
+    'src/mcp/skills.ts': 1,
+    'src/mcp/wallet-extended.ts': 2,
+    'src/mcp/workspace-members.ts': 1,
+    'src/mcp/workspaces.ts': 7,
+};
+
+/** A direct storage call: the bare `storage` or a member receiver (`deps.storage`, `this.storage`). */
+const DIRECT_CALL = /\bstorage\??\.([a-zA-Z]+)\s*\(/g;
+const LINT_RULE = join(ROOT, 'eslint-rules', 'no-storage-in-mcp.js');
 
 /**
  * The number that actually matters. A READ through storage is the same read whichever door asks;
@@ -141,50 +202,87 @@ function stripComments(source: string): string {
     return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 }
 
+/** The paths in the lint rule's EXEMPT set, read from its source: the list stays a literal there. */
+function lintExempt(): Set<string> {
+    const src = readFileSync(LINT_RULE, 'utf-8');
+    const body = /const EXEMPT = new Set\(\[([\s\S]*?)\]\)/.exec(src)?.[1] ?? '';
+    return new Set([...body.matchAll(/'([^']+)'/g)].map(m => m[1] as string));
+}
+
 function main(): void {
     const strict = process.argv.includes('--strict');
-    const offenders: { file: string; calls: string[] }[] = [];
+    const offenders: { file: string; lines: number; calls: string[] }[] = [];
 
     for (const file of walk(MCP)) {
         const rel = relative(ROOT, file).replace(/\\/g, '/');
         if (NOT_A_TOOL_SURFACE.has(rel)) continue;
         const source = stripComments(readFileSync(file, 'utf-8'));
-        const calls = [...source.matchAll(/\bstorage\.([a-zA-Z]+)\s*\(/g)].map(m => m[1]);
-        if (calls.length) offenders.push({ file: rel, calls: [...new Set(calls)].sort() });
+        const calls: string[] = [];
+        let lines = 0;
+        for (const line of source.split('\n')) {
+            const found = [...line.matchAll(DIRECT_CALL)].map(m => m[1] as string);
+            if (found.length) { lines++; calls.push(...found); }
+        }
+        if (lines) offenders.push({ file: rel, lines, calls: [...new Set(calls)].sort() });
     }
 
-    const count = offenders.length;
+    const total = offenders.reduce((n, o) => n + o.lines, 0);
+    const ceilingTotal = Object.values(CEILINGS).reduce((n, c) => n + c, 0);
     const writers = offenders.filter(o => o.calls.some(c => WRITEISH.test(c)));
     console.log('');
     console.log('  One capability, one implementation — MCP files doing the work themselves');
     console.log('  ' + '─'.repeat(62));
-    console.log(`  tool-surface files calling storage directly  ${String(count).padStart(4)}`);
-    console.log(`  seeded on 2026-08-10                         ${String(SEED).padStart(4)}`);
+    console.log(`  tool-surface files calling storage directly  ${String(offenders.length).padStart(4)}`);
+    console.log(`  lines with a direct storage call             ${String(total).padStart(4)}`);
+    console.log(`  sum of the per-file ceilings                 ${String(ceilingTotal).padStart(4)}`);
     console.log('');
     console.log(`  of those, files that WRITE                   ${String(writers.length).padStart(4)}`);
     console.log(`  seeded on 2026-08-10                         ${String(WRITE_SEED).padStart(4)}`);
     console.log('');
 
+    const problems: string[] = [];
     if (writers.length > WRITE_SEED) {
-        console.error(`✖ ${writers.length} files write through storage directly, above the seeded ${WRITE_SEED}.`);
+        problems.push(`${writers.length} files write through storage directly, above the seeded ${WRITE_SEED}: `
+            + writers.map(w => w.file).join(', '));
+    }
+    const seen = new Set<string>();
+    for (const o of offenders) {
+        seen.add(o.file);
+        const ceiling = CEILINGS[o.file];
+        if (ceiling === undefined) {
+            problems.push(`${o.file} calls storage directly on ${o.lines} line(s) (${o.calls.slice(0, 5).join(', ')}). `
+                + 'A new MCP tool calls the service or route REST calls; move the work there.');
+        } else if (o.lines > ceiling) {
+            problems.push(`${o.file} has ${o.lines} lines with a direct storage call, above its ceiling ${ceiling}. `
+                + 'Call the service the REST route calls instead of adding one.');
+        } else if (o.lines < ceiling) {
+            problems.push(`${o.file} is down to ${o.lines} from its ceiling ${ceiling}. Lower its CEILINGS entry `
+                + `in scripts/check-shared-implementation.ts to ${o.lines} to lock the gain in.`);
+        }
+    }
+    for (const file of Object.keys(CEILINGS)) {
+        if (!seen.has(file)) {
+            problems.push(`${file} has a ceiling and no direct storage call left (or no longer exists). Delete its `
+                + 'CEILINGS entry here and its line in eslint-rules/no-storage-in-mcp.js EXEMPT.');
+        }
+    }
+    // The lint rule's EXEMPT list and these ceilings name the same files, so the editor and the gate agree.
+    const exempt = lintExempt();
+    for (const file of Object.keys(CEILINGS)) {
+        if (!exempt.has(file)) problems.push(`${file} has a ceiling here and is missing from eslint-rules/no-storage-in-mcp.js EXEMPT.`);
+    }
+    for (const file of exempt) {
+        if (CEILINGS[file] === undefined && !NOT_A_TOOL_SURFACE.has(file)) {
+            problems.push(`${file} is in eslint-rules/no-storage-in-mcp.js EXEMPT and has no ceiling here. Delete the EXEMPT line.`);
+        }
+    }
+
+    if (problems.length) {
+        for (const p of problems) console.error(`✖ ${p}`);
         if (strict) process.exit(1);
         return;
     }
-
-    if (count > SEED) {
-        console.log('  NEW since the seed — these are the ones to look at:');
-        for (const o of offenders.slice(0, 10)) console.log(`    ${o.file}  (${o.calls.slice(0, 5).join(', ')})`);
-        console.log('');
-        console.error(`✖ ${count} exceeds the seeded ${SEED}. A new MCP tool must call the same service or route REST calls.`);
-        if (strict) process.exit(1);
-        return;
-    }
-
-    if (count < SEED) {
-        console.log(`  ✓ down ${SEED - count} from the seed. Lower the SEED constant in this script to lock the gain in.`);
-    } else {
-        console.log('  ✓ no new direct-storage tool surfaces (the backlog is unchanged)');
-    }
+    console.log(`  ✓ every file is at its ceiling (${total} lines in ${offenders.length} files)`);
 }
 
 main();

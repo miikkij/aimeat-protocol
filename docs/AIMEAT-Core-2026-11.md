@@ -44,7 +44,7 @@ A peer compares protocol versions as versions, not as strings, and never ranks a
 
 ### 0.3 Conformance profiles
 
-A profile is a named set of sections. A node claims the profiles it implements, in discovery (§11.6). A claim means that the node meets every MUST in the sections of that profile. A client relies on a profile only when the node claims it.
+A profile is a named set of sections. A node claims the profiles it implements, in discovery (§11.6). A claim means that the node meets every MUST in the sections of that profile, except the requirements the node lists as open for that profile in discovery (`profile_gaps`, §11.6) and in its conformance evidence. A client relies on a profile only when the node claims it, and reads a requirement listed as open as not met.
 
 | Profile | Sections | Depends on | Notes |
 |---|---|---|---|
@@ -58,7 +58,7 @@ A profile is a named set of sections. A node claims the profiles it implements, 
 | **Personal Node** | §9.7 | Federation | A node that reaches the network through a parent node. |
 | **Classification** | §5.6 | Base | Data classification. Optional for every node. A node that claims both Classification and Federation applies the classification condition of FED-20. |
 
-**AIMEAT Full Node** is the name for the combination Base + MCP + Collaboration + Pacing + Transparency + Federation. The reference node 4.0.0 claims Full Node, Agent Keys, Personal Node and Classification.
+**AIMEAT Full Node** is the name for the combination Base + MCP + Collaboration + Pacing + Transparency + Federation. The reference node 4.0.0 claims Full Node, Agent Keys, Personal Node and Classification, with the open requirements its evidence file lists under Base, Pacing and Federation.
 
 A claim of a profile includes a claim of the profiles it depends on.
 
@@ -886,7 +886,7 @@ AI clients reach a node through the Model Context Protocol. The tools a node off
 
 ### 11.6 Discovery
 
-- **DISC-01** A node MUST serve `GET /.well-known/aimeat` without authentication, with: `node_id`, `type`, `protocol` (`aimeat`), `version` (the API path version), `software_version`, `protocol_version` (this edition: `2026-11`), `profiles` (the profiles of §0.3 it claims), `public_key` (the node's Ed25519 key), and the addresses of its bootstrap document, its API description and its MCP endpoint. The bootstrap document MUST carry the same `protocol_version` and `profiles` values in its description of the node, and `protocol_versions_accepted` when discovery carries it.
+- **DISC-01** A node MUST serve `GET /.well-known/aimeat` without authentication, with: `node_id`, `type`, `protocol` (`aimeat`), `version` (the API path version), `software_version`, `protocol_version` (this edition: `2026-11`), `profiles` (the profiles of §0.3 it claims), `profile_gaps` (for each claimed profile with a requirement it does not meet yet, the ids of those requirements; an empty object when there are none), `public_key` (the node's Ed25519 key), and the addresses of its bootstrap document, its API description and its MCP endpoint. The bootstrap document MUST carry the same `protocol_version`, `profiles` and `profile_gaps` values in its description of the node, and `protocol_versions_accepted` when discovery carries it.
 - **DISC-02** A node that accepts messages from peers on an earlier edition MUST list those editions in `protocol_versions_accepted`.
 - **DISC-03** A node MUST serve `GET /.well-known/did.json`, a `did:web` document whose id matches the node's host and whose verification method is the node's Ed25519 key.
 - **DISC-04** A node that claims MCP MUST serve an MCP server card at `/.well-known/mcp.json` naming its MCP endpoint and stating that OAuth is required.

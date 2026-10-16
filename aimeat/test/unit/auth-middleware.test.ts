@@ -622,7 +622,11 @@ describe('error response shape', () => {
         expect(body.version).toBe('v1');
         expect(body.error.code).toBe('SCOPE_DENIED');
         expect(body.timestamp).toBeDefined();
-        expect(body.hints.next_actions).toHaveLength(1);
+        // The whole envelope since 2026-10-16 (QA audit D3-01): `node` and `request_id` like every
+        // error answer, the auth hint first and the support hint after it. This asserted exactly one
+        // hint, which pinned the hand-written envelope that left the two fields out.
+        expect(typeof body.node).toBe('string');
+        expect(typeof body.request_id).toBe('string');
         expect(body.hints.next_actions[0].url).toBe('/v1/auth/token');
     });
 

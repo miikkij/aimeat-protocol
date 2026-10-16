@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The metadata listing and the search read through services/memory-query.ts
+ *     (listMemoryMetaFor, searchMemoryRecords), the queries aimeat_memory_list and aimeat_memory_search
+ *     use too. No change to what either route answers (QA audit D2-06).
  *   2026-10-15 — GET /v1/memory (owner_scope or ?agent=) and GET /v1/memory/search (?agent=): an agent
  *     without memory:read-as-owner gets another same-owner identity's records only when their
  *     visibility admits a same-owner reader, the count included (feature-list audit #42).
@@ -82,6 +85,7 @@ import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
 import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
+import { listMemoryMetaFor, searchMemoryRecords } from '../../services/memory-query.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -380,9 +384,12 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // The classification reader (TARGET-082): a key this reader may not see is neither listed nor counted.
     const reader = readerFor({ storage, config }, req.auth);
     if (metaOnly) {
-      const allMeta = ownerScopeView(await reader.show((ownerScope && !agentParam)
-        ? await memoryDb.listOwnerScopeMeta(req.auth!.owner, { prefix, visibility, tags, maxFlags, archived })
-        : await storage.listMemoryMeta(gaii, { prefix, visibility, tags, maxFlags, archived }),
+      // The listing aimeat_memory_list reads too (services/memory-query.ts).
+      const allMeta = ownerScopeView(await reader.show(
+        await listMemoryMetaFor({ storage, config }, {
+          ownerScopeOf: (ownerScope && !agentParam) ? req.auth!.owner : null, gaii,
+          prefix, visibility, tags, maxFlags, archived,
+        }),
         r => memoryTarget(r.ownerGaii, r.key)), self, !restricted);
       // A count is a count of what MATCHES, never of what was returned — so it is answered before
       // the limit is applied, or `?count=true&limit=10` would report ten for a keyspace of a thousand.
@@ -558,16 +565,18 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // ONE indexed query across the identity set via the librarian's searchText primitive (SQLite FTS5 /
     // Mongo searchBlob), ranked best-first. Owner sessions cover GHII + every agent + every ecosystem app
     // (resolved by the service); an agent/eco session (or ?agent=) searches just that one identity.
-    const hits = (isOwnerSession && !agentParam)
-      ? await memoryDb.searchOwnerScope(req.auth!.owner as string, q, { keyPrefix: prefix, visibility, maxFlags, limit })
-      : await storage.searchText(q, { ownerGaiis: [gaii], keyPrefix: prefix, visibility, maxFlags, limit });
+    // The search aimeat_memory_search runs too (services/memory-query.ts).
+    const found = await searchMemoryRecords({ storage, config }, {
+      ownerScopeOf: (isOwnerSession && !agentParam) ? req.auth!.owner as string : null, gaii,
+      q, keyPrefix: prefix, visibility, maxFlags, limit,
+    });
     // `.version.N` history rows are immutable snapshots and never what a search is looking for. The
     // node MCP tool has dropped them since it was written and this door had no way to ask, which is
     // half of why the same tool name meant two different searches (review item 6.4). Opt-IN, so
     // every REST caller that exists keeps the answer it has always had.
     const includeVersions = req.query.include_versions !== 'false';
     // ?agent= naming a sibling: without memory:read-as-owner only what visibility admits (audit #42).
-    const all: MemoryRecord[] = ownerScopeView(hits.map(h => h.record), resolveIdentity(req.auth!, config.nodeId),
+    const all: MemoryRecord[] = ownerScopeView(found, resolveIdentity(req.auth!, config.nodeId),
       !agentParam || readsAsOwner(callerOf(req, config.nodeId, storage)));
     const kept = includeVersions ? all : all.filter(r => !isVersionKey(r.key));
     // Typed against the stored value, then presented: the classification reader plus the credential

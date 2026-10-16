@@ -3,10 +3,13 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Extension action execution routes — instance-scoped (/v1/ext/:extName/:instanceId/:actionId)
- *   and default (/v1/ext/:extName/:actionId). Each builds the sandbox ExtensionCtx (memory/fetch/wallet/
- *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
- *   satisfy max-file-lines.
+ *   and default (/v1/ext/:extName/:actionId). Both run services/extension-invoke.ts, the sequence the
+ *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
+ *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 — 2026-10-16 — Both handlers call invokeExtensionAction (services/extension-invoke.ts), which
+ *     holds the sequence that was written twice here and once more in mcp/extensions.ts. No change to
+ *     what either route answers (QA audit D2-05).
  *   v1.16.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): ext:invoke on POST /v1/ext/:extName/:instanceId/:actionId, POST /v1/ext/:extName/:actionId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.15.0 — 2026-10-09 — A failed action's own message and the timeout answer pass the 500 text
  *     filter (middleware/internal-error-text.ts) through keepErrorMessage; the script's message is
@@ -44,55 +47,24 @@
  *   v1.2.0 — 2026-07-17 — Per-call paywall (enforcePaywall) before execute in both handlers +
  */
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { emitChange } from '../../services/event-bus.js';
-import { executeExtensionAction, EXT_HASH_REFERENCE_JS } from '../../services/extension-runtime.js';
-import type { ExtensionCtx } from '../../services/extension-runtime.js';
+import { EXT_HASH_REFERENCE_JS } from '../../services/extension-runtime.js';
 
 /** The published hash, evaluated here so the served example is produced BY the served source. */
 const aimeatHashRef: (s: string) => string =
   new Function(`${EXT_HASH_REFERENCE_JS}; return aimeatHash;`)() as (s: string) => string;
-import { makeExtensionFiles } from '../../services/extension-files.js';
-import { makeExtensionDataPackage } from '../../services/datapackage/ext-capability.js';
-import { logger } from '../../utils/logger.js';
-import { redactCredentialText } from '../../utils/redact-credentials.js';
 import { keepErrorMessage } from '../../middleware/internal-error-text.js';
-import { getMember, accountOf } from '../../services/app-members.js';
-import { resolveIdentity, callerPrincipal, ownerGhiiOf } from '../../utils/gaii.js';
-
-/** Which producer a descriptor records for this session. The roles say what kind of principal it is;
- *  'manual' is the honest word for a person doing it themselves. */
-function producerKindOf(roles: string[]): 'app' | 'agent' | 'manual' {
-  if (roles.includes('app') || roles.includes('eco')) return 'app';
-  if (roles.includes('agent')) return 'agent';
-  return 'manual';
-}
+import { callerPrincipal } from '../../utils/gaii.js';
+import { callerOf } from '../../middleware/caller.js';
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
-import { resolveGatedApp } from './permissions.js';
-import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from '../../services/extension-ctx.js';
-import { capabilitiesOfRecord } from '../../services/extension-capability-declaration.js';
-import { attachExtensionWorkspace, workspaceRefusalFor, type ExtensionWorkspaceCapability } from '../../services/extension-workspace.js';
-import { maybeExtensionAi, getActiveAiJobService } from '../../services/ai-jobs/index.js';
-import { takeDesignations } from '../../commerce/beneficiary-designation.js';
-import { recordCallDuration } from '../../services/call-timing.js';
-import { countCapabilityCall } from '../../services/capability-record.js';
-import { getEncryptionKey } from '../../services/encryption.js';
-import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from '../../services/extension-secrets.js';
 import type { EmailService } from '../../services/email.js';
-import { resolveExtensionForCall } from '../../services/component-versions.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
-
-/**
- * Whether a sandbox run ended by running out of time. QuickJS reports its interrupt as
- * `interrupted`; the older wording is kept so neither form falls through to EXTENSION_ERROR.
- */
-function isSandboxTimeout(message: string): boolean {
-  return message.includes('Script execution timed out') || /\binterrupted\b/.test(message);
-}
+import { invokeExtensionAction } from '../../services/extension-invoke.js';
 
 export function registerExtensionActionRoutes(router: Router, config: AimeatConfig, storage: Storage, emailService?: EmailService): void {
   // ── GET /v1/ext-hash — the node's published ctx.hash, as source ──
@@ -112,390 +84,58 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     }));
   });
 
-  // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
-  router.post('/v1/ext/:extName/:instanceId/:actionId', requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
-    // `:extName` may pin a version (`name@1.2.0`): the call then runs that kept version's code.
-    const resolved = await resolveExtensionForCall(storage, req.params.extName as string);
-    const extName = resolved.name;
-    const instanceId = req.params.instanceId as string;
-    const actionId = req.params.actionId as string;
-    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-    // Who PAYS and whose namespace this runs in is `callerGaii`; who ACTED may be a hosted app, and
-    // the money path is where that distinction has to survive or nobody can be told an app spent.
-    const meteredCaller = callerPrincipal(req.auth!, config.nodeId);
-    // The caller's organism workspace, when the manifest declares it. Declared outside the try so
-    // the catch can tell a workspace refusal from a script failure.
-    let wsCap: Partial<ExtensionWorkspaceCapability> = {};
-
-    try {
-      // Look up the extension
-      if (!resolved.ok) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', resolved.reason === 'version'
-          ? `Version "${resolved.pinned}" of extension "${extName}" is not kept on this node`
-          : `Extension "${extName}" not found`));
-        return;
-      }
-      const ext = resolved.ext;
-
-      // Extension must be active
-      if (ext.status !== 'active') {
-        res.status(503).json(error(config.nodeId, 'EXTENSION_INACTIVE',
-          `Extension "${extName}" is not active`));
-        return;
-      }
-
-      // The caller's standing in the app this extension gates, resolved BEFORE the sandbox. A gate
-      // needs the role, but the roster is private and must stay that way, so the node reads it here
-      // rather than opening a lookup the sandbox could call. An extension declares which app it
-      // gates with `config: { app: owner/file.html }`; without that it gets null and keeps whatever
-      // membership model it already had.
-      const gatedApp = resolveGatedApp(ext);
-      const callerAccount = accountOf(callerGaii);
-      const isAppOwner = !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
-      const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, callerAccount) : null;
-
-      // Look up the instance
-      const instance = await storage.getExtensionInstance(extName, instanceId);
-      if (!instance) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-          `Instance "${instanceId}" not found for extension "${extName}"`));
-        return;
-      }
-
-      // Instance must be active
-      if (instance.status !== 'active') {
-        res.status(503).json(error(config.nodeId, 'INSTANCE_INACTIVE',
-          `This copy of "${extName}" is switched off. Turn it on in Profile → Extensions and try again.`));
-        return;
-      }
-
-      // Find the action
-      const action = ext.actions.find(a => a.id === actionId);
-      if (!action) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-          `Action "${actionId}" not found in extension "${extName}"`));
-        return;
-      }
-
-      // Validate HTTP method matches
-      if (action.method !== 'POST' && action.method !== req.method) {
-        res.status(405).json(error(config.nodeId, 'METHOD_NOT_ALLOWED',
-          `Action "${actionId}" requires ${action.method}, got ${req.method}`));
-        return;
-      }
-
-      // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
-      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii: meteredCaller, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
+  /**
+   * Run one action for this request and answer it. `:extName` may pin a version (`name@1.2.0`): the
+   * call then runs that kept version's code, with the live record's status, settings and instances.
+   */
+  const runAction = async (req: Request, res: Response, instanceId?: string): Promise<void> => {
+    const session = callerOf(req, config.nodeId, storage);
+    const out = await invokeExtensionAction({
+      config, storage, enforcePaywall, emailService,
+      extRef: req.params.extName as string,
+      instanceId,
+      actionId: req.params.actionId as string,
+      method: req.method,
+      input: req.body as Record<string, unknown>,
+      caller: {
+        // Who PAYS and whose namespace this runs in is `gaii`; who ACTED may be a hosted app, and the
+        // money path is where that distinction has to survive or nobody can be told an app spent.
+        gaii: session.principal,
+        metered: callerPrincipal(req.auth!, config.nodeId),
+        owner: session.owner,
+        kind: session.kind,
+        roles: [...session.roles],
+        scopes: [...session.scopes],
+        appGrantId: req.auth!.app_grant ?? null,
+      },
+      paywall: {
+        res,
+        payToken: req.header('x-aimeat-pay-token') ?? undefined,
         internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined,
         namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined,
-        session: { roles: req.auth!.roles, scopes: req.auth!.scopes, appGrantId: req.auth!.app_grant ?? null } });
-      if (!pay.ok) return;
-
-      // Build the ExtensionCtx with instance-scoped memory namespace
-      // Extension namespace is always ext:{name}.{instanceId} — no owner scoping,
-      // because ext:{name} is already unique and owner-scoping breaks client reads
-      // (apps call getPublic('ext:{name}', key) without knowing the owner suffix).
-      const extMemoryOwner = `ext:${ext.name}.${instanceId}`;
-      // The caller's organism workspace, as the caller, with the caller's own scopes deciding the
-      // authority question the way requireScope would (services/extension-workspace.ts).
-      wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
-        caller: { gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [] } });
-      const ctx: ExtensionCtx = buildExtensionCtx({
-        config, storage, extMemoryOwner,
-        extension: { name: ext.name, owner: ext.installedBy },
-        capabilities: capabilitiesOfRecord(ext),
-        workspace: wsCap.workspace,
-        caller: {
-          gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
-          // What this credential may do, as the token granted it — the same list requireScope reads
-          // on an ordinary route. An extension action is one route for every action there will be,
-          // so a script that must hold a scope word can only do it from here.
-          scopes: req.auth!.scopes ?? [],
-          // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
-          // handed in. A gate needs the role, but the roster is private and must stay that way, so
-          // the node reads it here rather than opening a lookup the sandbox could call. An
-          // extension declares which app it gates with `config: { app: owner/file.html }`; without
-          // that it gets null and keeps whatever membership model it already had.
-          member: appMember,
-          isAppOwner,
-        },
-        // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
-        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config), { extension: ext.name }),
-        instance: { id: instanceId, config: decryptSecretFields(instance.config, getInstanceSecretKeys(ext), getEncryptionKey(config), { extension: ext.name, instance: instanceId }) },
-        logPrefix: `[ext:${ext.name}:${instanceId}]`,
-        wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name, trackingScope: instanceId }),
-        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, callerRoles: req.auth!.roles, callerScopes: req.auth!.scopes ?? [], extName: ext.name }),
-        // Data packages land in the OWNER's namespace whichever principal called: the same package
-        // produced from the app, by an agent, on a clock or by a workflow step has to sit at ONE
-        // permanent address. `producedBy` still records the exact principal, because who owns it and
-        // who made it are different questions.
-        datapackage: makeExtensionDataPackage({
-          config, storage,
-          ownerGhii: ownerGhiiOf(callerGaii),
-          producedBy: { gaii: callerGaii, kind: producerKindOf(req.auth!.roles), ref: `${ext.name}/${action.id}` },
-        }),
-        // Background model calls, billed to the INSTALLER and not to whoever is calling — the same
-        // rule as buy() just below, and the reason both read `ext.installedBy` from the record.
-        ai: maybeExtensionAi({
-          service: getActiveAiJobService(), extName: ext.name, extOwner: ext.installedBy,
-          nodeId: config.nodeId, createdBy: callerGaii,
-        }),
-        buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
-          const { buyForExtension } = await import('../../services/extension-purchase.js');
-          return buyForExtension({
-            config, storage, extName: ext.name, extOwner: ext.installedBy,
-            appRef, tool, input: buyInput ?? {},
-            jwt: (req.headers.authorization || '').replace('Bearer ', ''),
-            correlationId: req.header('x-aimeat-correlation') ?? null,
-          });
-        },
-        notify: buildExtensionNotify({
-          storage, config, extName: ext.name,
-          recipientGaii: callerGaii, recipientOwner: req.auth!.owner as string,
-        }),
-        email: buildExtensionEmail({
-          storage, config, extName: ext.name, extConfig: ext.config,
-          ownerName: req.auth!.owner as string, emailService,
-        }),
-      });
-
-      // Execute the action in the sandbox. services/extension-ctx.ts owns the arithmetic.
-      const limits = sandboxLimits(ext.limits, config);
-      let result;
-      // Time the DELIVERY, not the gate: what a buyer experiences is how long the answer takes, and a
-      // provider can only commit to a service level from what was actually measured (call-timing.ts).
-      const startedAt = Date.now();
-      try {
-        result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
-      } catch (execErr) {
-        if (pay.refund) await pay.refund();   // never keep payment for a call that didn't deliver
-        throw execErr;
-      }
-      recordCallDuration(storage, `${ext.installedBy}@${config.nodeId}`, ext.name, action.id, Date.now() - startedAt);
-      // The capability registry's call count, when the node counts direct calls (off by default).
-      if (config.capabilityCallCounting) void countCapabilityCall(storage, `ext:${ext.name}:${action.id}`, true, Date.now() - startedAt);
-
-      // The call delivered, so whoever the provider owes a share of it is booked — out of the
-      // provider's own cut, never the consumer's charge. The designation key is the capability's own
-      // output and is stripped before the buyer sees it (commerce/beneficiary-designation.ts).
-      // EXCEPT on an internal hop, where an upstream door already settled and is invoking through
-      // this one. There the designation belongs to THAT door: the node is the only thing reading
-      // this response, and stripping it here left the outer door with nothing to accrue while its
-      // buyer had already paid — every app-tool sale settled and shared with nobody.
-      const shared = pay.upstream ? { designations: [], result } : takeDesignations(result);
-      if (pay.accrue) await pay.accrue(shared.designations);
-
-      res.json(success(config.nodeId, shared.result, [
-        { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
-      ]));
-      emitChange('extensions');
-    } catch (err) {
-      const message = (err as Error).message;
-      logger.error(`Extension action failed: ${extName}/${instanceId}/${actionId}`, { error: message, caller: callerGaii });
-
-      // A workspace refusal the script let through is the SERVICE's answer — not a member, no
-      // scope, schema, version conflict — and it keeps the service's status and code.
-      const wsRefusal = workspaceRefusalFor(err, wsCap);
-      if (wsRefusal) {
-        res.status(wsRefusal.status).json(error(config.nodeId, wsRefusal.code,
-          `Action "${actionId}" refused: ${wsRefusal.message}`));
-      } else if (isSandboxTimeout(message)) {
-        res.status(500).json(keepErrorMessage(error(config.nodeId, 'EXTENSION_TIMEOUT',
-          `Action "${actionId}" timed out`)));
-      } else if (message.includes('API call limit exceeded')) {
-        res.status(500).json(error(config.nodeId, 'API_LIMIT_EXCEEDED',
-          `Action "${actionId}" exceeded API call limit`));
-      } else {
-        // The script's own error is the extension author's answer to the caller (a quality gate
-        // naming the row), so it passes the 500 text filter; credential-shaped text is redacted.
-        res.status(500).json(keepErrorMessage(error(config.nodeId, 'EXTENSION_ERROR',
-          `Action "${actionId}" failed: ${redactCredentialText(message)}`)));
-      }
+      },
+      bearer: (req.headers.authorization || '').replace('Bearer ', ''),
+      correlationId: req.header('x-aimeat-correlation') ?? null,
+    });
+    if (out.kind === 'paywall') return;   // the paywall has answered
+    if (out.kind === 'refused') {
+      const body = error(config.nodeId, out.code, out.message);
+      res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
+      return;
     }
+    res.json(success(config.nodeId, out.result, [
+      { description: 'View extension', method: 'GET', url: `/v1/extensions/${out.extName}` },
+    ]));
+  };
+
+  // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
+  // Runs against one instance: its own config, and the namespace `ext:{name}.{instanceId}`.
+  router.post('/v1/ext/:extName/:instanceId/:actionId', requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
+    await runAction(req, res, req.params.instanceId as string);
   });
 
   // ── POST /v1/ext/:extName/:actionId — Dynamic action execution ──
   router.post('/v1/ext/:extName/:actionId', requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
-    // `:extName` may pin a version (`name@1.2.0`): the call then runs that kept version's code,
-    // with the live record's status, settings and instances.
-    const resolved = await resolveExtensionForCall(storage, req.params.extName as string);
-    const extName = resolved.name;
-    const actionId = req.params.actionId as string;
-    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-    // Who PAYS and whose namespace this runs in is `callerGaii`; who ACTED may be a hosted app, and
-    // the money path is where that distinction has to survive or nobody can be told an app spent.
-    const meteredCaller = callerPrincipal(req.auth!, config.nodeId);
-    // The caller's organism workspace, when the manifest declares it. Declared outside the try so
-    // the catch can tell a workspace refusal from a script failure.
-    let wsCap: Partial<ExtensionWorkspaceCapability> = {};
-
-    try {
-      // Look up the extension
-      if (!resolved.ok) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', resolved.reason === 'version'
-          ? `Version "${resolved.pinned}" of extension "${extName}" is not kept on this node`
-          : `Extension "${extName}" not found`));
-        return;
-      }
-      const ext = resolved.ext;
-
-      // Extension must be active
-      if (ext.status !== 'active') {
-        res.status(503).json(error(config.nodeId, 'EXTENSION_INACTIVE',
-          `Extension "${extName}" is not active`));
-        return;
-      }
-
-      // The caller's standing in the app this extension gates, resolved BEFORE the sandbox. A gate
-      // needs the role, but the roster is private and must stay that way, so the node reads it here
-      // rather than opening a lookup the sandbox could call. An extension declares which app it
-      // gates with `config: { app: owner/file.html }`; without that it gets null and keeps whatever
-      // membership model it already had.
-      const gatedApp = resolveGatedApp(ext);
-      const callerAccount = accountOf(callerGaii);
-      const isAppOwner = !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
-      const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, callerAccount) : null;
-
-      // Find the action
-      const action = ext.actions.find(a => a.id === actionId);
-      if (!action) {
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-          `Action "${actionId}" not found in extension "${extName}"`));
-        return;
-      }
-
-      // Validate HTTP method matches
-      if (action.method !== 'POST' && action.method !== req.method) {
-        res.status(405).json(error(config.nodeId, 'METHOD_NOT_ALLOWED',
-          `Action "${actionId}" requires ${action.method}, got ${req.method}`));
-        return;
-      }
-
-      // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
-      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii: meteredCaller, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
-        internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined,
-        namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined,
-        session: { roles: req.auth!.roles, scopes: req.auth!.scopes, appGrantId: req.auth!.app_grant ?? null } });
-      if (!pay.ok) return;
-
-      // Build the ExtensionCtx
-      // Extension memory uses a flat namespace (ext:{name}) so apps can
-      // read data via getPublic('ext:{name}', key) without knowing the owner.
-      const extMemoryOwner = `ext:${ext.name}`;
-      // The caller's organism workspace, as the caller, with the caller's own scopes deciding the
-      // authority question the way requireScope would (services/extension-workspace.ts).
-      wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
-        caller: { gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [] } });
-      const ctx: ExtensionCtx = buildExtensionCtx({
-        config, storage, extMemoryOwner,
-        extension: { name: ext.name, owner: ext.installedBy },
-        capabilities: capabilitiesOfRecord(ext),
-        workspace: wsCap.workspace,
-        caller: {
-          gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
-          // What this credential may do, as the token granted it — the same list requireScope reads
-          // on an ordinary route. An extension action is one route for every action there will be,
-          // so a script that must hold a scope word can only do it from here.
-          scopes: req.auth!.scopes ?? [],
-          // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
-          // handed in. A gate needs the role, but the roster is private and must stay that way, so
-          // the node reads it here rather than opening a lookup the sandbox could call. An
-          // extension declares which app it gates with `config: { app: owner/file.html }`; without
-          // that it gets null and keeps whatever membership model it already had.
-          member: appMember,
-          isAppOwner,
-        },
-        // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
-        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config), { extension: ext.name }),
-        logPrefix: `[ext:${ext.name}]`,
-        wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name }),
-        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, callerRoles: req.auth!.roles, callerScopes: req.auth!.scopes ?? [], extName: ext.name }),
-        // Data packages land in the OWNER's namespace whichever principal called: the same package
-        // produced from the app, by an agent, on a clock or by a workflow step has to sit at ONE
-        // permanent address. `producedBy` still records the exact principal, because who owns it and
-        // who made it are different questions.
-        datapackage: makeExtensionDataPackage({
-          config, storage,
-          ownerGhii: ownerGhiiOf(callerGaii),
-          producedBy: { gaii: callerGaii, kind: producerKindOf(req.auth!.roles), ref: `${ext.name}/${action.id}` },
-        }),
-        // Background model calls, billed to the INSTALLER and not to whoever is calling — the same
-        // rule as buy() just below, and the reason both read `ext.installedBy` from the record.
-        ai: maybeExtensionAi({
-          service: getActiveAiJobService(), extName: ext.name, extOwner: ext.installedBy,
-          nodeId: config.nodeId, createdBy: callerGaii,
-        }),
-        buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
-          const { buyForExtension } = await import('../../services/extension-purchase.js');
-          return buyForExtension({
-            config, storage, extName: ext.name, extOwner: ext.installedBy,
-            appRef, tool, input: buyInput ?? {},
-            jwt: (req.headers.authorization || '').replace('Bearer ', ''),
-            correlationId: req.header('x-aimeat-correlation') ?? null,
-          });
-        },
-        notify: buildExtensionNotify({
-          storage, config, extName: ext.name,
-          recipientGaii: callerGaii, recipientOwner: req.auth!.owner as string,
-        }),
-        email: buildExtensionEmail({
-          storage, config, extName: ext.name, extConfig: ext.config,
-          ownerName: req.auth!.owner as string, emailService,
-        }),
-      });
-
-      // Execute the action in the sandbox. services/extension-ctx.ts owns the arithmetic.
-      const limits = sandboxLimits(ext.limits, config);
-      let result;
-      // Time the DELIVERY, not the gate: what a buyer experiences is how long the answer takes, and a
-      // provider can only commit to a service level from what was actually measured (call-timing.ts).
-      const startedAt = Date.now();
-      try {
-        result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
-      } catch (execErr) {
-        if (pay.refund) await pay.refund();   // never keep payment for a call that didn't deliver
-        throw execErr;
-      }
-      recordCallDuration(storage, `${ext.installedBy}@${config.nodeId}`, ext.name, action.id, Date.now() - startedAt);
-      // The capability registry's call count, when the node counts direct calls (off by default).
-      if (config.capabilityCallCounting) void countCapabilityCall(storage, `ext:${ext.name}:${action.id}`, true, Date.now() - startedAt);
-
-      // The call delivered, so whoever the provider owes a share of it is booked — out of the
-      // provider's own cut, never the consumer's charge. The designation key is the capability's own
-      // output and is stripped before the buyer sees it (commerce/beneficiary-designation.ts).
-      // EXCEPT on an internal hop, where an upstream door already settled and is invoking through
-      // this one. There the designation belongs to THAT door: the node is the only thing reading
-      // this response, and stripping it here left the outer door with nothing to accrue while its
-      // buyer had already paid — every app-tool sale settled and shared with nobody.
-      const shared = pay.upstream ? { designations: [], result } : takeDesignations(result);
-      if (pay.accrue) await pay.accrue(shared.designations);
-
-      res.json(success(config.nodeId, shared.result, [
-        { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
-      ]));
-      emitChange('extensions');
-    } catch (err) {
-      const message = (err as Error).message;
-      logger.error(`Extension action failed: ${extName}/${actionId}`, { error: message, caller: callerGaii });
-
-      // A workspace refusal the script let through is the SERVICE's answer — not a member, no
-      // scope, schema, version conflict — and it keeps the service's status and code.
-      const wsRefusal = workspaceRefusalFor(err, wsCap);
-      if (wsRefusal) {
-        res.status(wsRefusal.status).json(error(config.nodeId, wsRefusal.code,
-          `Action "${actionId}" refused: ${wsRefusal.message}`));
-      } else if (isSandboxTimeout(message)) {
-        res.status(500).json(keepErrorMessage(error(config.nodeId, 'EXTENSION_TIMEOUT',
-          `Action "${actionId}" timed out`)));
-      } else if (message.includes('API call limit exceeded')) {
-        res.status(500).json(error(config.nodeId, 'API_LIMIT_EXCEEDED',
-          `Action "${actionId}" exceeded API call limit`));
-      } else {
-        // The script's own error is the extension author's answer to the caller (a quality gate
-        // naming the row), so it passes the 500 text filter; credential-shaped text is redacted.
-        res.status(500).json(keepErrorMessage(error(config.nodeId, 'EXTENSION_ERROR',
-          `Action "${actionId}" failed: ${redactCredentialText(message)}`)));
-      }
-    }
+    await runAction(req, res);
   });
 }

@@ -11,6 +11,8 @@
  *   import { registerMemoryExtendedTools } from './memory-extended.js';
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-16 — aimeat_memory_search calls searchMemoryRecords (services/memory-query.ts), the one
+ *     search GET /v1/memory/search calls, instead of the storage primitive (QA audit D2-06).
  *   2026-10-15 — aimeat_memory_search reads storage.searchText, as GET /v1/memory/search does: word-start over the values, no longer a substring match (feature-list audit #52).
  *   2026-10-08 — aimeat_memory_search names each hit's ai_provenance_id; aimeat_memory_read_public
  *     answers with the public record's id and block, as the REST public read does (aiprov E14).
@@ -50,6 +52,7 @@ import { readerForAgent } from '../services/classification/reader.js';
 import { shareCarriesKey } from '../services/group-shares-classification.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { readProvenance } from './ai-provenance-result.js';
+import { searchMemoryRecords } from '../services/memory-query.js';
 
 export function registerMemoryExtendedTools(
     mcp: McpServer,
@@ -98,11 +101,11 @@ export function registerMemoryExtendedTools(
             }
             // Pull a bounded candidate set from storage (safety net over a pathological store), then drop
             // version history in-tool and cap to `cap` non-version hits.
-            // storage.searchText, the primitive GET /v1/memory/search uses for an agent session: the
-            // word-start match over the indexed values. storage.searchMemory matched a substring,
-            // so the same query found different records on the two surfaces (feature-list audit #52).
-            const candidates = (await storage.searchText(effectiveQuery, { ownerGaiis: [agentGaii], visibility, limit: cap * 4 }))
-                .map(h => h.record);
+            // The search GET /v1/memory/search runs for an agent session (services/memory-query.ts):
+            // the word-start match over the indexed values, this agent's own records.
+            const candidates = await searchMemoryRecords({ storage, config }, {
+                ownerScopeOf: null, gaii: agentGaii, q: effectiveQuery, visibility, limit: cap * 4,
+            });
             // Typed against the stored value, then presented: the classification reader plus the
             // credential mask (TARGET-082). A hit this agent may not see is not in the answer.
             const typed = await presentMemories(readerForAgent({ storage, config }, agentGaii),

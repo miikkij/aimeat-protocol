@@ -8,6 +8,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-10-16 — archiveHandler calls organismArchiveOp (services/organism-archive-op.ts), which holds
+ *     the role rule, the target check, the fence, the archive and the timeline entry, so
+ *     aimeat_organism_archive runs the same operation. No change to what the route answers (QA audit D2-08).
  *   v1.14.1 — 2026-10-13 — archiveHandler hands the session's scopes to the fenced-space rule: a
  *     session that covers organism:direct archives and brings back a record of a space that names
  *     extensions (ruled by the developer on 2026-10-13).
@@ -74,18 +77,16 @@ import type { Storage, MemoryRecord, OrganismRecord } from '../../storage/interf
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { verifyShareToken, shareTokenVersionOf } from '../../services/share-token.js';
-import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
+import { emitMemoryWritten } from '../../services/event-bus.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../../services/doc-images.js';
 import { resolveIdentity, isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
-import { archiveTarget, unarchiveTarget, archiveRoleOf, type ArchiveLevel } from '../../services/archive.js';
-import { archiveFenceTarget, fencedSpaceRefusal } from '../../services/fenced-space.js';
+import { organismArchiveOp, validateArchiveTarget } from '../../services/organism-archive-op.js';
 import { callerOf } from '../../middleware/caller.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
-import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
 import { createPublicCollectors } from './shared-public.js';
@@ -716,53 +717,20 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return s.includes('#') ? s : `${s}#${owner}@${config.nodeId}`;
   };
 
-  const validateArchiveTarget = (id: string, body: Record<string, unknown>): { ok: true; target: { level: ArchiveLevel; orgId: string; ws?: string; namespace?: string; key?: string } } | { ok: false; msg: string } => {
-    const level = body.level as ArchiveLevel;
-    if (!['organism', 'workspace', 'space', 'record'].includes(level)) return { ok: false, msg: 'level must be organism|workspace|space|record' };
-    const ws = typeof body.ws === 'string' ? body.ws : undefined;
-    const namespace = typeof body.namespace === 'string' ? body.namespace : undefined;
-    const key = typeof body.key === 'string' ? body.key : undefined;
-    if ((level === 'workspace' || level === 'space' || level === 'record') && !ws) return { ok: false, msg: 'ws is required for workspace/space/record' };
-    if (level === 'space' && !namespace) return { ok: false, msg: 'namespace is required for space' };
-    if (level === 'record') {
-      if (!key) return { ok: false, msg: 'key is required for record' };
-      if (!key.startsWith(`organism.${id}.w.${ws}.`)) return { ok: false, msg: 'key must be inside organism.{id}.w.{ws}.' };
-    }
-    return { ok: true, target: { level, orgId: id, ws, namespace, key } };
-  };
-
+  // The whole operation, role rule, target check, fence, archive and timeline entry, is
+  // services/organism-archive-op.ts, which aimeat_organism_archive runs too.
   const archiveHandler = (mode: 'archive' | 'unarchive') => async (req: Request, res: Response) => {
-    const id = req.params.id as string;
-    const organism = await storage.getOrganism(id);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    // The rule ctx.workspace.archiveRecords asks too (services/archive.ts archiveRoleOf).
-    const role = await archiveRoleOf(storage, organism, { principal: req.auth!.sub, ownerName: req.auth!.owner });
-    if (role !== 'creator' && role !== 'admin') {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', `Only the creator or an admin can ${mode} organism content`));
+    const session = callerOf(req, config.nodeId, storage);
+    const out = await organismArchiveOp({ storage, config },
+      { principal: resolveIdentity(req.auth!, config.nodeId), ownerName: req.auth!.owner, roles: session.roles, scopes: session.scopes },
+      req.params.id as string, mode, (req.body ?? {}) as Record<string, unknown>);
+    if (!out.ok) {
+      res.status(out.status).json(out.details !== undefined
+        ? error(config.nodeId, out.code, out.message, out.status, out.details)
+        : error(config.nodeId, out.code, out.message));
       return;
     }
-    const v = validateArchiveTarget(id, (req.body ?? {}) as Record<string, unknown>);
-    if (!v.ok) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', v.msg)); return; }
-    const actor = resolveIdentity(req.auth!, config.nodeId);
-    // A record or a space of a record space that names extensions is archived, or brought back, for
-    // an agent only through one of them (services/fenced-space.ts). A whole workspace or organism
-    // stays with the creator-or-admin rule above.
-    const fenceTarget = archiveFenceTarget(v.target);
-    if (fenceTarget && v.target.ws) {
-      const session = callerOf(req, config.nodeId, storage);
-      const fenced = await fencedSpaceRefusal({ storage, config }, { principal: actor, roles: session.roles, scopes: session.scopes }, id, v.target.ws, fenceTarget);
-      if (fenced) { res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details)); return; }
-    }
-    try {
-      const result = mode === 'archive'
-        ? await archiveTarget(storage, v.target, actor)
-        : await unarchiveTarget(storage, v.target, actor);
-      res.json(success(config.nodeId, { [mode === 'archive' ? 'archived' : 'restored']: result.count, level: result.level, root: result.root }));
-      emitChange('organisms');
-      void updateOrganismStructure(storage, config, id, { event: `${v.target.level} ${mode}d`, actor }).catch(err => { logger.warn('archiveHandler: timeline best-effort', { error: String(err) }); });
-    } catch (e) {
-      res.status(400).json(error(config.nodeId, 'ARCHIVE_FAILED', (e as Error).message || `Could not ${mode}`));
-    }
+    res.json(success(config.nodeId, { [mode === 'archive' ? 'archived' : 'restored']: out.count, level: out.level, root: out.root }));
   };
 
   return {

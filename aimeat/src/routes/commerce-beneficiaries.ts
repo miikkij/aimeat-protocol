@@ -21,6 +21,9 @@
  *   POST /v1/commerce/beneficiary/release · GET+POST /v1/commerce/beneficiary/approvals
  * @usage app.use(commerceBeneficiariesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — POST /v1/commerce/beneficiary-splits calls declareSplit and both split routes answer
+ *     with splitView (commerce/beneficiary-split-declare.ts), which aimeat_commerce_beneficiary_split_set
+ *     uses too; a split now names its author, `created_by` (QA audit D2-08).
  *   v1.2.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): wallet:read on GET /v1/commerce/beneficiary/approvals. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-30 — Initial: declare / read / release / approve for the second rake.
@@ -32,10 +35,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
-import {
-  putSplit, deleteSplit, listSplitsByProvider,
-  BENEFICIARIES_MAX, type BeneficiarySplit, type BeneficiaryShare, type BeneficiaryRole,
-} from '../commerce/beneficiary-split.js';
+import { deleteSplit, listSplitsByProvider } from '../commerce/beneficiary-split.js';
+import { declareSplit, splitView } from '../commerce/beneficiary-split-declare.js';
 import {
   listBeneficiaryEntries, listBeneficiaryObligations, totalsOf, type BeneficiaryEntry,
 } from '../commerce/beneficiary-book.js';
@@ -46,27 +47,6 @@ import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/ben
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { operatorOverride } from '../services/operator-override.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
-
-/** What a split looks like on the wire. Snake-case, like every other commerce surface. */
-function splitView(s: BeneficiarySplit): Record<string, unknown> {
-  return {
-    split_id: s.splitId,
-    provider: s.providerGhii,
-    ext: s.ext,
-    action: s.action,
-    capability: s.capabilityLabel,
-    mode: s.mode,
-    pool_percent: s.poolPercent,
-    roles: s.roles.map(r => ({ role: r.role, percent: r.percent, ghii: r.ghii, note: r.note })),
-    /** One line a listing can show without the reader working it out. */
-    arrangement: describeSplit(s),
-    dynamic: s.dynamic,
-    state: s.state,
-    beneficiaries: s.beneficiaries.map(b => ({ ghii: b.ghii, weight: b.weight, note: b.note })),
-    created_at: s.createdAt,
-    updated_at: s.updatedAt,
-  };
-}
 
 function entryView(e: BeneficiaryEntry & { trackingCode: string }): Record<string, unknown> {
   return {
@@ -89,82 +69,6 @@ function entryView(e: BeneficiaryEntry & { trackingCode: string }): Record<strin
   };
 }
 
-/**
- * The arrangement in one sentence, derived from the record settlement actually reads.
- *
- * Derived rather than authored, so a listing cannot advertise a split the node would not honour. A
- * seller writing their own sentence here would be marketing; this is a description.
- */
-function describeSplit(s: BeneficiarySplit): string {
-  if (s.state !== 'active') return 'No revenue is shared at present.';
-  if (s.mode === 'roles') {
-    const named = s.roles.map(r => `${r.role} ${r.percent} %`).join(', ');
-    const open = s.roles.filter(r => !r.ghii).length;
-    return named
-      ? `${s.roles.length} roles, each paid its own share of the seller's revenue: ${named}.`
-        + (open ? ` ${open} of them are filled per sale.` : '')
-      : 'A role chain with no roles declared.';
-  }
-  if (s.poolPercent <= 0) return 'No revenue is shared at present.';
-  if (s.dynamic && !s.beneficiaries.length) {
-    return `${s.poolPercent} % of the seller's revenue is shared with the accounts each sale names.`;
-  }
-  const n = s.beneficiaries.length;
-  const weights = s.beneficiaries.map(b => b.weight).join(':');
-  return `${s.poolPercent} % of the seller's revenue is shared between ${n} account${n === 1 ? '' : 's'}`
-    + (n > 1 ? ` in the ratio ${weights}` : '')
-    + (s.dynamic ? ', plus any the sale itself names' : '') + '.';
-}
-
-/** Parse and validate the role rows. A chain that promises more than exists is refused outright. */
-function parseRoles(raw: unknown): { rows: BeneficiaryRole[] } | { bad: string } {
-  if (raw === undefined || raw === null) return { rows: [] };
-  if (!Array.isArray(raw)) return { bad: '`roles` must be an array' };
-  if (raw.length > BENEFICIARIES_MAX) return { bad: `At most ${BENEFICIARIES_MAX} roles per split` };
-  const rows: BeneficiaryRole[] = [];
-  const seen = new Set<string>();
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') return { bad: 'Each role must be an object' };
-    const { role, percent, ghii, note } = item as Record<string, unknown>;
-    if (typeof role !== 'string' || !role.trim()) return { bad: 'Each role needs a `role` name' };
-    if (seen.has(role)) return { bad: `Role "${role}" is declared twice` };
-    seen.add(role);
-    const pct = Number(percent);
-    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
-      return { bad: `Role "${role}" needs a \`percent\` between 0 and 100` };
-    }
-    if (ghii !== undefined && ghii !== null && (typeof ghii !== 'string' || ghii.indexOf('@') < 1)) {
-      return { bad: `Role "${role}" has a \`ghii\` that is not an owner GHII` };
-    }
-    rows.push({ role: role.trim(), percent: pct, ghii: (ghii as string) ?? null, note: typeof note === 'string' ? note : '' });
-  }
-  const total = rows.reduce((sum, r) => sum + r.percent, 0);
-  if (total > 100) {
-    return { bad: `The roles total ${total} % of your cut, which is more than you receive. `
-      + 'Each role takes its own percent independently, so they must total at most 100.' };
-  }
-  return { rows };
-}
-
-/** Parse and validate the beneficiary rows off a request body. Rejects rather than silently dropping. */
-function parseBeneficiaries(raw: unknown): { rows: BeneficiaryShare[] } | { bad: string } {
-  if (raw === undefined || raw === null) return { rows: [] };
-  if (!Array.isArray(raw)) return { bad: '`beneficiaries` must be an array' };
-  if (raw.length > BENEFICIARIES_MAX) return { bad: `At most ${BENEFICIARIES_MAX} beneficiaries per split` };
-  const rows: BeneficiaryShare[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== 'object') return { bad: 'Each beneficiary must be an object' };
-    const { ghii, weight, note } = item as Record<string, unknown>;
-    if (typeof ghii !== 'string' || ghii.indexOf('@') < 1) {
-      return { bad: 'Each beneficiary needs a `ghii` in the form owner@node-id' };
-    }
-    const w = weight === undefined ? 1 : Number(weight);
-    if (!Number.isFinite(w) || w <= 0) return { bad: `Weight for ${ghii} must be a positive number` };
-    rows.push({ ghii, weight: w, note: typeof note === 'string' ? note : '' });
-  }
-  return { rows };
-}
-
 export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -178,53 +82,15 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
    * money being given away has to be the giver's.
    */
   router.post('/v1/commerce/beneficiary-splits', requireAuth(), requireScope('exchange:beneficiary'), async (req: Request, res: Response) => {
-    const providerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
-    const body = (req.body ?? {}) as Record<string, unknown>;
-    const ext = typeof body.ext === 'string' ? body.ext.trim() : '';
-    const action = typeof body.action === 'string' ? body.action.trim() : '';
-    if (!ext || !action) {
-      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        'Name the metered coordinate this split applies to: `ext` and `action`'));
-    }
-
-    const mode = body.mode === 'roles' ? 'roles' : 'pool';
-    const dynamic = body.dynamic === true;
-
-    const roles = parseRoles(body.roles);
-    if ('bad' in roles) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', roles.bad));
-    const parsed = parseBeneficiaries(body.beneficiaries);
-    if ('bad' in parsed) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.bad));
-
-    let pool = 0;
-    if (mode === 'roles') {
-      if (!roles.rows.length) {
-        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-          'A role chain needs at least one role. Each role takes its own percent of your cut and they '
-          + 'total at most 100; an unfilled role simply pays nobody.'));
-      }
-    } else {
-      pool = Number(body.pool_percent);
-      if (!Number.isFinite(pool) || pool < 0 || pool > 100) {
-        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-          '`pool_percent` is the share of YOUR cut that goes to beneficiaries, 0-100'));
-      }
-      if (!parsed.rows.length && !dynamic) {
-        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-          'A split with no beneficiaries and no `dynamic: true` would divide nothing. Either list who '
-          + 'shares it, or set `dynamic: true` so the capability may name them per call.'));
-      }
-    }
-
-    const split = await putSplit(storage, {
-      providerGhii, ext, action,
-      capabilityLabel: typeof body.capability === 'string' ? body.capability : undefined,
-      mode, poolPercent: pool, beneficiaries: parsed.rows, roles: roles.rows, dynamic,
-      state: body.state === 'paused' ? 'paused' : 'active',
-      createdBy: resolveIdentity(req.auth!, config.nodeId),
-    });
+    // The validation, the author and the write are commerce/beneficiary-split-declare.ts, which
+    // aimeat_commerce_beneficiary_split_set calls too. The author is the calling principal.
+    const principal = resolveIdentity(req.auth!, config.nodeId);
+    const out = await declareSplit(storage, { providerGhii: ownerGhiiOf(principal), createdBy: principal },
+      (req.body ?? {}) as Record<string, unknown>);
+    if (!out.ok) return res.status(400).json(error(config.nodeId, out.code, out.message));
 
     return res.json(success(config.nodeId, {
-      split: splitView(split),
+      split: splitView(out.split),
       note: 'The pool is taken from YOUR cut, after the platform rake and never from the buyer\'s charge. '
         + 'Shares accrue on every settled call; releasing one needs the beneficiary to be verified.',
     }, [

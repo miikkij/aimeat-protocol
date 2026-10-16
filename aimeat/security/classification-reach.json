@@ -135,8 +135,7 @@
     "src/mcp/core.ts": {
       "reads": {
         "getMemory": 1,
-        "getOwnerScopeMemory": 2,
-        "listMemoryMeta": 3
+        "getOwnerScopeMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
@@ -149,7 +148,6 @@
     },
     "src/mcp/memory-extended.ts": {
       "reads": {
-        "searchText": 1,
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
@@ -499,12 +497,8 @@
       "reads": {
         "getStorageFile": 1,
         "getMemory": 1,
-        "memoryDb.listOwnerScopeMeta": 1,
-        "listMemoryMeta": 1,
         "memoryDb.listOwnerScope": 1,
-        "listMemory": 1,
-        "memoryDb.searchOwnerScope": 1,
-        "searchText": 1
+        "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
@@ -1708,6 +1702,15 @@
         "listAllMemoryMeta": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Value-free public metadata (keys, owners, tags)."
+    },
+    "src/services/memory-query.ts": {
+      "reads": {
+        "memoryDb.searchOwnerScope": 1,
+        "searchText": 1,
+        "memoryDb.listOwnerScopeMeta": 1,
+        "listMemoryMeta": 1
+      },
+      "why": "Reviewed 2026-10-16 (QA audit D2-06): the search and the metadata listing that GET /v1/memory, GET /v1/memory/search, aimeat_memory_list and aimeat_memory_search share, moved here from those four files; every caller passes the rows through the classification reader (reader.show, presentMemories) before any reaches the caller, as those files did."
     },
     "src/services/memory-replication.ts": {
       "reads": {

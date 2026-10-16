@@ -30,6 +30,10 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-10-16 — The per-item organism rule in writeWorkspaceDraftsOp carries the caller's extension
+ *     marker, so the named extension's draft write passes the fenced-space rule again; the 2026-10-15
+ *     check left it out and refused every ctx.workspace.write into a fenced space (found while
+ *     verifying QA audit D2-05).
  *   2026-10-15 — writeWorkspaceDraftsOp asks the organism rule for each item's real key, so the meta rule
  *     applies to a draft as it does to POST /v1/memory (feature-list audit 61).
  *   v1.11.1 — 2026-10-13 — The organism namespace rule is asked with the caller's scopes, which the
@@ -369,7 +373,7 @@ export async function writeWorkspaceDraftsOp(
     for (const [i, item] of resolved.entries()) {
         const key = `${root}.${item.namespace}.${item.instanceId}.draft`;
         const itemRefusal = await checkOrganismNamespaceAccess({ storage, config },
-            { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes }, key, 'write');
+            { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes, extension: caller.extension }, key, 'write');
         if (itemRefusal) return refuse(itemRefusal.status, itemRefusal.code, `${batch ? `items[${i}]: ` : ''}${itemRefusal.message}`);
     }
     const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];

@@ -6,6 +6,7 @@
  * @version-history
  *   2026-10-16 — PUT /:key refuses a change of an agent's live crew definition's browser site list
  *     unless the owner writes it in person (403 OWNER_APPROVES_SITES; QA audit F07b-02).
+ *   2026-10-16 — PUT /:key writes through services/memory-write.ts writeMemoryRecord: the archive guard and every after-write effect (workflow trigger, Tracked Response, EXCHANGE reconcile, ecosystem push, automation recipes) now run on an update too (QA audit D2-03, F05a-03).
  *   2026-10-15 — GET /:key with owner_scope or ?agent= naming a sibling: an agent without
  *     memory:read-as-owner gets another identity's record only when its visibility admits a same-owner
  *     reader, and 404 otherwise (feature-list audit #42).
@@ -63,16 +64,11 @@
  */
 
 import type { Router } from 'express';
-import type { AiProvenanceRecordRow } from '../../storage/interface.js';
 import { deleteMemoryRecord, restoreMemoryRecord } from '../../services/memory-bin.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryUpdateSchema, validateBody } from '../../models/schemas.js';
-import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
-import { validateMemoryWrite } from '../../services/schema-validator.js';
-import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
-import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
-import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
+import { writeMemoryRecord } from '../../services/memory-write.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { emitRecordChange } from '../../services/event-bus.js';
@@ -86,18 +82,14 @@ import { readerFor } from '../../services/classification/reader.js';
 import { warningField } from '../../services/classification-exits.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { registerPublicReadRoute } from './public-read.js';
-import { stampAgentWrite, resolveAttachableProvenanceId, storeHeldProvenance } from '../../services/ai-provenance.js';
 import { ownerGhiiOf, isForeignPrincipal, isOwnerInPerson } from '../../utils/gaii.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
-import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
-import { mediaKindOfValue } from '../../models/ai-provenance-schemas.js';
+import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
 import { logger } from '../../utils/logger.js';
-import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { rolesWithOperator } from '../../services/operator-override.js';
 import { recordOperatorAccess } from '../../services/operator-access-audit.js';
 import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
-import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
@@ -430,9 +422,6 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
         if (found) { existing = found; effectiveGaii = agent.gaii; break; }
       }
     }
-    // Read now, before anything below builds the new record: who is told about this update
-    // depends on who could read the record before it as well as after it.
-    const priorVisibility = existing?.visibility;
     if (!existing) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key not found: ${key}`));
       return;
@@ -451,148 +440,58 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    // The live crew definition's browser site list is the owner's to change, in person, here as on
-    // POST /v1/memory and the crew routes (QA audit F07b-02).
-    if (value !== undefined) {
-      const sites = await crewSitesWriteRefusal(storage, key, effectiveGaii, value, req.auth!);
-      if (sites) { res.status(403).json(error(config.nodeId, 'OWNER_APPROVES_SITES', sites)); return; }
-    }
-
-    // A workspace record whose space the workspace manifest does not declare is refused before the
-    // provenance stamp and the write below, with the same 422 POST /v1/memory answers (the
-    // developer's decision, 2026-09-13; services/workspace-write-items.ts). A record stored there
-    // before the decision can be read and deleted, and changed again once the space is declared.
-    if (key.startsWith('organism.')) {
-      const undeclared = await undeclaredSpaceForKey(storage, key, { audience: req.auth!.roles.includes('ecosystem') ? 'writer' : 'member' });
-      if (undeclared) {
-        res.status(undeclared.status).json(error(config.nodeId, undeclared.code, undeclared.message, undeclared.status, undeclared.details));
-        return;
-      }
-    }
-
-    // Per-value size limit & quota check — only when value is being changed
-    const effectiveValue = value !== undefined ? value : existing.value;
-    const newValueSize = Buffer.byteLength(JSON.stringify(effectiveValue), 'utf8');
-    const maxValueSize = config.memoryMaxValueSizeKb * 1024;
-    if (newValueSize > maxValueSize) {
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value size ${newValueSize} bytes exceeds limit of ${maxValueSize} bytes`));
-      return;
-    }
-
-    // M-1: Total memory quota check on update
-    const existingSize = Buffer.byteLength(JSON.stringify(existing.value), 'utf8');
-    const quotaCheck = await checkMemoryQuota(config, storage, effectiveGaii, newValueSize, existingSize);
-    if (!quotaCheck.allowed) {
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
-      return;
-    }
-
-    // Schema validation (Phase 0.1) — only when value is being changed
-    if (value !== undefined) {
-      const putValidation = await validateMemoryWrite(key, value, storage);
-      if (!putValidation.valid) {
-        res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
-          'Value does not match the schema for this key', 422, {
-          key,
-          violations: putValidation.errors,
-          schema_url: `/v1/memory/${encodeURIComponent(putValidation.schemaKey!)}/schema`,
-        }));
-        return;
-      }
-      // An EXCHANGE listing source whose changed text would break an ODPS length cap (2026-09-13).
-      const odps = odpsWriteRefusal(key, value, existing.value);
-      if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
-      const legacyPacing = legacyPacingWriteRefusal(key, value);
-      if (legacyPacing) { res.status(legacyPacing.status).json(error(config.nodeId, legacyPacing.code, legacyPacing.message)); return; }
-    }
-
-    const now = new Date().toISOString();
-    const effectiveVis = visibility ?? existing.visibility;
-    // MINT-3 (TARGET-058): a non-human principal that declares nothing is stamped, an owner is not.
-    // Only when the VALUE changes — a visibility or tag edit is not new content, and re-minting there
-    // would produce a second statement about bytes that already have one.
-    const newValue = value !== undefined ? value : existing.value;
-    // An explicitly supplied record wins, resolved against the caller's OWN account. Publishing a
-    // private record is done by attaching it to something public, so an unchecked id here would let
-    // a caller publish someone else's statement.
-    const attached = await resolveAttachableProvenanceId(storage, ownerGhiiOf(effectiveGaii), ai_provenance_id);
-    // A stamped record is HELD until the version-checked write below lands, and stored only then:
-    // the store is append-only, so a record about bytes a lost swap never stored could not be taken
-    // back (secaudit 2026-09, N2).
-    const held: AiProvenanceRecordRow[] = [];
-    const aiProvenanceId = attached
-      ?? (value !== undefined
-        ? await stampAgentWrite(storage, {
-          // The WRITER (`gaii`, the caller). `effectiveGaii` is the namespace the record lives in:
-          // an owner editing their agent's record is a person writing, and is not stamped.
-          principal: gaii,
-          content: memoryContentBytes(newValue),
-          mediaKind: mediaKindOfValue(newValue),
-          pipeline: 'memory.update',
-          surface: { visibility: effectiveVis, humanAudience: true },
-          labelPolicy: config.aiLabelPublic,
-          nodeId: config.nodeId,
-          baseUrl: config.baseUrl,
-          enabled: config.aiProvenance,
-          held,
-        })
-        : existing.aiProvenanceId);
-    const newRecord = {
+    // From here the write is the shared one (services/memory-write.ts), the same sequence POST
+    // /v1/memory and aimeat_memory_write run: the archive guard (record, workspace, organism), the
+    // undeclared-space refusal, the schema lock, the ODPS and legacy-pacing refusals, the three
+    // ceilings with the overage charge, the provenance statement, the version-checked write and
+    // everything a write sets off (Tracked Response, EXCHANGE reconcile, workflow trigger, ecosystem
+    // push, automation recipes, replication, live events). This route carried its own copy until
+    // 2026-10-16 and had none of the guard or the after-effects, so an archived record changed on a
+    // PUT, and an edit from the Memory page or AIMEAT.data.update() started no workflow (QA audit
+    // D2-03, F05a-03). What stays here is what only an update says: the record exists, its stored
+    // fields are the defaults for the fields left out, and `version` is required.
+    const who = callerOf(req, config.nodeId, storage);
+    const written = await writeMemoryRecord({
+      storage, config, peers, emitResourceUpdated, emitResourceListChanged, onDirectoryChange: ctx.onDirectoryChange, stats,
+      fromAgent: who.kind === 'agent',
+      ownerName: who.owner,
+    }, {
+      // The WRITER (`gaii`, the caller) is who provenance names; `effectiveGaii` is the namespace the
+      // record lives in, which differs when the owner edits an agent's record.
+      principal: gaii,
+      targetGaii: effectiveGaii,
+      scopes: [...who.scopes],
+      roles: [...who.roles],
+      federated: who.visitor,
+    }, {
       key,
-      ownerGaii: effectiveGaii,
-      value: newValue,
-      ...(aiProvenanceId ? { aiProvenanceId } : {}),
-      visibility: effectiveVis,
+      value: value !== undefined ? value : existing.value,
+      visibility: visibility ?? existing.visibility,
       tags: tags ?? existing.tags,
-      ttlHours: ttl_hours ?? existing.ttlHours,
-      version: existing.version + 1,
-      createdAt: existing.createdAt,
-      updatedAt: now,
-      ...(effectiveVis === 'group' && group_id ? { groupId: group_id } : {}),
-    };
-
-    // Use atomic version-checked update when available (prevents race conditions)
-    let record;
-    if (storage.setMemoryIfVersion) {
-      const result = await storage.setMemoryIfVersion(newRecord, version);
-      if (!result) {
+      ttlHours: ttl_hours ?? existing.ttlHours ?? null,
+      ...((visibility ?? existing.visibility) === 'group' && (group_id ?? existing.groupId) ? { groupId: group_id ?? existing.groupId } : {}),
+      ...((visibility ?? existing.visibility) === 'workspace' && existing.workspaceRef !== undefined ? { workspaceRef: existing.workspaceRef } : {}),
+      expectedVersion: version,
+      ...(ai_provenance_id ? { declaredProvenanceId: ai_provenance_id } : {}),
+      // A visibility or tag edit is not new content: the record keeps the statement it has.
+      valueUnchanged: value === undefined,
+      ...(existing.aiProvenanceId ? { keptProvenanceId: existing.aiProvenanceId } : {}),
+      pipeline: 'memory.update',
+      ownerScoped: effectiveGaii === ownerGhiiOf(effectiveGaii),
+    });
+    if (!written.ok) {
+      if (written.code === 'VERSION_CONFLICT') {
+        // The details this route has always answered a lost race with.
         const current = await storage.getMemory(effectiveGaii, key);
         res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',
           `Expected version ${version} but current is ${current?.version ?? 'unknown'}`,
           409, { current_version: current?.version, your_version: version }));
         return;
       }
-      record = result;
-    } else {
-      record = await storage.setMemory(newRecord);
+      res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, written.details));
+      return;
     }
-    // Landed: the record it names is stored now, before anything below reads or announces it.
-    await storeHeldProvenance(storage, held);
-    // Write-time classification (TARGET-082 V3), only when the value changed; scheduled, not awaited.
-    if (value !== undefined) classifyAfterWrite({ storage, config }, effectiveGaii, key, newValue);
-
-    // Who has had their hands on this key. `gaii` is the caller, `effectiveGaii` the namespace it
-    // lands in — an agent writing into its owner's store is both, and that is the difference the
-    // tally exists to hold.
-    recordMemoryTouch({ ownerGaii: effectiveGaii, key, writerPrincipal: gaii, kind: 'write' });
-
-    // C.3: Event-driven replication queue integration
-    if (peers) {
-      enqueueMemoryReplication(effectiveGaii, key, config, storage, peers).catch(err => {
-        // Non-critical for THIS request: the scheduled sync picks the record up later. Logged because an
-        // enqueue that keeps failing means replication runs only at sync cadence.
-        logger.warn('memory write: replication enqueue failed, leaving it to the scheduled sync', { error: String(err) });
-      });
-    }
-
-    // Charge overage morsels if over quota (§15)
-    if (quotaCheck.overageMorsels > 0) {
-      await chargeOverage(storage, effectiveGaii, quotaCheck.overageMorsels, 'memory_overage');
-    }
-
-    emitResourceUpdated(effectiveGaii, `aimeat://memory/${encodeURIComponent(key)}`);
-
-    stats?.increment('memory_writes');
+    const record = written.record;
 
     res.json(success(config.nodeId, {
       key: record.key,
@@ -602,10 +501,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       version: record.version,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
+      ...(written.warnings.length ? { warnings: written.warnings } : {}),
     }, [
       { description: 'Read this memory entry', method: 'GET', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
-    emitRecordChange('memory', record.ownerGaii, record.visibility, priorVisibility);
   });
 
   // ── CORS per-memory-key management ──

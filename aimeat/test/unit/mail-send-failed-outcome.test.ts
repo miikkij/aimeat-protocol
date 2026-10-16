@@ -15,6 +15,8 @@
  *   Each door is exercised with a sent outcome as well, so "everything is an error now" cannot pass.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mail-send-failed-outcome.test.ts
  * @version-history
+ *   2026-10-16 — The node tool takes the `mail:<record id>` aimeat_contact_add returns, and refuses
+ *     another owner's contact by either id (QA audit F12b-01).
  *   2026-10-15 — The node tool reads the owner's address book, so the contact and the log are the owner's (feature-list audit 129).
  *   v1.2.1 — 2026-10-05 — The connector case takes the tool from the whole connector: it is served over
  *     its CLI dispatch definition now (secaudit 2026-10, M3).
@@ -122,6 +124,23 @@ describe('node MCP aimeat_mail_send', () => {
         const out = await send({ contact_id: contactId, subject: 'Hei', body: 'Viesti.' });
         expect(out.isError ?? false).toBe(false);
         expect(JSON.parse(out.content[0].text).status).toBe('sent');
+    });
+
+    it('the mail: id aimeat_contact_add returns reaches the same contact', async () => {
+        setActiveEmailService(fakeSmtp(true));
+        const out = await send({ contact_id: `mail:${contactId}`, subject: 'Hei', body: 'Viesti.' });
+        expect(out.isError ?? false, out.content[0].text).toBe(false);
+        expect(JSON.parse(out.content[0].text).status).toBe('sent');
+    });
+
+    it('another owner\'s contact is NOT_FOUND by either id', async () => {
+        setActiveEmailService(fakeSmtp(true));
+        const other = (await ensureContact(storage, 'bob@test-node', { name: 'Toinen', email: 'toinen@example.com' })).id;
+        for (const id of [other, `mail:${other}`]) {
+            const out = await send({ contact_id: id, subject: 'Hei', body: 'Viesti.' });
+            expect(out.isError).toBe(true);
+            expect(out.content[0].text).toContain('NOT_FOUND');
+        }
     });
 });
 

@@ -5,6 +5,7 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   2026-10-16 — 17b-17d: GET /v1/agents/:name/skills refuses an app grant without memory:read and another owner's agent, and serves an app grant holding memory:read (QA audit P3-03).
  *   v1.5.0 -- 2026-10-16 -- Test 34 asked a '*' agent for words '*' covers and passed on the proposal,
  *     so it passed with the narrow-only guard removed; 34 and 34b now ask for a word the target lacks
  *     and accept only the refusal, and 33 presents the used token where only the single-use check can
@@ -68,7 +69,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 }
 
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
@@ -515,6 +516,76 @@ await test('17. A foreign agent cannot read this agent\'s skills', async () => {
         headers: { Authorization: `Bearer ${otherOwnerToken}` },
     });
     assert(status === 200 && body.data.skills.length === 0, `cross-owner leak: ${JSON.stringify(body.data)}`);
+});
+
+// QA audit P3-03: only the agent role was confined to its own record, so an app grant or an
+// ecosystem app of the owner read every agent's linked skills holding no scope at all, while
+// GET /v1/skills asks memory:read for the same data. The route now asks memory:read too.
+const APP_FILE = 'skills-scope-probe.html';
+const APP_REDIRECT = 'http://localhost:9911/callback';
+let appPublished = false;
+/** An app-grant token of owner A holding exactly `scope` (the app declares nothing, so the default set applies). */
+async function appGrantToken(scope: string): Promise<string> {
+    if (!appPublished) {
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({
+                filename: APP_FILE, content: Buffer.from('<!DOCTYPE html><html><body>probe</body></html>').toString('base64'),
+                name: 'Skills Scope Probe', description: 'skills scope probe app', category: 'utility',
+            }),
+        });
+        assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body)}`);
+        appPublished = true;
+    }
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const q = new URLSearchParams({
+        app: `${ownerName}/${APP_FILE}`, response_type: 'code', scope,
+        redirect_uri: APP_REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const m = /req=([^&]+)/.exec(res.headers.get('location') ?? '');
+    assert(!!m, `expected a consent redirect, got ${res.status} ${res.headers.get('location')}`);
+    const con = await json('/v1/app-grants/authorize-consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ request_id: decodeURIComponent(m![1]) }),
+    });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: APP_REDIRECT }),
+    });
+    assert(tok.body.ok === true, `app token: ${JSON.stringify(tok.body.error)}`);
+    const claims = JSON.parse(Buffer.from(String(tok.body.data.access_token).split('.')[1], 'base64url').toString());
+    assert(JSON.stringify(claims.scopes) === JSON.stringify([scope]), `the grant holds exactly ${scope}: ${JSON.stringify(claims.scopes)}`);
+    return tok.body.data.access_token as string;
+}
+
+await test('17b. An app grant without memory:read cannot read an agent\'s linked skills (403)', async () => {
+    const token = await appGrantToken('storage:read');
+    const { status, body } = await json(`/v1/agents/${agentName}/skills`, { headers: { Authorization: `Bearer ${token}` } });
+    assert(status === 403, `expected 403, got ${status} ${JSON.stringify(body.data ?? body.error)}`);
+    assert(body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${body.error?.code}`);
+    assert(!JSON.stringify(body).includes('Research briefs'), 'the refusal carries no skill body');
+});
+
+await test('17c. An app grant holding memory:read reads them, as GET /v1/skills allows it', async () => {
+    const token = await appGrantToken('memory:read');
+    const { status, body } = await json(`/v1/agents/${agentName}/skills`, { headers: { Authorization: `Bearer ${token}` } });
+    assert(status === 200, `expected 200, got ${status} ${JSON.stringify(body.error)}`);
+    assert(body.data.skills.length === 1 && body.data.skills[0].fileContents['SKILL.md'].includes('Research briefs'), `the linked skill: ${JSON.stringify(body.data)}`);
+});
+
+await test('17d. Another owner\'s agent holding memory:read cannot read this agent\'s skills (cross-owner)', async () => {
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ name: 'skills-foreign-reader', owner: otherOwnerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+    });
+    assert(reg.status === 201, `create foreign agent: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const foreignToken = await getToken(reg.body.data.agent.gaii, reg.body.data.private_key);
+    const { status, body } = await json(`/v1/agents/${agentName}/skills`, { headers: { Authorization: `Bearer ${foreignToken}` } });
+    assert(status === 403, `expected 403, got ${status} ${JSON.stringify(body.data ?? body.error)}`);
+    assert(!JSON.stringify(body).includes('Research briefs'), 'the refusal carries no skill body');
 });
 
 await test('18. Deleting a linked skill surfaces as unresolved, never silently dropped', async () => {

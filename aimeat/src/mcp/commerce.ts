@@ -20,6 +20,10 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-16 — aimeat_commerce_beneficiary_split_set calls declareSplit
+ *     (commerce/beneficiary-split-declare.ts), the validation and write POST /v1/commerce/beneficiary-splits
+ *     uses: the author is the calling agent, not its owner, a refusal is INVALID_INPUT, and pool mode
+ *     needs pool_percent, as on REST (QA audit D2-08).
  *   2026-10-16 — aimeat_commerce_psp_delete refuses with SCREEN_ONLY and the Wallet page link, as psp_set
  *     does: removing the payment secret is the owner's act in person (decision D5), and DELETE
  *     /v1/commerce/payout/stripe, which the connector and CLI tools call, refuses every agent. The two
@@ -96,7 +100,8 @@ import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_R
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
-import { putSplit, deleteSplit, listSplitsByProvider, type BeneficiaryShare } from '../commerce/beneficiary-split.js';
+import { deleteSplit, listSplitsByProvider } from '../commerce/beneficiary-split.js';
+import { declareSplit } from '../commerce/beneficiary-split-declare.js';
 import { listBeneficiaryEntries, listBeneficiaryObligations, totalsOf } from '../commerce/beneficiary-book.js';
 import { readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare } from '../commerce/beneficiary-release.js';
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
@@ -486,33 +491,14 @@ export function registerCommerceTools(
         zodShapeFor('aimeat_commerce_beneficiary_split_set'),
         annotationsFor('aimeat_commerce_beneficiary_split_set'),
         async ({ ext, action, mode, pool_percent, roles, beneficiaries, dynamic, capability, state }) => {
-            const rows: BeneficiaryShare[] = (beneficiaries ?? []).map(b => ({
-                ghii: b.ghii, weight: b.weight ?? 1, note: b.note ?? '',
-            }));
-            const bad = rows.find(b => b.ghii.indexOf('@') < 1);
-            if (bad) return fail(`INVALID_GHII: "${bad.ghii}" is not an owner GHII (owner@node-id)`);
-            const chain = (roles ?? []).map(r => ({
-                role: r.role, percent: r.percent, ghii: r.ghii ?? null, note: r.note ?? '',
-            }));
-            const useRoles = (mode ?? 'pool') === 'roles';
-            if (useRoles) {
-                if (!chain.length) return fail('EMPTY_CHAIN: a role chain needs at least one role.');
-                const total = chain.reduce((sum, r) => sum + r.percent, 0);
-                if (total > 100) {
-                    return fail(`ROLES_EXCEED_CUT: the roles total ${total} % of your cut, which is more than `
-                        + 'you receive. Each role takes its own percent independently, so they must total at most 100.');
-                }
-            } else if (!rows.length && !dynamic) {
-                return fail('EMPTY_SPLIT: a split with no beneficiaries and no dynamic:true would divide nothing. '
-                    + 'Either list who shares it, or set dynamic:true so the capability may name them per call.');
-            }
-            const split = await putSplit(storage, {
-                providerGhii: ownerGhii, ext, action, capabilityLabel: capability,
-                mode: useRoles ? 'roles' : 'pool',
-                poolPercent: useRoles ? 0 : (pool_percent ?? 0),
-                beneficiaries: rows, roles: chain, dynamic: dynamic ?? false,
-                state: state ?? 'active', createdBy: ownerGhii,
+            // The validation, the author and the write POST /v1/commerce/beneficiary-splits uses
+            // (commerce/beneficiary-split-declare.ts). The author is this session's agent; the split
+            // is written for its owner. A refusal is INVALID_INPUT, as on REST.
+            const out = await declareSplit(storage, { providerGhii: ownerGhii, createdBy: caller().principal }, {
+                ext, action, mode, pool_percent, roles, beneficiaries, dynamic, capability, state,
             });
+            if (!out.ok) return fail(`${out.code}: ${out.message}`);
+            const split = out.split;
             return ok({
                 split,
                 note: 'The pool is taken from YOUR cut, after the platform rake and never from the buyer\'s charge. '

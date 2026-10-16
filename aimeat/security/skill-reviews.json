@@ -240,12 +240,12 @@
       "digest": "sha256:dd9043a9af536df9721672a2"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-16",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:999b0d292852561cd860130e"
+      "digest": "sha256:75578545eb3e5fb6970d4591"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-11",
@@ -341,7 +341,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:4fe6d1863b5a365ddfedd137",
+      "digest": "sha256:e67448ec6c62883ce8035eb8",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -388,11 +388,11 @@
       "digest": "sha256:d69beca32c17c758bd59892c"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-10-12",
+      "reviewedOn": "2026-10-16",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:c1f252675f49a723ca502fa2"
+      "digest": "sha256:67ead2b7d0fa3b8a3ba49e01"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-09-19",
@@ -591,7 +591,7 @@
       "aimeat/src/mcp/core-admin.ts": "a2a0d28e157ccf1c"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "3b160b6e3411439a",
+      "aimeat/src/mcp/core.ts": "a5c97c287a3965de",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "6c99c1ceb71f40ad"
     },
     "node:manage-my-profile-data": {
@@ -614,7 +614,7 @@
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "dfed3aba0d306b43"
+      "aimeat/src/routes/skills.ts": "f1792d9f4df59235"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
@@ -718,13 +718,13 @@
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "ae4637931ecd008e",
-      "aimeat/src/routes/memory/key.ts": "e64e7a898cc210ab",
+      "aimeat/src/routes/memory/key.ts": "bc4ae2e72f0b7f5c",
       "aimeat/src/services/memory-bin.ts": "337c889faa2e6b75",
       "aimeat/src/routes/memory-hands.ts": "7c9bde91c26c70cc",
       "aimeat/src/routes/owners/export.ts": "86ef0669d00f4040",
       "aimeat/src/services/owner-erasure.ts": "91e2def6acaa1aa2",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
-      "aimeat/src/mcp/organisms.ts": "6f9dfe9706755abe"
+      "aimeat/src/mcp/organisms.ts": "a900557ce46b4962"
     },
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "6e3452ba7d0e746f",

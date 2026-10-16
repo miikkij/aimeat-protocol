@@ -12,6 +12,10 @@
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
+ *   2026-10-16 — aimeat_organism_archive runs organismArchiveOp (services/organism-archive-op.ts), the
+ *     operation POST /v1/organisms/:id/archive runs: the role comes from archiveRoleOf, so an attached
+ *     agent of the creator is refused as on REST, the archive writes the organism timeline entry, and
+ *     a refusal reads `CODE: message` (QA audit D2-08).
  *   2026-10-15 — The name-invite group gets the session caller, so accepting asks for the person in
  *     person (feature-list audit #57).
  *   2026-10-15 — aimeat_organism_create with a shape answers `workspaces_not_created` beside `workspaces` (feature-list audit #56).
@@ -85,8 +89,7 @@ import { importOrganism } from '../services/organism-import.js';
 import { registerOrganismNameInviteTools } from './organisms-name-invites.js';
 import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
 import { searchOrganismContent } from '../services/organism-search.js';
-import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../services/archive.js';
-import { archiveFenceTarget, fencedSpaceRefusal } from '../services/fenced-space.js';
+import { organismArchiveOp } from '../services/organism-archive-op.js';
 import { canAccessWorkspaceComments, addComment, listComments, deleteComment } from '../services/organism-comments.js';
 import { toolError } from './tool-error.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
@@ -452,52 +455,22 @@ export function registerOrganismsTools(
     );
 
     // ── Tool: aimeat_organism_archive ── (archive/unarchive content; read-only + hidden from AI)
+    // The operation is services/organism-archive-op.ts, the one POST /v1/organisms/:id/archive runs:
+    // creator or admin by archiveRoleOf (an ATTACHED organism agent is a member there, and refused,
+    // whoever its owner is), the target check, the fenced-space rule, the archive, the change event
+    // and the organism timeline entry. This tool renders the answer as text.
     mcp.tool(
         'aimeat_organism_archive',
         descriptionFor('aimeat_organism_archive'),
         zodShapeFor('aimeat_organism_archive'),
         annotationsFor('aimeat_organism_archive'),
         async ({ organism_id, action, level, ws, namespace, key }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            const ownerName = getOwnerName();
-            // Creator/admin only — archiving is a structural, destructive-adjacent op that hides
-            // content from every AI-facing surface.
-            //
-            // An ATTACHED organism agent is deliberately NOT enough, and used to be: attaching one
-            // needs only that its owner be a member (routes/organisms/membership.ts), so any plain
-            // member's agent could archive the whole organism, a workspace or a single record over
-            // MCP. The HTTP door maps an attached agent to role 'member' and then demands creator or
-            // admin (routes/organisms/shared.ts memberRole), which refuses it. The role also comes
-            // from an ACTIVE membership row there, so it is read the same way here.
-            const membership = await storage.getMembership(organism_id, ownerName);
-            const role = membership?.status === 'active' ? membership.role : null;
-            const isAdmin = role === 'creator' || role === 'admin';
-            if (!isAdmin) return { content: [{ type: 'text' as const, text: `Only the creator or an admin can ${action} organism content` }], isError: true };
-            // Validate required fields per level (mirrors the REST validator).
-            if ((level === 'workspace' || level === 'space' || level === 'record') && !ws) return { content: [{ type: 'text' as const, text: 'ws is required for workspace/space/record' }], isError: true };
-            if (level === 'space' && !namespace) return { content: [{ type: 'text' as const, text: 'namespace is required for level "space"' }], isError: true };
-            if (level === 'record') {
-                if (!key) return { content: [{ type: 'text' as const, text: 'key is required for level "record"' }], isError: true };
-                if (!key.startsWith(`organism.${organism_id}.w.${ws}.`)) return { content: [{ type: 'text' as const, text: 'key must be inside organism.{id}.w.{ws}.' }], isError: true };
-            }
-            const target = { level: level as ArchiveLevel, orgId: organism_id, ws, namespace, key };
-            // A record or a space of a record space that names extensions is archived, or brought
-            // back, for an agent only through one of them (services/fenced-space.ts): archiving
-            // takes a record out of every read, which is a change to what the app shows.
-            const fenceTarget = archiveFenceTarget(target);
-            if (fenceTarget && ws) {
-                const session = caller();
-                const fenced = await fencedSpaceRefusal({ storage, config }, { principal: session.principal, roles: session.roles, scopes: session.scopes }, organism_id, ws, fenceTarget);
-                if (fenced) return toolError(fenced.code, fenced.message);
-            }
-            try {
-                const result = action === 'archive' ? await archiveTarget(storage, target, agentGaii) : await unarchiveTarget(storage, target, agentGaii);
-                emitChange('organisms');
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ action, level: result.level, [action === 'archive' ? 'archived' : 'restored']: result.count, root: result.root }, null, 2) }] };
-            } catch (e) {
-                return withCaughtError({ content: [{ type: 'text' as const, text: `Could not ${action}: ${(e as Error).message}` }], isError: true }, e);
-            }
+            const session = caller();
+            const out = await organismArchiveOp({ storage, config },
+                { principal: session.principal, ownerName: getOwnerName(), roles: session.roles, scopes: session.scopes },
+                organism_id, action, { level, ws, namespace, key });
+            if (!out.ok) return { ...toolError(out.code, out.message) };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ action, level: out.level, [action === 'archive' ? 'archived' : 'restored']: out.count, root: out.root }, null, 2) }] };
         },
     );
 

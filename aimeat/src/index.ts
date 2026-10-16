@@ -18,6 +18,7 @@
  * @version-history v1.26.0 — 2026-07-10 — Emit securityPostureWarnings() at startup so a public-profile node flags risky settings.
  * @version-history v1.27.0 — 2026-07-13 — Extract help text, `connect` dispatch, and `start`/`serve` runtime into index-help/index-connect/index-start (max-file-lines).
  * @version-history v1.28.0 — 2026-09-28 — `aimeat init --install-set <file> [--install-set-secrets <file>]`: the install set the node applies at start-up.
+ * @version-history v1.30.0 — 2026-10-16 — A setting the node does not accept stops every command but validate, init and config with a plain message (QA audit D8-02, P6-03, D6-02).
  * @version-history v1.30.0 — 2026-10-16 — `aimeat backup` and `aimeat restore` send an operator's personal access token (--token or AIMEAT_OP_TOKEN, cli/backup-restore.ts), read the answer and exit 1 on a refusal without writing a file; `--url` reaches a running node; the `Bearer operator:<password>` form, which no auth path read, is gone (QA audit P6-07, F19b-01). `aimeat join` exits 1 when it did not join (QA audit F5-06).
  * @version-history v1.29.0 — 2026-10-09 — `aimeat config export --format consul --include-secrets`: the Consul export leaves the secret rows out without the flag (secrets audit 2026-10-09, S3).
  */
@@ -27,6 +28,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from './server.js';
 import { loadConfig } from './config.js';
+import { ConfigStartError } from './config-start-check.js';
 import { logger } from './utils/logger.js';
 import { HELP_TEXT, CONNECT_HELP_TEXT } from './index-help.js';
 import { runConnectCli } from './index-connect.js';
@@ -151,11 +153,25 @@ if (consulFlag) {
 if (consulPrefixFlag) cliOverrides['consul.prefix'] = consulPrefixFlag;
 if (consulTokenFlag) cliOverrides['consul.token'] = consulTokenFlag;
 
-const { config, envKeys, fileKeys, cliKeys, fileName } = loadConfig({
-  configPath: stringFlag(values.config),
-  cliOverrides: Object.keys(cliOverrides).length > 0 ? cliOverrides : undefined,
-});
 const subcommand = positionals[0];
+// `validate`, `init` and `config` exist to show or repair a broken environment, so they load it
+// without the start check; every other command refuses a setting the node does not accept.
+const loaded = (() => {
+  try {
+    return loadConfig({
+      configPath: stringFlag(values.config),
+      cliOverrides: Object.keys(cliOverrides).length > 0 ? cliOverrides : undefined,
+      checkSettings: !['validate', 'check', 'init', 'config'].includes(subcommand ?? ''),
+    });
+  } catch (err) {
+    if (err instanceof ConfigStartError) {
+      console.error(`\n[AIMEAT] ${err.message}\n`);
+      process.exit(1);
+    }
+    throw err;
+  }
+})();
+const { config, envKeys, fileKeys, cliKeys, fileName } = loaded;
 
 // Handle subcommands
 if (subcommand === 'config') {
