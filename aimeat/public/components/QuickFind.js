@@ -12,9 +12,11 @@
  *   Label).
  * @structure QuickFind({ value, onInput, placeholder, hint, groups, busy, busyLabel, emptyLabel, onPick })
  * @usage html`<${QuickFind} value=${q} onInput=${setQ} placeholder=${…} hint=${…}
- *   groups=${[{ key: 'orgs', label: t('organisms.title'), items: [{ key, mark: '🏢', label, sub, snippet }] }]}
+ *   groups=${[{ key: 'orgs', label: t('organisms.title'), items: [{ key, label, sub, snippet, meta }] }]}
  *   busy=${busy} busyLabel=${…} emptyLabel=${nothing ? t('search.noMatches') : null} onPick=${open} />`
  * @version-history
+ *   v1.1.0 — 2026-10-16 — An item's `meta`: the ids that address it (a key, a workspace id), in
+ *     typewriter letters under the snippet (Jouni: "ID:tkin olla näkyvillä jollain tavalla").
  *   v1.0.0 — 2026-09-27 — Initial: the command palette's list (views/command-palette.js, .cmdk*) as
  *     a component with its keys and its choice (page group G9).
  */
@@ -29,7 +31,7 @@ import { Label } from '/components/Mark.js';
 const html = htm.bind(h);
 
 /**
- * `groups`: [{ key, label, items: [{ key, mark, label, sub, snippet, …the page's own data }] }]; a
+ * `groups`: [{ key, label, items: [{ key, mark, label, sub, snippet, meta, …the page's own data }] }]; a
  * group with no items is not drawn. `onPick(item)` gets the item as the page gave it. `emptyLabel`:
  * the words when nothing was found (the page passes them only when a search has run).
  */
@@ -64,6 +66,7 @@ export function QuickFind({ value, onInput, placeholder, hint, groups = [], busy
         <span class="quick-find-label">${it.mark ? `${it.mark} ` : ''}${it.label}</span>
         ${it.sub ? html`<span class="quick-find-sub">${it.sub}</span>` : null}
         ${it.snippet ? html`<span class="quick-find-snippet">${it.snippet}</span>` : null}
+        ${it.meta ? html`<span class="quick-find-meta">${it.meta}</span>` : null}
       </button>`;
   };
 
