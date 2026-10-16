@@ -18,6 +18,9 @@
  *   StatsBlock · TransparencyBlock · PortalTextBlock · PortalBoardBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   v1.4.0 — 2026-10-16 — portal.text and portal.board show the AI label a passage or a post owes
+ *     (components/ai-label.js): the passage's record from /v1/provenance/:id, each post's from its
+ *     own `ai_provenance`. They showed none.
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.3.0 — 2026-09-14 — Seven V2* blocks: the front page as the message frame says it (TARGET-075).
  *   v1.2.0 — 2026-08-30 — portal.board shows a notice's category and its poster's name beside the
@@ -31,6 +34,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useShared } from '/views/surface/shared-read.js';
 import { Markdown } from '/components/Markdown.js';
+import { AiLabel } from '/components/ai-label.js';
 import { Gallery, StatsPanel } from '/views/landing-wall.js';
 import { BuildInvite } from '/views/landing-builder.js';
 import { WishBox, ConnectInvite, BuildHero } from '/views/landing-doors.js';
@@ -132,11 +136,15 @@ export function TransparencyBlock(/** @type {{ ctx?: any, props?: Record<string,
 export function PortalTextBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {}, title }) {
   const key = typeof props.key === 'string' ? props.key.trim() : '';
   const { data } = useShared(`portal-text:${key}`, key ? `/v1/memory/__site__/${encodeURIComponent(key)}` : '',
-    ['site'], (d) => (typeof d?.value === 'string' ? d.value : ''));
-  if (!data) return null;
+    ['site'], (d) => (typeof d?.value === 'string' ? { text: d.value, provenanceId: d.ai_provenance_id || '' } : null));
+  // The passage's record, decided for the public page it is on: the AI label it owes.
+  const recordPath = data?.provenanceId ? `/v1/provenance/${encodeURIComponent(data.provenanceId)}` : '';
+  const { data: record } = useShared(`portal-text-record:${data?.provenanceId || ''}`, recordPath, ['site'], (d) => d?.provenance ?? null);
+  if (!data?.text) return null;
   return html`
     <${TextBlock} title=${title}>
-      <${Markdown} text=${data} />
+      <${AiLabel} variant="block" record=${record} recordUrl=${recordPath ? `${location.origin}${recordPath}` : ''} />
+      <${Markdown} text=${data.text} />
     <//>`;
 }
 
@@ -227,6 +235,7 @@ export function PortalBoardBlock(/** @type {{ ctx?: any, props?: Record<string, 
             <div class="board-post-meta">
               ${p.author_gaii ? html`<span>${who(p.author_gaii)}</span>` : ''}
               ${p.created_at ? html`<time datetime=${p.created_at}>${String(p.created_at).slice(0, 10)}</time>` : ''}
+              <${AiLabel} record=${p.ai_provenance?.record} recordUrl=${p.ai_provenance?.record_url} />
             </div>
             <p>${p.body}</p>
           </article>`)}

@@ -14,6 +14,9 @@
  * @structure PublicWorkspaceViewer (default export)
  * @usage route /v1/publicworkspaceviewer?org=<id>&ws=<ws>[&type=<space>&id=<docId>]
  * @version-history
+ *   v1.5.0 — 2026-10-16 — Each page shows the AI label its record says it owes (components/ai-label.js):
+ *     above a Markdown page, and in the strip of an HTML page's frame. The read carried the record
+ *     and nothing drew it.
  *   v1.4.0 — 2026-10-16 — An HTML page renders in its frame (components/HtmlPageFrame.js) from the
  *     frame_url the read hands out, with Report for a signed-in visitor. A Markdown page's own
  *     pictures load for whoever the share admits (?share= on /v1/pub, with the read's headers).
@@ -42,6 +45,7 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
 import { HtmlPageFrame } from '/components/HtmlPageFrame.js';
+import { AiLabel } from '/components/ai-label.js';
 
 const html = htm.bind(h);
 
@@ -338,8 +342,11 @@ export default function PublicWorkspaceViewer() {
           ? visibleDocs.map(d => html`
               <article class="pwv-doc" id=${anchorId(d)} data-pwv-key=${docKey(d)}>
                 ${d.kind === 'html'
-                  ? html`<${HtmlPageFrame} src=${d.frame_url || null} title=${d.title || ''} text=${d.markdown || ''} onReport=${() => reportPage(d)} />`
-                  : html`<${SharedMarkdown} org=${org} ws=${ws} doc=${d} readHeaders=${readHeaders} onWikiLink=${onWikiLink} />`}
+                  ? html`<${HtmlPageFrame} src=${d.frame_url || null} title=${d.title || ''} text=${d.markdown || ''} onReport=${() => reportPage(d)}
+                      provenance=${d.ai_provenance ? { record: d.ai_provenance.record, recordUrl: d.ai_provenance.record_url } : null} />`
+                  : html`
+                    <${AiLabel} variant="block" record=${d.ai_provenance?.record} recordUrl=${d.ai_provenance?.record_url} />
+                    <${SharedMarkdown} org=${org} ws=${ws} doc=${d} readHeaders=${readHeaders} onWikiLink=${onWikiLink} />`}
               </article>
             `)
           : html`<div class="pwv-state">${t('pwv.selectDocument') || 'Select a document.'}</div>`

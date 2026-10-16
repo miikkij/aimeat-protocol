@@ -16,6 +16,8 @@
  * @structure
  *   - resolveShare() · readShareMetaOf() · redactShareOf() — the share as stored, as decided, as shown
  *   - isDocPublicAt() — does the share open this page now
+ *   - shareIsOpen() · shareServedVisibility() — whether what the share opens counts as public for
+ *     the AI label (EU AI Act Art. 50(4)) and the compliance counts
  *   - memberRoleOf() — the caller's active role in the organism (the share routes' membership check)
  *   - publicViewerPath() — the address a person opens a shared workspace or page at
  *   - setWorkspaceShareOp() — validate, merge, default the end dates, store, announce
@@ -23,6 +25,9 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.1.0 — 2026-10-16 — shareIsOpen and shareServedVisibility: the one rule for whether a share's
+ *     pages are public when a label is decided, used by the share routes, the member read, the page
+ *     host, shared files and the compliance counts.
  *   v1.0.0 — 2026-10-16 — Moved out of routes/organisms/shared.ts (readShareMeta, redactShare,
  *     memberRole) and routes/organisms/workspace-ops.ts (the PUT body) so the MCP tool runs the same
  *     code; `until` and the HTML page default are new.
@@ -81,6 +86,21 @@ export function isDocPublicAt(share: ResolvedShare, typeName: string, docId: str
     if (docKey in share.docs) return !!share.docs[docKey] && !ended(share.until[docKey], nowMs);
     if (typeName in share.spaces) return !!share.spaces[typeName] && !ended(share.until[`space:${typeName}`], nowMs);
     return !!share.public && !ended(share.until['*'], nowMs);
+}
+
+/**
+ * Does this share serve its pages to anyone who has the link? An open share does; a password or a
+ * sign-in narrows who may read. The same rule GET /v1/provenance/:id and the hash lookup use
+ * (services/share-provenance.ts), so a page's label, its record and the compliance counts
+ * agree about one page.
+ */
+export function shareIsOpen(share: Pick<ResolvedShare, 'access'>): boolean {
+    return share.access === 'open';
+}
+
+/** The visibility a label is decided against for what this share serves. */
+export function shareServedVisibility(share: Pick<ResolvedShare, 'access'>): 'public' | 'private' {
+    return shareIsOpen(share) ? 'public' : 'private';
 }
 
 /** The caller's active role in the organism: an organism agent is a member, a person by their membership. */

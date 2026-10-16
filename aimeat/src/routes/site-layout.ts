@@ -26,6 +26,9 @@
  * @structure siteLayoutRouter(config, storage)
  * @usage Mounted from siteRouter() so it inherits the site family's LB guard.
  * @version-history
+ *   v1.2.0 — 2026-10-16 — The layout reads carry `freeform_provenance`: each passage's provenance block,
+ *     so the front page and the home show the AI label a passage owes. The passages' records were
+ *     dropped here.
  *   v1.1.0 — 2026-10-08 — The passage declaration is validated (400 on a block that does not parse)
  *     and carries the session's scopes; the layout import refuses a declaration the writer may not
  *     make, and one record id for more than one passage, before the first surface is written (aiprov E9).
@@ -40,6 +43,7 @@ import { success, error } from '../middleware/envelope.js';
 import { SiteError } from '../services/site.js';
 import { SurfaceLayoutService, type LayoutSubmission, type PassageProvenance } from '../services/surface-layout/service.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { blocksForSurface, defaultLayout, operatorLabelKey } from '../services/surface-layout/registry.js';
@@ -97,6 +101,22 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
         };
     }
 
+    /**
+     * The layout as a page reads it: the passages' words, and beside them each passage's provenance
+     * block (`freeform_provenance`, keyed like `freeform`), with the label it owes decided as the
+     * passage is stored (a portal passage is public).
+     */
+    async function readLayoutBody(resolved: Awaited<ReturnType<SurfaceLayoutService['resolve']>>) {
+        const { text, provenance } = await svc.readFreeformWithProvenance(resolved.layout);
+        const served = await loadServedProvenanceMany(storage, config, Object.values(provenance));
+        const marks: Record<string, unknown> = {};
+        for (const [key, id] of Object.entries(provenance)) {
+            const block = provenanceItemBlock(served.get(id));
+            if ('ai_provenance' in block) marks[key] = block.ai_provenance;
+        }
+        return { ...layoutBody(resolved, text), freeform_provenance: marks };
+    }
+
     function layoutBody(resolved: Awaited<ReturnType<SurfaceLayoutService['resolve']>>, freeform: Record<string, string>) {
         return {
             layout: resolved.layout,
@@ -110,9 +130,8 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
     // GET /v1/site/layout/portal — public: the SPA reads this before anyone has signed in.
     router.get('/v1/site/layout/portal', async (_req, res) => {
         const resolved = await svc.resolve('portal');
-        const freeform = await svc.readFreeform(resolved.layout);
         // A visitor is not the audience for a repair note; the operator reads those in the admin tab.
-        res.json(success(config.nodeId, { ...layoutBody(resolved, freeform), problems: [] }));
+        res.json(success(config.nodeId, { ...await readLayoutBody(resolved), problems: [] }));
     });
 
     // GET /v1/site/layout/:surface — a member surface, for a signed-in reader.
@@ -120,8 +139,7 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
         const surface = surfaceOf(req, res);
         if (!surface) return;
         const resolved = await svc.resolve(surface);
-        const freeform = await svc.readFreeform(resolved.layout);
-        res.json(success(config.nodeId, layoutBody(resolved, freeform)));
+        res.json(success(config.nodeId, await readLayoutBody(resolved)));
     });
 
     // PUT /v1/site/layout/:surface — store a layout. Refuses in full or writes in full.

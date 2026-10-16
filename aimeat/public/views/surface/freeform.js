@@ -13,9 +13,10 @@
  *
  *   The heading is the operator's own words when they set any, and otherwise nothing: a block with
  *   an invented title reads as a section of the product rather than as something a person wrote.
- * @structure FreeformBlock({ text, props, title })
- * @usage html`<${FreeformBlock} text=${passage} props=${block.props} title=${heading} />`
+ * @structure FreeformBlock({ text, props, title, provenance })
+ * @usage html`<${FreeformBlock} text=${passage} props=${block.props} title=${heading} provenance=${block} />`
  * @version-history
+ *   2026-10-16: `provenance`, the passage's record from the layout read: the AI label it owes.
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
@@ -24,14 +25,17 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { Markdown } from '/components/Markdown.js';
 import { FreeText } from '/components/FreeText.js';
+import { AiLabel } from '/components/ai-label.js';
 
 /** Nothing to say, nothing rendered — the rule every block on these pages follows. */
-export function FreeformBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { text, props = {}, title = '' }) {
+export function FreeformBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string, provenance?: any }} */ { text, props = {}, title = '', provenance = null }) {
   const body = typeof text === 'string' ? text.trim() : '';
   if (!body) return null;
   const tone = props.tone === 'plain' || props.tone === 'band' ? props.tone : 'card';
+  // The passage's AI label, from the layout read's `freeform_provenance` (drawn only when one is owed).
   return html`
     <${FreeText} tone=${tone} title=${title}>
+      <${AiLabel} variant="block" record=${provenance?.record} recordUrl=${provenance?.record_url} />
       <${Markdown} text=${body} />
     <//>`;
 }

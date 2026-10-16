@@ -9,6 +9,7 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.8.1 — 2026-10-16 — HtmlPageFrame takes `provenance` (the AI label in its strip) and `author`.
  *   v1.8.0 — 2026-10-16 — HtmlPageFrame (components/HtmlPageFrame.js): a workspace's HTML page in its
  *     frame from the page host, with the strip the page cannot reach.
  *   v1.7.0 — 2026-10-06 — StoreDoor's discount code (code, StoreSoonCode, .store-soon-ask, .store-soon-code);
@@ -170,7 +171,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         summary: 'A workspace\'s HTML page in its frame: the page runs sandboxed on the node\'s page host, and the strip above it says a user made it, offers Full screen and Report, and shows a link the page asked to open until the person presses Open. Without a frame address it shows the page\'s text.',
         module: '/components/HtmlPageFrame.js', sheet: '/css/components/html-page-frame.css',
         data: {
-            shape: 'HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error })',
+            shape: 'HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author })',
             fields: {
                 src: 'the frame address the node gave (frame_url), or none',
                 title: 'the page title, for the frame',
@@ -179,6 +180,8 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
                 reportHint: 'the line under Report',
                 loading: 'true while the frame address is fetched',
                 error: 'what went wrong, in words',
+                provenance: "the page's record { record, recordUrl }: the AI label in the strip, drawn only when one is owed",
+                author: 'who made the page, for the workspace\'s members only; a visitor reads that a user made it',
             },
         },
         useFor: ['An HTML page of a workspace, in the member view and the public viewer.'],

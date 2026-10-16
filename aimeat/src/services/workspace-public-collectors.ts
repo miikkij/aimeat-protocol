@@ -1,5 +1,5 @@
 /**
- * @file src/routes/organisms/shared-public.ts
+ * @file src/services/workspace-public-collectors.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The published content a workspace share hands out, and the member read of a
@@ -14,6 +14,11 @@
  *   // … the share gate …
  *   const docs = await found.release(readerFor({ storage, config }, req.auth));
  * @version-history
+ *   v1.5.0 — 2026-10-16 — Moved from routes/organisms/shared-public.ts unchanged, so the share's
+ *     decision can be asked from a service and an MCP tool too (services/share-provenance.ts, the
+ *     compliance counts); a service may not import a route.
+ *   v1.4.0 — 2026-10-16 — docsToMarkdown takes each document's provenance note, written under its
+ *     heading: the whole-workspace Markdown carried none.
  *   v1.3.0 — 2026-10-16 — A share's end dates count (isDocPublicAt). An HTML page is handed out with
  *     `kind`, `namespace` and `html`, from which the route makes its frame address. One page asked
  *     for by id is read by its key instead of listing its whole space.
@@ -24,17 +29,17 @@
  *     refused visitor writes no audit row. What leave() keeps back is logged by key.
  *   v1.0.0 — 2026-09-29 — Moved from routes/organisms/shared.ts, with the classification reader.
  */
-import type { AimeatConfig } from '../../config.js';
-import type { Storage, MemoryRecord } from '../../storage/interface.js';
-import { readWorkspaceMetaRecord } from '../../services/workspace-meta.js';
-import { memoryTarget } from '../../services/classification/labels.js';
-import type { ContentReader } from '../../services/classification/reader.js';
-import { leftOutOf } from '../../services/classification-exits.js';
-import { logger } from '../../utils/logger.js';
-import { isDocPublicAt } from '../../services/workspace-share.js';
-import { findWorkspaceRecord } from '../../services/workspace-write.js';
-import { isHtmlPageValue } from '../../services/html-page.js';
-import type { ResolvedShare, PublicDoc, PublicRecord } from './share-types.js';
+import type { AimeatConfig } from '../config.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
+import { readWorkspaceMetaRecord } from './workspace-meta.js';
+import { memoryTarget } from './classification/labels.js';
+import type { ContentReader } from './classification/reader.js';
+import { leftOutOf } from './classification-exits.js';
+import { logger } from '../utils/logger.js';
+import { isDocPublicAt } from './workspace-share.js';
+import { findWorkspaceRecord } from './workspace-write.js';
+import { isHtmlPageValue } from './html-page.js';
+import type { ResolvedShare, PublicDoc, PublicRecord } from '../routes/organisms/share-types.js';
 
 /** What a public read found, held until the share's access gate has admitted the caller. */
 export interface SharePending<O> {
@@ -167,11 +172,21 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
   ): Promise<SharePending<PublicRecord>> =>
     pending((await collectWsRecordsWithSource(id, ws, filter)).filter(f => isDocPublic(share, f.out.type, f.out.id)), id, ws, f => f.out);
 
-  /** Render a list of public docs as a single markdown document (for ?format=md). */
-  const docsToMarkdown = (wsName: string | undefined, docs: PublicDoc[]): string => {
+  /**
+   * Render a list of public docs as a single markdown document (for ?format=md). `noteOf` gives a
+   * document's provenance note (services/ai-provenance-marks.ts provenanceMarkdownNote), written
+   * under its heading so an AI handed the text is told how each page was made.
+   */
+  const docsToMarkdown = (wsName: string | undefined, docs: PublicDoc[], noteOf?: (d: PublicDoc) => string): string => {
     const parts: string[] = [];
     if (wsName) parts.push(`# ${wsName}\n`);
-    for (const d of docs) { parts.push(`## ${d.title}\n`); parts.push(d.markdown.trim()); parts.push('\n---\n'); }
+    for (const d of docs) {
+      parts.push(`## ${d.title}\n`);
+      const note = noteOf?.(d);
+      if (note) parts.push(`${note}\n`);
+      parts.push(d.markdown.trim());
+      parts.push('\n---\n');
+    }
     return parts.join('\n');
   };
 

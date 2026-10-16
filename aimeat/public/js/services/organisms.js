@@ -13,6 +13,7 @@
  *   `getConfigStrict`, …, in organisms.records.js) through readForWrite (/js/load-state.js), so a
  *   failed read stops the write (docs/pitfalls.md section 84).
  * @version-history
+ *   v1.13.0 — 2026-10-16 — writeDraft takes the person's `aiProvenance` declaration.
  *   v1.12.0 — 2026-10-16 — The share carries `until`, its end dates.
  *   v1.11.0 — 2026-10-16 — The registry, config, colour and source reads and writes move to
  *     organisms.records.js (max-file-lines) with a strict read beside each forgiving one, re-exported
@@ -646,9 +647,17 @@ export async function removeSpace(orgId, wsId, manifest, typeName) {
   return saveManifest(orgId, wsId, { ...manifest, objectTypes: (manifest.objectTypes || []).filter(o => o.name !== typeName) });
 }
 
-/** Write/overwrite an object's draft (`…w.{wsId}.{namespace}.{id}.draft`). */
-export async function writeDraft(orgId, wsId, namespace, instanceId, value) {
-  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.${namespace}.${instanceId}.draft`, value, visibility: 'private' });
+/**
+ * Write/overwrite an object's draft (`…w.{wsId}.{namespace}.{id}.draft`). `aiProvenance`, when
+ * given, is the person's declaration of how it was made (js/page-authorship.js).
+ * @param {{ aiProvenance?: Record<string, unknown> }} [opts]
+ */
+export async function writeDraft(orgId, wsId, namespace, instanceId, value, opts = {}) {
+  const { aiProvenance } = opts;
+  return apiPost('/v1/memory', {
+    key: `${wsRoot(orgId, wsId)}.${namespace}.${instanceId}.draft`, value, visibility: 'private',
+    ...(aiProvenance ? { ai_provenance: aiProvenance } : {}),
+  });
 }
 
 /** Publish a draft → new version + latest (or a pending approval if the publish gate is on). */

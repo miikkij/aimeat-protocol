@@ -2463,7 +2463,8 @@
         "owner-this-node-only": "Solo lo que hiciste aquí. Todo lo que publicaste en otro lugar, en otra instalación o en la tuya propia, queda fuera de estas cifras.",
         "owner-your-slice": "Solo lo tuyo. Nada en esta página describe la actividad de otra persona, y nadie más ve la tuya aquí.",
         "owner-register-is-the-operators": "El registro de para qué se usa la IA lo mantiene quien administra esta instalación, no tú. Abajo están las entradas que nombran tu cuenta. Si falta algo tuyo, eso es una conversación con esa persona y no algo que puedas arreglar aquí.",
-        "owner-provenance-off": "El registro está desactivado en esta instalación, y eso no lo configuraste tú. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no hayas hecho nada."
+        "owner-provenance-off": "El registro está desactivado en esta instalación, y eso no lo configuraste tú. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no hayas hecho nada.",
+        "shares-open-only": "Aquí cuenta como pública una página de un espacio de trabajo compartida con un enlace abierto. Una página compartida con contraseña o solo con cuentas que iniciaron sesión no cuenta: quienes la leen no son el público en general, así que no necesita la etiqueta de IA y no se cuenta como pública."
       },
       "gapFonts": "Fuentes sin datos de licencia",
       "toFonts": "A Fuentes"
@@ -22917,11 +22918,17 @@
   "places.kw.admin.genesis": "pares",
   "places.kw.admin.design-lab": "componentes, biblioteca de interfaz, diseño",
   "places.kw.admin.themes": "fuentes, colores, tema, estilo, paleta",
+  "aiDeclare": {
+    "htmlPage": "Una IA hizo esta página",
+    "document": "Una IA escribió esta página",
+    "hint": "Cuando la página se comparte con un enlace abierto, quienes la leen ven la etiqueta de IA, como lo exige la Ley de IA de la UE."
+  },
   "pageFrame": {
     "loading": "Cargando la página…",
     "loadFailed": "No se pudo cargar la página.",
     "noHost": "Este servicio aún no muestra páginas HTML, así que la página se muestra como texto.",
     "madeByUser": "Una página hecha por un usuario. Funciona aparte y no puede acceder a tu cuenta.",
+    "madeBy": "{name} hizo esta página. Funciona aparte y no puede acceder a tu cuenta.",
     "fullScreen": "Pantalla completa",
     "report": "Denunciar",
     "reported": "Gracias. Quienes gestionan este servicio revisarán la página.",

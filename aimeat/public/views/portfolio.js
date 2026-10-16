@@ -5,6 +5,8 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.7.0 — 2026-10-16 — The page shows the AI label its record says it owes above the frame; the
+ *     read carried the record and nothing drew it (the portfolio's own address has its chip).
  *   v1.6.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and
  *     attributes itself, so a display name, bio, promoted app name or pitch with a quote or an
  *     ampersand showed as &quot; / &amp;. The srcdoc path is unchanged.
@@ -57,6 +59,7 @@ import { onAuthChange } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
 import { PortfolioBuilder } from './portfolio/builder.js';
 import { swallowed } from '/js/swallowed.js';
+import { AiLabel } from '/components/ai-label.js';
 
 
 /* ── Viewer Component ── */
@@ -234,6 +237,7 @@ function PortfolioViewer({ username, navigate }) {
           </button>
         </div>
         ${promotedBlock}
+        <${AiLabel} variant="block" record=${data.ai_provenance?.record} recordUrl=${data.ai_provenance?.record_url} />
         <iframe ref=${frameRef} class="portfolio-viewer-frame portfolio-viewer-frame-full"
           srcdoc=${stampCspNonce(data.portfolio_html)} sandbox="allow-scripts"
           onLoad=${(e) => postAuthState(e.target.contentWindow)}></iframe>

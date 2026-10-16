@@ -6,6 +6,7 @@
  *   record describes its markdown (aiprov E4, E13).
  * @usage pnpm test -- memory-content-canonical
  * @version-history
+ *   v1.1.0 — 2026-10-16 — An HTML page's record describes its html.
  *   v1.0.0 — 2026-10-08 — Initial (aiprov E4, E13).
  */
 import { describe, it, expect } from 'vitest';
@@ -60,6 +61,11 @@ describe('memoryContentHashes', () => {
 describe('documentContentBytes', () => {
     it('is a document\'s markdown, the text its reader is served', () => {
         expect(documentContentBytes({ title: 'T', markdown: '# Hello\n\nBody.' })).toBe('# Hello\n\nBody.');
+    });
+
+    it('is an HTML page\'s html, the document the page host serves, not the text derived from it', () => {
+        const html = '<!doctype html><title>Q4</title><h1>Q4</h1>';
+        expect(documentContentBytes({ title: 'Q4', html, markdown: '# Q4' })).toBe(html);
     });
 
     it('falls back to the canonical value for anything without markdown', () => {

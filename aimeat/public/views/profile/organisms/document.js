@@ -9,6 +9,9 @@
  * @structure loadToastUI (internal), DocumentView, DocumentEditor
  * @usage import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
  * @version-history
+ *   v1.12.0 — 2026-10-16 — The view shows the AI label the page owes (it draws only for a page that is
+ *     public, such as one on an open share). The editor asks whether an AI wrote the page and saves
+ *     the answer as its provenance (js/page-authorship.js).
  *   v1.11.0 — 2026-09-26 — Every part is a library component that takes data: the view is DocView
  *     (components/DocView.js: its bar, the Tabs of the two versions, Edit, Publish and the window icon,
  *     the three dates as Facts, the text framed only in the document's own window: `inPage` leaves it
@@ -62,6 +65,9 @@ import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { FileDrop } from '/components/FileDrop.js';
+import { Check } from '/components/Check.js';
+import { AiLabel } from '/components/ai-label.js';
+import { recordedAsAiMade } from '/js/page-authorship.js';
 import { FormActions } from '/components/Field.js';
 import { Spinner } from '/components/Spinner.js';
 import { Row as Line, Stack } from '/components/Layout.js';
@@ -164,6 +170,7 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
 
   return html`
     <${DocView} title=${shown.title || shown.id || page.id} tools=${tools} facts=${facts} framed=${!inPage} onClick=${onDocClick}>
+      <${AiLabel} variant="block" record=${shown._aiProvenance} recordUrl=${shown._aiProvenanceUrl} />
       <${TabPanel} value=${hasBoth ? tab : 'only'}><${Markdown} text=${rendered} onWikiLink=${onWikiLink} /><//>
     <//>`;
 }
@@ -183,6 +190,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [images, setImages] = useState([]);                // embedded /v1/storage images: [{key, alt, visibility}]
   const [imgBusy, setImgBusy] = useState(false);
+  const [aiMade, setAiMade] = useState(recordedAsAiMade(page));   // saved as the page's provenance (js/page-authorship.js)
 
   // Load the visibility of the document's already-saved /v1/storage images, so the author can make
   // them public (a private image won't load for other viewers of a shared/published document).
@@ -306,7 +314,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       // for any viewer), private → /v1/storage/<key> (owner-only). So a public document's images render.
       const visByKey = {}; for (const im of images) visByKey[im.key] = im.visibility;
       markdown = orgService.applyImageVisibilityUrls(markdown, visByKey, orgService.currentGhii());
-      onSave({ ...page, title: title.trim(), markdown });
+      onSave({ ...page, title: title.trim(), markdown, aiMade });
     } finally { setSaving(false); }
   };
 
@@ -340,6 +348,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
               value=${md} onInput=${setMd} />
             <${Box} scroll packed><${Markdown} text=${md} /><//>
           <//>`}
+      <${Check} checked=${aiMade} onChange=${setAiMade} hint=${t('aiDeclare.hint')}>${t('aiDeclare.document')}<//>
       <${FormActions}>
         <${Loud} control onClick=${save} disabled=${busy || saving || !title.trim()}>
           ${saving ? html`<${Spinner} /> ${t('organisms.saving') || 'Saving…'}` : (t('organisms.saveDraft') || 'Save draft')}

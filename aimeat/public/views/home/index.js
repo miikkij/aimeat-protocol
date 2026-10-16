@@ -16,6 +16,7 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-10-16: The layout's passages carry their records (freeformProvenance), for the AI label.
  *   2026-09-27: "Sign in" is the Loud component and the failure line the ToastBox (held, said as a
  *     status), the same markup; the page writes no class (page group G9, a move).
  *   2026-09-23: The page is composed from library components (PageFrame, PageIntro, ErrorNote,
@@ -153,6 +154,7 @@ export default function HomeView({ navigate }) {
       <${SurfaceRenderer}
         layout=${surface.layout}
         freeform=${surface.freeform}
+        freeformProvenance=${surface.freeformProvenance}
         ctx=${ctx}
         locale=${getLocale()} />
       <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}

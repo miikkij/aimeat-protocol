@@ -10,6 +10,7 @@
  *   live-updates on its own (profile.js, which normally bridges SSE, is not mounted here).
  * @structure DocSolo (default export)
  * @version-history
+ *   2026-10-16 — The page shows its AI label (the views draw it), and a save carries the editor's "An AI made this" declaration.
  *   2026-10-16 — An HTML page opens in its frame and is edited as HTML (views/profile/organisms/html-page.js).
  *   2026-10-16 — A failed read says the document could not be loaded, with Retry, instead of
  *     "Document not found." (QA audit F6-02).
@@ -31,6 +32,7 @@ import * as orgService from '/js/services/organisms.js';
 import { DocumentView, DocumentEditor } from './profile/organisms/document.js';
 import { HtmlPageView, HtmlPageEditor } from './profile/organisms/html-page.js';
 import * as htmlPages from '/js/services/html-pages.js';
+import { aiDeclarationFor } from '/js/page-authorship.js';
 import { SoloWindow } from '/components/SoloWindow.js';
 import { ToastBox } from '/components/Toast.js';
 import { swallowed } from '/js/swallowed.js';
@@ -97,8 +99,8 @@ export default function DocSolo() {
     try {
       // An HTML page goes through the drafts route, which checks it and writes its text.
       const r = typeof page.html === 'string'
-        ? await htmlPages.writeHtmlPage(org, ws, ot.name, docId, { title: page.title, html: page.html, ...(page.files ? { files: page.files } : {}) })
-        : await orgService.writeDraft(org, ws, ot.namespace, docId, { id: docId, title: page.title, markdown: page.markdown });
+        ? await htmlPages.writeHtmlPage(org, ws, ot.name, docId, { title: page.title, html: page.html, ...(page.files ? { files: page.files } : {}) }, { aiProvenance: aiDeclarationFor(page) })
+        : await orgService.writeDraft(org, ws, ot.namespace, docId, { id: docId, title: page.title, markdown: page.markdown }, { aiProvenance: aiDeclarationFor(page) });
       if (r?.ok === false) showToast(r?.error?.message || (t('organisms.docRejected') || 'Document rejected'));
       else { showToast(t('organisms.pageSaved') || 'Document saved'); await load(); setMode('view'); }
     } catch (e) { showToast((e && e.message) || 'Failed to save'); }

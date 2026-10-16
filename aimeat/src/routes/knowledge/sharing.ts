@@ -6,6 +6,8 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-16 — The export carries `entry_provenance`: each exported entry's provenance block,
+ *     keyed like `entry_data`, so the public knowledge viewer labels an entry an AI wrote.
  *   v1.3.0 — 2026-10-13 — The pacing amount is sharing.toll_morsels: the PATCH write-back, the clone
  *     and the export use the new name, and a manifest stored with sharing.morsel_price is answered
  *     under it (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
@@ -36,6 +38,7 @@ import { logger } from '../../utils/logger.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { loadServedProvenanceMany, provenanceItemBlock } from '../../services/ai-provenance-marks.js';
 
 /** The classification address of a package record (manifest or entry). */
 const targetOfRecord = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
@@ -377,6 +380,14 @@ export function registerSharingRoutes(
       const entryName = entry.key.split('/').pop() ?? entry.key;
       entryData[entryName] = record.value;
     }
+    // Each entry's own provenance, keyed like `entry_data`: an entry an AI wrote is labelled where
+    // it is shown (the public knowledge viewer), and an importer keeps how it was made.
+    const entryRecords = await loadServedProvenanceMany(storage, config, exported.map(x => x.record.aiProvenanceId));
+    const entryProvenance: Record<string, unknown> = {};
+    for (const { entry, record } of exported) {
+      const block = provenanceItemBlock(record.aiProvenanceId ? entryRecords.get(record.aiProvenanceId) : undefined);
+      if ('ai_provenance' in block) entryProvenance[entry.key.split('/').pop() ?? entry.key] = block.ai_provenance;
+    }
 
     const exportData = {
       aimeat_knowledge_package: true,
@@ -394,6 +405,7 @@ export function registerSharingRoutes(
         entries: entriesToExport,
       },
       entry_data: entryData,
+      ...(Object.keys(entryProvenance).length ? { entry_provenance: entryProvenance } : {}),
       trust_advisory: 'This knowledge was shared by another user. Verify critical information independently before relying on it.',
     };
 

@@ -32,6 +32,9 @@
  * @structure pageHostRouter(config, storage) — GET /p/_/holder.js · GET/HEAD /p/:token/{*path} (the holder, index.html, the page's files)
  * @usage app.use(pageHostRouter(config, storage)); // only answers on the page host
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The page and each of its files carry their provenance (the AI-Disclosure and
+ *     Link headers; in the page, the machine-readable marks), decided as public while an open share
+ *     serves the page. They carried none.
  *   v1.0.0 — 2026-10-16 — Initial (HTML pages in workspaces).
  */
 import { Router, type Request, type Response } from 'express';
@@ -39,7 +42,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { verifyPageFrameToken, PageFrameTokenError, type PageFrameClaims } from '../services/page-frame-token.js';
 import { findWorkspaceRecord } from '../services/workspace-write.js';
-import { readShareMetaOf, isDocPublicAt, publicViewerPath } from '../services/workspace-share.js';
+import { readShareMetaOf, isDocPublicAt, publicViewerPath, shareIsOpen } from '../services/workspace-share.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+import { applyServeMarks } from '../services/app-serve-marks.js';
 import {
     isHtmlPageValue, pageFrameCsp, pageHolderCsp, pageOriginOf, pageFileNameOk, isServablePageFileType, PAGE_PERMISSIONS_POLICY,
 } from '../services/html-page.js';
@@ -106,7 +111,7 @@ async function pageFile(
 /**
  * The classification reader on a page's file (TARGET-082): the page host holds no session, so the
  * reader is the anonymous one, and a shared page's file must also be allowed to leave the organism,
- * as the share's own content is (routes/organisms/shared-public.ts). A file it keeps back answers as
+ * as the share's own content is (services/workspace-public-collectors.ts). A file it keeps back answers as
  * absent.
  */
 async function passesClassification(
@@ -165,10 +170,18 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
         const key = `organism.${claims.org}.w.${claims.ws}.${claims.ns}.${claims.id}.${claims.r}`;
         const rec = await findWorkspaceRecord(storage, key);
         if (!rec || !isHtmlPageValue(rec.value)) { sendText(res, 404, 'This page is no longer here.'); return; }
-        if (claims.k === 'pub' && !isDocPublicAt(await readShareMetaOf(storage, config, claims.org, claims.ws), claims.sp, claims.id)) {
+        const share = await readShareMetaOf(storage, config, claims.org, claims.ws);
+        const sharedNow = isDocPublicAt(share, claims.sp, claims.id);
+        if (claims.k === 'pub' && !sharedNow) {
             sendText(res, 404, 'This page is no longer shared.');
             return;
         }
+        // The AI label of the page and of its files is decided for the page as it stands: public while
+        // an open share serves it to anyone (services/workspace-share.ts shareIsOpen), as the viewer's
+        // own answer decides it. The member's frame and the public one say the same.
+        const openNow = sharedNow && shareIsOpen(share);
+        const served = (provenanceId: string | null | undefined) => loadServedProvenance(storage, config, provenanceId,
+            openNow && provenanceId ? { alsoPublic: new Set([provenanceId]) } : undefined);
 
         if (isHolder) {
             const holder = pageFrameHolderHtml();
@@ -185,7 +198,12 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
         common(res, csp);
 
         if (isPage) {
-            const buf = withPageFrameShim(rec.value.html);
+            // The machine-readable marks ride on the page (the AI-Disclosure and Link headers, and in
+            // the document its meta, link and JSON-LD), as on an app; the visible label is the strip
+            // around the frame (components/HtmlPageFrame.js), which the page cannot draw over.
+            const prov = await served(rec.aiProvenanceId);
+            setProvenanceHeaders(res, prov);
+            const buf = withPageFrameShim(prov ? applyServeMarks(rec.value.html, { provenance: prov, isDocument: true }).toString('utf-8') : rec.value.html);
             res.setHeader('Content-Type', 'text/html; charset=utf-8');
             res.setHeader('Cache-Control', 'private, no-store');
             res.setHeader('Content-Length', String(buf.length));
@@ -197,6 +215,9 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
         const ref = pageFileNameOk(path) ? files[path] : undefined;
         const file = typeof ref === 'string' ? await pageFile({ storage, config }, rec.ownerGaii, ref, claims) : null;
         if (!file || !isServablePageFileType(file.mimeType)) { sendText(res, 404, 'Not found'); return; }
+        // A picture's own record, decided like the page: a generated image owes its label where the page is public.
+        setProvenanceHeaders(res, await loadServedProvenance(storage, config, file.aiProvenanceId,
+            openNow && file.aiProvenanceId ? { alsoPublic: new Set([file.aiProvenanceId]) } : undefined));
         res.setHeader('Content-Type', file.mimeType);
         res.setHeader('Cache-Control', 'private, max-age=300');
         res.setHeader('Content-Length', String(file.data.length));

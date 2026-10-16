@@ -573,11 +573,17 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Draft reopen copies internally, collapse deletes, and the organism meta.config."
     },
-    "src/routes/organisms/shared-public.ts": {
+    "src/services/workspace-public-collectors.ts": {
       "reads": {
         "listAllMemory": 2
       },
-      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
+      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. Moved from src/routes/organisms/shared-public.ts unchanged on 2026-10-16."
+    },
+    "src/services/design-book/part-provenance.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reads only the key and the provenance record id of the Design Book's own public part rows (the node's system identity), never their content, so the read routes can serve each part's AI label."
     },
     "src/routes/organisms/shared.ts": {
       "reads": {

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Connector provenance checks extracted unchanged from the disclosure gate.
  * @version-history
+ *   v1.4.0 -- 2026-10-16 -- ENVELOPE_PROVENANCE_ROUTES names src/routes/designbook.ts (one part's record).
  *   v1.3.0 -- 2026-10-08 -- ENVELOPE_PROVENANCE_ROUTES names src/routes/ai-voice.ts (the ?json=1 voice result).
  *   v1.2.1 -- 2026-10-08 -- ENVELOPE_PROVENANCE_ROUTES names the public share read of one document
  *     (routes/organisms/workspace-ops.ts), which serves meta.provenance since aiprov E1.
@@ -196,6 +197,10 @@ const ENVELOPE_PROVENANCE_ROUTES: Record<string, string> = {
     'GET /v1/organisms/:id/workspace/public/document, the anonymous share read of one page — no '
     + 'connector tool wraps it; the document also carries its record as the `ai_provenance` block in '
     + 'data, which survives `resp.data ?? resp` (aiprov E1, 2026-10-08).',
+  'src/routes/designbook.ts':
+    'GET /v1/designbook/:id, one Design Book part — shell path and connector MCP: aimeat_designbook_get '
+    + 'over its CLI dispatch definition, folded inside withProvenanceCarrying. The part also carries its '
+    + 'record as the `ai_provenance` block in data (2026-10-16).',
   'src/routes/ai-voice.ts':
     'POST /v1/ai/speak?json=1 and /v1/ai/stream?json=1 — shell path and connector MCP: aimeat_voice_speak '
     + 'and aimeat_voice_reply over their CLI dispatch definitions, folded inside withProvenanceCarrying. '

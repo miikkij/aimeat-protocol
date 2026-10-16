@@ -7,6 +7,10 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.20.0 -- 2026-10-16 -- The share routes decide each item's AI label for the reader the share
+ *     serves (shareServedVisibility: public on an open share); it was decided as private, so an
+ *     AI-made page on an open link owed no label. ?format=md carries each page's provenance note.
+ *     The member records read counts what an open share serves as public (shareOpenedIdsOf).
  *   v1.19.0 -- 2026-10-16 -- PUT …/workspace/share runs setWorkspaceShareOp (services/workspace-share.ts),
  *     the code the MCP tool aimeat_workspace_share runs; the share takes end dates (`until`). The
  *     public document reads give an HTML page its `frame_url` (services/page-frame.ts) and record
@@ -71,7 +75,7 @@ import { resolveIdentity, parseGaiiLoose, isSameOwner, localAccountName } from '
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { verifyPassword } from '../../services/password.js';
-import { setWorkspaceShareOp, type SetShareBody } from '../../services/workspace-share.js';
+import { setWorkspaceShareOp, shareServedVisibility, type SetShareBody } from '../../services/workspace-share.js';
 import { servePublicDocs } from '../../services/page-frame.js';
 import { markPageOpened, markPagesOpened } from '../../services/workspace-opened.js';
 import { generateShareToken, shareTokenVersionOf, SHARE_TOKEN_TTL_SECONDS } from '../../services/share-token.js';
@@ -87,8 +91,8 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
-import { withItemProvenance } from './share-provenance.js';
-import { loadServedProvenance, setProvenanceHeaders, envelopeMeta } from '../../services/ai-provenance-marks.js';
+import { withItemProvenance, shareOpenedIdsOf } from '../../services/share-provenance.js';
+import { loadServedProvenance, loadServedProvenanceMany, setProvenanceHeaders, envelopeMeta, provenanceMarkdownNote } from '../../services/ai-provenance-marks.js';
 import type { OrganismHelpers } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
@@ -439,15 +443,19 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const docs = await found.release(readerFor({ storage, config }, req.auth));
     if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
     void markPagesOpened(storage, config, id, ws, docs.map(d => ({ space: d.type, id: d.id })));
+    // Each label is decided for the reader this share serves: public on an open share.
+    const surface = { visibility: shareServedVisibility(share) };
     if (req.query.format === 'md') {
       const entry = await findWsEntry(id, ws);
-      res.type('text/markdown; charset=utf-8').send(docsToMarkdown(entry?.name, docs));
+      const prov = await loadServedProvenanceMany(storage, config, docs.map(d => d.aiProvenanceId), { surface });
+      res.type('text/markdown; charset=utf-8').send(docsToMarkdown(entry?.name, docs,
+        d => provenanceMarkdownNote(d.aiProvenanceId ? prov.get(d.aiProvenanceId) : undefined)));
       return;
     }
     // Each document carries its own record, `ai_provenance` (aiprov E1): a page of documents is
     // not one piece of content, so there is no page-level header. An HTML page carries its frame
     // address, minted here because this caller has just passed the share's gate.
-    const served = await servePublicDocs(config, await withItemProvenance(storage, config, docs), { orgId: id, ws, withHtml: false });
+    const served = await servePublicDocs(config, await withItemProvenance(storage, config, docs, { surface }), { orgId: id, ws, withHtml: false });
     res.json(success(config.nodeId, { organism_id: id, ws, documents: served }));
   });
 
@@ -468,15 +476,18 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const [doc] = await found.release(readerFor({ storage, config }, req.auth));
     if (!doc) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
     // ONE document is one piece of content: its record rides the AI-Disclosure and Link headers in
-    // both formats, `meta.provenance` and the item's block in JSON (aiprov E1).
-    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId);
+    // both formats, `meta.provenance` and the item's block in JSON (aiprov E1), and its note in the
+    // Markdown body. The label is decided for the reader this share serves.
+    const surface = { visibility: shareServedVisibility(share) };
+    const prov = await loadServedProvenance(storage, config, doc.aiProvenanceId, { surface });
     setProvenanceHeaders(res, prov);
     void markPageOpened(storage, config, id, ws, doc.type, doc.id);
     if (req.query.format === 'md') {
-      res.type('text/markdown; charset=utf-8').send(`# ${doc.title}\n\n${doc.markdown.trim()}\n`);
+      const note = provenanceMarkdownNote(prov);
+      res.type('text/markdown; charset=utf-8').send(`# ${doc.title}\n\n${note ? `${note}\n\n` : ''}${doc.markdown.trim()}\n`);
       return;
     }
-    const [served] = await servePublicDocs(config, await withItemProvenance(storage, config, [doc]), { orgId: id, ws, withHtml: true });
+    const [served] = await servePublicDocs(config, await withItemProvenance(storage, config, [doc], { surface }), { orgId: id, ws, withHtml: true });
     res.json(success(config.nodeId, { organism_id: id, ws, document: served }, undefined, envelopeMeta(prov)));
   });
 
@@ -529,7 +540,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       res.type('text/calendar; charset=utf-8').send(feed.ics);
       return;
     }
-    res.json(success(config.nodeId, { organism_id: id, ws, records: await withItemProvenance(storage, config, records) }));
+    res.json(success(config.nodeId, { organism_id: id, ws, records: await withItemProvenance(storage, config, records, { surface: { visibility: shareServedVisibility(share) } }) }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/records?ws=&space= — AUTHENTICATED member read of a
@@ -550,7 +561,9 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
     if (!(await canReadWs(id, ws, callerGaii))) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const records = await collectWsRecords(id, ws, readerFor({ storage, config }, req.auth), space ? { space } : undefined);
-    res.json(success(config.nodeId, { organism_id: id, ws, records: await withItemProvenance(storage, config, records) }));
+    // A record the workspace shares on an open link is public, and a member sees the label it owes there.
+    const alsoPublic = shareOpenedIdsOf(await readShareMeta(id, ws), records);
+    res.json(success(config.nodeId, { organism_id: id, ws, records: await withItemProvenance(storage, config, records, { alsoPublic }) }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/share?ws= — the current share state (for the UI toggles).

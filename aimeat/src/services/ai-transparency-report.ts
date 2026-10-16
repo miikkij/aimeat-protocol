@@ -30,13 +30,19 @@
  *   const report = await buildAiTransparencyReport(storage, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.2.0 — 2026-10-16 — With `config`, content an open workspace share serves to anyone counts as
+ *     public in the roll-up and in the unlabelled list (services/share-provenance.ts
+ *     sharePublicInScope); the SQL rule sees no share, so a shared page an AI wrote was counted as
+ *     private while every surface serving it labelled it.
  *   v1.1.0 — 2026-10-08 — `labelled` and `unlabelled` count the label each public record owes NOW
  *     (the serve-time decision), not the `required` flag stored at mint: content made public after
  *     its record was minted had counted as unlabelled while every surface labelled it. The options
  *     take the node's `labelPolicy`.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8.
  */
+import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
+import { sharePublicInScope, SHARE_SCAN_LIMIT } from './share-provenance.js';
 import { AI_PROVENANCE_SPEC_V1, type AiProvenance } from '../models/ai-provenance-schemas.js';
 import { disclosureFor, type DisclosureLabelPolicy } from './ai-disclosure.js';
 import { servedContext } from './ai-disclosure-served.js';
@@ -80,6 +86,32 @@ export interface ReportOptions {
   sinceDays?: number;
   /** The node's label posture, `config.aiLabelPublic`. Each label is decided under it. */
   labelPolicy?: DisclosureLabelPolicy;
+  /**
+   * The node's configuration. With it, content an open workspace share serves to anyone counts as
+   * public (services/share-provenance.ts sharePublicInScope), as every surface that serves it now
+   * decides its label; without it only the SQL rule counts, which sees no share.
+   */
+  config?: AimeatConfig;
+}
+
+/** One record's facts, as the facet query groups them: what a share-public record adds to the counts. */
+type CountedFacts = { humanInvolvement: string; level: string; day: string; mediaKind: string | null; reason: string | null; count: number };
+
+/**
+ * The records in scope an open workspace share serves to anyone, as facts the roll-up counts. The
+ * facet query counted each of them in `total` as not public, so they are added to the public counts
+ * only. `capped` when the share candidates ran past the scan limit.
+ */
+async function shareOpenedFacts(
+  storage: Storage, config: AimeatConfig, scope: { ownerGhii?: string; since?: string },
+): Promise<{ rows: AiProvenanceRecordRow[]; facts: CountedFacts[]; capped: boolean }> {
+  const { ids, capped } = await sharePublicInScope(storage, config, scope);
+  const rows = ids.size ? await storage.getAiProvenanceMany([...ids]) : [];
+  const facts = rows.map(r => ({
+    humanInvolvement: r.record.humanInvolvement ?? 'unstated', level: r.record.level ?? 'unstated',
+    day: r.generatedAt.slice(0, 10), mediaKind: r.record.mediaKind ?? null, reason: r.record.disclosure?.reason ?? null, count: 1,
+  }));
+  return { rows, facts, capped };
 }
 
 function sinceIso(days: number): string {
@@ -139,9 +171,7 @@ export async function buildAiTransparencyReport(
   };
 
   const byDay = new Map<string, { day: string; public: number; unlabelled: number }>();
-  for (const f of facets) {
-    report.total += f.count;
-    if (!f.publiclyLinked) continue;
+  const countPublic = (f: CountedFacts): void => {
     report.public_total += f.count;
     report.public_by_human_involvement[f.humanInvolvement] =
       (report.public_by_human_involvement[f.humanInvolvement] ?? 0) + f.count;
@@ -160,6 +190,19 @@ export async function buildAiTransparencyReport(
     bucket.public += f.count;
     bucket.unlabelled += unlabelled;
     byDay.set(f.day, bucket);
+  };
+  for (const f of facets) {
+    report.total += f.count;
+    if (f.publiclyLinked) countPublic(f);
+  }
+  // What an open workspace share serves to anyone: counted in `total` above as not public.
+  if (opts.config) {
+    const shared = await shareOpenedFacts(storage, opts.config, { ownerGhii: opts.ownerGhii, since });
+    for (const f of shared.facts) countPublic(f);
+    if (shared.capped) {
+      report.scope.note += ` More workspace share candidates were found than one report reads (${SHARE_SCAN_LIMIT}); `
+        + 'some shared items may be counted as not public.';
+    }
   }
   report.trend = [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
   report.apps_declaring_generation_with_gap = await appsWithDisclosureGap(storage, opts.ownerGhii);
@@ -210,7 +253,7 @@ export async function listUnlabelledPublic(
   // zero (the usual case, since every public surface decides its label when it serves) nothing is
   // scanned at all.
   const facets = await storage.aiProvenanceFacets({ ownerGhii: opts.ownerGhii, since });
-  const total = facets
+  let total = facets
     .filter((f) => f.publiclyLinked && (f.humanInvolvement === 'none' || f.humanInvolvement === 'light-review')
       && !owedWhenPublic(f, policy))
     .reduce((n, f) => n + f.count, 0);
@@ -233,6 +276,16 @@ export async function listUnlabelledPublic(
       if (!owed && items.length < limit) items.push(row);
     }
     if (rows.length < UNLABELLED_SCAN_PAGE) break;
+  }
+  // What an open workspace share serves to anyone, which the SQL population above cannot see.
+  if (opts.config) {
+    const shared = await shareOpenedFacts(storage, opts.config, { ownerGhii: opts.ownerGhii, since });
+    shared.facts.forEach((f, i) => {
+      if (f.humanInvolvement !== 'none' && f.humanInvolvement !== 'light-review') return;
+      if (owedWhenPublic(f, policy)) return;
+      total += 1;
+      if (items.length < limit) items.push(shared.rows[i]!);
+    });
   }
   return { items, total };
 }

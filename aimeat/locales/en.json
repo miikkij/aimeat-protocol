@@ -3520,7 +3520,8 @@
         "owner-this-node-only": "Only what you did here. Anything you published elsewhere, on another installation or on your own personal one, is outside these numbers.",
         "owner-your-slice": "Only yours. Nothing on this page describes anybody else's activity, and nobody else sees yours here.",
         "owner-register-is-the-operators": "The record of what AI is used for is kept by whoever runs this installation, not by you. Below are the entries that name your account. If something of yours is missing, that is a conversation with them rather than something you can fix here.",
-        "owner-provenance-off": "Recording is switched off on this installation, which is not your setting. Nothing was recorded, so every number above is zero for that reason and not because you did nothing."
+        "owner-provenance-off": "Recording is switched off on this installation, which is not your setting. Nothing was recorded, so every number above is zero for that reason and not because you did nothing.",
+        "shares-open-only": "A workspace page shared on an open link counts as public here. A page shared behind a password or only with signed-in accounts does not: its readers are not the general public, so it owes no AI label and is not counted as public."
       },
       "gapFonts": "Faces without licence data",
       "toFonts": "To Fonts"
@@ -25132,11 +25133,17 @@
   "places.kw.admin.genesis": "peers, seed peers",
   "places.kw.admin.design-lab": "components, UI library, design",
   "places.kw.admin.themes": "fonts, colours, colors, theme, style, palette",
+  "aiDeclare": {
+    "htmlPage": "An AI made this page",
+    "document": "An AI wrote this page",
+    "hint": "When the page is shared on an open link, its readers see the AI label, as the EU AI Act requires."
+  },
   "pageFrame": {
     "loading": "Loading the page…",
     "loadFailed": "The page could not be loaded.",
     "noHost": "This service does not show HTML pages yet, so the page is shown as text.",
     "madeByUser": "A page made by a user. It runs apart and cannot reach your account.",
+    "madeBy": "{name} made this page. It runs apart and cannot reach your account.",
     "fullScreen": "Full screen",
     "report": "Report",
     "reported": "Thank you. The people who run this service will look at the page.",
