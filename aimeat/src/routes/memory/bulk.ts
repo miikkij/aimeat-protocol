@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — Comment only: POST /v1/memory/bulk-delete puts each key in the bin; the comment said
+ *     it removed them for good (invariant 8 review, ruled by the developer on 2026-10-16).
  *   2026-10-16 — Bulk, import and copy refuse an entry that changes an agent's live crew definition's browser
  *     site list unless the owner writes it in person (OWNER_APPROVES_SITES; QA audit F07b-02).
  *   2026-10-16 — POST /v1/memory/bulk refuses an entry whose visibility the single write refuses (visibilityRefusal, batch-guards.ts): workspace and unknown words fail that entry instead of being stored (QA audit list review).
@@ -467,8 +469,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // A record space that names extensions takes a delete from a caller that is not a person only
     // through one of them (services/fenced-space.ts). This route asks no organism rule for the keys
-    // it removes, and it removes them for good, so one such key refuses the whole request before
-    // the first delete. The account holder in person returns from the rule before any manifest is read.
+    // it removes (each goes to the deleted-memory bin through storage.deleteMemory, restorable for
+    // the grace period), so one such key refuses the whole request before the first delete. The account holder in person returns from the rule before any manifest is read.
     // The same call refuses the removal of a workspace's manifest record that declares a fence, to
     // every caller but the account holder in person and a session that covers organism:direct.
     const session = callerOf(req, config.nodeId, storage);

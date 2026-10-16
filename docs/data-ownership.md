@@ -61,10 +61,17 @@ deleted it, and answers with `restorable_until`. `POST /v1/memory/{key}/restore`
 once shortly after start. `AIMEAT_MEMORY_DELETE_GRACE_DAYS` sets the window; zero makes a delete final
 at once.
 
-**What skips the window, by design:** workspace rows and a whole workspace (both need the
-`memory:purge` permission, and an agent that holds it never starts a task without the person's OK);
-stored files; apps; deleting an agent (every record and file under its identity goes with
-it); deleting an organism; erasing an account.
+**What skips the window, by design:** workspace rows, a whole workspace, deleting an organism and
+removing a Design Book part (all four need the `memory:purge` permission, an organism `organism:write`
+beside it, and an agent that holds it never starts a task without the person's OK); stored files;
+apps; deleting an agent (every record and file under its identity goes with it, and an agent needs
+`agent:delete` for it); erasing an account; and a record whose time to live, set when it was
+written, has run out. Notifications the person clears in person go at once; an agent or an app that
+clears them puts them in the bin.
+
+**The rule behind it** (security DNA invariant 8, ruled by Jouni on 2026-10-16): moving a record to
+the bin may be a default permission, so every agent holds `memory:delete`; a permanent purge and
+deleting an organism are explicit and separately consented, so `memory:purge` is in no default.
 
 Workspace records go through the window on both interfaces: `aimeat_workspace_object_delete` and its
 REST twin, `POST /v1/organisms/{id}/workspace/records/delete`, put them in the bin and ask

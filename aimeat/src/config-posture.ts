@@ -14,6 +14,9 @@
  *   import { securityPostureWarnings } from './config-posture.js';
  *   for (const w of securityPostureWarnings(config)) logger.warn(w);
  * @version-history
+ *   2026-10-16 — POWERFUL_AGENT_SCOPES drops memory:delete and names memory:purge and agent:delete:
+ *     a delete into the bin may be a default, a removal that cannot come back may not (invariant 8 as
+ *     ruled by the developer on 2026-10-16). The start-up warning about the shipped default stops.
  *   2026-10-16 — The admin-setup line of the public-node table is not written again: the test-switch
  *     warning above already names AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR on any node others reach.
  *   2026-10-16 — The other test-only settings (x402 test facilitator, test mode, dev mode, admin setup
@@ -43,8 +46,14 @@ import { PROVENANCE_SWITCH_LOCAL_ONLY_IN } from './config-ai-label.js';
  * The scopes invariant 8 calls powerful: explicit and separately consented, never part of the
  * ambient default an agent gets when nobody names a list (security-development-dna.md, invariant 8).
  * scripts/check-posture-defaults.ts holds the shipped default against this list.
+ *
+ * `memory:delete` is NOT here (Jouni, 2026-10-16): every memory delete it opens moves the record to
+ * the deleted-memory bin, where the owner restores it for the grace period, so it may be a default.
+ * What cannot come back is here: `memory:purge` (a workspace wiped, rows removed, an organism
+ * deleted, a Design Book part removed, each for good) and `agent:delete` (an agent ended, its
+ * records with it).
  */
-export const POWERFUL_AGENT_SCOPES: readonly string[] = ['ai:use', 'task:write', 'memory:delete'];
+export const POWERFUL_AGENT_SCOPES: readonly string[] = ['ai:use', 'task:write', 'memory:purge', 'agent:delete'];
 
 /**
  * Startup posture self-check. When the resolved security profile is `public`, return a list of

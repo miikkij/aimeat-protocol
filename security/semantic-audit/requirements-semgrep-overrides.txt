@@ -7,3 +7,9 @@
 # verifies a token, so the newer minor release is safe for what it runs. An override replaces the
 # whole requirement, so the [crypto] extra Semgrep asks for is repeated here.
 pyjwt[crypto]>=2.15.0
+#
+# semgrep 1.178.0 (and 1.181.0, the newest on 2026-10-16) pins mcp==1.29.0, and every mcp before
+# 1.30.0 carries GHSA-84m7-p3x7-pcfv (moderate: the StreamableHTTP server transport keeps sessions
+# without a bound). The taint job runs `semgrep scan` and never starts Semgrep's MCP server, so the
+# newer minor release is safe for what it runs. Kept below 2, which is a new major line.
+mcp>=1.30.0,<2
