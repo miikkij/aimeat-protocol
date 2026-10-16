@@ -1621,7 +1621,7 @@ components:
           example: MCowBQYDK2VwAyEA...
         setupCode:
           type: string
-          description: The one-time setup code from the start log. Needed only for the first account of a node whose base URL is not loopback.
+          description: The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it.
 
     AgentRegistration:
       type: object
@@ -3237,7 +3237,7 @@ components:
           example: jane@example.com
         setupCode:
           type: string
-          description: The one-time setup code from the start log. Needed only for the first account of a node whose base URL is not loopback.
+          description: The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it.
         interests:
           type: array
           items:
@@ -9005,9 +9005,9 @@ paths:
           description: >-
             REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by
             invitation only, or not at all. SETUP_CODE_REQUIRED / SETUP_CODE_INVALID — the node's base
-            URL is not loopback and it has no owner yet, so this account would be its first owner and
-            operator, which needs `setupCode`: the one-time code the node printed in its start log. Once
-            the node has an owner, registration needs no code.
+            URL is not loopback and it has no operator yet, so this account would become the operator (as
+            its first owner, or by the no-operator self-heal), which needs `setupCode`: the one-time code
+            the node printed in its start log. Once the node has an operator, registration needs no code.
         '409':
           description: Owner name already taken
 
@@ -37698,9 +37698,9 @@ paths:
           description: >-
             REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by
             invitation only, or not at all. SETUP_CODE_REQUIRED / SETUP_CODE_INVALID — the node's base
-            URL is not loopback and it has no owner yet, so this account would be its first owner and
-            operator, which needs `setupCode`: the one-time code the node printed in its start log. Once
-            the node has an owner, registration needs no code.
+            URL is not loopback and it has no operator yet, so this account would become the operator (as
+            its first owner, or by the no-operator self-heal), which needs `setupCode`: the one-time code
+            the node printed in its start log. Once the node has an operator, registration needs no code.
         '409':
           description: Username already taken
           content:
@@ -68446,7 +68446,7 @@ paths:
                 locale: { type: string }
                 password: { type: string, description: 'Optional; min 8 chars plus upper/lower/digit and not a common password. A password failing any of those is refused with 400 WEAK_PASSWORD, whose message names the rule that failed.' }
                 email: { type: string, format: email, description: 'Optional; REQUIRED when the email gate is on. Recorded + a verification code sent.' }
-                setupCode: { type: string, description: 'The one-time setup code from the start log. Needed only for the first account of a node whose base URL is not loopback (GET /v1/setup/status says setupCodeRequired).' }
+                setupCode: { type: string, description: 'The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it (GET /v1/setup/status says setupCodeRequired).' }
       responses:
         '201':
           description: Identity created
@@ -68488,9 +68488,9 @@ paths:
           description: >-
             REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by
             invitation only, or not at all. SETUP_CODE_REQUIRED / SETUP_CODE_INVALID — the node's base
-            URL is not loopback and it has no owner yet, so this account would be its first owner and
-            operator, which needs `setupCode`: the one-time code the node printed in its start log. Once
-            the node has an owner, registration needs no code.
+            URL is not loopback and it has no operator yet, so this account would become the operator (as
+            its first owner, or by the no-operator self-heal), which needs `setupCode`: the one-time code
+            the node printed in its start log. Once the node has an operator, registration needs no code.
         '409':
           description: NAME_TAKEN, or EMAIL_TAKEN when the email is already verified on another account
     put:
@@ -68626,6 +68626,7 @@ paths:
                 totp_code: { type: string }
                 backup_code: { type: string }
                 request_owner_key: { type: boolean, description: Mint a fresh owner keypair (new device with no local key) }
+                setupCode: { type: string, description: 'The one-time setup code from the start log. On a node whose base URL is not loopback and that has no operator, an account signing in becomes the operator only with it; without it the sign-in goes on as a plain owner.' }
       responses:
         '200':
           description: Authenticated

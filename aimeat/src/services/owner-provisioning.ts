@@ -7,9 +7,13 @@
  *   profile (optionally with a password hash, a verified email, and/or a linked external identity),
  *   and records the welcome-bonus transaction. Used by the OIDC signup finalize path and the email
  *   invitation accept path so account creation stays identical across entry points.
- * @structure emailHashOf; ProvisionEmailTakenError; SetupCodeRefusedError; claimFirstOwnerSetupCode; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
+ * @structure emailHashOf; ProvisionEmailTakenError; SetupCodeRefusedError; claimOperatorSetupCode; rolesAtWrite; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.11.0 — 2026-10-16 — claimOperatorSetupCode (was claimFirstOwnerSetupCode) asks for the setup code
+ *     while the node has no OPERATOR, so the no-operator self-heal needs it too, and says whether it took
+ *     the code; rolesAtWrite decides the operator role again inside the account's transaction, so a role
+ *     list computed before another request made the operator loses it (Jouni, 2026-10-16).
  *   v1.10.0 — 2026-10-16 — claimFirstOwnerSetupCode and SetupCodeRefusedError: on a node whose base URL is
  *     not loopback and that has no owner, an account that would be the first owner and operator needs the
  *     one-time setup code; createAccountRows asks before its transaction and spends the code after it, and
@@ -98,40 +102,60 @@ export class RegistrationHookRefusedError extends RegistrationClosedError {
   constructor(message: string) { super(message); this.name = 'RegistrationHookRefusedError'; }
 }
 
-/** Thrown before any row exists when the account would be the first owner, and so the operator, of a
- *  node whose base URL is not loopback, and the request lacks the valid one-time setup code. It is a
- *  RegistrationClosedError, so every caller that maps that one to a 403 answers its code too:
- *  SETUP_CODE_REQUIRED or SETUP_CODE_INVALID, as POST /v1/setup/init does (Jouni, 2026-10-16). */
+/** Thrown before any row exists when the account would become the operator of a node whose base URL
+ *  is not loopback and that has no operator (the first owner, or the no-operator self-heal), and the
+ *  request lacks the valid one-time setup code. It is a RegistrationClosedError, so every caller that
+ *  maps that one to a 403 answers its code too: SETUP_CODE_REQUIRED or SETUP_CODE_INVALID, as
+ *  POST /v1/setup/init does (Jouni, 2026-10-16). */
 export class SetupCodeRefusedError extends RegistrationClosedError {
   override readonly code: string;
   constructor(code: string, message: string) { super(message); this.name = 'SetupCodeRefusedError'; this.code = code; }
 }
 
-/** What claimFirstOwnerSetupCode hands back: spend the code once the owner exists, or put it back. */
-export interface FirstOwnerClaim { commit(): void; release(): void }
-const NO_CLAIM: FirstOwnerClaim = { commit: () => {}, release: () => {} };
+/**
+ * What claimOperatorSetupCode hands back. `tookCode` says the request took the setup code, which on
+ * a node others can reach is the one claim to the operator role; commit() spends the code once the
+ * role is written, release() puts it back when it is not.
+ */
+export interface OperatorClaim { tookCode: boolean; commit(): void; release(): void }
+const NO_CLAIM: OperatorClaim = { tookCode: false, commit: () => {}, release: () => {} };
 
 /**
- * The setup code an account needs when it would be this node's FIRST owner with the operator role on
- * a node others can reach (services/setup-code.ts). On a loopback node, for an account that is not
- * the operator, or once any owner exists, nothing is asked and nothing is used. Otherwise the code is
- * checked and taken in one synchronous step, so of two requests only one creates the first owner;
- * the caller commits after the rows are written and releases when they are not.
+ * The setup code a request needs when it would grant the operator role on a node others can reach
+ * that has no operator: the first owner, or the self-heal that makes the next account or sign-in the
+ * operator (services/setup-code.ts). On a loopback node, for a role list without the operator, or
+ * once an operator exists, nothing is asked and nothing is used. Otherwise the code is checked and
+ * taken in one synchronous step, so of several requests only one becomes the operator.
  * @throws SetupCodeRefusedError when the code is missing, wrong or was used a moment ago
  */
-export async function claimFirstOwnerSetupCode(
+export async function claimOperatorSetupCode(
   storage: Storage, config: AimeatConfig, roles: readonly string[], setupCode: unknown,
-): Promise<FirstOwnerClaim> {
-  // The role list the new account is minted with, not a check of the caller (that is isOperatorCaller).
+): Promise<OperatorClaim> {
+  // The role list the account is about to get, not a check of the caller (that is isOperatorCaller).
   const makesOperator = roles.indexOf('operator') >= 0;
   if (!makesOperator || !setupCodeRequired(config)) return NO_CLAIM;
-  const { anyOwner } = await storage.operatorAccountState();
-  if (anyOwner) return NO_CLAIM;
+  const { anyOperator } = await storage.operatorAccountState();
+  if (anyOperator) return NO_CLAIM;
   const refusal = setupCodeRefusal(config, setupCode);
   if (refusal) throw new SetupCodeRefusedError(refusal.code, refusal.message);
   const gate = setupCodeGateFor(config);
   if (!gate.take(setupCode)) throw new SetupCodeRefusedError('SETUP_CODE_INVALID', SETUP_CODE_USED_MESSAGE);
-  return { commit: () => gate.commit(), release: () => gate.release() };
+  return { tookCode: true, commit: () => gate.commit(), release: () => gate.release() };
+}
+
+/**
+ * The roles an account is written with, decided again INSIDE the transaction that writes it: a role
+ * list computed earlier carries the operator role because no operator existed then, and another
+ * request may have made one since. Unless this request took the setup code (the one claim on a node
+ * others can reach), the operator role is dropped when an operator exists by now. The read is the
+ * claim form of operatorAccountState: on PostgreSQL it takes a transaction-scoped advisory lock, so a
+ * second writer waits for the first to commit and then sees its operator; SQLite serialises
+ * transactions. Called inside the transaction that writes the owner row.
+ */
+export async function rolesAtWrite(storage: Storage, roles: readonly string[], claim: OperatorClaim): Promise<string[]> {
+  if (claim.tookCode || roles.indexOf('operator') < 0) return [...roles];
+  const { anyOperator } = await storage.operatorAccountState({ claim: true });
+  return anyOperator ? roles.filter(r => r !== 'operator') : [...roles];
 }
 
 /**
@@ -221,9 +245,11 @@ export async function creditWelcomeBonus(
  * before (its gates) and after (best-effort extras) stays outside, because a swallowed error inside
  * a PostgreSQL transaction would abort it.
  *
- * The first owner of a node others can reach needs the one-time setup code (claimFirstOwnerSetupCode):
- * `opts.setupCode` is the code the request carried. Asked here, before the transaction, so no route
- * that creates an account through this function can make the first operator without it.
+ * An account that would become the operator of a node others can reach that has no operator needs
+ * the one-time setup code (claimOperatorSetupCode): `opts.setupCode` is the code the request carried.
+ * Asked here, before the transaction, so no route that creates an account through this function can
+ * make an operator without it; inside the transaction the operator role is decided again
+ * (rolesAtWrite), so a role list computed before another request made the operator loses it.
  * @throws SetupCodeRefusedError before any row exists, when that code is missing or wrong
  */
 export async function createAccountRows(
@@ -233,10 +259,10 @@ export async function createAccountRows(
   profileRow: Omit<GHIIRecord, 'ownerName'>,
   opts: { setupCode?: unknown } = {},
 ): Promise<ProvisionedOwner> {
-  const claim = await claimFirstOwnerSetupCode(storage, config, ownerRow.roles, opts.setupCode);
+  const claim = await claimOperatorSetupCode(storage, config, ownerRow.roles, opts.setupCode);
   try {
     const rows = await storage.transaction(async () => {
-      const owner = await storage.createOwner(ownerRow);
+      const owner = await storage.createOwner({ ...ownerRow, roles: await rolesAtWrite(storage, ownerRow.roles, claim) });
       const ghii = await storage.createGHII({ ...profileRow, ownerName: owner.name } as GHIIRecord);
       await creditWelcomeBonus(storage, config, ghii.ghii, profileRow.createdAt);
       return { owner, ghii };
@@ -269,7 +295,7 @@ export interface ProvisionOwnerOpts {
   /** Fast/back-compat mirror of externalIdentities.google. */
   googleSub?: string;
   /** The one-time setup code the request carried, needed when this account would be the first owner
-   *  of a node others can reach (claimFirstOwnerSetupCode). An identity provider's redirect carries
+   *  of a node others can reach (claimOperatorSetupCode). An identity provider's redirect carries
    *  none, so a first sign-in there is refused until the first owner exists. */
   setupCode?: unknown;
 }

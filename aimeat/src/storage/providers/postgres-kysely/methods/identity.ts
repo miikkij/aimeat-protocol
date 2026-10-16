@@ -7,6 +7,8 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-10-16 — operatorAccountState({ claim: true }) takes a transaction-scoped advisory lock first, the
+ *     single claim to the first operator (Jouni, 2026-10-16).
  *   2026-10-16 — operatorAccountState: two EXISTS queries (QA audit P7-10).
  *   2026-10-11 — stoppedAt and stoppedBy on create and read (migration 0101). updateAgent passes them through.
  *   2026-10-02 — taskStart on create and read (migration 0092). updateAgent passes it through.
@@ -126,7 +128,10 @@ export const identityMethods = {
   async listOwners(this: PostgresKyselyStorage): Promise<OwnerRecord[]> {
     return (await this.db.selectFrom('Owner').selectAll().execute()).map(toOwnerRecord);
   },
-  async operatorAccountState(this: PostgresKyselyStorage): Promise<{ anyOwner: boolean; anyOperator: boolean }> {
+  async operatorAccountState(this: PostgresKyselyStorage, opts?: { claim?: boolean }): Promise<{ anyOwner: boolean; anyOperator: boolean }> {
+    // The claim: held until the open transaction ends, so two writers of a first operator read one
+    // after the other (owner.repository.ts). Outside a transaction it is released at once.
+    if (opts?.claim) await sql`SELECT pg_advisory_xact_lock(hashtext('aimeat.operator-claim'))`.execute(this.db);
     const r = await this.db.selectNoFrom([
       sql<boolean>`exists(select 1 from "Owner" where "name" <> 'anonymous')`.as('anyOwner'),
       sql<boolean>`exists(select 1 from "Owner" where 'operator' = any("roles"))`.as('anyOperator'),
