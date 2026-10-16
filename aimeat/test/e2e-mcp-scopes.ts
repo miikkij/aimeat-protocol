@@ -7,6 +7,9 @@
  * @version-history
  *   2026-10-16 — The node registry's POST, PATCH and DELETE refuse a plain owner and the operator's
  *     agent without operator:admin, and admit the one holding it (QA audit F01c-01).
+ *   v1.7.0 — 2026-10-16 — An agent registered with no scopes named: it holds the node default, and on
+ *     a node with the shipped default (the production-settings lane) its MCP surface holds every tool
+ *     the feature list promises a default agent and none outside it (QA audit P7-03, F03a-02).
  *   v1.6.0 — 2026-10-05 — The HTTP admin routes admit the agent holding operator:admin and refuse the
  *     one without it, as the tools do (secaudit 2026-10, C2).
  *   v1.5.0 — 2026-10-02 — aimeat_agent_runtime_report: an agent's own report (with `llm`) without
@@ -607,6 +610,51 @@ await test("The node registry's POST, PATCH and DELETE refuse a plain owner and 
         await json(`/v1/mcp-servers/node/${a.body.data.server.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${adminTok}` } });
     }
 });
+
+// ── An agent approved with no named list ──
+// What a production node gives an agent nobody picked scopes for: the node default. The suite process
+// gets the node's pins (run-e2e-server.ts pinnedEnv), so NODE_DEFAULT is that node's list: the shipped
+// six words on the production-settings lane the guard tier runs on, '*' on the full sweep. The tools
+// below are what docs/AIMEAT-Feature-List.md promises such an agent (read and write memory, delete it,
+// read workspaces, see its owner's agents) and what it does not get. Written out by hand on purpose: a
+// list derived from the catalog would move with the next scope word and catch nothing, which is how a
+// deploy took workspace reads from every default agent in October with every suite green
+// (docs/pitfalls.md §119; QA audit P7-03, F03a-02).
+const NODE_DEFAULT = (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*').split(',').map(s => s.trim());
+const PROMISED = ['aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_delete',
+    'aimeat_catalogue_search', 'aimeat_workspace_read', 'aimeat_workspace_list', 'aimeat_workspace_overview', 'aimeat_organism_search',
+    'aimeat_agents_list'];
+const NOT_PROMISED = ['aimeat_workspace_publish', 'aimeat_wallet_balance', 'aimeat_board_post', 'aimeat_task_create'];
+let defaultAgent: { gaii: string; key: string } = { gaii: '', key: '' };
+
+await test(`Setup: an agent registered with no scopes named gets the node default (${NODE_DEFAULT.join(',')})`, async () => {
+    const r = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'defaultagent', owner: ownerName, capabilities: ['memory'], model: 'gpt-4o' }),
+    });
+    assert(r.status === 201, `register defaultagent ${r.status}: ${JSON.stringify(r.body)}`);
+    defaultAgent = { gaii: r.body.data.agent.gaii as string, key: r.body.data.private_key as string };
+    const scopes = (r.body.data.agent.scopes ?? []) as string[];
+    assert([...scopes].sort().join(',') === [...NODE_DEFAULT].sort().join(','), `stored scopes ${JSON.stringify(scopes)}, node default ${JSON.stringify(NODE_DEFAULT)}`);
+});
+
+if (!NODE_DEFAULT.includes('*')) {
+    await test('…and over MCP it is offered every tool the product promises a default agent, and none it does not', async () => {
+        const tools = await (await connectMcp(defaultAgent.gaii, defaultAgent.key)).list();
+        const missing = PROMISED.filter(t => !tools.includes(t));
+        assert(missing.length === 0, `a default agent lost promised tools: ${missing.join(', ')}`);
+        const extra = NOT_PROMISED.filter(t => tools.includes(t));
+        assert(extra.length === 0, `a default agent was offered tools outside its default: ${extra.join(', ')}`);
+    });
+    await test('…and a promised write works while an unpromised one is refused by name', async () => {
+        const client = await connectMcp(defaultAgent.gaii, defaultAgent.key);
+        const wrote = await client.call('aimeat_memory_write', { key: 'default-agent.probe', value: { ok: true } });
+        assert(wrote.ok, `memory_write refused for a default agent: ${JSON.stringify(wrote.body).slice(0, 300)}`);
+        const paid = await client.call('aimeat_wallet_balance', {});
+        assert(!paid.ok, 'a default agent read the wallet, which its default list does not hold');
+    });
+}
 
 console.log(`\n────────────────────────────────────────`);
 console.log(`MCP Scope Enforcement E2E: ${passed} passed, ${failed} failed out of ${passed + failed}`);

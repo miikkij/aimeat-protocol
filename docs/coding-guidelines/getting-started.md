@@ -123,8 +123,9 @@ pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci
 `--test=agent-onboarding`. Without `--test=` the runner starts every suite.
 
 Run `pnpm gate` once on the finished change. A green gate is what "done" needs; do not wait for
-GitHub CI. `pnpm gate --postgres` adds the production backend when the change touches storage or
-the identity layer. The full E2E sweep takes about two hours and runs only with the developer's
+GitHub CI. The gate adds the production backend by itself when the change touches storage, the
+identity layer, the routes, the MCP tools or the test runner; `pnpm gate --postgres` forces it for
+any change. The full E2E sweep takes about two hours and runs only with the developer's
 approval. See [testing requirements](testing-requirements.md).
 
 ## Find the implementation

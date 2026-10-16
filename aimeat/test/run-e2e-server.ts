@@ -7,6 +7,11 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.10.0 -- 2026-10-16 -- The production-settings lane (run-e2e-production-lane.ts): with
+ *            --production-settings every suite's node runs test mode, dev mode and anonymous mode off,
+ *            the shipped default agent scopes, the admin setup route closed after the first operator
+ *            and the production rate limits, except the groups a listed suite keeps (QA audit P1-01,
+ *            P1-08, P7-03, P7-05, F03a-02, S1-08, F7d). AIMEAT_E2E_SERVER_READY_MS sets the start budget.
  *   v1.9.2 -- 2026-10-16 -- e2e-session-forgery joins ANONYMOUS_OFF_SUITES (three green runs alone on
  *            each backend with the setting off; QA audit F20-01).
  *   v1.10.0 -- 2026-10-16 -- startServer records the node's whole output per suite
@@ -66,6 +71,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
+import { keptGroups, keptTestValues, productionLaneOn, productionOverlay } from './run-e2e-production-lane.js';
 
 const authLogs = new WeakMap<RunnerTarget, string>();
 /** A5: a suite owns its log, including when a parent environment names a shared log. */
@@ -216,6 +222,8 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
 
 /** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */
 export function anonymousModeFor(suite?: string): string {
+    // The production-settings lane runs every suite with it off, except a suite listed as keeping it.
+    if (productionLaneOn() && !keptGroups(suite).includes('anonymous')) return 'false';
     if (suite && ANONYMOUS_OFF_SUITES.includes(suite)) return 'false';
     return process.env.AIMEAT_ANONYMOUS ?? 'true';
 }
@@ -233,6 +241,7 @@ export const ADMIN_SETUP_CLOSED_SUITES: readonly string[] = [
 
 /** AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR for a suite's node: 'false' for a listed suite, else the default. */
 export function adminSetupOpenFor(suite?: string): string {
+    if (productionLaneOn() && !keptGroups(suite).includes('adminSetup')) return 'false';
     if (suite && ADMIN_SETUP_CLOSED_SUITES.includes(suite)) return 'false';
     return process.env.AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR ?? 'true';
 }
@@ -501,6 +510,11 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         AIMEAT_EXT_MAX_MEMORY_MB: process.env.AIMEAT_EXT_MAX_MEMORY_MB ?? '192',
         AIMEAT_EXT_TIMEOUT_MS: process.env.AIMEAT_EXT_TIMEOUT_MS ?? '60000',
         AIMEAT_JWT_TTL: process.env.AIMEAT_JWT_TTL ?? '3600',
+
+        // ── The production-settings lane, last so it wins over every relaxed pin above ──
+        // Empty unless the run was started with --production-settings (run-e2e-production-lane.ts).
+        ...productionOverlay(suite),
+        ...keptTestValues(suite),
     };
 }
 
@@ -694,7 +708,8 @@ export function keepTails(child: ChildProcess): () => string {
 
 const SERVER_EXIT_TIMEOUT_MS = 10_000;
 const PORT_FREE_TIMEOUT_MS = 15_000;
-const SERVER_READY_TIMEOUT_MS = 60_000;
+// AIMEAT_E2E_SERVER_READY_MS raises it on a loaded machine, where a boot alone can pass a minute.
+const SERVER_READY_TIMEOUT_MS = Number(process.env.AIMEAT_E2E_SERVER_READY_MS ?? 60_000);
 
 export async function startServer(target: RunnerTarget, suite?: string): Promise<ChildProcess> {
     await requirePortFree(Number(target.port), PORT_FREE_TIMEOUT_MS, 'the runner asked to start a server on it');
