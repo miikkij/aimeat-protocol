@@ -13,6 +13,8 @@
  *   import KnowledgeTab from './knowledge-tab.js';
  *   html`<${KnowledgeTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v2.1.0 — 2026-10-16 — A failed load of the packages is drawn as one (packagesFailed: the could-not-load
+ *     note with Retry), never as "no packages"; a failed reload keeps the list (QA audit F6-05).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Tietopankin sivu", direction A). The
  *     action bar, the always-open import box and the wall of expandable cards are replaced by the
  *     cover and the package page; the OpenClaw prompt gives way to the prompt for an agent over MCP.
@@ -33,12 +35,16 @@ import { useConfirm } from '/components/Modal.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 import { extractFedConsents } from './knowledge-tab.helpers.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState } from '/js/load-state.js';
 import { pkgId } from './knowledge/frame.js';
 import { renderKnowledgeView } from './knowledge/cover.js';
 
 export default function KnowledgeTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [packages, setPackages] = useState([]);
+  // A failed first load is drawn as one, never as "no packages" (packages stays [] until a load works).
+  const pkgLoad = useLoadState();
+  const { ok: pkgLoadOk, fail: pkgLoadFail } = pkgLoad;
   const [loading, setLoading] = useState(true);
   const [importText, setImportText] = useState('');
   const [importPreview, setImportPreview] = useState(null);
@@ -71,10 +77,11 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       if (showSpinner) setLoading(true);
       const list = await knowledgeService.listMyPackages();
       setPackages(list);
+      pkgLoadOk();
       onStats?.({ knowledge: list.length });
-    } catch (err) { swallowed('knowledge-tab', err); if (showSpinner) setPackages([]); }
+    } catch (err) { swallowed('knowledge-tab', err); pkgLoadFail(err); }
     finally { setLoading(false); }
-  }, [onStats]);
+  }, [onStats, pkgLoadOk, pkgLoadFail]);
   const loadFedConsents = useCallback(async () => {
     try { setFedConsents(extractFedConsents(await listConsents())); }
     catch (err) { swallowed('knowledge-tab: consents', err); }
@@ -85,6 +92,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       const ov = await knowledgeService.getKnowledgeTab();
       if (!ov) { loadPackages(); loadFedConsents(); return; }
       setPackages(ov.packages);
+      pkgLoadOk();
       onStats?.({ knowledge: ov.packages.length });
       setFedConsents(extractFedConsents(ov.consents));
       setLoading(false);
@@ -248,7 +256,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const setAllEntries = (entries, open) => setOpenEntries(open ? new Set(entries.map((e, i) => e.key || String(i))) : new Set());
 
   const ctx = {
-    ghii, organisms, showToast, packages, loading, fedConsents, togglingFed, deleting, savingSharing, entryData, loadingEntries,
+    ghii, organisms, showToast, packages, packagesFailed: pkgLoad.failed, reloadPackages: () => loadPackages(), loading, fedConsents, togglingFed, deleting, savingSharing, entryData, loadingEntries,
     discovered, discoverLoading, organismPackages, organismLoading,
     view, pickView, sort, setSort, road, setRoad, pasteOpen, setPasteOpen, openEntries, toggleEntry, openEntry, setAllEntries, detailsOpen, setDetailsOpen, shareOrg, setShareOrg,
     importText, importPreview, setImportPreview, importError, importing, handleImportPaste, confirmImport,

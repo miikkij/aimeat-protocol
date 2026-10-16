@@ -1,0 +1,867 @@
+{
+  "note": "How many silent catch handlers of each shape (empty, absence, discards, substitute) each file under src/static is allowed to hold: the served SDK libs, the app-catalog bundle and the standalone scripts, which check:silent-catch reported and did not gate until 2026-10-16. Seeded that day from the state of the tree, with the developer's approval of the W25 acceptance criterion (\"the silent-catch ratchet extends to src/static\"), and NOT REVIEWED: an entry here is a question, not a clearance. Per shape, because fixing an empty catch does not buy room for a new substitute. Fixing one lowers its count; the gate names the gain so it can be locked in. Re-seeding forgives the lot.",
+  "files": {
+    "src/static/app-catalog/js/app-agents.js": {
+      "counts": {
+        "empty": 3,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/apps-io.js": {
+      "counts": {
+        "empty": 3,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/config.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/cortex.js": {
+      "counts": {
+        "empty": 8,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/cost.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/data-map.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/detail.js": {
+      "counts": {
+        "empty": 7,
+        "absence": 3,
+        "discards": 6
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/favorites.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/legal.js": {
+      "counts": {
+        "discards": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/main.js": {
+      "counts": {
+        "empty": 14
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/marks.js": {
+      "counts": {
+        "discards": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/migrate.js": {
+      "counts": {
+        "empty": 5,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/monetize.js": {
+      "counts": {
+        "empty": 1,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/odps.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/preview-host.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/promote.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/render.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/seo.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/server-io.js": {
+      "counts": {
+        "empty": 3,
+        "absence": 2,
+        "discards": 3,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/settings.js": {
+      "counts": {
+        "empty": 6
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/util.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/visitors-map.js": {
+      "counts": {
+        "empty": 1,
+        "discards": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/visitors.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-catalog/js/workcopy.js": {
+      "counts": {
+        "empty": 2,
+        "absence": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-frame-core.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-frame-shim.js": {
+      "counts": {
+        "empty": 9,
+        "discards": 1,
+        "substitute": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-frame.js": {
+      "counts": {
+        "empty": 6,
+        "absence": 2,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-login.js": {
+      "counts": {
+        "empty": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-silent.js": {
+      "counts": {
+        "empty": 4,
+        "discards": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/app-sw.js": {
+      "counts": {
+        "absence": 1,
+        "discards": 1,
+        "substitute": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/_core/app-ref.js": {
+      "counts": {
+        "absence": 1,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/_core/clipboard.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/_core/format.js": {
+      "counts": {
+        "absence": 1,
+        "substitute": 8
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/_core/lang.js": {
+      "counts": {
+        "empty": 4,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/_core/spend.js": {
+      "counts": {
+        "empty": 2,
+        "discards": 2,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/agentface/index.js": {
+      "counts": {
+        "absence": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/agents/index.js": {
+      "counts": {
+        "empty": 5,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/ai/call.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/ai/index.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/ai/stream.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/assets/library.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/assets/pack.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/assets/preview.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/assets/texts.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/ai-task.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/aide.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/ambient-gl.js": {
+      "counts": {
+        "empty": 1,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/ambient.js": {
+      "counts": {
+        "empty": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/anime-more.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/anime-show.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/arrive.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/commercial.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/connections.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/controls.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/copy.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/decision.js": {
+      "counts": {
+        "discards": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/dom.js": {
+      "counts": {
+        "empty": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/handbook.js": {
+      "counts": {
+        "empty": 1,
+        "discards": 1,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/i18n.js": {
+      "counts": {
+        "empty": 3,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/ink.js": {
+      "counts": {
+        "substitute": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/intake-form-helpers.js": {
+      "counts": {
+        "absence": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/island.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/lenis-parts.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/members-admin.js": {
+      "counts": {
+        "absence": 1,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/members-shared.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/mosaic-bind.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/mosaic-layout.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/motion.js": {
+      "counts": {
+        "empty": 2,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/scroll-edge.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/springs.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/verbs.js": {
+      "counts": {
+        "empty": 3,
+        "absence": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/workbench-parts.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/workflow-input.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/workspace-picker.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/atelier/workspace-team.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/audio/index.js": {
+      "counts": {
+        "empty": 4
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/audio/instruments.js": {
+      "counts": {
+        "empty": 6
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/app-frame.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/app-origin.js": {
+      "counts": {
+        "empty": 2,
+        "absence": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/auth-error.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/config.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/crypto.js": {
+      "counts": {
+        "empty": 3,
+        "absence": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/i18n.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/locale.js": {
+      "counts": {
+        "empty": 4
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/modal-login-link.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/modal-recovery-views.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/modal.js": {
+      "counts": {
+        "empty": 2,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/on-login.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/palette.js": {
+      "counts": {
+        "empty": 5,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/passkey.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/pill.js": {
+      "counts": {
+        "empty": 3,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/session.js": {
+      "counts": {
+        "absence": 1,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/signup.js": {
+      "counts": {
+        "empty": 1,
+        "discards": 4
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/auth/theme.js": {
+      "counts": {
+        "empty": 5,
+        "absence": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/capabilities/index.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/commerce/index.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/editor/index.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 2,
+        "discards": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/exchange/client.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/exchange/sell.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/game/i18n.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/game/markers.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/header/index.js": {
+      "counts": {
+        "empty": 5,
+        "discards": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/iam/index.js": {
+      "counts": {
+        "absence": 2,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/iam/panel.js": {
+      "counts": {
+        "absence": 1,
+        "discards": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/intake/index.js": {
+      "counts": {
+        "absence": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/live/index.js": {
+      "counts": {
+        "empty": 9,
+        "discards": 3,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/bindings.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/decide-run.js": {
+      "counts": {
+        "empty": 2,
+        "absence": 1,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/dialog-parts.js": {
+      "counts": {
+        "empty": 4,
+        "absence": 1,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/dom.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/format.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/formula-view.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/hooks.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/i18n.js": {
+      "counts": {
+        "empty": 5,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/index.js": {
+      "counts": {
+        "empty": 4
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/nodes/source.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/living/sources-url.js": {
+      "counts": {
+        "empty": 1,
+        "discards": 1,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/markdown/index.js": {
+      "counts": {
+        "empty": 7,
+        "discards": 3
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/organism/index.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/organism/members.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/portfolio-standalone/index.js": {
+      "counts": {
+        "empty": 1,
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/print/content.js": {
+      "counts": {
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/push/index.js": {
+      "counts": {
+        "empty": 1,
+        "absence": 2,
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/speech/index.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/storage/index.js": {
+      "counts": {
+        "substitute": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/tunnel/index.js": {
+      "counts": {
+        "empty": 2,
+        "absence": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/voice/player.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/voice/segments.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/voice/session.js": {
+      "counts": {
+        "empty": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/wallet/index.js": {
+      "counts": {
+        "discards": 1
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/webmcp/index.js": {
+      "counts": {
+        "empty": 4
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    },
+    "src/static/sdk-libs/workflows/index.js": {
+      "counts": {
+        "empty": 2
+      },
+      "reason": "SEEDED 2026-10-16, NOT REVIEWED — these handlers were in this file when src/static came under the gate, and whether each one is a deliberate swallow or a failure shown as an empty result is a question nobody has read yet. Kept so the gate can refuse a NEW one."
+    }
+  }
+}

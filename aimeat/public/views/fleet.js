@@ -30,6 +30,8 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v2.2.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of the "no
+ *     agents" empty state and its starter (QA audit F6-05, E7-04).
  *   v2.1.0 -- 2026-10-01 -- What the agents did in the last 7 days comes before their sign-in health
  *     (fleet-week.js, guided journey P4).
  *   v2.0.0 -- 2026-09-27 -- Drawn from library components and writing no class (page group G9): the
@@ -93,6 +95,7 @@ import { Tab } from '/components/Tabs.js';
 import { Row as Line, Stack, Space } from '/components/Layout.js';
 import { List, Row, Name, Doors, Group } from '/components/List.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { WeekBlock } from './fleet-week.js';
 
 /** The states that mean a person has something to do. The heading counts these. */
@@ -234,6 +237,7 @@ function MigrateBanner({ migration, migrating, outcome, onPress }) {
  */
 export default function FleetView({ embedded = false, starter = null } = {}) {
   const [agents, setAgents] = useState(null);
+  const fleetLoad = useLoadState();
   const [signedIn, setSignedIn] = useState(hasSession());
   const [onlyProblems, setOnlyProblems] = useState(false);
   const [migration, setMigration] = useState(null);
@@ -255,7 +259,13 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
     try {
       const resp = await apiGet('/v1/agents?include=stats,credentials');
       setAgents(resp?.data?.agents ?? []);
-    } catch (err) { swallowed('fleet: load', err); setAgents([]); }
+      fleetLoad.ok();
+    } catch (err) {
+      // Never an empty list: "no agents" with the starter over a fleet that only failed to load.
+      // The list stays as it was; the first load shows the could-not-load note.
+      swallowed('fleet: load', err);
+      fleetLoad.fail(err);
+    }
     // What could be done about the ones that cannot sign in. Read separately because it is a
     // DECISION rather than a listing: the node answers which agents would move, whether a
     // connector is there to move them, and the sentence to show if it is not.
@@ -397,7 +407,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
   if (!signedIn) {
     return frame(html`<${EmptyState} title=${t('fleet.signedOut')} text=${t('fleet.signedOutText')} />`);
   }
-  if (!agents) return frame(html`<${Spinner} text=${t('fleet.loading')} />`);
+  if (!agents) return frame(fleetLoad.failed ? html`<${LoadFailed} onRetry=${load} />` : html`<${Spinner} text=${t('fleet.loading')} />`);
 
   const problems = agents.filter(a => NEEDS_ATTENTION.has(a.credential?.state));
   const shown = onlyProblems ? problems : agents;

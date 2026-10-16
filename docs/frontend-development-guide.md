@@ -771,6 +771,20 @@ try {
 }
 ```
 
+### An error is not an empty result
+
+A load has three outcomes, and a page draws each one apart: loading, failed, loaded. A failed load
+leaves the page's data as it was (null before the first load) and shows the existing error frame
+with a Retry button; it never sets an empty list, because the page then says "you have none" about
+data that still exists. `/js/load-state.js` is the one way to do it: `useLoadState()` (`ok()`,
+`fail(err)`, `failed`) for a loader that sets its own state, `LoadFailed({ onRetry })` for the note,
+and `loadPhase()` as the pure decision; `useApiCall` in `/js/hooks.js` keeps the same three states.
+In `js/services/`, a read that forgives a failure (answers `[]`, `{}` or `null`) is for drawing
+only, and its strict twin is named `…Strict` and throws. A write that replaces a whole record reads
+it with the strict name just before it writes, through `readForWrite()`, which throws `NOT_LOADED`
+with words a person can act on; or the page refuses to save a record it did not load and says so
+(`common.settingsNotLoaded`). `docs/pitfalls.md` section 84 is the same rule on the server.
+
 What `api()` does around the call:
 
 - **Reads are retried, writes are not.** A `GET`, `HEAD` or `OPTIONS` that gets a 429, a 5xx, a

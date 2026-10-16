@@ -11,6 +11,8 @@
  * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents · whereUsed
  * @usage import { renderContactsView } from './contacts/cover.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry under People and
+ *     no "nobody yet" line in the other sections (ctx.contactsFailed) (QA audit F6-05).
  *   v1.12.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Tabs and Tab in their fold tone; TextField; List; More; Note; Tinted; Action): the page passes data and writes no class. Put back from main: the blocked people are a dim tag (page group G8).
  *   v1.11.0 -- 2026-09-26 -- "Where" is the Listing (listing, listing-row, the name with its line; cut name-name, two to a line), a unification: the look most tabs use.
  *   v1.10.0 -- 2026-09-26 -- The line under each place in "Where" is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
@@ -51,6 +53,7 @@ import { c, rel, nameOf, crumb, pageLinks, peopleRows, noAccountRows, agentRows,
 import { renderPerson } from './person.js';
 import { addBody } from './add.js';
 import { Hint } from '/components/Hint.js';
+import { LoadFailed } from '/js/load-state.js';
 
 const PAGE = 12;
 
@@ -132,7 +135,8 @@ function secPeople(ctx) {
   return html`
     <${PageSection} id="ct-people" num="01" title=${c('secPeople')} count=${`${ctx.people.length} · ${c('secPeopleSub')}`} doors=${doors} first>
       ${ctx.searchOpen ? html`<${Space} below="medium"><${TextField} size="medium" placeholder=${c('searchPlaceholder')} value=${ctx.q} onInput=${(v) => ctx.setQ(v)} autoFocus /><//>` : null}
-      ${ctx.loading && !ctx.contacts.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+      ${ctx.contactsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />`
+        : ctx.loading && !ctx.contacts.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
         : !shown.length ? html`<${Note} kind="quiet">${ctx.people.length ? c('emptyFiltered') : c('emptyPeople')}<//>`
         : peopleRows(ctx, shown)}
       ${list.length > shown.length ? html`<${More} onMore=${() => ctx.setShowAll(true)} label=${c('showRest', { n: list.length - shown.length })} />` : null}
@@ -145,7 +149,7 @@ function secNoAccount(ctx) {
   const doors = html`<${Action} small onClick=${() => ctx.openAdd('person')}>${c('writeDown')}<//>`;
   return html`
     <${PageSection} id="ct-noaccount" num="02" title=${c('secNoAccount')} count=${ctx.noAccount.length} doors=${doors}>
-      ${!ctx.noAccount.length ? html`<${Note} kind="quiet">${c('emptyNoAccount')}<//>` : noAccountRows(ctx, ctx.noAccount)}
+      ${ctx.contactsFailed ? null : !ctx.noAccount.length ? html`<${Note} kind="quiet">${c('emptyNoAccount')}<//>` : noAccountRows(ctx, ctx.noAccount)}
       <${Hint}>${c('noAccountHint')}<//>
     <//>`;
 }
@@ -157,7 +161,7 @@ function secAgents(ctx) {
     items=${[{ value: 'others', label: c('othersN', { n: others.length }) }, { value: 'mine', label: c('mineN', { n: mine.length }) }]} />`;
   return html`
     <${PageSection} id="ct-agents" num="03" title=${c('secAgents')} count=${`${ctx.agents.length} · ${c('secAgentsSub')}`} doors=${doors}>
-      ${!list.length ? html`<${Note} kind="quiet">${ctx.agentsFilter === 'mine' ? c('emptyMine') : c('emptyOthers')}<//>` : agentRows(ctx, sortPeople(list))}
+      ${ctx.contactsFailed ? null : !list.length ? html`<${Note} kind="quiet">${ctx.agentsFilter === 'mine' ? c('emptyMine') : c('emptyOthers')}<//>` : agentRows(ctx, sortPeople(list))}
       <${Hint}>${c('agentsHint')}<//>
     <//>`;
 }

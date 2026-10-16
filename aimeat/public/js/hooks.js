@@ -9,7 +9,12 @@
  *   - useApiCall(endpoint, options): fetches via api(), returns { data, error, loading, reload }
  *   - reload(): bumps an internal key to re-run the fetch (e.g. after a mutation)
  *
+ *   A view whose loader sets its own state uses useLoadState and LoadFailed from /js/load-state.js
+ *   for the same three outcomes (loading, failed, loaded).
+ *
  * @version-history
+ *   v1.1.0 — 2026-10-16 — A thrown refusal keeps the node's message in `error` (every ok:false landed
+ *     as "Network error", because api() throws) (QA audit F6-05).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { useState, useEffect } from 'preact/hooks';
@@ -56,8 +61,10 @@ export function useApiCall(endpoint, options = {}) {
         setError(r.error?.message ?? String(r.error ?? 'Request failed'));
         setData(null);
       }
-    }).catch(() => {
-      if (!cancelled) setError('Network error — please try again');
+    }).catch((err) => {
+      // api() throws on ok:false, so this is where a refusal lands too: keep the node's own words.
+      // `data` is left as it was, so a failed reload is not drawn as an empty result.
+      if (!cancelled) setError(err?.message || 'Network error — please try again');
     }).finally(() => {
       if (!cancelled) setLoading(false);
     });

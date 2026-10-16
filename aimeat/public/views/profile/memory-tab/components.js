@@ -8,6 +8,9 @@
  *   Extracted from memory-tab.js to satisfy max-file-lines. Every part is a component of the kit
  *   that gets data; the file writes no class.
  * @version-history
+ *   v2.1.1 -- 2026-10-16 -- Sending the collection to a workspace adds its sources on top of a strict
+ *     read (addWorkspaceSources): a failed read saves nothing instead of replacing the workspace's
+ *     sources with the collection (QA audit F6-04).
  *   v2.1.0 -- 2026-10-02 -- The question mark that explains a record's visibility in MemoryForm and EditMemoryModal: memory.visibility (components/HelpTip.js). MemoryForm offers "My agents" (owner) where it offered "Shared", which the write route refuses (MemoryWriteSchema has no 'shared').
  *   v2.0.1 -- 2026-09-26 -- The collection folds from a click anywhere on its head again, as on main
  *     (Group wholeHead), and a discovered value scrolls after 300px as main's .mem-discover-preview
@@ -59,7 +62,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import * as memoryService from '/js/services/memory.js';
 import { getNodeUrl } from '/js/services/auth.js';
-import { listWorkspaces, getWorkspaceSources, saveWorkspaceSources } from '/js/services/organisms.js';
+import { listWorkspaces, addWorkspaceSources } from '/js/services/organisms.js';
 import { Modal } from '/components/Modal.js';
 import { FilePreview } from '/components/FilePreview.js';
 import { Action, Loud, Icon, Actions } from '/components/Action.js';
@@ -149,19 +152,12 @@ export function CartTray({ cart, nodeUrl, orgs, onRemove, onClear, showToast }) 
     if (!sendOrg || !sendWs) return;
     setSending(true);
     try {
-      const existing = await getWorkspaceSources(sendOrg, sendWs);
-      const have = new Set(existing.map(srcKeyOf));
-      const additions = [];
-      for (const it of cart) {
-        const src = sourceOf(it);
-        if (have.has(srcKeyOf(src))) continue;
-        have.add(srcKeyOf(src));
-        additions.push({ id: 's-' + Math.random().toString(36).slice(2, 9), addedAt: new Date().toISOString(), ...src });
-      }
-      if (additions.length === 0) { showToast(t('profile.memory.cartSourcesExist') || 'All items already attached to that workspace'); return; }
-      const r = await saveWorkspaceSources(sendOrg, sendWs, [...existing, ...additions]);
-      if (r?.ok === false) { showToast(r.error?.message || t('profile.error'), true); return; }
-      showToast((t('profile.memory.cartSourcesAdded') || 'Added {n} sources to the workspace').replace('{n}', String(additions.length)));
+      // The sources record is saved whole: addWorkspaceSources reads it strictly just before the
+      // write, so a failed read saves nothing (it was written as the cart's items alone).
+      const additions = cart.map(it => ({ id: 's-' + Math.random().toString(36).slice(2, 9), addedAt: new Date().toISOString(), ...sourceOf(it) }));
+      const { added } = await addWorkspaceSources(sendOrg, sendWs, additions, srcKeyOf);
+      if (added === 0) { showToast(t('profile.memory.cartSourcesExist') || 'All items already attached to that workspace'); return; }
+      showToast((t('profile.memory.cartSourcesAdded') || 'Added {n} sources to the workspace').replace('{n}', String(added)));
       setSendOpen(false);
     } catch (e) { showToast(e.message || t('profile.error'), true); }
     finally { setSending(false); }

@@ -43,6 +43,10 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-setup-verification.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-and-verification
  * @version-history
+ *   2026-10-16 — Tests 4, 6 and 10: the status gives the running node type and port; an init whose
+ *     settings match reports each one unchanged; an init on a node with a .env reports the node id,
+ *     port and genesis URL as not written, names the .env and does not say setup is complete
+ *     (QA audit F1-03).
  *   2026-10-16 — Test 15b: PUT /v1/admin/config refuses eudiw.enabled=true and the wallet routes stay off (QA audit D6-01, F21b-01).
  *   2026-10-15 — Test 22: the receipt's collection method and language follow how and by whom the
  *     consent was given (feature-list audit #161).
@@ -259,6 +263,10 @@ try {
             const { status, body } = await call(setupNode.base, '/v1/setup/status');
             assert(status === 200, `expected 200, got ${status}`);
             assert(body.data.needsSetup === true, `needsSetup: ${body.data.needsSetup}`);
+            // The wizard's defaults are the running values, so an untouched form changes nothing (F1-03).
+            assert(body.data.nodeId === NODE_ID, `nodeId: ${body.data.nodeId}`);
+            assert(body.data.nodeType === 'full', `nodeType: ${body.data.nodeType}`);
+            assert(String(body.data.port) === SETUP_PORT, `port: ${body.data.port}`);
         });
 
         await test('5. Every shape the first owner may not have is refused', async () => {
@@ -337,6 +345,13 @@ try {
             assert(body.data.agent.name === 'app', `default agent: ${body.data.agent.name}`);
             assert(body.data.agent.gaii === `app#${SETUP_USER}@${NODE_ID}`, `agent gaii: ${body.data.agent.gaii}`);
             assert(typeof body.data.token === 'string' && body.data.token.length > 0, 'a session comes back with it');
+            // Every node setting sent equals the running value, so nothing waits for a restart and
+            // the answer may say setup is complete (QA audit F1-03).
+            const settings = body.data.settings as Array<{ setting: string; status: string }>;
+            assert(Array.isArray(settings) && settings.length === 4 && settings.every(s => s.status === 'unchanged'),
+                `settings: ${JSON.stringify(settings)}`);
+            assert(body.data.restart_required === false, `restart_required: ${body.data.restart_required}`);
+            assert(/Node setup complete/.test(body.data.message), `message: ${body.data.message}`);
             setupOwnerToken = body.data.token;
             setupGhii = `${SETUP_USER}@${NODE_ID}`;
         });
@@ -379,12 +394,31 @@ try {
         await test('10. Without an imported key the node makes its own, which nobody else holds', async () => {
             const other = await spawnNode(SECOND_PORT);
             try {
+                // Node settings that differ from the running node, on a node where a .env already
+                // exists (the placeholder above, or the developer's own): none is written, the answer
+                // names each one and the reason, and it does not say setup is complete (QA audit F1-03).
                 const { status, body } = await call(other.base, '/v1/setup/init', {
                     method: 'POST',
-                    body: JSON.stringify({ owner: { username: SECOND_USER, password: SETUP_PASSWORD } }),
+                    body: JSON.stringify({
+                        nodeId: 'renamed-by-wizard', port: 40999, genesisUrl: 'https://genesis.example',
+                        owner: { username: SECOND_USER, password: SETUP_PASSWORD },
+                    }),
                 });
                 assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body.error)}`);
                 assert(body.data.owner.name === SECOND_USER, `owner: ${body.data.owner.name}`);
+                const byName = Object.fromEntries((body.data.settings as any[]).map(s => [s.setting, s]));
+                for (const [name, requested] of [['node_id', 'renamed-by-wizard'], ['port', 40999], ['genesis_url', 'https://genesis.example']] as const) {
+                    const s = byName[name];
+                    assert(s?.status === 'not_written' && s.requested === requested, `${name}: ${JSON.stringify(s)}`);
+                    assert(/\.env/.test(s.reason ?? ''), `${name} names the .env that stopped it: ${s.reason}`);
+                }
+                assert(byName.node_id.running === NODE_ID, `the node keeps its id: ${byName.node_id.running}`);
+                assert(byName.node_type?.status === 'unchanged', `node_type was not sent: ${JSON.stringify(byName.node_type)}`);
+                assert(body.data.restart_required === false, 'nothing was written, so no restart applies it');
+                assert(!/setup complete/i.test(body.data.message), `the message claims completion: ${body.data.message}`);
+                assert(/NOT saved/.test(body.data.message) && /node id/.test(body.data.message), `message: ${body.data.message}`);
+                // The account was made on the id the node runs as, not the one typed.
+                assert(body.data.agent.gaii === `app#${SECOND_USER}@${NODE_ID}`, `agent gaii: ${body.data.agent.gaii}`);
                 // displayName falls back to the username when none is given.
                 assert(body.data.owner.displayName === SECOND_USER, `displayName: ${body.data.owner.displayName}`);
                 assert(typeof body.data.token === 'string', 'a session comes back');

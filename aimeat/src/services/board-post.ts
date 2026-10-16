@@ -30,6 +30,8 @@
  *   const out = await createBoardPost({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.4.0 — 2026-10-16 — createBoardPost writes the charge, its ledger line, the provenance record and
+ *     the post in one transaction (QA audit E6-03).
  *   v1.3.0 — 2026-10-08 — createBoardPost asks provenanceDeclarationRefusal before it debits the
  *     public-board price: a declaration the session may not make cost the author the price of a post
  *     that was never written. The caller carries the session's scopes into both provenance calls.
@@ -191,49 +193,57 @@ export async function createBoardPost(
     // everybody reads, and it applied only to the HTTP door. The board's own price, when its keeper
     // set one, replaces the node's base price; a board priced at 0 is free.
     const charged = boardPostPrice(board, config, body.length);
-    if (charged > 0) {
-        const debited = await storage.debitBalance(caller.gaii, charged);
-        if (!debited) {
-            return { ok: false, status: 402, code: 'INSUFFICIENT_MORSELS', message: `Posting costs ${charged} morsels` };
+    // The charge, its ledger line, the provenance record and the post in ONE transaction: written
+    // apart, a failed post write after the debit charged the author for a post that was never stored
+    // (QA audit E6-03). A provenance refusal thrown inside rolls the charge back too.
+    const post = await storage.transaction(async () => {
+        if (charged > 0) {
+            const debited = await storage.debitBalance(caller.gaii, charged);
+            if (!debited) {
+                return null;
+            }
+            await storage.addTransaction({
+                id: `tx-${randomUUID()}`,
+                gaii: caller.gaii,
+                type: 'spent',
+                amount: -charged,
+                timestamp: new Date().toISOString(),
+            });
         }
-        await storage.addTransaction({
-            id: `tx-${randomUUID()}`,
-            gaii: caller.gaii,
-            type: 'spent',
-            amount: -charged,
-            timestamp: new Date().toISOString(),
+
+        // The hash covers title + body together, which is the unit a reader sees.
+        const aiProvenanceId = await provenanceForWrite(storage, {
+            principal: caller.gaii,
+            scopes: caller.scopes,
+            content: `${title}\n\n${body}`,
+            declaredId: input.declaredProvenanceId,
+            declared: input.declaredProvenance,
+            pipeline: input.pipeline,
+            surface: { visibility: board.visibility === 'public' ? 'public' : 'private', humanAudience: true },
+            labelPolicy: config.aiLabelPublic,
+            nodeId: config.nodeId,
+            baseUrl: config.baseUrl,
+            enabled: config.aiProvenance,
         });
+
+        const hours = input.ttlHours ?? board.rules?.defaultTtlHours ?? DEFAULT_TTL_HOURS;
+        return storage.createPost({
+            id: `post-${randomBytes(8).toString('hex')}`,
+            boardId: input.boardId,
+            authorGaii: caller.gaii,
+            title,
+            body,
+            category: input.category,
+            tags,
+            ttlExpiresAt: new Date(Date.now() + hours * 3600_000).toISOString(),
+            reactions: {},
+            createdAt: new Date().toISOString(),
+            ...(aiProvenanceId ? { aiProvenanceId } : {}),
+        });
+    });
+    if (!post) {
+        return { ok: false, status: 402, code: 'INSUFFICIENT_MORSELS', message: `Posting costs ${charged} morsels` };
     }
-
-    // The hash covers title + body together, which is the unit a reader sees.
-    const aiProvenanceId = await provenanceForWrite(storage, {
-        principal: caller.gaii,
-        scopes: caller.scopes,
-        content: `${title}\n\n${body}`,
-        declaredId: input.declaredProvenanceId,
-        declared: input.declaredProvenance,
-        pipeline: input.pipeline,
-        surface: { visibility: board.visibility === 'public' ? 'public' : 'private', humanAudience: true },
-        labelPolicy: config.aiLabelPublic,
-        nodeId: config.nodeId,
-        baseUrl: config.baseUrl,
-        enabled: config.aiProvenance,
-    });
-
-    const hours = input.ttlHours ?? board.rules?.defaultTtlHours ?? DEFAULT_TTL_HOURS;
-    const post = await storage.createPost({
-        id: `post-${randomBytes(8).toString('hex')}`,
-        boardId: input.boardId,
-        authorGaii: caller.gaii,
-        title,
-        body,
-        category: input.category,
-        tags,
-        ttlExpiresAt: new Date(Date.now() + hours * 3600_000).toISOString(),
-        reactions: {},
-        createdAt: new Date().toISOString(),
-        ...(aiProvenanceId ? { aiProvenanceId } : {}),
-    });
 
     // The two things that happen BESIDES the write, and both lived in the HTTP route so the tool
     // surface had neither. A board open in a browser listens on the 'boards' domain, so without the

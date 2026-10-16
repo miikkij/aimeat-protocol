@@ -3903,7 +3903,10 @@
     "error": "Error",
     "copyPrompt": "Copiar el prompt",
     "copyLink": "Copiar el enlace",
-    "copyUrl": "Copiar la URL"
+    "copyUrl": "Copiar la URL",
+    "loadFailed": "No se pudo cargar en este momento. No se ha borrado nada. Inténtalo de nuevo en un momento.",
+    "notLoadedNotSaved": "La versión actual no se cargó, así que no se cambió nada. Inténtalo de nuevo en un momento.",
+    "settingsNotLoaded": "Tu configuración guardada no se cargó, así que no se guardó nada. Vuelve a cargar la página e inténtalo de nuevo."
   },
   "compat": {
     "title": "¿Qué IA pueden leer tus recuerdos por su cuenta?",
@@ -4925,6 +4928,8 @@
   "pkpage.syncRemote": "Traer de otros servidores",
   "pkpage.syncing": "Trayendo…",
   "pkpage.syncedToast": "Los listados de otros servidores están traídos.",
+  "pkpage.syncedPartialToast": "Los listados de {ok} servidores están traídos. {failed} no respondieron: {names}.",
+  "pkpage.syncedNone": "Ningún otro servidor comparte todavía sus listados con este servidor.",
   "pkpage.open": "Abrir",
   "pkpage.close": "Cerrar",
   "pkpage.openApp": "Abrir la app",
@@ -7652,6 +7657,10 @@
   "notiftext.workflow_failed.body": "No produjo: {failed} · unos {minutes} min · {steps}",
   "notiftext.workflow_cancelled.title": "El flujo \"{name}\" fue cancelado",
   "notiftext.workflow_cancelled.body": "unos {minutes} min · {steps}",
+  "notiftext.schedule_failed.title": "La programación \"{name}\" falló",
+  "notiftext.schedule_failed.body": "{detail}",
+  "notiftext.schedule_paused.title": "La programación \"{name}\" se pausó",
+  "notiftext.schedule_paused.body": "{detail}",
   "notiftext.workflow_stopped.title": "El flujo \"{name}\" se detuvo al llegar a su límite de gasto",
   "notiftext.workflow_stopped.body": "Ya se habían gastado {spent} en IA, y el límite es de {cap} por ejecución · unos {minutes} min · {steps}",
   "notiftext.workflow_stopped_estimate.title": "El flujo \"{name}\" se detuvo para no superar su límite de gasto",
@@ -7713,6 +7722,8 @@
   "notiftext.package_renewal_agent_limit.body": "Tu agente activó la renovación automática, y esta renovación pasaría de lo máximo que puede gastar en un día, o no tiene límite. No se hizo ningún cobro a tu tarjeta. El servicio de actualizaciones termina el {date}, a menos que lo renueves a mano o subas el límite del agente. La renovación se intenta de nuevo cada día hasta entonces.",
   "notiftext.package_renewed.title": "Se renovó el servicio de actualizaciones de {name}",
   "notiftext.package_renewed.body": "Se cobraron {amount} a tu tarjeta, y las versiones nuevas siguen llegando durante {days} días más.",
+  "notiftext.payment_not_delivered.title": "Se cobró un pago de {amount} y el pedido no se entregó",
+  "notiftext.payment_not_delivered.body": "No se pudo entregar el pedido y el pago no volvió al comprador, así que lo tienes tú. Devuelve el pago al comprador o entrega el pedido. Referencia del pedido: {session}.",
   "notiftext.package_sale_request_approved.title": "Se aprobó tu solicitud de {name}",
   "notiftext.package_sale_request_approved.body": "El vendedor la aprobó. Abre tu página de Paquetes para ver qué sigue.",
   "notiftext.package_sale_request_refused.title": "No se aprobó tu solicitud de {name}",
@@ -12438,7 +12449,9 @@
     "resumeFound": "Hay una solicitud pendiente ({{requestId}}). ¿Sigo consultando?",
     "resumeYes": "Sí, mira el estado",
     "resumeNo": "No, empezar de cero",
-    "alreadyPeer": "Este nodo ya es par del destino"
+    "alreadyPeer": "Este nodo ya es par del destino",
+    "cancelled": "Unión cancelada. No se cambió la configuración de federación en .env.",
+    "notJoined": "No se completó la unión. La red a la que intentaste unirte no aceptó la clave, así que no se cambió la configuración de federación en .env. Vuelve a ejecutar \"aimeat join\" cuando acepte la clave."
   },
   "knowledge": {
     "tabLabel": "Conocimiento",

@@ -7,6 +7,14 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   2026-10-16 — A failed core job sends the operator the deduplicated fault message; a failed user
+ *     schedule tells its owner in the bell and is paused after five failures in a row
+ *     (scheduler-failures.ts); a core job whose handler is not registered is skipped with one log
+ *     line (QA audit E4-03). Every run has a per-kind time limit that ends it as an error and frees
+ *     the job (scheduler-run-limit.ts; QA audit E4-04). At start a fire missed while the node was
+ *     down is caught up once (daily-or-longer core jobs) or recorded as missed (user schedules), and
+ *     shutdown() stops the crons and waits a bounded time for running jobs (scheduler-catch-up.ts;
+ *     QA audit E4-07). The agent_task bodies moved to scheduler-agent-task.ts (max-file-lines).
  *   v2.19.0 — 2026-10-11 — An agent_task run for a stopped agent is skipped, outcome `stopped` (agent-stop-rules.ts).
  *   v2.18.0 — 2026-10-04 — A cron fire is claimed in the database before it runs (scheduler-fire-claim.ts).
  *   v2.17.1 — 2026-10-04 — A declined occurrence no longer blocks the next fire (isTerminalTaskStatus).
@@ -90,23 +98,22 @@
 import { Cron } from 'croner';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord, ExecutionLogEntry, AgentTaskRecord, AgentTaskScope, ScheduleConstraint } from '../storage/interface.js';
-import { isTerminalTaskStatus } from '../storage/interface.js';
+import type { Storage, ScheduledJobRecord, ExecutionLogEntry, ScheduleConstraint } from '../storage/interface.js';
 import type { EmailService } from './email.js';
 import type { PushService } from './push.js';
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { evaluateConstraints, applyAfterRun } from './schedule-constraints.js';
-import { emitChange, emitDelivery } from './event-bus.js';
-import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent-task-rules.js';
-import { isStopped } from './agent-stop-rules.js';
-import { withWildcardFacts } from './scope-use.js';
-import { emitResourceUpdated } from '../mcp/resource-events.js';
+import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
 import { SlotPool } from './slot-pool.js';
 import { runExtensionJob } from './scheduler-extension-job.js';
 import { runAiJob, runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
+import { runAgentTaskJob, materialiseAgentTask as materialiseAgentTaskRecord, type TaskWake } from './scheduler-agent-task.js';
+import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { claimCronFire } from './scheduler-fire-claim.js';
+import { withRunLimit, runLimitFor, type RUN_LIMIT_MS } from './scheduler-run-limit.js';
+import { onFailedRun, noteSuccess, tellScheduleOwner } from './scheduler-failures.js';
+import { missedFire, missedMessage, type MissedFire } from './scheduler-catch-up.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -132,8 +139,17 @@ export class Scheduler {
   private emailService?: EmailService;
   private webhookDispatcher?: WebhookDispatcher;
   private pushService?: PushService;
-  /** Guards against overlapping fires of the same job (one run at a time). */
-  private executing = new Set<string>();
+  /** Guards against overlapping fires of the same job (one run at a time); the job, for shutdown(). */
+  private executing = new Map<string, ScheduledJobRecord>();
+  /** Per-kind run limits that replace RUN_LIMIT_MS (setRunOptions; tests shorten them). */
+  private runLimits: Partial<Record<keyof typeof RUN_LIMIT_MS, number>> = {};
+  /** Catch-up runs wait this long after start(), so they do not add to the boot's own load. */
+  private catchUpDelayMs = 60_000;
+  private catchUpTimer?: NodeJS.Timeout;
+  /** Core jobs whose handler is not registered, already logged once in this process. */
+  private missingHandlerLogged = new Set<string>();
+  /** Failures in a row per job since its last success, as this process saw them (scheduler-failures.ts). */
+  private failureStreaks = new Map<string, number>();
 
   // Boot-memory trace 2026-08-17: a cron tick launched 13 jobs in the same second, several of
   // them extension jobs that each open a QuickJS WASM sandbox (external memory spiked to
@@ -169,6 +185,12 @@ export class Scheduler {
     return { push: this.pushService, email: this.emailService };
   }
 
+  /** Replace the per-kind run limits or the catch-up delay (tests; defaults otherwise). */
+  setRunOptions(opts: { runLimits?: Partial<Record<keyof typeof RUN_LIMIT_MS, number>>; catchUpDelayMs?: number }): void {
+    if (opts.runLimits) this.runLimits = { ...opts.runLimits };
+    if (opts.catchUpDelayMs !== undefined) this.catchUpDelayMs = opts.catchUpDelayMs;
+  }
+
   /**
    * Register a core handler function that can be referenced by scheduled jobs.
    * Must be called before start().
@@ -193,21 +215,34 @@ export class Scheduler {
 
     const jobs = await this.storage.listScheduledJobs({ enabled: true });
     const activateJobs: ScheduledJobRecord[] = [];
+    const missed: Array<{ job: ScheduledJobRecord; plan: MissedFire }> = [];
+    const now = new Date();
 
     for (const job of jobs) {
       if (job.cron === '@activate') {
         activateJobs.push(job);
       } else {
+        // Read the stored next fire before scheduleJob writes the new one (scheduler-catch-up.ts).
+        const plan = missedFire(job, now);
+        if (plan) missed.push({ job, plan });
         this.scheduleJob(job);
       }
     }
 
-    logger.info(`Scheduler started with ${jobs.length} enabled jobs (${activateJobs.length} @activate)`);
+    logger.info(`Scheduler started with ${jobs.length} enabled jobs (${activateJobs.length} @activate, ${missed.length} with a missed fire)`);
 
     // Run @activate jobs sequentially after scheduler is running
     if (activateJobs.length > 0) {
       this.runActivateJobsList(activateJobs).catch(err =>
         logger.error('Scheduler @activate jobs failed', { error: String(err) }));
+    }
+
+    if (missed.length > 0) {
+      this.catchUpTimer = setTimeout(() => {
+        this.catchUpTimer = undefined;
+        this.handleMissedFires(missed).catch(err => logger.error('Scheduler catch-up failed', { error: String(err) }));
+      }, this.catchUpDelayMs);
+      this.catchUpTimer.unref?.();
     }
   }
 
@@ -215,6 +250,7 @@ export class Scheduler {
    * Stop all scheduled jobs.
    */
   stop(): void {
+    if (this.catchUpTimer) { clearTimeout(this.catchUpTimer); this.catchUpTimer = undefined; }
     for (const [id, cron] of this.cronJobs) {
       cron.stop();
       logger.info(`Scheduler stopped job: ${id}`);
@@ -222,6 +258,52 @@ export class Scheduler {
     this.cronJobs.clear();
     this.running = false;
     logger.info('Scheduler stopped');
+  }
+
+  /**
+   * Stop the crons and wait up to `graceMs` for the runs in progress (the node is shutting down).
+   * A run still going when the wait ends gets an error row in its run log, so the cut-off run is on
+   * record; the job row keeps its stored next fire, which the next start reads (scheduler-catch-up.ts).
+   * Returns the ids of the runs that did not finish.
+   */
+  async shutdown(graceMs = 4000): Promise<string[]> {
+    this.stop();
+    const until = Date.now() + graceMs;
+    while (this.executing.size > 0 && Date.now() < until) await new Promise(r => setTimeout(r, 50));
+    const unfinished = [...this.executing.values()];
+    for (const job of unfinished) {
+      await this.writeLog(job, 'cron', 'error', {
+        errorMessage: 'The node shut down while this run was in progress, so it did not finish.',
+        durationMs: 0, reads: [], writes: [],
+      });
+    }
+    if (unfinished.length) logger.warn(`Scheduler shutdown: ${unfinished.length} run(s) did not finish`, { jobs: unfinished.map(j => j.id) });
+    return unfinished.map(j => j.id);
+  }
+
+  /** The fires missed while the node was down: run once or record, each claimed first. */
+  private async handleMissedFires(missed: Array<{ job: ScheduledJobRecord; plan: MissedFire }>): Promise<void> {
+    for (const { job: loaded, plan } of missed) {
+      if (!this.running) return;
+      // The job as it is now: the owner may have paused or deleted it since start().
+      let job: ScheduledJobRecord | null;
+      try { job = await this.storage.getScheduledJob(loaded.id); } catch (err) {
+        logger.warn(`Scheduler catch-up: could not read ${loaded.id}; its missed fire is left`, { error: String(err) });
+        continue;
+      }
+      if (!job?.enabled) continue;
+      let claimed = true;
+      try { claimed = await this.storage.claimScheduledFire(job.id, plan.fireAt); } catch (err) {
+        logger.warn(`Scheduler: could not claim the missed fire of ${job.id}; handling it here`, { error: String(err) });
+      }
+      if (!claimed) continue;
+      if (plan.action === 'run') {
+        logger.info(`Scheduler catch-up: running ${job.id} once for the fire at ${plan.fireAt}`);
+        await this.executeJob(job, 'cron').catch(err => logger.error(`Scheduler catch-up run failed: ${job.id}`, { error: String(err) }));
+      } else {
+        await this.writeLog(job, 'cron', 'skipped', { errorMessage: missedMessage(plan.fireAt), durationMs: 0, reads: [], writes: [] });
+      }
+    }
   }
 
   /**
@@ -336,6 +418,18 @@ export class Scheduler {
   }
 
   private async executeJob(job: ScheduledJobRecord, trigger: JobTrigger): Promise<JobOutcome> {
+    // ── A core job whose handler this node did not register (its feature is off, e.g. consent) ──
+    // It is not a failure: nothing broke, the feature is turned off. One log line per process, no
+    // run-log row, no fault report, so it cannot bury a real failure in the same list. A manual
+    // "Run now" is told why.
+    if (job.type === 'core' && job.coreHandler && !this.coreHandlers.has(job.coreHandler)) {
+      if (!this.missingHandlerLogged.has(job.id)) {
+        this.missingHandlerLogged.add(job.id);
+        logger.info(`Scheduler: core job ${job.id} is skipped, its handler "${job.coreHandler}" is not active on this node (the feature it serves is turned off)`);
+      }
+      return { code: 'error', detail: `The handler of this job is not active on this node, because the feature it serves is turned off. Turn the feature on, or disable the job.` };
+    }
+
     // ── Overlap guard: never run two fires of the same job concurrently ──
     if (this.executing.has(job.id)) {
       logger.warn(`Scheduler skipped overlapping fire: ${job.id}`);
@@ -362,7 +456,7 @@ export class Scheduler {
     const isExtension = job.type === 'extension';
     if (isExtension) await this.extJobPool.acquire();
 
-    this.executing.add(job.id);
+    this.executing.set(job.id, job);
     const startTime = Date.now();
     // Boot-memory trace 2026-08-17 round 3: the boot flood survived the cron gate, so every
     // job now reports its own RSS delta — the completion line names the eaters directly.
@@ -374,29 +468,9 @@ export class Scheduler {
     let run: JobRunResult = { reads: [], writes: [] };
 
     try {
-      if (job.type === 'core') {
-        await this.executeCoreJob(job);
-      } else if (job.type === 'extension') {
-        run = await this.executeExtensionJob(job);
-      } else if (job.type === 'ai') {
-        run = await this.executeAiJob(job);
-      } else if (job.type === 'agent_task') {
-        run = await this.executeAgentTaskJob(job, trigger);
-      } else if (job.type === 'workflow') {
-        run = await this.executeWorkflowJob(job);
-      } else if (job.type === 'eco-capability') {
-        run = await this.executeEcoCapabilityJob(job);
-      } else if (job.type === 'connections-publish') {
-        run = await this.executeConnectionsPublishJob(job);
-      } else if (this.kindExecutors.has(job.type)) {
-        run = await this.kindExecutors.get(job.type)!(job);
-      } else {
-        // A kind with no branch used to fall through here and be recorded as a SUCCESSFUL run that
-        // did nothing — a scheduled post that never leaves and a green run log saying it did. Caught
-        // by the LÄHETIN e2e when a new kind's dispatch was missed; failing loudly is the only way
-        // the next added kind cannot repeat it.
-        throw new Error(`scheduler has no executor for job type "${job.type}"`);
-      }
+      // A run that does not settle within its kind's limit ends here as an error and frees the job;
+      // whatever the handler returns later is not recorded (scheduler-run-limit.ts).
+      run = await withRunLimit(this.dispatchRun(job, trigger), runLimitFor(job.type, this.runLimits), `scheduled job ${job.id}`);
     } catch (err) {
       result = 'error';
       errorMessage = err instanceof Error ? err.message : String(err);
@@ -424,6 +498,7 @@ export class Scheduler {
     let updatedConstraints: ScheduleConstraint[] | undefined;
     if (result === 'success') {
       newRunCount = (job.runCount ?? 0) + 1;
+      noteSuccess(this.failureStreaks, job.id);
       job.runCount = newRunCount;
       try {
         const agent = job.agentGaii ? await this.storage.getAgent(job.agentGaii) : null;
@@ -454,7 +529,10 @@ export class Scheduler {
 
     if (result === 'error') {
       logger.error(`Scheduler job failed: ${job.id} (${job.displayName || job.name})`, { error: errorMessage, durationMs, trigger });
-      this.notifyOwner(job, 'Schedule failed', errorMessage ?? 'Unknown error');
+      // The operator for a core job, the owner for a user schedule, and a pause after a run of
+      // failures (scheduler-failures.ts).
+      const { pauseReason } = await onFailedRun({ storage: this.storage, config: this.config }, job, errorMessage ?? 'Unknown error', this.failureStreaks);
+      if (pauseReason) await this.autoDisable(job, pauseReason);
       return { code: 'error', detail: errorMessage };
     }
 
@@ -504,7 +582,8 @@ export class Scheduler {
     job.enabled = false;
     await this.storage.updateScheduledJob(job.id, { enabled: false, updatedAt: new Date().toISOString() }).catch(err => { logger.warn('error: continuing after a suppressed failure', { error: String(err) }); });
     emitChange('scheduler');
-    this.notifyOwner(job, 'Schedule auto-paused', reason);
+    await tellScheduleOwner(this.storage, job, 'paused', reason)
+      .catch(err => { logger.warn('scheduler: the pause notification is best-effort', { error: String(err) }); });
     logger.info(`Scheduler auto-disabled job ${job.id}: ${reason}`);
   }
 
@@ -520,19 +599,6 @@ export class Scheduler {
     }
   }
 
-  /** Send an owner push notification (best-effort; no-op if push disabled). */
-  private notifyOwner(job: ScheduledJobRecord, title: string, body: string): void {
-    if (!this.pushService?.enabled || !job.ownerScope) return;
-    const ownerName = localAccountName(job.ownerScope);
-    const label = job.displayName || job.name;
-    this.pushService.sendNotification(ownerName, {
-      title,
-      body: `${label}: ${body}`,
-      url: '/v1/profile?tab=scheduler',
-      tag: `schedule:${job.id}`,
-    }).catch(err => { logger.warn('error: push best-effort', { error: String(err) }); });
-  }
-
   /**
    * `ai` kind: gather predefined input memory keys, compose the prompt, run a
    * server-side completion on the owner's OpenRouter key, and store the result
@@ -545,205 +611,24 @@ export class Scheduler {
   /**
    * `agent_task` kind: materialise an AgentTaskRecord into the target agent's
    * queue and wake it via the existing webhook/MCP/SSE fan-out. The schedule is
-   * the parent (parentTaskId); offline agents pick it up on reconnect.
+   * the parent (parentTaskId); offline agents pick it up on reconnect. Body in scheduler-agent-task.ts.
    */
   private async executeAgentTaskJob(job: ScheduledJobRecord, trigger: JobTrigger): Promise<JobRunResult> {
-    const owner = job.ownerScope;
-    const agentGaii = job.agentGaii;
-    const agentName = job.agentName;
-    if (!owner || !agentGaii || !agentName) {
-      throw new Error(`agent_task job "${job.id}" missing ownerScope/agentGaii/agentName`);
-    }
-    const cfg = (job.input ?? {}) as {
-      taskTemplate?: {
-        title?: string; description?: string; scope?: AgentTaskScope[]; rules?: string[];
-        verification?: { userExpects?: string; technicalChecks?: string[] };
-        resources?: { knowledgePackages?: string[]; memoryKeys?: string[]; memoryPrefixes?: string[] };
-      };
-    };
-    const tmpl = cfg.taskTemplate;
-    if (!tmpl?.title) throw new Error(`agent_task job "${job.id}" missing taskTemplate.title`);
-
-    // A STOPPED AGENT'S RUN IS SKIPPED, NOT QUEUED (Jouni, 2026-10-11). An agent stopped for a week with
-    // an hourly schedule must not find 168 runs waiting when it is started. Before the overlap guard,
-    // so a "Run now" on a stopped agent says the agent is stopped and not that a run is still going.
-    const agent = await this.storage.getAgent(agentGaii);
-    if (isStopped(agent)) {
-      return { reads: [], writes: [], skipped: true, skipCode: 'stopped',
-        skipReason: `${agent?.displayName ?? agentName} is stopped, so this run was skipped. Start the agent, and the next run happens at its time.` };
-    }
-
-    // Overlap guard: don't pile up occurrences of the same schedule. A task the
-    // owner has set aside — `paused` (manual only) or any `archived` task — never
-    // blocks, which fixes the trap where a paused/archived occurrence silently
-    // swallowed every "Run now".
-    //  - Manual "Run now": defer only to an occurrence that is pending or running
-    //    on its own (queued/draft/revision_requested/active/stalled). A paused
-    //    one was deliberately stopped, so an explicit run gets a fresh occurrence.
-    //  - Cron/@activate: keep the stricter guard so unfinished occurrences don't
-    //    accumulate (anything not done/failed/declined defers the next fire).
-    const { tasks } = await this.storage.listAgentTasks(agentGaii, { perPage: 200 });
-    const blocks = trigger === 'manual'
-      ? (t: AgentTaskRecord) => t.status !== 'paused' && !isTerminalTaskStatus(t.status)
-      : (t: AgentTaskRecord) => !isTerminalTaskStatus(t.status);
-    const inFlight = tasks.find(t => t.parentTaskId === job.id && t.triage !== 'archived' && blocks(t));
-    if (inFlight) {
-      logger.info(`agent_task ${job.id}: occurrence ${inFlight.id} still ${inFlight.status}; skipping this fire [${trigger}]`);
-      return {
-        reads: [], writes: [], skipped: true,
-        skipReason: `A previous run is still ${inFlight.status}; finish, fail, or delete it to run again.`,
-      };
-    }
-
-    // The same start decision every created task gets (services/agent-task-rules.ts): the agent's
-    // own answer, never past the permission floor. It read `mode === 'task-runner'` inline until
-    // 2026-10-02, a copy of the old rule that would have kept a concierge's schedules waiting.
-    const autoActivated = decideTaskStart(await withWildcardFacts(this.storage, agent)).startsNow;
-    const now = new Date().toISOString();
-    const scheduleScope: AgentTaskScope = {
-      name: 'schedule', value: job.cron, type: 'cron', description: job.displayName || job.name,
-    };
-    const record: AgentTaskRecord = {
-      id: randomUUID(),
-      agentGaii,
-      ownerGaii: owner,
-      title: tmpl.title,
-      description: tmpl.description ?? '',
-      scope: [...(tmpl.scope ?? []), scheduleScope],
-      rules: tmpl.rules ?? [],
-      verification: {
-        userExpects: tmpl.verification?.userExpects ?? '',
-        technicalChecks: tmpl.verification?.technicalChecks ?? [],
-      },
-      resources: tmpl.resources,
-      todos: [],
-      status: autoActivated ? 'active' : 'queued',
-      parentTaskId: job.id,
-      createdAt: now,
-      updatedAt: now,
-      lastEventAt: autoActivated ? now : undefined,
-    };
-    const created = await this.storage.createAgentTask(record);
-
-    if (autoActivated) {
-      await this.storage.appendTaskEvent({
-        id: randomUUID(),
-        taskId: record.id,
-        type: 'started',
-        message: `Task auto-activated from schedule "${job.displayName || job.name}"`,
-        details: { started_by: AUTO_START_MARK },
-        timestamp: now,
-      });
-    }
-
-    // Wake fan-out — same channels a normally-created task uses.
-    const eventName = autoActivated ? 'task.approved' : 'task.queued';
-    if (this.webhookDispatcher) {
-      this.webhookDispatcher.dispatchWebhookEvent(agentGaii, eventName, {
-        task_id: record.id,
-        title: record.title,
-        description: record.description ?? '',
-        has_todos: false,
-        todo_count: 0,
-        scope_summary: record.scope.slice(0, 5).map(s => `${s.type || s.name}:${s.value}`),
-        created_at: record.createdAt,
-        auto_activated: autoActivated,
-        schedule_id: job.id,
-      });
-    }
-    // The connector tunnel, which the line above's "same channels a normally-created task uses"
-    // claimed and did not deliver. A webhook subscriber heard about a scheduled task and an agent
-    // holding a socket did not, so the task waited for whatever polled next. Same miss as the
-    // workflow engine's, found in the same sweep. → pitfalls §58
-    emitDelivery({ target: agentGaii, kind: 'task_assigned', id: taskWakeId(record.id, record.status, now), payload: created });
-    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('cfg: MCP not connected', { error: String(err) }); }
-    emitChange('agent-tasks');
-
-    return { reads: [], writes: [], taskId: created.id };
+    return runAgentTaskJob(this.storage, this.taskWake(), job, trigger);
   }
 
   /**
    * Materialise a one-off AgentTaskRecord into an agent's queue and wake it via the same
-   * webhook/MCP/SSE fan-out a scheduled `agent_task` uses. Public so other triggers (e.g. the
-   * ecosystem-app automation recipe, feature B4) can reuse the exact wake path without duplicating
-   * the dispatch machinery. `parentRef` is recorded as the task's parentTaskId (a recipe id here) so
-   * the lineage is visible; unlike the scheduled path there is NO overlap guard — each trigger
-   * deposit produces a fresh task occurrence. Best-effort wake (offline agents pick it up on
-   * reconnect). Returns the created task id.
+   * webhook/MCP/SSE fan-out a scheduled `agent_task` uses (feature B4, the ecosystem-app automation
+   * recipe). No overlap guard: each call produces a fresh occurrence. Body in scheduler-agent-task.ts.
    */
-  async materialiseAgentTask(args: {
-    owner: string;            // owner GHII (e.g. alice@node)
-    agentGaii: string;        // the target agent's full GAII
-    agentName: string;        // the agent's bare name (for the MCP resource URI)
-    parentRef: string;        // recorded as parentTaskId (the recipe id) for lineage
-    title: string;
-    description?: string;
-    scope?: AgentTaskScope[];
-    rules?: string[];
-    verification?: { userExpects?: string; technicalChecks?: string[] };
-    resources?: { knowledgePackages?: string[]; memoryKeys?: string[]; memoryPrefixes?: string[] };
-    /** Ecosystem-app recipe provenance/routing (B5/B6). Stamped onto the task so the agent
-     *  knows WHERE to write its report (organism) and the completion hook knows whether to
-     *  email the owner / gate the output. Omitted for non-automation triggers. */
-    automation?: AgentTaskRecord['automation'];
-  }): Promise<string> {
-    const agent = await this.storage.getAgent(args.agentGaii);
-    const autoActivated = decideTaskStart(await withWildcardFacts(this.storage, agent)).startsNow;
-    const now = new Date().toISOString();
-    const record: AgentTaskRecord = {
-      id: randomUUID(),
-      agentGaii: args.agentGaii,
-      ownerGaii: args.owner,
-      title: args.title,
-      description: args.description ?? '',
-      scope: args.scope ?? [],
-      rules: args.rules ?? [],
-      verification: {
-        userExpects: args.verification?.userExpects ?? '',
-        technicalChecks: args.verification?.technicalChecks ?? [],
-      },
-      resources: args.resources,
-      todos: [],
-      status: autoActivated ? 'active' : 'queued',
-      parentTaskId: args.parentRef,
-      createdAt: now,
-      updatedAt: now,
-      lastEventAt: autoActivated ? now : undefined,
-      ...(args.automation ? { automation: args.automation } : {}),
-    };
-    const created = await this.storage.createAgentTask(record);
+  async materialiseAgentTask(args: Parameters<typeof materialiseAgentTaskRecord>[2]): Promise<string> {
+    return materialiseAgentTaskRecord(this.storage, this.taskWake(), args);
+  }
 
-    if (autoActivated) {
-      await this.storage.appendTaskEvent({
-        id: randomUUID(),
-        taskId: record.id,
-        type: 'started',
-        message: `Task auto-activated from automation recipe "${args.parentRef}"`,
-        details: { started_by: AUTO_START_MARK },
-        timestamp: now,
-      }).catch(err => { logger.warn('cfg: best-effort', { error: String(err) }); });
-    }
-
-    const eventName = autoActivated ? 'task.approved' : 'task.queued';
-    if (this.webhookDispatcher) {
-      this.webhookDispatcher.dispatchWebhookEvent(args.agentGaii, eventName, {
-        task_id: record.id,
-        title: record.title,
-        description: record.description ?? '',
-        has_todos: false,
-        todo_count: 0,
-        scope_summary: record.scope.slice(0, 5).map(s => `${s.type || s.name}:${s.value}`),
-        created_at: record.createdAt,
-        auto_activated: autoActivated,
-      });
-    }
-    // Same pair. This method's own doc says callers reuse it to get "the exact wake path without
-    // duplicating the dispatch machinery", so the path it hands them has to be the whole one.
-    emitDelivery({ target: args.agentGaii, kind: 'task_assigned', id: taskWakeId(record.id, record.status, now), payload: created });
-    try { emitResourceUpdated(args.agentGaii, `aimeat://agents/${args.agentName}/tasks`); } catch (err) { logger.warn('cfg: MCP not connected', { error: String(err) }); }
-    emitChange('agent-tasks');
-
-    return created.id;
+  /** The wake channels of a created task (scheduler-agent-task.ts). */
+  private taskWake(): TaskWake {
+    return { webhookDispatcher: this.webhookDispatcher, emitResourceUpdated };
   }
 
   /**
@@ -777,6 +662,27 @@ export class Scheduler {
   private async executeConnectionsPublishJob(job: ScheduledJobRecord): Promise<JobRunResult> {
     const { runConnectionsPublishJob } = await import('./connections/scheduled-publish-job.js');
     return runConnectionsPublishJob(this.storage, this.config, job);
+  }
+
+  /** Run the job's kind. Throws when the kind has no executor. */
+  private async dispatchRun(job: ScheduledJobRecord, trigger: JobTrigger): Promise<JobRunResult> {
+    if (job.type === 'core') {
+      await this.executeCoreJob(job);
+      return { reads: [], writes: [] };
+    }
+    if (job.type === 'extension') return this.executeExtensionJob(job);
+    if (job.type === 'ai') return this.executeAiJob(job);
+    if (job.type === 'agent_task') return this.executeAgentTaskJob(job, trigger);
+    if (job.type === 'workflow') return this.executeWorkflowJob(job);
+    if (job.type === 'eco-capability') return this.executeEcoCapabilityJob(job);
+    if (job.type === 'connections-publish') return this.executeConnectionsPublishJob(job);
+    const kindExecutor = this.kindExecutors.get(job.type);
+    if (kindExecutor) return kindExecutor(job);
+    // A kind with no branch used to fall through here and be recorded as a SUCCESSFUL run that
+    // did nothing — a scheduled post that never leaves and a green run log saying it did. Caught
+    // by the LÄHETIN e2e when a new kind's dispatch was missed; failing loudly is the only way
+    // the next added kind cannot repeat it.
+    throw new Error(`scheduler has no executor for job type "${job.type}"`);
   }
 
   private async executeCoreJob(job: ScheduledJobRecord): Promise<void> {

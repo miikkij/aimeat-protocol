@@ -13,13 +13,18 @@
  *       has a live invitation. Anything else makes this an address-checking machine;
  *     - one live invitation per address, so an inbox cannot be buried by repeating the call;
  *     - the model is required, so the email can always say what asked for it;
- *     - the invitation is single-use and expires;
- *     - and the account it produces lands on the REMAKE track at step one — the chain does not end
- *       at the account.
+ *     - a node without mail says nothing was sent (reason mail_disabled) and gives the portal link;
+ *     - an unknown token resolves to nothing and accepting it creates no account.
+ *   This shared node sends no mail, so no invitation token exists here to accept. Accepting a mailed
+ *   registration link end to end (the account, its session, and single use: a second accept refused
+ *   INVITE_USED) is asserted in e2e-email-delivery.ts, which runs its own node against an SMTP sink.
+ *   A failed send on a node with mail is a unit test (test/unit/registration-invite-no-mail.test.ts).
+ *   The invitation's expiry is not asserted by any suite yet.
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-registration-invites
  * @version-history
+ *   2026-10-16 — The header no longer lists single use and expiry as proven here (no token exists on this node); it says where each is proven. The no-mail answer carries reason mail_disabled (QA audit F02a-04).
  *   2026-10-15 — This E2E server sends no mail, so the call must answer 200 not_sent with the portal link and GET / must not offer the invite; the old assertions required 202 "sent" and "check your email" where nothing was sent (feature-list audit #23).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4b).
  */
@@ -57,10 +62,9 @@ const invite = (email: string, agent: Record<string, unknown>, ua = 'e2e-agent/1
     });
 
 /**
- * The raw token lives only in the emailed link, and this suite has no inbox. It reads it from the
- * node's own storage the way the recipient's mail client would read the URL — via the operator
- * surface would need a token we may not have, so instead the suite drives the halves it CAN see
- * and asserts the response contract, plus the parts of the chain reachable without the raw token.
+ * The raw token lives only in the emailed link, and this node sends no mail, so no token is ever
+ * minted here. The suite asserts the response contract and the parts of the chain reachable without
+ * a token; the accept of a real token is in e2e-email-delivery.ts.
  */
 
 console.log('\n=== Registration Invites E2E (phase 4b: the agent door) ===\n');
@@ -115,6 +119,7 @@ await test('On a node without mail, the call says nothing was sent and gives the
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'not_sent', `status: ${JSON.stringify(body.data)}`);
     assert(body.data.email_sent === false, 'email_sent must be false');
+    assert(body.data.reason === 'mail_disabled', `the reason says the node sends no mail: ${body.data.reason}`);
     assert(typeof body.data.register_url === 'string' && body.data.register_url.endsWith('/v1/portal'),
         `register_url: ${body.data.register_url}`);
     assert(typeof body.data.tell_the_person === 'string' && body.data.tell_the_person.includes(body.data.register_url),

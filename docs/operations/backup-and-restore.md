@@ -29,10 +29,17 @@ file on a volume (`AIMEAT_NODE_KEY_PATH`), and back that volume up with the data
   agents, actions, boards and each agent's memory and transactions. It carries no credential, and it
   does **not** carry the records people keep under their own accounts, organisms, workspaces, apps or
   files. Use it to move account and agent rows, never as the node's backup. `POST /v1/admin/restore`
-  reads the same shape and skips rows that already exist.
-- **`aimeat backup` and `aimeat restore`** call those two routes. In the current release both are
-  refused with 401 (the command sends a sign-in form the node does not accept) and the file they write
-  holds the error. Do not schedule them until that is fixed.
+  reads the same shape. Its answer counts, per kind, the rows it imported, the rows it skipped
+  because they already exist (`skipped_duplicates`) and the rows that failed for any other reason
+  (`failed`, with the first errors in `failures`); `restored` is `true` only when nothing failed.
+- **`aimeat backup` and `aimeat restore`** call those two routes with a personal access token of an
+  operator account: `--token <token>` or `AIMEAT_OP_TOKEN`. An operator creates one at
+  `<node>/v1/profile?tab=access` with the level "Run the whole server", or with
+  `POST /v1/access/tokens` and `grant_operator: true`. `--url <node>` reaches a running node; without
+  it the command starts a node in its own process on the configured database. Without a token, or
+  when the node refuses it, the command prints the node's code and message, writes no file and exits
+  1. `aimeat restore` also exits 1 when any row failed for a reason other than already being there.
+  The export is still the partial one above.
 - **A person's own export** (their account export, memory export, apps backup) is theirs to take; it is
   described in the [data ownership guide](../data-ownership.md). It is not a node backup either.
 

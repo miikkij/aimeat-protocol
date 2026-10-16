@@ -5,6 +5,9 @@
  * @description Agent Defaults section — owner-level default rules for agents. Mounted at the foot
  *   of the Your agents page.
  * @version-history
+ *   v1.14.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of "No default
+ *     rules set", the editor opens only on loaded defaults, and Save takes the memory areas from a
+ *     strict read made just before the PUT, so a failed read saves nothing (QA audit F6-04).
  *   v1.13.0 -- 2026-10-02 -- The token budget goes, its row and its field: nothing on the server enforces default_token_budget, so the form no longer shows it or sends it. The rules and the memory areas save as before.
  *   v1.12.0 -- 2026-10-02 -- The question mark that explains the token budget: agent.token_budget on its TextField (components/HelpTip.js).
  *   v1.11.1 --2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
@@ -45,6 +48,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-directives.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState, LoadFailed, readForWrite } from '/js/load-state.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { Card } from '/components/Card.js';
 import { Row, Space } from '/components/Layout.js';
@@ -61,6 +65,10 @@ export function AgentDefaultsSection({ showToast, initial }) {
   const [defaults, setDefaults] = useState(initial?.defaults ?? null);   // seeded from /v1/access/overview; else self-loads
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  // null `defaults` means "none stored" only after a load that worked: the save replaces the whole
+  // record, so the editor opens only on loaded defaults.
+  const load = useLoadState(!!initial);
+  const { ok: loadOk, fail: loadFail } = load;
 
   // Edit state
   const [editRules, setEditRules] = useState([]);
@@ -70,11 +78,12 @@ export function AgentDefaultsSection({ showToast, initial }) {
     try {
       const resp = await getOwnerDefaults();
       setDefaults(resp?.data?.defaults || null);
+      loadOk();
     } catch (err) {
       swallowed('agent-defaults: AgentDefaultsSection', err);
-      setDefaults(null);
+      loadFail(err);
     }
-  }, []);
+  }, [loadOk, loadFail]);
 
   useEffect(() => { if (!initial) loadDefaults(); }, [loadDefaults]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
 
@@ -88,20 +97,24 @@ export function AgentDefaultsSection({ showToast, initial }) {
   }, []);
 
   const startEdit = useCallback(() => {
+    if (!load.loaded) { showToast(t('common.settingsNotLoaded'), true); loadDefaults(); return; }
     const rules = defaults?.rules || [];
     setEditRules([...rules]);
     setNewRule('');
     setEditing(true);
-  }, [defaults]);
+  }, [defaults, load.loaded, showToast, loadDefaults]);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
     try {
+      // The PUT replaces the record, and the memory areas are not on this form: they come from a
+      // strict read made just before the write, so a failed read saves nothing instead of [] areas.
+      const current = await readForWrite(() => getOwnerDefaults());
       // No default_token_budget: nothing on the server enforces it, so the form neither shows nor
       // sends it. PUT /v1/owner/agent-defaults stores an omitted budget as unset, as an empty field did.
       await upsertOwnerDefaults({
         rules: editRules,
-        default_memory_areas: defaults?.default_memory_areas || [],
+        default_memory_areas: current?.data?.defaults?.default_memory_areas || [],
       });
       showToast(t('profile.access.adSaved') || 'Agent defaults saved');
       setEditing(false);
@@ -111,7 +124,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
     } finally {
       setSaving(false);
     }
-  }, [editRules, defaults, showToast, loadDefaults]);
+  }, [editRules, showToast, loadDefaults]);
 
   const addRule = useCallback(() => {
     if (!newRule.trim()) return;
@@ -142,6 +155,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
           <//>
         <//>
 
+        ${load.failed ? html`<${LoadFailed} onRetry=${loadDefaults} />` : html`
         <${List} cols="name-doors" dense
           empty=${`${t('profile.access.adNoRules') || 'No default rules set.'} ${t('profile.access.adRuleExample') || 'Example: "Always answer in Finnish" or "Never spend morsels without asking".'}`}>
           ${rules.map((rule, i) => html`
@@ -150,7 +164,7 @@ export function AgentDefaultsSection({ showToast, initial }) {
               <${Cell} />
             <//>
           `)}
-        <//>
+        <//>`}
       <//>
     ` : html`
       <${Card} tone="section">

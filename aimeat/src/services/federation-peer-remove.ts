@@ -12,6 +12,10 @@
  *   (federation.ts). A node id that is only a waiting package registration is deleted as that.
  * @structure PeerRemoveResult · removePeer()
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The emergency notice to the network is a signed peer request
+ *     (federation-trust-notice.ts) and each peer's answer is read: the response lists the outcome per
+ *     peer (`network_notices`), and `network_notified` is true only when every peer accepted (QA audit
+ *     S6-06). A removed peer's stored template listings are deleted with it (QA audit F1-04).
  *   v1.0.0 — 2026-10-01 — Moved out of routes/federation-peer/lifecycle.ts for the MCP tool (follow-up
  *     to the peer-registration incident, item 5). Unchanged but for the network notice, which goes
  *     through safeFetch and logs the error it caught.
@@ -21,8 +25,9 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { returnEscrow } from './morsel.js';
 import { logger } from '../utils/logger.js';
-import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { emitChange } from './event-bus.js';
+import { sendTrustNotice } from './federation-trust-notice.js';
+import { deleteRemoteTemplates } from './federation-remote-templates.js';
 import { peerKeyCache } from './federation-helpers.js';
 import { forgetPeer, readPendingPeer, deletePendingPeer } from './peer-origin.js';
 
@@ -73,33 +78,19 @@ export async function removePeer(
             cancelledCount++;
         }
 
-        // 3. Notify other peers if requested
-        if (notifyNetwork) {
-            const activePeers = [...peers.values()].filter(p => p.status === 'active');
-            for (const otherPeer of activePeers) {
-                try {
-                    // SSRF validation: block requests to private/reserved IPs
-                    const peerUrlCheck = await validateOutboundUrl(otherPeer.url);
-                    if (!peerUrlCheck.valid) {
-                        logger.warn(`Blocked outbound request to peer ${otherPeer.nodeId}: ${peerUrlCheck.reason}`);
-                        continue;
-                    }
-                    await safeFetch(`${otherPeer.url}/v1/federation/trust-advisory`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            target_node: nodeId,
-                            advisory_type: 'suspend',
-                            reason,
-                            issued_by: config.nodeId,
-                        }),
-                        signal: AbortSignal.timeout(5_000),
-                    });
-                } catch (err) {
-                    logger.warn(`Failed to notify peer ${otherPeer.nodeId} about emergency de-peering of ${nodeId}`, { error: String(err) });
-                }
-            }
+        // 3. Notify other peers if requested: a signed notice to each, and each answer read. Until
+        // 2026-10-16 this was an unsigned POST to a route that requires the receiving operator's own
+        // session, its answer was not read, and the response said network_notified: true (QA audit S6-06).
+        const notices = notifyNetwork
+            ? await sendTrustNotice({ config, storage, peers }, { target_node: nodeId, advisory_type: 'suspend', reason })
+            : [];
+        for (const n of notices) {
+            if (!n.accepted) logger.warn(`A peer did not accept the notice about the emergency de-peering of ${nodeId}`, { peer: n.node, status: n.status, error: n.error });
         }
+        const accepted = notices.filter(n => n.accepted).length;
+
+        // The stored template listings of this peer go with it (services/federation-remote-templates.ts).
+        await deleteRemoteTemplates(storage, nodeId);
 
         emitChange('federation');
         return { ok: true, body: {
@@ -108,8 +99,12 @@ export async function removePeer(
             emergency: true,
             reason,
             cancelled_work_items: cancelledCount,
-            network_notified: notifyNetwork,
-            note: 'Peer immediately de-peered — all in-flight work cancelled, escrow returned',
+            // True only when the notice was asked for, there was a peer to tell, and every peer accepted it.
+            network_notified: notifyNetwork && notices.length > 0 && accepted === notices.length,
+            ...(notifyNetwork ? { network_notices: notices, network_notified_peers: accepted } : {}),
+            note: notifyNetwork
+                ? `Peer immediately de-peered — all in-flight work cancelled, escrow returned. ${accepted} of ${notices.length} peers accepted the notice.`
+                : 'Peer immediately de-peered — all in-flight work cancelled, escrow returned',
         } };
     } else {
         // ── Normal de-peering: grace period ──
@@ -152,6 +147,8 @@ export async function removePeer(
 
         // Remove peer keys from cache
         peerKeyCache.delete(nodeId);
+        // A peer in its grace is no longer read for listings; its stored ones go now.
+        await deleteRemoteTemplates(storage, nodeId);
 
         logger.info(`De-peering grace period started for peer ${nodeId}`, {
             expiredActions,

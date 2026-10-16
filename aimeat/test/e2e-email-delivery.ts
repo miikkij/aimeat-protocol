@@ -41,6 +41,7 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-10-16 — The mailed registration link is accepted end to end: the account the person names, its session, its password, and a second accept refused INVITE_USED (QA audit F02a-04).
  *   2026-10-16 — The password reset limit is one bucket per address: a fourth reset carrying another identity's token is refused (QA audit F02a-02).
  *   2026-10-15 — The registration invite on a mailing node answers `sent`, and GET / offers it in getting_started (feature-list audit #23).
  *   v1.3.0 -- 2026-09-30 -- The organism invitation names the inviter by display name, is written in
@@ -212,6 +213,7 @@ async function run(): Promise<void> {
     let opVerificationId = '';
     let recToken = '';
     let organismId = '';
+    let regInviteToken = '';
 
     console.log('Phase 0 — the operator, and a transport that authenticates');
 
@@ -489,6 +491,32 @@ async function run(): Promise<void> {
         const token = /v1\/invite\?token=([a-f0-9]{64})/.exec(mail.text)![1];
         const lookup = await json(`/v1/invitations/${token}`);
         assert(lookup.status === 200, `the emailed link must resolve: ${lookup.status} ${short(lookup.body)}`);
+        regInviteToken = token;
+    });
+
+    // QA audit F02a-04: no test accepted a registration invitation, so the node-level branch of the
+    // accept handler ran nowhere. The person picks the username; the account and its session follow.
+    await test('the emailed registration link makes the account the person names, signs it in, and works once', async () => {
+        assert(regInviteToken, 'the previous test must have read the token from the mail');
+        const username = `edrgu${STAMP}`;
+        const accept = await json(`/v1/invitations/${regInviteToken}/accept`, {
+            method: 'POST', body: JSON.stringify({ username, password: 'Registered-Door-9x', display_name: 'Door Person' }),
+        });
+        assert(accept.status === 200 && accept.body.data?.status === 'registered' && accept.body.data.created_account === true
+            && accept.body.data.organism_id === null && typeof accept.body.data.token === 'string',
+            `accept ${accept.status}: ${short(accept.body)}`);
+        const me = await json('/v1/ghii/me', { headers: bearer(accept.body.data.token) });
+        assert(me.status === 200 && JSON.stringify(me.body.data).includes(username),
+            `the session the link opens must be ${username}: ${me.status} ${short(me.body)}`);
+        const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username, password: 'Registered-Door-9x' }) });
+        assert(login.status === 200, `the chosen password must sign in: ${login.status} ${short(login.body)}`);
+
+        const again = await json(`/v1/invitations/${regInviteToken}/accept`, {
+            method: 'POST', body: JSON.stringify({ username: `edrgv${STAMP}`, password: 'Registered-Door-9x' }),
+        });
+        assert(again.status === 410 && again.body.error?.code === 'INVITE_USED', `a second accept is refused: ${again.status} ${short(again.body)}`);
+        const second = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: `edrgv${STAMP}`, password: 'Registered-Door-9x' }) });
+        assert(second.status !== 200, `the refused second accept made no account: ${second.status}`);
     });
 
     await test('a contact invitation names the inviter and carries their message', async () => {

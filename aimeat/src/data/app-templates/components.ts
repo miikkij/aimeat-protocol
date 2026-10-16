@@ -11,6 +11,10 @@
  *   COMP_MERMAID_DIAGRAM · COMP_THREE_SCENE · COMP_P5_SKETCH · COMP_PIXI_STAGE · COMP_PHASER_ARCADE ·
  *   COMP_FLOW_EDITOR
  * @version-history
+ *   v1.5.1 — 2026-10-16 — COMP_PRIVATE_STORE, COMP_SETTINGS and COMP_PHASER_ARCADE's saveHighScore
+ *     say why their "read, change, write the whole value" is safe: AIMEAT.data.get() throws on a
+ *     refused read (aimeat-data v1.7.0), so the set() after it never runs, and an app built from them
+ *     must not catch that throw into the default. Unit-tested by running them (QA audit F6-03).
  *   v1.5.0 — 2026-10-09 — COMP_REALTIME_ROOM opens the socket with a single-use ticket (POST
  *     /v1/ws/ticket). It opened with no credential, which a node with anonymous mode off refuses (401),
  *     and the alternative an app would reach for was the JWT in the URL (secrets audit 2026-10-09, d3).
@@ -48,6 +52,8 @@ AIMEAT.auth.mountLoginButton('#login', {
 applyAuth(null);   // hidden until a session arrives`;
 
 export const COMP_PRIVATE_STORE = `// private-store — a per-owner private collection (aimeat-data). Only the owner can read it.
+// get() resolves null only when the key does not exist and THROWS when the read was refused, so a
+// failed read never reaches set(): keep the await inside the function that writes, never catch it to [].
 async function listItems() { return (await AIMEAT.data.get('{{app}}.items')) || []; }
 async function addItem(item) {
   var items = await listItems();
@@ -140,6 +146,8 @@ AIMEAT.ui.viewers.DataTable({
 });`;
 
 export const COMP_SETTINGS = `// settings-panel — read/write the app's settings (aimeat-data).
+// get() throws when the read was refused (null means "never saved"), so saveSettings() never writes
+// the defaults over settings it could not read. Show the error; do not catch it into the defaults.
 async function getSettings() { return (await AIMEAT.data.get('{{app}}.settings')) || { /* defaults */ }; }
 async function saveSettings(patch) {
   var s = Object.assign(await getSettings(), patch);
@@ -365,7 +373,7 @@ function bootGame(el, onGameOver) {
 }
 async function saveHighScore(score) { // one public key per player -> a leaderboard everyone can read
   var s = AIMEAT.auth.getSession(); if (!s) return;
-  var prev = (await AIMEAT.data.get('{{app}}.highscore')) || { score: 0 };
+  var prev = (await AIMEAT.data.get('{{app}}.highscore')) || { score: 0 }; // throws on a refused read, so no write follows it
   if (score > (prev.score || 0)) await AIMEAT.data.set('{{app}}.highscore', { score: score, by: s.owner, at: new Date().toISOString() }, { visibility: 'public' });
 }
 async function leaderboard() { // every player's public score: discover(), because search() reads only your own keys

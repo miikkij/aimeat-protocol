@@ -12,6 +12,8 @@
  * @structure renderWorkflowsView · renderCover · secWorkflows · secWaiting · questionBlock · secNew · pasteBlock · howToRead
  * @usage import { renderWorkflowsView } from './workflows/cover.js';
  * @version-history
+ *   v1.16.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry instead of "no
+ *     workflows" (ctx.itemsFailed) (QA audit F6-05).
  *   v1.15.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the page frame is the SettingsPage, the strip the FigureStrip, the check note and a waiting question the Box (the question's answers the Tabs, several at once where the question takes several, its own answer a TextField), the three roads the Roads, the paste box the TextArea with its message, how to read the page the Facts.
  *   v1.14.0 -- 2026-09-26 -- The workflows table's heading row is inside its Listing (workflowRows with head), a unification: the look most tabs use.
  *   v1.13.0 -- 2026-09-26 -- A question waiting for the person is the Object box on the page's ground, its answers the Tab with the chosen one on the sun (a unification: Jouni's decision "Question box").
@@ -58,6 +60,7 @@ import { renderDetail } from './detail.js';
 import { renderRun } from './run.js';
 import { renderForm } from './form.js';
 import { Hint } from '/components/Hint.js';
+import { LoadFailed } from '/js/load-state.js';
 
 export function renderWorkflowsView(ctx) {
   const v = ctx.view;
@@ -112,7 +115,8 @@ function secWorkflows(ctx) {
   const doors = html`<${Tab} tone="fold" on=${!ctx.onlyProblems} onClick=${() => ctx.setOnlyProblems(false)}>${c('all')}<//><${Tab} tone="fold" on=${ctx.onlyProblems} onClick=${() => ctx.setOnlyProblems(true)}>${c('onlyProblems')}<//>`;
   return html`
     <${PageSection} id="wp-list" num="01" title=${t('profile.workflows.title')} count=${`${ctx.items.length} · ${c('secListSub')}`} doors=${doors} first>
-      ${ctx.loading && !ctx.items.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+      ${ctx.itemsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />`
+        : ctx.loading && !ctx.items.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
         : !list.length ? html`<${Note} kind="quiet">${ctx.items.length ? c('emptyProblems') : c('empty')}<//>`
         : workflowRows(ctx, list, { head: true })}
       ${ctx.checkNote ? html`<${Box} name=${ctx.checkNote.title}

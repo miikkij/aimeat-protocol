@@ -6,6 +6,8 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The owner row, the profile row and the welcome bonus are written in one transaction
+ *     (createAccountRows) (QA audit E6-02).
  *   2026-10-15 — The registration hooks run here too (ownerRegistrationRefusal before any row,
  *     announceOwnerRegistered after); only POST /v1/owners ran them (feature-list audit 89).
  *   2026-10-15 — Who becomes operator is createdAccountIsOperator (services/owner-provisioning.ts), the one
@@ -88,7 +90,7 @@ import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../mod
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { parseLoginIdentifier } from '../../utils/login-identifier.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
-import { registrationRefusal, creditWelcomeBonus, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../../services/owner-provisioning.js';
+import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../../services/owner-provisioning.js';
 import { eraseOwner } from '../../services/owner-erasure.js';
 
 export function registerRegisterLoginRoutes(
@@ -247,17 +249,16 @@ export function registerRegisterLoginRoutes(
         const roles: string[] = ['owner'];
         if (await createdAccountIsOperator(storage)) roles.push('operator');
 
-        const owner = await storage.createOwner({
+        // The owner row, the GHII profile and the welcome bonus commit together or not at all: a
+        // failure between them had left a taken name with no profile (QA audit E6-02).
+        const now = new Date().toISOString();
+        const { owner, ghii: ghiiRecord } = await createAccountRows(storage, config, {
             name: username,
             displayName: display_name,
             publicKey: keyPair.publicKey,
             roles,
-            createdAt: new Date().toISOString(),
-        });
-
-        // Create GHII profile with welcome bonus
-        const now = new Date().toISOString();
-        const ghiiRecord = await storage.createGHII({
+            createdAt: now,
+        }, {
             username,
             nodeId: config.nodeId,
             ghii,
@@ -267,7 +268,6 @@ export function registerRegisterLoginRoutes(
             locale: typeof locale === 'string' ? locale : undefined,
             passwordHash,
             verificationLevel: 0,
-            ownerName: owner.name,
             totpEnabled: false,
             notificationEmail: cleanEmail || undefined,  // unverified — does NOT reserve the emailHash
             magicLinkEnabled: cleanEmail ? true : undefined,
@@ -275,9 +275,6 @@ export function registerRegisterLoginRoutes(
             createdAt: now,
             updatedAt: now,
         });
-
-        // The welcome bonus, decided in one place for every door that creates an account.
-        await creditWelcomeBonus(storage, config, ghii, now);
         announceOwnerRegistered(storage, config, owner, 'direct');
 
         // Which onboarding path this account was created on (05-mittaus.md). K3: new accounts get

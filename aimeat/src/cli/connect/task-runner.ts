@@ -26,8 +26,18 @@
  *   - `launchTaskRunner(agent, task)` -- spawn subprocess, capture output, post result
  *   - In-flight task tracking prevents the same task being launched twice while
  *     the previous subprocess is still alive.
+ *   - `postToNode()` -- one POST whose envelope is read; retried with backoff while the tunnel is
+ *     down (a thrown error, 503 TUNNEL_DISCONNECTED or 504 TUNNEL_TIMEOUT), a bounded number of times
+ *   - `keepResult()` -- a result the node never took is written to
+ *     <connector home>/runner-results/<owner>/<agent>/<task id>.json
  *
  * @version-history
+ *   v1.2.0 -- 2026-10-16 -- completeTask, failTask and postEvent read the envelope client.post
+ *     returns and print the node's code and message when it is not ok; "done" is printed only after
+ *     the node accepted the completion. A completion or failure sent while the tunnel is down is
+ *     retried with backoff (RUNNER_POST_RETRY), and a result the node never took is kept in a file in
+ *     the connector home, whose path is printed. They read no answer before, so a refused completion
+ *     (409 INVALID_STATE) or one sent during a reconnect was dropped after "done" (QA audit E5-02).
  *   v1.0.0 -- 2026-05-29 -- Initial subprocess task runner
  *   v1.1.0 -- 2026-09-24 -- The child gets a CURRENT credential, asked for at launch (a key mints),
  *     not the one the daemon's client was built with, which for an agent moved onto a key was the
@@ -36,10 +46,12 @@
  */
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { RegisteredAgent } from './agent-registry.js';
 import { resolveToken } from './agent-key.js';
 import { getConfigDir } from './config.js';
 import { logger } from '../../utils/logger.js';
+import { writePrivateFile, ensurePrivateDir } from '../../utils/private-file.js';
 
 const SUMMARY_MAX_BYTES = 64 * 1024;
 const STDERR_MAX_BYTES = 8 * 1024;
@@ -84,11 +96,79 @@ function truncate(text: string, max: number): string {
   return text.slice(0, max) + `\n\n... (truncated; original length ${text.length} bytes)`;
 }
 
+/**
+ * The waits between attempts of a completion or a failure while the tunnel is down: six attempts
+ * over about two minutes, which covers a node restart. Exported so a test can shorten them.
+ */
+export const RUNNER_POST_RETRY = { delaysMs: [2_000, 5_000, 10_000, 30_000, 60_000] };
+
+/** The answers that mean the request did not reach the node, so the same request may be sent again. */
+const TRANSIENT_CODES = new Set(['TUNNEL_DISCONNECTED', 'TUNNEL_TIMEOUT']);
+
+type PostOutcome =
+  | { ok: true }
+  | { ok: false; code: string; message: string; attempts: number };
+
+interface Envelope { ok?: boolean; error?: { code?: string; message?: string } }
+
+/**
+ * One POST whose envelope is read. client.post returns a refusal as a value ({ ok: false, error })
+ * and throws only when the transport has no connection, so both are read here. With `retry`, a throw
+ * or a tunnel answer is sent again after each wait in RUNNER_POST_RETRY; any other refusal is final.
+ */
+async function postToNode(agent: RegisteredAgent, path: string, body: unknown, retry: boolean): Promise<PostOutcome> {
+  const delays = retry ? RUNNER_POST_RETRY.delaysMs : [];
+  let last: { code: string; message: string } = { code: 'UNKNOWN', message: 'no answer' };
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    if (attempt > 0) {
+      console.error(`[runner:${agent.agent}] the node could not be reached (${last.code}: ${last.message}); trying again in ${Math.round(delays[attempt - 1] / 1000)}s (attempt ${attempt + 1} of ${delays.length + 1})`);
+      await new Promise(r => setTimeout(r, delays[attempt - 1]));
+    }
+    let answer: Envelope | undefined;
+    try {
+      answer = await agent.client.post(path, body) as Envelope | undefined;
+    } catch (err) {
+      last = { code: 'NOT_CONNECTED', message: (err as Error).message };
+      continue;
+    }
+    if (answer?.ok === true) return { ok: true };
+    last = { code: answer?.error?.code ?? 'NO_ANSWER', message: answer?.error?.message ?? 'The node sent no envelope.' };
+    if (!TRANSIENT_CODES.has(last.code)) return { ok: false, ...last, attempts: attempt + 1 };
+  }
+  return { ok: false, ...last, attempts: delays.length + 1 };
+}
+
+/**
+ * Write a result the node never took to <connector home>/runner-results/<owner>/<agent>/<task>.json
+ * (mode 0600) and return the path, or null when the file could not be written.
+ */
+function keepResult(agent: RegisteredAgent, taskId: string, kind: 'complete' | 'fail', message: string,
+  outcome: { code: string; message: string; attempts: number }): string | null {
+  const safe = (s: string) => s.replace(/[^A-Za-z0-9._-]/g, '_');
+  const dir = join(getConfigDir(), 'runner-results', safe(agent.owner ?? 'owner'), safe(agent.agent));
+  const file = join(dir, `${safe(taskId)}.json`);
+  try {
+    ensurePrivateDir(dir);
+    writePrivateFile(file, JSON.stringify({
+      task_id: taskId, agent: agent.agent, gaii: agent.gaii, kind, message,
+      node_answer: { code: outcome.code, message: outcome.message }, attempts: outcome.attempts,
+      kept_at: new Date().toISOString(),
+    }, null, 2));
+    return file;
+  } catch (err) {
+    console.error(`[runner:${agent.agent}] the result of task ${taskId} could not be kept in ${file}: ${(err as Error).message}`);
+    return null;
+  }
+}
+
 async function postEvent(agent: RegisteredAgent, taskId: string, type: string, message: string): Promise<void> {
   const enc = encodeURIComponent(agent.agent);
-  try {
-    await agent.client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(taskId)}/event`, { type, message });
-  } catch (err) { logger.warn('postEvent: best-effort', { error: String(err) }); }
+  // A progress event is not retried: the next one replaces it. A refusal is printed, not dropped.
+  const r = await postToNode(agent, `/v1/agents/${enc}/tasks/${encodeURIComponent(taskId)}/event`, { type, message }, false);
+  if (!r.ok) {
+    console.error(`[runner:${agent.agent}] the node did not take a progress event for task ${taskId}: ${r.code}: ${r.message}`);
+    logger.warn('postEvent: the node did not take the event', { taskId, code: r.code });
+  }
 }
 
 /**
@@ -207,8 +287,10 @@ export async function launchTaskRunner(agent: RegisteredAgent, task: TaskRunnerI
 
     if (code === 0) {
       const summary = readDeliverable(runner.output_capture, stdoutBuf);
-      console.error(`[runner:${agent.agent}] task ${task.id} -- done (exit 0, ${summary.length} bytes)`);
-      await completeTask(agent, task.id, truncate(summary, SUMMARY_MAX_BYTES));
+      console.error(`[runner:${agent.agent}] task ${task.id} -- exit 0, ${summary.length} bytes; sending the result to the node`);
+      if (await completeTask(agent, task.id, truncate(summary, SUMMARY_MAX_BYTES))) {
+        console.error(`[runner:${agent.agent}] task ${task.id} -- done (the node took the result)`);
+      }
     } else {
       const message = `Runner exited with code ${code}.${stderrBuf ? `\n\nstderr:\n${truncate(stderrBuf, STDERR_MAX_BYTES)}` : ''}`;
       console.error(`[runner:${agent.agent}] task ${task.id} -- failed (exit ${code})`);
@@ -231,20 +313,24 @@ function readDeliverable(outputCapture: string | undefined, stdoutBuf: string): 
   return stdoutBuf;
 }
 
-async function completeTask(agent: RegisteredAgent, taskId: string, summary: string): Promise<void> {
+/** Send the result. True only when the node accepted it; otherwise the result is kept in a file. */
+async function completeTask(agent: RegisteredAgent, taskId: string, summary: string): Promise<boolean> {
   const enc = encodeURIComponent(agent.agent);
-  try {
-    await agent.client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(taskId)}/complete`, { message: summary });
-  } catch (err) {
-    console.error(`[runner:${agent.agent}] failed to post task_complete for ${taskId}: ${(err as Error).message}`);
-  }
+  const r = await postToNode(agent, `/v1/agents/${enc}/tasks/${encodeURIComponent(taskId)}/complete`, { message: summary }, true);
+  if (r.ok) return true;
+  console.error(`[runner:${agent.agent}] task ${taskId} -- NOT done: the node did not take the result (${r.code}: ${r.message}).`);
+  const kept = keepResult(agent, taskId, 'complete', summary, r);
+  if (kept) console.error(`[runner:${agent.agent}] the result of task ${taskId} is kept in ${kept}`);
+  return false;
 }
 
-async function failTask(agent: RegisteredAgent, taskId: string, reason: string): Promise<void> {
+/** Report the failure. True only when the node accepted it; otherwise the reason is kept in a file. */
+async function failTask(agent: RegisteredAgent, taskId: string, reason: string): Promise<boolean> {
   const enc = encodeURIComponent(agent.agent);
-  try {
-    await agent.client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(taskId)}/fail`, { message: reason });
-  } catch (err) {
-    console.error(`[runner:${agent.agent}] failed to post task_fail for ${taskId}: ${(err as Error).message}`);
-  }
+  const r = await postToNode(agent, `/v1/agents/${enc}/tasks/${encodeURIComponent(taskId)}/fail`, { message: reason }, true);
+  if (r.ok) return true;
+  console.error(`[runner:${agent.agent}] the node did not take the failure of task ${taskId} (${r.code}: ${r.message}).`);
+  const kept = keepResult(agent, taskId, 'fail', reason, r);
+  if (kept) console.error(`[runner:${agent.agent}] the failure report of task ${taskId} is kept in ${kept}`);
+  return false;
 }

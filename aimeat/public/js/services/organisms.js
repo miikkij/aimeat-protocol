@@ -7,7 +7,16 @@
  *   template, generate a workspace with AI, read the workspace, write/publish drafts, and
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
+ *
+ *   A read that forgives a failure (answers [], {}, null or '') is for drawing only. A write that
+ *   replaces a whole record reads it with the strict name first (`listWorkspacesStrict`,
+ *   `getConfigStrict`, …, in organisms.records.js) through readForWrite (/js/load-state.js), so a
+ *   failed read stops the write (docs/pitfalls.md section 84).
  * @version-history
+ *   v1.11.0 — 2026-10-16 — The registry, config, colour and source reads and writes move to
+ *     organisms.records.js (max-file-lines) with a strict read beside each forgiving one, re-exported
+ *     here. createWorkspace and deleteWorkspace read the registry strictly: a failed read stops the
+ *     action and writes nothing (QA audit F6-01, F6-04).
  *   v1.10.0 — 2026-10-01 — PROJECT_OBJECT_TYPES and PROJECT_SCHEMAS are no longer re-exported: the
  *     project template lives on the server as the `project` shape. getShapes() lists the shapes.
  *   v1.9.0 — 2026-09-25 — addSpace and saveSections move to organisms.member-changes.js, which calls the
@@ -47,6 +56,8 @@ import { wsRoot, isMemorySpace, isDocSpace } from './organisms.shared.js';
 import { mlbl } from './organisms.charts.js';
 import { swallowed } from '/js/swallowed.js';
 import { getSession, getStoredGhii } from '/js/services/auth.js';
+import { readForWrite } from '/js/load-state.js';
+import { listWorkspaces, listWorkspacesStrict, saveWorkspaceRegistry, getWorkspaceSources } from './organisms.records.js';
 
 // ── Re-exports of pieces extracted to sibling modules (pure extraction, max-file-lines) ──
 export { wsRoot, isMemorySpace, isDocSpace, getObjectSchema } from './organisms.shared.js';
@@ -66,6 +77,12 @@ export {
 export {
   addSpace, addWorkspaceSpaces, saveSections, setMemberChangeRule, listSuggestions, decideSuggestion, changeOutcome,
 } from './organisms.member-changes.js';
+// The whole-record meta reads (forgiving and strict) and the writes built on the strict ones.
+export {
+  listWorkspaces, listWorkspacesStrict, saveWorkspaceRegistry, getConfig, getConfigStrict, setPublishGate,
+  getAllColors, getAllColorsStrict, saveColors, saveItemColor, getWorkspaceSources, getWorkspaceSourcesStrict,
+  saveWorkspaceSources, addWorkspaceSources, removeWorkspaceSource,
+} from './organisms.records.js';
 
 /** List organisms. */
 export async function listOrganisms(opts = {}) {
@@ -302,10 +319,17 @@ export async function unarchiveContent(orgId, target) {
 /** Delete a workspace entirely — removes all organism.{id}.* memory + its schema locks. The
  *  organism stays (returns to "no workspace yet"). Deliberate typed-confirmation lives in the UI. */
 export async function deleteWorkspace(orgId, wsId) {
+  // The registry is a whole record the browser rewrites. A registry that cannot be read stops the
+  // delete before anything happens; a read that answered [] would have written an empty registry.
+  await readForWrite(() => listWorkspacesStrict(orgId));
   const r = await apiDelete(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`);
-  // Drop the registry entry so the deleted workspace no longer lists.
-  const list = await listWorkspaces(orgId);
-  await saveWorkspaceRegistry(orgId, list.filter(w => w.id !== wsId)).catch(err => { swallowed('organisms: deleteWorkspace', err); });
+  // Drop the registry entry so the deleted workspace no longer lists, from a fresh strict read made
+  // just before the write. When that read or the write fails, the entry stays (a workspace that
+  // lists but no longer opens) and the rest of the registry is untouched.
+  try {
+    const list = await listWorkspacesStrict(orgId);
+    await saveWorkspaceRegistry(orgId, list.filter(w => w.id !== wsId));
+  } catch (err) { swallowed('organisms: deleteWorkspace registry', err); }
   return r;
 }
 
@@ -406,26 +430,8 @@ export async function saveManifest(orgId, wsId, manifest) {
   return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.manifest`, value: manifest, visibility: 'private' });
 }
 
-/* ── Workspace registry: one organism lists its workspaces at organism.{id}.meta.workspaces =
- *    { workspaces: [{ id, name, createdAt }] }. A workspace appears here even before it has a
- *    manifest (so a freshly-created, not-yet-generated workspace is openable). ── */
-
-/** List an organism's workspaces (registry order). */
-export async function listWorkspaces(orgId) {
-  const key = `organism.${orgId}.meta.workspaces`;
-  try {
-    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
-    const item = (resp?.data?.items || []).find(i => i.key === key);
-    const list = Array.isArray(item?.value?.workspaces) ? item.value.workspaces : [];
-    // Names are plain text; legacy import paths stored them HTML-escaped. Decode for display.
-    return list.map(w => (w && w.name ? { ...w, name: decodeEntities(w.name) } : w));
-  } catch (err) { swallowed('organisms: item', err); return []; }
-}
-
-/** Persist the workspace registry. */
-export async function saveWorkspaceRegistry(orgId, workspaces) {
-  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.workspaces`, value: { workspaces }, visibility: 'private' });
-}
+/* ── Workspace registry (organism.{id}.meta.workspaces): listWorkspaces, listWorkspacesStrict and
+ *    saveWorkspaceRegistry live in organisms.records.js. ── */
 
 /* ── Workspace access (per-workspace, creator-controlled, consent-backed) ──
  * Organism membership lets you DISCOVER every workspace (names + creator + your access status);
@@ -434,14 +440,17 @@ export async function saveWorkspaceRegistry(orgId, workspaces) {
 /** Discover all workspaces in the org with your access status ('owner' | 'granted' | 'none').
  *  opts.include='enrichment' folds the per-workspace getWorkspace+activity+participants fan-out into
  *  one response: each readable row gains `enrichment:{hasManifest,recs,docs,lastEvent,participants,pendingReviews}`. */
+export async function discoverWorkspacesStrict(orgId, opts = {}) {
+  const qs = opts.include ? `?include=${encodeURIComponent(opts.include)}` : '';
+  const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspaces${qs}`);
+  const list = Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
+  // Names are plain text; legacy import paths stored them HTML-escaped. Decode for display.
+  return list.map(w => (w && w.name ? { ...w, name: decodeEntities(w.name) } : w));
+}
+/** The same list, [] when the read fails: for a picker that can live with none, never for the
+ *  workspace list itself, which shows a failed read as one (discoverWorkspacesStrict). */
 export async function discoverWorkspaces(orgId, opts = {}) {
-  try {
-    const qs = opts.include ? `?include=${encodeURIComponent(opts.include)}` : '';
-    const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspaces${qs}`);
-    const list = Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
-    // Names are plain text; legacy import paths stored them HTML-escaped. Decode for display.
-    return list.map(w => (w && w.name ? { ...w, name: decodeEntities(w.name) } : w));
-  } catch (err) { swallowed('organisms: discoverWorkspaces', err); return []; }
+  try { return await discoverWorkspacesStrict(orgId, opts); } catch (err) { swallowed('organisms: discoverWorkspaces', err); return []; }
 }
 
 /** Request access to a workspace you can see but not read. */
@@ -552,7 +561,9 @@ export async function createWorkspace(orgId, name) {
   const id = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const createdBy = (currentGhii().split('@')[0]) || '';   // bare owner name — who controls this workspace's access
   const entry = { id, name: String(name || '').trim() || 'Workspace', createdAt: new Date().toISOString(), createdBy };
-  const list = await listWorkspaces(orgId);
+  // A failed read throws here and nothing is written: a read that answered [] replaced the registry
+  // with this one entry, and the organism's other workspaces stopped listing.
+  const list = await readForWrite(() => listWorkspacesStrict(orgId));
   await saveWorkspaceRegistry(orgId, [...list, entry]);
   return entry;
 }
@@ -681,15 +692,6 @@ export async function resolveApproval(orgId, aid, decision, note) {
   return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/approvals/${encodeURIComponent(aid)}`, { decision, note });
 }
 
-/** Read the runtime config entry (publish gate toggle, etc.). Uses prefix-list to avoid 404 noise. */
-export async function getConfig(orgId) {
-  const key = `organism.${orgId}.meta.config`;
-  try {
-    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
-    return (resp?.data?.items || []).find(i => i.key === key)?.value || {};
-  } catch (err) { swallowed('organisms: getConfig', err); return {}; }
-}
-
 /** The current owner's GHII (`owner@node`). ALWAYS returns a string so callers can safely `.split('@')`.
  *  Prefers the persisted GHII (readable before the session object exists) and falls back to the active
  *  session's. Empty string when unknown. */
@@ -714,53 +716,11 @@ export async function getAllSections(orgId, wsId) {
   return out;
 }
 
-/** Read the optional per-item color tags for every space → { typeName: { instanceId: colorKey } }.
- *  Mirrors getAllSections; stored at …w.{wsId}.meta.colors.{typeName} = { colors: { id: key } }. */
-export async function getAllColors(orgId, wsId) {
-  const out = {};
-  try {
-    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(`${wsRoot(orgId, wsId)}.meta.colors.`)}`);
-    for (const it of (resp?.data?.items || [])) {
-      const m = String(it.key || '').match(/\.meta\.colors\.(.+)$/);
-      if (m) out[m[1]] = (it.value && typeof it.value.colors === 'object' && it.value.colors) || {};
-    }
-  } catch (err) { swallowed('organisms: getAllColors', err); }
-  return out;
-}
-
-/** Persist the per-item color map for one space (…w.{wsId}.meta.colors.{typeName}). */
-export async function saveColors(orgId, wsId, typeName, colors) {
-  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.colors.${typeName}`, value: { colors }, visibility: 'private' });
-}
-
-/* ── Sources: references the workspace draws on (memory / storage / knowledge). Pointers only —
- *  the referenced data is never copied or moved, it stays where it lives. Stored at
- *  organism.{id}.meta.sources = { sources: [{ id, type, label, key?, ownerGaii?, packageId?, external }] }. */
-
-/** Read the workspace's attached source references (empty array if none). */
-export async function getWorkspaceSources(orgId, wsId) {
-  const key = `${wsRoot(orgId, wsId)}.meta.sources`;
-  try {
-    const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
-    const item = (resp?.data?.items || []).find(i => i.key === key);
-    return Array.isArray(item?.value?.sources) ? item.value.sources : [];
-  } catch (err) { swallowed('organisms: item', err); return []; }
-}
-
-/** Persist the workspace's source references. */
-export async function saveWorkspaceSources(orgId, wsId, sources) {
-  return apiPost('/v1/memory', { key: `${wsRoot(orgId, wsId)}.meta.sources`, value: { sources }, visibility: 'private' });
-}
+/* The per-item colour maps, the workspace's source pointers and the publish gate (config) live in
+ * organisms.records.js, each with a forgiving read for drawing and a strict read for writing. */
 
 /** List the caller's own storage files (key, size, mime, visibility) — for the storage source picker. */
 export async function listOwnStorageFiles() {
   const resp = await apiGet('/v1/storage');
   return resp?.data?.files || [];
-}
-
-/** Toggle the publish-review gate in the org's config. */
-export async function setPublishGate(orgId, enabled, approverRole = 'owner') {
-  const cfg = await getConfig(orgId);
-  const next = { ...cfg, gates: { ...(cfg.gates || {}), publish: { enabled: !!enabled, approverRole } } };
-  return apiPost('/v1/memory', { key: `organism.${orgId}.meta.config`, value: next, visibility: 'private' });
 }

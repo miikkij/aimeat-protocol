@@ -13,6 +13,8 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.3.1 — 2026-10-16 — readKeyFileClaim's silent-catch exemption states its reason after `--`,
+ *     which check:silent-catch now requires of every exemption (W25). Comment only.
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.3.0 — 2026-10-09 — The database copy of the private key is stored encrypted when the node has
  *     AIMEAT_KEY_PASSPHRASE or AIMEAT_ENCRYPTION_KEY (storage/node-key-at-rest.ts); it was plain text
@@ -121,7 +123,7 @@ function readKeyFileClaim(keyPath: string): string | null {
   } catch {
     // An unreadable key file is not this function's to report: loadPersistedNodeKey refuses to
     // start over it, and says why far better than a duplicate check here could.
-    // eslint-disable-next-line aimeat/no-silent-catch
+    // eslint-disable-next-line aimeat/no-silent-catch -- loadPersistedNodeKey refuses to start over an unreadable key file and says why
     return null;
   }
 }

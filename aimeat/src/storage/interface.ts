@@ -13,6 +13,9 @@
  *   - Storage interface: the full CRUD surface aggregated from the per-domain repositories
  *
  * @version-history
+ *   v1.10.0 — 2026-10-16 — savepoint(): a tolerant step inside a transaction that undoes only its
+ *     own writes when it fails, so a caught failure no longer turns the COMMIT into a ROLLBACK on
+ *     PostgreSQL (QA audit E6-01).
  *   v1.9.0 — 2026-09-29 — ClassificationAuditRepository joins the Storage composite: the
  *     classification audit log (TARGET-082 V4).
  *   v1.8.0 — 2026-09-29 — ContentLabelRepository joins the Storage composite: classification labels
@@ -213,4 +216,19 @@ export interface Storage extends
    * });
    */
   transaction<T>(fn: () => Promise<T>): Promise<T>;
+
+  /**
+   * Run `fn` as a TOLERANT STEP inside the open transaction: when `fn` throws, its own writes are
+   * undone (ROLLBACK TO SAVEPOINT) and the transaction stays usable for the steps after it; when it
+   * succeeds, its writes stay part of the transaction. Outside a transaction it simply runs `fn`.
+   *
+   * WHY IT EXISTS. A step that catches its own error inside `transaction()` does not leave the
+   * transaction usable on PostgreSQL: the first statement the database rejects marks the whole
+   * transaction failed, every later statement is refused, and the final COMMIT is executed as a
+   * ROLLBACK without an error. So a caught failure in step 3 silently undid steps 1 and 2 and every
+   * step after it (QA audit E6-01). SQLite keeps going after a failed statement, which is why only
+   * production could show it. A caller that catches a step's error and carries on wraps that step
+   * in `savepoint()`; the error still reaches the caller's catch.
+   */
+  savepoint<T>(fn: () => Promise<T>): Promise<T>;
 }

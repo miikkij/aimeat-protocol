@@ -10,6 +10,9 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   2026-10-16 — A failed read of the workspace is its own state with Retry and no set-up button (the
+ *     button replaced the manifest and README of a workspace the page could not read); a colour change
+ *     goes on top of a strict read of the colour map (QA audit F6-02, F6-04).
  *   2026-09-25 — A member's change goes through the member change doors and the page shows what
  *     happened: saving sections, filing a new document under a section and adding a space say when the
  *     change waits for the creator or an admin, or why it was refused, and reload to what is stored
@@ -88,6 +91,8 @@ import { WorkspaceGenerator } from './workspace/generator.js';
 import { renderWorkspaceView } from './workspace/cover.js';
 import { buildBreadcrumb, buildWorkspaceModel } from './workspace/model.js';
 import { swallowed } from '/js/swallowed.js';
+import { LoadFailed } from '/js/load-state.js';
+import { WS_FAILED, nextWorkspaceState } from './workspace-load.js';
 
 /** A refusal from a member change door, as the page says it: with the node's own reason. */
 const refusedText = (e) => (t('organisms.change.refused') || 'Not saved: {reason}').replace('{reason}', (e && e.message) || '');
@@ -120,7 +125,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     window.open(u, 'aimeatdoc_' + orgId + '_' + wsId + '_' + docId, 'width=940,height=1040,menubar=no,toolbar=no,location=no,status=no');
   };
   const { confirm, ConfirmUI } = useConfirm();
-  const [ws, setWs] = useState(undefined); // undefined=loading, null=no manifest, object=workspace
+  const [ws, setWs] = useState(undefined); // undefined=loading, null=no manifest, WS_FAILED=read failed, object=workspace
   const [approvals, setApprovals] = useState([]);
   const [gateOn, setGateOn] = useState(false);
   const [adding, setAdding] = useState(null);          // objectType name being added
@@ -214,7 +219,11 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
 
   const load = useCallback(async () => {
     // In the archived view, request ONLY archived content (read-only); otherwise the normal active set.
-    const w = await orgService.getWorkspace(orgId, wsId, showArchived ? { archived: 'only' } : undefined).catch(err => { swallowed('workspace', err); return null; });
+    // A failed read is its own state (WS_FAILED: Retry, no set-up button), never "no manifest yet",
+    // whose set-up button would replace the structure the page could not see (workspace-load.js).
+    let w;
+    try { w = await orgService.getWorkspace(orgId, wsId, showArchived ? { archived: 'only' } : undefined); }
+    catch (err) { swallowed('workspace', err); setWs(prev => nextWorkspaceState(prev, { ok: false })); return; }
     if (w && w.manifest) {
       const [ap, cfg, secs, act, cols] = await Promise.all([
         orgService.listApprovals(orgId, 'pending').catch(err => { swallowed('workspace', err); return []; }),
@@ -228,7 +237,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled)); setSectionsByType(w.sections || secs);
       setWsEvents(act?.events || []); setColorsByType(cols);
     }
-    setWs(w && w.manifest ? w : null);
+    setWs(nextWorkspaceState(undefined, { ok: true, workspace: w }));
   }, [orgId, wsId, showArchived]);
 
   useEffect(() => { load(); }, [load]);
@@ -352,7 +361,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
 
   // First-ever visit: seed the seen baseline once the workspace has loaded — no badges for history.
   useEffect(() => {
-    if (seen !== null || ws === undefined) return;
+    if (seen !== null || ws === undefined || ws === WS_FAILED) return;
     const next = { __base: new Date().toISOString() };
     try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
     setSeen(next);
@@ -483,13 +492,12 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const setSectionColor = (typeName, secId, color) =>
     updateSections(typeName, (sectionsByType[typeName] || []).map(s => s.id === secId ? { ...s, color: color || undefined } : s));
   const itemColor = (typeName, id) => (colorsByType[typeName] || {})[id] || null;
+  // The colour map is saved whole, so the change goes on top of a strict read made just before the
+  // write (saveItemColor); a failed read saves nothing and the toast says so.
   const setItemColor = useCallback((typeName, id, color) => {
-    setColorsByType(prev => {
-      const m = { ...(prev[typeName] || {}) };
-      if (color) m[id] = color; else delete m[id];
-      orgService.saveColors(orgId, wsId, typeName, m).catch(e => showToast((e && e.message) || 'Failed to save color'));
-      return { ...prev, [typeName]: m };
-    });
+    orgService.saveItemColor(orgId, wsId, typeName, id, color)
+      .then(m => setColorsByType(prev => ({ ...prev, [typeName]: m })))
+      .catch(e => showToast((e && e.message) || 'Failed to save color'));
   }, [orgId, wsId, showToast]);
 
   const publish = useCallback(async (ot, instanceId) => {
@@ -701,6 +709,8 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const back = buildBreadcrumb({ onBack, onBackToList, org, showSettings, guardWsDirty, setShowSettings, wsName, ws });
 
   if (ws === undefined) return html`<div><${Crumb} steps=${back} /><${Note} kind="loading">${t('organisms.loading') || 'Loading...'}<//></div>`;
+
+  if (ws === WS_FAILED) return html`<div><${Crumb} steps=${back} /><${LoadFailed} onRetry=${load} /></div>`;
 
   if (ws === null) {
     return html`

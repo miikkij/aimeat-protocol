@@ -7,6 +7,9 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.20.0 -- 2026-10-16 -- A failed fleet load shows the could-not-load note with Retry instead of "no
+ *     agents yet"; the custom groups move to agents/agent-groups-state.js (max-file-lines), whose save
+ *     is refused until the stored groups have loaded (QA audit F6-04, F6-05).
  *   v4.19.1 -- 2026-10-14 -- On a node that takes no computers the developer fold shows NoComputersHere in place of the connector commands, its recommendation and its Node.js help.
  *   v4.19.0 -- 2026-10-03 -- The page's start (components/PageStart.js, New agent as its button) and the title's question mark, concept.agent (guidance part B).
  *   v4.18.0 -- 2026-10-02 -- The agents list names the agents whose `*` holds their tasks until narrowed.
@@ -135,7 +138,9 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
-import { listAgents, updateAgentScopes, deleteAgent, getAgentGroups, saveAgentGroups } from '/js/services/agents.js';
+import { listAgents, updateAgentScopes, deleteAgent } from '/js/services/agents.js';
+import { useLoadState, LoadFailed } from '/js/load-state.js';
+import { useAgentGroups } from './agents/agent-groups-state.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { timeAgo } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
@@ -155,7 +160,7 @@ import { TextField } from '/components/TextField.js';
 import { Stack, Split } from '/components/Layout.js';
 import { HowTo } from '/components/HowTo.js';
 import { buildAgentPrompt, buildTaskRunnerPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
-import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, matchesAgentQuery, popOutAgent, loadFold, saveFold } from './agents/tab-helpers.js';
+import { loadAgentOrder, saveAgentOrder, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, matchesAgentQuery, popOutAgent, loadFold, saveFold } from './agents/tab-helpers.js';
 import { AgentSearch, FilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import { agentState } from './agents/state-detector.js';
 import ScopesModal from './agents/scopes-modal.js';
@@ -234,16 +239,12 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [agentOrder, setAgentOrder] = useState(() => loadAgentOrder(session?.owner));
   const [draggingName, setDraggingName] = useState(null);
   const draggedName = useRef(null);
-  // Custom groups: definitions are server-side (AIMEAT memory), the collapse
-  // toggle is per-browser. editingGroup holds the id of the group being renamed.
-  const [agentGroups, setAgentGroups] = useState([]);
-  const [collapsedGroups, setCollapsedGroups] = useState(() => loadCollapsedGroups(session?.owner));
-  const [editingGroup, setEditingGroup] = useState(null);
-  const draggedAgent = useRef(null);
-  const [draggingAgentName, setDraggingAgentName] = useState(null);
+  // Custom groups (definitions in memory `agents.groups`, collapse state per browser): agents/agent-groups-state.js.
+  const {
+    agentGroups, collapsedGroups, editingGroup, setEditingGroup, addGroup, renameGroup, removeGroup, toggleGroupCollapsed, groupDnd,
+  } = useAgentGroups({ session, showToast, confirm });
+  const fleetLoad = useLoadState();
 
-  // Load the owner's saved group definitions once per session. Mutations below
-  // update state optimistically and persist, so no need to re-fetch on the poll.
   useEffect(() => {
     // A failure is shown as one: an empty box that says "Loading" for ever would read as a
     // page that is still working.
@@ -260,66 +261,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
   }, []);
 
   useEffect(() => {
-    if (!session) { setAgentGroups([]); return; }
-    setCollapsedGroups(loadCollapsedGroups(session.owner));
-    setConnectOpen(loadFold(session.owner, 'connect', true));
-    getAgentGroups().then(g => setAgentGroups(Array.isArray(g) ? g : [])).catch(() => setAgentGroups([]));
+    if (session) setConnectOpen(loadFold(session.owner, 'connect', true));
   }, [session]);
-
-  function persistGroups(next) {
-    setAgentGroups(next);
-    saveAgentGroups(next).catch(e => showToast((e && e.message) || t('profile.agents.groups.saveError'), true));
-  }
-  function addGroup() {
-    const id = 'grp-' + Date.now().toString(36);
-    persistGroups([...agentGroups, { id, name: '', agents: [] }]);
-    setEditingGroup(id); // open the new group in rename mode immediately
-  }
-  function renameGroup(id, name) {
-    persistGroups(agentGroups.map(g => g.id === id ? { ...g, name } : g));
-  }
-  function removeGroup(id) {
-    const grp = agentGroups.find(g => g.id === id);
-    confirm(
-      t('profile.agents.groups.confirmRemove').replace('{name}', grp?.name || '…'),
-      () => persistGroups(agentGroups.filter(g => g.id !== id)),
-    );
-  }
-  // Move an agent into targetId (a group id, or UNGROUPED_ID to remove it from
-  // every group). An agent belongs to at most one group.
-  function moveAgentToGroup(agentName, targetId) {
-    if (!agentName) return;
-    const cleaned = agentGroups.map(g => ({ ...g, agents: (g.agents || []).filter(n => n !== agentName) }));
-    const next = targetId === UNGROUPED_ID
-      ? cleaned
-      : cleaned.map(g => g.id === targetId ? { ...g, agents: [...g.agents, agentName] } : g);
-    persistGroups(next);
-  }
-  function toggleGroupCollapsed(id) {
-    setCollapsedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      saveCollapsedGroups(session?.owner, next);
-      return next;
-    });
-  }
-
-  // Drag-to-assign for custom-group mode: drag an agent bar (grip handle) onto a
-  // group header to file it there. Mirrors the document-space section pattern.
-  const groupDnd = {
-    draggingAgentName,
-    onDragStart: (name, e) => {
-      draggedAgent.current = name;
-      setDraggingAgentName(name);
-      if (e?.dataTransfer) {
-        e.dataTransfer.effectAllowed = 'move';
-        try { e.dataTransfer.setData('text/plain', name); } catch (err) { swallowed('agents-tab: onDragStart', err); }
-      }
-    },
-    onDragOver: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; },
-    onDropToGroup: (targetId) => { moveAgentToGroup(draggedAgent.current, targetId); draggedAgent.current = null; setDraggingAgentName(null); },
-    onDragEnd: () => { draggedAgent.current = null; setDraggingAgentName(null); },
-  };
 
   function reorderAgents(fromName, toName) {
     if (!fromName || !toName || fromName === toName || !session || !agents) return;
@@ -390,6 +333,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
       // 1 + N×5 per-agent fan-out (~185 requests for 46 agents).
       const list = await listAgents(session.owner, { include: 'stats' });
       setAgents(list);
+      fleetLoad.ok();
       onStats?.({ agents: list.length });
       if (!groupByDefaultApplied.current && !userPickedGroupBy.current && list.some(a => (a.tags ?? []).length > 0)) {
         groupByDefaultApplied.current = true;
@@ -448,7 +392,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
         saveSeen(session.owner, fresh);
       }
       setChangesMap(chMap);
-    } catch (err) { swallowed('agents-tab', err); setAgents([]); }
+    } catch (err) { swallowed('agents-tab', err); fleetLoad.fail(err); }
   }
 
   // Live updates (push-only, no steady-state polling): refetch the fleet only when a relevant
@@ -585,7 +529,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
     } catch (e) { showToast(e.message || t('profile.unknownError'), true); }
   }
 
-  if (!agents) return html`<${Note} kind="loading">${t('profile.agents.loadingAgents')}<//>`;
+  // A failed load is drawn as one, never as "no agents yet" (QA audit F6-05).
+  if (!agents) return fleetLoad.failed ? html`<${LoadFailed} onRetry=${loadData} />` : html`<${Note} kind="loading">${t('profile.agents.loadingAgents')}<//>`;
 
   // The figures. Ready and never-connected read the server's health verdict, the same one the
   // rows show, so the strip and the table cannot disagree.

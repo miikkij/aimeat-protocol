@@ -337,11 +337,9 @@
   var SETTINGS_KEY = "living-hooks.settings";
   function langs() {
     const out = [];
-    try {
-      const attr = document.documentElement.getAttribute("lang");
-      if (attr) out.push(attr.slice(0, 2).toLowerCase());
-    } catch {
-    }
+    const root = typeof document !== "undefined" ? document.documentElement : null;
+    const attr = root ? root.getAttribute("lang") : null;
+    if (attr) out.push(attr.slice(0, 2).toLowerCase());
     const saved = storedLang();
     if (saved) out.push(saved.slice(0, 2).toLowerCase());
     return out;
@@ -356,7 +354,13 @@
   }
   async function readSettings() {
     const res = await authFetch2("/v1/memory/" + encodeURIComponent(SETTINGS_KEY) + "?soft=1");
-    if (!res.ok) return {};
+    if (!res.ok) {
+      if (res.error && res.error.code === "NOT_FOUND") return {};
+      throw Object.assign(
+        new Error(res.error && res.error.message || "The allowlist could not be read, so nothing was changed. Try again."),
+        { code: res.error && res.error.code || "READ_FAILED" }
+      );
+    }
     const value = res.data && res.data.value;
     return value && typeof value === "object" ? value : {};
   }
@@ -384,14 +388,18 @@
     words(refusal) {
       return hooks.words(refusal);
     },
-    /** The hosts this person allows. The operator's hosts apply as well and are not listed here. */
+    /**
+     * The hosts this person allows. The operator's hosts apply as well and are not listed here.
+     * Throws (with the node's `code`) when the read was refused: an empty list means none are allowed.
+     */
     async hosts() {
       const settings = await readSettings();
       return Array.isArray(settings.allow_hosts) ? settings.allow_hosts.slice() : [];
     },
     /**
      * Add one host to the person's allowlist. Returns the new list. Call it only from a control the
-     * person presses: every app and agent of this person may send to a host on this list.
+     * person presses: every app and agent of this person may send to a host on this list. When the
+     * current list cannot be read it throws and writes nothing.
      * @param {string} host  "api.example.com", "https://api.example.com/x" or ".example.com"
      */
     async allowHost(host) {

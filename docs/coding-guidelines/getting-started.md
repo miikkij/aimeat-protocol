@@ -156,8 +156,9 @@ there.
 
 `aimeat backup` is a partial export, not a backup: it carries accounts, agents and agents' memory but
 not the records people keep under their own accounts, organisms, apps or files, and no credential.
-In the current release the command is refused with 401 and writes the error to its file. The
-procedure, the restore and its test: [backup and restore](../operations/backup-and-restore.md).
+It needs a personal access token of an operator account (`--token <token>` or `AIMEAT_OP_TOKEN`),
+and a refusal writes no file and exits 1. The procedure, the restore and its test:
+[backup and restore](../operations/backup-and-restore.md).
 
 ### App thumbnails (optional)
 

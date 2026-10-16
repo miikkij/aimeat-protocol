@@ -10,6 +10,7 @@
  *   getting_started narrative offers the invite only when the node can send mail.
  * @usage cd aimeat && pnpm exec vitest run test/unit/registration-invite-no-mail.test.ts
  * @version-history
+ *   2026-10-16 — A send that fails cancels the invitation and a retry sends again (QA audit F02a-04).
  *   2026-10-15 — Initial (feature-list audit #23).
  */
 import { describe, it, expect, afterEach } from 'vitest';
@@ -26,19 +27,25 @@ const input = {
     observed: { ip: '127.0.0.1', userAgent: 'test', at: new Date().toISOString() },
 };
 
-function recordingStorage(): { storage: Storage; created: unknown[] } {
-    const created: unknown[] = [];
+function recordingStorage(): { storage: Storage; created: Array<{ id: string; status: string }> } {
+    const created: Array<{ id: string; status: string }> = [];
     const storage = {
-        listInvitationsByEmailHash: async () => [],
-        createInvitation: async (rec: unknown) => { created.push(rec); return rec; },
+        // The per-address cap reads what is still pending, as the real repository does.
+        listInvitationsByEmailHash: async () => created.filter(r => r.status === 'pending'),
+        createInvitation: async (rec: { id: string; status: string }) => { created.push(rec); return rec; },
+        updateInvitation: async (id: string, updates: { status?: string }) => {
+            const rec = created.find(r => r.id === id);
+            if (rec && updates.status) rec.status = updates.status;
+            return rec ?? null;
+        },
     } as unknown as Storage;
     return { storage, created };
 }
 
-function mailService(enabled: boolean, sent: string[]): EmailService {
+function mailService(enabled: boolean, sent: string[], delivers = true): EmailService {
     return {
         enabled,
-        sendRaw: async (to: string) => { sent.push(to); return true; },
+        sendRaw: async (to: string) => { sent.push(to); return delivers; },
     } as unknown as EmailService;
 }
 
@@ -79,6 +86,26 @@ describe('createRegistrationInvitation without mail', () => {
         expect(result.emailSent).toBe(true);
         expect(created).toHaveLength(1);
         expect(sent).toEqual(['person@example.org']);
+        expect(result.sendFailed).toBe(false);
+    });
+
+    // QA audit F02a-04: a failed send answered "sent" and left a pending row that suppressed every
+    // retry for the address for 24 hours.
+    it('a send that fails reports sendFailed, cancels the invitation, and a retry sends again', async () => {
+        const sent: string[] = [];
+        setActiveEmailService(mailService(true, sent, false));
+        const { storage, created } = recordingStorage();
+        const first = await createRegistrationInvitation(storage, config, input);
+        expect(first.sendFailed).toBe(true);
+        expect(first.emailSent).toBe(false);
+        expect(first.invitation).toBeNull();
+        expect(created.map(r => r.status)).toEqual(['cancelled']);
+
+        setActiveEmailService(mailService(true, sent, true));
+        const retry = await createRegistrationInvitation(storage, config, input);
+        expect(retry.suppressed).toBeNull();
+        expect(retry.emailSent).toBe(true);
+        expect(sent).toEqual(['person@example.org', 'person@example.org']);
     });
 });
 

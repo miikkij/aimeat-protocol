@@ -18,6 +18,8 @@
  *   - SUPERSEDED: old file → the file that replaces it
  *   - runMigrations(pool): apply every file not applied yet, in lexical order
  * @version-history
+ *   v1.2.0 — 2026-10-16 — A migration's transaction lifts the pool's statement and lock limits for
+ *     itself (QA audit E6-07).
  *   v1.1.0 — 2026-09-26 — SUPERSEDED, and the `superseded_by` column: 0085 is recorded as replaced by
  *     0086 on a database that has not applied it, and never runs there.
  *   v1.0.0 — 2026-07-15 — Phase 5: SQL-file migration runner (replaces prisma db push).
@@ -62,6 +64,11 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      // The pool's statement and lock limits end a stalled request (pool-limits.ts). A migration
+      // that rewrites a large table is not stalled, and a node that cannot finish one does not boot,
+      // so this transaction lifts both limits for itself (LOCAL ends with the transaction).
+      await client.query('SET LOCAL statement_timeout = 0');
+      await client.query('SET LOCAL lock_timeout = 0');
       await client.query(ddl);
       await client.query('INSERT INTO "_kysely_migrations"(name) VALUES ($1)', [file]);
       for (const [old, by] of Object.entries(SUPERSEDED)) {

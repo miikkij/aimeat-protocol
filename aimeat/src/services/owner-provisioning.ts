@@ -10,6 +10,9 @@
  * @structure emailHashOf; ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.9.0 — 2026-10-16 — createAccountRows(): the owner row, the profile row and the welcome bonus in
+ *     one transaction, used by provisionOwner and every account-creating route; a failure after the
+ *     owner row had left a taken name nobody could sign in with (QA audit E6-02).
  *   v1.8.0 — 2026-10-15 — ownerRegistrationRefusal / announceOwnerRegistered: the registration hooks run
  *     on every account-creating route, provisionOwner included, and a refusal throws
  *     RegistrationHookRefusedError before any row exists (feature-list audit 89).
@@ -167,6 +170,28 @@ export async function creditWelcomeBonus(
   });
 }
 
+/**
+ * The account's three rows, in ONE transaction: the owner row, the profile (GHII) row, which holds
+ * the password hash, and the welcome-bonus ledger line. Written separately, a failure after the
+ * owner row left a name that answered NAME_TAKEN on every retry and could not sign in, with no sweep
+ * to find it (QA audit E6-02). Every route that creates an account calls this; what each route does
+ * before (its gates) and after (best-effort extras) stays outside, because a swallowed error inside
+ * a PostgreSQL transaction would abort it.
+ */
+export async function createAccountRows(
+  storage: Storage,
+  config: AimeatConfig,
+  ownerRow: OwnerRecord,
+  profileRow: Omit<GHIIRecord, 'ownerName'>,
+): Promise<ProvisionedOwner> {
+  return storage.transaction(async () => {
+    const owner = await storage.createOwner(ownerRow);
+    const ghii = await storage.createGHII({ ...profileRow, ownerName: owner.name } as GHIIRecord);
+    await creditWelcomeBonus(storage, config, ghii.ghii, profileRow.createdAt);
+    return { owner, ghii };
+  });
+}
+
 export interface ProvisionOwnerOpts {
   /** How this account is arriving — the registration-mode gate decides by it. REQUIRED so the
    *  compiler forces every new call site to classify itself (see {@link RegistrationVia}). */
@@ -246,17 +271,16 @@ export async function provisionOwner(
   const roles: string[] = ['owner'];
   if (opts.via !== 'provisioning' && await createdAccountIsOperator(storage)) roles.push('operator');
 
-  const owner = await storage.createOwner({
+  const verified = verifiedEmail;
+  const ghii = `${username}@${config.nodeId}`;
+  // The owner row, the profile row and the welcome bonus commit together or not at all (QA audit E6-02).
+  const { owner, ghii: ghiiRecord } = await createAccountRows(storage, config, {
     name: username,
     displayName,
     publicKey: keyPair.publicKey,
     roles,
     createdAt: now,
-  });
-
-  const verified = verifiedEmail;
-  const ghii = `${username}@${config.nodeId}`;
-  const ghiiRecord = await storage.createGHII({
+  }, {
     username,
     nodeId: config.nodeId,
     ghii,
@@ -272,7 +296,6 @@ export async function provisionOwner(
     magicLinkEnabled: opts.enableMagicLink === true ? true : undefined,
     verificationLevel: verified ? 1 : 0,
     verificationMethod: verified ? 'email' : undefined,
-    ownerName: owner.name,
     totpEnabled: false,
     morselBalance: config.welcomeBonus,
     loginCount: 0,
@@ -290,8 +313,6 @@ export async function provisionOwner(
     await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHashOf(verified), ghii)
       .catch(err => { logger.warn('provisionOwner: app invitations are best-effort', { error: String(err) }); });
   }
-
-  await creditWelcomeBonus(storage, config, ghii, now);
 
   // Which onboarding path this account was created on (05-mittaus.md). This is the SHARED
   // account-creation core — invitation accept (including the agent door), OAuth sign-up and

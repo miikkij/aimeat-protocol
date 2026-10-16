@@ -9,6 +9,9 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-10-16 -- setMemory on a trackable key reads the row FOR UPDATE inside a transaction, so two
+ *     concurrent writers no longer both write version N+1 and lose the first value from the history
+ *     (QA audit D4-10, F10b-02).
  *   2026-10-15 -- searchMemory is one owner's searchText (word-start), no longer a substring ILIKE over the blob (feature-list audit #52).
  *   v1.6.0 -- 2026-10-12 -- bulkBinMemory: many rows into the bin, chunked like bulkDeleteMemory.
  *   v1.5.0 -- 2026-09-08 -- countMemoryWithOrigins, for the operator's CORS page.
@@ -91,6 +94,24 @@ export const memoryMethods = {
 
   async setMemory(this: PostgresKyselyStorage, record: MemoryRecord): Promise<MemoryRecord> {
     const existing = await this._rawMemory(record.ownerGaii, record.key);
+    // A TRACKABLE key keeps every earlier value in MemoryVersion, and that promise needs the row
+    // locked: with a plain read-then-write two writers both read version N, both wrote N+1, and the
+    // first writer's value reached neither the record nor the history (QA audit D4-10). So for a
+    // trackable key the read is repeated FOR UPDATE inside a transaction (joining one already open),
+    // and the second writer waits, reads N+1 and writes N+2. A key without history keeps the
+    // cheaper path: there, last writer wins, which is what a plain write has always meant.
+    if (existing?.trackable) {
+      return this.transaction(async () => {
+        const locked = await this.db.selectFrom('Memory').selectAll()
+          .where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).forUpdate().executeTakeFirst();
+        return this._writeMemoryRow(record, locked ? rowToRecord(locked) : null);
+      });
+    }
+    return this._writeMemoryRow(record, existing);
+  },
+
+  /** The body of setMemory once the current row is known (read FOR UPDATE for a trackable key). */
+  async _writeMemoryRow(this: PostgresKyselyStorage, record: MemoryRecord, existing: MemoryRecord | null): Promise<MemoryRecord> {
     // trackable is a property of the KEY: inherit the existing setting if the writer didn't specify.
     const trackable = record.trackable ?? existing?.trackable ?? false;
     record.trackable = trackable || undefined;

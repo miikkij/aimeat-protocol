@@ -5,6 +5,8 @@
  * @description Profile tab for managing personal node registrations, visibility,
  *   agent assignments, tunnel URLs, and mailbox status.
  * @version-history
+ *   v1.22.0 -- 2026-10-16 -- A failed load shows "Could not load your servers." with Retry instead of an
+ *     empty list, and no longer reports 0 servers to the header (QA audit F6-05).
  *   v1.21.2 -- 2026-10-11 -- The setup guide link opens the guide on GitHub; /docs/personal-node-setup-guide.md is not a path the node serves.
  *   v1.21.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes itself, so a node id or agent GAII with an ampersand showed as &amp;.
  *   v1.21.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with the Tabs bar, Section, List with its opened Panel, Facts, Card, Fields, TextField, Check, Tab, Split, Mark, Note, Action): the page passes data and writes no class. The setup steps name their keys again as main did (page group G8).
@@ -72,6 +74,7 @@ import * as nodesService from '/js/services/nodes.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import NodeStatsTab from './node-stats-tab.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState, LoadFailed } from '/js/load-state.js';
 
 /** A setup step's words begin with their own number ("1. Open…"); the list counts, so the number is said once. */
 const stepWords = (s) => String(s).replace(/^\s*\d+\.\s*/, '');
@@ -83,6 +86,7 @@ function NodesList({ session, showToast, onStats }) {
   const NODE_URL = getNodeUrl();
   const tunnelUrl = NODE_URL.replace(/^http/, 'ws') + '/v1/personal/tunnel';
   const [nodes, setNodes] = useState(null);
+  const nodesLoad = useLoadState();
   const [showNodeForm, setShowNodeForm] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [expandedSetups, setExpandedSetups] = useState(new Set());
@@ -108,8 +112,14 @@ function NodesList({ session, showToast, onStats }) {
     try {
       const list = await nodesService.listNodes();
       setNodes(list);
+      nodesLoad.ok();
       onStats?.({ nodes: list.length });
-    } catch (err) { swallowed('nodes-tab', err); setNodes([]); onStats?.({ nodes: 0 }); }
+    } catch (err) {
+      // Neither an empty list nor "0 servers" to the header: a failed load is drawn as one, and the
+      // header keeps the figure it had.
+      swallowed('nodes-tab', err);
+      nodesLoad.fail(err);
+    }
   }
 
   async function handleRegister(nodeId, vis, gaiis) {
@@ -147,7 +157,7 @@ function NodesList({ session, showToast, onStats }) {
     <${Section} band title=${t('profile.nodes.title')} first>
     <${Space} below="large"><${Loud} onClick=${() => setShowNodeForm(!showNodeForm)}>${t('profile.nodes.addBtn')}<//><//>
     ${showNodeForm && html`<${NodeForm} onRegister=${handleRegister} onCancel=${() => setShowNodeForm(false)} />`}
-    ${!nodes ? html`<${LoadingLine} text=${t('profile.nodes.loading')} />`
+    ${!nodes ? (nodesLoad.failed ? html`<${LoadFailed} text=${t('profile.nodes.error')} onRetry=${loadData} />` : html`<${LoadingLine} text=${t('profile.nodes.loading')} />`)
       : html`<${List} cols="name-desc-doors" empty=${t('profile.nodes.empty')}>${nodes.map((node, idx) => {
           const statusClass = node.status || 'offline';
           const statusLabel = t('profile.nodes.' + statusClass) || statusClass;

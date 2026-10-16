@@ -12,6 +12,7 @@
  *   problem. Flattening a chosen server into the list with its real schemas is a later phase, opted
  *   into per server.
  * @version-history
+ *   2026-10-16 — aimeat_mcp_grant_set: a grant on a node-wide server narrows the caller's own agents and apps; GRANT_NOT_APPLICABLE is for another person's server; an expires value that is not a date is refused (QA audit F01b-02).
  *   2026-10-15 — aimeat_mcp_grant_set says a node-wide server answers GRANT_NOT_APPLICABLE (feature-list audit #12).
  *   2026-10-09 — aimeat_mcp_authorize says the address is the node's confirmation page (secrets audit 2026-10-09).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -176,7 +177,7 @@ export const mcpProxyTools = [
     },
     {
         name: 'aimeat_mcp_grant_set',
-        description: "Narrow one agent or app to named tools on one attached server, optionally with arguments already decided, a call ceiling and an end date. This is how 'my coding agent may READ Jira' becomes true without also meaning it may close tickets. locked_input is the part worth understanding: {\"project\":\"SUPPORT\"} means every call lands in SUPPORT whatever the agent asks for, because those values win over what it sends. Writing a grant REPLACES any earlier one for the same agent on the same server. Only a server attached to this person's own account takes a grant: one the node offers to everybody answers GRANT_NOT_APPLICABLE. Needs the mcp:manage permission. Ask the person which tools before guessing; a narrowing that is too tight looks exactly like a broken server.",
+        description: "Narrow one agent or app to named tools on one attached server, optionally with arguments already decided, a call ceiling and an end date. This is how 'my coding agent may READ Jira' becomes true without also meaning it may close tickets. locked_input is the part worth understanding: {\"project\":\"SUPPORT\"} means every call lands in SUPPORT whatever the agent asks for, because those values win over what it sends. Writing a grant REPLACES any earlier one for the same agent on the same server. On a server the node offers to everybody, the grant narrows only this person's own agents and apps; a server another person attached answers GRANT_NOT_APPLICABLE. An expires value that is not a date is refused with INVALID_INPUT. Needs the mcp:manage permission. Ask the person which tools before guessing; a narrowing that is too tight looks exactly like a broken server.",
         caller: 'agent',
         visibility: agentEverywhere,
         // Idempotent: writing the same grant twice leaves the same state. Not destructive, although
@@ -190,7 +191,7 @@ export const mcpProxyTools = [
             tools: { type: 'array', required: true, description: "Which tools it may use: a list of names, or the string '*' for all of them.", zod: z.union([z.literal('*'), z.array(z.string())]) },
             locked_input: { type: 'object', description: 'Arguments it may not choose. These win over whatever it sends.' },
             call_cap: { type: 'object', description: 'At most {count} calls in {windowHours} hours.', zod: z.object({ count: z.number(), windowHours: z.number() }) },
-            expires: { type: 'string', description: 'An ISO date after which this stops applying.' },
+            expires: { type: 'string', description: 'An ISO date after which this stops applying, such as 2026-12-31. A value that is not a date is refused.' },
             read_only: { type: 'boolean', description: 'True: only tools the server itself marks read-only (readOnlyHint), on top of `tools`. A tool with no such mark is refused, and so is one the server adds later until it is marked.' },
         },
     },

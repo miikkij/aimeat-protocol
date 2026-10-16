@@ -11,6 +11,8 @@
  * @structure AppsTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'apps'.
  * @version-history
+ *   v2.3.0 — 2026-10-16 — A failed load of the owner's apps is drawn as one (appsFailed: the could-not-load
+ *     note with Retry), never as "no apps yet" with the first-app guide (QA audit F6-05).
  *   v2.2.0 — 2026-10-04 — `shared`: the apps somebody else owns and the person may build
  *     (listApps({ building: true })), so a draft waiting on such an app shows under What waits for you,
  *     now that the Roadmap and shared work section is gone (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
@@ -43,6 +45,7 @@ import * as skillsService from '/js/services/skills.js';
 import { apiGet, apiGetText, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { recordRecent } from '/js/recents.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState } from '/js/load-state.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { a, appRef, nameOf, computeKunto, lineDiff } from './apps/frame.js';
 import { buildAgentAuthoringPrompt } from './apps/build.js';
@@ -51,7 +54,9 @@ import { renderPage } from './apps/page.js';
 export default function AppsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [publishApp, setPublishApp] = useState(null);
-  const [apps, setApps] = useState(null);          // the owner's apps, null while loading
+  const [apps, setApps] = useState(null);          // the owner's apps, null while loading (or after a failed first load)
+  const appsLoad = useLoadState();
+  const { ok: appsLoadOk, fail: appsLoadFail } = appsLoad;
   const [community, setCommunity] = useState(0);   // other people's apps on this node
   const [communityOwners, setCommunityOwners] = useState(0);
   const [bound, setBound] = useState({});          // "owner/filename" → the skills bound to it
@@ -82,10 +87,16 @@ export default function AppsTab({ session, showToast, onStats }) {
       const own = list.filter((x) => x.owner === session.owner);
       const others = list.filter((x) => x.owner !== session.owner);
       setApps(own);
+      appsLoadOk();
       setCommunity(others.length);
       setCommunityOwners(new Set(others.map((x) => x.owner)).size);
       onStatsRef.current?.({ apps: own.length });
-    } catch (err) { swallowed('apps-tab', err); setApps([]); }
+    } catch (err) {
+      // Never an empty list: "no apps yet" with its first-app guide over apps that only failed to
+      // load. The list stays as it was; the first load shows the could-not-load note.
+      swallowed('apps-tab', err);
+      appsLoadFail(err);
+    }
     try {
       // One read for every app: the owner's skills carry their bindings, so the page never asks
       // per app (155 requests on the production node before this).
@@ -115,7 +126,7 @@ export default function AppsTab({ session, showToast, onStats }) {
       swallowed('apps-tab: dev-grants', err);
       setBuilders(false);
     }
-  }, [session]);
+  }, [session, appsLoadOk, appsLoadFail]);
 
   useEffect(() => { if (session) load(); }, [session, load]);
   const liveRef = useRef(null);
@@ -284,7 +295,7 @@ Start by asking me which app and what I want changed. Fill a data map (aimeat_da
 
   const ctx = {
     publishApp, submitPublish, closePublish: () => { if (!busy) setPublishApp(null); },
-    session, apps, community, communityOwners, bound, grants, shared, buildPrompt, busy, diff, openScopes,
+    session, apps, appsFailed: appsLoad.failed, reload: load, community, communityOwners, bound, grants, shared, buildPrompt, busy, diff, openScopes,
     builders, buildersBusy, onGrantBuilder, onRevokeBuilder,
     kunto: computeKunto(apps || [], bound), ConfirmUI, showToast,
     publishDraft, discardDraft, toggleDiff, revokeGrant, toggleScopes: (g) => setOpenScopes(openScopes === g.grant_id ? null : g.grant_id),

@@ -32,6 +32,9 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-cli.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connect-cli
  * @version-history
+ *   2026-10-16 — `aimeat backup` and `aimeat restore` against this node: no token, a bad token and a
+ *     non-operator token exit 1 and write no file; an operator PAT writes the accounts and agents; a
+ *     restore with a failed row exits 1 and the route answers restored: false (QA audit P6-07, F19b-01).
  *   2026-10-15 — The `client --home` DEFECT test is inverted: the credential lands in --home
  *     (feature-list audit #6).
  *   v1.0.0 — 2026-09-08 — Initial creation. No suite had ever run these commands.
@@ -46,6 +49,7 @@ import {
   registerOwnerAndAgent, seedConnectorHome, approveDeviceRequest,
   type NodeAccount, type CliRun,
 } from './helpers/connect-cli.js';
+import { ownerToken, registerOwner, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 let passed = 0;
 let failed = 0;
@@ -844,6 +848,104 @@ await test('aimeat skill install refuses a malformed ref; a bare `skill` is help
   said(wrongAction, 'Usage: aimeat skill install');
 });
 
+// QA audit P6-07 / F19b-01: backup and restore sent a credential no auth path read, wrote the 401
+// answer into the backup file, logged success and exited 0. Each case below is one way the work
+// fails, and the command has to say so, write nothing, and exit 1.
+const backupFile = join(tmpRoot, 'backup.json');
+const brokenRestoreFile = join(tmpRoot, 'restore-broken.json');
+const OPERATOR = `cliop${stamp}`;
+const PLAIN_OWNER = `cliplain${stamp}`;
+let operatorPat = '';
+let plainToken = '';
+
+await test('aimeat backup / restore: an operator account and its personal access token', async () => {
+  const reg = await json('/v1/admin/setup/register', {
+    method: 'POST',
+    headers: { 'X-Admin-Password': process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw' },
+    body: JSON.stringify({ name: OPERATOR, password: OWNER_PASSWORD }),
+  });
+  assert(reg.status === 200 && reg.body.owner?.roles?.includes('operator'), `register operator: ${reg.status} ${JSON.stringify(reg.body).slice(0, 300)}`);
+  const jwt = await ownerToken(BASE, OPERATOR);
+  const pat = await json('/v1/access/tokens', {
+    method: 'POST', ...auth(jwt), body: JSON.stringify({ label: 'cli-backup', grant_operator: true }),
+  });
+  assert(pat.status === 201 && typeof pat.body.data?.token === 'string', `mint operator PAT: ${pat.status} ${JSON.stringify(pat.body).slice(0, 300)}`);
+  operatorPat = pat.body.data.token;
+});
+
+await test('aimeat backup without a token says what to pass, writes no file and exits 1', async () => {
+  const r = await runCli(['backup', backupFile, '--url', BASE], { home: emptyHome, env: { AIMEAT_OP_TOKEN: undefined }, timeoutMs: 60_000 });
+  exited(r, 1);
+  said(r, 'needs an operator token', 'stderr');
+  said(r, 'AIMEAT_OP_TOKEN', 'stderr');
+  assert(!existsSync(backupFile), 'a backup file was written without a token');
+});
+
+await test('aimeat backup with a token the node does not accept prints the 401, writes no file and exits 1', async () => {
+  const r = await runCli(['backup', backupFile, '--url', BASE, '--token', 'aimeat_pat_not-a-real-token'],
+    { home: emptyHome, env: { AIMEAT_OP_TOKEN: undefined }, timeoutMs: 60_000 });
+  exited(r, 1);
+  said(r, /HTTP 401 [A-Z_]+: /, 'stderr');
+  said(r, 'No file was written.', 'stderr');
+  assert(!existsSync(backupFile), 'the refusal was written into the backup file');
+  assert(!/Backup written/.test(r.out), 'the command reported success after a refusal');
+});
+
+await test('aimeat backup with a token of a non-operator account prints the 403 and writes no file', async () => {
+  // A new account: OWNER is the first account on this node, which the node makes its operator.
+  const plain = await registerOwner(BASE, PLAIN_OWNER);
+  plainToken = plain.token;
+  const r = await runCli(['backup', backupFile, '--url', BASE, '--token', plain.token],
+    { home: emptyHome, env: { AIMEAT_OP_TOKEN: undefined }, timeoutMs: 60_000 });
+  exited(r, 1);
+  said(r, /HTTP 403/, 'stderr');
+  assert(!existsSync(backupFile), 'a backup file was written for a non-operator');
+});
+
+await test('aimeat backup with an operator PAT in AIMEAT_OP_TOKEN writes the accounts and agents', async () => {
+  const r = await runCli(['backup', backupFile, '--url', BASE], { home: emptyHome, env: { AIMEAT_OP_TOKEN: operatorPat }, timeoutMs: 60_000 });
+  exited(r, 0);
+  said(r, `Backup written to ${backupFile}`);
+  said(r, 'This export is partial.');
+  const file = JSON.parse(readFileSync(backupFile, 'utf-8'));
+  assert(file.ok === true, `the file holds an error: ${JSON.stringify(file).slice(0, 300)}`);
+  const owners = (file.data?.owners ?? []).map((o: any) => o.name);
+  assert(owners.includes(OWNER) && owners.includes(OPERATOR), `owners in the file: ${owners.join(', ')}`);
+  const agents = (file.data?.agents ?? []).map((a: any) => a.gaii);
+  assert(agents.includes(acc.agentGaii), `agents in the file: ${agents.join(', ')}`);
+});
+
+await test('aimeat restore with a bad token prints the 401 and exits 1', async () => {
+  const r = await runCli(['restore', backupFile, '--url', BASE, '--token', 'aimeat_pat_not-a-real-token'],
+    { home: emptyHome, env: { AIMEAT_OP_TOKEN: undefined }, timeoutMs: 60_000 });
+  exited(r, 1);
+  said(r, /HTTP 401 [A-Z_]+: /, 'stderr');
+  said(r, 'Nothing was imported.', 'stderr');
+  assert(!/Restore complete/.test(r.out), 'the command reported success after a refusal');
+});
+
+await test('aimeat restore of the same backup skips every row as already there and exits 0', async () => {
+  const r = await runCli(['restore', backupFile, '--url', BASE, '--token', operatorPat], { home: emptyHome, timeoutMs: 60_000 });
+  exited(r, 0);
+  said(r, /Already on this node, skipped: .*owners/);
+  said(r, 'Restore complete.');
+});
+
+await test('aimeat restore of a row that fails for another reason says so and exits 1', async () => {
+  // An owner row without a name: not a duplicate (no such account exists), and storage refuses it.
+  writeFileSync(brokenRestoreFile, JSON.stringify({ ok: true, data: { owners: [{ displayName: 'nameless' }] } }));
+  const r = await runCli(['restore', brokenRestoreFile, '--url', BASE, '--token', operatorPat], { home: emptyHome, timeoutMs: 60_000 });
+  exited(r, 1);
+  said(r, /Restore incomplete\. Not imported because of an error: 1 owners/, 'stderr');
+  assert(!/Restore complete/.test(r.out), 'a failed row was reported as a complete restore');
+  // The route itself answers restored: false for the same body.
+  const direct = await json('/v1/admin/restore', {
+    method: 'POST', ...auth(operatorPat), body: JSON.stringify({ owners: [{ displayName: 'nameless' }] }),
+  });
+  assert(direct.status === 200 && direct.body.data?.restored === false && direct.body.data?.failed?.owners === 1,
+    `the restore route on a failed row: ${direct.status} ${JSON.stringify(direct.body).slice(0, 300)}`);
+});
+
 await test('aimeat screenshot-worker --dry-run reads the node\'s app list without a token', async () => {
   // --dry-run is the branch an operator uses to see what a real run would touch, and it is the one
   // branch that needs no operator credential. What is asserted is the listing it made from this
@@ -880,6 +982,11 @@ await test('Cascade-delete the owner and remove every temp directory', async () 
     method: 'DELETE', ...auth(acc.ownerToken),
   });
   assert(status === 200, `owner delete status ${status}`);
+  if (operatorPat) {
+    // The operator made for the backup tests deletes itself with its own token.
+    await json(`/v1/owners/${encodeURIComponent(OPERATOR)}`, { method: 'DELETE', ...auth(operatorPat) });
+  }
+  if (plainToken) await json(`/v1/owners/${encodeURIComponent(PLAIN_OWNER)}`, { method: 'DELETE', ...auth(plainToken) });
   await sleep(200);
   try { rmSync(tmpRoot, { recursive: true, force: true }); } catch { /* a handle may still be closing */ }
   void NODE_ID;

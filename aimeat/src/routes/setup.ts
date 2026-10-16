@@ -13,6 +13,13 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   v1.6.1 -- 2026-10-16 -- The owner row and the GHII profile are written in one transaction (QA audit E6-02).
+ *   v1.6.0 -- 2026-10-16 -- POST /v1/setup/init answers `settings` (per node setting: unchanged,
+ *     written to .env for the next start, or not written because a .env exists or the write failed)
+ *     and `restart_required`, and its message says "complete" only when nothing was dropped; dropped
+ *     settings are logged at warn level. GET /v1/setup/status also gives nodeType and port, the
+ *     wizard's defaults. The answer said "Node setup complete" while the settings were dropped
+ *     (QA audit F1-03).
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.5.0 -- 2026-10-09 -- The node settings (nodeId, nodeType, genesisUrl, locale) are checked by
  *     services/setup-env.ts before anything is created, and .env is written through its one writer
@@ -39,7 +46,7 @@ import { hashPassword } from '../services/password.js';
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
 import { writePrivateFile } from '../utils/private-file.js';
-import { parseSetupNodeSettings, buildSetupEnv } from '../services/setup-env.js';
+import { parseSetupNodeSettings, buildSetupEnv, setupSettingOutcomes, setupMessage, type SetupEnvWrite } from '../services/setup-env.js';
 
 const __dirname_setup = dirname(fileURLToPath(import.meta.url));
 
@@ -81,9 +88,12 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             // e2e-setup-and-verification). owners.ts skips it the same way for the operator grant.
             const owners = (await storage.listOwners()).filter(o => o.name !== 'anonymous');
             const needsSetup = owners.length === 0;
+            // nodeType and port are the wizard's defaults, so an untouched form matches the running node.
             res.json(success(config.nodeId, {
                 needsSetup,
                 nodeId: config.nodeId,
+                nodeType: config.nodeType,
+                port: config.port,
             }));
         } catch (err) {
             logger.error('Setup status check failed', errorFields(err));
@@ -183,30 +193,34 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             }
 
             // 2. Create owner with roles ['owner', 'operator'] (first owner = operator)
+            // 3. ...and the GHII profile that holds the password, in ONE transaction with the owner
+            //    row: written apart, a failure between them left a taken name nobody could sign in
+            //    with, on the one node that has no other operator to remove it (QA audit E6-02).
             const now = new Date().toISOString();
-            const ownerRecord = await storage.createOwner({
-                name: username,
-                displayName: resolvedDisplayName,
-                publicKey: ownerPublicKey,
-                roles: ['owner', 'operator'],
-                createdAt: now,
-            });
-
-            // 3. Create GHII profile
             const ghii = `${username}@${config.nodeId}`;
             const passwordHash = await hashPassword(password);
-            await storage.createGHII({
-                username,
-                nodeId: config.nodeId,
-                ghii,
-                displayName: resolvedDisplayName,
-                locale,
-                passwordHash,
-                verificationLevel: 0,
-                ownerName: ownerRecord.name,
-                totpEnabled: false,
-                createdAt: now,
-                updatedAt: now,
+            const ownerRecord = await storage.transaction(async () => {
+                const created = await storage.createOwner({
+                    name: username,
+                    displayName: resolvedDisplayName,
+                    publicKey: ownerPublicKey,
+                    roles: ['owner', 'operator'],
+                    createdAt: now,
+                });
+                await storage.createGHII({
+                    username,
+                    nodeId: config.nodeId,
+                    ghii,
+                    displayName: resolvedDisplayName,
+                    locale,
+                    passwordHash,
+                    verificationLevel: 0,
+                    ownerName: created.name,
+                    totpEnabled: false,
+                    createdAt: now,
+                    updatedAt: now,
+                });
+                return created;
             });
 
             // 4. Create a default agent for the owner
@@ -227,7 +241,9 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             });
 
             // 5. Write .env file with config values (best effort), at mode 0600: it is the file the
-            //    node reads its secrets from once the operator adds them.
+            //    node reads its secrets from once the operator adds them. What happened is reported
+            //    per setting below, because the running node takes none of them (QA audit F1-03).
+            let envWrite: SetupEnvWrite;
             try {
                 const envContent = buildSetupEnv(nodeSettings.settings, config, now);
 
@@ -245,10 +261,22 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 if (!existsSync(envPath)) {
                     writePrivateFile(envPath, envContent);
                     logger.info('Setup wizard wrote .env file', { path: envPath });
+                    envWrite = { written: true };
+                } else {
+                    envWrite = { written: false, reason: 'A .env configuration file already exists, and setup does not overwrite it.' };
                 }
             } catch (envErr) {
                 // Non-fatal: .env writing is best-effort
                 logger.warn('Setup wizard could not write .env file', errorFields(envErr));
+                envWrite = { written: false, reason: 'The .env file could not be written; the node log says why.' };
+            }
+            const settings = setupSettingOutcomes(nodeSettings.settings, config, envWrite);
+            const dropped = settings.filter(o => o.status === 'not_written');
+            if (dropped.length > 0) {
+                logger.warn('Setup wizard: node settings were not saved; the node keeps its current values', {
+                    settings: dropped.map(o => ({ setting: o.setting, requested: o.requested, running: o.running })),
+                    reason: dropped[0].reason,
+                });
             }
 
             // 6. An OWNER session for auto-login, which is what the wizard does with it: it stores the
@@ -287,7 +315,9 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 },
                 token,
                 expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
-                message: 'Node setup complete. You are now the operator of this node.',
+                message: setupMessage(settings),
+                settings,
+                restart_required: settings.some(o => o.restart_required),
             }, [
                 { description: 'View your profile', method: 'GET', url: `/v1/ghii/${encodeURIComponent(ghii)}` },
                 { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },

@@ -19,6 +19,9 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.35.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of an empty
+ *     list, and leaves the lists as they were, so the open organism is no longer closed as if it had
+ *     gone; the list-order prefs are saved only after they loaded (QA audit F6-04, F6-05).
  *   v2.34.0 -- 2026-10-03 -- The page's start (components/PageStart.js: what a shared place is for, the first prompt with Create organism as its button, what happens next) and the title's question mark, concept.organism (guidance part B).
  *   v2.33.0 -- 2026-10-01 -- The create form starts from a shape (own work, team, company, family, club,
  *     project; GET /v1/organisms/shapes): the shape sets the type, policy and visibility and the create
@@ -116,6 +119,7 @@ import { IncomingInvitations } from '/views/profile/organisms/panels.js';
 import { OrganismHome } from '/views/profile/organisms/home.js';
 import { Workspace } from '/views/profile/organisms/workspace.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { authHeaders } from '/js/services/auth.js';
 
 /** The padlock beside a non-public organism: an outline that takes the row's own colour. */
@@ -174,10 +178,15 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
   const ghii = session?.owner || '';
   const [wsCounts, setWsCounts] = useState({});   // orgId → workspace count (own orgs)
+  const orgLoad = useLoadState();
+  const { ok: orgLoadOk, fail: orgLoadFail } = orgLoad;
+  // The order prefs are saved whole ({ order, sort }), so a sort or drag is saved only once they loaded.
+  const prefsLoaded = useRef(false);
 
   const loadData = useCallback(async () => {
     // Apply the saved list-order prefs (organisms.ui) whether they came from the composite or a fallback read.
     const applyPrefs = (v) => {
+      prefsLoaded.current = true;
       if (v && typeof v === 'object') {
         if (Array.isArray(v.order)) setCustomOrder(v.order.filter(x => typeof x === 'string'));
         if (['custom', 'name', 'newest'].includes(v.sort)) setSortMode(v.sort);
@@ -194,6 +203,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         onStats?.({ organisms: ov.mine.length });
         setWsCounts(Object.fromEntries(ov.mine.map(o => [o.id, o.workspace_count ?? 0])));
         applyPrefs(ov.uiPrefs);
+        orgLoadOk();
         return;
       }
       const [myResp, pubResp] = await Promise.all([
@@ -206,13 +216,15 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       setPublicOrganisms((pubResp?.data?.organisms || []).filter(o => !mineIds.has(o.id)));
       onStats?.({ organisms: mine.length });
       setWsCounts(Object.fromEntries(mine.map(o => [o.id, o.workspace_count ?? 0])));
+      orgLoadOk();
       try { const r = await memoryService.getMemory('organisms.ui', { soft: true }); applyPrefs(r?.data?.value); } catch (err) { swallowed('organisms-tab: applyPrefs', err); }
     } catch (err) {
-      swallowed('organisms-tab: applyPrefs', err);
-      setMyOrganisms([]);
-      setPublicOrganisms([]);
+      // A failed load is drawn as one. The lists stay as they were (null before the first load), so
+      // the open organism is not closed by the check below as if it had gone.
+      swallowed('organisms-tab: loadData', err);
+      orgLoadFail(err);
     }
-  }, [ghii, onStats]);
+  }, [ghii, onStats, orgLoadOk, orgLoadFail]);
 
   useEffect(() => {
     if (session) loadData();
@@ -222,8 +234,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   // Read as part of loadData's mount composite (above); this key backs savePrefs.
   const UI_PREFS_KEY = 'organisms.ui';
   const savePrefs = useCallback((order, sort) => {
+    // Without the stored prefs, `order` may be the empty default and the save would drop the
+    // person's manual order. The change still shows; it is not saved, and the toast says so.
+    if (!prefsLoaded.current) { showToast(t('common.settingsNotLoaded'), true); return; }
     memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(err => { swallowed('organisms-tab: applyPrefs', err); });
-  }, []);
+  }, [showToast]);
 
   // Stable sort keeps server order for ids missing from the saved manual order (appended at the end).
   const sortedMine = useMemo(() => {
@@ -544,7 +559,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       <${ConfirmUI} />`;
   }
 
-  if (!myOrganisms) return html`<${Note} kind="loading">${t('organisms.loading') || 'Loading organisms...'}<//>`;
+  if (!myOrganisms) {
+    return orgLoad.failed
+      ? html`<${LoadFailed} onRetry=${loadData} />`
+      : html`<${Note} kind="loading">${t('organisms.loading') || 'Loading organisms...'}<//>`;
+  }
 
   // Open a cross-organism search hit: jump to its organism + workspace, pre-filling the in-workspace
   // search with the query so you land on the filtered result list (reuses Kerros 1).

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The shutdown handler stops the workflow engine's sweep and the scheduler, and waits
+ *     up to 4 s for scheduled runs in progress (Scheduler.shutdown; QA audit E4-07).
  *   2026-10-15 — The shutdown handler flushes the write buffers through flushProcessBuffers, which
  *     also flushes the agent refusal notes; they were lost on shutdown before (feature-list audit #30).
  *   v1.10.0 — 2026-10-12 — The three WebSocket servers add the Deprecation headers to the 101 answer
@@ -57,6 +59,9 @@ import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
 import { turnDeprecationWarning } from './services/turn-credentials.js';
 import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-setup-secret.js';
+
+/** How long shutdown waits for scheduled runs in progress; the process exits 5 s after server.close. */
+const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
 
 /**
  * Start an AIMEAT node. Runs the post-upgrade asset self-heal, launches the HTTP
@@ -469,6 +474,13 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     // The chat agent is a child of this process; it goes when we go, or it is orphaned.
     const { shutdownChat } = await import('./services/chat-session.js');
     shutdownChat();
+    // No new scheduled fire and no workflow sweep from here on; the runs in progress get a bounded
+    // wait, and one still going after it is written to its run log as cut off (Scheduler.shutdown).
+    const { getActiveScheduler } = await import('./services/scheduler.js');
+    const { getActiveWorkflowEngine } = await import('./services/workflow/engine.js');
+    getActiveWorkflowEngine()?.stop();
+    await getActiveScheduler()?.shutdown(SCHEDULER_SHUTDOWN_GRACE_MS)
+      .catch(err => logger.warn('index-start: scheduler shutdown failed', { error: String(err) }));
     const statsInstance = getStatsInstance();
     if (statsInstance) await statsInstance.shutdown();
     // Every write buffer, the agent refusal notes included (server-bootstrap/process-buffers.ts).

@@ -16,6 +16,8 @@
  * @structure JourneyPath · RoadChooser · ConnectBox (moved from journey.js) · PromptRoad
  * @usage html`<${JourneyPath} journey=${journey} />  <${RoadChooser} journey=${journey} />`
  * @version-history
+ *   v1.3.1 — 2026-10-16 — The road is saved only on top of a strict read of journey.state: a failed read
+ *     writes nothing instead of replacing what the person's AI wrote there (QA audit F6-04).
  *   v1.3.0 — 2026-10-03 — The road for an AI that cannot connect makes the profile: it offers the
  *     served welcome-mat interview prompt in the page's language (with its shorter fallback after a
  *     refused paste) and sends the answer to POST /v1/home/welcome-mat, which publishes the card and
@@ -31,6 +33,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t, getLocale } from '/js/i18n.js';
 import { api } from '/js/api.js';
+import { readForWrite } from '/js/load-state.js';
 import { useShared, invalidateShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { NamedRow } from '/components/NamedRow.js';
@@ -78,14 +81,14 @@ export function JourneyPath({ journey }) {
     <//>`;
 }
 
-/** Write the chosen road into the person's record, keeping whatever their AI wrote there. */
+/** Write the chosen road into the person's record, keeping whatever their AI wrote there. The read is
+ *  strict: a failed read throws and nothing is written, because a write built on {} would replace
+ *  what their AI wrote with the road alone. A record that does not exist yet reads as {} (soft=1). */
 async function saveRoad(road) {
   let current = {};
-  try {
-    const got = await api(`/v1/memory/${JOURNEY_KEY}?soft=1`);
-    const value = got?.data?.value;
-    if (value && typeof value === 'object') current = value;
-  } catch (e) { swallowed('home journey: road read', e); }
+  const got = await readForWrite(() => api(`/v1/memory/${JOURNEY_KEY}?soft=1`));
+  const value = got?.data?.value;
+  if (value && typeof value === 'object') current = value;
   await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: JOURNEY_KEY, value: { ...current, road }, visibility: 'private' }) });
 }
 

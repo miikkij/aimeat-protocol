@@ -11,6 +11,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-10-16 — Setup's owner row, profile row and welcome bonus are written in one transaction, and
+ *     a failed profile write is no longer swallowed (QA audit E6-02).
  *   2026-10-16 — Disabling and enabling an account writes the operator trail (QA audit E2-04).
  *   2026-10-15 — The dashboard counts morsels in circulation from the account holders' balances (morselsInCirculation), not from agent rows, which are always 0; the ledger figures are summed in the database (sumTransactionsByType), not from the newest 10 000 rows (feature-list audit #169).
  *   v1.12.1 — 2026-10-12 — The economy figures count the burned share of pacing (`pacing_burn`) as burned
@@ -231,26 +233,28 @@ export function adminRouter(
         // Setup wizard is admin-password-protected — always grant operator
         const roles = ['owner', 'operator'];
 
-        const owner = await storage.createOwner({
-            name,
-            displayName: display_name,
-            publicKey: keyPair.publicKey,
-            roles,
-            createdAt: new Date().toISOString(),
-        });
-
         // Always create GHII profile (required for single-balance economy)
         let hasPassword = false;
         const ghii = `${name}@${config.nodeId}`;
         const now = new Date().toISOString();
         const existingGhii = await storage.getGHIIByOwner(name);
-        if (!existingGhii) {
-            let passwordHash: string | undefined;
-            if (password && typeof password === 'string') {
-                passwordHash = await hashPassword(password);
-            }
-            if (passwordHash) hasPassword = true;
-            try {
+        let passwordHash: string | undefined;
+        if (!existingGhii && password && typeof password === 'string') {
+            passwordHash = await hashPassword(password);
+        }
+        // The owner row, the GHII profile and the welcome bonus commit together or not at all. The
+        // profile write had its error swallowed, so a failure left an operator account with no
+        // profile and no password (QA audit E6-02); now the whole request fails and can be retried.
+        const owner = await storage.transaction(async () => {
+            const created = await storage.createOwner({
+                name,
+                displayName: display_name,
+                publicKey: keyPair.publicKey,
+                roles,
+                createdAt: now,
+            });
+            if (!existingGhii) {
+                if (passwordHash) hasPassword = true;
                 await storage.createGHII({
                     username: name,
                     nodeId: config.nodeId,
@@ -272,11 +276,11 @@ export function adminRouter(
                     amount: config.welcomeBonus,
                     timestamp: now,
                 });
-            // eslint-disable-next-line aimeat/no-silent-catch -- GHII record may already exist
-            } catch { /* GHII record may already exist */ }
-        } else {
-            hasPassword = !!existingGhii.passwordHash;
-        }
+            } else {
+                hasPassword = !!existingGhii.passwordHash;
+            }
+            return created;
+        });
 
         // The node has an owner now, so the boot's secret file has done its job (services/admin-setup-secret.ts).
         try {

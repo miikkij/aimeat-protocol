@@ -10,6 +10,8 @@
  * @structure NotificationsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'notifications'.
  * @version-history
+ *   v2.3.0 — 2026-10-16 — A failed load of the inbox is drawn as one (itemsFailed: the could-not-load note
+ *     with Retry), never as an empty inbox (QA audit F6-05, E7-04).
  *   v2.2.0 — 2026-09-25 — An inline action runs only when its button calls a door of this node's own
  *     API (isRunnableActionEndpoint); any other says why it was not used, and nothing is sent.
  *   v2.1.0 — 2026-09-13 — Nothing is saved while the owner's settings are not loaded. The page saves
@@ -31,6 +33,7 @@ import { apiGet, api } from '/js/api.js';
 import { getNodeId } from '/js/services/auth.js';
 import * as notif from '/js/services/notifications.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState } from '/js/load-state.js';
 import { c, actionWord } from './notifications/frame.js';
 import { renderCover } from './notifications/cover.js';
 
@@ -40,6 +43,9 @@ const senderKeyOf = (r) => (r.kind === 'aimeat' ? null : r.key);
 export default function NotificationsTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [items, setItems] = useState([]);
+  // A failed first load is drawn as one, never as an empty inbox (items stays [] until a load works).
+  const inboxLoad = useLoadState();
+  const { ok: inboxLoadOk, fail: inboxLoadFail } = inboxLoad;
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState([]);
   const [senders, setSenders] = useState([]);
@@ -78,9 +84,10 @@ export default function NotificationsTab({ session, showToast }) {
       }
       const mineEndpoint = mine?.endpoint || null;
       setDevices((dev.subscriptions || []).map(d => ({ ...d, thisBrowser: d.endpoint === mineEndpoint })));
-    } catch (err) { swallowed('notifications-tab', err); }
+      inboxLoadOk();
+    } catch (err) { swallowed('notifications-tab', err); inboxLoadFail(err); }
     finally { setLoading(false); }
-  }, []);
+  }, [inboxLoadOk, inboxLoadFail]);
 
   useEffect(() => {
     load();
@@ -193,7 +200,7 @@ export default function NotificationsTab({ session, showToast }) {
   }
 
   const ctx = {
-    items, loading, groups, senders, settings, devices, pushSupport, vapid, emailVerified, busy, busyId, results, filter, showAll, groupsOpen, folds, quietForm, ConfirmUI,
+    items, itemsFailed: inboxLoad.failed, reload: () => load(), loading, groups, senders, settings, devices, pushSupport, vapid, emailVerified, busy, busyId, results, filter, showAll, groupsOpen, folds, quietForm, ConfirmUI,
     setFilter, setShowAll, setGroupsOpen, setFold, setQuietForm, openTab,
     open, markAllRead, clearAll, runAction, saveSettings, setPref, revokeApp, subscribe, unsubscribe, removeDevice, testPush,
   };

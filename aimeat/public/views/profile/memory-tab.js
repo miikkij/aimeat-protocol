@@ -5,6 +5,9 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.3.0 — 2026-10-16 — A failed load of the records or the files is drawn as one (the could-not-load
+ *     note with Retry, through memFailed / filesFailed in the render context), never as "Nothing here
+ *     yet"; changing the agent or the archived view starts the list from loading (QA audit F6-05).
  *   v3.2.0 — 2026-09-26 — The federated session's note is the Note component (the attention note, as
  *     the branch drew it) with the space under it; the tab writes no class (page group G3).
  *   v3.1.0 — 2026-09-25 — A note that asks you to look or act is the Attention note (.poster-aside, its small cut; solid for an act that cannot be undone, the waiting tone while an agent onboards) (Jouni's decision "Attention note", a unification).
@@ -111,12 +114,16 @@ import { EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
 import { loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
 import { renderMemoryView } from './memory-tab/cover.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState } from '/js/load-state.js';
 
 export default function MemoryTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
   const [memories, setMemories] = useState(null);
   const [files, setFiles] = useState(null);
+  // A failed load leaves the list as it was (null before the first load) and is drawn as one.
+  const memLoad = useLoadState();
+  const filesLoad = useLoadState();
   const [fileSizeLimitMb, setFileSizeLimitMb] = useState(null);   // what the NODE accepts, not a constant
   const [showMemForm, setShowMemForm] = useState(false);
   const [showFileForm, setShowFileForm] = useState(false);
@@ -244,7 +251,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
     // Skip the initial run — loadTab() already seeded the default memory view from the composite. Only
     // an actual agent-selection / archived-toggle change re-fetches the (dynamic) memory list.
     if (!memFilterMounted.current) { memFilterMounted.current = true; return; }
-    if (session) { loadMemories(); }
+    // Another agent's list (or the archived set) is a different list: start it from "loading", so a
+    // failed read shows as one instead of leaving the previous list under the new choice.
+    if (session) { setMemories(null); memLoad.reset(); loadMemories(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAgent, memArchived]);
 
@@ -337,12 +346,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
     // memory (metadata-only default view — mirrors loadMemories meta path)
     const items = ov.memory?.items || [];
     setMemories(items);
+    memLoad.ok();
     setMemQuota(ov.memory?.quota || null);
     setValueCache({});
     if (!memArchived) onStats?.({ memory: items.length });
     // files
     const fileList = ov.files?.files || [];
     setFiles(fileList);
+    filesLoad.ok();
     onStats?.({ files: fileList.length });
     const limitBytes = Number(ov.files?.max_file_size_bytes);
     if (Number.isFinite(limitBytes) && limitBytes > 0) setFileSizeLimitMb(Math.round(limitBytes / 1048576));
@@ -376,16 +387,23 @@ export default function MemoryTab({ session, showToast, onStats }) {
       if (fullLoaded) {
         const list = await memoryService.listMemories(agentGaii, memOpts);
         setMemories(Array.isArray(list) ? list : []);
+        memLoad.ok();
         // Don't report the archived-only count as the headline memory stat (it's a filtered view).
         if (!memArchived) onStats?.({ memory: Array.isArray(list) ? list.length : 0 });
       } else {
         const { items, quota } = await memoryService.listMemoriesMeta(agentGaii, memOpts);
         setMemories(items);
+        memLoad.ok();
         setMemQuota(quota);
         setValueCache({});
         if (!memArchived) onStats?.({ memory: items.length });
       }
-    } catch (err) { swallowed('memory-tab', err); setMemories([]); }
+    } catch (err) {
+      // Never an empty list: "Nothing here yet" over a store that only failed to answer reads as
+      // data loss. A list already on the page stays; the first load shows the could-not-load note.
+      swallowed('memory-tab', err);
+      memLoad.fail(err);
+    }
   }
 
   // "Load all contents" — pull every entry's value so the instant client filter can search values too.
@@ -490,12 +508,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
     try {
       const list = await memoryService.listFiles();
       setFiles(Array.isArray(list) ? list : []);
+      filesLoad.ok();
       onStats?.({ files: Array.isArray(list) ? list.length : 0 });
       // The form used to state a hardcoded "Max 10MB per file". Ask the node instead: an operator who
       // raises quota.storage_max_file_size_mb should see the new number, not be told a smaller lie.
       const mb = await memoryService.fileSizeLimitMb();
       if (mb) setFileSizeLimitMb(mb);
-    } catch (err) { swallowed('memory-tab', err); setFiles([]); }
+    } catch (err) { swallowed('memory-tab: loadFiles', err); filesLoad.fail(err); }
   }
 
   async function handleCreateMemory(key, value, visibility, tags, groupId) {
@@ -715,6 +734,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const ctx = {
     // shared
     session, showToast, confirm, NODE_URL, loadMemories, currentGhii,
+    memFailed: memLoad.failed, filesFailed: filesLoad.failed, loadFiles,
     // the poster face
     view, pickView, spaceSort, setSpaceSort, showRaw, setShowRaw, sysOpen, setSysOpen, showSearch, setShowSearch,
     staleAll, setStaleAll, moreOpen, toggleMore, agents, selectedAgent, setSelectedAgent, cart, cartOrgs, removeCartItem, clearCart, mainTab,

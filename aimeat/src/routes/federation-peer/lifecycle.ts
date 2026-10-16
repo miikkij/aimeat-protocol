@@ -5,6 +5,9 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-16 — DELETE /v1/federation/peers/:nodeId takes notify_network from the query as
+ *     well as the body (the connector and CLI send no body), and its answer lists each peer's outcome
+ *     of the signed notice (QA audit S6-06).
  *   2026-10-16 — key-exchange answers no agent roster to any tier (agent_keys is an empty list) and
  *     keeps none it receives (QA audit S6-04).
  *   v1.9.0 — 2026-10-12 — A re-admission asks peerUrlRefusal for the address it admits: a public node
@@ -68,7 +71,8 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
     router.delete('/v1/federation/peers/:nodeId', requireAuth(), requireOperator(storage), async (req, res) => {
         const out = await removePeer({ config, storage, peers }, req.params.nodeId as string, {
             emergency: req.query.emergency === 'true',
-            notifyNetwork: req.body?.notify_network === true,
+            // The signed notice to the other peers (services/federation-trust-notice.ts); emergency only.
+            notifyNetwork: req.body?.notify_network === true || req.query.notify_network === 'true',
             // The reason from the body (the page) or the query (the MCP tool's connector and CLI twins,
             // whose DELETE carries no body).
             ...(typeof req.body?.reason === 'string' ? { reason: req.body.reason as string }

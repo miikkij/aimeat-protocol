@@ -19,6 +19,7 @@
  * @structure buildGettingStarted(base, instruction, anonymousMode, canSendMail)
  * @usage import { buildGettingStarted } from '../data/getting-started.js';
  * @version-history
+ *   2026-10-16 — The no-account path says what to do when the invite answers not_sent (a send that failed) (QA audit F02a-04).
  *   2026-10-15 — The keypair sign-in signs the identity and a timestamp; no nonce is fetched, and the token lasts the node's token lifetime (feature-list audit 33).
  *   2026-10-15 — The no-account path offers POST /v1/registration-invites only when the node can send mail; otherwise it gives the portal link (feature-list audit #23).
  *   v1.0.0 — 2026-08-07 — Extracted from routes/bootstrap.ts and rewritten off the removed
@@ -68,6 +69,7 @@ export function buildGettingStarted(
             tell_them: 'The message shows the IP address this call came from and which AI made it, so they can see it was you and not someone else.',
             next: 'Once they have the account, come back to the has_account path and connect yourself as their agent.',
             if_you_cannot_post: `Say so plainly and send them to ${base}/v1/portal to register themselves. A silent failure leaves them waiting.`,
+            if_not_sent: 'When the answer says status "not_sent", no message is on its way: tell them what its tell_the_person says, which gives the portal link, and do not send them to their inbox.',
           } : {
             action: `Give them this link: ${base}/v1/portal`,
             result: 'This node does not send email, so it cannot mail them a link. They open the portal, choose a username and a password, and the account exists. You never choose the username.',

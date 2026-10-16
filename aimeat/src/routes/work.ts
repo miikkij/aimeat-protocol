@@ -12,6 +12,7 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   2026-10-16 — The escrow hold and the work item's creation are one transaction (QA audit E6-03).
  *   2026-10-15 — Rate and reject store the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   v1.7.0 — 2026-10-11 — The escrow holds the action's pacing amount (`toll`, was `basePrice`) plus
  *     the network fee; a morsel is pacing, not a price. Every response's `cost` carries `toll` and,
@@ -233,9 +234,26 @@ export async function createWorkItem(
   const effectiveToll = priority === 'high' ? tollMorsels * 2 : tollMorsels;
   const cost = calculateWorkCost(effectiveToll, config.burnRate);
 
-  // Hold escrow
-  const held = await holdEscrow(storage, requesterGaii, provider_gaii, trackingCode, cost.total);
-  if (!held) {
+  // Hold escrow and create the work item in ONE transaction: written apart, a failed create after
+  // the debit charged the requester for work that was never stored (QA audit E6-03).
+  const created = await storage.transaction(async () => {
+    const held = await holdEscrow(storage, requesterGaii, provider_gaii, trackingCode, cost.total);
+    if (!held) return null;
+    return storage.createWork({
+      trackingCode,
+      status: 'pending',
+      actionId: action_id,
+      providerGaii: provider_gaii,
+      requesterGaii,
+      input: input as Record<string, unknown>,
+      cost,
+      callbackUrl: callback_url,
+      ttlExpiresAt: new Date(now.getTime() + ttl * 3600_000).toISOString(),
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+    });
+  });
+  if (!created) {
     const requester = await storage.getAgent(requesterGaii);
     return {
       error: `You need ${cost.total} morsels but have ${requester?.morselBalance ?? 0}`,
@@ -245,19 +263,7 @@ export async function createWorkItem(
     };
   }
 
-  const work = await storage.createWork({
-    trackingCode,
-    status: 'pending',
-    actionId: action_id,
-    providerGaii: provider_gaii,
-    requesterGaii,
-    input: input as Record<string, unknown>,
-    cost,
-    callbackUrl: callback_url,
-    ttlExpiresAt: new Date(now.getTime() + ttl * 3600_000).toISOString(),
-    createdAt: now.toISOString(),
-    updatedAt: now.toISOString(),
-  });
+  const work = created;
 
   // If the provider is on a personal node, queue a notification
   if (personalNodeTarget) {

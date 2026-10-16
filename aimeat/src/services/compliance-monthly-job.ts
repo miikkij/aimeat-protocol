@@ -10,9 +10,15 @@
  *   window filed under a month's name is a quiet lie in an archive somebody reads a year later,
  *   which is exactly the kind of document this whole feature exists to avoid producing.
  *
- *   IT DOES NOT OVERWRITE A MONTH WITH DIFFERENT NUMBERS SILENTLY. Re-running writes a new version
- *   of the same key, so the memory record's own version history holds the earlier answer. A stored
- *   compliance report that changed with no trace would be worse than none.
+ *   IT DOES NOT OVERWRITE A MONTH WITH DIFFERENT NUMBERS SILENTLY. Should the same month be written
+ *   again, it is a new version of the same key, so the memory record's own version history holds the
+ *   earlier answer. A stored compliance report that changed with no trace would be worse than none.
+ *
+ *   IT DECIDES BY WHAT IS STORED, NOT BY THE DAY IT RUNS. The months owed are the ones after the
+ *   newest stored monthly report, up to the month that ended (at most MAX_MONTHS_MADE_UP). So a run
+ *   that comes late, because the node was down at 04:00 on the first and the scheduler caught the
+ *   fire up at start (scheduler-catch-up.ts), makes up the month it owes, and a second run in the
+ *   same month writes nothing and tells nobody again. A report of this moment is the snapshot below.
  *
  *   IT NOTIFIES THE OPERATORS, NOT EVERYONE. The report is node-wide, and the accounts entitled to
  *   read it are the ones the gate admits. A node with no operator writes the report and tells
@@ -23,10 +29,14 @@
  *   the page.
  * @structure
  *   - previousMonth(now) — `YYYY-MM` of the month before the given date, UTC
- *   - runComplianceMonthlyReport(config, storage) — the handler
+ *   - monthsOwed(target, newestStored) — the months a run still has to write, oldest first
+ *   - runComplianceMonthlyReport(config, storage, now) — the handler
  *   - saveComplianceSnapshot(config, storage, opts) — keep the report as it stands right now
  * @usage registered as the core handler `compliance-report-monthly` in services/core-jobs.ts
  * @version-history
+ *   2026-10-16 — The months to write are decided by the newest stored monthly report: a late run
+ *     makes up the month it owes (at most three), a month already stored is not written or
+ *     announced again (QA audit E4-07).
  *   v1.1.2 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.1.1 — 2026-10-02 — The notification linked to /admin, which the SPA has no route for, so it
  *     opened the front page. It links to /v1/admin now.
@@ -37,7 +47,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { buildComplianceReport } from './compliance-report.js';
-import { writeStoredReport, snapshotIdFor } from './compliance-register.js';
+import { writeStoredReport, snapshotIdFor, listStoredReports } from './compliance-register.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
@@ -49,48 +59,78 @@ export function previousMonth(now: Date): string {
   return m === 0 ? `${y - 1}-12` : `${y}-${String(m).padStart(2, '0')}`;
 }
 
+/** The most owed months one run makes up. A node down for longer gets the newest three. */
+export const MAX_MONTHS_MADE_UP = 3;
+
+/** `YYYY-MM` of the month before a `YYYY-MM`. */
+function monthBefore(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+}
+
+/**
+ * The months a run still has to write, oldest first: those after `newestStored` up to and including
+ * `target`, the newest MAX_MONTHS_MADE_UP of them. With nothing stored, only `target`: a new node
+ * does not write reports for months before it existed.
+ */
+export function monthsOwed(target: string, newestStored: string | null, max = MAX_MONTHS_MADE_UP): string[] {
+  if (!newestStored) return [target];
+  const owed: string[] = [];
+  for (let m = target; m > newestStored && owed.length < max; m = monthBefore(m)) owed.unshift(m);
+  return owed;
+}
+
 export interface MonthlyReportResult {
+  /** The month that ended, which this run is about. */
   month: string;
+  /** The months this run wrote, oldest first; empty when every owed month was already stored. */
+  written: string[];
+  /** Gaps and use cases of the newest month written (0 when nothing was written). */
   gaps: number;
   usecases: number;
   notified: number;
 }
 
 /**
- * Build the previous month's report, store it under `compliance.report.<YYYY-MM>`, and tell the
- * operators it is there.
+ * Build each owed month's report, store it under `compliance.report.<YYYY-MM>`, and tell the
+ * operators it is there. A month already stored is not built, written or announced again.
  *
  * The notification carries the gap count rather than a summary of the report, because the gap count
  * is the only number that asks somebody to do something.
  */
 export async function runComplianceMonthlyReport(
-  config: AimeatConfig, storage: Storage,
+  config: AimeatConfig, storage: Storage, now: Date = new Date(),
 ): Promise<MonthlyReportResult> {
-  const month = previousMonth(new Date());
-  const report = await buildComplianceReport(storage, config, { month });
-  await writeStoredReport(storage, config.nodeId, month, report);
+  const month = previousMonth(now);
+  const stored = await listStoredReports(storage, config.nodeId);
+  const newestStored = stored.find(r => r.kind === 'monthly')?.id ?? null;   // newest first
+  const owed = monthsOwed(month, newestStored);
+  if (owed.length === 0) {
+    logger.info('compliance: the monthly report for this month is already stored', { month });
+    return { month, written: [], gaps: 0, usecases: 0, notified: 0 };
+  }
 
   const owners = await storage.listOwners();
   const operators = owners.filter(isOperatorAccount);
-  for (const op of operators) {
-    await notify(storage, `${op.name}@${config.nodeId}`, {
-      type: 'compliance_report',
-      title: `Compliance report for ${month} is ready`,
-      body: report.gaps.length
-        ? `${report.gaps.length} thing(s) need a look: activity nobody wrote down, or a use case with unanswered questions.`
-        : 'Nothing in it needs a decision. It also names what it does not cover — read that part.',
-      // The admin page is the SPA route /v1/admin; /admin is no route and opens the front page.
-      link: `/v1/admin?tab=compliance&month=${month}`,
-    });
+  let last = { gaps: 0, usecases: 0 };
+  for (const m of owed) {
+    const report = await buildComplianceReport(storage, config, { month: m });
+    await writeStoredReport(storage, config.nodeId, m, report);
+    for (const op of operators) {
+      await notify(storage, `${op.name}@${config.nodeId}`, {
+        type: 'compliance_report',
+        title: `Compliance report for ${m} is ready`,
+        body: report.gaps.length
+          ? `${report.gaps.length} thing(s) need a look: activity nobody wrote down, or a use case with unanswered questions.`
+          : 'Nothing in it needs a decision. It also names what it does not cover — read that part.',
+        // The admin page is the SPA route /v1/admin; /admin is no route and opens the front page.
+        link: `/v1/admin?tab=compliance&month=${m}`,
+      });
+    }
+    last = { gaps: report.gaps.length, usecases: report.register.usecases.length };
+    logger.info('compliance: monthly report stored', { month: m, ...last, notified: operators.length });
   }
-
-  logger.info('compliance: monthly report stored', {
-    month, gaps: report.gaps.length, usecases: report.register.usecases.length, notified: operators.length,
-  });
-  return {
-    month, gaps: report.gaps.length,
-    usecases: report.register.usecases.length, notified: operators.length,
-  };
+  return { month, written: owed, ...last, notified: operators.length };
 }
 
 export interface SnapshotResult {

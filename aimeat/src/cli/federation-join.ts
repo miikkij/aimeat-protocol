@@ -14,6 +14,11 @@
  *   - load/save/clearPendingJoin: resumable pending-request state on disk
  *
  * @version-history
+ *   v1.4.0 — 2026-10-16 — doKeyExchange returns its outcome and sends `node_public_key`, the field the
+ *     key-exchange route requires (it sent `public_key` and was refused with 400 on every run). A failed
+ *     exchange saves no federation state and prints no success text; runFederationJoin returns false on
+ *     every path that did not join, and a cancel says it was cancelled, so the caller exits non-zero
+ *     (QA audit F5-06).
  *   v1.3.0 — 2026-10-09 — .env lines go through utils/env-file.ts envLine and the file is left at
  *     mode 0600 (utils/private-file.ts), also when it existed; it holds the second private key
  *     (secrets audit 2026-10-09, S4d).
@@ -44,14 +49,15 @@ const POLL_INTERVAL_MS = 10_000;
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function bail(t: TFunction): never {
-  p.cancel(t('join.done'));
-  process.exit(0);
+  // A cancel did not join anything: it says so and exits non-zero, so a script can tell it apart.
+  p.cancel(t('join.cancelled'));
+  process.exit(1);
 }
 
 /**
  * As init-wizard/helpers.ts, and subtracting for the same reason: @clack/prompts 1.8 made the
  * cancel a `unique symbol`, which no longer matches a `symbol` parameter. This copy keeps its own
- * `bail` because joining a federation says `join.done` on the way out, not `init.cancelled`.
+ * `bail` because a cancelled join says `join.cancelled` on the way out, not `init.cancelled`.
  */
 function checkCancel<T>(value: T, t: TFunction): Exclude<T, symbol> {
   if (p.isCancel(value)) bail(t);
@@ -167,11 +173,16 @@ interface DiscoveryInfo {
 
 // ── Main join flow ──────────────────────────────────────────────────
 
+/**
+ * Runs the join. Returns true only when the key exchange was accepted and the federation state was
+ * saved; every other path (unreachable target, refused introduction, rejection, interruption, failed
+ * key exchange) returns false, and the CLI entry exits non-zero on false.
+ */
 export async function runFederationJoin(
   config: AimeatConfig,
   targetUrl?: string,
   locale?: string,
-): Promise<void> {
+): Promise<boolean> {
   const t = createT((locale ?? 'en') as Locale);
   p.intro(t('join.title'));
 
@@ -213,15 +224,21 @@ export async function runFederationJoin(
       const finalStatus = await pollApproval(t, targetUrl, pending.requestId);
       if (finalStatus === 'approved') {
         const keys = await ensureKeypair(t);
-        await doKeyExchange(t, targetUrl, config, keys);
+        if (!await doKeyExchange(t, targetUrl, config, keys)) {
+          // The approval stands on the target, so the pending file stays for the next run.
+          p.outro(t('join.notJoined'));
+          return false;
+        }
         saveFederationState(config, targetUrl, pending.role);
         clearPendingJoin();
         showDone(t);
-      } else if (finalStatus === 'rejected') {
+        return true;
+      }
+      if (finalStatus === 'rejected') {
         clearPendingJoin();
         p.outro(t('join.rejectedMessage'));
       }
-      return;
+      return false;
     }
     // If 'no', continue with fresh flow
   }
@@ -240,7 +257,7 @@ export async function runFederationJoin(
     if (!targetInfo || targetInfo.protocol !== 'aimeat') {
       s.stop(t('join.discoveryFailed'));
       p.log.error(t('join.notAimeat'));
-      return;
+      return false;
     }
   } catch (e) {
     s.stop(t('join.discoveryFailed'));
@@ -248,7 +265,7 @@ export async function runFederationJoin(
       url: targetUrl,
       error: e instanceof Error ? e.message : String(e),
     }));
-    return;
+    return false;
   }
   s.stop(t('join.discovered', { nodeId: targetInfo.node_id }));
 
@@ -325,7 +342,7 @@ export async function runFederationJoin(
       if (introResp.status === 409) {
         p.log.warn(t('join.alreadyPeer'));
       }
-      return;
+      return false;
     }
 
     if (introResp.json === undefined) throw new Error('The answer is not JSON.');
@@ -335,7 +352,8 @@ export async function runFederationJoin(
     introSpinner.stop(t('join.sendFailed', {
       error: e instanceof Error ? e.message : String(e),
     }));
-    return;
+    logger.warn('aimeat join: the introduction failed', { targetUrl, error: String(e) });
+    return false;
   }
   introSpinner.stop();
 
@@ -358,26 +376,31 @@ export async function runFederationJoin(
     if (finalStatus === 'rejected') {
       clearPendingJoin();
       p.outro(t('join.rejectedMessage'));
-      return;
+      return false;
     }
     if (finalStatus === 'interrupted') {
       // User pressed Ctrl+C — show resume hint
       p.log.info(t('join.resumeHint', { url: targetUrl }));
       p.log.info(`Request ID: ${introData.request_id}`);
-      return;
+      return false;
     }
     // approved
     clearPendingJoin();
   }
 
-  // 7. Key exchange
-  await doKeyExchange(t, targetUrl, config, keys);
+  // 7. Key exchange. A failed exchange stops here: no federation state is saved and no success
+  // text is printed, because the target does not hold this node's key.
+  if (!await doKeyExchange(t, targetUrl, config, keys)) {
+    p.outro(t('join.notJoined'));
+    return false;
+  }
 
   // 8. Save federation state
   saveFederationState(config, targetUrl, role);
 
   // 9. Done
   showDone(t);
+  return true;
 }
 
 /** Poll for approval status. Returns 'approved', 'rejected', or 'interrupted'. */
@@ -431,38 +454,52 @@ async function pollApproval(
   }
 }
 
-/** Perform key exchange with the target node. */
+/**
+ * Perform key exchange with the target node. Returns true only when the target accepted the key
+ * (a 2xx answer); a refusal prints the target's own code and message.
+ */
 async function doKeyExchange(
   t: TFunction,
   targetUrl: string,
   config: AimeatConfig,
   keys: { publicKey: string; privateKey: string },
-): Promise<void> {
+): Promise<boolean> {
   const s = p.spinner();
   s.start(t('join.keyExchange'));
 
   try {
+    // The same field names the node's own exchange sends (services/federation-helpers.ts
+    // performKeyExchange); the route refuses a body without `node_public_key`.
     const resp = await peerFetch(`${targetUrl}/v1/federation/key-exchange`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         node_id: config.nodeId,
-        public_key: keys.publicKey,
+        node_url: config.baseUrl,
+        node_public_key: keys.publicKey,
+        timestamp: new Date().toISOString(),
         capabilities: ['memory', 'actions', 'work', 'wallet', 'boards', 'federation'],
       }),
     }, { timeoutMs: 15_000 });
     if (!resp.ok) throw new Error(resp.message);
 
     if (resp.status < 200 || resp.status >= 300) {
-      s.stop(t('join.keyExchangeFailed', { error: `HTTP ${resp.status}` }));
-      return;
+      const errBody = (resp.json ?? null) as { error?: { code?: string; message?: string } } | null;
+      const detail = errBody?.error?.code
+        ? `HTTP ${resp.status} ${errBody.error.code}: ${errBody.error.message ?? ''}`.trim()
+        : `HTTP ${resp.status}`;
+      s.stop(t('join.keyExchangeFailed', { error: detail }));
+      return false;
     }
 
     s.stop(t('join.keyExchangeDone'));
+    return true;
   } catch (e) {
     s.stop(t('join.keyExchangeFailed', {
       error: e instanceof Error ? e.message : String(e),
     }));
+    logger.warn('aimeat join: the key exchange failed', { targetUrl, error: String(e) });
+    return false;
   }
 }
 

@@ -48,13 +48,13 @@
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-guided-journey": {
-      "reviewedOn": "2026-10-02",
+      "reviewedOn": "2026-10-15",
       "watches": [
         "aimeat/src/services/journey-state.ts",
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:ba0f473a39718fb752d4970f",
+      "digest": "sha256:4e4c5ecd4d96b41e02204c9c",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -222,7 +222,7 @@
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:bf83c3d202454d997585d206"
+      "digest": "sha256:30bed3f6559c759fc9c50c98"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-08",
@@ -341,7 +341,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:ceb32b2ca61e3e2634ed66af",
+      "digest": "sha256:a200b82e0dfbc71fbb8402a9",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -353,7 +353,7 @@
         "aimeat/src/services/mcp-client/invoke.ts",
         "aimeat/src/mcp/mcp-proxy.ts"
       ],
-      "digest": "sha256:885101279a34a835717b49a0"
+      "digest": "sha256:8142722277b692cec31bc6f3"
     },
     "node:aimeat-workflow-decisions": {
       "reviewedOn": "2026-10-15",
@@ -402,14 +402,14 @@
       "digest": "sha256:cec4c74bb67ae7d2b7990016"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-12",
+      "reviewedOn": "2026-10-15",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:0a97d020ae29855c184ea130"
+      "digest": "sha256:04a7658574c9cc9d5d083cb2"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -580,7 +580,7 @@
     },
     "node:aimeat-node-guide": {
       "aimeat/src/routes/agents/device-auth.ts": "562ec994ef35b79c",
-      "aimeat/src/routes/ghii/register-login.ts": "d31301e80cb6c7eb",
+      "aimeat/src/routes/ghii/register-login.ts": "0be3d1061e246093",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
     "node:ai-transparency": {
@@ -622,7 +622,7 @@
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "8bbafc624ca1d4e4",
       "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
-      "aimeat/src/services/scheduler.ts": "a21ee931b11fae98",
+      "aimeat/src/services/scheduler.ts": "37b9eb960a15af90",
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
     },
     "node:aimeat-game-apps": {
@@ -691,7 +691,7 @@
     },
     "node:aimeat-guided-journey": {
       "aimeat/src/services/journey-state.ts": "bb659ae390279e59",
-      "aimeat/public/views/home/journey-roads.js": "1d1acb77d659a151",
+      "aimeat/public/views/home/journey-roads.js": "075d5b69523c143b",
       "aimeat/public/views/home/journey-prompts.js": "429f406334ba193e"
     },
     "node:aimeat-organisms": {
@@ -722,16 +722,16 @@
       "aimeat/src/services/memory-bin.ts": "b60b792ebb28ebcd",
       "aimeat/src/routes/memory-hands.ts": "7c9bde91c26c70cc",
       "aimeat/src/routes/owners/export.ts": "86ef0669d00f4040",
-      "aimeat/src/services/owner-erasure.ts": "18e38187bc10c89d",
+      "aimeat/src/services/owner-erasure.ts": "91e2def6acaa1aa2",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
       "aimeat/src/mcp/organisms.ts": "6f9dfe9706755abe"
     },
     "node:aimeat-mcp-servers": {
-      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "0bace0d912b7b75a",
-      "aimeat/src/services/mcp-client/grants.ts": "ae03576e68fa74b9",
+      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "6e3452ba7d0e746f",
+      "aimeat/src/services/mcp-client/grants.ts": "1652c22f0c53e827",
       "aimeat/src/services/mcp-client/registry.ts": "804ea44a9115d001",
       "aimeat/src/services/mcp-client/invoke.ts": "851e02be17abd315",
-      "aimeat/src/mcp/mcp-proxy.ts": "c517461ac4cde856"
+      "aimeat/src/mcp/mcp-proxy.ts": "90805e2c0ccc1653"
     },
     "node:aimeat-workflow-decisions": {
       "aimeat/src/models/workflow-schemas.ts": "8bbafc624ca1d4e4",

@@ -8,11 +8,12 @@
  *   node holds no funds and needs no credentials — this is the rail for B2B selling and for anyone
  *   who bills separately but wants the order, the receipt and the obligation recorded here.
  *
- *   collect mints a tracking code, payout books a PENDING payable entry, refund is a no-op because
- *   nothing was ever captured.
+ *   collect mints a tracking code, payout books a PENDING payable entry, refund answers
+ *   `nothing_captured` because nothing was ever captured.
  * @structure INVOICE_HANDLER_ID · invoicePaymentHandler
  * @usage registerPaymentHandler(invoicePaymentHandler());
  * @version-history
+ *   2026-10-16 — refund answers `nothing_captured`, so a failed fulfilment no longer tells the buyer a payment was refunded (QA audit F5-01).
  *   v1.0.0 — 2026-07-28 — Promoted into core from the removed ee/ module (single edition).
  */
 import { randomUUID } from 'node:crypto';
@@ -42,7 +43,9 @@ export function invoicePaymentHandler(): PaymentHandler {
     },
 
     async refund() {
-      // Nothing was captured externally, so there is nothing to reverse.
+      // Nothing was captured externally, so there is nothing to reverse, and nothing is owed: the
+      // payable is booked by payout, which a failed fulfilment never reaches.
+      return { outcome: 'nothing_captured' };
     },
   };
 }

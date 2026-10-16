@@ -11,6 +11,8 @@
  * @structure renderKnowledgeView · renderCover · secPackages · secMake · importPreview · secOrganisms · secLibrary
  * @usage import { renderKnowledgeView } from './knowledge/cover.js';
  * @version-history
+ *   v1.20.0 -- 2026-10-16 -- A failed first load of the packages shows the could-not-load note with Retry
+ *     instead of "no packages" (ctx.packagesFailed) (QA audit F6-05).
  *   v1.19.0 -- 2026-09-26 -- On the component kit (page group G7): the page is the SettingsPage (crumb,
  *     marks, the rail and its sibling pages as data), the strip the FigureStrip; the sections are
  *     Section; the packages table, the organisms' packages and the library are the List (its head,
@@ -70,6 +72,7 @@ import { List, Row, Name, Desc, Cell, Doors, Group } from '/components/List.js';
 import { Hint } from '/components/Hint.js';
 import { c, num, rel, ctWord, synthWord, visWord, relWord, manifestOf, statsOf, groupOf, GROUP_ORDER, pkgId, authorName, crumb, packageHead, packageRow, pageLinks } from './frame.js';
 import { renderPackage } from './package.js';
+import { LoadFailed } from '/js/load-state.js';
 
 /** The public library, in a new window. */
 const openLibraryPage = () => window.open('/v1/publicknowledgeviewer', '_blank', 'noopener');
@@ -140,7 +143,8 @@ function secPackages(ctx) {
     body = [...pkgs].sort(ctx.sort === 'name' ? byName : byUpdated).map(pkg => packageRow(ctx, pkg));
   }
   return html`<${Section} id="kp-packages" num="01" title=${c('secPackages')} count=${pkgs.length} doors=${doors} first=${true}>
-    <${List} cols="name-count-words-when-doors" keepCols head=${packageHead()} loading=${ctx.loading && t('common.loading')} empty=${c('nonePackages')}>${body}<//>
+    ${ctx.packagesFailed ? html`<${LoadFailed} onRetry=${ctx.reloadPackages} />`
+      : html`<${List} cols="name-count-words-when-doors" keepCols head=${packageHead()} loading=${ctx.loading && t('common.loading')} empty=${c('nonePackages')}>${body}<//>`}
   <//>`;
 }
 

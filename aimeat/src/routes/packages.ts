@@ -21,6 +21,8 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — GET /v1/packages/tab carries `remote`: the other nodes' template listings stored by the
+ *     last federation template sync, with per-peer fetch time and error (QA audit F1-04).
  *   2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   2026-10-02 — POST /v1/packages/:groupId/versions/:version/withdraw (package sale design, phase 5: T6).
  *   2026-10-02 — POST /v1/packages/compose under a name the caller already has publishes the next
@@ -83,6 +85,7 @@ import { resolveNodeRead } from '../services/packages/sale/package-entitlements.
 import { registerPackageEntitlementRoutes } from './package-entitlements.js';
 import { registerPackageSaleRoutes } from './package-sales.js';
 import { isOperatorCaller } from '../services/operator-override.js';
+import { readRemoteTemplates } from '../services/federation-remote-templates.js';
 
 // The version generator, the content hash and the per-author ceiling used to live here, one copy
 // per road. They are in services/packages/compose/package-create.ts now, which is the one place a package version is
@@ -109,7 +112,13 @@ export function packagesRouter(
   const packagesTabDb = createPackagesTabService(storage);
   router.get('/v1/packages/tab', requireAuth(), requireRole('owner'), async (req, res) => {
     const data = await packagesTabDb.overview(req.auth!.owner as string);
-    res.json(success(config.nodeId, data));
+    // `remote`: the other nodes' template listings this node stored at its last sync (POST
+    // /v1/federation/templates/sync), with each peer's fetch time and last error. The page read them
+    // from the peer-facing signed GET until 2026-10-16, which an owner session cannot open (QA audit F1-04).
+    const remote = config.packageFederationEnabled
+      ? { enabled: true, ...(await readRemoteTemplates(storage, peers)) }
+      : { enabled: false, templates: [], peers: [] };
+    res.json(success(config.nodeId, { ...data, remote }));
   });
 
   // POST /v1/packages/compose — build a package out of apps this owner already published.

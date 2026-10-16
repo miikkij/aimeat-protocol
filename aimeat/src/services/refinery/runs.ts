@@ -12,7 +12,14 @@
  *   same page of mail twice and race each other's cursor.
  * @structure startRun · getRun · runningFor
  * @usage const run = startRun(deps, caller, 'postinjalostamo', {}); … getRun(run.id, caller.ownerGhii)
+ *
+ *   A RUN THAT DOES NOT FINISH IS STALLED, NOT RUNNING. A batch still marked running STALL_MS after
+ *   it started is marked failed as stalled when the next start asks, so a batch whose promise never
+ *   settles cannot answer every later start with itself for the life of the process. If it settles
+ *   afterwards, its late result does not overwrite the failed state.
  * @version-history
+ *   2026-10-16 — A run still marked running STALL_MS (30 minutes) after its start is marked failed as
+ *     stalled, and a new start begins a new run (QA audit E4-04).
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  */
 import { randomBytes } from 'node:crypto';
@@ -20,6 +27,8 @@ import { logger } from '../../utils/logger.js';
 import { runBatch, RefineryError, type RefineryCaller, type RefineryDeps, type RunState } from './pipeline.js';
 
 const KEEP_MS = 60 * 60 * 1000;
+/** A batch still running this long after its start is stalled. The scheduler's refinery run limit is the same. */
+export const STALL_MS = 30 * 60 * 1000;
 const runs = new Map<string, { owner: string; state: RunState; finished?: number }>();
 
 function sweep(): void {
@@ -27,9 +36,18 @@ function sweep(): void {
   for (const [id, r] of runs) if (r.finished && now - r.finished > KEEP_MS) runs.delete(id);
 }
 
-/** The run of this owner's definition that is still working, if one is. */
+/** The run of this owner's definition that is still working, if one is. A stalled one is marked failed. */
 export function runningFor(ownerGhii: string, prefix: string): RunState | null {
-  for (const r of runs.values()) if (r.owner === ownerGhii && r.state.prefix === prefix && r.state.status === 'running') return r.state;
+  const now = Date.now();
+  for (const r of runs.values()) {
+    if (r.owner !== ownerGhii || r.state.prefix !== prefix || r.state.status !== 'running') continue;
+    if (now - Date.parse(r.state.startedAt) <= STALL_MS) return r.state;
+    r.state.status = 'failed';
+    r.state.error = `stalled: the batch did not finish within ${STALL_MS / 60_000} minutes of its start`;
+    r.state.finishedAt = new Date(now).toISOString();
+    r.finished = now;
+    logger.warn('refinery: a batch stalled and was marked failed', { prefix, run: r.state.id });
+  }
   return null;
 }
 
@@ -52,8 +70,12 @@ export function startRun(
   const entry: { owner: string; state: RunState; finished?: number } = { owner: caller.ownerGhii, state: run };
   runs.set(run.id, entry);
   const done = runBatch(deps, caller, prefix, { run, messageIds: opts.messageIds })
-    .then((r) => { r.status = 'done'; r.step = ''; r.finishedAt = new Date().toISOString(); entry.finished = Date.now(); return r; })
+    .then((r) => {
+      if (r.status !== 'running') return r;   // marked stalled before it settled; that state stands
+      r.status = 'done'; r.step = ''; r.finishedAt = new Date().toISOString(); entry.finished = Date.now(); return r;
+    })
     .catch((err: unknown) => {
+      if (run.status !== 'running') return run;
       run.status = 'failed';
       run.error = err instanceof RefineryError ? `${err.code}: ${err.message}` : String((err as Error)?.message ?? err);
       run.finishedAt = new Date().toISOString();

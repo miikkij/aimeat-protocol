@@ -26,6 +26,9 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.6.1 — 2026-10-16 — removeContact reads the conversation before it removes anything and lets a
+ *     failed read propagate: a failed read had been taken as "no history" and the consent row with
+ *     its gate state was deleted (QA audit F2-06).
  *   v2.6.0 — 2026-10-05 — listContactsFor(storage, nodeId, auth, query): the address book as one caller
  *     sees it, which GET /v1/contacts and aimeat_contact_list both call (secaudit 2026-10, M6).
  *   v2.5.0 — 2026-10-01 — withoutCorrespondence(row): the same row with the conversation columns empty,
@@ -566,6 +569,12 @@ export async function removeContact(
 ): Promise<void> {
   const person = await findPersonRecord(storage, ownerGhii, contactId);
   const consent = await storage.getContact(ownerGhii, contactId);
+  // Whether the conversation has history decides between keeping the gate state and deleting the
+  // row, so it is read BEFORE anything is removed, and a failed read stops the removal: an error
+  // here is not an empty conversation.
+  const hasHistory = consent && consent.state !== 'blocked'
+    ? (await storage.listConversation(ownerGhii, conversationIdFor(ownerGhii, contactId), { page: 1, perPage: 1 })).messages.length > 0
+    : false;
 
   if (person) {
     await storage.deleteOutboundContact(person.id);
@@ -584,8 +593,7 @@ export async function removeContact(
 
   if (consent) {
     if (consent.state === 'blocked') throw new ContactsError(409, 'BLOCKED', 'Blocked contacts are managed in Messages');
-    const conv = await storage.listConversation(ownerGhii, conversationIdFor(ownerGhii, contactId), { page: 1, perPage: 1 }).catch(() => ({ messages: [] }));
-    if (conv.messages.length > 0) {
+    if (hasHistory) {
       await storage.setContactState(ownerGhii, contactId, consent.state, undefined, 'message');
     } else {
       await storage.deleteContact(ownerGhii, contactId);

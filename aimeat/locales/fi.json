@@ -4960,7 +4960,10 @@
     "error": "Virhe",
     "copyPrompt": "Kopioi kehote",
     "copyLink": "Kopioi linkki",
-    "copyUrl": "Kopioi URL"
+    "copyUrl": "Kopioi URL",
+    "loadFailed": "Tätä ei voitu ladata juuri nyt. Mitään ei poistettu. Yritä hetken päästä uudelleen.",
+    "notLoadedNotSaved": "Nykyinen versio ei latautunut, joten mitään ei muutettu. Yritä hetken päästä uudelleen.",
+    "settingsNotLoaded": "Tallennetut asetuksesi eivät latautuneet, joten mitään ei tallennettu. Lataa sivu uudelleen ja yritä sitten uudestaan."
   },
   "compat": {
     "title": "Mitkä tekoälyt osaavat lukea muistisi automaattisesti?",
@@ -5982,6 +5985,8 @@
   "pkpage.syncRemote": "Hae muilta palvelimilta",
   "pkpage.syncing": "Haetaan…",
   "pkpage.syncedToast": "Muiden palvelinten listaukset on haettu.",
+  "pkpage.syncedPartialToast": "{ok} palvelimen listaukset on haettu. {failed} palvelinta ei vastannut: {names}.",
+  "pkpage.syncedNone": "Yksikään muu palvelin ei vielä jaa listauksiaan tälle palvelimelle.",
   "pkpage.open": "Avaa",
   "pkpage.close": "Sulje",
   "pkpage.openApp": "Avaa sovellus",
@@ -8777,6 +8782,10 @@
   "notiftext.workflow_failed.body": "Ei tuottanut: {failed} · noin {minutes} min · {steps}",
   "notiftext.workflow_cancelled.title": "Työnkulku \"{name}\" peruttiin",
   "notiftext.workflow_cancelled.body": "noin {minutes} min · {steps}",
+  "notiftext.schedule_failed.title": "Ajastuksen \"{name}\" suoritus epäonnistui",
+  "notiftext.schedule_failed.body": "{detail}",
+  "notiftext.schedule_paused.title": "Ajastus \"{name}\" keskeytettiin",
+  "notiftext.schedule_paused.body": "{detail}",
   "notiftext.workflow_stopped.title": "Työnkulku \"{name}\" pysähtyi kulukaton takia",
   "notiftext.workflow_stopped.body": "Tekoälyyn oli kulunut {spent}, ja kulukatto on {cap} ajoa kohden · noin {minutes} min · {steps}",
   "notiftext.workflow_stopped_estimate.title": "Työnkulku \"{name}\" pysähtyi, jotta kulukatto ei ylittyisi",
@@ -8838,6 +8847,8 @@
   "notiftext.package_renewal_agent_limit.body": "Agenttisi kytki automaattisen uusinnan päälle, ja tämä uusinta ylittäisi sen, mitä agentti saa käyttää päivässä, tai agentilla ei ole rajaa. Korttiasi ei veloitettu. Päivityspalvelu päättyy {date}, ellet uusi sitä itse tai nosta agentin rajaa. Uusintaa yritetään uudelleen joka päivä siihen asti.",
   "notiftext.package_renewed.title": "Paketin {name} päivityspalvelu uusittiin",
   "notiftext.package_renewed.body": "Korttiasi veloitettiin {amount}, ja uusia versioita tulee vielä {days} päivän ajan.",
+  "notiftext.payment_not_delivered.title": "Ostaja maksoi {amount}, mutta tilausta ei toimitettu",
+  "notiftext.payment_not_delivered.body": "Tilausta ei voitu toimittaa, eikä maksu palannut ostajalle, joten raha on sinulla. Palauta maksu ostajalle tai toimita tilaus. Tilauksen tunniste: {session}.",
   "notiftext.package_sale_request_approved.title": "Pyyntösi paketista {name} hyväksyttiin",
   "notiftext.package_sale_request_approved.body": "Myyjä hyväksyi pyynnön. Näet Paketit-sivulta, mitä seuraavaksi tapahtuu.",
   "notiftext.package_sale_request_refused.title": "Pyyntöäsi paketista {name} ei hyväksytty",
@@ -14133,7 +14144,9 @@
     "resumeFound": "Löytyi odottava liittymispyyntö ({{requestId}}). Jatketaanko pollaamista?",
     "resumeYes": "Kyllä, tarkista tila",
     "resumeNo": "Ei, aloita alusta",
-    "alreadyPeer": "Tämä solmu on jo kohteen vertainen"
+    "alreadyPeer": "Tämä solmu on jo kohteen vertainen",
+    "cancelled": "Liittyminen peruttiin. Federaation asetuksia ei muutettu .env-tiedostossa.",
+    "notJoined": "Liittyminen ei onnistunut. Verkko, johon yritit liittyä, ei hyväksynyt avainta, joten federaation asetuksia ei muutettu .env-tiedostossa. Aja \"aimeat join\" uudelleen, kun verkko hyväksyy avaimen."
   },
   "knowledge": {
     "tabLabel": "Tietopankki",

@@ -16,6 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-16 — optionalAuth answers 401 invalid_token for a Bearer token it refuses (expired,
+ *     revoked, dead PAT, an account that refuses it) on every route, instead of continuing with no
+ *     identity or the shared anonymous one; a request with no token is unchanged (QA audit F1-01).
  *   2026-10-12 — optionalAuth and requireAuth ask ./mcp-token-on-rest.ts of every verified JWT: a
  *     token bound to the MCP endpoint is refused on a REST route from 4.0.0 (401 invalid_token) and
  *     counted with the Deprecation headers before it; the MCP surface and the node's own loopback
@@ -139,6 +142,16 @@ export function initSessionAuth(storage: Storage, config?: AimeatConfig): void {
   // So localAccountName (utils/gaii.ts) can tell this node's identities from a visitor's home GHII.
   setThisNodeId(config?.nodeId ?? null);
 }
+
+/** What optionalAuth answers for a Bearer token it refused: expired, revoked, a dead personal access
+ *  token, or an account that refuses it (QA audit F1-01). */
+const REFUSED_CREDENTIAL_MESSAGE = 'The access token on this request has expired or was revoked. '
+  + 'Sign in again or get a new token; to read only public data, send the request without a token.';
+/** Three base64url segments: the shape of every JWT this node or a peer issues. */
+const JWT_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*$/;
+/** Routes that take a dead access token on purpose and answer for it themselves: sign-out clears the
+ *  refresh cookie even after the short-lived token expired, and refresh reads its own cookie. */
+const ROUTES_ANSWERING_DEAD_TOKENS = new Set(['/v1/auth/revoke', '/v1/auth/refresh']);
 
 const _lastSeenCache = new Map<string, number>();
 const LAST_SEEN_THROTTLE_MS = 5 * 60_000;
@@ -333,14 +346,27 @@ export function optionalAuth() {
   return async (req: Request, res: Response, next: NextFunction) => {
     const token = extractToken(req);
     if (token) {
+      // A CREDENTIAL THAT WAS PRESENTED AND REFUSED IS ANSWERED 401 ON EVERY ROUTE (QA audit F1-01).
+      // It used to leave req.auth unset and let the request go on, so a route without requireAuth()
+      // served its public or empty view — 'unknown' agent, no tasks, public packages only — to a
+      // caller whose token had expired or been revoked, and in anonymous mode handed them the shared
+      // anonymous identity; nothing told them the token was dead. A request with NO credential is
+      // untouched: it stays public, or anonymous when that mode is on.
+      //   Two exceptions, where the refusal stays the route's own: a Bearer value that is not one of
+      //   ours (a SCIM provisioning token is an opaque string its route checks itself), and the routes
+      //   that must work with a dead access token (sign out, refresh).
+      const refuseDead = (token.startsWith(PAT_PREFIX) || JWT_SHAPE.test(token)) && !ROUTES_ANSWERING_DEAD_TOKENS.has(req.path);
       if (token.startsWith(PAT_PREFIX)) {
         const patAuth = await resolvePatToken(token);
         if (patAuth) {
           req.auth = patAuth;
           maybeSetPatBrowserSession(req, res, token, patAuth);
+        } else if (refuseDead) {
+          denyInvalidToken(req, res, REFUSED_CREDENTIAL_MESSAGE);
+          return;
         }
       } else if (await isRevoked(token)) {
-        req.auth = undefined;
+        if (refuseDead) { denyInvalidToken(req, res, REFUSED_CREDENTIAL_MESSAGE); return; }
       } else {
         const verified = await verifyJWT(token);
         // SECURITY: the session check belongs HERE, not only in requireAuth(). This middleware is
@@ -364,6 +390,8 @@ export function optionalAuth() {
           // what it holds now. Narrowed here, once, so every door downstream — routes, the MCP
           // surface, the tunnel's forwarded calls — reads the same answer without asking again.
           req.auth = await withCurrentScopes(sessionStorage(), verified);
+        } else {
+          if (refuseDead) { denyInvalidToken(req, res, REFUSED_CREDENTIAL_MESSAGE); return; }
         }
       }
     }

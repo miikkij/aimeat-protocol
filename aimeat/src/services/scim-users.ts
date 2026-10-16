@@ -24,6 +24,8 @@
  *   normalizeEntraPatchBody() (the string-boolean shim, unit-tested in scim-entra-compat).
  * @usage declareScimResources(); // once, from routes/scim.ts
  * @version-history
+ *   v1.0.2 — 2026-10-16 — Both deactivation paths read the result: a credential step that failed is
+ *     logged at warn, and a flag that did not land is an error rather than "deprovisioned" (QA audit E6-01).
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-24 — Initial (BR-04 phase 3), after the SCIMMY spike: Express 5 works,
  *     context flows per request, capitalised op verbs parse, string booleans need the shim.
@@ -126,7 +128,10 @@ async function applyActive(ctx: ScimContext, owner: OwnerRecord, active: boolean
     if (isOperatorAccount(owner)) {
       throw scimError(403, null, 'This account operates the node and cannot be deactivated through provisioning');
     }
-    await deactivateOwner(ctx.storage, owner.name, `sso:${ctx.conn.id}`);
+    const result = await deactivateOwner(ctx.storage, owner.name, `sso:${ctx.conn.id}`);
+    if (result.incomplete.length) {
+      logger.warn('SCIM deactivated an account, but some credentials could not be revoked', { connection: ctx.conn.id, owner: owner.name, incomplete: result.incomplete });
+    }
   }
 }
 
@@ -243,8 +248,11 @@ export function declareScimResources(): void {
         if (isOperatorAccount(owner)) {
           throw scimError(403, null, 'This account operates the node and cannot be deactivated through provisioning');
         }
-        if (!owner.disabledAt) {
-          await deactivateOwner(context.storage, owner.name, `sso:${context.conn.id}`);
+        // deactivateOwner throws when the flag did not reach the database, so reaching the log line
+        // below means the account refuses sign-in; a revocation step that failed is named in it.
+        const result = owner.disabledAt ? null : await deactivateOwner(context.storage, owner.name, `sso:${context.conn.id}`);
+        if (result?.incomplete.length) {
+          logger.warn('SCIM deprovisioned an account, but some credentials could not be revoked', { connection: context.conn.id, owner: owner.name, incomplete: result.incomplete });
         }
         logger.info('SCIM deprovisioned an account (deactivated, not erased)', { connection: context.conn.id, owner: owner.name });
       } catch (err) {

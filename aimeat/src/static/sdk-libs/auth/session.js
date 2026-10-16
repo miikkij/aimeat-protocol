@@ -12,6 +12,10 @@
  *   scheduleAutoRefresh/createSession · refreshOnFocus · the `auth` object.
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
+ *   v1.7.1 — 2026-10-16 — Every caught error leaves a trace (QA audit F6-03). session.fetch's comment
+ *     states its contract (ok:false is a refusal, never an empty result); a non-JSON refresh answer
+ *     throws with its cause; a codeless cookie-restore failure and an unreachable sign-out log; a
+ *     failed boot refresh emits 'expired' with its reason; scheduleAutoRefresh uses parseJwt.
  *   v1.7.0 — 2026-10-12 — register() without a password no longer signs in with the account key
  *     (POST /v1/auth/token, removed in node 4.0.0): it makes a random password, registers with it,
  *     signs in with POST /v1/ghii/login and hands the password back once as session.generatedPassword.
@@ -122,7 +126,11 @@ export async function restoreSessionFromCookie() {
     scheduleAutoRefresh(session);
     emit('login', session, { restored: true });
     return session;
-  } catch {
+  } catch (e) {
+    // No usable cookie is the ordinary answer (the refresh route refuses with a code, which api()
+    // keeps on the error), and a signed-out boot is right for it. A failure without a code (the
+    // network, an answer that is not JSON) gets a console line, so a lost session has a trace.
+    if (!(e && /** @type {any} */ (e).code)) console.warn('[aimeat-auth] Restoring the session from the cookie failed:', e && /** @type {Error} */ (e).message);
     return null;
   }
 }
@@ -188,23 +196,22 @@ export function restoreSessionFromAppOrigin(interactive, prompt) {
 export function scheduleAutoRefresh(session) {
   if (refreshTimer) clearTimeout(refreshTimer);
   if (!session?.jwt) return;
-  try {
-    const payload = JSON.parse(atob(session.jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-    if (!payload.exp) return;
-    // Refresh 5 minutes before expiry (or immediately if less than 5 min left)
-    const msUntilExpiry = (payload.exp * 1000) - Date.now();
-    const refreshIn = Math.max(msUntilExpiry - 5 * 60 * 1000, 10_000); // min 10s
-    refreshTimer = setTimeout(async () => {
-      try {
-        await session.refresh();
-        emit('refreshed', session);
-        scheduleAutoRefresh(session); // Schedule next refresh
-      } catch (e) {
-        console.warn('[aimeat-auth] Auto-refresh failed:', e.message);
-        emit('expired', { reason: 'refresh_failed', error: e.message });
-      }
-    }, refreshIn);
-  } catch { /* invalid JWT, skip scheduling */ }
+  // parseJwt answers null for a token it cannot decode, and such a token has nothing to schedule.
+  const payload = parseJwt(session.jwt);
+  if (!payload || !payload.exp) return;
+  // Refresh 5 minutes before expiry (or immediately if less than 5 min left)
+  const msUntilExpiry = (payload.exp * 1000) - Date.now();
+  const refreshIn = Math.max(msUntilExpiry - 5 * 60 * 1000, 10_000); // min 10s
+  refreshTimer = setTimeout(async () => {
+    try {
+      await session.refresh();
+      emit('refreshed', session);
+      scheduleAutoRefresh(session); // Schedule next refresh
+    } catch (e) {
+      console.warn('[aimeat-auth] Auto-refresh failed:', e.message);
+      emit('expired', { reason: 'refresh_failed', error: e.message });
+    }
+  }, refreshIn);
 }
 
 export function createSession(data) {
@@ -236,8 +243,11 @@ export function createSession(data) {
     homeNode: data.homeNode || '',
     homeUrl: data.homeUrl || '',
 
-    // Authenticated fetch wrapper — returns parsed JSON without throwing on error so callers
-    // (e.g. AIMEAT.data.get) can inspect res.ok / res.error themselves.
+    // Authenticated fetch wrapper — returns the parsed envelope for every answer, ok or not, without
+    // throwing, so a caller can branch on res.ok / res.error.code itself. A caller MUST branch: an
+    // envelope with ok:false is a refused call (401, 403, 429, 5xx), never an empty result, and a read
+    // that was refused is never the basis of a write (AIMEAT.data.get() resolves null only for
+    // NOT_FOUND and throws for the rest). An answer that is not JSON rejects from resp.json().
     async fetch(path, opts = {}) {
       if (isExpired(session.jwt)) {
         await session.refresh();
@@ -322,9 +332,14 @@ export function createSession(data) {
           headers: { 'Content-Type': 'application/json', 'X-AIMEAT-Refresh': '1' },
         });
         let data2 = null;
-        try { data2 = await resp.json(); } catch { /* no body */ }
+        let unreadable = null;
+        // An answer with no JSON body (a proxy's error page) is a failed refresh; the throw below
+        // says so and carries the parse error as its cause.
+        try { data2 = await resp.json(); } catch (e) { unreadable = e; }
         if (!resp.ok || !data2 || data2.ok === false) {
-          throw new Error(data2?.error?.message || 'Session refresh failed');
+          throw new Error(data2?.error?.message
+            || ('Session refresh failed' + (unreadable ? ' (HTTP ' + resp.status + ', the answer was not JSON)' : '')),
+          unreadable ? { cause: unreadable } : undefined);
         }
         session.jwt = data2.data.token;
         session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
@@ -455,9 +470,10 @@ async function restoreStoredSession(username) {
   if (isOwnerLocal || isExpired(session.jwt)) {
     try {
       await session.refresh();
-    } catch {
+    } catch (e) {
       remove('session');
-      emit('expired');
+      // The same reason the auto-refresh gives, so a listener can tell why the session ended.
+      emit('expired', { reason: 'refresh_failed', error: e && /** @type {Error} */ (e).message });
       return null;
     }
   }
@@ -662,9 +678,13 @@ export const auth = {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...(jwt ? { 'Authorization': 'Bearer ' + jwt } : {}) },
       });
-    } catch { /* best effort — local state is already cleared */ }
+    } catch (e) { // local state is already cleared; the node's refresh cookie may still be valid
+      console.warn('[aimeat-auth] Sign-out could not reach the node; the server session may still be open:', e && /** @type {Error} */ (e).message);
+    }
     // On an app origin, end the apex session too so EXIT sticks across the whole family.
-    if (onAppOrigin) { try { await apexLogout(); } catch { /* best effort */ } }
+    if (onAppOrigin) {
+      try { await apexLogout(); } catch (e) { console.warn('[aimeat-auth] Sign-out on the node address failed:', e && /** @type {Error} */ (e).message); }
+    }
   },
 
   /**

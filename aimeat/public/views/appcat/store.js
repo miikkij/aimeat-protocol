@@ -20,6 +20,9 @@
  *   subscribe(fn) · setState(patch)
  * @usage const cat = useCatalog(); cat.own.map(…)
  * @version-history
+ *   v1.2.0 — 2026-10-16 — `favouritesLoaded`: a star is written only after the stored set was read once;
+ *     before that the press is refused with a notice, because the write replaces the whole set (QA
+ *     audit F6-04).
  *   v1.1.0 — 2026-10-04 — `building`: the apps somebody else owns and the person holds a development
  *     right on (GET /v1/apps?building=true), read beside the stars when signed in, for the Building for
  *     others view (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
@@ -31,18 +34,20 @@
 import { useEffect, useState } from 'preact/hooks';
 import { api, apiPost } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
+import { t } from '/js/i18n.js';
 
 /**
  * The state. `loaded` turns true when the first listing has answered (success or failure).
  * `notice` is { text, kind, at } or null; `skillsLoaded` says the bound skills have been read.
  * @typedef {{ loaded: boolean, error: string|null, me: string|null, all: any[], own: any[],
- *   community: any[], building: any[], favourites: Set<string>, skillsBound: Set<string>, skillsLoaded: boolean,
+ *   community: any[], building: any[], favourites: Set<string>, favouritesLoaded: boolean,
+ *   skillsBound: Set<string>, skillsLoaded: boolean,
  *   detail: any|null, notice: { text: string, kind: string, at: number }|null }} CatalogState
  */
 /** @type {CatalogState} */
 const state = {
   loaded: false, error: null, me: null, all: [], own: [], community: [], building: [], favourites: new Set(),
-  skillsBound: new Set(), skillsLoaded: false, detail: null, notice: null,
+  favouritesLoaded: false, skillsBound: new Set(), skillsLoaded: false, detail: null, notice: null,
 };
 const listeners = new Set();
 const FAV_KEY = 'app-catalog.favorites';
@@ -92,16 +97,18 @@ async function fetchAll() {
   }
 }
 
-/** The star set on the node (F181); an empty set when signed out or when none is stored. */
+/** The star set on the node (F181); an empty set when signed out or when none is stored. `ok` says
+ *  the stored set was read: a star is written as the whole set, so it waits for a read that worked. */
 async function fetchFavourites() {
-  if (!getSession()) return new Set();
+  if (!getSession()) return { refs: new Set(), ok: false };
   try {
     const json = await api(`/v1/memory/${encodeURIComponent(FAV_KEY)}?soft=1`, { method: 'GET' });
     const refs = json?.data?.value?.refs;
-    return new Set(Array.isArray(refs) ? refs.filter((r) => typeof r === 'string') : []);
+    return { refs: new Set(Array.isArray(refs) ? refs.filter((r) => typeof r === 'string') : []), ok: true };
   } catch (err) {
     console.warn('[appcat] the stars could not be read', err);
-    return state.favourites; // a passing failure leaves the stars as they were, as the old page did
+    // A passing failure leaves the stars as they were, as the old page did.
+    return { refs: state.favourites, ok: state.favouritesLoaded };
   }
 }
 
@@ -141,7 +148,7 @@ export async function reloadCatalog() {
   const mine = ++round;
   const session = getSession();
   const me = session?.owner || null;
-  const [listing, favourites, building] = await Promise.all([
+  const [listing, fav, building] = await Promise.all([
     fetchAll().then((rows) => ({ rows, error: null }), (err) => ({ rows: [], error: err?.message || String(err) })),
     fetchFavourites(),
     me ? fetchBuilding() : Promise.resolve([]),
@@ -150,7 +157,7 @@ export async function reloadCatalog() {
   const all = listing.rows;
   const own = me ? all.filter((a) => sameOwner(a.owner, me)) : [];
   const community = me ? all.filter((a) => !sameOwner(a.owner, me)) : all;
-  setState({ loaded: true, error: listing.error || null, me, all, own, community, building, favourites });
+  setState({ loaded: true, error: listing.error || null, me, all, own, community, building, favourites: fav.refs, favouritesLoaded: fav.ok });
   if (!me || listing.error) { setState({ skillsBound: new Set(), skillsLoaded: !!me }); return; }
   // The skills are read after the lists are up, so a slow or refused read only delays that one row.
   try {
@@ -168,6 +175,9 @@ export async function reloadCatalog() {
  * @param {string} ref "owner/filename"
  */
 export async function toggleFavourite(ref) {
+  // The write replaces the whole set. Until the stored set has been read, a set built here holds
+  // only this one star and would replace every star the person had.
+  if (getSession() && !state.favouritesLoaded) { notice(t('common.settingsNotLoaded'), 'error'); return; }
   const next = new Set(state.favourites);
   if (next.has(ref)) next.delete(ref); else next.add(ref);
   setState({ favourites: next });

@@ -1,0 +1,793 @@
+{
+  "note": "How many silent-catch findings an eslint-disable directive suppresses in each file under src/ and public/. An exemption is a finding somebody chose to keep, so adding one has to be as visible as adding the finding: the gate refuses a file that holds more than its count, and refuses any directive with no reason after `--`. Counted from ESLint's own suppression record, so a block disable counts every finding it covers. Seeded 2026-10-16 with the developer's approval of the W25 acceptance criterion (\"per-line exemptions counted\"); the reasons are on the directives themselves and were not re-read when this was seeded. Removing one lowers its count; the gate names the gain so it can be locked in. Re-seeding forgives the lot.",
+  "files": {
+    "public/views/profile/landing-page.js": {
+      "count": 11,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/organisms/workspace.js": {
+      "count": 8,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/agents/tab-helpers.js": {
+      "count": 6,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/organisms-tab.js": {
+      "count": 5,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/component-registrar.ts": {
+      "count": 5,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/cms-verify.ts": {
+      "count": 5,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/memory-tab.js": {
+      "count": 4,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/discovery/sources/designbook-source.ts": {
+      "count": 4,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/trust-list.ts": {
+      "count": 4,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/MessageComposer.js": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/WorldMap.js": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/services/audio-recorder.js": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/workcopy.js": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/agents/tab-messages.js": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/inbox-tab/use-thread-ux.js": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/landing-page.helpers.js": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/public-workspace-viewer.js": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/unfurl.ts": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/auth-audit.ts": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/design-book/service.ts": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/mcp-client/pool.ts": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/packages/compose/package-sheet.ts": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/utils/build-stamp.ts": {
+      "count": 3,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/ImageDeliverable.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/NotificationBell.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/PageStart.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/SetupGuide.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/VoiceRecorder.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/contact-picker.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/recents.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/services/chat.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/swallowed.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/theme.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/sections/legal-state.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/agents-tab.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/agents/tab-data-access.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/extensions-tab.prompts.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/inbox-tab.js": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/connect/clients/launcher.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/init-wizard/steps-advanced.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/federation-genesis.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/subdomains.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/server-bootstrap/config-init.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/server-bootstrap/static-files.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/app-frame-redirect.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/config-loader.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/config-schema-validators.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/display-prefs.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/chain.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/eudi.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/records.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/revocation.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/x509-info.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/extension-secrets.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/finance/finvoice-operator.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/hooks.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/invitations.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/packages/compose/package-component-collisions.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/packages/install/package-capabilities.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/packages/install/package-memory-component.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/packages/install/package-skill-component.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/passkeys.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/realtime-manager.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/storage/providers/postgres-kysely/methods/secrets.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/storage/providers/sqlite/methods/secrets.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/utils/env-validator.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/utils/git-head.ts": {
+      "count": 2,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/JsonView.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/components/LinkPreview.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/api.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/app-sandbox.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/dialog.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/intake.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/services/memory.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/services/messages.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/services/offers.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/js/services/packages.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/sw.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/admin/themes-tab.prompt.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/ai-calls.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/sections/app-write.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/sections/datamap.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/sections/marks.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/sections/odps-tool.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/sections/skills.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/sections/visitors.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/appcat/store.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/command-palette.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/home/status-parts.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/landing.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/access-tab/sharing-groups.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/agents-services-subtab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/agents/agent-card.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/agents/task-item-parts.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/apps-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/calibrator/engine.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/companies-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/discover/frame.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/knowledge-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/landing-page.cards.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/memory-tab/entries-view.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/notebook-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/offers-tab.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/organisms/mindmap.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/organisms/panels.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "public/views/profile/packages/rows.js": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/auth/jwt.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/auth/keypair.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/auth/node-keys.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/connect/agent-key.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/connect/auth.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/connect/mcp/local-discovery.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/connect/mcp/local-server.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/connect/status.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/connect/tui/index.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/connect/tunnel-client.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/cli/federation-join.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/commerce/x402-facilitator.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/config-hosts.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/index-connect.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/index-start.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/mcp/oauth.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/mcp/workspace-member-changes.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/mcp/workspaces.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/middleware/agent-me-alias.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/middleware/app-origin-sign-in.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/middleware/subdomain.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/models/agent-v2-message.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/agents-v2/token.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/apps/inline-frame.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/companies.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/ghii/login-link-second-factor.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/organisms/shared.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/portal.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/portfolio.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/schedules.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/routes/wellknown.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/a2a-foreign.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/agent-card.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/agent-port-redirect.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/ai/errors.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/app-artifact-lint.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/app-config.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/app-urls.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/assertion-spend.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/calendar-feed.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/chat-cards.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/classification/classifier.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/classification/detect.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/company/company-service.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/config-at-rest.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/config-schema.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/connect-tunnel-forward.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/connect-tunnel-roster.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/connector-registry.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/consul-config.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/design-book/component-notice.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/design-book/reasons.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/statement.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/docsign/validate.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/extension-fetch-decode.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/extension-notify.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/external-login.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/federation-availability.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/federation-helpers.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/goose-acp.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/install-set-spec.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/knowledge-package-entry.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/login-link.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/mailbox-notification.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/network-policy.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/node-card.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/node-update-check.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/organism-import.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/owner-secrets.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/packages/compose/package-config.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/packages/compose/package-expects.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/packages/peer/package-pull.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/refinery/message.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/saml-sp.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/screenshot-capture.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/site-sync.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/stats-page.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/web-bot-auth.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/welcome-mat-parse.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/services/workspace-tool-ops.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/storage/erased-cortex.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/storage/providers/postgres-kysely/methods/passkeys.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/storage/providers/postgres-kysely/migrate.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/storage/providers/sqlite/index.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/storage/providers/sqlite/methods/passkeys.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/tool-dispatch/tool-call-helpers.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/utils/app-content-type.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/utils/app-protect.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/utils/inline-script-parse.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/utils/peer-fetch.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    },
+    "src/utils/version.ts": {
+      "count": 1,
+      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+    }
+  }
+}

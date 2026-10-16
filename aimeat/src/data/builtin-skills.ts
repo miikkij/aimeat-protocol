@@ -11,6 +11,9 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.32.0 -- 2026-10-16 -- diagnose-a-workflow: a run past its time limit is an error and the next one
+ *     runs, five failures in a row pause a schedule and tell its owner, a run missed while the node was
+ *     down is logged as skipped with "Missed:" (QA audit E4-03, E4-04, E4-07).
  *   v1.31.0 -- 2026-10-13 -- aimeat-node-guide: an owner signs in with the password (POST /v1/ghii/login);
  *     it no longer says the owner-key sign-in still works, since node 4.0.0 removes it.
  *   v1.30.1 -- 2026-10-13 -- diagnose-a-workflow, step 10: a workflow that starts on an event and did
@@ -558,7 +561,10 @@ metadata:
 3. **Check the trigger:** \`aimeat_workflow_get\` returns the trigger and the recent runs. A
    workflow's backing cron is not in \`aimeat_schedule_list\`, which returns only the schedules an
    agent created. Every user schedule logs each run; only the node's internal \`core\` ticks leave
-   their successes out of the log.
+   their successes out of the log. A run that does not end within its time limit is logged as an
+   error and the next run goes ahead. A schedule that fails five times in a row is paused, and its
+   owner is told in the notifications. A run that fell while the node was down is logged as skipped
+   with a message starting \`Missed:\` and is not made up.
 4. **Check the worker:** \`aimeat_agents_list\` for the agent a step dispatches to — is it
    connected and seen recently (\`last_seen\`, \`mode\`)? \`aimeat_agent_activity\` and
    \`aimeat_task_list\` report on the CALLING agent only, so neither reads the worker's queue.

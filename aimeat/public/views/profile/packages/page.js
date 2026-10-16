@@ -11,6 +11,9 @@
  * @structure renderPage · secInstalled · secOffers · secOwn · secNew · composeForm · secAgent
  * @usage import { renderPage } from './packages/page.js';
  * @version-history
+ *   v1.23.1 — 2026-10-16 — The operator's "Fetch from other servers" shows when package federation is on
+ *     (`ctx.remoteEnabled`), not only when a remote listing is already there: the listings come from that
+ *     fetch, so the old condition could never become true (QA audit F1-04).
  *   v1.23.0 — 2026-10-03 — The page's start (components/PageStart.js: the first prompt asks the person's AI what is on offer, its button opens the offers) and the title's question mark, concept.package (guidance part B).
  *   v1.22.0 — 2026-09-26 — On the component kit (page group G7): the page is SettingsPage (crumb, mast,
  *     marks, strip, rail as data), the lists are List (Filters, SearchLine, More, the pick rows of the
@@ -153,8 +156,8 @@ function secOffers(ctx, offers) {
   const shown = rows.slice(0, ctx.shown);
   const set = (patch) => ctx.setFilter(patch);
   const tog = (field, value) => set({ [field]: F[field] === value ? '' : value });
-  // Only an operator syncs the other nodes' listings, and only when there are any.
-  const sync = ctx.isOperator && offers.some((o) => o.remote)
+  // Only an operator syncs the other nodes' listings, and only when this node has package federation on.
+  const sync = ctx.isOperator && ctx.remoteEnabled
     ? html`<${Action} small soft disabled=${ctx.busy === 'sync'} onClick=${() => ctx.syncRemote()}>${ctx.busy === 'sync' ? x('syncing') : x('syncRemote')}<//>`
     : null;
   return html`
