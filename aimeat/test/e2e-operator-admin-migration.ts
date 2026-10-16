@@ -20,6 +20,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-operator-admin-migration
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-operator-admin-migration
  * @version-history
+ *   2026-10-16 — A tool the session was not offered answers SCOPE_DENIED with the word it needs (QA audit E5-04);
+ *     the not-offered assertions read that answer as well as the SDK's "not found".
  *   v1.1.0 — 2026-10-05 — The migrated agent's token passes the HTTP admin routes too (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-25 — Initial.
  */
@@ -368,7 +370,7 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
         assert(offered.length === 0, `offered ${offered.length}: ${offered.join(', ')}`);
         // A tool the session was not offered is not registered, and the SDK answers "not found".
         const byName = await (await mcpSession(token)).call('aimeat_admin_stats', {});
-        assert(byName.body.result?.isError === true && String(byName.body.result?.content?.[0]?.text).includes('not found'),
+        assert(byName.body.result?.isError === true && /not found|so the tool is offered/.test(String(byName.body.result?.content?.[0]?.text)),
             `the narrow agent called aimeat_admin_stats by name and was answered: ${JSON.stringify(byName.body).slice(0, 200)}`);
     });
 
@@ -384,7 +386,7 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
         const offered = await adminToolsOffered(token);
         assert(offered.length === 0, `offered ${offered.length}: ${offered.join(', ')}`);
         const byName = await (await mcpSession(token)).call('aimeat_admin_stats', {});
-        assert(byName.body.result?.isError === true && String(byName.body.result?.content?.[0]?.text).includes('not found'),
+        assert(byName.body.result?.isError === true && /not found|so the tool is offered/.test(String(byName.body.result?.content?.[0]?.text)),
             `the ordinary owner's agent called aimeat_admin_stats by name and was answered: ${JSON.stringify(byName.body).slice(0, 200)}`);
     });
 

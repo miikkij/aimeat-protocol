@@ -33,6 +33,8 @@
  *   - Phase 6: MCP resources — the memory mapper in resources/list, the storage blob in resources/read
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-core-doors
  * @version-history
+ *   2026-10-16 — The requester holds storage:read: the aimeat://storage resource asks the word
+ *     aimeat_storage_download asks since QA audit S3-03.
  *   v1.2.0 — 2026-10-12 — The 4.0.0 forms: the requester holds agent:read, the word of the agent
  *     roster from 4.0.0 (aimeat_agents_list was missing from its surface there), and the provider
  *     publishes its action with pricing.toll_morsels (pricing.base_morsels is 400
@@ -221,7 +223,8 @@ await test('1. Two owners, three agents of the first and one of the second', asy
     providerOwner = await makeOwner('cdprov');
     // The requester commissions work, reads it back over REST, and does the memory half of the suite.
     // agent:read is the word of the owner's agent roster (aimeat_agents_list, GET /v1/agents) from 4.0.0.
-    requester = await makeAgent(requesterOwner, ['work:request', 'work:read', 'memory:read', 'memory:write', 'storage:write', 'agent:read']);
+    // storage:read reads the aimeat://storage resource, as aimeat_storage_download asks it (QA audit S3-03).
+    requester = await makeAgent(requesterOwner, ['work:request', 'work:read', 'memory:read', 'memory:write', 'storage:write', 'storage:read', 'agent:read']);
     // A second agent of the SAME owner, so the owner-scope read has a sibling namespace to find.
     sibling = await makeAgent(requesterOwner, ['memory:write']);
     provider = await makeAgent(providerOwner, ['work:read', 'work:accept', 'work:publish', 'memory:read']);
