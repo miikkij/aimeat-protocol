@@ -24,6 +24,10 @@
  * @structure default AgentWorkView({ navigate })
  * @usage routed at /v1/home?agent=<name>&work=<task id> by spa.html
  * @version-history
+ *   v1.2.0 — 2026-10-17 — The agent's own words keep their line breaks (keepLineBreaks, drawn as
+ *     Markdown), and "Where the result is" is said only when a result was saved somewhere or shared:
+ *     a task runner's whole answer is its words, and the page said it lay in the agent's memory
+ *     (Jouni, 2026-10-17, on Claude Code's answer to Grok's test task).
  *   v1.1.1 — 2026-10-11 — The page opens the live stream itself (lib/live-updates.js
  *     relayLiveUpdates), so a running task that ends shows its result without a reload.
  *   v1.1.0 — 2026-10-11 — What this work is tied to: where the result is and who sees it (the
@@ -57,6 +61,7 @@ import { getDeliverableValue } from '/js/services/offers.js';
 import { readHomeAgents } from '/js/services/agent-draft.js';
 import { LineList } from '/components/LineList.js';
 import { placeWords } from '/views/home/agent-ties-parts.js';
+import { keepLineBreaks } from './line-breaks.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const p = (key, fallback) => tr('home.agentWork.' + key, fallback);
@@ -161,8 +166,9 @@ export default function AgentWorkView({ navigate }) {
         { k: p('asked', 'Asked'), v: ago(task.createdAt) },
         ended && { k: p('finished', 'Ended'), v: ago(outcome?.at || task.completedAt || task.updatedAt) },
         // Where the result is, and who sees it: the workspaces it is shared with (the outcome's
-        // `shared_with`), or the agent's own memory.
-        task.status === 'done' && { k: p('where', 'Where the result is'),
+        // `shared_with`), or the agent's own memory. Said only when there is a result to be
+        // somewhere: an agent whose whole answer is its own words saved none (a task runner).
+        task.status === 'done' && (shared.length > 0 || result.state === 'ready') && { k: p('where', 'Where the result is'),
           v: shared.length > 0 ? shared.map(placeWords).join(' · ') : p('whereOwn', 'The agent\'s own memory') },
         task.status === 'done' && { k: p('seenBy', 'Who sees it'),
           v: shared.length > 0
@@ -179,7 +185,8 @@ export default function AgentWorkView({ navigate }) {
         ${task.status === 'active' && html`<${Note} kind="quiet">${p('running', 'The agent is working on this now. The result appears here when it is done.')}<//>`}
         ${!ended && task.status !== 'active' && html`<${Note} kind="quiet">${p('waiting', 'This work has not started yet.')}<//>`}
         ${ended && outcome?.message && html`
-          <${Note} kind="message" error=${task.status === 'failed'}><b>${p('says', 'The agent says')}:</b> ${outcome.message}<//>`}
+          <${Note} kind="message" error=${task.status === 'failed'}><b>${p('says', 'The agent says')}:</b><//>
+          <${Markdown} text=${keepLineBreaks(outcome.message)} small />`}
         ${result.state === 'loading' && html`<${Spinner} text=${p('loadingResult', 'Reading the result…')} />`}
         ${result.state === 'ready' && html`<${DeliverableBody} value=${result.value} alt=${task.title || ''} />`}
         ${result.state === 'empty' && html`<${Note} kind="quiet">${p('noOutput', 'The agent saved no separate result. Its own words are above.')}<//>`}
