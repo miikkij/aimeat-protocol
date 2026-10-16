@@ -150,6 +150,20 @@ describe('the menu find', () => {
         expect(found.sections).toBe(12);
     });
 
+    it('the person\'s own things: an exact name is the chosen fit over the pages, best fits first, and past `max` the rest is counted', () => {
+        const yours = { key: 'yours', title: 'Yours', byScore: true, max: 2, items: [
+            { id: 'agent:gtm-viestittaja', label: 'GTM-viestittäjä', tail: 'agent' },
+            { id: 'agent:gtm-mittari', label: 'GTM-mittari', tail: 'agent' },
+            { id: 'agent:gtm-vastaukset', label: 'GTM-vastaukset', tail: 'agent' },
+        ] };
+        const exact = findInMenu([yours, ...MENU], 'gtm-vastaukset');
+        expect(exact.rows[exact.best]).toMatchObject({ label: 'GTM-vastaukset', tail: 'agent' });
+        const many = findInMenu([yours, ...MENU], 'gtm');
+        expect(many.groups[0]).toMatchObject({ key: 'yours', more: 1 });
+        expect(many.groups[0]!.rows).toHaveLength(2);
+        expect(findInMenu([yours, ...MENU], 'agent').groups[0]!.key).toBe('auto');
+    });
+
     it('nothing typed, nothing found: no rows and no choice', () => {
         expect(findInMenu(MENU, '   ').rows).toEqual([]);
         const none = findInMenu(MENU, 'vpn');

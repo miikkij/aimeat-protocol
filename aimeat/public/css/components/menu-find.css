@@ -85,6 +85,10 @@
 .menu-find-row.is-sel :is(.menu-find-num, .menu-find-via, .menu-find-tail) { color: var(--on-sun); }
 .menu-find-row.is-sel .menu-find-hit { text-decoration-color: var(--on-sun); }
 
+/* The rows a group did not show, counted: more letters narrow them. */
+.menu-find-more { padding: .4rem 0; font-size: var(--text-xs); color: var(--text-dim); }
+.menu-find--operator .menu-find-more { padding: 4px 18px; color: var(--menu-find-dim); }
+
 /* Nothing in the menus: the dashed aside, and the way to the content search. */
 .menu-find-none { margin-top: 1.1rem; font-size: .9rem; }
 .menu-find-none-words { margin: 0 0 .6rem; }

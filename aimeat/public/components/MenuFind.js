@@ -11,11 +11,16 @@
  *   field moves into the find. With nothing found it says so and offers the content search.
  *   The matching is js/menu-find.js; the look is css/components/menu-find.css; the catalogue entry is
  *   `menu-find` (design: claude.ai/artifact/ExfoqqeSCQuguJVRdcfWuA, approved by Jouni 2026-10-14).
- * @structure MenuFind({ tone, label, placeholder, groups, other, otherTitle, hiddenNote, onOpen, onWake, onContentSearch, initialQuery, children })
- *   (`initialQuery`: words already in the field when it appears, for the design lab's demos)
+ * @structure MenuFind({ tone, label, placeholder, groups, other, otherTitle, hiddenNote, onOpen, onWake, onContentSearch, onSearchStart, busyNote, initialQuery, children })
+ *   (`initialQuery`: words already in the field when it appears, for the design lab's demos;
+ *   `onSearchStart`: called at the first letter of each search, so the page can read what it searches
+ *   besides its menu; `busyNote`: the words while that reading runs; a group's `more` rows are counted
+ *   under it)
  * @usage html`<${MenuFind} label=${t('menuFind.labelSettings')} placeholder=${t('menuFind.placeholderSettings')}
  *   groups=${groups} other=${adminGroups} otherTitle=${t('menuFind.otherOperator')} onOpen=${openRow}>${menu}<//>`
  * @version-history
+ *   v1.1.0 — 2026-10-16 — onSearchStart and busyNote (the page reads the person's own things at the
+ *     first letter), and a group's uncounted rows as one quiet line.
  *   v1.0.0 — 2026-10-14 — Initial (wish-pikahaku-settings-controls-ja-admin-sivuille).
  */
 import { h } from 'preact';
@@ -60,9 +65,10 @@ const glass = html`<svg class="menu-find-glass" viewBox="0 0 16 16" width="16" h
  * @param {{ tone?: 'settings'|'operator', label: string, placeholder?: string,
  *   groups: import('/js/menu-find.js').FindGroup[], other?: import('/js/menu-find.js').FindGroup[], otherTitle?: string,
  *   hiddenNote?: string, onOpen: (row: import('/js/menu-find.js').FindRow, words: string) => void, onWake?: () => void,
- *   onContentSearch?: (words: string) => void, initialQuery?: string, children?: any }} props
+ *   onContentSearch?: (words: string) => void, onSearchStart?: () => void, busyNote?: string,
+ *   initialQuery?: string, children?: any }} props
  */
-export function MenuFind({ tone = 'settings', label, placeholder, groups, other, otherTitle, hiddenNote, onOpen, onWake, onContentSearch, initialQuery = '', children }) {
+export function MenuFind({ tone = 'settings', label, placeholder, groups, other, otherTitle, hiddenNote, onOpen, onWake, onContentSearch, onSearchStart, busyNote, initialQuery = '', children }) {
   const [q, setQ] = useState(initialQuery);
   const [sel, setSel] = useState(-1);
   const inputRef = useRef(/** @type {HTMLInputElement|null} */ (null));
@@ -77,6 +83,9 @@ export function MenuFind({ tone = 'settings', label, placeholder, groups, other,
 
   // New words, a new choice: the best fit.
   useEffect(() => { setSel(-1); }, [found.query]);
+  // The first letter of a search: the page may now read what it searches besides its menu.
+  const searching0 = !!found.query;
+  useEffect(() => { if (searching0) onSearchStart?.(); }, [searching0]);   // eslint-disable-line react-hooks/exhaustive-deps -- once per search, not per render of the page's callback
 
   // The / key anywhere outside a field moves into the find.
   useEffect(() => {
@@ -168,7 +177,7 @@ export function MenuFind({ tone = 'settings', label, placeholder, groups, other,
         </div>
         ${searching && found.rows.length ? html`
           <div class="menu-find-count" id=${`${id}-count`} aria-live="polite">
-            <b>${count}</b>. ${t('menuFind.keys')}${found.hidden && hiddenNote ? ` ${hiddenNote}` : ''}
+            <b>${count}</b>. ${t('menuFind.keys')}${found.hidden && hiddenNote ? ` ${hiddenNote}` : ''}${busyNote ? ` ${busyNote}` : ''}
           </div>` : null}
       </div>
       ${!searching ? children : found.rows.length ? html`
@@ -177,8 +186,10 @@ export function MenuFind({ tone = 'settings', label, placeholder, groups, other,
             <div class="menu-find-group" key=${g.key}>
               ${g.title ? html`<div class=${`menu-find-title${g.other ? ' menu-find-title--other' : ''}`}>${g.title}</div>` : null}
               ${g.rows.map(row)}
+              ${g.more ? html`<div class="menu-find-more">${t('menuFind.moreHere', { n: g.more })}</div>` : null}
             </div>`)}
-        </div>` : html`
+        </div>` : busyNote ? html`
+        <div class="menu-find-count" aria-live="polite">${busyNote}</div>` : html`
         <div class="poster-aside poster-aside--small menu-find-none" aria-live="polite">
           <p class="menu-find-none-words">${t('menuFind.nothing', { q: q.trim() })}</p>
           ${onContentSearch ? html`

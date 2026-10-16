@@ -13,6 +13,7 @@
  *   - SchedulerTab (default) — state, the two loads, the action handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v2.4.0 -- 2026-10-16 -- The menu find opens one schedule here (useOpenItem, js/open-item.js).
  *   v2.3.0 -- 2026-10-11 -- "Run now" on a stopped agent's schedule says the agent is stopped.
  *   v2.2.0 -- 2026-09-26 -- The loading line is the Note's loading kind; the page writes no class (page group G5).
  *   v2.1.0 -- 2026-09-26 -- Every line that says a part is loading is the loading line: the quiet sentence with the blinking Loading mark, LoadingLine in views/profile/shared.js (a unification: the look most tabs use).
@@ -35,6 +36,7 @@ import { t } from '/js/i18n.js';
 import { listAgents } from '/js/services/agents.js';
 import { listAllSchedules, getSchedulerTab, listScheduleOccurrences, getScheduleDetail, setScheduleEnabled, triggerSchedule, deleteSchedule } from '/js/services/schedules.js';
 import { swallowed } from '/js/swallowed.js';
+import { useOpenItem } from '/js/open-item.js';
 import { Note } from '/components/Note.js';
 import { buildModel, startOfDay } from './scheduler/model.js';
 import { renderSchedulerView } from './scheduler/cover.js';
@@ -123,6 +125,8 @@ export default function SchedulerTab({ showToast }) {
   }, [detailId, reloadTick]);
 
   const pickView = (v) => { setView(v); setEditOpen(false); };
+  // The menu find opens one schedule (js/open-item.js).
+  useOpenItem('scheduler', (id) => pickView({ kind: 'detail', id }), !loading);
   const toggleMore = (id) => setMoreOpen(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const run = async (fn) => {

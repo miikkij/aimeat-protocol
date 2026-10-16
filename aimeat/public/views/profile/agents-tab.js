@@ -7,6 +7,8 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.21.0 -- 2026-10-16 -- The menu find opens one agent here, also while the page is already open
+ *     (useOpenItem, js/open-item.js).
  *   v4.20.0 -- 2026-10-16 -- A failed fleet load shows the could-not-load note with Retry instead of "no
  *     agents yet"; the custom groups move to agents/agent-groups-state.js (max-file-lines), whose save
  *     is refused until the stored groups have loaded (QA audit F6-04, F6-05).
@@ -169,6 +171,7 @@ import BasicAgentsPanel from './agents/basic-agents-panel.js';
 import NewAgentPanel from './agents/new-agent-panel.js';
 import { AgentGuide, NoAgentsYet, NoComputersHere, useTakesComputers } from './agents/agent-guide.js';
 import { swallowed } from '/js/swallowed.js';
+import { useOpenItem, scrollToElementSoon } from '/js/open-item.js';
 
 const p = (key, vars) => t('profile.agents.page.' + key, vars);
 
@@ -444,6 +447,12 @@ export default function AgentsTab({ session, showToast, onStats }) {
     // "on mount", and re-running this would re-expand an agent the person had since collapsed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The menu find opens one agent, also while this page is already open (js/open-item.js).
+  useOpenItem('agents', (name) => {
+    setExpandedAgent(name);
+    scrollToElementSoon(`[data-agent-name="${CSS.escape(name)}"]`);
+  }, agents !== null);
 
   // Running-now panel → open a specific agent's Tasks tab on a specific task.
   // Expand the agent, record the deep-link (nonce bump re-fires repeat clicks),
