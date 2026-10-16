@@ -201,6 +201,7 @@
     "check:outbound-fetch": "tsx scripts/check-outbound-fetch.ts --strict",
     "check:peer-paths": "tsx scripts/check-peer-paths.ts --strict",
     "check:posture-defaults": "tsx scripts/check-posture-defaults.ts",
+    "check:own-node-backend": "tsx scripts/check-own-node-backend.ts",
     "check:trusted-keys": "tsx scripts/check-trusted-keys.ts --strict",
     "check:trusted-keys:report": "tsx scripts/check-trusted-keys.ts",
     "check:trusted-keys:seed": "tsx scripts/check-trusted-keys.ts --seed",
