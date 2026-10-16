@@ -5,6 +5,8 @@
  * @description Runs the real gate planner against disposable Git repositories. Stronger modes
  * must retain changed suites, and shared security code must select the guard tier.
  * @version-history
+ *   2026-10-16 -- Each case may take 30 s, above the child process's own 20 s limit: under load the
+ *     first case timed out at vitest's 5 s default while the planner was still compiling.
  *   v1.1.0 -- 2026-10-16 -- The planner runs with AIMEAT_CI_STATE=off: the plan now prints main's CI
  *     state, and a unit test reads no network (QA audit P2-01).
  *   v1.0.0 -- 2026-09-07 -- Review regression: --full dropped changed non-guard E2E suites.
@@ -36,7 +38,9 @@ function plan(path: string, ...flags: string[]): string {
     } finally { rmSync(file); }
 }
 
-describe('the gate selects what the change can affect', () => {
+// Each case starts the planner in a child process with a 20 s limit; the first compiles gate.ts
+// through tsx and took 12.5 s on a loaded machine, past vitest's 5 s default.
+describe('the gate selects what the change can affect', { timeout: 30_000 }, () => {
     it('keeps a changed non-guard suite under --full', () => {
         expect(plan('aimeat/test/e2e-example.ts', '--full')).toContain('own E2E suite(s)');
     });
