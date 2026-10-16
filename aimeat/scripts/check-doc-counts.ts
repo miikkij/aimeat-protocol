@@ -33,6 +33,8 @@
  *   v1.0.0 — 2026-09-04 — Initial (quality plan stream C: documentation truth).
  *   v1.1.0 — 2026-09-13 — The two sentences moved verbatim out of CLAUDE.md into the path rules
  *     .claude/rules/testing.md and .claude/rules/gates-ratchets.md; the claims read them there.
+ *   2026-10-16 — The testing rule says CI runs the guard tier on every push, not that it refuses a
+ *     merge, because CI reports and does not block (QA audit W07).
  */
 import { readFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -78,7 +80,7 @@ const CLAIMS: Claim[] = [
     {
         file: TESTING_RULE,
         label: 'rules/testing.md — guard tier size',
-        pattern: /run the (\d+) suites CI refuses to merge without/,
+        pattern: /run the (\d+) suites CI runs on every push/,
         expected: guardSuiteCount,
     },
     {
