@@ -23,9 +23,36 @@ permissions:
   contents: read
 
 jobs:
+  # A RELEASE WAITS FOR GREEN (QA audit 2026-10-16, P2-02, S9-04). The Python package was published with no test of the
+  # tagged commit: python-aimeat-crewai.yml runs pytest on pushes to main and nothing waited for it.
+  # A release commit bumps pyproject.toml, so that workflow has a run of it; ci.yml is the node the
+  # package talks to. The nightly sweep tests no Python, so it is not asked for here.
+  # On a tag the job refuses unless the commit is on main and each workflow named below has a green
+  # run of that exact commit (aimeat/scripts/release-ready.mjs); a run by hand (workflow_dispatch)
+  # publishes nothing, so it passes without asking.
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read # read the runs of the tagged commit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: The tagged commit is on main and green in ci.yml,python-aimeat-crewai.yml
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node aimeat/scripts/release-ready.mjs --sha="$GITHUB_SHA" --require=ci.yml,python-aimeat-crewai.yml
+
   build:
     name: Build sdist + wheel
+    needs: release-gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     defaults:
       run:
@@ -83,6 +110,7 @@ jobs:
     name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     # Required by PyPI Trusted Publisher OIDC flow. The 'pypi' environment
     # name must match what was registered as the pending publisher on PyPI.

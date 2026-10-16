@@ -18,6 +18,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-screenshot-capture
  * @version-history
+ *   v1.1.0 — 2026-10-16 — A failed render (502 RENDER_FAILED) is red; NO_BROWSER is the only answer a
+ *     node may decline with. The public GET is asserted by what the capture stored: the image after a
+ *     render, 404 otherwise (QA audit F10b-06). The throttle stays untested: it is checked after the
+ *     browser check, so a browserless runner cannot reach it.
  *   v1.0.0 — 2026-08-16 — initial: auth, ownership, not-published, and the browserless answer.
  */
 
@@ -101,27 +105,38 @@ await test('An app that was never published is a plain 404, not a failed render'
     assert(body.error?.code === 'NOT_FOUND', `code NOT_FOUND, got ${body.error?.code}`);
 });
 
-await test('The owner\'s own capture answers, and says why when it cannot render', async () => {
+let rendered = false;
+
+await test('The owner\'s own capture renders, or says the node has no browser', async () => {
     const { status, body } = await capture(ownerAName, APP, aAuthed);
-    // CI has no browser. Both outcomes are correct; what must never happen is a 500 or a silent 0.
-    // The branch is printed because a green run on a browserless machine is NOT evidence that
-    // rendering works, and a suite that hides which half it exercised invites exactly that reading.
+    // Two answers are correct: a rendered image, or NO_BROWSER on a machine with none (CI). A render
+    // that FAILS on a machine with a browser is a defect, and it used to pass here as a "named
+    // refusal" (QA audit 2026-10-16, F10b-06). The branch is printed because a green run on a
+    // browserless machine is NOT evidence that rendering works.
     console.log(`     ↳ ${status === 200 ? 'rendered on this machine' : `no render here (${body.error?.code})`}`);
     if (status === 200) {
+        rendered = true;
         assert(body.data?.captured === true, 'captured=true');
         assert(typeof body.data?.size === 'number' && body.data.size > 0, `a real image came back (${body.data?.size} bytes)`);
         assert(String(body.data?.screenshot_url).endsWith('/screenshot'), 'the answer carries the screenshot URL');
     } else {
-        assert(status === 503 || status === 502, `a browserless node answers 503/502, got ${status}: ${JSON.stringify(body.error)}`);
-        assert(['NO_BROWSER', 'RENDER_FAILED'].includes(body.error?.code), `named refusal, got ${body.error?.code}`);
+        assert(status === 503 && body.error?.code === 'NO_BROWSER',
+            `only a node without a browser may decline: expected 503 NO_BROWSER, got ${status} ${body.error?.code}: ${JSON.stringify(body.error)}`);
         assert(String(body.error?.message).length > 20, 'the refusal explains itself');
     }
 });
 
-await test('The screenshot GET stays public and unauthenticated', async () => {
-    // This is what makes the URL usable as a model input, so it is worth pinning.
+await test('The screenshot GET stays public and unauthenticated, and serves what the capture stored', async () => {
+    // This is what makes the URL usable as a model input, so it is worth pinning. It answers by what
+    // the capture above did: the image after a render, 404 when nothing was stored (it accepted
+    // either answer whatever happened, F10b-06).
     const res = await fetch(`${BASE}/v1/apps/${ownerAName}/${APP}/screenshot`);
-    assert(res.status === 200 || res.status === 404, `public GET answers without auth, got ${res.status}`);
+    if (rendered) {
+        assert(res.status === 200, `after a render the public GET serves the image, got ${res.status}`);
+        assert((res.headers.get('content-type') ?? '').startsWith('image/'), `served as ${res.headers.get('content-type')}`);
+    } else {
+        assert(res.status === 404, `with nothing stored the public GET is 404 and asks no credential, got ${res.status}`);
+    }
 });
 
 await test('Cleanup: delete the app', async () => {

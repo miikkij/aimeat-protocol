@@ -3,6 +3,9 @@
  * @description E2E for the agent task surface: create, list, detail, start, complete, fail, todos,
  *   triage, buckets, search, and the live-trace reclaim that runs on completion.
  * @version-history
+ *   v1.3.0 — 2026-10-16 — 10g: owner B naming A's agent by its whole identity can neither queue a
+ *     task on it nor list its tasks; the second-owner tests sent a bare name, which resolves under the
+ *     caller's own account and cannot reach the handler's check (QA audit S2-03).
  *   v1.2.0 — 2026-10-04 — 11c: a declined task ends as declined with its reason on the detail and the
  *     list, moves no failure counter, and refuses every later ending; /decline joins the stranger table.
  *   v1.1.0 — 2026-08-17 — E2E quality, agent-tasks:325 and :359. One owner and one agent drove the
@@ -527,6 +530,36 @@ await test('10f. Owner B and B\'s agent are refused every write door on A\'s tas
         `the task's status moved: ${statusBefore} → ${after.body.data.task.status}`);
     assert(after.body.data.task.completedAt === completedBefore, 'the completion stamp moved');
     assert(after.body.data.task.title !== 'hijacked', 'the title was rewritten by a refused call');
+});
+
+// The doors above take a task id. Creating and listing take the AGENT from the path, and a bare
+// name resolves under the caller's own account, so a second-owner test that sends one gets a 404
+// whatever the handler checks. Owner B naming A's agent by its WHOLE identity is the form that
+// reaches the handler (QA audit 2026-10-16, S2-03; the class is S2-01).
+await test('10g. Owner B naming A\'s agent by its whole identity can neither queue a task on it nor list its tasks', async () => {
+    const g = encodeURIComponent(agentGaii);
+    const listBefore = await json(`/v1/agents/${agentName}/tasks?per_page=100`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(listBefore.status === 200, `A lists its own tasks: ${listBefore.status}`);
+    const countBefore = listBefore.body.data.total as number;
+
+    const create = await json(`/v1/agents/${g}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ title: 'queued by another account', description: 'must be refused' }),
+    });
+    assert(create.status === 403 || create.status === 404, `owner B creating a task on A's agent: expected 403 or 404, got ${create.status} ${JSON.stringify(create.body.error)}`);
+
+    const list = await json(`/v1/agents/${g}/tasks?per_page=100`, { headers: { Authorization: `Bearer ${otherOwnerToken}` } });
+    const leaked = (list.body?.data?.tasks ?? []) as Array<{ title?: string }>;
+    assert((list.status === 403 || list.status === 404) && leaked.length === 0,
+        `owner B listing A's agent's tasks: expected 403 or 404 and nothing, got ${list.status} with ${leaked.length} task(s)`);
+
+    const listAfter = await json(`/v1/agents/${agentName}/tasks?per_page=100`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(listAfter.body.data.total === countBefore, `A's agent gained a task from the refused call: ${countBefore} → ${listAfter.body.data.total}`);
+
+    // A itself still reaches its agent by the same whole identity.
+    const own = await json(`/v1/agents/${g}/tasks?per_page=1`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(own.status === 200, `A listing its own agent by its whole identity: ${own.status}`);
 });
 
 await test('10d. Completing does NOT touch the deliverable, nor another task\'s live key', async () => {

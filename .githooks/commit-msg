@@ -23,5 +23,6 @@ case "$1" in
   *) MSG="$ROOT/$1" ;;
 esac
 
+. "$(dirname "$0")/lib-pnpm.sh"
 cd "$ROOT/aimeat"
 pnpm -s check:commit-msg "$MSG"

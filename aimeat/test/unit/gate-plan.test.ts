@@ -5,6 +5,8 @@
  * @description Runs the real gate planner against disposable Git repositories. Stronger modes
  * must retain changed suites, and shared security code must select the guard tier.
  * @version-history
+ *   v1.1.0 -- 2026-10-16 -- The planner runs with AIMEAT_CI_STATE=off: the plan now prints main's CI
+ *     state, and a unit test reads no network (QA audit P2-01).
  *   v1.0.0 -- 2026-09-07 -- Review regression: --full dropped changed non-guard E2E suites.
  */
 import { afterAll, describe, expect, it } from 'vitest';
@@ -30,7 +32,7 @@ function plan(path: string, ...flags: string[]): string {
     try {
         return execFileSync(process.execPath, ['--import', import.meta.resolve('tsx'),
             fileURLToPath(new URL('../../scripts/gate.ts', import.meta.url)), '--plan', '--base=HEAD', ...flags],
-        { cwd: aimeat, encoding: 'utf8', timeout: 20_000 });
+        { cwd: aimeat, encoding: 'utf8', timeout: 20_000, env: { ...process.env, AIMEAT_CI_STATE: 'off' } });
     } finally { rmSync(file); }
 }
 

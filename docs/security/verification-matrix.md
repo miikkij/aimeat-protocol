@@ -15,7 +15,8 @@ live paid deployment.
 ## Standing verification (runs on every merge)
 
 The node's own refusals are not documented here as prose: they are asserted by the guard E2E tier,
-which CI refuses to merge without. This is the authoritative internal penetration test, re-run on
+which CI runs after every push; a red run is printed by the session-start hook and `pnpm gate`,
+and a release waits for a green one. This is the authoritative internal penetration test, re-run on
 every change.
 
 | Surface | Where it is proven | What it asserts |

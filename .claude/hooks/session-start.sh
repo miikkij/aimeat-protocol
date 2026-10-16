@@ -12,6 +12,9 @@
 # named, whether it sits in its own worktree, and what the shared checkout looks like right
 # now. It asserts nothing and blocks nothing — a hook that refuses work at startup would be
 # worse than the problem. Everything it prints, it measured.
+#
+# 2026-10-16 — Also prints whether the git hooks are on and main's CI and nightly state (QA audit
+# W07 P2-01, P4-01, P8-01, P2-03; W09 P2-07).
 set -u
 
 # Claude Code hands the hook a JSON object on stdin, and its session_id is the one thing a session
@@ -83,6 +86,26 @@ else
   printf '\nCodeQL: MISSING on this machine. Install it FIRST, before any other work:\n'
   printf '    cd aimeat && pnpm codeql:install\n'
   printf '  Without it pnpm gate refuses check:field-reach, and the local CI run is not complete.\n'
+fi
+
+# The git hooks run only when core.hooksPath points at .githooks. The root `pnpm install` sets it and
+# the documented worktree recipe never ran that install, so a clone could commit and push with no
+# hook at all and nothing said so (QA audit 2026-10-16, P2-07). Say which it is.
+hooks_path=$(git -C "${toplevel:-.}" config --get core.hooksPath 2>/dev/null || echo '')
+if [ "$hooks_path" = ".githooks" ]; then
+  printf 'Git hooks: ON (core.hooksPath .githooks): pre-commit, commit-msg and pre-push run.\n'
+else
+  printf 'Git hooks: OFF (core.hooksPath is %s). No commit or push check runs on this clone. Turn them on:\n' "${hooks_path:-unset}"
+  printf '    git config core.hooksPath .githooks\n'
+fi
+
+# Main's CI and the nightly sweep, read from GitHub (cached, short timeouts, "unknown" offline).
+# CI ran after every push and its answer reached nobody: red for 236 runs from 2026-10-02, across a
+# release (QA audit 2026-10-16, P2-01, P4-01, P8-01). A push on top of a red CI needs a named reason
+# (the pre-push hook says how).
+if [ -n "$toplevel" ] && [ -f "$toplevel/aimeat/scripts/ci-state.mjs" ] && command -v node >/dev/null 2>&1; then
+  printf '\n'
+  node "$toplevel/aimeat/scripts/ci-state.mjs" 2>&1 || printf 'CI state: could not be read.\n'
 fi
 
 cat <<'RITUAL'

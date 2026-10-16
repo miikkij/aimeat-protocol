@@ -20,19 +20,23 @@
 #                        services, storage, mcp or middleware changed (scripts/gate.ts prints why)
 #     pnpm gate:full     everything, both backends — a release, a storage change, rarely
 #
-# CI runs all of it on every push and blocks a merge on it, so nothing is skipped; it is moved to
-# where waiting for it costs nobody an afternoon. A session says "done" only after `pnpm gate` is
-# green (CLAUDE.md, Gates); a person can push a text change and go on with their day.
+# CI runs all of it after every push, so nothing is skipped; it is moved to where waiting for it
+# costs nobody an afternoon. CI blocks no push (work goes straight to main): its red run is printed
+# by the session-start hook, `pnpm gate` and the pre-push hook (QA audit 2026-10-16, P8-01). A
+# session says "done" only after `pnpm gate` is green (CLAUDE.md, Gates); a person can push a text
+# change and go on with their day.
 #
 # The pre-push hook keeps the two things a push must not do to other sessions (push from behind
 # origin, push a tree that does not boot) and nothing slower.
 #
 # Bypass in a genuine emergency with:  git commit --no-verify
 #
-# Activated via `git config core.hooksPath .githooks` (set automatically by the root
-# package.json "prepare" script on `pnpm install`).
+# Activated via `git config core.hooksPath .githooks`, which the root `pnpm install`, the
+# `pnpm install` in aimeat/ (its "prepare" script) and the WorktreeCreate hook all set (QA audit
+# 2026-10-16, P2-07). The session-start hook says whether it is on.
 
 set -e
+. "$(dirname "$0")/lib-pnpm.sh"
 
 echo "[pre-commit] ESLint, cached (lint)…"
 pnpm -s lint

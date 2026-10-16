@@ -13,15 +13,24 @@ permissions:
 # FOUR JOBS, SIDE BY SIDE. Until 2026-09-05 this was one job that ran everything in a row and took
 # 82 minutes, most of it the two full E2E sweeps, which were advisory (continue-on-error) and so
 # decided nothing while deciding the wall clock. The sweeps now run nightly and on demand in
-# e2e-full.yml, with an issue opened when one is red; what a push waits for is the four things that
-# block a merge, each in its own job so the clock is the longest of them rather than their sum, and
-# so a red run names itself in the job list.
+# e2e-full.yml, with an issue opened when one is red; what runs after every push is four jobs, each
+# in its own job so the clock is the longest of them rather than their sum, and so a red run names
+# itself in the job list.
+#
+# CI BLOCKS NO PUSH. Work goes straight to main, so this runs after the commit has landed. It was red
+# for 236 runs in a row from 2026-10-02, across a release, and nobody was told (QA audit 2026-10-16,
+# P2-01, P8-01). So its state is read back where people look: the session-start hook and `pnpm gate`
+# print it (aimeat/scripts/ci-state.mjs), the pre-push hook wants a named reason for a push on top of
+# a red run, and a release tag waits for a green run of its own commit (scripts/release-ready.mjs).
 jobs:
   # The static gates: what the pre-commit hook runs, uncached and over the whole tree. The hook
   # exists to fail fast on a developer's machine; `--no-verify` walks straight past it, and this is
   # the copy that guards the branch.
   checks:
     runs-on: ubuntu-latest
+    # Every job has a time limit (QA audit P1-06): without one a hung step holds the runner until
+    # GitHub's own six-hour default, and the run says nothing until then.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -115,6 +124,7 @@ jobs:
 
   unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -134,8 +144,9 @@ jobs:
         working-directory: aimeat
         run: pnpm install --frozen-lockfile
 
-      # The whole suite. The hook runs only the files reachable from what changed (vitest --changed);
-      # the pre-push hook and this job run all of it.
+      # The whole suite. `pnpm gate` runs only the files reachable from what changed (vitest
+      # --changed) and the whole suite only with --full; this job and the nightly 4.0.0 run are where
+      # it runs whole on Linux, the production operating system (QA audit P4-01).
       - name: Unit tests (vitest)
         working-directory: aimeat
         run: pnpm test
@@ -152,10 +163,11 @@ jobs:
   # holds the suite COUNT against GUARD_SUITES.length, and nothing can hold a total that changes
   # every time somebody adds an assertion to a guard suite — which this repo asks people to do
   # freely. It was written down for one day, 2026-09-04, and needed correcting twice within it.
-  # No continue-on-error — a red run here is a hole, and merging
-  # on top of it is the thing this repo spent August discovering it had been doing.
+  # No continue-on-error — a red run here is a hole, and pushing on top of it is the thing this repo
+  # spent August discovering it had been doing; the pre-push hook now asks for the reason.
   guards-sqlite:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -187,8 +199,20 @@ jobs:
         working-directory: aimeat
         run: pnpm test:e2e:guards:sqlite
 
+      # The node's own output for each red suite (the runner keeps it under test-results/e2e-node/
+      # and prints its tail under the suite): a 500 or a crash leaves a stack here (QA audit P1-07).
+      - name: Keep the node logs of the red suites
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-node-logs-guards-sqlite
+          path: aimeat/test-results/e2e-node/
+          if-no-files-found: ignore
+          retention-days: 14
+
   guards-postgres:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
@@ -235,6 +259,17 @@ jobs:
       - name: E2E guard tier (PostgreSQL + Kysely — primary backend) — blocking
         working-directory: aimeat
         run: pnpm test:e2e:guards:postgres-kysely
+
+      # The node's own output for each red suite (the runner keeps it under test-results/e2e-node/
+      # and prints its tail under the suite): a 500 or a crash leaves a stack here (QA audit P1-07).
+      - name: Keep the node logs of the red suites
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-node-logs-guards-postgres
+          path: aimeat/test-results/e2e-node/
+          if-no-files-found: ignore
+          retention-days: 14
 
       # The unit job has no Postgres service. Run the cross-provider assertions here, and refuse
       # both a missing URL and a failed connection instead of accepting a SQLite-only result.
