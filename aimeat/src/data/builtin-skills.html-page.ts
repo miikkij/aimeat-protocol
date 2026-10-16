@@ -80,7 +80,8 @@ less than the person expected. So write it this way:
   \`aimeat_storage_upload\` (presigned for anything over a kilobyte), then map the name the page uses
   to the upload's \`embed_url\` in \`files\`, for example \`{ "kaavio.png": "/v1/pub/…/kaavio.png" }\`, and
   write \`<img src="kaavio.png">\`. A name is letters, digits, \`.\`, \`-\` and \`_\`, in segments split by
-  \`/\`. Up to 50 files. Pictures from any other address do not load.
+  \`/\`. Up to 50 files. Pictures from any other address do not load, and neither does a file whose
+  classification keeps it from the reader or, on a shared page, inside the organism.
 - **localStorage and cookies work, and are forgotten when the page closes.** Never keep anything a
   reader needs only there.
 - **Links** to a source open in a new tab after the reader confirms the address. \`window.open\` and

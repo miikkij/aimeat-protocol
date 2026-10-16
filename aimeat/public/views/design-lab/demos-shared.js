@@ -9,6 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.15.0 — 2026-10-16 — HtmlPageFrame's demo: framed with Report, the text without a page host, loading.
  *   v1.14.0 — 2026-09-27 — The own-aimeat demo moves to demos-operator.js, drawn by calling OwnAimeat;
  *     OwnAimeatDemo and its OwnAimeatBlock import go.
  *   v1.13.0 — 2026-09-27 — The box and choice tile shapes' demos are box-shape and choice-shape, as their entries.
@@ -41,6 +42,7 @@ import { McpQuickConnect } from '/components/McpInstall.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { TagList } from '/components/TagList.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
+import { HtmlPageFrame } from '/components/HtmlPageFrame.js';
 
 const html = htm.bind(h);
 const noop = () => {};
@@ -98,6 +100,12 @@ export const SHARED_DEMOS = {
   ] },
   'tags': { variants: [{ name: 'default', render: (ex) => html`<${TagList} tags=${ex.tags} max=${ex.max} onTag=${noop} />` }] },
   'app-sandbox': { height: 420, variants: [{ name: 'open', render: () => html`<${SandboxOpen} />` }] },
+  // The framed cut shows an empty frame: a real page needs a frame token the page host signed.
+  'html-page-frame': { height: 520, variants: [
+    { name: 'framed, with Report', render: (ex) => html`<${HtmlPageFrame} src="about:blank" title=${ex.title} onReport=${async () => true} />` },
+    { name: 'no page host: the page as text', render: () => html`<${HtmlPageFrame} title="Quarter in pictures" text=${MARKDOWN} />` },
+    { name: 'loading', render: () => html`<${HtmlPageFrame} loading />` },
+  ] },
 };
 
 /** One element with the shape's classes; `cls` is the base, `extra` the cut. */
