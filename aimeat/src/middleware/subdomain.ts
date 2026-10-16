@@ -17,6 +17,8 @@
  *   - labelFromHost(req) — leftmost label under app/portfolio/co/apex host
  * @usage app.use(subdomainMiddleware(config)); // before route mounting
  * @version-history
+ *   v1.6.0 — 2026-10-16 — `req.pageOrigin`: the page host (`config.pageHost`), one exact host read
+ *     off the raw Host before every family, for the HTML pages of workspaces (routes/page-host.ts).
  *   v1.3.0 — 2026-07-28 — On the header path, a missing `X-Subdomain` falls back to the Host label
  *     instead of reading as "no subdomain". The proxy marks the host family on every location but
  *     names the label on only some: under `/.well-known/*` every app origin was reporting itself as
@@ -64,6 +66,12 @@ declare global {
        * served on the same isolated, session-less host model as an app.
        */
       coOrigin?: boolean;
+      /**
+       * True when the request arrived on the page host (`config.pageHost`, e.g. `pages.aimeat.io`):
+       * the one host the HTML pages of workspaces are served from, inside the page frame
+       * (routes/page-host.ts). An exact host, never a family: no label under it means anything.
+       */
+      pageOrigin?: boolean;
     }
   }
 }
@@ -92,6 +100,7 @@ export function subdomainMiddleware(config: AimeatConfig) {
   const appHost = (config.appHost || '').toLowerCase();
   const portfolioHost = (config.portfolioHost || '').toLowerCase();
   const coHost = (config.coHost || '').toLowerCase();
+  const pageHost = (config.pageHost || '').toLowerCase();
 
   /**
    * The host the client addressed, port stripped, read from the raw `Host` header.
@@ -178,6 +187,15 @@ export function subdomainMiddleware(config: AimeatConfig) {
     req.appOrigin = false;
     req.portfolioOrigin = false;
     req.coOrigin = false;
+    req.pageOrigin = false;
+
+    // The page host is one exact host and is read off the raw Host before anything else: it is an
+    // apex subdomain (`pages.aimeat.io`), and read below it would become the subdomain site "pages".
+    // No marker is asked for, for the reason hostOf gives: the Host is what nginx routed on.
+    if (pageHost && hostOf(req) === pageHost) {
+      req.pageOrigin = true;
+      return next();
+    }
 
     // Header path (production behind nginx). x-app-origin marks the app host
     // family, x-portfolio-origin the portfolio host family. Each marker only counts on a Host in

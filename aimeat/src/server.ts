@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-16 — pageHostOnly() after subdomainMiddleware: the page host answers the page frame and
+ *     nothing else (HTML pages in workspaces).
  *   2026-10-16 — refusalRecorder() mounted after the request id: every 401 and 403 reaches the refusal
  *     log (QA audit S1-02, E2-07, E2-08).
  *   2026-10-15 — The JSON 404 and the global error handler moved to middleware/fallback-handlers.ts and
@@ -54,6 +56,7 @@ import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { refusalRecorder } from './middleware/refusal-recorder.js';
 import { subdomainMiddleware } from './middleware/subdomain.js';
+import { pageHostOnly } from './middleware/page-host-only.js';
 import { robotsHeader } from './middleware/robots-header.js';
 import { apexPageRedirect } from './middleware/apex-page-redirect.js';
 import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
@@ -213,6 +216,8 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // in a Sitemap: line naming a different host. The middleware only sets request properties, so
   // running it earlier changes nothing else. Serving still happens in subdomainServeRouter.
   app.use(subdomainMiddleware(config));
+  // The page host answers the page frame (/p/…) and nothing else, before the static files can.
+  app.use(pageHostOnly(config));
 
   // X-Robots-Tag on every response: noindex for what is not a content page, and for everything
   // while discovery is switched off. After subdomainMiddleware, because an app or portfolio origin

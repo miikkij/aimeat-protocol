@@ -11,10 +11,15 @@
  *   or null when the static tree was not shipped with this node. Cached after the first read.
  *   FRAME_SUPPORT_MARK · withFrameShim(body) — the support script put in front of an app's markup,
  *   under the attribute services/app-serve-marks-strip.ts recognises it by.
+ *   pageFrameShimSource() · withPageFrameShim(html) — the same for an HTML page in the page frame
+ *   (src/static/page-frame-shim.js, routes/page-host.ts).
  * @usage
  *   import { appFrameHostHtml } from '../utils/app-frame-assets.js';
  *   const html = appFrameHostHtml(); if (html) res.send(html);
  * @version-history
+ *   v1.2.0 — 2026-10-16 — The page frame's support script (src/static/page-frame-shim.js), put in
+ *     front of an HTML page the same way: pageFrameShimSource() · withPageFrameShim(html). The two
+ *     share one insertion rule (insertFirst).
  *   v1.1.0 — 2026-09-26 — appFrameCoreScript(): the grant and consent module app-frame.js imports.
  *   v1.0.0 — 2026-09-25 — Initial (audit A7-1: apps on shared nodes without an app origin).
  */
@@ -88,10 +93,30 @@ export function withFrameShim(body: Buffer | Uint8Array | string): Buffer {
   const raw = typeof body === 'string' ? body : Buffer.from(body).toString('utf-8');
   const source = appFrameShimSource();
   if (!source) return Buffer.from(raw, 'utf-8');
-  const tag = `<script ${FRAME_SUPPORT_MARK}>${source}</script>`;
+  return Buffer.from(insertFirst(raw, `<script ${FRAME_SUPPORT_MARK}>${source}</script>`), 'utf-8');
+}
+
+/** `tag` in front of everything the document wrote: after `<head>`, else `<html>`, else the doctype, else at the start. */
+function insertFirst(raw: string, tag: string): string {
   const at = [/<head\b[^>]*>/i, /<html\b[^>]*>/i, /^\s*<!doctype[^>]*>/i]
     .map(re => re.exec(raw))
     .find((m): m is RegExpExecArray => m !== null);
   const cut = at ? at.index + at[0].length : 0;
-  return Buffer.from(raw.slice(0, cut) + tag + raw.slice(cut), 'utf-8');
+  return raw.slice(0, cut) + tag + raw.slice(cut);
+}
+
+/** The script put in front of an HTML page in the page frame, without its leading comment block. */
+export function pageFrameShimSource(): string | null {
+  const text = staticFile('page-frame-shim.js');
+  return text === null ? null : text.replace(/^\s*\/\*[\s\S]*?\*\/\s*/, '');
+}
+
+/**
+ * Put the page frame's support script in front of everything an HTML page wrote, for the same reason
+ * as withFrameShim: the page's first line may be the localStorage read the opaque origin refuses.
+ * Without the script on disk the page is served as it is; the sandbox does not depend on it.
+ */
+export function withPageFrameShim(html: string): Buffer {
+  const source = pageFrameShimSource();
+  return Buffer.from(source ? insertFirst(html, `<script data-aimeat-page-support>${source}</script>`) : html, 'utf-8');
 }

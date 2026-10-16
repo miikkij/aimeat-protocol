@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.30.0 — 2026-10-16 — pagesDefaults(): pageHost (AIMEAT_PAGE_HOST), the host the HTML pages of workspaces are served from (config-pages.ts).
  *   v1.29.0 — 2026-10-16 — loadConfig() refuses to start on a setting the node does not accept and treats an empty number or fixed-set setting as unset (config-start-check.ts; QA audit D8-02, P6-03, D6-02); `checkSettings: false` for validate, init and config. The five settings no code read are removed: AIMEAT_CAPABILITY_PUBLISHERS, _MIN_PUBLISHER_TRUST, _PUBLISHER_ALLOWLIST, _LOG_RETENTION_DAYS and AIMEAT_PACKAGE_FEDERATION_AUTO_ACCEPT (QA audit D8-05). A config file may name a setting with no schema row by its variable name, and the load line counts what was applied and names what was skipped (QA audit D8-03). The Consul block moved to config-consul.ts (pure extraction).
  *   v1.28.1 — 2026-10-14 — otkGraceMs (AIMEAT_OTK_GRACE_MS) removed: the connectivity-key routes it timed are gone (feature-list audit row 202).
  *   v1.28.0 — 2026-10-12 — SHIPPED_DEFAULT_AGENT_SCOPES carries agent:read, the word of the owner's agent list.
@@ -93,6 +94,7 @@ import { aiModelDefaults } from './config-ai-models.js';
 import { decideDefaults } from './config-decide.js';
 import { visibilityDefaults } from './config-visibility.js';
 import { turnDefaults } from './config-turn.js';
+import { pagesDefaults } from './config-pages.js';
 import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config-ai-label.js';
 import { docsignDefaults } from './config-docsign.js';
 import { dataAccessDefaults } from './config-data-access.js';
@@ -276,6 +278,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Company origin: {slug}.co.<apex>, same shape as the app origin.
     coHost: (process.env.AIMEAT_CO_HOST ?? deriveCoHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
     coOriginEnabled: process.env.AIMEAT_CO_ORIGIN_ENABLED === 'true',
+    ...pagesDefaults(),
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     // Settings the party who STARTED this node nominated as read-only, for a node one party

@@ -8,6 +8,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-10-16 — readShareMeta, redactShare and memberRole delegate to services/workspace-share.ts,
+ *     which the share MCP tool runs too; the share has end dates (`until`). An HTML page publishes
+ *     under its own version window (services/html-page.ts htmlPageRetention).
  *   2026-10-16 — archiveHandler calls organismArchiveOp (services/organism-archive-op.ts), which holds
  *     the role rule, the target check, the fence, the archive and the timeline entry, so
  *     aimeat_organism_archive runs the same operation. No change to what the route answers (QA audit D2-08).
@@ -102,7 +105,9 @@ import { isOrganismOwner } from '../../services/organism-ownership.js';
 
 // The share shapes live in share-types.ts (shared-public.ts names them without a cycle).
 export type { ShareAccess, ShareMeta, ResolvedShare, PublicDoc, PublicRecord } from './share-types.js';
-import type { ShareAccess, ShareMeta, ResolvedShare } from './share-types.js';
+import type { ResolvedShare } from './share-types.js';
+import { readShareMetaOf, redactShareOf, memberRoleOf } from '../../services/workspace-share.js';
+import { htmlPageRetention, isHtmlPageValue } from '../../services/html-page.js';
 
 export type OrganismHelpers = ReturnType<typeof createOrganismHelpers>;
 
@@ -119,14 +124,10 @@ export interface BatchPublishItemResult {
 export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   // ── Gate primitive helpers ──
 
-  // Active membership keyed by bare owner name (or org agent) — returns { role } or null.
-  const memberRole = async (req: Express.Request, organism: { agentGaiis: string[] }, id: string): Promise<string | null> => {
-    if (req.auth!.sub && organism.agentGaiis.includes(req.auth!.sub)) return 'member';
-    const ownerName = req.auth!.owner;
-    if (!ownerName) return null;
-    const m = await storage.getMembership(id, ownerName);
-    return m && m.status === 'active' ? m.role : null;
-  };
+  // Active membership keyed by bare owner name (or org agent) — returns { role } or null. The rule is
+  // services/workspace-share.ts memberRoleOf, which the share MCP tool asks too.
+  const memberRole = (req: Express.Request, organism: { agentGaiis: string[] }, id: string): Promise<string | null> =>
+    memberRoleOf(storage, organism, id, { sub: req.auth!.sub, owner: req.auth!.owner });
 
   // Read the organism's manifest value (for gate policy).
   const readManifest = async (id: string): Promise<unknown> => {
@@ -270,8 +271,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
         ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
         visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
       });
-      // Retention: prune history beyond the space's window (append-only spaces never pruned).
-      await pruneVersionsAfterPublish(storage, config, { refs: versionRefs, publishedN: n, ot: pubOt });
+      // Retention: prune history beyond the space's window (append-only spaces never pruned). An HTML
+      // page keeps at most five: it can fill a whole memory value, and every version is a full copy.
+      await pruneVersionsAfterPublish(storage, config, { refs: versionRefs, publishedN: n, ot: isHtmlPageValue(draftValue) ? htmlPageRetention(pubOt, config) : pubOt });
     }
     // .latest (current state) is owned by a member's GHII — ONE owner per key, so it never forks into
     // per-agent duplicates a read then has to disambiguate. Preserve the record's existing owner
@@ -625,22 +627,12 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
 
   // ── Document-space public sharing (meta.share) ──
 
-  // The copy that counts (services/workspace-meta.ts), so a member's own copy shares nothing.
-  const readShareMeta = async (id: string, ws: string): Promise<ResolvedShare> => {
-    const v = ((await readWorkspaceMetaRecord(storage, id, ws, 'meta.share', config.nodeId))?.value as ShareMeta | undefined) ?? {};
-    const access: ShareAccess = v.access === 'password' || v.access === 'account' ? v.access : 'open';
-    return {
-      public: !!v.public, spaces: v.spaces ?? {}, docs: v.docs ?? {},
-      access, passwordHash: typeof v.passwordHash === 'string' ? v.passwordHash : null,
-      icsKeyHash: typeof v.icsKeyHash === 'string' ? v.icsKeyHash : null,
-    };
-  };
+  // The copy that counts (services/workspace-meta.ts), so a member's own copy shares nothing. Read,
+  // shown and set in services/workspace-share.ts, which the share MCP tool runs too.
+  const readShareMeta = (id: string, ws: string): Promise<ResolvedShare> => readShareMetaOf(storage, config, id, ws);
 
   /** The share state as the API is allowed to show it — the password hash and the feed key's hash NEVER leave the server. */
-  const redactShare = (share: ResolvedShare): Record<string, unknown> => ({
-    public: share.public, spaces: share.spaces, docs: share.docs,
-    access: share.access, has_password: !!share.passwordHash, has_ics_key: !!share.icsKeyHash,
-  });
+  const redactShare = (share: ResolvedShare): Record<string, unknown> => redactShareOf(share);
 
   /** Gate the NO-AUTH public read path by the share's access mode. Returns null when allowed,
    *  else the 401 error code + message the caller should send. Assumes the caller has already

@@ -30,6 +30,10 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-10-16 — An HTML page (a document value with `html`) is checked and given its text before the
+ *     schema reads it (services/html-page.ts normalizeHtmlPageValue); the index marks a page `kind:
+ *     'html'`, the day it was last opened and whether it went `stale` (services/workspace-opened.ts).
+ *     deleteRecordsBatchOp moved to ./workspace-records-delete-op.ts (max-file-lines), re-exported.
  *   2026-10-16 — The per-item organism rule in writeWorkspaceDraftsOp carries the caller's extension
  *     marker, so the named extension's draft write passes the fenced-space rule again; the 2026-10-15
  *     check left it out and refused every ctx.workspace.write into a fenced space (found while
@@ -110,8 +114,6 @@
 import type { Storage, MemoryRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { canWriteNamespaceRule, readOrganismConfig, createOrganismHelpers, fresherRec } from '../routes/organisms/shared.js';
 import type { BatchPublishItemResult } from '../routes/organisms/shared.js';
-import { checkDeleteGuard } from './write-guards.js';
-import { isSameOwner } from '../utils/gaii.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { workspaceRowIndex } from './workspace-rows/row-service.js';
 import type { RowObjectType } from './workspace-rows/row-space.js';
@@ -136,6 +138,15 @@ import { memoryContentBytes, documentContentBytes } from '../utils/memory-conten
 import { directValueProvenance, type DeclarationParser } from './workspace-direct-provenance.js';
 import { instanceFromKey } from './workspace-record-key.js';
 import { logger } from '../utils/logger.js';
+import { normalizeHtmlPageValue, isHtmlPageValue } from './html-page.js';
+import { isPageStale } from './workspace-opened.js';
+
+/** What the index says of a page's life: an HTML page's kind, the day it was last opened, and whether it went stale. */
+const pageLifeOf = (cur: MemoryRecord, lastOpened: string | undefined): Record<string, unknown> => ({
+    ...(isHtmlPageValue(cur.value) ? { kind: 'html' } : {}),
+    ...(lastOpened ? { last_opened: lastOpened } : {}),
+    ...(isPageStale(lastOpened, cur.updatedAt) ? { stale: true } : {}),
+});
 import {
     refuse, denyReason, memberRoleOf, fencedOpRefusal,
     type WorkspaceOpsDeps, type WorkspaceOpsCaller, type WorkspaceOpResult,
@@ -277,11 +288,13 @@ export async function readWorkspaceOp(
     }
     const index: Record<string, unknown[]> = {};
     const counts: Record<string, number> = {};
+    const opened = ((await metaReader.pick(ws, 'meta.opened', items))?.value ?? {}) as Record<string, string>;
     for (const [name, s] of spaces) {
+        const isDocSpace = s.ot.mode === 'document' || (!s.ot.mode && s.ot.kind === 'document');
         const entries = [...s.inst.entries()]
             .map(([id, slot]) => {
                 const cur = slot.latest ?? slot.draft!;
-                return { id, title: entryTitle(cur.value, id), updated: cur.updatedAt, version: slot.latest?.version ?? 0, bytes: byteLen(cur.value), published: !!slot.latest, has_draft: !!slot.draft, ...warningFieldSnake(cur) };
+                return { id, title: entryTitle(cur.value, id), updated: cur.updatedAt, version: slot.latest?.version ?? 0, bytes: byteLen(cur.value), published: !!slot.latest, has_draft: !!slot.draft, ...warningFieldSnake(cur), ...(isDocSpace ? pageLifeOf(cur, opened[`${name}/${id}`]) : {}) };
             })
             .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.id < b.id ? -1 : 1));
         index[name] = entries;
@@ -380,6 +393,13 @@ export async function writeWorkspaceDraftsOp(
     for (const [i, item] of resolved.entries()) {
         const key = `${root}.${item.namespace}.${item.instanceId}.draft`;
         let v = coerceValue(item.value, item.instanceId);
+        // An HTML page is checked and given its text before the schema reads it, so a space whose
+        // schema requires `markdown` takes a page, and every Markdown reader reads it as its text.
+        if (item.isDoc) {
+            const page = normalizeHtmlPageValue(v);
+            if (!page.ok) return refuse(400, 'INVALID_INPUT', `${batch ? `items[${i}]: ` : ''}${page.message}`);
+            v = page.value;
+        }
         // NO `workspaceRef` HERE, AND THAT IS THE POINT. Passing it opens every embedded file to
         // the workspace's members as a side effect of rewriting the URL — a write, inside the loop
         // that decides whether to write at all. The rewritten URL is identical either way; the
@@ -533,8 +553,6 @@ export async function publishWorkspaceOp(
 
 /** At most this many records per publish call. */
 export const BATCH_PUBLISH_MAX = 1000;
-/** At most this many ids per delete call. */
-export const BATCH_DELETE_MAX = 2000;
 
 const VISIBILITIES = new Set(['private', 'owner', 'group', 'members', 'public', 'workspace']);
 
@@ -702,93 +720,5 @@ export async function publishRecordsBatchOp(
     return { ok: true, data };
 }
 
-export interface DeleteRecordsBatchArgs { organismId: string; ws?: string; namespace: string; ids: unknown[] }
-
-export interface DeleteRecordsBatchData {
-    deleted: Array<{ id: string; keys: number }>;
-    failed: Array<{ id: string; reason: string }>;
-    rows_removed: number;
-}
-
-/**
- * Remove many records of one namespace as one operation: each record's family (bare, .draft,
- * .latest, .version.N) that the CALLER's own identity family owns goes into the deleted-memory bin in
- * one batch, restorable with aimeat_memory_restore for the node's grace period, as the single delete
- * aimeat_workspace_object_delete does. A member never removes another member's rows. An append-only
- * (create_only) namespace refuses the whole batch.
- */
-export async function deleteRecordsBatchOp(
-    deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, args: DeleteRecordsBatchArgs,
-): Promise<WorkspaceOpResult<DeleteRecordsBatchData>> {
-    const { storage, config } = deps;
-    const { organismId, ws, namespace } = args;
-    if (typeof namespace !== 'string' || !namespace || !Array.isArray(args.ids) || args.ids.length === 0) {
-        return refuse(400, 'INVALID_INPUT', 'namespace (string) and ids (non-empty array) are required');
-    }
-    if (args.ids.length > BATCH_DELETE_MAX) {
-        return refuse(400, 'INVALID_INPUT', `At most ${BATCH_DELETE_MAX} ids per request`);
-    }
-    const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
-
-    const root = rootOf(organismId, ws);
-    const callerId = caller.principal;
-    const ids = args.ids.filter((x: unknown): x is string => typeof x === 'string' && !!x);
-    if (ids.length === 0) return refuse(400, 'INVALID_INPUT', 'ids must hold at least one non-empty string');
-
-    // A record space that names extensions takes a delete from a caller that is not a person only
-    // through one of them (services/fenced-space.ts). The family a caller owns includes the rows
-    // under its owner's name (isSameOwner below), so an agent removed the published copy of a
-    // record the app's tool had written.
-    if (ws) {
-        const fenced = await fencedOpRefusal(deps, caller, organismId, ws, { keys: ids.map(x => `${root}.${namespace}.${x}`) });
-        if (fenced) return fenced;
-    }
-
-    // Append-only guard ONCE (per-namespace policy): a create_only namespace refuses record deletion
-    // on every path, so existing events can never be erased. If it is append-only, refuse the batch.
-    const guard = await checkDeleteGuard(`${root}.${namespace}.${ids[0]}.latest`, storage);
-    if (!guard.valid) {
-        return refuse(409, 'WRITE_CONFLICT', guard.errors?.[0]?.message ?? 'namespace is append-only', { violations: guard.errors });
-    }
-
-    // A key's role suffix must be the RECORD itself (bare), its .draft/.latest, or a .version.N, never
-    // a sibling instance (`${base}0`) or an unrelated child. Mirrors object_delete's per-row guard.
-    const roleOk = (base: string, key: string): boolean => {
-        const role = key === base ? '' : key.slice(base.length + 1);
-        return role === '' || role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role);
-    };
-
-    const refs: { ownerGaii: string; key: string }[] = [];
-    const deleted: { id: string; keys: number }[] = [];
-    const failed: { id: string; reason: string }[] = [];
-    // ONE value-free (ownerGaii, key) scan of the namespace: the delete needs only addresses. Falls
-    // back to a value scan only on a backend without the key-only primitive.
-    const nsPrefix = `${root}.${namespace}.`;
-    const nsKeys = storage.listMemoryKeysByPrefix
-        ? await storage.listMemoryKeysByPrefix(nsPrefix)
-        : (await storage.listAllMemory({ prefix: nsPrefix, limit: 100000 })).items.map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
-    const done = new Set<string>();
-    for (const rid of ids) {
-        if (done.has(rid)) continue;
-        done.add(rid);
-        const base = `${root}.${namespace}.${rid}`;
-        const family = nsKeys.filter(r =>
-            (r.key === base || r.key.startsWith(`${base}.`)) && roleOk(base, r.key)
-            && (r.ownerGaii === callerId || isSameOwner(r.ownerGaii, callerId)));
-        if (family.length === 0) { failed.push({ id: rid, reason: 'nothing to delete (or not owned by you)' }); continue; }
-        for (const r of family) refs.push({ ownerGaii: r.ownerGaii, key: r.key });
-        deleted.push({ id: rid, keys: family.length });
-    }
-
-    let removed = 0;
-    if (refs.length) {
-        if (storage.bulkBinMemory) removed = await storage.bulkBinMemory(refs, callerId);
-        else for (const r of refs) { if (await storage.deleteMemory(r.ownerGaii, r.key, callerId)) removed++; }
-    }
-    if (removed > 0) {
-        emitChange('organisms');
-        void updateOrganismStructure(storage, config, organismId, { event: `deleted ${deleted.length} record(s) in ${namespace}`, actor: callerId })
-            .catch(err => { logger.warn('deleteRecordsBatchOp: timeline best-effort', { error: String(err) }); });
-    }
-    return { ok: true, data: { deleted, failed, rows_removed: removed } };
-}
+// The batch delete moved to ./workspace-records-delete-op.ts (max-file-lines) and is re-exported for its importers.
+export { deleteRecordsBatchOp, BATCH_DELETE_MAX, type DeleteRecordsBatchArgs, type DeleteRecordsBatchData } from './workspace-records-delete-op.js';

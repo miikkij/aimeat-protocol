@@ -13,6 +13,7 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.4.0 — 2026-10-16 — The page frame token (services/page-frame-token.ts) is signed with the node keys too.
  *   v1.3.1 — 2026-10-16 — readKeyFileClaim's silent-catch exemption states its reason after `--`,
  *     which check:silent-catch now requires of every exemption (W25). Comment only.
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
@@ -55,6 +56,7 @@ import { initUploadTokenKeys } from '../services/upload-token.js';
 import { initConfirmTokenKeys } from '../services/operator-confirm.js';
 import { initDownloadTokenKeys } from '../services/download-token.js';
 import { initShareTokenKeys } from '../services/share-token.js';
+import { initPageFrameTokenKeys } from '../services/page-frame-token.js';
 import { initDraftTokenKeys } from '../services/draft-token.js';
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
@@ -419,6 +421,7 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
     initDownloadTokenKeys(privateKey, publicKey);
     initConfirmTokenKeys(privateKey, publicKey);
     initShareTokenKeys(privateKey, publicKey);
+    initPageFrameTokenKeys(privateKey, publicKey);
     initDraftTokenKeys(privateKey, publicKey);
     logger.info('Node keys initialized for JWT signing');
   } catch (err) {
