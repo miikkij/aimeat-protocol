@@ -11,6 +11,7 @@
  * @structure CompaniesTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'companies'.
  * @version-history
+ *   v2.1.0 — 2026-10-16 — The menu find opens one company here (useOpenItem, js/open-item.js).
  *   v2.0.0 — 2026-08-31 — The poster face (design canvas "AIMEAT Yritysten sivu", direction A).
  *     A row per company and a page behind it; the organism link reaches the page for the first
  *     time; the invoice and send counts come from the company-scoped finance and outbound reads.
@@ -28,6 +29,7 @@ import { useConfirm } from '/components/Modal.js';
 import * as api from '/js/services/companies.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
+import { useOpenItem } from '/js/open-item.js';
 import { buildSettingsPrompt, buildPortfolioPrompt, buildAppPrompt, buildCompaniesPrompt } from './companies-prompts.js';
 import { c, FIELDS } from './companies/frame.js';
 import { renderCover } from './companies/cover.js';
@@ -134,6 +136,8 @@ export default function CompaniesTab({ showToast, session }) {
   }, [companies, extras]);
 
   const back = useCallback(() => { setSelected(null); setEditingFacts(false); }, []);
+  // The menu find opens one company (js/open-item.js); open() needs the list, so it waits for it.
+  useOpenItem('companies', open, companies.length > 0);
 
   /* ── register ── */
 

@@ -12,6 +12,7 @@
  * @structure SkillsTab() — state (library, apps, orgs, details, filters, editor, picker) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'skills'
  * @version-history
+ *   v2.1.0 — 2026-10-16 — The menu find opens one of your skills here (useOpenItem, js/open-item.js).
  *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Taidot-sivu", direction A with the
  *     Kenelle column): three shelves with facets and search instead of three bare lists; the app
  *     and the agents a skill serves on every row; the opened row with the version-locked ref, the
@@ -25,6 +26,7 @@ import { useConfirm } from '/components/Modal.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
+import { useOpenItem } from '/js/open-item.js';
 import * as skillsService from '/js/services/skills.js';
 import { listApps } from '/js/services/apps.js';
 import { listAgents } from '/js/services/agents.js';
@@ -104,6 +106,11 @@ export default function SkillsTab({ session, showToast }) {
     if (!details[s.ref]) loadDetail(s);
   };
   const showFull = (s) => setFullText((m) => ({ ...m, [s.ref]: true }));
+  // The menu find opens one of your skills (js/open-item.js), by its ref; an open one stays open.
+  useOpenItem('skills', (ref) => {
+    const s = (library?.user || []).find((x) => x.ref === ref);
+    if (s && expanded !== s.ref) toggle(s);
+  }, library !== null);
 
   /* ── Doors ───────────────────────────────────────────────────────────────────────────────── */
   const download = async (s) => {

@@ -9,6 +9,8 @@
  * @structure OPERATOR_ENTRIES
  * @usage import { OPERATOR_ENTRIES } from './entries-operator.js';
  * @version-history
+ *   v1.3.0 — 2026-10-16 — menu-find: onSearchStart, busyNote and a group's byScore/max (the person's
+ *     own things in the find).
  *   v1.2.0 — 2026-10-14 — menu-find: the find field at the top of a side menu.
  *   v1.1.0 — 2026-09-27 — The seventeen new parts of the admin pages and the inner pages: readings,
  *     operator-menu, operator-frame, ask-page, solo-window, quick-find, pick-field, status-page-preview,
@@ -183,7 +185,7 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
         summary: 'The find field at the top of a side menu, and the narrowed menu under it. At rest it is the field (a small coral label, a glass, one heavy underline that turns coral while you are in it, and the / key as a chip) with the whole menu under it. Typing narrows the menu to the places whose name, other words or group match, in the menu\'s own order: the matched part underlined in coral, a place found by another word with that word in grey typewriter letters under it, the sections inside a page under their page with their number, the other side\'s places last under an ink slab, and the best fit chosen on the sun with ↩. ↑ and ↓ move the choice, Enter opens it, Escape clears; the / key anywhere outside a field moves into it. With nothing found it says so in a dashed coral aside and offers the content search.',
         module: '/components/MenuFind.js', sheet: '/css/components/menu-find.css',
         data: {
-            shape: 'MenuFind({ tone, label, placeholder, groups, other, otherTitle, hiddenNote, onOpen, onWake, onContentSearch, initialQuery, children })',
+            shape: 'MenuFind({ tone, label, placeholder, groups, other, otherTitle, hiddenNote, onOpen, onWake, onContentSearch, onSearchStart, busyNote, initialQuery, children })',
             fields: {
                 tone: 'settings (the paper side menu, default) | operator (the admin menu\'s ink)',
                 label: 'the small coral label over the field', placeholder: 'the field\'s grey words (two short examples)',
@@ -195,6 +197,9 @@ export const OPERATOR_ENTRIES: UiEntryWritten[] = [
                 onWake: 'called before the / key moves into the field (a phone opens the drawer the menu is in)',
                 onContentSearch: 'onContentSearch(words): the person asked to search the content when no place matched',
                 initialQuery: 'words already in the field when it appears (the design lab\'s demos)',
+                onSearchStart: 'called at the first letter of each search: the page reads what it searches besides its menu (the person\'s own agents, apps, shared places…)',
+                busyNote: 'the words while that reading runs, in the count line',
+                'groups[].byScore / max': 'a group of many things of one kind ("Yours") orders its rows by fit and shows at most `max`, the rest counted on one quiet line',
                 children: 'the menu as it is drawn while nothing is typed',
             },
         },
