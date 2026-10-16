@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-10-16 — aimeat_app_get says which apps it answers as not found (QA audit W15).
  *   v1.2.0 — 2026-10-12 — aimeat_app_delete says it deletes, and that only an earlier app backup brings
  *     the app back; it said archive (wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app-).
  *   v1.1.0 — 2026-10-06 — aimeat_app_publish and aimeat_app_draft_save are the one schema all three
@@ -88,7 +89,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_get',
-        description: 'Get one app\'s detail (manifest, current version number, size, mime type, whether access-protected, download count, `url` — the app\'s public web address to give a person — and the download/inline URLs) identified by its owner and filename. Find owner/filename via aimeat_app_list; for the list of prior versions use aimeat_app_manage { action: "versions" }.',
+        description: 'Get one app\'s detail (manifest, current version number, size, mime type, whether access-protected, download count, `url` — the app\'s public web address to give a person — and the download/inline URLs) identified by its owner and filename. Find owner/filename via aimeat_app_list; for the list of prior versions use aimeat_app_manage { action: "versions" }. An app you may not see is answered as not found: an app an operator hid, one behind an access code or an unlisted one shows only to its owner and an operator, and one listed to the community only to signed-in members of this node.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get App', readOnlyHint: true },

@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-16 — The access code, the operator hide and the pacing amount are read from the latest
+ *     version (currentAppRow) when an older version is asked for (QA audit F10a-01).
  *   2026-10-15 — A served version takes the app's current copy protection (servedProtection), not
  *     its own manifest's: updateAppMeta writes protection on the latest version only, and
  *     ?version=<older> served the source unprotected (feature-list audit #103).
@@ -114,7 +116,7 @@ import { appContentType } from '../../utils/app-content-type.js';
 import { detectLocale } from '../../i18n.js';
 import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.js';
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
-import { servedProtection } from '../../services/app-served-protection.js';
+import { currentAppRow } from '../../services/app-served-protection.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
@@ -493,6 +495,10 @@ export function registerReadRoutes(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}`));
             return;
         }
+        // The row whose settings decide the gates below: the latest version's, also when an older
+        // version is served. A publish writes an access code and a pacing amount on its new row only,
+        // so ?version=<older> answered without them (QA audit F10a-01).
+        const current = await currentAppRow(storage, app, version);
 
         // Operator-hidden apps are removed from public view entirely: only the
         // owner (who still manages it, badged) and operators may fetch it. Anyone
@@ -507,7 +513,7 @@ export function registerReadRoutes(
         const operatorReads = async (): Promise<boolean> => (operatorRead ??= await operatorOverride(
             storage, config, req.auth, { ownerOf: appOwnerName, area: 'app', action: 'read', subject: filename }));
 
-        if (app.operatorHidden) {
+        if (current.operatorHidden) {
             let isOwner = false;
             if (req.auth) {
                 const { owner: viewerOwner } = await canonicalOwner(req);
@@ -519,7 +525,7 @@ export function registerReadRoutes(
             }
         }
 
-        if (app.accessCode && app.accessCode !== code) {
+        if (current.accessCode && current.accessCode !== code) {
             // The code gates OTHER people, never the app's own owner or an operator: an
             // authenticated owner request (the catalog's Details/version/fork fetches carry a
             // Bearer) used to 403 here silently, dead-ending the owner on their own app
@@ -548,7 +554,7 @@ export function registerReadRoutes(
 
         // Paced app check: if the app store is on and the app has a pacing amount, require a valid
         // licence (the app taken once through POST /v1/app-store/purchase).
-        if (appIsPaced(config, app.manifest)) {
+        if (appIsPaced(config, current.manifest)) {
             // The anonymous identity (AIMEAT_ANONYMOUS_MODE) carries a req.auth, and it can hold no
             // licence, so it gets the 401 that tells a caller to sign in (secaudit 2026-10-10 C1).
             if (!req.auth || req.auth.anonymous) {
@@ -570,7 +576,7 @@ export function registerReadRoutes(
                 const hasLicense = await storage.hasValidLicense(caller, app.ownerGaii, filename, undefined, app.versionNumber);
                 if (!hasLicense) {
                     res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED',
-                        `This app has ${appToll(app.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase`));
+                        `This app has ${appToll(current.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase`));
                     return;
                 }
             }
@@ -617,8 +623,8 @@ export function registerReadRoutes(
         const foreignOrigin = !!here && (here.draft || here.target !== `${app.ownerName}/${app.filename}`);
         if (runnable && config.appOriginEnabled && config.appHost && (!req.appOrigin || foreignOrigin)) {
             const target = await appOriginUrl(config, storage, owner, filename);
-            const gated = !!app.accessCode
-                || appIsPaced(config, app.manifest);
+            const gated = !!current.accessCode
+                || appIsPaced(config, current.manifest);
             if (!gated) {
                 res.redirect(301, target);
                 return;
@@ -649,7 +655,7 @@ export function registerReadRoutes(
         }
 
         // The app's current protection, also for an older version (feature-list audit #103).
-        const protection = await servedProtection(storage, app, version);
+        const protection = current.manifest.protection;
 
         // Copy-protection `noRawDownload`: the owner can block the raw (attachment)
         // source download so the app is only delivered in runnable inline form. The
@@ -699,7 +705,7 @@ export function registerReadRoutes(
                 visibleLabel: {
                     config, locale,
                     // As the publish decides it: an access code or a park makes the app private.
-                    publiclyReadable: !app.accessCode && !app.parked,
+                    publiclyReadable: !current.accessCode && !current.parked,
                 },
                 // The named reviewer, when the account holder declared one: served in the head,
                 // and the visible content label is decided again with that declaration.

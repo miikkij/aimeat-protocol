@@ -1,5 +1,14 @@
-// E2E tests for app-catalog backup export + selective import
-// Run: cd aimeat && pnpm exec tsx test/e2e-apps-backup.ts
+/**
+ * @file e2e-apps-backup.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description E2E tests for app-catalog backup export + selective import.
+ *   Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-apps-backup
+ * @version-history
+ *   2026-10-16 — Hand-made backups: a new app keeps no operator's search approval, an appended version
+ *     keeps the live app's access code, and a cortex extension is rebuilt from its manifest in a
+ *     namespace the caller owns (QA audit F10b-01). Header added.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -403,6 +412,90 @@ await test('Restore with stale/foreign token → 400', async () => {
         body: JSON.stringify({ backup_token: inspBody.data.backup_token, selections: [{ filename: 'bk-app-a.html' }] }),
     }));
     assert(status === 400, `expected 400 for foreign token, got ${status}`);
+});
+
+// ─── Hand-made backups (QA audit F10b-01) ───
+// A restore wrote the ZIP's manifest and ext.json as they were: an operator's search approval, a new
+// row without the live app's access code, and a cortex record in somebody else's namespace.
+console.log('\nHand-made backups');
+
+const forgedZip = async (opts: {
+    apps?: Array<{ filename: string; manifest: Record<string, unknown> }>;
+    exts?: Array<{ name: string; record: Record<string, unknown> }>;
+}) => {
+    const entries: Array<{ name: string; content: Buffer | string }> = [{
+        name: 'backup-manifest.json',
+        content: JSON.stringify({
+            aimeatAppsBackup: '1.0', exportedAt: new Date().toISOString(), source: { nodeId: 'elsewhere', owner: owner2 },
+            apps: (opts.apps ?? []).map(a => ({ filename: a.filename })), extensions: (opts.exts ?? []).map(x => ({ name: x.name })),
+        }),
+    }];
+    for (const a of opts.apps ?? []) {
+        const body = html(`forged ${a.filename}`);
+        entries.push({ name: `apps/${a.filename}/app.json`, content: JSON.stringify({ filename: a.filename, name: a.filename, versions: [{ version: 1, file: 'versions/v1.html', mimeType: 'text/html', size: body.length, createdAt: new Date().toISOString(), manifest: a.manifest }] }) });
+        entries.push({ name: `apps/${a.filename}/versions/v1.html`, content: body });
+    }
+    for (const x of opts.exts ?? []) entries.push({ name: `extensions/${x.name}/ext.json`, content: JSON.stringify(x.record) });
+    return (await buildZip(entries)).toString('base64');
+};
+const restoreAs = (t: string, zip: string, body: Record<string, unknown>) =>
+    json('/v1/apps/backup/restore', authed({ method: 'POST', body: JSON.stringify({ zip_base64: zip, ...body }) }, t));
+const baseManifest = { description: 'forged', version: '1.0.0', category: 'tool', tags: [], authorDisplay: 'someone', usesCortex: [] };
+
+await test('A restored new app keeps the owner\'s search switch but no operator\'s approval', async () => {
+    const zip = await forgedZip({ apps: [{ filename: 'bk-forged.html', manifest: { ...baseManifest, name: 'Forged', seo: { index: true, approvedBy: 'someoperator', approvedAt: '2026-01-01T00:00:00.000Z' } } }] });
+    const { status, body } = await restoreAs(token2, zip, { selections: [{ filename: 'bk-forged.html' }] });
+    assert(status === 200 && body.data.apps_created.includes('bk-forged.html'), `restore: ${status} ${JSON.stringify(body.data ?? body.error)}`);
+    const list = await json('/v1/apps?own=true&limit=200', authed({}, token2));
+    const app = (list.body.data.apps as any[]).find(a => a.filename === 'bk-forged.html');
+    assert(!!app, 'the restored app is listed for its owner');
+    assert(app.seo?.index === true, `the owner's own switch is kept: ${JSON.stringify(app.seo)}`);
+    assert(!app.seo?.approvedBy && !app.seo?.approved_by, `an operator's approval came in from the ZIP: ${JSON.stringify(app.seo)}`);
+});
+
+await test('A version appended onto an access-coded app keeps the code', async () => {
+    const pub = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: 'bk-coded.html', content: Buffer.from(html('coded v1')).toString('base64'), name: 'Coded', description: 'Backup/restore test app: coded.', access_code: 'bk-code-5678' }),
+    }, token2));
+    assert(pub.status === 201, `publish coded: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+    const zip = await forgedZip({ apps: [{ filename: 'bk-coded.html', manifest: { ...baseManifest, name: 'Coded' } }] });
+    const { status, body } = await restoreAs(token2, zip, { selections: [{ filename: 'bk-coded.html', conflict: 'append' }] });
+    assert(status === 200 && body.data.apps_appended.includes('bk-coded.html'), `append: ${status} ${JSON.stringify(body.data ?? body.error)}`);
+    // A visitor with no account: the first owner of this suite is the node's operator, who opens coded apps.
+    const outsider = await fetch(`${BASE}/v1/apps/${owner2}/bk-coded.html`);
+    assert(outsider.status === 403, `the appended version opened without the code: ${outsider.status}`);
+    const withCode = await fetch(`${BASE}/v1/apps/${owner2}/bk-coded.html?code=bk-code-5678`);
+    assert(withCode.status === 200, `the code opens it: ${withCode.status}`);
+});
+
+const cortexYaml = (name: string, namespace: string) => [
+    'apiVersion: cortex.aimeat.org/v1', 'kind: Extension', 'metadata:', `  name: ${name}`, `  namespace: ${namespace}`,
+    'spec:', '  version: "1.0.0"', '  description: "Restore fixture"', '  components:',
+    '    - type: schema', '      name: shape', `      key_pattern: "${name}:*"`, '      apply_to: prefix',
+    '      schema:', '        type: object',
+].join('\n') + '\n';
+const extRecord = (name: string, namespace: string) => ({
+    name, namespace, shortName: name, apiVersion: 'cortex.aimeat.org/v1', version: '1.0.0', description: 'x', author: 'x',
+    tags: [], labels: {}, status: 'active', visibility: 'private', installedAt: new Date().toISOString(), installedBy: owner,
+    manifest: cortexYaml(name, namespace), components: [],
+    activationArtifacts: { schemaKeys: [], promptKeys: [], actionIds: [], boardIds: [], seedDataKeys: [], ontologyKeys: [], libFiles: [] },
+});
+
+await test('A restored cortex extension in another owner\'s namespace is refused; one in the backup owner\'s own is filed under the caller', async () => {
+    const foreign = `bkfx${Date.now() % 100000}`;
+    const own = `bkox${Date.now() % 100000}`;
+    const zip = await forgedZip({ exts: [{ name: foreign, record: extRecord(foreign, owner) }, { name: own, record: extRecord(own, owner2) }] });
+    const { status, body } = await restoreAs(token2, zip, { selections: [], extensions: [{ name: foreign }, { name: own }] });
+    assert(status === 200, `restore: ${status} ${JSON.stringify(body.error)}`);
+    assert(!body.data.extensions_created.includes(foreign), `the foreign namespace was restored: ${JSON.stringify(body.data)}`);
+    assert(body.data.errors.some((e: any) => e.item === foreign && String(e.message).startsWith('NAMESPACE_DENIED')), `no NAMESPACE_DENIED: ${JSON.stringify(body.data.errors)}`);
+    assert(body.data.extensions_created.includes(own), `the caller's own extension: ${JSON.stringify(body.data)}`);
+    const got = await json(`/v1/cortex/${encodeURIComponent(own)}`, authed({}, token2));
+    const ext = got.body.data?.extension ?? got.body.data;
+    assert(ext?.namespace === owner2, `namespace: ${JSON.stringify(ext?.namespace)}`);
+    assert(Array.isArray(ext?.components) && ext.components.length === 1, `components come from the manifest, not from ext.json: ${JSON.stringify(ext?.components)}`);
+    await json(`/v1/cortex/${encodeURIComponent(own)}`, authed({ method: 'DELETE' }, token2));
 });
 
 // ─── Cleanup ───

@@ -16,6 +16,9 @@
  * @structure registerPublicReadRoute(router, ctx)
  * @usage registerPublicReadRoute(router, ctx);   // from registerKeyRoutes, last
  * @version-history
+ *   2026-10-16 — A record that is not public needs memory:read from a signed-in caller that is not
+ *     the account holder in person: an app grant (whose identity is its owner's GHII) or an agent
+ *     without the word gets 403 SCOPE_DENIED (QA audit S3-03).
  *   v1.1.2 — 2026-10-05 — The public and members reads audit the resolved reader (accessorGaii), not
  *     the raw `sub`, so an owner session's audit row names the full identity (secaudit 2026-10, CHK-1).
  *   v1.1.1 — 2026-09-30 — The CLASSIFIED refusal is refuseClassified(): a plain sentence and the way
@@ -35,6 +38,8 @@ import { shareCarriesKey } from '../../services/group-shares-classification.js';
 import { ownDoorRefusal } from '../../utils/own-door-keys.js';
 import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import { type MemoryRouteCtx, visibilityToZone } from './shared.js';
+import { callerOf } from '../../middleware/caller.js';
+import { denyScope403 } from '../../auth/deny.js';
 
 export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, stats, resolve } = ctx;
@@ -84,6 +89,17 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
       return true;
     };
 
+    // A signed-in caller that is not the account holder in person reads a record that is not public
+    // only with memory:read, the word every other memory read asks. An app grant resolves to its
+    // owner's GHII, so authorizeRead answers `owner` for it, and an app granted one unrelated word
+    // read the owner's private records by key here (QA audit S3-03). Public records need no word.
+    const refuseWithoutReadWord = (): boolean => {
+      if (callerOf(req, config.nodeId, storage).has('memory:read')) return false;
+      denyScope403(req, res, ['memory:read'],
+        'Reading a record that is not public needs the "memory:read" scope. Ask the owner to grant it, or read only public records.');
+      return true;
+    };
+
     // WHO MAY READ IT is decided first, on the stored record's visibility; the classification reader
     // runs below, only for a reader admitted here, so an outsider leaves no classification audit row
     // in the owner's log (TARGET-082 review).
@@ -105,6 +121,7 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
       // true) for unauthenticated visitors, so a bare req.auth truthiness gate would leak members
       // records to everyone. Anonymous behaves like other non-public records: a miss.
       if (!req.auth || req.auth.anonymous === true) { miss(); return; }
+      if (refuseWithoutReadWord()) return;
       await authorizeRead(storage, config, {
         ownerGaii: stored.ownerGaii,
         accessorGaii,
@@ -117,6 +134,7 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
     } else {
       // Non-public data: if consent is not enabled, fall back to old behavior (404)
       if (!config.consentEnabled) { miss(); return; }
+      if (!isAnonymousReader && refuseWithoutReadWord()) return;
       // Non-public data with consent enabled: shared guard decides + audits the attempt. For a
       // 'workspace' record the guard runs canReadWorkspace(record.workspaceRef) — thread the ref + the
       // accessor's sub/owner so a workspace member is recognised (parity with the storage-file /v1/pub path).

@@ -45,6 +45,8 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-10-16 — activateCortex asks activationRefusal first and answers its status and code, so a
+ *     schema lock another account holds refuses the activation before any write (QA audit S7-01).
  *   v1.7.0 — 2026-09-26 — removeCortex deletes the seed records under every principal of the installing
  *     account: under the bare account name as before, and under its GHII, agents and ecosystem apps
  *     where the record carries this cortex's seed tags, so a record of the person's own under the
@@ -82,7 +84,7 @@ import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '
 import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
 import { cortexInstallRefusal } from './install-quotas.js';
 import { emitChange } from './event-bus.js';
-import { activateExtension, deactivateExtension, type CortexActor } from '../routes/cortex/activation.js';
+import { activateExtension, activationRefusal, deactivateExtension, type CortexActor } from '../routes/cortex/activation.js';
 import { refreshCortexDependencies, forgetDependencies } from './dependency-map.js';
 import { snapshotCortexVersion, forgetVersions } from './component-versions.js';
 import { accountPrincipals } from './db/owner-identity.js';
@@ -376,6 +378,11 @@ export async function activateCortex(
         emitChange('cortex');
         return { ok: true, value: { extension: ext, activatedAt: ext.activatedAt, alreadyActive: true } };
     }
+
+    // Refused here with its status and code, before anything is written: activateExtension asks the
+    // same question again and can only throw (QA audit S7-01, the schema lock rule).
+    const refused = await activationRefusal(ext, config, storage, caller.gaii, caller.isOperator);
+    if (refused) return refuse(refused.status, refused.code, refused.message);
 
     const artifacts = await activateExtension(ext, config, storage, caller, caller.isOperator);
     const activatedAt = new Date().toISOString();

@@ -17,6 +17,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-namespaces
  * @version-history
+ *   2026-10-16 — An agent without memory:read is refused its owner's owner-visibility record on GET
+ *     /v1/memory/:gaii/:key; an agent holding the word reads it (QA audit S3-03).
  *   2026-10-15 — "the agent CAN read it with ?owner_scope=true" asserted the hole: an agent holding
  *     memory:read read the owner's private record. Now it is 404 without memory:read-as-owner on REST
  *     read, list, count, ?agent=, search and the MCP read, a sibling's owner-visible record is still
@@ -729,6 +731,28 @@ async function main() {
             body: JSON.stringify({ key: 'nstest.contacts.alice@example.com', value: { name: 'Alice' } }),
         });
         assert(email.status === 201, `an email address in another key: ${email.status} ${JSON.stringify(email.body)}`);
+    });
+
+    // ── The by-identity read asks memory:read for a record that is not public (QA audit S3-03) ──
+    console.log('\nPhase: the by-identity read asks memory:read');
+    const OWNER_VIS_KEY = `nstest.ownervis.${Date.now() % 100000}`;
+    await test('an agent without memory:read is refused its owner\'s owner-visibility record by identity; nsbot with it reads it', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ key: OWNER_VIS_KEY, value: { word: 'ownervisible' }, visibility: 'owner' }),
+        });
+        assert(w.status === 201, `owner write: ${w.status} ${JSON.stringify(w.body)}`);
+        const ag = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: 'nsnoread', owner, capabilities: ['memory'], scopes: ['memory:write'] }),
+        });
+        assert(ag.status === 201, `register agent: ${ag.status} ${JSON.stringify(ag.body)}`);
+        const noRead = await getToken(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+        const path = `/v1/memory/${encodeURIComponent(ownerGhii())}/${encodeURIComponent(OWNER_VIS_KEY)}`;
+        const refused = await json(path, { headers: { Authorization: `Bearer ${noRead}` } });
+        assert(refused.status === 403, `expected 403 without memory:read, got ${refused.status}: ${JSON.stringify(refused.body).slice(0, 200)}`);
+        const read = await json(path, { headers: { Authorization: `Bearer ${agentToken}` } });
+        assert(read.status === 200 && read.body.data?.value?.word === 'ownervisible', `nsbot with memory:read: ${read.status} ${JSON.stringify(read.body).slice(0, 200)}`);
     });
 
 

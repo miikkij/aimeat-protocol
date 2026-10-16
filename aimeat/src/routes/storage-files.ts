@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — GET /v1/pub/:gaii/{key}: a file that is not public needs storage:read from a
+ *     signed-in caller that is not the account holder in person (QA audit S3-03).
  *   v1.2.0 -- 2026-10-05 -- Every classification read passes the file's workspace binding to fileTarget,
  *     so a workspace file is shown under its organism's classification (secaudit 2026-10, DATA-4).
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 2 (F11): presigned GET /v1/download/:token + storage
@@ -120,6 +122,8 @@ import { authorizeRead } from '../services/access-guard.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { callerOf } from '../middleware/caller.js';
+import { denyScope403 } from '../auth/deny.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { writeStorageFile, mintStorageUploadUrl, removeStorageFile, type StorageProvenanceInput } from '../services/storage-file-write.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
@@ -524,6 +528,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // anonymous identity, so gate it here — a token-less <img> must not read a members-only file.
         if (file.visibility === 'members' && isAnonymous) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            return;
+        }
+        // A signed-in caller that is not the account holder in person reads a file that is not
+        // public only with storage:read, the word GET /v1/storage/{key} asks. An app grant resolves
+        // to its owner's GHII, so authorizeRead answers `owner` for it, and an app granted one
+        // unrelated word read the owner's private files by key here (QA audit S3-03).
+        if (!isAnonymous && !callerOf(req, config.nodeId, storage).has('storage:read')) {
+            denyScope403(req, res, ['storage:read'],
+                'Reading a file that is not public needs the "storage:read" scope. Ask the owner to grant it, or read only public files.');
             return;
         }
         const result = await authorizeRead(storage, config, {

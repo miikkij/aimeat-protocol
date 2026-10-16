@@ -30,14 +30,14 @@
       "digest": "sha256:90f67577f4bed52222bc7fd5"
     },
     "node:aimeat-recurring-work": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-16",
       "watches": [
         "aimeat/src/services/schedule-gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:2bcf487e476cbdc2d9b02dea"
+      "digest": "sha256:a25963ba9be8f78ece453c39"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-02",
@@ -659,10 +659,10 @@
       "aimeat/scripts/locale-merge.ts": "e1c28235732aafa5"
     },
     "node:aimeat-recurring-work": {
-      "aimeat/src/services/schedule-gate.ts": "d10acbe327138c37",
+      "aimeat/src/services/schedule-gate.ts": "985289110e69d190",
       "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "2cc241d84ffad32b",
-      "aimeat/src/services/schedule-write.ts": "13ba30d4b9d1d111"
+      "aimeat/src/services/schedule-write.ts": "39fccaf66cdad7fe"
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",

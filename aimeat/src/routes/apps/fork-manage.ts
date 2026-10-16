@@ -6,6 +6,7 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — A fork of an older version reads the pacing amount of the latest version (QA audit F10a-01).
  *   2026-10-15 — Gate 2 of the fork asks the licence for the version it copies (feature-list audit #110).
  *   v1.10.0 — 2026-10-12 — PATCH takes `listing` (listed, community, unlisted) beside `parked`, and
  *     answers with it (services/app-settings.ts).
@@ -76,6 +77,7 @@ import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { operatorOverride } from '../../services/operator-override.js';
 import { appIsPaced, appToll } from '../../services/app-pacing.js';
+import { currentAppRow } from '../../services/app-served-protection.js';
 
 /** What PATCH /v1/apps/:filename answers when the body cannot be carried out, before it writes. */
 interface PatchRefusal { status: number; code: string; message: string; }
@@ -186,7 +188,10 @@ export function registerForkManageRoutes(
         const sameOwner = callerOwner === source.ownerName;
         // The operator check is asked only where one of the gates below would refuse a caller who is
         // not the owner, so the operator trail is written only for a fork that needed the override.
-        const paidSource = appIsPaced(config, source.manifest);
+        // The pacing amount is the latest version's, also when an older version is forked: a publish
+        // writes it on its new row only (QA audit F10a-01).
+        const current = await currentAppRow(storage, source, version);
+        const paidSource = appIsPaced(config, current.manifest);
         const isOperator = !sameOwner && (!!source.operatorHidden || !source.forkable || paidSource)
             && await operatorOverride(storage, config, req.auth, {
                 ownerOf: source.ownerName, area: 'app', action: 'fork', subject: sourceFilename,
@@ -213,7 +218,7 @@ export function registerForkManageRoutes(
             // The version copied: a single licence covers the version bought (feature-list audit #110).
             const hasLicense = await storage.hasValidLicense(ownerGhiiOf(callerGaii), source.ownerGaii, sourceFilename, undefined, source.versionNumber);
             if (!hasLicense) {
-                res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app has ${appToll(source.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase, then fork it.`));
+                res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app has ${appToll(current.manifest)} morsels of pacing. Take it first via POST /v1/app-store/purchase, then fork it.`));
                 return;
             }
         }

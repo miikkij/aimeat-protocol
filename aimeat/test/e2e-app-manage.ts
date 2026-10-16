@@ -17,6 +17,9 @@
  *   - Phase 4: grants, backup, cost, bundled agents, subdomains, cortex source
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-manage
  * @version-history
+ *   2026-10-16 — 5b, 6 and 6b: aimeat_app_get answers an unlisted or coded app only to the owner's and
+ *     the operator's agents, a community-listed app also to another member's agent, a listed app to
+ *     anyone (QA audit W15).
  *   v1.1.1 — 2026-10-06 — The agents hold catalogue:read, which aimeat_cortex_list asks since the
  *     secaudit 2026-10 follow-up (A4); test 20 measures the source refusal on an agent offered the list.
  *   v1.1.0 — 2026-09-27 — Phase 5: the ten old tool names answer TOOL_MOVED with the new call, on the node MCP server and through aimeat_invoke.
@@ -234,9 +237,33 @@ await test('5. settings hides the app, allows forking, sets an access code and r
     assert(!(list.body?.data?.apps ?? []).some((x: { filename: string }) => x.filename === APP), 'the public catalogue no longer lists it');
 });
 
+// QA audit W15: aimeat_app_get answered a hidden, coded or unlisted app to anyone the tool reached.
+await test('5b. aimeat_app_get answers the unlisted, coded app as not found to another owner\'s agent, and to the operator\'s agent', async () => {
+    const other = await callTool(sOther, 'aimeat_app_get', { owner: A.owner, filename: APP });
+    assert(other.isError && /not found/i.test(other.text), `another owner's agent read the hidden app: ${other.text.slice(0, 200)}`);
+    assert(!other.text.includes('Managed'), 'the refusal carries the app\'s name');
+    const op = await callTool(sOp, 'aimeat_app_get', { owner: A.owner, filename: APP });
+    assert(!op.isError && op.data.filename === APP, `the operator's agent with operator:admin: ${op.text.slice(0, 200)}`);
+});
+
 await test('6. settings with an empty access code clears it, and parked: false lists the app again', async () => {
     const r = await manage(s, { action: 'settings', filename: APP, access_code: '', parked: false });
     assert(!r.isError && r.data.protected === false && r.data.parked === false, `answer: ${r.text.slice(0, 300)}`);
+    const other = await callTool(sOther, 'aimeat_app_get', { owner: A.owner, filename: APP });
+    assert(!other.isError && other.data.filename === APP, `a listed app is everyone's: ${other.text.slice(0, 200)}`);
+});
+
+await test('6b. A community-listed app is answered to a member\'s agent; behind an access code it is the owner\'s again', async () => {
+    const c = await manage(s, { action: 'settings', filename: APP, listing: 'community' });
+    assert(!c.isError, `community listing: ${c.text.slice(0, 200)}`);
+    const member = await callTool(sOther, 'aimeat_app_get', { owner: A.owner, filename: APP });
+    assert(!member.isError && member.data.listing === 'community', `a member's agent reads a community app: ${member.text.slice(0, 200)}`);
+    const coded = await manage(s, { action: 'settings', filename: APP, listing: 'listed', access_code: 'second-code' });
+    assert(!coded.isError, `code: ${coded.text.slice(0, 200)}`);
+    const refused = await callTool(sOther, 'aimeat_app_get', { owner: A.owner, filename: APP });
+    assert(refused.isError && /not found/i.test(refused.text), `a coded app is the owner's: ${refused.text.slice(0, 200)}`);
+    const back = await manage(s, { action: 'settings', filename: APP, access_code: '' });
+    assert(!back.isError, `clear: ${back.text.slice(0, 200)}`);
 });
 
 await test('7. Another owner\'s agent cannot change the app; the service refuses it', async () => {

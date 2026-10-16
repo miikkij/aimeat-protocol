@@ -231,10 +231,10 @@
      "slug": "g-1-the-node-s-own-mcp-registry",
      "cells": [
       "<strong>The node's own MCP registry</strong>",
-      "The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Only the operator attaches a server node-wide: in person, or through their own agent holding <code>operator:admin</code>.",
+      "The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Only the operator attaches, changes or removes a node-wide server, in person or through their own agent holding <code>operator:admin</code>.",
       "<code>POST /v1/mcp-servers/node</code> · <code>PATCH /v1/mcp-servers/node/{id}</code> · <code>aimeat_mcp_registry_list</code> · <code>aimeat_mcp_registry_set</code>"
      ],
-     "plain": "The node's own MCP registry The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Only the operator attaches a server node-wide: in person, or through their own agent holding operator:admin. POST /v1/mcp-servers/node · PATCH /v1/mcp-servers/node/{id} · aimeat_mcp_registry_list · aimeat_mcp_registry_set"
+     "plain": "The node's own MCP registry The operator can attach a server for everyone with an account or for named owners only, and set a price per call. No availability policy, or an empty allowlist, offers it to nobody. A price is in money only: morsels pace how much gets used and are never a price, so a morsel price is refused. Proxied calls cannot take payment yet, so a server with a money price refuses its calls by name until they can; leave it free for now. Only the operator attaches, changes or removes a node-wide server, in person or through their own agent holding operator:admin. POST /v1/mcp-servers/node · PATCH /v1/mcp-servers/node/{id} · aimeat_mcp_registry_list · aimeat_mcp_registry_set"
     },
     {
      "slug": "g-1-a-server-that-belongs-to-a-team",
@@ -750,10 +750,10 @@
      "slug": "g-5-schema-locking",
      "cells": [
       "<strong>Schema locking</strong>",
-      "Lock a key to a JSON Schema; every later write must validate, a copy from another identity included.",
-      "<code>/v1/schemas</code>"
+      "Lock a key to a JSON Schema; every later write must validate, a copy from another identity included. A lock applies to every account, so the node limits who sets which: a pattern that would reach every key is the operator's, an organism's records are locked by its admins or the workspace's creator, and nobody replaces or sits beside another account's lock. Removing a lock removes only that one, and a cortex activation asks the same rule.",
+      "<code>/v1/schemas</code>, <code>PUT</code>/<code>DELETE /v1/memory/{key}/schema</code>"
      ],
-     "plain": "Schema locking Lock a key to a JSON Schema; every later write must validate, a copy from another identity included. /v1/schemas"
+     "plain": "Schema locking Lock a key to a JSON Schema; every later write must validate, a copy from another identity included. A lock applies to every account, so the node limits who sets which: a pattern that would reach every key is the operator's, an organism's records are locked by its admins or the workspace's creator, and nobody replaces or sits beside another account's lock. Removing a lock removes only that one, and a cortex activation asks the same rule. /v1/schemas, PUT/DELETE /v1/memory/{key}/schema"
     },
     {
      "slug": "g-5-search",
@@ -1401,10 +1401,10 @@
      "slug": "g-8-schedules",
      "cells": [
       "<strong>Schedules</strong>",
-      "Schedule an extension action, an AI completion, an agent task, a connected ecosystem capability or publication to your own connected account. The server keeps the clock after you disconnect. Managed schedules can be edited, paused, resumed, triggered now or removed; removing one stops future fires and leaves existing tasks intact. You manage all your schedules; your agents manage each other's; an app manages only the schedules it made itself.",
+      "Schedule an extension action, an AI completion, an agent task, a connected ecosystem capability or publication to your own connected account. The server keeps the clock after you disconnect. Managed schedules can be edited, paused, resumed, triggered now or removed; removing one stops future fires and leaves existing tasks intact. You manage all your schedules; your agents manage each other's; an app manages only the schedules it made itself. Changing or running a schedule asks the same permission as creating it, for example <code>ai:use</code> for an AI schedule; pausing it asks none.",
       "<code>/v1/schedules</code>, <code>aimeat_schedule_*</code> (extension, AI and agent-task creation)"
      ],
-     "plain": "Schedules Schedule an extension action, an AI completion, an agent task, a connected ecosystem capability or publication to your own connected account. The server keeps the clock after you disconnect. Managed schedules can be edited, paused, resumed, triggered now or removed; removing one stops future fires and leaves existing tasks intact. You manage all your schedules; your agents manage each other's; an app manages only the schedules it made itself. /v1/schedules, aimeat_schedule_* (extension, AI and agent-task creation)"
+     "plain": "Schedules Schedule an extension action, an AI completion, an agent task, a connected ecosystem capability or publication to your own connected account. The server keeps the clock after you disconnect. Managed schedules can be edited, paused, resumed, triggered now or removed; removing one stops future fires and leaves existing tasks intact. You manage all your schedules; your agents manage each other's; an app manages only the schedules it made itself. Changing or running a schedule asks the same permission as creating it, for example ai:use for an AI schedule; pausing it asks none. /v1/schedules, aimeat_schedule_* (extension, AI and agent-task creation)"
     },
     {
      "slug": "g-8-scheduler-calendar-and-agent-schedules",
@@ -1991,10 +1991,10 @@
      "slug": "g-10-listing-and-access-codes",
      "cells": [
       "<strong>Listing and access codes</strong>",
-      "Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. The link opens the app in all three. Set, change or remove an access code for opening the app.",
+      "Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. The link opens the app in all three. Set, change or remove an access code for opening the app. The code, the pacing amount and the copy protection you set now apply to every earlier version too. An AI asking for an app's details (<code>aimeat_app_get</code>) gets them only for an app it may see; any other app is answered as not found.",
       "<code>PATCH /v1/apps/:filename</code> (<code>listing</code>), <code>aimeat_app_manage</code> action <code>settings</code>, App Catalog &gt; Manage on server"
      ],
-     "plain": "Listing and access codes Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. The link opens the app in all three. Set, change or remove an access code for opening the app. PATCH /v1/apps/:filename (listing), aimeat_app_manage action settings, App Catalog > Manage on server"
+     "plain": "Listing and access codes Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. The link opens the app in all three. Set, change or remove an access code for opening the app. The code, the pacing amount and the copy protection you set now apply to every earlier version too. An AI asking for an app's details (aimeat_app_get) gets them only for an app it may see; any other app is answered as not found. PATCH /v1/apps/:filename (listing), aimeat_app_manage action settings, App Catalog > Manage on server"
     },
     {
      "slug": "g-10-screenshots-icons-and-promotion",
@@ -2009,10 +2009,10 @@
      "slug": "g-10-backup-and-restore",
      "cells": [
       "<strong>Backup and restore</strong>",
-      "Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose.",
+      "Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose. A restore applies the checks a publish and an install apply: your app limit, the access code and settings of the app it adds to, and your own namespace for an extension.",
       "<code>/v1/apps/backup</code> (with <code>?to=storage</code> an agent holding app:write writes the ZIP to private storage), <code>aimeat_app_manage</code> action <code>backup_export</code>; restoring is the owner's own act in App Catalog"
      ],
-     "plain": "Backup and restore Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose. /v1/apps/backup (with ?to=storage an agent holding app:write writes the ZIP to private storage), aimeat_app_manage action backup_export; restoring is the owner's own act in App Catalog"
+     "plain": "Backup and restore Download a ZIP of every version of your apps and your own cortex extensions, inspect it, restore what you choose. A restore applies the checks a publish and an install apply: your app limit, the access code and settings of the app it adds to, and your own namespace for an extension. /v1/apps/backup (with ?to=storage an agent holding app:write writes the ZIP to private storage), aimeat_app_manage action backup_export; restoring is the owner's own act in App Catalog"
     },
     {
      "slug": "g-10-search-engines-only-if-you-say-so",

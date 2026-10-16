@@ -8,6 +8,7 @@
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   2026-10-16 — A fork of an older version reads the pacing amount of the latest version (QA audit F10a-01).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-15 — Gate 2 asks the licence for the version it copies (feature-list audit #110).
  *   v1.2.0 — 2026-10-11 — Gate 2 reads the app's pacing amount (`tollMorsels`; a morsel is pacing, not
@@ -33,6 +34,7 @@ import { forkApp, resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { logger } from '../utils/logger.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { appIsPaced, appToll } from '../services/app-pacing.js';
+import { currentAppRow } from '../services/app-served-protection.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerAppForkTool(
@@ -70,11 +72,13 @@ export function registerAppForkTool(
             // Gate 2 — a paced source's bytes are not copied before the app is taken. A licence is
             // keyed on the buyer's OWNER GHII (app-store.ts), so it is asked of ownerGhiiOf(agentGaii),
             // the coordinate POST .../fork asks; an agent's own GAII holds no receipt.
-            if (appIsPaced(config, source.manifest) && !sameOwner) {
+            // The pacing amount is the latest version's, also for an older version (QA audit F10a-01).
+            const current = await currentAppRow(storage, source, version);
+            if (appIsPaced(config, current.manifest) && !sameOwner) {
                 // The version copied: a single licence covers the version bought (feature-list audit #110).
                 const hasLicense = await storage.hasValidLicense(ownerGhiiOf(agentGaii), source.ownerGaii, filename, undefined, source.versionNumber);
                 if (!hasLicense) {
-                    return { content: [{ type: 'text' as const, text: `This app has ${appToll(source.manifest)} morsels of pacing. Take it first (POST /v1/app-store/purchase), then fork it.` }], isError: true };
+                    return { content: [{ type: 'text' as const, text: `This app has ${appToll(current.manifest)} morsels of pacing. Take it first (POST /v1/app-store/purchase), then fork it.` }], isError: true };
                 }
             }
 

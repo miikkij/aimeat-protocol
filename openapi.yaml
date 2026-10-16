@@ -22996,7 +22996,9 @@ paths:
         Tier-1 "librarian" retrieval — one ranked full-text query (SQLite FTS5 / MongoDB $text)
         fanned across every identity the caller owns (GHII + agents + ecosystem apps), so it reaches
         every organism they have contributed to plus their personal memory. Returns ranked,
-        snippeted, organism-annotated hits to pick from.
+        snippeted, organism-annotated hits to pick from. Without `memory:read` an agent's search stays
+        inside its own namespace; an app grant without it is refused with 403 SCOPE_DENIED on
+        scope=own, because its own identity is its owner's GHII. scope=public needs no scope.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -24123,6 +24125,10 @@ paths:
         of that organism, whether a group share or the record's own visibility (`public`, `members`)
         let them in, answers 403 CLASSIFIED with `details.label` when its classification keeps it
         inside its organism. An AI shown a warning-classified record gets `classificationWarning`.
+
+        A record that is not public needs the `memory:read` scope from a signed-in caller that is
+        not the account holder in person: an app grant (whose identity is its owner's GHII) or an
+        agent without the word gets 403 SCOPE_DENIED. Public records need no scope.
       tags: [Memory]
       parameters:
         - name: gaii
@@ -32402,6 +32408,10 @@ paths:
         session, so that grant is the whole check it makes; a gated app requested there without one
         answers the same `404` an unmapped subdomain does. Ungated apps keep the plain `301`.
 
+        **Older versions (`?version=N`):** the gates are the app's current settings, read from the
+        latest version: its access code, its operator hide, its pacing amount and its copy
+        protection apply to every version served, also one published before the setting was made.
+
         Since 2026-08-15 that `404` has a door in it for people, because the app origin is the
         address they hold: a **browser** (`Accept: text/html`) meeting a **code**-gated app there
         with no usable grant is sent back here with `302 …?mode=inline&unlock=1`, which is the code
@@ -35419,7 +35429,15 @@ paths:
         extensions into the CALLER's account. Per-app conflict mode when the
         app already exists — skip (default), append (backup versions stack on
         top as new versions) or copy (new filename with a -restored suffix).
-        Nothing is ever silently overwritten.
+        Nothing is ever silently overwritten. A new app (free name or copy) counts
+        against the per-owner app quota. An appended version keeps the live app's
+        access code, listing, forking, operator hide, search block and search
+        settings, as a publish does; a new app keeps the owner's search switches but
+        no operator's approval. An extension is rebuilt from its manifest under the
+        install checks: the manifest validates, the namespace is the caller's own
+        (the backup owner's name becomes the caller's), the cortex ceiling and the
+        library size limit hold, and every declared library is present. A refusal
+        is reported per item in `errors`, with its code at the start of the message.
       tags: [App Store]
       security:
         - BearerAuth: []
@@ -35786,7 +35804,18 @@ paths:
       summary: Set schema for a memory key pattern
       description: |
         Lock a memory key (or key prefix) to a JSON Schema. All future writes
-        to matching keys will be validated against this schema. Requires operator role.
+        to matching keys, by every account, are validated against this schema.
+        An account holder or the operator may set one, within these limits
+        (services/schema-lock-rule.ts):
+          - a pattern that starts with a wildcard, or a trailing-star pattern that
+            is not a `name:*` key family, reaches every account's keys: operator only
+            (403 SCHEMA_PATTERN_NODE_WIDE);
+          - a pattern under `organism.<id>.` is set by the organism's admins, the
+            workspace's creator, or the member whose namespace it is
+            (403 SCHEMA_PATTERN_NOT_YOURS); a wildcard organism id is operator only;
+          - the same pattern locked by someone else, under either apply_to, or a key
+            another account's lock already governs, is refused
+            (403 SCHEMA_LOCKED_BY_OTHER) unless the operator overrides it.
       tags: [Schema]
       security:
         - BearerAuth: []
@@ -35882,7 +35911,11 @@ paths:
     delete:
       operationId: deleteMemorySchema
       summary: Remove schema from a memory key
-      description: Remove the schema lock from a memory key pattern. Requires operator role.
+      description: |
+        Remove one schema lock row: the (key pattern, apply_to) pair. Only the
+        principal that set it, or the operator, may remove it (403 NOT_SCHEMA_OWNER).
+        Without apply_to the exact lock is the row, else the prefix lock; the other
+        row of the same pattern, which may be another principal's, is left in place.
       tags: [Schema]
       security:
         - BearerAuth: []
@@ -35893,6 +35926,13 @@ paths:
           schema:
             type: string
           description: Memory key to unlock
+        - name: apply_to
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [exact, prefix]
+          description: Which row of the pattern to remove. Leave out for the exact row, or the prefix row when there is no exact one.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -47847,7 +47887,12 @@ paths:
         Materialises the cortex's components and answers with what it made (`artifacts`). Its
         actions are published under the caller's full identity, a person's GHII or an agent's GAII,
         and `artifacts.actionProvider` names that identity. GET /v1/cortex/{name} shows the same
-        record as `activation_artifacts`.
+        record as `activation_artifacts`. Each schema component is asked the rule
+        PUT /v1/memory/{key}/schema asks, before anything is written: a node-wide pattern
+        (403 SCHEMA_PATTERN_NODE_WIDE), another organism's namespace (403 SCHEMA_PATTERN_NOT_YOURS),
+        or a lock another account holds on, beside or above the pattern (403 SCHEMA_LOCKED_BY_OTHER)
+        refuses the activation. Deactivation removes only the lock rows the installing account
+        still holds.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -48986,6 +49031,9 @@ paths:
         `organism.{id}` grants resolve for active organism members. Denied reads are written to the
         consent audit log. An authenticated caller without access gets 403; anonymous/
         unauthenticated callers get 404 (file existence is hidden on public URLs).
+        A non-public file needs the `storage:read` scope from a signed-in caller that is not the
+        account holder in person: an app grant (whose identity is its owner's GHII) or an agent
+        without the word gets 403 SCOPE_DENIED.
         Supports wildcard keys with path separators.
 
         With `mode=handle` the response is a presigned, TTL-limited `download_url` plus metadata
@@ -53599,6 +53647,12 @@ paths:
       x-aimeat-scope: { word: 'workflow:write', enforcedIn: '4.0.0' }
       operationId: updateSchedule
       summary: Edit a schedule (cron, enabled/pause, timezone, constraints, input)
+      description: >
+        A caller that is not the owner in person holds the scope for what the schedule
+        drives, as on create (`ai:use` for an ai schedule, `task:write` for agent_task,
+        `connections:use` for connections-publish, the four refinery words), for any edit
+        but a pause or a change of display_name, description or purpose; without it the
+        answer is 403 SCOPE_DENIED.
       tags: [Schedules]
       security:
         - BearerAuth: []
@@ -53668,6 +53722,10 @@ paths:
         reached), or `error` (the job ran but failed; `data.reason` has the
         message). A manual run only defers to a genuinely running (active/stalled)
         occurrence — a paused/queued/archived one no longer blocks it.
+        A caller that is not the owner in person also holds the scope for what the
+        schedule drives, as on create (`ai:use` for an ai schedule, `task:write` for
+        agent_task, `connections:use` for connections-publish, the four refinery words);
+        without it the answer is 403 SCOPE_DENIED.
       tags: [Schedules]
       security:
         - BearerAuth: []

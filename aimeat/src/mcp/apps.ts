@@ -11,6 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-16 — aimeat_app_get applies the app visibility rule (services/app-visibility.ts): a hidden,
+ *     access-coded or unlisted app is the owner's and an operator's, a community-listed app also a
+ *     member's of this node; anyone else gets the not-found answer (QA audit W15).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-12 — aimeat_app_list and aimeat_app_get carry `listing` (listed, community, unlisted), and
  *     aimeat_app_list returns the apps other owners listed to the node's members.
@@ -133,6 +136,8 @@ import { loadServedProvenance } from '../services/ai-provenance-marks.js';
 import { registerAppForkTool } from './apps-fork.js';
 import { presentAppManifest } from '../services/app-pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { mayViewApp } from '../services/app-visibility.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -141,6 +146,8 @@ export function registerAppsTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's caller (register-all.ts): who asks, for the app visibility rule of aimeat_app_get. */
+    caller?: () => CallerContext,
 ): void {
 
     /**
@@ -595,7 +602,14 @@ export function registerAppsTools(
         annotationsFor('aimeat_app_get'),
         async ({ owner, filename }) => {
             const app = await storage.getAppByOwnerName(owner, filename);
-            if (!app) {
+            // An app the caller may not see (hidden, behind an access code, unlisted, or listed to this
+            // node's members for a caller who is not one) is answered as absent, as the app read routes
+            // answer it (services/app-visibility.ts; QA audit W15).
+            const session = caller?.();
+            const viewer = session
+                ? { ownerName: session.owner, member: session.kind !== 'anonymous' && !session.visitor, auth: session.auth }
+                : null;
+            if (!app || !(await mayViewApp(storage, config, viewer, app, 'detail'))) {
                 return { content: [{ type: 'text' as const, text: `App "${filename}" not found for owner "${owner}"` }], isError: true };
             }
 

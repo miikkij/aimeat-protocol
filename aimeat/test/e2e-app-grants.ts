@@ -8,6 +8,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
+ *   2026-10-16 -- A catalogue:read app is refused the owner's private record by GET /v1/memory/:gaii/:key,
+ *     the private file by GET /v1/pub/:gaii/{key} (QA audit S3-03) and the owner's memory by GET
+ *     /v1/librarian/search (F05b-01); an app holding memory:read or storage:read still reads them.
  *   v1.5.0 -- 2026-10-12 -- Phase 5b plants the owner's AI key through PUT /v1/ai/providers/:id/key,
  *     the route node 4.0.0 keeps, and checks the record it lands in (ai.apikey.provider.<id>) on every
  *     door; on 3.x a second key goes through PUT /v1/openrouter/settings as well, since an upgraded
@@ -421,6 +424,65 @@ async function main() {
             body: JSON.stringify({ visibility: 'public' }),
         });
         assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    });
+
+    // ── The by-identity reads (QA audit S3-03) and the librarian search (F05b-01) ──
+    // The same hole on three more routes: GET /v1/memory/:gaii/:key and GET /v1/pub/:gaii/{key} asked
+    // no word, and authorizeRead answers `owner` for a token whose identity is the owner's GHII; the
+    // librarian search narrowed an app without memory:read to "its own" records, which are the owner's.
+    const ownerGhiiEnc = encodeURIComponent(`${owner}@${NODE_ID}`);
+    const PRIVATE_KEY = `s303.private.${Date.now() % 100000}`;
+    const PRIVATE_FILE = `s303-private-${Date.now() % 100000}.txt`;
+    const PUBLIC_KEY = `s303.public.${Date.now() % 100000}`;
+    await test('setup: the owner writes a private record, a public record and a private file', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ key: PRIVATE_KEY, value: { word: 'zebrafinch' }, visibility: 'private' }),
+        });
+        assert(w.status === 201 || w.status === 200, `private record: ${w.status} ${JSON.stringify(w.body.error)}`);
+        const p = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ key: PUBLIC_KEY, value: { word: 'public' }, visibility: 'public' }),
+        });
+        assert(p.status === 201 || p.status === 200, `public record: ${p.status} ${JSON.stringify(p.body.error)}`);
+        const f = await json('/v1/storage', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ key: PRIVATE_FILE, data: b64('private bytes'), mime_type: 'text/plain', visibility: 'private' }),
+        });
+        assert(f.status === 201, `private file: ${f.status} ${JSON.stringify(f.body.error)}`);
+    });
+
+    await test('app without memory:read is refused the owner\'s private record by GET /v1/memory/:gaii/:key (S3-03)', async () => {
+        const r = await json(`/v1/memory/${ownerGhiiEnc}/${encodeURIComponent(PRIVATE_KEY)}`, { headers: { Authorization: `Bearer ${narrowToken}` } });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+        assert(!JSON.stringify(r.body).includes('zebrafinch'), 'the private value leaked in the refusal');
+    });
+
+    await test('app without memory:read still reads a PUBLIC record by identity', async () => {
+        const r = await json(`/v1/memory/${ownerGhiiEnc}/${encodeURIComponent(PUBLIC_KEY)}`, { headers: { Authorization: `Bearer ${narrowToken}` } });
+        assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    });
+
+    await test('app without storage:read is refused the owner\'s private file by GET /v1/pub/:gaii/{key} (S3-03)', async () => {
+        const r = await json(`/v1/pub/${ownerGhiiEnc}/${PRIVATE_FILE}`, { headers: { Authorization: `Bearer ${narrowToken}` } });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    });
+
+    await test('app without memory:read is refused the owner\'s memory by GET /v1/librarian/search (F05b-01)', async () => {
+        const r = await json('/v1/librarian/search?q=zebrafinch', { headers: { Authorization: `Bearer ${narrowToken}` } });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+        assert(!JSON.stringify(r.body).includes(PRIVATE_KEY), 'the private key leaked in the refusal');
+    });
+
+    await test('apps WITH the words still read: memory:read by identity and search, storage:read the file', async () => {
+        const mem = (await grantAppToken('memory:read')).access_token as string;
+        const r = await json(`/v1/memory/${ownerGhiiEnc}/${encodeURIComponent(PRIVATE_KEY)}`, { headers: { Authorization: `Bearer ${mem}` } });
+        assert(r.status === 200 && r.body.data?.value?.word === 'zebrafinch', `memory:read by identity: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+        const s = await json('/v1/librarian/search?q=zebrafinch', { headers: { Authorization: `Bearer ${mem}` } });
+        assert(s.status === 200, `memory:read search: ${s.status} ${JSON.stringify(s.body).slice(0, 200)}`);
+        const sto = (await grantAppToken('storage:read')).access_token as string;
+        const f = await fetch(`${BASE}/v1/pub/${ownerGhiiEnc}/${PRIVATE_FILE}`, { headers: { Authorization: `Bearer ${sto}` } });
+        assert(f.status === 200 && (await f.text()) === 'private bytes', `storage:read file: ${f.status}`);
     });
 
     await test('the OWNER is unaffected by the new scope gates (export still 200)', async () => {

@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-10-16 -- aimeat_app_get answers an app behind an access code only to its owner, as the node's MCP tool does (QA audit W15).
  *   v1.12.0 -- 2026-10-12 -- aimeat_app_delete says it deletes, as the code does; it said archive.
  *   v1.11.0 -- 2026-10-09 -- aimeat_extension_config_set sends PATCH /v1/extensions/:name/config.
  *   v1.10.1 -- 2026-10-06 -- aimeat_appdev_overview takes sections as the list the catalog publishes
@@ -337,7 +338,7 @@ export const appTools: ConnectCliToolDefinition[] = [
         // the app's own bytes, and the node's MCP builds the detail from storage directly, which a
         // connector cannot. So the detail comes from the catalogue listing, which already carries the
         // manifest, version, size, download count and public url per entry, narrowed to the one app.
-        handler: async ({ client }, input) => {
+        handler: async ({ client, config }, input) => {
             const owner = requiredString(input, 'owner');
             const filename = requiredString(input, 'filename');
             // `q` is the search GET /v1/apps reads. Sent as `search` it was ignored, the listing was
@@ -345,7 +346,12 @@ export const appTools: ConnectCliToolDefinition[] = [
             const resp = await client.get(`/v1/apps${query({ q: filename, limit: '200' })}`);
             if (resp.ok === false) return resp;
             const apps = ((resp.data ?? {}) as { apps?: Array<Record<string, unknown>> }).apps ?? [];
-            const app = apps.find(a => a.filename === filename && (a.owner === owner || a.ownerName === owner));
+            const found = apps.find(a => a.filename === filename && (a.owner === owner || a.ownerName === owner));
+            // The listing leaves out hidden, unlisted and (for a visitor) community apps; an app behind an
+            // access code is listed with `protected`, and its detail is its owner's, as the node's MCP
+            // aimeat_app_get answers it (services/app-visibility.ts; QA audit W15).
+            const ownApp = !!found && (config.owner === found.owner || String(config.owner).startsWith(`${String(found.owner)}@`));
+            const app = found && (found.protected !== true || ownApp) ? found : undefined;
             if (!app) {
                 return { ok: false as const, error: {
                     code: 'NOT_FOUND',

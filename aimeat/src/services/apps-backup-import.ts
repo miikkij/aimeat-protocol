@@ -16,11 +16,21 @@
  *   v1.0.0 — 2026-06-12 — Initial: selective app-catalog restore with conflict modes
  *   v1.1.0 — 2026-09-28 — `append` onto an app a managed package install owns is refused per app
  *     (services/packages/install/package-managed.ts); `copy` still restores it beside the app.
+ *   2026-10-16 — A restore applies the publish and install refusals it skipped (QA audit F10b-01): a new
+ *     app counts against the per-owner app quota; an appended version carries the live app's access
+ *     code, listing, forking, operator hide and search block, and its search settings, as a publish
+ *     does; a new app keeps no operator's search approval from the ZIP. An extension is rebuilt from
+ *     its manifest with parseCortexManifest, in a namespace the caller owns, under the cortex ceiling
+ *     and the lib size limit, with every lib it declares present.
  */
-import type { Storage, AppManifest, CortexExtensionRecord } from '../storage/interface.js';
+import type { Storage, AppManifest, AppRecord, CortexExtensionRecord } from '../storage/interface.js';
+import type { AimeatConfig } from '../config.js';
 import { safeUnzip, BACKUP_ZIP_LIMITS, type SafeZipLimits } from './safe-zip.js';
 import { APPS_BACKUP_VERSION } from './apps-backup-export.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
+import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
+import { cortexInstallRefusal } from './install-quotas.js';
+import { libsWithoutContent, missingLibsMessage } from './cortex-lifecycle.js';
 
 const APP_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
@@ -240,6 +250,104 @@ async function uniqueCopyExtName(storage: Storage, name: string): Promise<string
 }
 
 /**
+ * The manifest a restored version is stored with. The author is the caller. The search settings are
+ * the live app's when the version stacks on one, as a publish carries them (services/app-publish.ts);
+ * a new app keeps the owner's own search switches from the ZIP but no operator's approval, which only
+ * the operator's review sets (routes/admin-seo.ts).
+ */
+function restoredManifest(manifest: AppManifest, owner: string, live: AppRecord | null): AppManifest {
+  const out: AppManifest = { ...manifest, authorDisplay: owner };
+  if (live) {
+    if (live.manifest?.seo) out.seo = live.manifest.seo;
+    else delete out.seo;
+  } else if (out.seo) {
+    const ownersPart = { ...out.seo };
+    delete ownersPart.approvedBy;
+    delete ownersPart.approvedAt;
+    out.seo = ownersPart;
+  }
+  return out;
+}
+
+/** The moderation and exposure columns a new version of `live` keeps, as a publish keeps them. */
+function carriedState(live: AppRecord): Partial<AppRecord> {
+  return {
+    accessCode: live.accessCode,
+    parked: !!live.parked,
+    community: !!live.parked && !!live.community,
+    forkable: !!live.forkable,
+    operatorHidden: !!live.operatorHidden,
+    operatorHiddenBy: live.operatorHiddenBy,
+    operatorHiddenAt: live.operatorHiddenAt,
+    operatorHideReason: live.operatorHideReason,
+    operatorSeoBlocked: !!live.operatorSeoBlocked,
+    operatorSeoBlockedBy: live.operatorSeoBlockedBy,
+    operatorSeoBlockedAt: live.operatorSeoBlockedAt,
+    operatorSeoBlockReason: live.operatorSeoBlockReason,
+  };
+}
+
+/** The per-owner app quota a publish applies to a new app, as a sentence, or null. */
+async function appQuotaRefusal(
+  storage: Storage, ownerGhii: string, config: Pick<AimeatConfig, 'maxAppsPerAgent'>,
+): Promise<string | null> {
+  if (!(config.maxAppsPerAgent > 0)) return null;
+  const { total } = await storage.listApps({ ownerGaii: ownerGhii, limit: 1 });
+  return total >= config.maxAppsPerAgent
+    ? `QUOTA_EXCEEDED: You have reached the maximum of ${config.maxAppsPerAgent} published apps. Delete an app you no longer need, then restore this one.`
+    : null;
+}
+
+/**
+ * The extension record a restore creates, built from the backup's manifest with the refusals
+ * installCortex makes: the lib size limit, the cortex ceiling, a manifest that validates, a
+ * namespace the caller owns (the backup's own owner name becomes the caller's), and every declared
+ * lib present. Throws with the reason, which the restore reports per item.
+ */
+async function restoredExtension(
+  storage: Storage,
+  config: AimeatConfig,
+  ext: ParsedBackupExtension,
+  name: string,
+  owner: string,
+  sourceOwner: string,
+  isOperator: boolean,
+): Promise<CortexExtensionRecord> {
+  const libs = Object.fromEntries(ext.libs);
+  for (const [lib, content] of ext.libs) {
+    if (Buffer.byteLength(content, 'utf8') / 1024 > config.cortexMaxLibSizeKb) {
+      throw new Error(`QUOTA_EXCEEDED: The library "${lib}" is larger than this node allows (${config.cortexMaxLibSizeKb} KB).`);
+    }
+  }
+  const ceiling = await cortexInstallRefusal({ storage, config }, true);
+  if (ceiling) throw new Error(`${ceiling.code}: ${ceiling.message}`);
+
+  const manifest = typeof ext.record.manifest === 'string' ? ext.record.manifest : '';
+  const parsedManifest = parseCortexManifest(manifest, owner, ext.libs.size > 0 ? libs : undefined);
+  if (!parsedManifest.ok || !parsedManifest.extension) {
+    throw new Error(`INVALID_MANIFEST: The extension's manifest in the backup does not pass this node's checks: ${(parsedManifest.errors ?? []).join('; ')}`);
+  }
+  const fromManifest = parsedManifest.extension;
+  const namespace = fromManifest.namespace === sourceOwner ? owner : fromManifest.namespace;
+  if (!isOperator && !validateNamespaceOwnership(namespace, owner)) {
+    throw new Error(`NAMESPACE_DENIED: The extension belongs to "${namespace}", which is not yours. Restore it under your own name "${owner}" or "community".`);
+  }
+  const missing = libsWithoutContent(fromManifest.components, libs);
+  if (missing.length) throw new Error(`INVALID_MANIFEST: ${missingLibsMessage(missing)}`);
+
+  return {
+    ...fromManifest,
+    name,
+    namespace,
+    installedBy: owner,
+    // Restored inactive: activation derives its artifacts in this node's context.
+    status: 'inactive',
+    activatedAt: undefined,
+    installedAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Restores the selected apps/extensions into the CALLER's account. Conflicts
  * are resolved per item with an explicit mode; the default is skip — an
  * existing app is never touched without an explicit choice.
@@ -252,9 +360,13 @@ export async function restoreAppsBackup(
     parsed: ParsedAppsBackup;
     selections: AppSelection[];
     extensions?: ExtSelection[];
+    /** The app quota, the cortex ceiling and the lib size limit come from here. */
+    config: AimeatConfig;
+    /** The operator may restore an extension into any namespace, as installCortex lets them. */
+    isOperator?: boolean;
   },
 ): Promise<RestoreSummary> {
-  const { owner, ownerGhii, parsed, selections } = opts;
+  const { owner, ownerGhii, parsed, selections, config } = opts;
   const summary: RestoreSummary = {
     apps_created: [], apps_appended: [], apps_copied: [], apps_skipped: [],
     versions_restored: 0,
@@ -280,7 +392,9 @@ export async function restoreAppsBackup(
       }
       if (versions.length === 0) { summary.apps_skipped.push(sel.filename); continue; }
 
-      const writeVersions = async (filename: string, renumberFrom?: number) => {
+      // `live` is the app the versions stack on (append), whose moderation and exposure state they
+      // carry as a publish carries it; a new app (free name, copy) starts with none of it.
+      const writeVersions = async (filename: string, renumberFrom?: number, live?: AppRecord | null) => {
         let next = renumberFrom ?? 0;
         for (const v of versions) {
           const versionNumber = renumberFrom !== undefined ? ++next : v.version;
@@ -289,12 +403,13 @@ export async function restoreAppsBackup(
             ownerName: owner,
             filename,
             versionNumber,
-            // Ownership transfers to the caller; everything else is preserved.
-            manifest: { ...v.manifest, authorDisplay: owner },
+            // Ownership transfers to the caller; the operator-owned parts of the manifest do not.
+            manifest: restoredManifest(v.manifest, owner, live ?? null),
             mimeType: v.mimeType,
             size: v.data.length,
             data: v.data,
             createdAt: v.createdAt,
+            ...(live ? carriedState(live) : {}),
           });
           summary.versions_restored++;
         }
@@ -302,6 +417,8 @@ export async function restoreAppsBackup(
 
       const latest = await storage.getLatestVersionNumber(ownerGhii, sel.filename);
       if (latest === 0) {
+        const quota = await appQuotaRefusal(storage, ownerGhii, config);
+        if (quota) { summary.errors.push({ item: sel.filename, message: quota }); continue; }
         await writeVersions(sel.filename);                 // free name — keep original numbering
         summary.apps_created.push(sel.filename);
         continue;
@@ -315,9 +432,11 @@ export async function restoreAppsBackup(
         // code (services/packages/install/package-managed.ts). `copy` restores it beside the app instead.
         const managed = await managedChangeRefusal(storage, owner, 'app', sel.filename, 'code');
         if (managed) { summary.errors.push({ item: sel.filename, message: `${managed.code}: ${managed.message}` }); continue; }
-        await writeVersions(sel.filename, latest);          // backup versions stack on top
+        await writeVersions(sel.filename, latest, await storage.getApp(ownerGhii, sel.filename));   // backup versions stack on top
         summary.apps_appended.push(sel.filename);
       } else if (mode === 'copy') {
+        const quota = await appQuotaRefusal(storage, ownerGhii, config);
+        if (quota) { summary.errors.push({ item: sel.filename, message: quota }); continue; }
         const copyName = await uniqueCopyFilename(storage, ownerGhii, sel.filename);
         await writeVersions(copyName);                      // keep original numbering under the new name
         summary.apps_copied.push({ from: sel.filename, to: copyName });
@@ -336,16 +455,10 @@ export async function restoreAppsBackup(
       if (!ext) { summary.errors.push({ item: sel.name, message: 'Not present in the backup' }); continue; }
 
       const writeExt = async (name: string) => {
-        const record: CortexExtensionRecord = {
-          ...ext.record,
-          name,
-          installedBy: owner,
-          // Restored inactive — activation re-derives artifacts in this node's context.
-          status: 'inactive',
-          activatedAt: undefined,
-          installedAt: new Date().toISOString(),
-          namespace: ext.record.namespace === parsed.source.owner ? owner : ext.record.namespace,
-        };
+        // The record is rebuilt from the manifest the ZIP carries, with the checks installCortex
+        // makes, never taken from ext.json: a hand-made ext.json could name any namespace and any
+        // components, and skip the ceiling and the lib size limit (QA audit F10b-01).
+        const record = await restoredExtension(storage, config, ext, name, owner, parsed.source.owner, opts.isOperator === true);
         await storage.createCortexExtension(record);
         for (const [lib, content] of ext.libs) await storage.setCortexLibFile(name, lib, content);
       };

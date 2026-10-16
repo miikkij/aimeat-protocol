@@ -352,7 +352,11 @@ the third form, and it is the one that reads as ungated from every angle a scann
 `GET /v1/librarian/search` reads `memory:read` and uses it to NARROW: without the word the search
 stays inside the caller's own records, and `e2e-librarian` asserts exactly that: status 200, and a
 sibling agent's private record absent from the hits. A `requireScope` in front turns "serves you your
-own things" into "refuses you", which is a worse answer to the same question.
+own things" into "refuses you", which is a worse answer to the same question. Degrading works only
+when "the caller's own records" are small: an app grant's own identity is its owner's GHII, so the
+same narrowing handed a narrowly granted app the owner's whole personal memory, and the route refuses
+an app without the word instead (QA audit 2026-10-16, F05b-01). Before choosing to degrade, ask what
+"own" resolves to for every kind of caller.
 
 **And a door whose permission depends on the answer is decided after the answer, not before it.** The
 extension-invoke routes hold their decision until the paywall knows whether the call costs anything.
