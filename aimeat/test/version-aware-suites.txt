@@ -42,6 +42,7 @@ e2e-federation-nodeinfo
 e2e-federation-policy
 e2e-federation-relay-claim
 e2e-federation-settlements-sync
+e2e-federation-two-real-nodes
 e2e-federation-visiting
 e2e-home-journey
 e2e-mcp

@@ -13,6 +13,12 @@
 // am I" before it can announce itself to an editor. The ACP work had been verified against the SDK's
 // own client, which never asks the node that question, so the gap survived being tested. This suite
 // asks the node the question directly, which is the only thing that would have caught it.
+//
+// Version history:
+//   2026-10-16 -- Case 4 expects 403 ACCESS_DENIED. Its setup no longer matched the product: since
+//     QA audit S2-03 (2026-10-16) an owner session's task-list read names one of the owner's own
+//     agents or is refused, so a literal `me` from an owner is refused instead of answering the owner
+//     list. The property the case pins is unchanged: owner B never sees owner A's agent.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -99,11 +105,12 @@ await test('3. An OWNER session is still refused, because `me` is ambiguous for 
 
 await test('4. And `me` grants nothing: it never reaches another owner', async () => {
   // MEASURED RATHER THAN GUESSED. An owner session is not rewritten, so `/v1/agents/me/tasks` keeps
-  // a literal `me` and the tasks route takes its owner-scoped path — which answers 200 with THAT
-  // owner's own list. Not a refusal, and not a leak either: the scoping is by owner GHII, so owner
-  // B sees owner B. The property worth pinning is that one, not the status code.
+  // a literal `me`. Until 2026-10-16 the tasks route then took its owner-scoped path and answered 200
+  // with THAT owner's own list; since QA audit S2-03 the owner's branch reads only an agent the owner
+  // may act on, and `me` is none, so the read is refused. The property worth pinning is that owner B
+  // never sees owner A's agent through the alias.
   const mine = await json('/v1/agents/me/tasks', { headers: { Authorization: `Bearer ${tokB}` } });
-  assert(mine.status === 200, `owner-scoped listing: ${mine.status}`);
+  assert(mine.status === 403 && mine.body?.error?.code === 'ACCESS_DENIED', `owner-scoped listing: ${mine.status} ${mine.body?.error?.code}`);
   assert(!JSON.stringify(mine.body).includes(gaiiA),
     'owner B must not see owner A agent through the me alias');
 });

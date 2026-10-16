@@ -336,6 +336,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       actions: read # read the sweep legs' results from this run
+      checks: read # read a red leg's annotations, which name its red suites
       issues: write # open, comment on and close the nightly-sweep issue
     strategy:
       fail-fast: false
@@ -371,12 +372,21 @@ jobs:
           JOB: ${{ matrix.job }}
         run: |
           CONCLUSION="$(gh run view "$GITHUB_RUN_ID" --json jobs --jq ".jobs[] | select(.name == \"$JOB\") | .conclusion")"
-          echo "$JOB: ${CONCLUSION:-not found}"
+          JOB_ID="$(gh run view "$GITHUB_RUN_ID" --json jobs --jq ".jobs[] | select(.name == \"$JOB\") | .databaseId")"
+          echo "$JOB: ${CONCLUSION:-not found} (job ${JOB_ID:-not found})"
           echo "conclusion=$CONCLUSION" >> "$GITHUB_OUTPUT"
+          echo "job_id=$JOB_ID" >> "$GITHUB_OUTPUT"
 
       # Every conclusion but success is red (QA audit P1-06): a leg that hit its time limit ends
       # as cancelled or timed_out, and one that could not be found answers nothing; both opened no
       # issue while the condition read only 'failure'.
+      #
+      # THE ISSUE NAMES THE RED SUITES (2026-10-16). Each comment from 2026-10-12 to 2026-10-16 said
+      # only "Still red" with a run link, and GitHub serves a job's log to signed-in readers only, so
+      # nobody working without a GitHub token could tell which suites were red. The E2E runner writes
+      # its red suites as error annotations (scripts/lib/e2e-github-report.ts); the leg's annotations
+      # with a title are copied here. The runner's "Process completed with exit code" line has no
+      # title and is left out.
       - name: Open or update the issue for a red sweep
         if: steps.sweep.outputs.conclusion != 'success'
         env:
@@ -384,14 +394,24 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TITLE: ${{ matrix.title }}
           WHAT: ${{ matrix.what }}
+          JOB_ID: ${{ steps.sweep.outputs.job_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          BODY="$WHAT failed: $RUN_URL
+          RED=""
+          if [ -n "$JOB_ID" ]; then
+            RED="$(gh api "repos/$GH_REPO/check-runs/$JOB_ID/annotations?per_page=50" --jq '.[] | select(.annotation_level == "failure" and (.title // "") != "") | "- **" + .title + "**: " + (.message | gsub("\n"; " · "))' || true)"
+          fi
+          if [ -n "$RED" ]; then
+            RED="
+
+          $RED"
+          fi
+          BODY="$WHAT failed: $RUN_URL$RED
 
           The sweep is advisory and blocks nothing; a suite that is red here and matters is one to fix and promote into the guard tier (test/run-e2e-ci.ts, GUARD_SUITES). See docs/coding-guidelines/testing-requirements.md Rule 1b and docs/pitfalls.md §18 before reading a red suite as a regression."
           EXISTING="$(gh issue list --label nightly-sweep --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')"
           if [ -n "$EXISTING" ]; then
-            gh issue comment "$EXISTING" --body "Still red on $(date -u +%Y-%m-%d): $RUN_URL"
+            gh issue comment "$EXISTING" --body "Still red on $(date -u +%Y-%m-%d): $RUN_URL$RED"
           else
             gh label create nightly-sweep --description "Opened by the nightly E2E sweep" --color B60205 2>/dev/null || true
             gh issue create --title "$TITLE" --label nightly-sweep --body "$BODY"

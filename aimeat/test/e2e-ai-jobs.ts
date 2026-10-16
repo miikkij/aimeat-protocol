@@ -20,6 +20,11 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.5.1 — 2026-10-16 — The suite's setup no longer matched the product: its node started with
+ *     AIMEAT_AI_JOB_MAX_CHAIN=0, and since 2026-10-16 (QA audit W34, config-start-check.ts) a node
+ *     refuses to start on a value outside a setting's range, which for the chain depth is 1-1000. The
+ *     suite DID NOT RUN. The depth is 1 now, and case 5's chain goes two links deep: the first link is
+ *     allowed, the second is refused, and the first link's job is the one that fails.
  *   v1.5.0 — 2026-10-08 — 17f: a job the provider refuses stores error.status and error.details
  *     (aiprov plan, A11).
  *   v1.4.0 — 2026-09-28 — System 2 plan, V5, cases 17a-17e: an image job lands the record
@@ -62,7 +67,9 @@ const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const SLOTS = 1;
 const MAX_QUEUED = 3;
 const MAX_QUEUED_PER_OWNER = 2;
-const MAX_CHAIN = 0;          // any on_done that starts another job is one step too deep
+// The lowest depth the node accepts (config-schema.ts, 1-1000): a callback may start one more job,
+// and that job's callback starting another is one step too deep.
+const MAX_CHAIN = 1;
 const MAX_PROMPT_BYTES = 4096;
 
 const STUB_CONTENT = 'The harbour extension was approved 7-2. Construction begins in March.';
@@ -293,9 +300,14 @@ const SCRIPT_MARK = `export default async function(ctx, input) {
     await ctx.memory.set('callback.ran', { job_id: input.job_id, state: input.state, result_key: input.result_key });
     return { ok: true };
 }`;
+// Each link starts the next with itself as the callback: link 1 at depth 1, link 2 at depth 2.
 const SCRIPT_CHAIN = `export default async function(ctx, input) {
-    const started = await ctx.ai.start({ prompt: 'the next link', result_key: 'aijob.chain.next' });
-    await ctx.memory.set('chain.attempt', started);
+    const depth = input.result_key === 'aijob.chain.first' ? 1 : 2;
+    const started = await ctx.ai.start({
+        prompt: 'link ' + depth, result_key: 'aijob.chain.link' + depth,
+        on_done: { extension: 'aijobchain', action: 'next' },
+    });
+    await ctx.memory.set('chain.attempt' + depth, started);
     return { started: started };
 }`;
 const SCRIPT_THROW = `export default async function(ctx, input) {
@@ -567,16 +579,22 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
             on_done: { extension: 'aijobchain', action: 'next' },
         });
         assert(r.status === 202, `start ${r.status}`);
-        const end = await waitForState(a, r.body.data.job_id, ['done', 'failed']);
+        // The first callback starts link 1 at depth 1, inside the limit, so the first job is done.
+        const first = await waitForState(a, r.body.data.job_id, ['done', 'failed']);
+        assert(first.state === 'done', `the first job continued within the limit: ${first.state}`);
+        const attempt1 = await json('/v1/memory/ext:aijobchain/chain.attempt1');
+        assert(attempt1.status === 200 && attempt1.body.data.value.ok === true, `link 1 started: ${JSON.stringify(attempt1.body?.data?.value)}`);
+        // Link 1's callback tries depth 2, past the limit, so link 1 is the job that fails.
+        const end = await waitForState(a, attempt1.body.data.value.job_id, ['done', 'failed']);
         assert(end.state === 'failed', `expected failed, got ${end.state}`);
         assert(end.chain_stopped === 'chain_too_deep', `chain_stopped ${end.chain_stopped}`);
         // The extension was handed a decision rather than a throw, so it could have degraded.
-        const attempt = await json('/v1/memory/ext:aijobchain/chain.attempt');
+        const attempt = await json('/v1/memory/ext:aijobchain/chain.attempt2');
         assert(attempt.status === 200, `the extension recorded what it was told: ${attempt.status}`);
         assert(attempt.body.data.value.ok === false, 'ctx.ai.start answered with a decision, not a throw');
         assert(attempt.body.data.value.code === 'AI_JOB_CHAIN_TOO_DEEP', `code ${attempt.body.data.value.code}`);
-        const next = await readMemory(a, 'aijob.chain.next');
-        assert(next.status === 404, 'and no next job ran');
+        const next = await readMemory(a, 'aijob.chain.link2');
+        assert(next.status === 404, 'and no job at depth 2 ran');
     });
 
     // ── 8. The callback's extension changes owner between enqueue and fire ──

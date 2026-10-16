@@ -12,6 +12,10 @@
  *   agent sends its work, and cannot read the build instructions about it.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-ties
  * @version-history
+ *   v1.0.2 — 2026-10-16 — The spaces read expects `tool_only: false` on a space that names no extension.
+ *     The suite's expectation no longer matched the product: 6bd43d125 (2026-10-13) added the field to
+ *     every watchable space (services/agent-ties.ts v1.3.0) and left this exact comparison unchanged, so
+ *     the case was red in every nightly sweep from 2026-10-14 on both backends.
  *   v1.0.1 — 2026-10-13 — The owner signs in with the password (helpers/owner-login.ts ownerSignIn), because
  *     node 4.0.0 removes the owner-key sign-in. Nothing else in the suite changed.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
@@ -538,7 +542,7 @@ console.log('\n=== Agent ties: apps, the workplace, the first run, the build ins
 
         const mine = await json(q(orgId, support), { headers: authA });
         assert(mine.status === 200, `status ${mine.status}: ${JSON.stringify(mine.body?.error)}`);
-        assert(JSON.stringify(mine.body.data.spaces) === JSON.stringify([{ name: 'request', namespace: 'shared.support-requests', description: 'What a customer asks.' }]),
+        assert(JSON.stringify(mine.body.data.spaces) === JSON.stringify([{ name: 'request', namespace: 'shared.support-requests', description: 'What a customer asks.', tool_only: false }]),
             `spaces: ${JSON.stringify(mine.body.data.spaces)}`);
 
         const theirs = await json(q(orgId, support), { headers: authB });
@@ -560,7 +564,7 @@ console.log('\n=== Agent ties: apps, the workplace, the first run, the build ins
         }
         const counted = await json(`${q(orgId, support)}&include=counts`, { headers: authA });
         assert(counted.status === 200, `counts ${counted.status}: ${JSON.stringify(counted.body?.error)}`);
-        assert(JSON.stringify(counted.body.data.spaces) === JSON.stringify([{ name: 'request', namespace: 'shared.support-requests', description: 'What a customer asks.', records: 2 }]),
+        assert(JSON.stringify(counted.body.data.spaces) === JSON.stringify([{ name: 'request', namespace: 'shared.support-requests', description: 'What a customer asks.', tool_only: false, records: 2 }]),
             `two published records and one draft: ${JSON.stringify(counted.body.data.spaces)}`);
         const plain = await json(q(orgId, support), { headers: authA });
         assert(!('records' in plain.body.data.spaces[0]), `no count unless asked: ${JSON.stringify(plain.body.data.spaces)}`);
