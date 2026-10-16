@@ -24,11 +24,23 @@
  *   follows only if its record still says the system wrote it. `decidePromptContent` is the pure
  *   decision.
  *
+ *   A SHIPPED TEXT IS EVIDENCE TOO (Jouni, 2026-10-16). A stored text that is exactly one of the
+ *   texts the prompt has shipped with (prompt-defaults/shipped-hashes.ts) is a text nobody wrote on
+ *   this node. That answers where the version history cannot: after a restore from a backup, after
+ *   the history was pruned, or for a record that names an operator and has no version entry. Such a
+ *   prompt follows, unless its newest version entry is the operator writing this very text (a
+ *   restore of an old version), which is a choice they made. A text that matches no shipped text
+ *   and no factory version is the operator's, and a stored prompt the software does not ship is
+ *   never read here. The start log names each prompt that takes the new text.
+ *
  * @structure
- *   - decidePromptContent(existing, seed, newest, kind): 'keep' | 'code-sync' | 'follow'
- *   - seedSystemPrompts(storage): upsert seeds, insert-or-update, and version what changes
+ *   - decidePromptContent(existing, seed, newest, kind, shipped): 'keep' | 'code-sync' | 'follow'
+ *   - seedSystemPrompts(storage, opts): upsert seeds, insert-or-update, and version what changes
  *
  * @version-history
+ *   v1.3.0 — 2026-10-16 — A stored text that is one of the prompt's shipped default texts (by hash,
+ *     prompt-defaults/shipped-hashes.ts) follows the current default unless the operator's own newest
+ *     version entry wrote that text, and the start log names every prompt that took the new text (Jouni, decision 2026-10-16).
  *   v1.2.0 — 2026-09-15 — A prompt nobody changed on this node follows this build's text, with a
  *     version entry, instead of keeping its first seed for good.
  *   v1.1.0 — 2026-09-12 — The two lists that decide whether a prompt is rewritten from source move
@@ -39,6 +51,7 @@
  */
 import { PROMPT_SEEDS } from './prompt-defaults.js';
 import { promptSourceKind, type PromptSourceKind } from './prompt-ownership.js';
+import { isShippedDefaultText, SHIPPED_PROMPT_HASHES } from './prompt-defaults/shipped-hashes.js';
 import type { Storage, SystemPromptRecord, SystemPromptVersionRecord } from '../storage/interface.js';
 import { stableStringify } from '../utils/stable-json.js';
 import { logger } from '../utils/logger.js';
@@ -54,19 +67,25 @@ function isFactoryWrite(entry: Pick<SystemPromptVersionRecord, 'changedBy' | 'ch
 }
 
 /**
- * Decide what happens to one existing prompt's text, from what is stored, what ships, and the
- * newest version entry (null when the prompt has none).
+ * Decide what happens to one existing prompt's text, from what is stored, what ships, the newest
+ * version entry (null when the prompt has none), and whether the stored text is one of the texts
+ * the prompt has shipped with (`shipped`).
  */
 export function decidePromptContent(
   existing: Pick<SystemPromptRecord, 'content' | 'locales' | 'updatedBy'>,
   seed: SeedText,
   newest: Pick<SystemPromptVersionRecord, 'content' | 'changedBy' | 'changeNote'> | null,
   kind: PromptSourceKind,
+  shipped = false,
 ): PromptContentAction {
   const sameText = existing.content === seed.content
     && stableStringify(existing.locales ?? {}) === stableStringify(seed.locales ?? {});
   if (kind === 'code') return existing.content !== seed.content ? 'code-sync' : 'keep';
   if (sameText) return 'keep';
+  // A shipped text follows, unless the newest version entry is the operator writing this very text
+  // (a restore of an old version, or a save they made on purpose): that is a choice, not a leftover.
+  const operatorChoseIt = !!newest && !isFactoryWrite(newest) && newest.content === existing.content;
+  if (shipped && !operatorChoseIt) return 'follow';
   const untouched = newest
     ? isFactoryWrite(newest) && newest.content === existing.content
     : existing.updatedBy === 'system';
@@ -77,11 +96,15 @@ export function decidePromptContent(
  * Seed system prompts on startup.
  * - New prompts (not in storage) are inserted with version 1.
  * - Existing prompts get their metadata refreshed, and their text by decidePromptContent.
+ * `opts.shippedHashes` replaces the list of shipped default texts, for a test.
  */
-export async function seedSystemPrompts(storage: Storage): Promise<void> {
+export async function seedSystemPrompts(
+  storage: Storage, opts: { shippedHashes?: Readonly<Record<string, readonly string[]>> } = {},
+): Promise<void> {
+  const shippedHashes = opts.shippedHashes ?? SHIPPED_PROMPT_HASHES;
   let inserted = 0;
   let updated = 0;
-  let followed = 0;
+  const followedIds: string[] = [];
 
   for (const seed of PROMPT_SEEDS) {
     const existing = await storage.getSystemPrompt(seed.id);
@@ -136,8 +159,9 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       // unchanged text never needs it, and this runs for every prompt at every boot.
       const needsHistory = kind !== 'code'
         && (existing.content !== seed.content || stableStringify(existing.locales ?? {}) !== stableStringify(seed.locales ?? {}));
+      const shipped = needsHistory && isShippedDefaultText(seed.id, existing, shippedHashes);
       const newest = needsHistory ? (await storage.getSystemPromptVersions(seed.id))[0] ?? null : null;
-      const action = decidePromptContent(existing, seed, newest, kind);
+      const action = decidePromptContent(existing, seed, newest, kind, shipped);
 
       if (action === 'code-sync') {
         metaUpdate.content = seed.content;
@@ -152,7 +176,7 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
         Object.assign(metaUpdate, {
           content: seed.content, locales: seed.locales, version: followedVersion, updatedAt: now, updatedBy: 'system',
         });
-        logger.info(`System prompt "${seed.id}" was not changed on this node: took this build's text as v${followedVersion}`);
+        logger.info(`System prompt "${seed.id}" was not changed on this node${shipped ? ' (its text is a shipped default)' : ''}: took this build's text as v${followedVersion}`);
       }
 
       await storage.upsertSystemPrompt(metaUpdate as unknown as SystemPromptRecord);
@@ -167,13 +191,13 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
           changeNote: 'Updated to the factory default of this build',
         });
         await storage.pruneSystemPromptVersions(seed.id, 50);
-        followed++;
+        followedIds.push(seed.id);
       }
       updated++;
     }
   }
 
   if (inserted > 0 || updated > 0) {
-    logger.info(`System prompts: ${inserted} seeded, ${updated} metadata-updated, ${followed} took this build's text`);
+    logger.info(`System prompts: ${inserted} seeded, ${updated} metadata-updated, ${followedIds.length} took this build's text${followedIds.length ? `: ${followedIds.join(', ')}` : ''}`);
   }
 }

@@ -28,6 +28,8 @@
  * @usage
  *   cd aimeat && pnpm check:posture-defaults
  * @version-history
+ *   2026-10-16 — The AIMEAT_STATS_ACCESS entry leaves ALLOWED: .env.example sets operator, so a copied
+ *     example opens nothing (Jouni, decision 2026-10-16).
  *   2026-10-16 — The owed invariant 8 decision is answered: memory:delete stays in the default and
  *     leaves POWERFUL_AGENT_SCOPES, because every delete it opens goes to the bin; the ALLOWED entry
  *     for it is removed (ruled by the developer on 2026-10-16).
@@ -126,10 +128,6 @@ export function postureFindings(input: {
  * the gate fails on a finding that is not here, so the next disagreement cannot slip in beside these.
  */
 export const ALLOWED: Record<string, string> = {
-    'uncommented-unsafe:AIMEAT_STATS_ACCESS':
-        'DECISION OWED (2026-10-16): .env.example ships AIMEAT_STATS_ACCESS=public uncommented, and the '
-        + 'start-up self-check warns about exactly that on a public node. Either the example ships '
-        + 'authenticated, or this sentence says why a copied example should publish the node statistics.',
     'unwarned:AIMEAT_SETUP_ALLOWED_IPS':
         'DECISION OWED (2026-10-16): the DNA table asks a public node to restrict the first-owner setup '
         + 'wizard to loopback, the code default is open, and no warning names it. Either the self-check '

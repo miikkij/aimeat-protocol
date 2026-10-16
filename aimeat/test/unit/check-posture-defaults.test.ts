@@ -11,6 +11,8 @@
  *   the extension install role, the admin setup setting and the AI provider allowlist
  *   (QA audit S10-05, S1-08, F7d-05).
  * @version-history
+ *   2026-10-16 — The example's AIMEAT_STATS_ACCESS line is operator, and the old public line is refused
+ *     (Jouni, decision 2026-10-16).
  *   2026-10-16 — Invariant 8 as ruled by the developer: memory:delete may be a default (no inv8
  *     finding, no start-up warning for the shipped list); memory:purge and agent:delete are refused.
  *   2026-10-16 — Initial (QA audit S10-05, S10-09, S1-08, F7d-05).
@@ -43,6 +45,13 @@ describe('invariant 10: .env.example, the code default and the self-check', () =
     it('refuses an uncommented unsafe value in the example', () => {
         expect(keys('AIMEAT_ANONYMOUS=true\n')).toContain('uncommented-unsafe:AIMEAT_ANONYMOUS');
         expect(keys('AIMEAT_ANONYMOUS=false\n')).not.toContain('uncommented-unsafe:AIMEAT_ANONYMOUS');
+    });
+    it('refuses the statistics opened to anyone by a copied example, and takes the line it ships now', () => {
+        expect(keys('AIMEAT_STATS_ACCESS=public          # public | authenticated | operator\n')).toContain('uncommented-unsafe:AIMEAT_STATS_ACCESS');
+        expect(keys('AIMEAT_STATS_ACCESS=operator\n')).not.toContain('uncommented-unsafe:AIMEAT_STATS_ACCESS');
+        const real = readFileSync(join(AIMEAT, '.env.example'), 'utf8');
+        expect(envExampleFacts(real, ['AIMEAT_STATS_ACCESS']).get('AIMEAT_STATS_ACCESS')).toEqual({ uncommented: 'operator', statedDefault: 'public' });
+        expect(ALLOWED['uncommented-unsafe:AIMEAT_STATS_ACCESS']).toBeUndefined();
     });
     it('refuses a stated default the code does not have (the line this commit corrected)', () => {
         const old = '# AIMEAT_EXT_INSTALL_ROLE=operator     # Role required to install extensions: operator | owner (default: operator)\n';

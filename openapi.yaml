@@ -64631,6 +64631,12 @@ paths:
       description: |
         Operator-only. Lists recorded security incidents (e.g. rejected/quarantined uploads),
         newest first, with the count of still-open incidents. Requires the `operator` role.
+
+        A setting whose value the node did not accept at start (from the environment, the config
+        file or a command-line flag) is one incident of type `config_setting`, code
+        `SETTING_NOT_ACCEPTED`, with `setting: { variable, value }`: the node runs that setting's
+        default, and the incident closes by itself at the first start with a value the node accepts.
+        One open incident per setting; a start with the same value adds none.
       security:
         - BearerAuth: []
       responses:

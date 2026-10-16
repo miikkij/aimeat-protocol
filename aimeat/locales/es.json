@@ -209,14 +209,16 @@
           "held_account_names": "Registros que la actualización dejó como estaban",
           "workspace_schema_closed": "Espacios de un espacio de trabajo que rechazan todos los registros",
           "headless_browser": "El navegador propio del servidor no arranca",
-          "scope_words_kept": "Permisos que la actualización dio a los agentes y las apps existentes"
+          "scope_words_kept": "Permisos que la actualización dio a los agentes y las apps existentes",
+          "config_setting": "Un ajuste que el servidor no aceptó, así que usa el valor predeterminado"
         },
         "source": {
           "workspace_import": "importación de espacio de trabajo",
           "organism_import": "importación de organismo",
           "app_backup": "copia de seguridad de una app",
           "full_identity_move": "actualización al iniciar",
-          "workspace_schema_relock": "revisión de los bloqueos de los espacios de trabajo al iniciar"
+          "workspace_schema_relock": "revisión de los bloqueos de los espacios de trabajo al iniciar",
+          "start": "arranque del servidor"
         },
         "kept": "{size} guardados",
         "notKept": "no guardado, demasiado grande",

@@ -5,7 +5,10 @@
  * @description CLI config validator — checks environment, file configs, and DB for
  *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
  *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.
- * @version-history v1.3.1 — 2026-10-16 — AIMEAT_NODE_TYPE takes personal, as the loader does (QA audit D8-02).
+ * @version-history v1.4.0 — 2026-10-16 — Names every value the start sets aside and runs the default
+ *   for (config-start-check.ts), as an error, and a fixed-set word in another case as a warning; says
+ *   which ones still stop the start (Jouni, decision 2026-10-16).
+ *   v1.3.1 — 2026-10-16 — AIMEAT_NODE_TYPE takes personal, as the loader does (QA audit D8-02).
  *   v1.3.0 — 2026-08-08 — Validate the Code of Practice signature
  *   (AIMEAT_AI_COP_SECTIONS / _SIGNED_ON): unknown sections, a missing or malformed
  *   date, and Section 1 signed by a node that does not run the models;
@@ -17,6 +20,7 @@
  */
 
 import { ALL_CONFIG_MAP, parseConfigValue } from '../services/config-schema.js';
+import { REFUSE_ON_INVALID, dropEmptySettings, normaliseFixedSetSettings, startSettingProblems } from '../config-start-check.js';
 import { loadFileSource } from '../services/config-loader.js';
 import { logger } from '../utils/logger.js';
 
@@ -392,6 +396,28 @@ export function validateEnv(): ValidationResult[] {
       results.push({ level: 'warning', variable: 'AIMEAT_AI_COP_SECTIONS', message: 'Section 1 is the PROVIDER commitment: imperceptible marking of a generative model\'s own output. An AIMEAT node does not sample the model\'s tokens and /v1/ai-transparency states that it does not watermark text, so signing Section 1 as a node operator claims a layer this software does not provide. Sign it only if you run the models yourself.' });
     }
     results.push({ level: 'info', variable: 'AIMEAT_AI_COP_SECTIONS', message: `/v1/ai-transparency reports this node as a Code of Practice signatory for section(s) ${copSections.join(', ')}. Set it only after the AI Office confirmed your signature — it is a public compliance claim.` });
+  }
+
+  // ── Every value the start sets aside (config-start-check.ts) ──
+  // The start runs the default of a setting whose value it does not accept, so this is the place an
+  // operator sees all of them before starting. For a setting this pass covers, it says what the start
+  // does, in place of an error a check above wrote by comparing the exact word.
+  const asStarted: NodeJS.ProcessEnv = { ...env };
+  dropEmptySettings(asStarted);
+  const caseOnly = normaliseFixedSetSettings(asStarted);
+  const setAside = startSettingProblems(asStarted);
+  const covered = new Set([...caseOnly, ...setAside.map(p => p.variable)]);
+  for (let i = results.length - 1; i >= 0; i--) {
+    if (results[i].level === 'error' && covered.has(results[i].variable)) results.splice(i, 1);
+  }
+  for (const v of caseOnly) {
+    results.push({ level: 'warning', variable: v, message: `"${env[v]}" is read as "${asStarted[v]}", the word it differs from only in case or spaces. Write it as "${asStarted[v]}".` });
+  }
+  for (const p of setAside) {
+    const effect = REFUSE_ON_INVALID[p.variable]
+      ? `The node does not start until it is corrected: ${REFUSE_ON_INVALID[p.variable]}.`
+      : 'The node starts on the default and lists the setting on the Security page until it is corrected.';
+    results.push({ level: 'error', variable: p.variable, message: `"${p.value}" is not a value this setting takes: it ${p.takes}. ${effect}` });
   }
 
   // ── Config File Validation (aimeat.ini / aimeat.json) ─────────

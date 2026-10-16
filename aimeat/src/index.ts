@@ -18,6 +18,7 @@
  * @version-history v1.26.0 — 2026-07-10 — Emit securityPostureWarnings() at startup so a public-profile node flags risky settings.
  * @version-history v1.27.0 — 2026-07-13 — Extract help text, `connect` dispatch, and `start`/`serve` runtime into index-help/index-connect/index-start (max-file-lines).
  * @version-history v1.28.0 — 2026-09-28 — `aimeat init --install-set <file> [--install-set-secrets <file>]`: the install set the node applies at start-up.
+ * @version-history v1.31.0 — 2026-10-16 — A setting the node does not accept no longer stops a command: the node runs its default, logs one line, and `start` passes the settings to the server for the Security page; only REFUSE_ON_INVALID (config-start-check.ts) still stops one (Jouni, decision 2026-10-16).
  * @version-history v1.30.0 — 2026-10-16 — A setting the node does not accept stops every command but validate, init and config with a plain message (QA audit D8-02, P6-03, D6-02).
  * @version-history v1.30.0 — 2026-10-16 — `aimeat backup` and `aimeat restore` send an operator's personal access token (--token or AIMEAT_OP_TOKEN, cli/backup-restore.ts), read the answer and exit 1 on a refusal without writing a file; `--url` reaches a running node; the `Bearer operator:<password>` form, which no auth path read, is gone (QA audit P6-07, F19b-01). `aimeat join` exits 1 when it did not join (QA audit F5-06).
  * @version-history v1.29.0 — 2026-10-09 — `aimeat config export --format consul --include-secrets`: the Consul export leaves the secret rows out without the flag (secrets audit 2026-10-09, S3).
@@ -155,7 +156,8 @@ if (consulTokenFlag) cliOverrides['consul.token'] = consulTokenFlag;
 
 const subcommand = positionals[0];
 // `validate`, `init` and `config` exist to show or repair a broken environment, so they load it
-// without the start check; every other command refuses a setting the node does not accept.
+// without the start check; every other command runs the default of a setting the node does not accept
+// and says so, and only the few settings in REFUSE_ON_INVALID stop it (config-start-check.ts).
 const loaded = (() => {
   try {
     return loadConfig({
@@ -171,7 +173,7 @@ const loaded = (() => {
     throw err;
   }
 })();
-const { config, envKeys, fileKeys, cliKeys, fileName } = loaded;
+const { config, envKeys, fileKeys, cliKeys, fileName, settingFallbacks } = loaded;
 
 // Handle subcommands
 if (subcommand === 'config') {
@@ -381,7 +383,7 @@ if (subcommand === 'config') {
   console.log('\n  Done!\n');
   process.exit(0);
 } else if (subcommand === 'start' || subcommand === 'serve') {
-  await runStart(config, { envKeys, fileKeys, cliKeys, fileName }, __pkgRoot);
+  await runStart(config, { envKeys, fileKeys, cliKeys, fileName, settingFallbacks }, __pkgRoot);
 } else if (subcommand) {
   console.error(`Unknown command: ${subcommand}\n`);
   console.log(HELP_TEXT);

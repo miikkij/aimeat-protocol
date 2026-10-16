@@ -1,8 +1,9 @@
 # Builds the AIMEAT Personal Node desktop app for Windows, macOS and Linux and publishes the
 # installers as a GitHub Release. Triggered by a `desktop-v*.*.*` tag whose numeric part must match
 # aimeat-desktop/src-tauri/tauri.conf.json `version` (mirrors the Python publish workflow's
-# tag-vs-manifest gate). workflow_dispatch builds and signs only (no release), which is how a change
-# to this file is proven before a tag depends on it.
+# tag-vs-manifest gate). workflow_dispatch on a branch builds and signs only (no release), which is
+# how a change to this file is proven before a tag depends on it; on the tag it releases, as a push of
+# the tag does.
 #
 # WHAT SHIPS, per platform:
 #   Windows  NSIS installer (-setup.exe) and MSI. The updater installs the -setup.exe.
@@ -28,7 +29,14 @@ on:
   push:
     tags:
       - 'desktop-v*.*.*'
-  workflow_dispatch: {}
+  # A run by hand on a branch builds and signs only. A run by hand ON THE TAG releases it, and is how
+  # a release goes out over a nightly sweep that is not green, with the reason in red_reason.
+  workflow_dispatch:
+    inputs:
+      red_reason:
+        description: 'Why this release cannot wait for a green nightly sweep (a security fix). CI and desktop-check must still be green.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -40,8 +48,13 @@ jobs:
   # tauri.conf.json, so desktop-check.yml has a run of it; ci.yml and the nightly sweep are the node.
   # On a tag the job refuses unless the commit is on main and each workflow named below has a green
   # run of that exact commit (aimeat/scripts/release-ready.mjs); a run by hand (workflow_dispatch)
-  # publishes nothing, so it passes without asking.
+  # on a branch publishes nothing, so it passes without asking.
+  # A SECURITY RELEASE MAY GO OUT OVER A RED NIGHTLY WITH A NAMED REASON (Jouni, 2026-10-16): a line
+  # `Red-Nightly: <reason>` in the annotated tag's message, or the red_reason input of a run by hand
+  # on the tag. The gate prints the reason and the run, and the release notes start with it.
   release-gate:
+    outputs:
+      red_reason: ${{ steps.gate.outputs.red_reason }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -54,9 +67,11 @@ jobs:
           fetch-depth: 0
 
       - name: The tagged commit is on main and green in ci.yml,e2e-full.yml,desktop-check.yml
+        id: gate
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
+          AIMEAT_RELEASE_RED_REASON: ${{ inputs.red_reason }}
         run: node aimeat/scripts/release-ready.mjs --sha="$GITHUB_SHA" --require=ci.yml,e2e-full.yml,desktop-check.yml
 
   build:
@@ -273,7 +288,7 @@ jobs:
   # THE TOKEN THAT WRITES RELEASES IS HERE, and the job runs nothing but a copy: it downloads the
   # installers from the builds and the manifest from the sign job, and uploads them.
   publish:
-    needs: [build, sign]
+    needs: [release-gate, build, sign]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
@@ -294,6 +309,9 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          # Empty unless the gate released over a nightly sweep that is not green; then the notes
+          # start with the reason it was given.
+          body: "${{ needs.release-gate.outputs.red_reason && format('Released over a nightly sweep that was not green. Reason: {0}', needs.release-gate.outputs.red_reason) || '' }}"
           files: dist/*
 
       # THE MANIFEST ALSO GOES TO A FIXED ADDRESS, and this is what makes auto-update work at all.

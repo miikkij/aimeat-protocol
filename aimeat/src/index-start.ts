@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The settings loadConfig() set aside reach createServer, which records them on the
+ *     Security page (Jouni, decision 2026-10-16).
  *   2026-10-16 — The posture header says "this node": the test and dev mode warnings are reported on
  *     any node whose public URL is not a loopback address, not only on the public profile (QA audit S1-08).
  *   2026-10-16 — The shutdown handler stops the workflow engine's sweep and the scheduler, and waits
@@ -75,7 +77,7 @@ const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
  * @param pkgRoot Package root (aimeat/ dir) — used to read package.json for the version.
  */
 export async function runStart(config: AimeatConfig, sources: ConfigSources, pkgRoot: string): Promise<void> {
-  const { envKeys, fileKeys, cliKeys, fileName } = sources;
+  const { envKeys, fileKeys, cliKeys, fileName, settingFallbacks } = sources;
 
   // Self-heal runtime assets after a package upgrade. The server serves
   // CWD/{public,locales,static} ahead of the package's own copies, so an
@@ -108,7 +110,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   // person only through the 0600 file written below, never through a log.
   const generatedAdminSecret = config.adminPassword ? null : randomBytes(16).toString('base64url');
   if (generatedAdminSecret) config.adminPassword = generatedAdminSecret;
-  const { app, tunnelManager, connectTunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName });
+  const { app, tunnelManager, connectTunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName, settingFallbacks });
 
   // The generated secret opens POST /v1/admin/setup/register, so it goes to a file only this
   // user can read, and only while the node has no owner (the `anonymous` system owner of
