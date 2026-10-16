@@ -54,10 +54,17 @@ describe('atelier-contrast — the matrix as a callable service', () => {
     // darkens its gradient stops toward the ink); the flat fill under white does not.
     // On the light house palette, which is where the review measured it: every failure the raw
     // coral produces is AK-SOLID, and AK-GRAD is green throughout — one look, one failure.
+    // One exception, by name: kirjapaino's page (#e9e2d4) is a shade darker than the other papers,
+    // so the RAW coral as text on it measures 4.44, under 4.5 (AK-TINT). The shipped coral is capped
+    // and passes there (check:atelier), so the exception is about the raw value only, and the claim
+    // under test still holds: the gradient checks see none of what the solid fill fails.
     const light = runMatrix({ '--ak-accent': '#e8564a' })
       .filter((r) => !r.ok && r.combo.endsWith('aimeat/light'));
-    expect(light.length).toBeGreaterThan(0);
-    expect(light.every((f) => f.label.startsWith('AK-SOLID'))).toBe(true);
+    const solid = light.filter((f) => f.label.startsWith('AK-SOLID'));
+    const other = light.filter((f) => !f.label.startsWith('AK-SOLID'));
+    expect(solid.length).toBeGreaterThan(0);
+    expect(light.some((f) => f.label.startsWith('AK-GRAD'))).toBe(false);
+    expect(other.map((f) => `${f.combo} ${f.label}`)).toEqual(['kirjapaino × aimeat/light AK-TINT accent-as-text on page']);
     expect(light.every((f) => f.actual < f.min)).toBe(true);
   });
 });
