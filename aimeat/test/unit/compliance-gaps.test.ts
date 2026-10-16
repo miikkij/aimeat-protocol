@@ -17,6 +17,7 @@
  *   already covered.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-gaps.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-16 — The storage answers the workspace share candidates the counts now read (none).
  *   v1.1.0 — 2026-10-03 — A face added without licence data is a finding (the font manager).
  *   v1.0.0 — 2026-08-23 — BR-02. Closes the hole the browser pass exposed: no test drove the
  *     undocumented-model path, which is the headline half of the report.
@@ -32,7 +33,7 @@ const CONFIG = {
   aiProvenance: true,
 } as unknown as AimeatConfig;
 
-/** The three reads buildComplianceReport makes, and nothing else. */
+/** The reads buildComplianceReport makes, and nothing else. */
 function storageWith(opts: {
   models?: string[];
   usecases?: unknown[];
@@ -64,6 +65,9 @@ function storageWith(opts: {
     consentFacets: async () => [],
     aiProvenanceFacets: async () => [],
     listAiProvenance: async () => ({ items: [], total: 0 }),
+    // The share candidates the counts add (services/share-provenance.ts sharePublicInScope): none here.
+    workspaceProvenanceLinks: async () => [],
+    getAiProvenanceMany: async () => [],
     listApps: async () => ({
       apps: (opts.appsWithGap ?? []).map(a => ({
         ownerName: a.ownerName, filename: a.filename,

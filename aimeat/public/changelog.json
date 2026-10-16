@@ -5,6 +5,18 @@
       "date": "2026-10-16",
       "kind": "feature",
       "title": {
+        "en": "The AI label on every page that shows content an AI made",
+        "fi": "Tekoälymerkintä jokaisella sivulla, jolla on tekoälyn tekemää sisältöä"
+      },
+      "body": {
+        "en": "When an AI made a page and you share it on an open link, its readers now see the EU AI label. It appears on shared workspace pages and HTML pages, on knowledge packages and on each entry an AI wrote, on portfolios, on the front page's passages and notices, and on Design Book parts. Inside the workspace, members see the same label and who made the page. When you paste a page from another AI into the workspace editor, you tick that an AI made it, and the page keeps that record. A page shared behind a password or only with signed-in accounts is not public, so it needs no label. Your compliance report and the operator's now count pages shared on an open link as public content.",
+        "fi": "Kun tekoäly on tehnyt sivun ja jaat sen avoimella linkillä, lukijat näkevät nyt EU:n tekoälymerkinnän. Se näkyy jaetuilla työtilan sivuilla ja HTML-sivuilla, portfolioissa, etusivun teksteissä ja ilmoituksissa sekä Design Bookin osissa. Tietopaketissa tekoälymerkintä näkyy paketin kohdalla ja jokaisen sellaisen merkinnän kohdalla, jonka tekoäly kirjoitti. Työtilan jäsenet näkevät saman tekoälymerkinnän ja sen, kuka sivun teki. Kun liität työtilan editoriin toisen tekoälyn tekemän sivun, valitset, että sen teki tekoäly, ja sivu säilyttää tämän tiedon. Salasanalla tai vain kirjautuneille jaettu sivu ei ole julkinen, joten se ei tarvitse tekoälymerkintää. Sinun ja ylläpitäjän compliance-raportit laskevat nyt avoimella linkillä jaetut sivut julkiseksi sisällöksi."
+      }
+    },
+    {
+      "date": "2026-10-16",
+      "kind": "feature",
+      "title": {
         "en": "Bring a presentation into a workspace as an HTML page",
         "fi": "Tuo esitys työtilaan HTML-sivuna"
       },
