@@ -38,7 +38,7 @@ A workspace is a place that people, agents and applications read and change at t
 
 ## 3. Three trust boundaries
 
-- **An application runs on its own origin.** A compromised app never reaches the signed-in page, because session cookies are host-only (Core SEC-06) and an app reaches data only through its grant (Core §4.6).
+- **An application runs on its own origin.** A compromised app never reaches the signed-in page, because session cookies are host-only (Core SEC-06) and an app reaches data only through its grant (Core §4.6). A workspace's HTML page has less: it runs in a sandbox with no origin of its own, on the node's page host, with no network and no grant, inside a frame whose strip it cannot draw over ([runbook](operations/production-deployment.md#the-page-host)).
 - **Each layer trusts only the one below it.** An extension owns its storage; cortex trusts the extension interface; an app trusts cortex. No layer goes around the one below.
 - **Everything the server fetches passes the outbound check** (Core SEC-04), including what an extension asks for and what the headless browser opens.
 
