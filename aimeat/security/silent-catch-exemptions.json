@@ -489,6 +489,10 @@
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
+    "src/mcp/tool-usage-wrap.ts": {
+      "count": 1,
+      "reason": "2026-10-16, QA audit W21 (E5-01): when a tool result is text that only starts like JSON, JSON.parse fails and the text carries no error code to record; the usage row is written with the error class instead, so nothing is lost."
+    },
     "src/mcp/workspace-member-changes.ts": {
       "count": 1,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
