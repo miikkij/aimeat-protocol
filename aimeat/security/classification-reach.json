@@ -619,6 +619,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
+    "src/routes/page-host.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "2026-10-16: a file an HTML page maps passes the classification reader before its bytes go out (passesClassification: show with the anonymous reader, the page host having no session, and leave for a shared page), as the share's own content does. The page itself passed the reader when its frame address was minted."
+    },
     "src/routes/permissions.ts": {
       "reads": {
         "getMemory": 2,
@@ -2369,6 +2375,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of meta records and the registry."
     },
+    "src/services/workspace-records-delete-op.ts": {
+      "reads": {
+        "listMemoryKeysByPrefix": 1,
+        "listAllMemory": 1
+      },
+      "why": "The batch delete's key-only scan and its value-scan fallback, moved unchanged from services/workspace-tool-ops.ts on 2026-10-16 (max-file-lines): they find the addresses a delete removes, and no value reaches the caller."
+    },
     "src/services/workspace-rows/row-service.ts": {
       "reads": {
         "listWorkspaceRows": 1,
@@ -2378,10 +2391,9 @@
     },
     "src/services/workspace-tool-ops.ts": {
       "reads": {
-        "listAllMemory": 2,
-        "listMemoryKeysByPrefix": 1
+        "listAllMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-06: the batch delete's key-only scan and its value-scan fallback moved here from routes/organisms/workspace-ops.ts; they find the addresses a delete removes, and no value reaches the caller."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. The batch delete's scans, here from 2026-10-06, moved to services/workspace-records-delete-op.ts on 2026-10-16."
     },
     "src/services/workspace-transfer-rows.ts": {
       "reads": {
