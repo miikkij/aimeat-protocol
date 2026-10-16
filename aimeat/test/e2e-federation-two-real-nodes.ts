@@ -31,6 +31,10 @@
  *   test is what crosses the wire, and the storage of both is the same code either way.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-two-real-nodes
  * @version-history
+ *   2026-10-16 — Both directions of the window: B answers the unsigned service summary request from A
+ *     while A's signed heartbeat names 4.0.2, and refuses it once A names 4.0.3 and from a peer of
+ *     unknown version; a peer of unknown version that refuses the unsigned request is asked again
+ *     signed and gets the signed form from then on (decision 2026-10-16).
  *   2026-10-16 — A's refusal is HTTP 502 with B's 401 in details.peer_status, on POST /v1/work/request and
  *     POST /v1/federation/cross-node/work; new: aimeat_action_execute over MCP names B, B's status and
  *     B's answer (decision 2026-10-16).
@@ -44,6 +48,7 @@ import { createServer, type Server, type IncomingHttpHeaders } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { ServiceSummary } from '../src/utils/service-summary.js';
 import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../src/config-federation.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
 import { getSoftwareVersion, versionAtLeast } from '../src/utils/version.js';
 import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { PeerInfo } from '../src/services/federation.js';
@@ -292,15 +297,71 @@ try {
         }
     });
 
-    await test('B, a node on this code, takes the signed service summary request and refuses the unsigned one', async () => {
+    await test('a peer of unknown version that refuses the unsigned request is asked again signed, and gets the signed form from then on', async () => {
+        const asked: Array<'signed' | 'unsigned'> = [];
+        let round = 0;
+        const strict = createServer((req, res) => {
+            res.setHeader('Content-Type', 'application/json');
+            if ((req.url ?? '').endsWith('/v1/federation/ping')) { round++; res.end(JSON.stringify({ ok: true, data: { pong: true, service_summary_hash: `strict-${round}-${stamp}` } })); return; }
+            if ((req.url ?? '').endsWith('/v1/federation/service-summary')) {
+                const signed = typeof req.headers['x-signature'] === 'string';
+                asked.push(signed ? 'signed' : 'unsigned');
+                if (!signed) { res.statusCode = 401; res.end(JSON.stringify({ ok: false, error: { code: 'UNAUTHORIZED' } })); return; }
+                res.end(JSON.stringify({ ok: true, data: { actions: [], agents: [], boards: [], csms: [] } }));
+                return;
+            }
+            res.statusCode = 404; res.end('{}');
+        });
+        await new Promise<void>(r => strict.listen(0, '127.0.0.1', () => r()));
+        servers.push(strict);
+        const id = `aimeat-strict-${stamp}`;
+        const peers = new Map<string, PeerInfo>([[id, { ...peerInfo(B), nodeId: id, url: `http://127.0.0.1:${(strict.address() as AddressInfo).port}`, softwareVersion: null }]]);
         const directory = new Map<string, ServiceSummary>();
-        // Unknown version first: in the window A sends the unsigned form, which B refuses, so B stays
-        // out of the directory until its version is known (its next signed heartbeat to A).
+        await runHeartbeatCycle(A.config, A.storage, peers, directory, { everyPeer: true });
+        const first = windowOpen ? ['unsigned', 'signed'] : ['signed'];
+        assert(JSON.stringify(asked) === JSON.stringify(first), `first round: ${JSON.stringify(asked)}, expected ${JSON.stringify(first)}`);
+        assert(directory.has(id), 'the summary taken on the signed retry is in the directory');
+        await runHeartbeatCycle(A.config, A.storage, peers, directory, { everyPeer: true });
+        assert(JSON.stringify(asked.slice(first.length)) === JSON.stringify(['signed']),
+            `the next round goes signed at once: ${JSON.stringify(asked)}`);
+    });
+
+    await test('B, a node on this code, takes A\'s request when A does not know B\'s version (the signed retry)', async () => {
+        const directory = new Map<string, ServiceSummary>();
         await runHeartbeatCycle(A.config, A.storage, new Map([[B_ID, peerInfo(B, { softwareVersion: null })]]), directory, { everyPeer: true });
-        assert(directory.has(B_ID) === !windowOpen,
-            `unknown version: B ${directory.has(B_ID) ? 'took' : 'refused'} the request (window open: ${windowOpen})`);
-        await runHeartbeatCycle(A.config, A.storage, new Map([[B_ID, peerInfo(B, { softwareVersion: '4.0.3' })]]), directory, { everyPeer: true });
-        assert(directory.has(B_ID), 'B refused the signed service summary request from A');
+        assert(directory.has(B_ID), 'B is not in A\'s directory after one round');
+    });
+
+    // THE RECEIVING SIDE OF THE WINDOW. The version B goes by is the one A names in its own signed
+    // heartbeat, sent here by hand so it can name 4.0.2; never anything the summary request says.
+    const pingBAs = async (softwareVersion: string): Promise<void> => {
+        const payload = { node_id: A_ID, timestamp: new Date().toISOString(), version: 'v1', software_version: softwareVersion, stats: { uptime_hours: 1 } };
+        const signed = JSON.stringify(payload);
+        const r = await B.json('/v1/federation/ping', {
+            method: 'POST',
+            body: JSON.stringify({ ...payload, signature: await sign(A.nodeKey.privateKey, signed), ...await audienceProof(A.nodeKey.privateKey, signed, B_ID) }),
+        });
+        assert(r.status === 200, `signed heartbeat to B: ${r.status} ${JSON.stringify(r.body)}`);
+    };
+    const unsignedFrom = (nodeId: string, extra: Record<string, string> = {}) =>
+        B.json('/v1/federation/service-summary', { headers: { 'x-source-node': nodeId, ...extra } });
+
+    await test('B answers A\'s unsigned service summary request while A\'s signed heartbeat names 4.0.2, and refuses it once A names 4.0.3', async () => {
+        await pingBAs('4.0.2');
+        const old = await unsignedFrom(A_ID);
+        if (windowOpen) assert(old.status === 200 && old.body.ok === true, `an old peer is answered unsigned in the window: ${old.status} ${JSON.stringify(old.body)}`);
+        else assert(old.status === 401, `after the window an old peer is refused unsigned: ${old.status}`);
+        await pingBAs('4.0.3');
+        const fresh = await unsignedFrom(A_ID);
+        assert(fresh.status === 401 && fresh.body.error?.code === 'UNAUTHORIZED', `a peer on 4.0.3 is refused unsigned: ${fresh.status} ${JSON.stringify(fresh.body)}`);
+    });
+
+    await test('B refuses the unsigned request from a peer whose version it has not heard, whatever the request says about itself', async () => {
+        const quiet = `aimeat-quiet-${stamp}`;
+        const key = await generateKeyPair();
+        await addPeer(B, quiet, 'http://127.0.0.1:1', key.publicKey, { allow_routing: true, share_catalogue: true, tier: 'member' });
+        const r = await unsignedFrom(quiet, { 'x-software-version': '4.0.2', 'user-agent': 'aimeat/4.0.2' });
+        assert(r.status === 401 && r.body.error?.code === 'UNAUTHORIZED', `unknown version is refused unsigned: ${r.status} ${JSON.stringify(r.body)}`);
     });
 
     await test('a peer nothing answers at goes degraded after 3 failed cycles and offline after 10; a de-peered peer past its grace is purged', async () => {

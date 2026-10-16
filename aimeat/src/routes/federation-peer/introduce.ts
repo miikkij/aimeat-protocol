@@ -5,6 +5,9 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — Through node 4.0.4 GET /v1/federation/service-summary also answers an unsigned request from a
+ *     peer whose own signed heartbeat named 4.0.2 or older (unsignedServiceSummaryAccepted), logged once per
+ *     peer per start; a peer of unknown or newer version is refused as before (decision 2026-10-16).
  *   2026-10-16 — GET /v1/federation/service-summary answers a signed request only: a signature over
  *     { source_node, timestamp, purpose } with the peer's key, the audience headers and one use inside
  *     five minutes (signedGetRefusal; QA audit S6-09). The x-source-node header alone was the gate.
@@ -56,6 +59,10 @@ import { getActivePolicy, evaluateAutoAdmit } from '../../services/network-polic
 import { logger } from '../../utils/logger.js';
 import { reportPeerIncident } from '../../services/peer-incidents.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
+import { unsignedServiceSummaryAccepted, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../../config-federation.js';
+
+/** Peers whose unsigned service summary request was answered since this process started, logged once each. */
+const unsignedSummaryPeersLogged = new Set<string>();
 
 export function registerIntroduceRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // GET /v1/federation/directory — public peer directory (Tier 0)
@@ -138,6 +145,20 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         // finding templates.ts closed for the template listing in 2026-08.
         const timestamp = req.headers['x-timestamp'] as string | undefined;
         const signature = req.headers['x-signature'] as string | undefined;
+        // THE ONE-RELEASE WINDOW (decision 2026-10-16). Through node 4.0.4 a peer on 4.0.2 or older,
+        // which sends x-source-node alone, is still answered. The version is the one that peer named
+        // in its own signed heartbeat (the ping route writes peer.softwareVersion after the signature
+        // verified), never a claim this request makes; a peer of unknown or newer version is refused.
+        if (!timestamp && !signature && unsignedServiceSummaryAccepted(peer.softwareVersion)) {
+            if (!unsignedSummaryPeersLogged.has(peer.nodeId)) {
+                unsignedSummaryPeersLogged.add(peer.nodeId);
+                logger.warn('Service summary answered to an unsigned request from a peer on an older version', {
+                    peer: peer.nodeId, peer_version: peer.softwareVersion, signed_only_from: UNSIGNED_SERVICE_SUMMARY_REMOVED_IN,
+                });
+            }
+            res.json(success(config.nodeId, await computeServiceSummary(config, storage)));
+            return;
+        }
         if (!timestamp || !signature || !peer.publicKey) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED',
                 'The service summary is for peer nodes: sign the request as your node (x-timestamp, x-signature, x-audience, x-audience-signature).'));

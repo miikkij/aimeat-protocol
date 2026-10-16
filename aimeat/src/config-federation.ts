@@ -23,11 +23,14 @@
  * @structure FederationConfig · AUDIENCE_REQUIRED_BY_DEFAULT_IN · UNPROVEN_FORMAT_REMOVED_IN ·
  *   RELAY_CLAIM_OPTIONAL_REMOVED_IN · SIGNED_SERVICE_SUMMARY_PEER_FROM · UNSIGNED_SERVICE_SUMMARY_REMOVED_IN ·
  *   audienceRequiredByDefault(version?) · unprovenFormatLive(version?) · relayClaimOptionalLive(version?) ·
- *   serviceSummaryForm(peerVersion, ownVersion?) · federationDefaults()
+ *   serviceSummaryForm(peerVersion, ownVersion?) · unsignedServiceSummaryAccepted(heartbeatVersion, ownVersion?) ·
+ *   federationDefaults()
  * @usage
  *   import { federationDefaults } from './config-federation.js';
  *   const config = { ...federationDefaults(), ... };
  * @version-history
+ *   2026-10-16 — unsignedServiceSummaryAccepted: the receiving side of the same window, true through 4.0.4
+ *     only for a peer whose signed heartbeat named 4.0.2 or older (decision 2026-10-16).
  *   2026-10-16 — serviceSummaryForm, SIGNED_SERVICE_SUMMARY_PEER_FROM (4.0.3) and
  *     UNSIGNED_SERVICE_SUMMARY_REMOVED_IN (4.0.5): through 4.0.4 a peer on 4.0.2 or older, or of unknown
  *     version, gets the unsigned service summary request; from 4.0.5 every peer gets the signed one
@@ -70,7 +73,8 @@ export const SIGNED_SERVICE_SUMMARY_PEER_FROM = '4.0.3';
  * The release from which this node sends only the signed service summary request, to every peer.
  * One release (4.0.4) sends the older form to a peer on 4.0.2 or older and to a peer whose version
  * it does not know; the release after it (4.0.5) does not (decision 2026-10-16, Core 2026-11
- * Appendix B). The receiving side accepts only the signed form since 4.0.3 and is not changed.
+ * Appendix B). The receiving side keeps the same window: through 4.0.4 it also answers the unsigned
+ * form from a peer whose signed heartbeat named 4.0.2 or older (unsignedServiceSummaryAccepted).
  */
 export const UNSIGNED_SERVICE_SUMMARY_REMOVED_IN = '4.0.5';
 
@@ -121,6 +125,17 @@ export function unprovenFormatLive(version: string = getSoftwareVersion()): bool
 /** Whether a node on `version` may still take `optional` as a relay-claim setting, the node's or a peer's. */
 export function relayClaimOptionalLive(version: string = getSoftwareVersion()): boolean {
   return !versionAtLeast(version, RELAY_CLAIM_OPTIONAL_REMOVED_IN);
+}
+
+/**
+ * Whether this node answers an UNSIGNED service summary request from a peer whose own signed
+ * heartbeat named `heartbeatVersion` (PeerInfo.softwareVersion, written only by the ping route after
+ * the signature verified). True only before UNSIGNED_SERVICE_SUMMARY_REMOVED_IN and only for a known
+ * version older than SIGNED_SERVICE_SUMMARY_PEER_FROM: never for a peer of unknown or newer version,
+ * and never on what the request itself says (decision 2026-10-16, the same window as the sending side).
+ */
+export function unsignedServiceSummaryAccepted(heartbeatVersion: string | null | undefined, ownVersion: string = getSoftwareVersion()): boolean {
+  return serviceSummaryForm(heartbeatVersion, ownVersion).reason === 'peer-old';
 }
 
 export function federationDefaults(): FederationConfig {
