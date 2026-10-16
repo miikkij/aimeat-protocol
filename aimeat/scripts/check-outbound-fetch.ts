@@ -34,6 +34,9 @@
  *   cd aimeat && pnpm check:outbound-fetch --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:outbound-fetch --seed     # rewrite the exemption file
  * @version-history
+ *   2026-10-16 — A `//` after a colon is kept: the comment strip cut constant URLs at their scheme
+ *     and reported fetch('https://…', …) as a caller-chosen URL. Found by the new fixture test
+ *     (test/unit/security-gates-fail.test.ts, QA audit S10-09).
  *   v1.2.0 — 2026-10-16 — A stale exemption (one matching no call site) fails under --strict, and a
  *     repeated identical line is keyed `#2`, `#3` so each call needs its own entry. main() runs only
  *     as the command, so the unit test imports compareExemptions (QA audit P3-04).
@@ -92,7 +95,9 @@ export function collectFetches(files: string[]): Finding[] {
             // person it should leave alone. Line comments and single-line block comments are
             // dropped; a `fetch(` inside a multi-line block comment is rare enough to accept, and
             // errs toward reporting rather than missing.
-            const code = line.replace(/\/\*.*?\*\//g, '').replace(/^\s*\*.*$/, '').split('//')[0];
+            // A `//` after a colon is a URL scheme, not a comment: cutting there turned
+            // fetch('https://x', …) into fetch('https: and reported a constant URL as caller-chosen.
+            const code = line.replace(/\/\*.*?\*\//g, '').replace(/^\s*\*.*$/, '').replace(/(^|[^:])\/\/.*$/, '$1');
             if (!code.trim()) continue;
             // `await fetch(` / `= fetch(` / `return fetch(` — but not safeFetch(, and not a method
             // call like `res.fetch(` or `session.fetch(` (those are the browser SDK's own helper).

@@ -37,14 +37,17 @@
  *   somewhere and offered somewhere. Whether the right door asks it is a reading job, and
  *   check:route-scopes counts the doors that ask nothing at all.
  * @structure
- *   - sources(): the TypeScript sources under src/
- *   - findings(): the two directions
+ *   - scopeParitySources(): the TypeScript sources under src/
+ *   - scopeParityFindings(): the two directions
  *   - main(): compare against security/scope-parity-exemptions.json, report, gate under --strict
  * @usage
  *   cd aimeat && pnpm check:scope-parity           # report
  *   cd aimeat && pnpm check:scope-parity --strict  # gate (pre-commit + CI)
  *   cd aimeat && pnpm check:scope-parity --seed    # rewrite the exemption file from today's state
  * @version-history
+ *   2026-10-16 — sources() and findings() are exported as scopeParitySources(dir) and
+ *     scopeParityFindings(files, vocabulary, root), and main() runs only when invoked as the script,
+ *     so a unit test can show the comparison refusing a word on one side only (QA audit S10-09).
  *   v1.0.2 — 2026-10-05 — scopes-operator.ts is gone: every tool's scope is on its catalog definition
  *     (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-10-05 — A TOOL_SCOPES entry may name several words (secaudit 2026-10, C3).
@@ -54,7 +57,8 @@
  */
 import ts from 'typescript';
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { scopeMentions } from './inventory/scope-mentions.js';
 import { readVocabulary, demandedScopes } from './inventory/scope-vocabulary.js';
 import { TOOL_SCOPES, toolScopeWords } from '../src/tool-catalog/scopes.js';
@@ -76,7 +80,7 @@ const DEFINITION_FILES = ['tool-catalog/scopes.ts', 'utils/scope-coverage.ts'];
 
 interface ExemptionFile { note: string; exempt: Record<string, string> }
 
-function sources(): ts.SourceFile[] {
+export function scopeParitySources(srcDir: string = SRC): ts.SourceFile[] {
     const files: string[] = [];
     const walk = (dir: string): void => {
         for (const name of readdirSync(dir)) {
@@ -85,11 +89,11 @@ function sources(): ts.SourceFile[] {
             if (p.endsWith('.ts') && !p.endsWith('.d.ts')) files.push(p);
         }
     };
-    walk(SRC);
+    walk(srcDir);
     return files.map(f => ts.createSourceFile(f, readFileSync(f, 'utf-8'), ts.ScriptTarget.ESNext, true));
 }
 
-interface Finding {
+export interface Finding {
     /** The stable key an exemption is written against. */
     key: string;
     word: string;
@@ -97,10 +101,9 @@ interface Finding {
     detail: string;
 }
 
-function findings(): Finding[] {
-    const vocabulary = readVocabulary(AIMEAT);
-    const files = sources();
-    const mentions = scopeMentions(files, vocabulary, AIMEAT, DEFINITION_FILES);
+/** The two directions over `files`, against the owner-facing `vocabulary`; `root` makes paths relative. */
+export function scopeParityFindings(files: ts.SourceFile[], vocabulary: Set<string>, root: string = AIMEAT): Finding[] {
+    const mentions = scopeMentions(files, vocabulary, root, DEFINITION_FILES);
     const actionWords = actionScopeWords();
     const mcpWords = new Set([...Object.values(TOOL_SCOPES).flatMap(toolScopeWords), ...actionWords.map(a => a.word)]);
     const demanded = demandedScopes(files);
@@ -124,7 +127,7 @@ function findings(): Finding[] {
     const seen = new Map<string, string[]>();
     for (const d of demanded) {
         if (vocabulary.has(d.word)) continue;
-        const where = `${relative(AIMEAT, d.file).split('\\').join('/')}:${d.line}`;
+        const where = `${relative(root, d.file).split('\\').join('/')}:${d.line}`;
         seen.set(d.word, [...(seen.get(d.word) ?? []), where]);
     }
     for (const word of mcpWords) {
@@ -149,7 +152,7 @@ function findings(): Finding[] {
 function main(): void {
     const strict = process.argv.includes('--strict');
     const seed = process.argv.includes('--seed');
-    const all = findings();
+    const all = scopeParityFindings(scopeParitySources(), readVocabulary(AIMEAT));
 
     if (seed) {
         const exempt: Record<string, string> = {};
@@ -208,4 +211,6 @@ function main(): void {
         : '  ✓ no permission word is newly on one side only');
 }
 
-main();
+// Runs only when invoked as the script, so test/unit/security-gates-fail.test.ts can import the comparison.
+const invokedDirectly = process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedDirectly) main();

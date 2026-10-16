@@ -433,10 +433,21 @@ third-party apps benefits; the denylist is a code invariant.
 **Startup self-check:** on boot, `securityPostureWarnings(config)` (`src/config-posture.ts`, called from
 `src/index-start.ts`) logs one `SECURITY:` warning per unsafe setting when the profile resolves to
 `public`: `AIMEAT_ANONYMOUS=true`, `AIMEAT_ALLOW_PRIVATE_EGRESS=true`, `AIMEAT_FEDERATION_OPEN_JOIN=true`,
-no `AIMEAT_ENCRYPTION_KEY`, `*` in `AIMEAT_CORS_ALLOWED_ORIGINS`, `AIMEAT_STATS_ACCESS=public`, and two
-values the node refused (`AIMEAT_AI_LABEL_PUBLIC=off`, reset to `strict`, and
-`AIMEAT_AI_FIXED_BASEURL_OVERRIDES`). It only warns: the node still starts, so an insecure public node
-is a choice the operator made with the warning in the log. On a `local` node it says nothing.
+no `AIMEAT_ENCRYPTION_KEY`, `*` in `AIMEAT_CORS_ALLOWED_ORIGINS`, `AIMEAT_STATS_ACCESS=public`,
+`AIMEAT_METRICS_ACCESS=public`, `AIMEAT_EXT_INSTALL_ROLE` other than `operator`,
+`AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=true`, an empty `AIMEAT_AI_PROVIDER_ALLOWLIST`, a powerful
+scope (invariant 8) in `AIMEAT_DEFAULT_AGENT_SCOPES`, and two values the node refused
+(`AIMEAT_AI_LABEL_PUBLIC=off`, reset to `strict`, and `AIMEAT_AI_FIXED_BASEURL_OVERRIDES`). Three test
+switches are reported on any node whose public URL is not a loopback address, whatever the profile:
+`AIMEAT_TEST_MONEY_HANDLER`, `AIMEAT_TEST_MODE` and `AIMEAT_DEV_MODE`. It only warns: the node still
+starts, so an insecure public node is a choice the operator made with the warning in the log. On a
+`local` node it says nothing else.
+
+*Gate for invariants 8 and 10:* `pnpm check:posture-defaults`, since 2026-10-16. For each knob in the
+table above it holds three things: an uncommented value in `.env.example` is safe on a public node, a
+`(default: X)` the file states is the value the code resolves with nothing set, and a public node with
+nothing set either runs the safe value or the self-check names it. It also refuses a powerful scope in
+the shipped default agent scopes. What it leaves open is listed in the script as `DECISION OWED`.
 
 `aimeat validate` (`src/utils/env-validator.ts`) is the offline check. It reads the environment and the
 config file, prints errors, warnings and notes, and exits 1 on an error. It does not read the security
