@@ -12,6 +12,10 @@
  *   delivered over SMTP (absent here), so it is covered by the unchanged verify-email path + the wrong-code
  *   assertion below.
  * @version-history
+ *   2026-10-17 — The restart waits for the old node to EXIT and its port to go quiet. It waited on
+ *     `child.killed`, which is true once the signal is sent, so on a loaded runner the old node
+ *     answered the new one's readiness poll and then left (17/19 "fetch failed" every nightly since
+ *     2026-10-07, both backends).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-06 — A code key's holder under the gate: signing in with the key answers
  *     EMAIL_NOT_VERIFIED with has_email true, and attach-email takes the key as the password and sends a
@@ -81,13 +85,29 @@ async function startServer(gateOn: boolean, freshDb: boolean): Promise<ChildProc
     return waitForServer(child, BASE, { label: 'the login-attach node' });
 }
 
+/**
+ * Stop the node and wait until it has EXITED and its port answers nothing.
+ *
+ * `child.killed` turns true the moment the signal is SENT, not when the process ends, so the loop
+ * this replaces waited 0.5 s. On a loaded CI runner the old node was still serving: the restart's
+ * readiness poll was answered by the OLD node, the new one lost the port, and the old one then went
+ * away under every later request ("fetch failed", 17 of 19, every nightly since 2026-10-07).
+ */
 async function stopServer(child: ChildProcess): Promise<void> {
+    const exited = new Promise<void>(r => {
+        if (child.exitCode !== null || child.signalCode !== null) r();
+        else child.once('exit', () => r());
+    });
     child.kill('SIGTERM');
+    const done = await Promise.race([exited.then(() => true), new Promise<boolean>(r => setTimeout(() => r(false), 15_000))]);
+    if (!done) { child.kill('SIGKILL'); await exited; }
     const start = Date.now();
-    while (!child.killed && child.exitCode === null && Date.now() - start < 5000) {
-        await new Promise(r => setTimeout(r, 100));
+    while (Date.now() - start < 15_000) {
+        try { await fetch(`${BASE}/v1/spec`, { signal: AbortSignal.timeout(1000) }); }
+        catch { break; } // nothing answers: the port is free
+        await new Promise(r => setTimeout(r, 200));
     }
-    await new Promise(r => setTimeout(r, 500)); // let the port + DB lock release before the restart
+    await new Promise(r => setTimeout(r, 200)); // the DB lock follows the process
 }
 
 async function main() {
