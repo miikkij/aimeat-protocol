@@ -46,6 +46,8 @@ import {
 import { withPageFrameShim, pageFrameHolderHtml, pageFrameHolderScript } from '../utils/app-frame-assets.js';
 import { localAccountName } from '../utils/gaii.js';
 import { decodeUriSegment } from '../utils/uri-decode.js';
+import { readerFor } from '../services/classification/reader.js';
+import { fileTarget } from '../services/classification/labels.js';
 import { logger } from '../utils/logger.js';
 
 /** Plain words for a refusal: the frame shows them in place of the page. */
@@ -81,8 +83,9 @@ function parseFileRef(ref: string): { owner?: string; key: string } | null {
  * owner had.
  */
 async function pageFile(
-    storage: Storage, pageOwner: string, ref: string, c: PageFrameClaims,
+    deps: { storage: Storage; config: AimeatConfig }, pageOwner: string, ref: string, c: PageFrameClaims,
 ): Promise<StorageFileRecord | null> {
+    const { storage } = deps;
     const parsed = parseFileRef(ref);
     if (!parsed || !parsed.key) return null;
     const account = localAccountName(pageOwner);
@@ -92,13 +95,30 @@ async function pageFile(
     for (const owner of owners) {
         const file = await storage.getStorageFile(owner, parsed.key).catch(err => { logger.warn('page host: a page file could not be read', { error: String(err) }); return null; });
         if (!file) continue;
-        if (family.includes(owner)) return file;
-        if (file.visibility === 'public') return file;
         const refs = (file.workspaceRef ?? '').split(/\s+/).filter(Boolean);
-        if (file.visibility === 'workspace' && refs.includes(`${c.org}/${c.ws}`)) return file;
-        return null;
+        const mayOpen = family.includes(owner) || file.visibility === 'public'
+            || (file.visibility === 'workspace' && refs.includes(`${c.org}/${c.ws}`));
+        return mayOpen ? passesClassification(deps, file, owner, parsed.key, c) : null;
     }
     return null;
+}
+
+/**
+ * The classification reader on a page's file (TARGET-082): the page host holds no session, so the
+ * reader is the anonymous one, and a shared page's file must also be allowed to leave the organism,
+ * as the share's own content is (routes/organisms/shared-public.ts). A file it keeps back answers as
+ * absent.
+ */
+async function passesClassification(
+    deps: { storage: Storage; config: AimeatConfig }, file: StorageFileRecord, owner: string, key: string, c: PageFrameClaims,
+): Promise<StorageFileRecord | null> {
+    const reader = readerFor(deps, null);
+    const target = () => fileTarget(owner, key, file.workspaceRef);
+    const shown = await reader.show([file], target);
+    if (!shown.length) return null;
+    if (c.k !== 'pub') return file;
+    const { kept } = await reader.leave(shown, target, { kind: 'share', organismId: c.org, ws: c.ws });
+    return kept.length ? file : null;
 }
 
 export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
@@ -175,7 +195,7 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
         }
         const files = rec.value.files && typeof rec.value.files === 'object' ? rec.value.files : {};
         const ref = pageFileNameOk(path) ? files[path] : undefined;
-        const file = typeof ref === 'string' ? await pageFile(storage, rec.ownerGaii, ref, claims) : null;
+        const file = typeof ref === 'string' ? await pageFile({ storage, config }, rec.ownerGaii, ref, claims) : null;
         if (!file || !isServablePageFileType(file.mimeType)) { sendText(res, 404, 'Not found'); return; }
         res.setHeader('Content-Type', file.mimeType);
         res.setHeader('Cache-Control', 'private, max-age=300');
