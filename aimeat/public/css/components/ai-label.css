@@ -21,11 +21,14 @@
  *   floating, so it cannot be covered by app chrome or a toast; `isolation: isolate` keeps a
  *   descendant's z-index from escaping and a parent's stacking context from burying it.
  * @structure
- *   - .ai-label (+ --inline / --block / --interaction) — the wrapper
+ *   - .ai-label (+ --inline / --block / --interaction / --chip) — the wrapper
  *   - .ai-label__icon (+ per-icon aspect ratios) — the official EU glyph, theme-variant switched
  *   - .ai-label__text / __short / __long / __link
+ *   - .ai-label__toggle / __tap / __panel — the corner chip's tap toggle and its statement panel
  * @usage preloaded from spa.html; classes emitted by /components/ai-label.js
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The corner chip (--chip): the app's mark, for an HTML page in full screen
+ *     (Jouni, 2026-10-16: "AI badge siellä missä appseissakin vasen alanurkka samalla tyylillä").
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 3.
  */
 
@@ -144,3 +147,48 @@
 @media (prefers-reduced-motion: no-preference) {
   .ai-label__link { transition: color 120ms ease; }
 }
+
+/* The corner chip: the app's own mark (services/ai-provenance-marks.ts visibleLabelMarkup) for a
+   page that fills the screen, an HTML page in full screen. The EU icon alone in a 34px pill; the
+   statement and the details link open in a panel ABOVE the chip on hover, focus or a tap, so the
+   chip never moves. The caller places it (bottom-left, as on an app). */
+.ai-label--chip {
+  --ai-label-icon-h: 15px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  font-weight: var(--weight-semibold, 600);
+}
+.ai-label--chip .ai-label__icon { min-height: 15px; }
+.ai-label__toggle { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.ai-label__tap { position: absolute; inset: 0; margin: 0; cursor: pointer; border-radius: var(--radius-full); z-index: 2; }
+.ai-label__toggle:focus-visible ~ .ai-label__tap { outline: var(--shape-frame) solid var(--border-focus); outline-offset: 2px; }
+/* Closed, the statement is visually hidden, never display:none: a screen reader reads it at all times. */
+.ai-label__panel {
+  position: absolute; left: -1px; bottom: 100%; width: 1px; height: 1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.ai-label--chip:hover .ai-label__panel,
+.ai-label--chip:focus-within .ai-label__panel,
+.ai-label__toggle:checked ~ .ai-label__panel {
+  bottom: calc(100% + 6px);
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px;
+  width: max-content; max-width: min(420px, calc(100vw - 24px)); height: auto;
+  box-sizing: border-box; padding: 10px 14px; overflow: visible; clip-path: none; white-space: normal;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); box-shadow: var(--shadow-lg);
+}
+/* The gap between the panel and the chip, made hoverable, so the pointer reaches the link. */
+.ai-label__panel::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 8px; }
+.ai-label__panel b { overflow-wrap: anywhere; }
+.ai-label__panel .ai-label__link { position: relative; z-index: 3; }
