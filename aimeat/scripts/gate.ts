@@ -13,12 +13,15 @@
  *     always        check:fast and check:invariants — thirty seconds, and half of them read docs
  *     unit          vitest --changed <base>: the test files whose import graph reaches a changed
  *                   file; the whole suite only with --full
- *     guard tier    only when a change touches the code the tier guards — src/routes, src/auth,
- *                   src/services, src/storage, src/mcp, src/middleware, src/utils, src/commerce,
- *                   src/server-bootstrap and config — on SQLite; --postgres adds
- *                   the production backend; --full forces the tier
- *     own suites    an E2E suite file that itself changed is run, including under --full;
- *                   SQLite always, Postgres with --postgres or --full
+ *     guard tier    when a change touches server source (anything under src/ but src/static), the
+ *                   dependency manifests or the E2E machinery (runner, helpers, fixtures); on
+ *                   SQLite, and on PostgreSQL too when the Postgres legs run; --full forces it
+ *     own suites    a registered E2E suite file that itself changed is run, including under --full;
+ *                   SQLite always, PostgreSQL when the Postgres legs run
+ *     Postgres legs the guard tier, the changed suites and the unit files with a Postgres half run
+ *                   on PostgreSQL by themselves when the change touches storage, identity, the
+ *                   doors (src/routes, src/mcp, src/tool-catalog) or the runner; --postgres or
+ *                   --full forces them
  *
  *   It prints the plan and the reason for each line before running anything, so a "why did this
  *   take four minutes" has its answer at the top of the log. CI runs everything after every push
@@ -27,13 +30,18 @@
  *   person or a session runs before saying done.
  * @usage
  *   cd aimeat && pnpm gate                 # what the change reaches
- *   cd aimeat && pnpm gate --postgres      # …plus the Postgres tier when the tier runs
+ *   cd aimeat && pnpm gate --postgres      # …plus the Postgres legs whatever changed
  *   cd aimeat && pnpm gate --full          # all units, changed suites and guards on both backends
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
  *   v1.3.0 -- 2026-10-16 -- The plan prints main's CI state and the nightly sweep's state (QA audit
  *     P2-01, P4-01, P8-01, P2-03) and says when core.hooksPath is not .githooks (QA audit P2-07).
+ *   2026-10-16 — The guard tier runs for every server source change but src/static, for the
+ *     dependency manifests and for the E2E machinery; the Postgres legs run by themselves for a
+ *     storage, identity, door or runner change, and include the unit files with a Postgres half;
+ *     a changed suite is found by its registration in the runner, not by an e2e- prefix
+ *     (QA audit P2-04, P2-05, P2-06, P8-06, P1-03, P4-02).
  *   v1.2.0 -- 2026-10-12 -- More than 40 changed suites go to the runner in a file (--tests-file):
  *     404 of them made a command line Windows refused, and the gate stopped there in 0 s.
  *   v1.1.0 -- 2026-09-07 -- Preserve changed suites under --full, honor --postgres for them,
@@ -42,24 +50,56 @@
  *     only when platform code that concerns it changed, not for every little thing."
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describeState, readCiState } from './lib/ci-runs.mjs';
 
 const args = process.argv.slice(2);
 const FULL = args.includes('--full');
-const POSTGRES = args.includes('--postgres') || FULL;
+const POSTGRES_ASKED = args.includes('--postgres') || FULL;
 const PLAN_ONLY = args.includes('--plan');
 const BASE = args.find(a => a.startsWith('--base='))?.slice('--base='.length) ?? 'origin/main';
 
 const AIMEAT = process.cwd();
 const ROOT = resolve(AIMEAT, '..');
 
-/** Paths that can move a guard suite: the doors, the identity layer, the services behind them. */
-const GUARDED = /^aimeat\/src\/(?:(routes|auth|services|storage|mcp|middleware|utils|commerce|server-bootstrap)\/|config(?:-types)?\.ts$)/;
-/** Paths a unit test can reach at all. */
-const UNIT_REACH = /^aimeat\/(src\/|test\/(unit|integration)\/|public\/|scripts\/|package\.json|vitest\.config|tsconfig|eslint\.config|locales\/)/;
+/**
+ * The suites the runner knows, read from its lists as text: `'test/<name>.ts'` entries. A changed
+ * suite is selected by membership, not by an `e2e-` prefix, because nine registered suites have
+ * none (federation-messages.ts, api-full.ts, …) and a change to one of them ran nothing (QA audit
+ * P2-06, P1-03). Read as text so the planner does not import the runner, which starts work on load.
+ */
+function registeredSuites(): Set<string> {
+    try {
+        const text = readFileSync(join(AIMEAT, 'test', 'run-e2e-ci.ts'), 'utf8');
+        return new Set([...text.matchAll(/'test\/([A-Za-z0-9_.-]+)\.ts'/g)].map(m => m[1]));
+    } catch {
+        return new Set();
+    }
+}
+
+/**
+ * Paths that can move a guard suite. Every server source file except the browser libraries the node
+ * serves (src/static), plus the dependency manifests and the E2E machinery itself (the runner, its
+ * server lifecycle and production lane, the shared helpers, the fixtures, the version-aware list).
+ *
+ * It was a list of nine directories plus config.ts and config-types.ts until 2026-10-16, and 40
+ * top-level files sat outside it: 35 config-*.ts files split out of config.ts, server.ts (which
+ * mounts the global auth middleware) and index-start.ts (the WebSocket upgrade's credentials), and
+ * six directories, src/tool-catalog among them, which holds the scope each MCP tool asks. A change to
+ * any of them finished the gate without the tier (QA audit P2-05, P8-06, P1-03).
+ */
+const GUARDED = /^aimeat\/(?:src\/(?!static\/)|package\.json$|pnpm-lock\.yaml$|test\/(?:run-e2e-[^/]+\.ts$|helpers\/|fixtures\/|version-aware-suites\.txt$))/;
+/**
+ * Paths whose change runs the PostgreSQL legs as well, without --postgres: the storage layer, the
+ * identity layer, the doors (REST routes and MCP tools) and the E2E machinery, which decides how
+ * both backends are run. PostgreSQL is the production backend, and a change in these places is the
+ * kind that differs between the two providers or decides who may do what (QA audit P2-04).
+ */
+const POSTGRES_TRIGGER = /^aimeat\/(?:src\/(?:storage|auth|routes|mcp|tool-catalog)\/|src\/(?:services|utils)\/[^/]*(?:identity|gaii|ghii|owner|principal)[^/]*\.ts$|test\/run-e2e-[^/]+\.ts$|test\/helpers\/server-db\.ts$)/;
+/** Paths a unit test can reach at all. The whole test tree: the runner has unit tests of its own (QA audit P2-06). */
+const UNIT_REACH = /^aimeat\/(src\/|test\/|public\/|scripts\/|package\.json|vitest\.config|tsconfig|eslint\.config|locales\/)/;
 
 function git(...a: string[]): string {
     return execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' }).trim();
@@ -105,7 +145,13 @@ function plan(files: string[], mergeBase: string): Step[] {
     const steps: Step[] = [];
     const unitReach = files.filter(f => UNIT_REACH.test(f));
     const guarded = files.filter(f => GUARDED.test(f));
-    const ownSuites = files.filter(f => /^aimeat\/test\/e2e-[^/]+\.ts$/.test(f)).map(f => f.replace(/^aimeat\/test\//, '').replace(/\.ts$/, ''));
+    const postgresReason = postgresWhy(files);
+    const POSTGRES = postgresReason !== null;
+    const registered = registeredSuites();
+    const ownSuites = files
+        .filter(f => /^aimeat\/test\/[^/]+\.ts$/.test(f))
+        .map(f => f.replace(/^aimeat\/test\//, '').replace(/\.ts$/, ''))
+        .filter(name => registered.has(name) || name.startsWith('e2e-'));
 
     steps.push({ name: 'check:fast', cmd: ['pnpm', '-s', 'check:fast'], why: 'always: thirty seconds, and half of it reads documents' });
     steps.push({ name: 'check:invariants', cmd: ['pnpm', '-s', 'check:invariants'], why: 'always: one compiler program, five gates' });
@@ -129,14 +175,21 @@ function plan(files: string[], mergeBase: string): Step[] {
         const shown = ownSuites.length > 40 ? `${ownSuites.length} suites` : ownSuites.join(', ');
         for (const backend of POSTGRES ? ['sqlite', 'postgres-kysely'] : ['sqlite']) {
             const label = backend === 'sqlite' ? 'SQLite' : 'Postgres';
-            steps.push({ name: `own E2E suite(s), ${label}: ${shown}`, cmd: ['node', `--env-file=.env.test.${backend}`, '--import', 'tsx', 'test/run-e2e-ci.ts', ...selection], why: 'a suite that changed is run' });
+            steps.push({ name: `own E2E suite(s), ${label}: ${shown}`, cmd: ['node', `--env-file=.env.test.${backend}`, '--import', 'tsx', 'test/run-e2e-ci.ts', ...selection], why: backend === 'sqlite' ? 'a suite that changed is run' : postgresReason ?? '' });
         }
     }
 
     if (FULL || guarded.length > 0) {
         const why = FULL ? '--full' : guarded.slice(0, 4).join(', ') + (guarded.length > 4 ? ', …' : '');
         steps.push({ name: 'guard tier, SQLite', cmd: ['pnpm', '-s', 'test:e2e:guards:sqlite'], why });
-        if (POSTGRES) steps.push({ name: 'guard tier, Postgres', cmd: ['pnpm', '-s', 'test:e2e:guards:postgres-kysely'], why: FULL ? '--full' : '--postgres' });
+        if (POSTGRES) steps.push({ name: 'guard tier, Postgres', cmd: ['pnpm', '-s', 'test:e2e:guards:postgres-kysely'], why: postgresReason ?? '' });
+    }
+
+    // The unit files with a PostgreSQL half run it against the Postgres test database whenever the
+    // Postgres legs run, with the flag that turns a missing URL into a failure (QA audit P4-02,
+    // F7c-02, F24-01). Without this their Postgres half ran in no automatic run.
+    if (POSTGRES) {
+        steps.push({ name: 'unit tests with a Postgres half, Postgres', cmd: ['node', '--env-file=.env.test.postgres-kysely', '--import', 'tsx', 'scripts/test-unit-postgres.ts'], why: postgresReason ?? '' });
     }
     return steps;
 }
@@ -156,6 +209,17 @@ async function contextLines(): Promise<string[]> {
     return lines;
 }
 
+
+/** Why the Postgres legs run, or null when they do not: --postgres or --full, or a changed path that needs them. */
+function postgresWhy(files: string[]): string | null {
+    if (FULL) return '--full';
+    if (POSTGRES_ASKED) return '--postgres';
+    const hits = files.filter(f => POSTGRES_TRIGGER.test(f));
+    if (hits.length === 0) return null;
+    return 'storage, identity or doors changed: ' + hits.slice(0, 3).join(', ') + (hits.length > 3 ? ', …' : '');
+}
+
+
 async function main(): Promise<void> {
     const { files, mergeBase } = changedSince(BASE);
     const steps = plan(files, mergeBase);
@@ -164,7 +228,8 @@ async function main(): Promise<void> {
     for (const s of steps) console.log(`  • ${s.name.padEnd(44)} ${s.why}`);
     const skipped: string[] = [];
     if (!FULL && !files.some(f => UNIT_REACH.test(f))) skipped.push('unit tests (nothing a test can reach changed)');
-    if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard tier (no guarded backend, shared utility, commerce, configuration or bootstrap changes)');
+    if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard tier (no server source, dependency or E2E machinery changed)');
+    if (postgresWhy(files) === null) skipped.push('PostgreSQL legs (no storage, identity, door or runner change; --postgres forces them)');
     for (const s of skipped) console.log(`  · skipped: ${s}`);
     console.log('');
     for (const line of await contextLines()) console.log(`  ${line}`);
