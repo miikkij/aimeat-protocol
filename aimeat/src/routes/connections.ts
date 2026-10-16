@@ -29,6 +29,9 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   2026-10-16 — POST /v1/connections/:id/read/:resource answers 403 READ_AS_OWNER_REQUIRED, with the MCP
+ *     mail tools' sentence (readAsOwnerRefusal), when an agent reads its owner's mailbox without
+ *     connections:read-as-owner; it answered 404 for a connection GET /v1/connections had listed (Jouni, 2026-10-16).
  *   2026-10-16 — GET /v1/connections/attempts lists the owner's items too for an agent on
  *     connections:read-as-owner, each marked `holder` (Jouni, 2026-10-16).
  *   2026-10-15 — GET /v1/connections lists an agent's owner's connections on connections:use, and
@@ -78,7 +81,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { buildOutboundProviders, listProviderMeta, findProvider } from '../services/connections/providers.js';
 import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
-import { connectionHoldersOf, listUsableConnections, requireUsableConnection, toPublicConnection, toPublicClient } from '../services/connections/access.js';
+import { connectionHoldersOf, listUsableConnections, requireUsableConnection, readAsOwnerRefusal, CONNECTIONS_READ_AS_OWNER_SCOPE, toPublicConnection, toPublicClient } from '../services/connections/access.js';
 import { startAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { answerConnectCallback, connectCallbackPath } from './connections-callback.js';
 import { browserCanBind, issueRoundBinding } from '../middleware/oauth-round-cookie.js';
@@ -713,6 +716,12 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     // connection on connections:read-as-owner (feature-list audit 128).
     const connection = await requireUsableConnection(storage, holdersOf(req, 'read'), req.params.id as string);
     if (!connection) {
+      // The owner's mailbox, which GET /v1/connections lists to this agent on connections:use, is not
+      // "no such connection": the refusal names the missing permission, as the MCP mail tools do.
+      const refusal = await readAsOwnerRefusal(storage, principal, `${req.auth!.owner}@${config.nodeId}`, req.auth!.scopes, req.params.id as string);
+      if (refusal) {
+        return res.status(403).json(error(config.nodeId, refusal.code, refusal.message, undefined, { scope: CONNECTIONS_READ_AS_OWNER_SCOPE }));
+      }
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such connection of yours'));
     }
 

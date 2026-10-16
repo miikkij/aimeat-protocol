@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — A node whose base URL is not loopback and that has no owner issues the one-time setup
+ *     code (services/setup-code.ts) and prints it in the start banner at warn level, with where to
+ *     enter it; POST /v1/setup/init refuses without it (Jouni, 2026-10-16).
  *   2026-10-16 — The settings loadConfig() set aside reach createServer, which records them on the
  *     Security page (Jouni, decision 2026-10-16).
  *   2026-10-16 — The posture header says "this node": the test and dev mode warnings are reported on
@@ -63,6 +66,7 @@ import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
 import { turnDeprecationWarning } from './services/turn-credentials.js';
 import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-setup-secret.js';
+import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
 
 /** How long shutdown waits for scheduled runs in progress; the process exits 5 s after server.close. */
 const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
@@ -116,8 +120,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   // user can read, and only while the node has no owner (the `anonymous` system owner of
   // anonymous mode is nobody's and does not count). With an owner, or with a secret the operator
   // set, a file left from an earlier boot is deleted. Secrets audit 2026-10-09, 1.4.
+  let hasOwner = true;
   try {
-    const hasOwner = (await storage.listOwners()).some(o => o.name !== 'anonymous');
+    hasOwner = (await storage.listOwners()).some(o => o.name !== 'anonymous');
     const written = syncAdminSetupSecretFile({ dir: adminSetupSecretDir(config), secret: generatedAdminSecret, hasOwner });
     if (written.action === 'written') {
       logger.info(`   Admin setup secret: written to ${written.path} (readable by this user only). Use it at ${config.baseUrl}/v1/admin/setup to create the first operator.`);
@@ -127,6 +132,10 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   } catch (err) {
     logger.warn(`Admin setup secret could not be written to a file: ${err instanceof Error ? err.message : String(err)}. Set AIMEAT_ADMIN_PASSWORD to choose the secret yourself.`);
   }
+  // A node others can reach and nobody owns yet: the first-owner setup asks for this one-time code,
+  // which only the start log carries (services/setup-code.ts; Jouni, 2026-10-16). Printed at warn
+  // level, so a node started with AIMEAT_LOG_LEVEL=warn still shows it.
+  const setupCode = !hasOwner && setupCodeRequired(config) ? setupCodeGateFor(config).issue() : null;
   const server = app.listen(config.port, (listenError?: Error) => {
     // Express 5 calls this for the server's 'error' event too, not only for 'listening'. Without
     // this check a node whose port was taken printed "AIMEAT node started", ran its schedulers and
@@ -179,6 +188,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     }
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup`);
+    if (setupCode) {
+      logger.warn(`   Setup code: ${setupCode}. Enter it in the setup wizard at ${config.baseUrl}/v1/setup/wizard to create this node's first owner; it works once.`);
+    }
     logger.info(`──────────────────────────────────────────────────────────`);
 
     // Security warnings

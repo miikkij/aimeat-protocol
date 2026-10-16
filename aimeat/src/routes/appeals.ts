@@ -11,6 +11,10 @@
  *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
  *
  * @version-history
+ *   2026-10-16 — POST /v1/appeals/:id/review decides the organism arm with archiveRoleOf (services/archive.ts),
+ *     the rule archiving asks: the creator or an admin, in person or through one of their own agents; an
+ *     agent attached to the organism is refused whoever its owner is. It read organism.admins for the
+ *     owner name alone, so an attached agent of an admin decided appeals (Jouni, 2026-10-16).
  *   v1.3.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): social:write on POST /v1/flags/:flagId/appeal, POST /v1/appeals/:id/review; social:read on GET /v1/appeals. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.2.1 — 2026-10-10 — POST /v1/flags/:flagId/appeal decides operator admission with isOperatorCaller and writes the operator trail only after the ALREADY_APPEALED check, so a refused second appeal leaves no operator_acted event (secaudit 2026-10-10 I5).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -32,6 +36,7 @@ import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
+import { archiveRoleOf } from '../services/archive.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -269,7 +274,11 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Phase 2.4 — Allow organism admins to review appeals for their organism's content
+        // The organism's creator or an admin reviews an appeal on that organism's content, in person or
+        // through one of their own agents, by the rule archiving asks (services/archive.ts
+        // archiveRoleOf): an agent attached to the organism is a member there whoever its owner is,
+        // and the role is read for the resolved principal, never for the owner name alone. The owner
+        // name used to decide it, so an attached agent of an admin decided appeals (Jouni, 2026-10-16).
         const isOperator = await isOperatorCaller(storage, req.auth);
         let isOrganismAdmin = false;
         if (!isOperator) {
@@ -281,11 +290,9 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
                 if (orgMatch) {
                     const organism = await storage.getOrganism(orgMatch[1]);
                     if (organism) {
-                        const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);
-                        if (organism.admins.includes(req.auth!.owner as string)
-                            || (ghiiRecord && organism.admins.includes(ghiiRecord.ghii))) {
-                            isOrganismAdmin = true;
-                        }
+                        const role = await archiveRoleOf(storage, organism,
+                            { principal: resolveIdentity(req.auth!, config.nodeId), ownerName: req.auth!.owner });
+                        isOrganismAdmin = role === 'creator' || role === 'admin';
                     }
                 }
             }

@@ -18,10 +18,13 @@
  *   person which account it is — while the credential and the provider's own scope vocabulary never
  *   appear in it.
  * @structure listOwnConnections · requireOwnConnection · CONNECTIONS_READ_AS_OWNER_SCOPE ·
- *   connectionHoldersOf · listUsableConnections · requireUsableConnection · listAgentsConnections ·
- *   requireAgentsConnection · toPublicConnection · toPublicClient
+ *   connectionHoldersOf · listUsableConnections · requireUsableConnection · readAsOwnerRefusal ·
+ *   listAgentsConnections · requireAgentsConnection · toPublicConnection · toPublicClient
  * @usage const conn = await requireOwnConnection(storage, principal, id);
  * @version-history
+ *   2026-10-16 — readAsOwnerRefusal and READ_AS_OWNER_REQUIRED_MESSAGE: the one decision and sentence for
+ *     a read of the owner's mailbox by an agent without connections:read-as-owner, asked by the MCP
+ *     mail tools and by POST /v1/connections/:id/read/:resource, which answered 404 (Jouni, 2026-10-16).
  *   2026-10-15 — connectionHoldersOf / listUsableConnections / requireUsableConnection: an agent names
  *     its owner's connections on connections:use and reads them on the new connections:read-as-owner
  *     (feature-list audit 128-130).
@@ -155,6 +158,29 @@ export async function requireUsableConnection(
   const conn = await storage.getConnection(connectionId);
   if (!conn || !holders.includes(conn.principal)) return null;
   return conn;
+}
+
+/** The code a read of the owner's mailbox answers when the agent may name it but not read it. */
+export const READ_AS_OWNER_REQUIRED = 'READ_AS_OWNER_REQUIRED';
+
+/** The sentence that goes with READ_AS_OWNER_REQUIRED, on MCP and on REST alike. */
+export const READ_AS_OWNER_REQUIRED_MESSAGE =
+  'This mailbox is your owner\'s. You may see it and send through it, but reading what is in it needs '
+  + 'their separate permission (connections:read-as-owner). Ask them to allow it on your page under Agents.';
+
+/**
+ * Why a connection the caller may not read is refused, when "no such connection" would not be true:
+ * the caller may NAME it (its owner's mailbox, listed to it on connections:use) but lacks
+ * connections:read-as-owner. Null for every other case, where absent and not-yours answer alike, so
+ * the answer discloses nothing the connection list did not. POST /v1/connections/:id/read/:resource
+ * and the MCP mail read tools both ask this, so they refuse with the same code and sentence.
+ */
+export async function readAsOwnerRefusal(
+  storage: Storage, principal: string, ownerGhii: string, scopes: readonly string[] | undefined, connectionId: string,
+): Promise<{ code: typeof READ_AS_OWNER_REQUIRED; message: string } | null> {
+  const named = await requireUsableConnection(storage, connectionHoldersOf(principal, ownerGhii, scopes, 'name'), connectionId);
+  if (!named || named.principal === principal) return null;
+  return { code: READ_AS_OWNER_REQUIRED, message: READ_AS_OWNER_REQUIRED_MESSAGE };
 }
 
 /**

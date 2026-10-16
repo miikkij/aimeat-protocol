@@ -33,6 +33,8 @@
  *   2026-10-16 — The owed invariant 8 decision is answered: memory:delete stays in the default and
  *     leaves POWERFUL_AGENT_SCOPES, because every delete it opens goes to the bin; the ALLOWED entry
  *     for it is removed (ruled by the developer on 2026-10-16).
+ *   2026-10-16 — The AIMEAT_SETUP_ALLOWED_IPS entry is decided: the one-time setup code closes the
+ *     first-owner setup on a node whose base URL is not loopback (Jouni, 2026-10-16).
  *   2026-10-16 — Initial (QA audit S10-05, S10-09).
  */
 import { readFileSync } from 'node:fs';
@@ -129,9 +131,10 @@ export function postureFindings(input: {
  */
 export const ALLOWED: Record<string, string> = {
     'unwarned:AIMEAT_SETUP_ALLOWED_IPS':
-        'DECISION OWED (2026-10-16): the DNA table asks a public node to restrict the first-owner setup '
-        + 'wizard to loopback, the code default is open, and no warning names it. Either the self-check '
-        + 'reports it, or this sentence says what closes the wizard on a public node.',
+        'DECIDED (Jouni, 2026-10-16): the address allowlist stays empty by default and unwarned, because '
+        + 'what closes the first-owner setup on a node whose base URL is not loopback is the one-time setup '
+        + 'code (services/setup-code.ts): the node prints it in its start log while it has no owner, and '
+        + 'POST /v1/setup/init refuses without it. The allowlist is an extra restriction an operator may add.',
 };
 
 /** A config resolved on the public profile with no AIMEAT_* variable and no config file. */

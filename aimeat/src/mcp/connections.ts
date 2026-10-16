@@ -26,6 +26,8 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-16 — The READ_AS_OWNER_REQUIRED refusal is readAsOwnerRefusal (services/connections/access.ts),
+ *     the decision and sentence the REST read route answers too (Jouni, 2026-10-16).
  *   2026-10-16 — aimeat_mail_send takes locale, image_url and image_alt, as POST /v1/outbound/send does.
  *   2026-10-16 — aimeat_connection_history and aimeat_connection_replies read the owner's published
  *     items on connections:read-as-owner, through the same holders as the mail tools (Jouni, 2026-10-16).
@@ -70,7 +72,7 @@ import { readResource } from '../services/connections/read.js';
 import { storeMailAttachment, type StoreAttachmentInput } from '../services/connections/attachment-store.js';
 import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
 import { listSendAsAliases } from '../services/connections/send-mail.js';
-import { connectionHoldersOf, listUsableConnections, requireUsableConnection, mailboxHolderFor } from '../services/connections/access.js';
+import { connectionHoldersOf, listUsableConnections, requireUsableConnection, mailboxHolderFor, readAsOwnerRefusal } from '../services/connections/access.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { sendOutbound, OutboundError } from '../services/outbound/outbound-service.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -105,12 +107,9 @@ export function registerConnectionTools(
      * Every other case keeps `fallback`, where absent and not-yours answer alike.
      */
     const unreadable = async (connectionId: string, fallback: string): Promise<TextResult> => {
-        const named = await requireUsableConnection(storage, holders('name'), connectionId);
-        if (named && named.principal !== principal()) {
-            return toolError('READ_AS_OWNER_REQUIRED',
-                'This mailbox is your owner\'s. You may see it and send through it, but reading what is in it needs '
-                + 'their separate permission (connections:read-as-owner). Ask them to allow it on your page under Agents.');
-        }
+        // The decision POST /v1/connections/:id/read/:resource asks too (services/connections/access.ts).
+        const refusal = await readAsOwnerRefusal(storage, principal(), ownerGhiiOf(principal()), scopes, connectionId);
+        if (refusal) return toolError(refusal.code, refusal.message);
         return fail(fallback);
     };
 
