@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-16 — ConfigSources carries the settings loadConfig() set aside (`settingFallbacks`), for
+ *     the Security page incidents config-init.ts opens (Jouni, decision 2026-10-16).
  *   2026-10-16 — pageHostOnly() after subdomainMiddleware: the page host answers the page frame and
  *     nothing else (HTML pages in workspaces).
  *   2026-10-16 — refusalRecorder() mounted after the request id: every 401 and 403 reaches the refusal
@@ -47,6 +49,7 @@
 import express from 'express';
 import compression from 'compression';
 import type { AimeatConfig } from './config.js';
+import type { StartSettingFallback } from './config-start-check.js';
 import type { Storage } from './storage/interface.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { optionalAuth } from './auth/middleware.js';
@@ -95,6 +98,12 @@ export interface ConfigSources {
   fileKeys: string[];
   cliKeys: string[];
   fileName: string | null;
+  /**
+   * The settings whose value loadConfig() did not accept and ran the default for. Given: their
+   * incidents are opened and the incidents of settings accepted now are closed. Absent: incidents
+   * are left as they are.
+   */
+  settingFallbacks?: StartSettingFallback[];
 }
 
 /**

@@ -101,8 +101,11 @@ AIMEAT_SQLITE_PATH=./data/aimeat.db
 Use `AIMEAT_SQLITE_PATH=:memory:` for ephemeral SQLite storage.
 For PostgreSQL, set `AIMEAT_STORAGE=postgres-kysely` and `DATABASE_URL`.
 `pnpm dev` (from the root or `aimeat/`) starts the node from source, and `pnpm start` starts the
-built node (`pnpm build` first); both need this file. The node refuses to start on a value it does
-not accept, and names the setting; `aimeat validate` checks the file without starting.
+built node (`pnpm build` first); both need this file. A value the node does not accept is set
+aside: the node starts on that setting's default, names the setting in its log and lists it on the
+admin Security page until the value is corrected. A wrong `AIMEAT_STORAGE`, `AIMEAT_NODE_TYPE` or
+`AIMEAT_REGISTRATION_MODE` still stops the start, because those defaults are not safe in place of a
+typing error. `aimeat validate` checks the file without starting.
 
 Read [the configuration reference](../b-config.md) for precedence and sealed settings.
 `aimeat config` reports settings for the process that runs that command.

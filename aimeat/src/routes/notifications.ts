@@ -17,6 +17,10 @@
  *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   2026-10-16 — DELETE /v1/notifications from an agent or an app grant puts the notifications in the
+ *     deleted-memory bin (bulkBinMemory) and answers in_bin and restorable_until; the account holder
+ *     in person still clears for good. memory:delete, a default agent scope, removed them for good
+ *     (invariant 8 as ruled by the developer on 2026-10-16).
  *   2026-10-16 — The senders read lists the owner's own agents (getAgentsByOwner), not every agent (QA audit P7-10).
  *   2026-10-16 — GET and POST /read read the caller's own notifications, every row, through
  *     listOwnerNotificationRecords. POST /read listed the node's oldest 500 rows of all owners and
@@ -57,6 +61,7 @@ import {
 } from '../services/notification-settings.js';
 import { listOwnerNotifications, listOwnerNotificationRecords } from '../services/notification-sweeps.js';
 import { logger } from '../utils/logger.js';
+import { isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
 
 interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string; source?: NotifSource; i18n?: unknown; held?: boolean }
 
@@ -247,7 +252,16 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
   /* ── DELETE /v1/notifications — clear the caller's notifications (all, or a given { ids: [...] }) ──
    * "Clear all" from the header bell: notifications are per-owner memory rows under NOTIF_PREFIX, so we
    * list THIS owner's notif rows (owner-scoped, never NOT deleteMemoryByPrefix which spans all owners)
-   * and remove them — batched via bulkDeleteMemory when the backend offers it, else a per-key fallback. */
+   * and remove them.
+   *
+   * WHO CLEARS DECIDES WHERE THEY GO. The account holder in person clears their own bell for good
+   * (bulkDeleteMemory), as before: nothing of theirs is lost that they did not choose to lose, and a
+   * bin full of read notifications is noise. Any other principal (an agent, an app grant) holds
+   * memory:delete, which is in every agent's default scopes because what it removes goes to the
+   * deleted-memory bin, so its clear goes there too (bulkBinMemory) and the owner can put a
+   * notification back with POST /v1/memory/:key/restore for the grace period. Until 2026-10-16 an
+   * agent cleared the owner's notifications for good on the default scope (invariant 8 as ruled by
+   * the developer on 2026-10-16). */
   router.delete('/v1/notifications', requireAuth(), requireScope('memory:delete'), async (req, res) => {
     const ghii = ownerGhii(req);
     const ids = Array.isArray(req.body?.ids) ? new Set(req.body.ids) : null;
@@ -255,16 +269,24 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
     const refs = mine
       .filter(r => { const v = r.value as NotifValue; return v && v.id && (!ids || ids.has(v.id)); })
       .map(r => ({ ownerGaii: ghii, key: r.key }));
+    const toBin = !isOwnerInPerson(req.auth);
     let cleared = 0;
     if (refs.length) {
-      if (storage.bulkDeleteMemory) {
+      if (toBin) {
+        const by = resolveIdentity(req.auth!, config.nodeId);
+        if (storage.bulkBinMemory) cleared = await storage.bulkBinMemory(refs, by);
+        else for (const ref of refs) { if (await storage.deleteMemory(ref.ownerGaii, ref.key, by)) cleared++; }
+      } else if (storage.bulkDeleteMemory) {
         cleared = await storage.bulkDeleteMemory(refs);
       } else {
         for (const ref of refs) { if (await storage.deleteMemory(ref.ownerGaii, ref.key)) cleared++; }
       }
       emitChange('notifications', ghii);
     }
-    res.json(success(config.nodeId, { cleared }));
+    const graceDays = config.memoryDeleteGraceDays;
+    res.json(success(config.nodeId, toBin
+      ? { cleared, in_bin: true, restorable_until: graceDays > 0 ? new Date(Date.now() + graceDays * 86_400_000).toISOString() : null }
+      : { cleared }));
   });
 
   return router;

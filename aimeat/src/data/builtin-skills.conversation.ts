@@ -33,6 +33,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   2026-10-16 — aimeat-mail-to-data: a read of the owner's mailbox without connections:read-as-owner
+ *     answers READ_AS_OWNER_REQUIRED on MCP and REST alike (Jouni, 2026-10-16).
  *   2026-10-15 — aimeat-mail-to-data: a mailbox the owner connected appears with holder owner and is read on connections:read-as-owner (feature-list audit 128).
  *   v1.4.1 — 2026-10-05 — aimeat-paying-for-the-ai: a call that names its model is refused once the
  *     allowance is spent, and the operator may choose daily limits instead (secaudit 2026-10, AI-1).
@@ -623,8 +625,9 @@ then appears in \`aimeat_connection_list\`, which is where its id comes from.
 
 If the person already connected the mailbox in their own browser, it is theirs and not yours: it
 appears in \`aimeat_connection_list\` with \`holder: "owner"\`, and you read it only when they gave
-you \`connections:read-as-owner\` as well as \`connections:read-through\`. Ask for that permission
-rather than for a second connection of the same mailbox.
+you \`connections:read-as-owner\` as well as \`connections:read-through\`. Without it a read
+answers \`READ_AS_OWNER_REQUIRED\`, over MCP and over REST alike. Ask for that permission rather
+than for a second connection of the same mailbox.
 
 Over REST the same two are \`GET /v1/connections/providers\` and \`POST /v1/connections/start\`.
 

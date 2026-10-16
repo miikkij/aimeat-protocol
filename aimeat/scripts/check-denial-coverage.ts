@@ -38,10 +38,12 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-10-16 — ROUTE_CEILING 491: e2e-notifications refuses DELETE /v1/notifications to an agent
+ *     without memory:delete, so its exemption is gone (invariant 8 review).
  *   2026-10-16 — AIMEAT_DENIAL_ROUTES=off runs the suite question alone, for a fixture tree with no
  *     openapi.yaml; without it the route question read a missing file and crashed, so every fixture
  *     case exited 1 whatever the suite asserted.
- *   2026-10-16 — ROUTE_CEILING 491: GET /v1/compliance/report/mine is refused by test/e2e-ai-label-shares.ts.
+ *   2026-10-16 — ROUTE_CEILING 490: GET /v1/compliance/report/mine is refused by test/e2e-ai-label-shares.ts.
  *   2026-10-16 — denialKind answers the same two kinds as one word; the separate
  *     denial-coverage-no-second-principal.json list of a parallel P3-08 change is folded into
  *     `anonymous_only` here.
@@ -81,7 +83,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 491;
+export const ROUTE_CEILING = 490;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

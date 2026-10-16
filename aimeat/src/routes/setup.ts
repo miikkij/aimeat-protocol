@@ -4,15 +4,26 @@
  * SPDX-License-Identifier: MIT
  * @description First-run node setup routes — serves the setup wizard, reports whether the node still
  *   needs an initial owner, and creates the first owner account (keypair, hashed password, owner JWT)
- *   before any owners exist; guarded by an optional setup-IP allowlist.
+ *   before any owners exist; guarded by an optional setup-IP allowlist and, on a node whose base URL
+ *   is not loopback, by the one-time setup code the start log prints (services/setup-code.ts).
  *
  * @structure
  *   - resolvePublicFile: locate a public/ asset from both src/ and dist/ layouts
- *   - setupRouter: builds the Express router, with a checkSetupIp gate
- *   - GET /v1/setup/status: report whether setup is needed (no owners yet)
+ *   - setupRouter: builds the Express router, with a checkSetupIp gate and the setup-code refusal
+ *   - GET /v1/setup/status: report whether setup is needed (no owners yet) and whether it needs the code
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   v1.7.2 -- 2026-10-16 -- ALREADY_CONFIGURED no longer clears the setup code: while the node has no
+ *     operator the self-heal paths still need it (Jouni, 2026-10-16).
+ *   v1.7.1 -- 2026-10-16 -- The code refusal is setupCodeRefusal (services/setup-code.ts), the one the
+ *     registration routes answer for the first account too (Jouni, 2026-10-16).
+ *   v1.7.0 -- 2026-10-16 -- On a node whose base URL is not loopback, POST /v1/setup/init takes
+ *     `setupCode`, the one-time code the start log prints while the node has no owner, and refuses
+ *     403 SETUP_CODE_REQUIRED without it and SETUP_CODE_INVALID with a wrong one, before it reads
+ *     anything else; the code is used once, in one synchronous step before the owner is created.
+ *     GET /v1/setup/status says `setupCodeRequired`. The setup was open to any address, so whoever
+ *     reached a fresh public node first became its operator (Jouni, 2026-10-16).
  *   v1.6.1 -- 2026-10-16 -- The owner row and the GHII profile are written in one transaction (QA audit E6-02).
  *   v1.6.0 -- 2026-10-16 -- POST /v1/setup/init answers `settings` (per node setting: unchanged,
  *     written to .env for the next start, or not written because a .env exists or the write failed)
@@ -47,6 +58,7 @@ import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
 import { writePrivateFile } from '../utils/private-file.js';
 import { parseSetupNodeSettings, buildSetupEnv, setupSettingOutcomes, setupMessage, type SetupEnvWrite } from '../services/setup-env.js';
+import { setupCodeGateFor, setupCodeRequired, setupCodeRefusal, SETUP_CODE_USED_MESSAGE } from '../services/setup-code.js';
 
 const __dirname_setup = dirname(fileURLToPath(import.meta.url));
 
@@ -80,6 +92,10 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
         return false;
     };
 
+    // The one-time setup code of a node others can reach (services/setup-code.ts). The start log
+    // (index-start.ts) issues it through the same gate.
+    const codeGate = setupCodeGateFor(config);
+
     // GET /v1/setup/status — Check if node needs setup
     router.get('/v1/setup/status', async (_req, res) => {
         try {
@@ -89,8 +105,10 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             const owners = (await storage.listOwners()).filter(o => o.name !== 'anonymous');
             const needsSetup = owners.length === 0;
             // nodeType and port are the wizard's defaults, so an untouched form matches the running node.
+            // setupCodeRequired tells the wizard to ask for the code the start log printed.
             res.json(success(config.nodeId, {
                 needsSetup,
+                setupCodeRequired: needsSetup && setupCodeRequired(config),
                 nodeId: config.nodeId,
                 nodeType: config.nodeType,
                 port: config.port,
@@ -126,7 +144,17 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             // Guard: only works when no owners exist
             const existingOwners = (await storage.listOwners()).filter(o => o.name !== 'anonymous');
             if (existingOwners.length > 0) {
+                // The code stays: while the node has no operator, the self-heal that makes the next
+                // account or sign-in the operator still needs it (services/owner-provisioning.ts).
                 res.status(403).json(error(config.nodeId, 'ALREADY_CONFIGURED', 'This node is already configured. Setup can only run once.'));
+                return;
+            }
+
+            // On a node others can reach, the one-time code from the start log, before anything else
+            // is read (services/setup-code.ts; Jouni, 2026-10-16).
+            const codeRefusal = setupCodeRefusal(config, req.body?.setupCode);
+            if (codeRefusal) {
+                res.status(403).json(error(config.nodeId, codeRefusal.code, codeRefusal.message));
                 return;
             }
 
@@ -199,6 +227,16 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             const now = new Date().toISOString();
             const ghii = `${username}@${config.nodeId}`;
             const passwordHash = await hashPassword(password);
+            // The code is used here, checked and taken in one synchronous step, so of two requests
+            // carrying it (this route or a registration route, services/owner-provisioning.ts) only
+            // one creates the first owner. Taken from the gate itself rather than through
+            // claimOperatorSetupCode, because this route makes an operator whatever the owner count
+            // says by now. It waits again if the owner cannot be created.
+            const codeNeeded = setupCodeRequired(config);
+            if (codeNeeded && !codeGate.take(req.body?.setupCode)) {
+                res.status(403).json(error(config.nodeId, 'SETUP_CODE_INVALID', SETUP_CODE_USED_MESSAGE));
+                return;
+            }
             const ownerRecord = await storage.transaction(async () => {
                 const created = await storage.createOwner({
                     name: username,
@@ -221,7 +259,11 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                     updatedAt: now,
                 });
                 return created;
+            }).catch((err: unknown) => {
+                if (codeNeeded) codeGate.release();
+                throw err;
             });
+            if (codeNeeded) codeGate.commit();
 
             // 4. Create a default agent for the owner
             const agentKeyPair = await generateKeyPair();

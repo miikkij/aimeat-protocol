@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-16 -- aimeat-node-guide: the account that would become the operator of a node others can reach needs the one-time setup code while it has none (Jouni, 2026-10-16).
+ *   2026-10-16 -- aimeat-node-guide: the first account of a node others can reach needs the one-time setup code (Jouni, 2026-10-16).
  *   2026-10-16 -- aimeat-html-page (builtin-skills.html-page.ts): an HTML page in a workspace in three calls, and its rules.
  *   2026-10-16 -- use-app-bound-skills: GET /v1/agents/{name}/skills asks memory:read, except of the agent reading its own (QA audit W35, route-scope triage).
  *   v1.32.0 -- 2026-10-16 -- diagnose-a-workflow: a run past its time limit is an error and the next one
@@ -269,7 +271,10 @@ Fetch these in order of depth; each is self-describing:
 ## Humans: register and log in
 
 - Register: \`POST /v1/ghii\` with \`{ username, display_name, password, email }\` — it creates the
-  owner account and the GHII profile in one step — or use the web portal at \`/\`.
+  owner account and the GHII profile in one step — or use the web portal at \`/\`. While a node others
+  can reach has no operator, the account that would become it (the first one, or the next one when no
+  operator exists) needs \`setupCode\`, the one-time code the node printed in its start log; a 403
+  \`SETUP_CODE_REQUIRED\` says so. Once it has an operator, no account needs it.
 - Log in (web/API): \`POST /v1/ghii/login\` with \`{ username, password }\` → a session JWT.
 - Sign in with the password, as above. The older sign-in with the account's Ed25519 key
   (\`POST /v1/auth/token\` with \`owner\`) is removed in node 4.0.0; a script uses a personal access

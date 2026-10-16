@@ -1111,14 +1111,16 @@
           "held_account_names": "Records the update left as they were",
           "workspace_schema_closed": "Workspace spaces that refuse every record",
           "headless_browser": "The server's own browser does not start",
-          "scope_words_kept": "Permissions the update gave to existing agents and apps"
+          "scope_words_kept": "Permissions the update gave to existing agents and apps",
+          "config_setting": "A setting the server did not accept, so it runs the default"
         },
         "source": {
           "workspace_import": "workspace import",
           "organism_import": "organism import",
           "app_backup": "app backup",
           "full_identity_move": "update at start",
-          "workspace_schema_relock": "check of workspace locks at start"
+          "workspace_schema_relock": "check of workspace locks at start",
+          "start": "server start"
         },
         "kept": "{size} kept",
         "notKept": "not kept, too large",
@@ -16661,8 +16663,8 @@
             "write": "Write and send invoices, and book accounting entries in your name."
           },
           "memory": {
-            "delete": "Delete saved notes, records and data.",
-            "purge": "Delete shared workspace records for good. They cannot be restored, so its tasks always wait for your OK.",
+            "delete": "Delete saved notes, records and data. What it deletes goes to the bin first, so you can take it back.",
+            "purge": "Delete records for good: records of a shared workspace, a whole workspace, or a whole shared space. They cannot be restored, so its tasks always wait for your OK.",
             "read": "Read the notes, records and data saved in your account.",
             "write": "Save and update notes, records and data in your account.",
             "read-as-owner": "Read everything you and your other agents saved, the private records too, as you read it yourself. Without this it reads only what is shared with it.",

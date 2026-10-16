@@ -5,6 +5,7 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — A refusal from the far node answers HTTP 502 PEER_REFUSED (PEER_REFUSED_STATUS) on both forwarding routes; the far node's status is only in details.peer_status, so its 401 cannot read as the caller's own session ending (decision 2026-10-16).
  *   2026-10-16 — GET /v1/federation/resolve/:gaii names and asks only the peers the public directory
  *     lists; a private peer's address is not given out (QA audit S6-09).
  *   2026-10-15 — POST /v1/federation/route and POST /v1/federation/cross-node/work answer a refusal from the far node with an error envelope (PEER_REFUSED, its status, its answer in details) instead of ok: true (peerRefusal).
@@ -55,8 +56,15 @@ import { gatePeer } from '../../services/federation-peer-gate.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
 /**
- * The answer when the far node refused what this node forwarded: an error envelope with the far
- * node's status, and its own answer in `details`. Both forwarding routes answered the far node's
+ * The HTTP status of every PEER_REFUSED answer. A gateway error, never the far node's own status: a
+ * client that signs its user out on any 401 read the far node's refusal as the end of its own
+ * session (decision 2026-10-16). The far node's status travels in `details.peer_status`.
+ */
+const PEER_REFUSED_STATUS = 502;
+
+/**
+ * The answer when the far node refused what this node forwarded: an error envelope with status 502,
+ * and the far node's status and answer in `details`. Both forwarding routes answered the far node's
  * 401 or 500 inside a success envelope, `ok: true` beside an error status, so a caller reading `ok`
  * took a refusal for a delivery.
  */
@@ -64,7 +72,7 @@ function peerRefusal(nodeId: string, target: string, status: number, data: unkno
   const peerError = (data && typeof data === 'object' && 'error' in data) ? (data as { error: unknown }).error : data;
   return error(nodeId, 'PEER_REFUSED',
     'The other node refused the request, so nothing was done there. Its own answer is in details; the routing fee was given back.',
-    status, { routed_to: target, peer_status: status, peer_error: peerError ?? null });
+    PEER_REFUSED_STATUS, { routed_to: target, peer_status: status, peer_error: peerError ?? null });
 }
 
 /**
@@ -243,7 +251,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 // An error answer is no route made, so the fee goes back and the answer is an error.
                 if (response.status < 200 || response.status >= 300) {
                     await fee.giveBack();
-                    res.status(response.status).json(peerRefusal(config.nodeId, target_node, response.status, data));
+                    res.status(PEER_REFUSED_STATUS).json(peerRefusal(config.nodeId, target_node, response.status, data));
                     return;
                 }
 
@@ -506,7 +514,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             // An error answer is no route made, so the fee goes back and the answer is an error.
             if (response.status < 200 || response.status >= 300) {
                 await fee.giveBack();
-                res.status(response.status).json(peerRefusal(config.nodeId, target_node, response.status, data));
+                res.status(PEER_REFUSED_STATUS).json(peerRefusal(config.nodeId, target_node, response.status, data));
                 return;
             }
 

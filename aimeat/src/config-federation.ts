@@ -21,12 +21,20 @@
  *   version again). A peer that has once sent the proof is held to it whatever this says
  *   (deliveryProofAt on the peer).
  * @structure FederationConfig · AUDIENCE_REQUIRED_BY_DEFAULT_IN · UNPROVEN_FORMAT_REMOVED_IN ·
- *   RELAY_CLAIM_OPTIONAL_REMOVED_IN · audienceRequiredByDefault(version?) · unprovenFormatLive(version?) ·
- *   relayClaimOptionalLive(version?) · federationDefaults()
+ *   RELAY_CLAIM_OPTIONAL_REMOVED_IN · SIGNED_SERVICE_SUMMARY_PEER_FROM · UNSIGNED_SERVICE_SUMMARY_REMOVED_IN ·
+ *   audienceRequiredByDefault(version?) · unprovenFormatLive(version?) · relayClaimOptionalLive(version?) ·
+ *   serviceSummaryForm(peerVersion, ownVersion?) · unsignedServiceSummaryAccepted(heartbeatVersion, ownVersion?) ·
+ *   federationDefaults()
  * @usage
  *   import { federationDefaults } from './config-federation.js';
  *   const config = { ...federationDefaults(), ... };
  * @version-history
+ *   2026-10-16 — unsignedServiceSummaryAccepted: the receiving side of the same window, true through 4.0.4
+ *     only for a peer whose signed heartbeat named 4.0.2 or older (decision 2026-10-16).
+ *   2026-10-16 — serviceSummaryForm, SIGNED_SERVICE_SUMMARY_PEER_FROM (4.0.3) and
+ *     UNSIGNED_SERVICE_SUMMARY_REMOVED_IN (4.0.5): through 4.0.4 a peer on 4.0.2 or older, or of unknown
+ *     version, gets the unsigned service summary request; from 4.0.5 every peer gets the signed one
+ *     (decision 2026-10-16).
  *   v1.2.0 — 2026-10-12 — The two 4.0.0 removals are version gates (Core 2026-11 FED-09, FED-10,
  *     HTTP-08): from UNPROVEN_FORMAT_REMOVED_IN the audience is required whatever the environment
  *     says, and from RELAY_CLAIM_OPTIONAL_REMOVED_IN (moved here from services/relay-claim-policy.ts,
@@ -56,6 +64,42 @@ export const UNPROVEN_FORMAT_REMOVED_IN = '4.0.0';
 export const RELAY_CLAIM_OPTIONAL_REMOVED_IN = '4.0.0';
 
 /**
+ * The first node release that signs its service summary request, and the release from which a
+ * peer gets the signed form from this node. A peer on 4.0.2 or older sends and expects the older
+ * form: `x-source-node` alone (decision 2026-10-16).
+ */
+export const SIGNED_SERVICE_SUMMARY_PEER_FROM = '4.0.3';
+/**
+ * The release from which this node sends only the signed service summary request, to every peer.
+ * One release (4.0.4) sends the older form to a peer on 4.0.2 or older and to a peer whose version
+ * it does not know; the release after it (4.0.5) does not (decision 2026-10-16, Core 2026-11
+ * Appendix B). The receiving side keeps the same window: through 4.0.4 it also answers the unsigned
+ * form from a peer whose signed heartbeat named 4.0.2 or older (unsignedServiceSummaryAccepted).
+ */
+export const UNSIGNED_SERVICE_SUMMARY_REMOVED_IN = '4.0.5';
+
+/** Which service summary request this node sends a peer, and why. */
+export interface ServiceSummaryForm {
+  form: 'signed' | 'unsigned';
+  reason: 'window-closed' | 'peer-new' | 'peer-old' | 'peer-unknown';
+}
+
+/**
+ * The service summary request form for a peer that reported `peerVersion` in its signed heartbeat
+ * (PeerInfo.softwareVersion). From UNSIGNED_SERVICE_SUMMARY_REMOVED_IN every peer gets the signed
+ * form. Before it, a peer on SIGNED_SERVICE_SUMMARY_PEER_FROM or newer gets the signed form, and a
+ * peer on an older version or of unknown version gets the unsigned one.
+ */
+export function serviceSummaryForm(peerVersion: string | null | undefined, ownVersion: string = getSoftwareVersion()): ServiceSummaryForm {
+  if (versionAtLeast(ownVersion, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN)) return { form: 'signed', reason: 'window-closed' };
+  const known = typeof peerVersion === 'string' && /^\d+\.\d+\.\d+/.test(peerVersion.trim());
+  if (!known) return { form: 'unsigned', reason: 'peer-unknown' };
+  return versionAtLeast(peerVersion.trim(), SIGNED_SERVICE_SUMMARY_PEER_FROM)
+    ? { form: 'signed', reason: 'peer-new' }
+    : { form: 'unsigned', reason: 'peer-old' };
+}
+
+/**
  * Named here rather than picked from AimeatConfig, for the reason config-decide.ts gives: a type
  * import from config-types.ts would close a cycle. The spread in loadConfig is where the compiler
  * checks the two agree.
@@ -81,6 +125,17 @@ export function unprovenFormatLive(version: string = getSoftwareVersion()): bool
 /** Whether a node on `version` may still take `optional` as a relay-claim setting, the node's or a peer's. */
 export function relayClaimOptionalLive(version: string = getSoftwareVersion()): boolean {
   return !versionAtLeast(version, RELAY_CLAIM_OPTIONAL_REMOVED_IN);
+}
+
+/**
+ * Whether this node answers an UNSIGNED service summary request from a peer whose own signed
+ * heartbeat named `heartbeatVersion` (PeerInfo.softwareVersion, written only by the ping route after
+ * the signature verified). True only before UNSIGNED_SERVICE_SUMMARY_REMOVED_IN and only for a known
+ * version older than SIGNED_SERVICE_SUMMARY_PEER_FROM: never for a peer of unknown or newer version,
+ * and never on what the request itself says (decision 2026-10-16, the same window as the sending side).
+ */
+export function unsignedServiceSummaryAccepted(heartbeatVersion: string | null | undefined, ownVersion: string = getSoftwareVersion()): boolean {
+  return serviceSummaryForm(heartbeatVersion, ownVersion).reason === 'peer-old';
 }
 
 export function federationDefaults(): FederationConfig {

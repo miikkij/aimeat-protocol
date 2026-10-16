@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-16 — Section 4: deleting an organism asks memory:purge of an agent; memory:delete is a
+ *     default because what it deletes goes to the bin, and notifications an agent clears go there too
+ *     (invariant 8, ruled by the developer on 2026-10-16).
  *   2026-10-16 — Section 5: an archived record refuses an update and a tag or visibility change too, now that PUT /v1/memory/:key writes through the shared write; only a creator or admin, in person or through their own agent, archives (QA audit D2-03, D2-08).
  *   2026-10-15 — The account export lists published apps, AI provenance, connections, agent messages
  *     and apps taken; a restore can answer MORSEL_PRICE_REMOVED (feature-list audit #160, #205).
@@ -158,8 +161,12 @@ What an export leaves out, and why:
 - an app (\`aimeat_app_delete\`: the app and its versions are removed; only an apps backup taken
   earlier brings it back);
 - an agent: deleting it removes every record and file under its identity at once;
-- an organism (its creator deletes it);
+- an organism (its creator deletes it; an agent needs \`memory:purge\` beside \`organism:write\`);
 - the whole account (section 6).
+
+\`memory:delete\` is in every agent's default permissions because everything it deletes goes to the
+bin. Anything that cannot come back asks \`memory:purge\`, which the person grants separately.
+Notifications you clear for the person also go to the bin.
 
 Some records refuse a delete: records a service owns, records that hold a credential, and spaces a
 workspace keeps append-only. The refusal says which. One more refusal is about WHO asks, not about

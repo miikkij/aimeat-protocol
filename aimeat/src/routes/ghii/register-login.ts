@@ -6,6 +6,9 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — POST /v1/ghii takes `setupCode`: the first account on a node whose base URL is not
+ *     loopback, which becomes the operator, needs the one-time setup code from the start log and is
+ *     refused 403 SETUP_CODE_REQUIRED / SETUP_CODE_INVALID without it (Jouni, 2026-10-16).
  *   2026-10-16 — The owner row, the profile row and the welcome bonus are written in one transaction
  *     (createAccountRows) (QA audit E6-02).
  *   2026-10-15 — The registration hooks run here too (ownerRegistrationRefusal before any row,
@@ -90,7 +93,7 @@ import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../mod
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { parseLoginIdentifier } from '../../utils/login-identifier.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
-import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered } from '../../services/owner-provisioning.js';
+import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
 import { eraseOwner } from '../../services/owner-erasure.js';
 
 export function registerRegisterLoginRoutes(
@@ -252,7 +255,11 @@ export function registerRegisterLoginRoutes(
         // The owner row, the GHII profile and the welcome bonus commit together or not at all: a
         // failure between them had left a taken name with no profile (QA audit E6-02).
         const now = new Date().toISOString();
-        const { owner, ghii: ghiiRecord } = await createAccountRows(storage, config, {
+        // The first owner of a node others can reach needs the one-time setup code from the start
+        // log (`setupCode`); createAccountRows refuses without it, before any row (Jouni, 2026-10-16).
+        let created: Awaited<ReturnType<typeof createAccountRows>>;
+        try {
+            created = await createAccountRows(storage, config, {
             name: username,
             displayName: display_name,
             publicKey: keyPair.publicKey,
@@ -274,7 +281,15 @@ export function registerRegisterLoginRoutes(
             morselBalance: config.welcomeBonus,
             createdAt: now,
             updatedAt: now,
-        });
+        }, { setupCode: req.body?.setupCode });
+        } catch (err) {
+            if (err instanceof SetupCodeRefusedError) {
+                res.status(403).json(error(config.nodeId, err.code, err.message));
+                return;
+            }
+            throw err;
+        }
+        const { owner, ghii: ghiiRecord } = created;
         announceOwnerRegistered(storage, config, owner, 'direct');
 
         // Which onboarding path this account was created on (05-mittaus.md). K3: new accounts get

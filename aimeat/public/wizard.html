@@ -760,6 +760,17 @@ body {
       </table>
     </div>
 
+    <!-- Shown when GET /v1/setup/status says setupCodeRequired: a node others can reach asks for the
+         one-time code its start log printed (services/setup-code.ts). -->
+    <div class="wiz-card hidden" id="setupCodeCard">
+      <div class="field">
+        <label for="setupCode" data-i18n="wizard.setupCode.label">Setup code</label>
+        <div class="hint" data-i18n="wizard.setupCode.hint">Other computers can reach this node, so creating its first owner needs the one-time code from the node's start log. Copy it from the line that starts with "Setup code".</div>
+        <input type="text" id="setupCode" placeholder="XXXX-XXXX-XXXX" autocomplete="one-time-code" spellcheck="false">
+        <div class="field-error" id="setupCodeError"></div>
+      </div>
+    </div>
+
     <div id="initResult"></div>
 
     <div class="btn-row" id="step5Buttons">
@@ -857,6 +868,9 @@ var T = {
     "wizard.init.settingNodeType": "Node type",
     "wizard.init.settingPort": "Port",
     "wizard.init.settingGenesis": "Genesis node",
+    "wizard.setupCode.label": "Setup code",
+    "wizard.setupCode.hint": "Other computers can reach this node, so creating its first owner needs the one-time code from the node's start log. Copy it from the line that starts with \"Setup code\".",
+    "wizard.validate.setupCodeRequired": "Enter the setup code from the node's start log",
 
     "wizard.validate.usernameRequired": "Username is required",
     "wizard.validate.usernameFormat": "3-30 chars: lowercase letters, numbers, hyphens, underscores",
@@ -951,6 +965,9 @@ var T = {
     "wizard.init.settingNodeType": "Solmun tyyppi",
     "wizard.init.settingPort": "Portti",
     "wizard.init.settingGenesis": "Genesis-solmu",
+    "wizard.setupCode.label": "Käyttöönottokoodi",
+    "wizard.setupCode.hint": "Tähän solmuun pääsee muilta tietokoneilta, joten ensimmäisen omistajan luominen vaatii kertakäyttöisen koodin. Solmu kirjoitti koodin käynnistyslokiinsa. Kopioi se riviltä, joka alkaa sanoilla \"Setup code\".",
+    "wizard.validate.setupCodeRequired": "Kirjoita käyttöönottokoodi solmun käynnistyslokista",
 
     "wizard.validate.usernameRequired": "Käyttäjänimi puuttuu",
     "wizard.validate.usernameFormat": "3–30 merkkiä: pieniä kirjaimia, numeroita, väliviivoja ja alaviivoja",
@@ -1211,6 +1228,12 @@ function buildSummary() {
 // ────────────────────────────────────────────────────────────────────
 function doInit() {
   var btn = document.getElementById('initBtn');
+  var setupCode = document.getElementById('setupCode').value.trim();
+  document.getElementById('setupCodeError').textContent = '';
+  if (setupCodeRequired && !setupCode) {
+    setError('setupCode', 'setupCodeError', t('wizard.validate.setupCodeRequired'));
+    return;
+  }
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> ' + t('wizard.init.working');
 
@@ -1254,6 +1277,7 @@ function doInit() {
     genesisUrl: genesisUrl,
     port: port
   };
+  if (setupCodeRequired) body.setupCode = setupCode;
 
   fetch('/v1/setup/init', {
     method: 'POST',
@@ -1327,6 +1351,7 @@ function escapeHtml(str) {
 
 // The running node's values, from GET /v1/setup/status. The node id field falls back to this.
 var runningNodeId = 'aimeat-local-001-dev';
+var setupCodeRequired = false;
 
 function applyRunningDefaults(s) {
   if (typeof s.nodeId === 'string' && s.nodeId) {
@@ -1341,6 +1366,11 @@ function applyRunningDefaults(s) {
   }
   if (typeof s.port === 'number') {
     document.getElementById('nodePort').value = String(s.port);
+  }
+  // A node others can reach asks for the one-time code from its start log (services/setup-code.ts).
+  if (s.setupCodeRequired === true) {
+    setupCodeRequired = true;
+    document.getElementById('setupCodeCard').classList.remove('hidden');
   }
 }
 

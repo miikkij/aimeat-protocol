@@ -8,6 +8,8 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   2026-10-16 — operatorAccountState takes { claim } and needs nothing for it: transactions are serialised
+ *     (Jouni, 2026-10-16).
  *   2026-10-16 — operatorAccountState: two EXISTS queries (QA audit P7-10).
  *   v1.3.0 — 2026-10-14 — deleteOwner runs the 28 identity columns left undecided through
  *     eraseAccountRecords (repos/account-records-erasure.ts): deleted with the account, or kept under
@@ -70,7 +72,9 @@ export const identityMethods = {
     return rows.map(r => this.deserializeOwner(r));
   },
 
-  async operatorAccountState(this: SqliteStorage): Promise<{ anyOwner: boolean; anyOperator: boolean }> {
+  // `opts.claim` needs nothing here: SQLite serialises transactions, so the read inside one is already
+  // the single claim to the first operator (owner.repository.ts).
+  async operatorAccountState(this: SqliteStorage, _opts?: { claim?: boolean }): Promise<{ anyOwner: boolean; anyOperator: boolean }> {
     const r = this.db.prepare(
       `SELECT EXISTS(SELECT 1 FROM owners WHERE name <> 'anonymous') AS anyOwner,
               EXISTS(SELECT 1 FROM owners, json_each(owners.roles) WHERE json_each.value = 'operator') AS anyOperator`

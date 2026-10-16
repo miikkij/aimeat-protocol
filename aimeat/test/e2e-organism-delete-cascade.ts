@@ -6,6 +6,9 @@
  *   by the member who wrote it (creator GHII) and only KEYED `organism.{id}.…`, so it was orphaned
  *   and stayed findable via the (indexed) librarian/$text search. Now it deletes by key prefix.
  * @version-history
+ *   2026-10-16 — An agent with organism:write and the default memory words is refused the delete
+ *     (SCOPE_DENIED naming memory:purge); with memory:purge beside it the delete goes through
+ *     (invariant 8 as ruled by the developer on 2026-10-16).
  *   v1.0.0 — 2026-06-22 — Initial: organism delete purges workspace content from memory + search.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-delete-cascade
@@ -100,6 +103,43 @@ await test('Deleting an organism is the CREATOR\'s act — a member cannot do it
     assert(r.status === 403 || r.status === 404, `a member deleted the organism: ${r.status} ${JSON.stringify(r.body?.error)}`);
     const still = await json(`/v1/organisms/${orgId}`, { headers: auth() });
     assert(still.status === 200, `the refused delete removed it anyway: ${still.status}`);
+});
+
+// Deleting an organism removes every record keyed under it for good, so an agent needs memory:purge
+// beside organism:write, as the workspace wipe does (invariant 8 as ruled by the developer on
+// 2026-10-16). organism:write alone renames, archives and leaves, and it was all the delete asked.
+const ed = await import('@noble/ed25519');
+const { createHash } = await import('node:crypto');
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+async function agentToken(name: string, scopes: string[]): Promise<string> {
+    const ag = await json('/v1/agents', { method: 'POST', headers: auth(), body: JSON.stringify({ name, owner: A.name, capabilities: ['memory'], scopes }) });
+    assert(ag.status === 201, `register ${name} ${ag.status}: ${JSON.stringify(ag.body?.error)}`);
+    const gaii = ag.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(gaii + ts), Buffer.from(ag.body.data.private_key, 'base64'))).toString('base64');
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
+    assert(tok.body.ok === true, `${name} token: ${JSON.stringify(tok.body.error)}`);
+    return tok.body.data.token as string;
+}
+
+await test('Refused: the creator\'s agent with organism:write and the default memory words cannot delete it (memory:purge)', async () => {
+    const t = await agentToken(`delw${Date.now() % 100000}`, ['memory:read', 'memory:write', 'memory:delete', 'organism:read', 'organism:write']);
+    const r = await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${t}` } });
+    assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(String(r.body.error?.message).includes('memory:purge'), `the refusal names memory:purge: ${r.body.error?.message}`);
+    const still = await json(`/v1/organisms/${orgId}`, { headers: auth() });
+    assert(still.status === 200, `the refused delete removed it anyway: ${still.status}`);
+});
+
+await test('With memory:purge beside organism:write the creator\'s agent deletes an organism', async () => {
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(), body: JSON.stringify({ name: 'Purge Word Org', type: 'project', visibility: 'public', join_policy: 'open' }) });
+    assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body?.error)}`);
+    const doomed = o.body.data.organism.id as string;
+    const t = await agentToken(`delp${Date.now() % 100000}`, ['memory:read', 'organism:read', 'organism:write', 'memory:purge']);
+    const r = await json(`/v1/organisms/${doomed}`, { method: 'DELETE', headers: { Authorization: `Bearer ${t}` } });
+    assert(r.status === 200, `delete ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const gone = await json(`/v1/organisms/${doomed}`, { headers: auth() });
+    assert(gone.status === 404, `the organism is gone: ${gone.status}`);
 });
 
 await test('Delete the organism', async () => {

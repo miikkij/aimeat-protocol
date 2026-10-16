@@ -6,6 +6,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-16 — DELETE /v1/organisms/:id asks memory:purge beside organism:write, as the workspace
+ *     wipe does: it removes every record keyed under the organism for good, and deleting an organism
+ *     is explicit and separately consented (invariant 8 as ruled by the developer on 2026-10-16).
  *   2026-10-15 — POST /v1/organisms with a shape answers `workspaces_not_created` beside `workspaces` (feature-list audit #56).
  *   v1.16.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/organisms/waiting. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.15.0 — 2026-10-12 — POST /:id/leave no longer calls revokeDepartedMemberAccess itself:
@@ -334,7 +337,11 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
 
   /* ── DELETE /v1/organisms/:id — Delete organism ── */
   // Deleting is strictly more than updating, and it carried strictly less.
-  router.delete('/v1/organisms/:id', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
+  // memory:purge beside organism:write, as DELETE /v1/organisms/:id/workspace asks: every record
+  // keyed under the organism goes for good, every member's included, and nothing goes to the
+  // deleted-memory bin. organism:write alone also renames, archives and leaves, so it is not a
+  // separate consent to destroy (security-development-dna.md, invariant 8; Jouni, 2026-10-16).
+  router.delete('/v1/organisms/:id', requireAuth(), requireRole('agent'), requireScope('organism:write', 'memory:purge'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
 

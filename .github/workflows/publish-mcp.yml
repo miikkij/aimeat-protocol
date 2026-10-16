@@ -2,6 +2,14 @@ name: Publish to MCP Registry
 on:
   push:
     tags: ["v*"]
+  # Run by hand ON THE TAG (Use workflow from: the v* tag) to release it over a nightly sweep that
+  # is not green, with the reason. Run on a branch it refuses: the branch name is not a version.
+  workflow_dispatch:
+    inputs:
+      red_reason:
+        description: 'Why this release cannot wait for a green nightly sweep (a security fix). CI must still be green.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -12,6 +20,11 @@ permissions:
 # aimeat/package.json carry, and CI and the nightly E2E sweep each have a green run of that exact
 # commit (aimeat/scripts/release-ready.mjs). When the nightly has not run on the commit yet, start
 # "E2E full sweep" for it from the Actions tab and re-run this workflow once it is green.
+#
+# A SECURITY RELEASE MAY GO OUT OVER A RED NIGHTLY WITH A NAMED REASON (Jouni, 2026-10-16): a line
+# `Red-Nightly: <reason>` in the annotated tag's message, which keeps it in the release record, or
+# the `red_reason` input of a run by hand on the tag, which the job summary keeps. CI must still be
+# green; the gate prints the reason and the run it releases over.
 jobs:
   release-gate:
     runs-on: ubuntu-latest
@@ -39,6 +52,7 @@ jobs:
       - name: CI and the nightly sweep are green on the tagged commit, and it is on main
         env:
           GH_TOKEN: ${{ github.token }}
+          AIMEAT_RELEASE_RED_REASON: ${{ inputs.red_reason }}
         run: node aimeat/scripts/release-ready.mjs --sha="$GITHUB_SHA" --require=ci.yml,e2e-full.yml
 
   publish:
