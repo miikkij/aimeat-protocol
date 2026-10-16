@@ -11,6 +11,9 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-16 -- e2e-config-setting-fallback.ts joins the list (not the guard tier): a node started with
+ *     a setting it does not accept runs the default and shows a Security page incident, on its own node
+ *     on 40484 (Jouni, decision 2026-10-16).
  *   2026-10-16 -- e2e-html-pages.ts joins the list (not the guard tier): HTML pages in workspaces and their page host.
  *   2026-10-16 -- e2e-contract.ts joins the list (not the guard tier): selected operations answer what
  *     openapi.yaml declares, field by field (QA audit D3-01).
@@ -835,6 +838,9 @@ const ALL_SUITES = [
     // A node started as a production deployment starts it: public profile, the three modes off,
     // the shipped limits and scopes. Its own node on 40479, on the run's backend (QA audit P7-05).
     'test/e2e-production-posture.ts',
+    // Owns its node on 40484 and boots it three times on one database: a setting the node does not
+    // accept runs its default and opens a Security page incident, which the corrected start closes.
+    'test/e2e-config-setting-fallback.ts',
     // Owns its server on 40478, the same three boots for a published app: an app that calls a gated
     // route its aimeat-scopes does not name keeps the word, and a new app gets a publish warning.
     'test/e2e-app-scope-allowance.ts',

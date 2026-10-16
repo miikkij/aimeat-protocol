@@ -23,6 +23,8 @@
  *   SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.4.0 -- 2026-10-16 -- An incident can name the setting it is about (`setting`: the variable and
+ *     the value the node did not accept), for the start-up incident of config-setting-incidents.ts.
  *   v1.3.2 -- 2026-10-01 -- recordSecurityIncident asks only for the node id of the config, the one
  *     field it reads, so a service that holds no whole config records federation peer events too.
  *   v1.3.1 -- 2026-09-27 -- recordSecurityIncident quarantines only a Buffer: a blob of any other type
@@ -92,6 +94,14 @@ export interface SecurityIncidentInput {
   moveAt?: string;
   /** The runs of the records it was made from (`<key>@<at>`), so a start never takes one twice. */
   sources?: string[];
+  /** The setting the incident is about: its variable and the value the node did not accept. */
+  setting?: IncidentSetting;
+}
+
+/** A setting an incident is about. */
+export interface IncidentSetting {
+  variable: string;
+  value: string;
 }
 
 /** One incident as stored and as served to the operator. */
@@ -118,6 +128,8 @@ export interface SecurityIncidentValue {
   move_at?: string;
   /** The runs of the records this incident was made from (`<key>@<at>`): the move's and the start step's. */
   sources?: string[];
+  /** The setting this incident is about, with the value the node did not accept. */
+  setting?: IncidentSetting;
 }
 
 type IncidentRecord = Awaited<ReturnType<Storage['listAllMemory']>>['items'][number];
@@ -160,6 +172,7 @@ export async function recordSecurityIncident(
         ...(input.untied ? { untied: input.untied } : {}),
         ...(input.moveAt ? { move_at: input.moveAt } : {}),
         ...(input.sources ? { sources: input.sources } : {}),
+        ...(input.setting ? { setting: input.setting } : {}),
       },
       visibility: 'private', tags: ['security'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });

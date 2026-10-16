@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.30.0 — 2026-10-16 — A setting the node does not accept no longer refuses the start (except the few in REFUSE_ON_INVALID): loadConfig() sets it aside, builds the config on its default, logs one line per setting, drops it from the env/file/cli provenance and returns it as `settingFallbacks`, which the server records on the Security page (Jouni, decision 2026-10-16).
  *   v1.30.0 — 2026-10-16 — pagesDefaults(): pageHost (AIMEAT_PAGE_HOST), the host the HTML pages of workspaces are served from (config-pages.ts).
  *   v1.29.0 — 2026-10-16 — loadConfig() refuses to start on a setting the node does not accept and treats an empty number or fixed-set setting as unset (config-start-check.ts; QA audit D8-02, P6-03, D6-02); `checkSettings: false` for validate, init and config. The five settings no code read are removed: AIMEAT_CAPABILITY_PUBLISHERS, _MIN_PUBLISHER_TRUST, _PUBLISHER_ALLOWLIST, _LOG_RETENTION_DAYS and AIMEAT_PACKAGE_FEDERATION_AUTO_ACCEPT (QA audit D8-05). A config file may name a setting with no schema row by its variable name, and the load line counts what was applied and names what was skipped (QA audit D8-03). The Consul block moved to config-consul.ts (pure extraction).
  *   v1.28.1 — 2026-10-14 — otkGraceMs (AIMEAT_OTK_GRACE_MS) removed: the connectivity-key routes it timed are gone (feature-list audit row 202).
@@ -118,17 +119,15 @@ export type {
   OperatorType,
   OperatorConfig,
   AimeatConfig,
-  LoadConfigOptions,
-  LoadConfigResult,
 } from './config-types.js';
+export type { LoadConfigOptions, LoadConfigResult } from './config-load-types.js';
 import type {
   AimeatConfig,
   NodeType,
   FederationRole,
   OperatorType,
-  LoadConfigOptions,
-  LoadConfigResult,
 } from './config-types.js';
+import type { LoadConfigOptions, LoadConfigResult } from './config-load-types.js';
 
 // isPrivateHost moved to config-private-host.ts when this file reached the line limit (2026-10-06).
 import { isPrivateHost } from './config-private-host.js';
@@ -137,7 +136,7 @@ import { isPrivateHost } from './config-private-host.js';
 // modules that import it from here keep working; the move was not meant to be visible.
 export { securityPostureWarnings } from './config-posture.js';
 import { assertEudiwNotHalfBuilt } from './config-eudiw-guard.js';
-import { assertStartSettings } from './config-start-check.js';
+import { applyStartSettings, startSettingFallbacks, type StartSettingProblem } from './config-start-check.js';
 import { consulDefaults } from './config-consul.js';
 
 /**
@@ -189,8 +188,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   }
 
   // ── Build config from process.env (now includes CLI + env + file layers) ──
-  // A value the Config tab would refuse refuses the start too (config-start-check.ts).
-  if (checkSettings) assertStartSettings(process.env);
+  // A value the Config tab would refuse is set aside and the default runs (config-start-check.ts);
+  // only the settings in REFUSE_ON_INVALID refuse the start.
+  const setAside: StartSettingProblem[] = checkSettings ? applyStartSettings(process.env) : [];
   const nodeType = (process.env.AIMEAT_NODE_TYPE ?? 'full') as NodeType;
   if (!['full', 'relay', 'mirror', 'personal'].includes(nodeType)) {
     throw new Error(`Invalid AIMEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', 'mirror', or 'personal'.`);
@@ -780,7 +780,13 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     },
   };
 
-  return { config, envKeys, fileKeys, cliKeys, fileName: fileSource?.name ?? null };
+  const settingFallbacks = startSettingFallbacks(setAside, config);
+  // A set-aside value runs the default, so its source is not the environment, the file or the flag.
+  const kept = (dotPath: string) => !settingFallbacks.some(f => f.dotPath === dotPath);
+  return {
+    config, envKeys: envKeys.filter(kept), fileKeys: fileKeys.filter(kept), cliKeys: cliKeys.filter(kept),
+    fileName: fileSource?.name ?? null, settingFallbacks,
+  };
 }
 
 // Pure extraction (2026-08-18, max-file-lines): applyConfigOverrides moved to config-overrides.ts

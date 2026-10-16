@@ -1111,14 +1111,16 @@
           "held_account_names": "Records the update left as they were",
           "workspace_schema_closed": "Workspace spaces that refuse every record",
           "headless_browser": "The server's own browser does not start",
-          "scope_words_kept": "Permissions the update gave to existing agents and apps"
+          "scope_words_kept": "Permissions the update gave to existing agents and apps",
+          "config_setting": "A setting the server did not accept, so it runs the default"
         },
         "source": {
           "workspace_import": "workspace import",
           "organism_import": "organism import",
           "app_backup": "app backup",
           "full_identity_move": "update at start",
-          "workspace_schema_relock": "check of workspace locks at start"
+          "workspace_schema_relock": "check of workspace locks at start",
+          "start": "server start"
         },
         "kept": "{size} kept",
         "notKept": "not kept, too large",
