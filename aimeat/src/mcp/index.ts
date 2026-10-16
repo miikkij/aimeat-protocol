@@ -11,6 +11,10 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-16 — Tools are registered through mcp/tool-registrar.ts, which adds the fault wrapper
+ *     (mcp/tool-fault.ts): a tool that throws is logged, reported and answered with a sentence. A call
+ *     to a tool the request's permissions do not allow answers SCOPE_DENIED and is noted for the owner
+ *     (mcp/scope-denied-answer.ts) (QA audit E1-01, D2-01, F5-02, E2-02, E5-01, E5-04).
  *   2026-10-14 — An unknown agent is told to connect through device authorization; the message named
  *     POST /v1/agents/connect, which is removed (feature-list audit row 202).
  *   2026-10-12 — Every tool is registered through withDeferredScopeNotice: a call made without a word
@@ -140,12 +144,10 @@ import { resolveSupportRoute } from '../services/message-alias.js';
 // Every tool group, in one list this file no longer keeps: mcp/register-all.ts.
 import { registerAllServerTools } from './register-all.js';
 import { registerRemoteTools } from './remote-tools.js';
-import { scopeAllowsTool } from '../tool-catalog/scopes.js';
+import { scopeAllowsTool, enforcedScopesForTool } from '../tool-catalog/scopes.js';
 import { withResourceGate } from './resource-gate.js';
-import { wrapToolHandler } from './tool-usage-wrap.js';
-import { withOrganismAgentGate } from './organism-agent-gate.js';
-import { withErrorNextStep } from './error-next-step.js';
-import { withDeferredScopeNotice } from './deferred-scope-notice.js';
+import { toolRegistrar } from './tool-registrar.js';
+import { answerScopeDeniedTools } from './scope-denied-answer.js';
 import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
 import { instructionsFor } from './instructions.js';
@@ -327,10 +329,11 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // (mcp/organism-agent-gate.ts). Innermost, so the refusal is measured and carries a next step.
         // A call without a word the tool names for 4.0.0 is counted, as its REST twin counts it
         // (mcp/deferred-scope-notice.ts, auth/rest-scope-gate.ts). Innermost, so it sees the call itself.
-        const noticedTool = withDeferredScopeNotice(originalTool, () => scopes);
-        const noticedRegisterTool = withDeferredScopeNotice(originalRegisterTool, () => scopes);
-        const measuredTool = withOrganismAgentGate(wrapToolHandler(withErrorNextStep(noticedTool), () => agentGaii), () => agentGaii, storage);
-        const measuredRegisterTool = withOrganismAgentGate(wrapToolHandler(withErrorNextStep(noticedRegisterTool), () => agentGaii), () => agentGaii, storage);
+        // A tool that throws, or returns a caught internal error, is logged, reported to the operator
+        // and answered with a sentence (mcp/tool-fault.ts). The whole chain and its order: mcp/tool-registrar.ts.
+        const registrarDeps = { scopes: () => scopes, principal: () => agentGaii, storage, config };
+        const measuredTool = toolRegistrar(originalTool, registrarDeps);
+        const measuredRegisterTool = toolRegistrar(originalRegisterTool, registrarDeps);
         // Keep the initial surface ceiling and its memory footprint. The SDK reads enabled at
         // list/call time, so a removed permission affects discovery without rebuilding a session.
         // Newly granted tools outside that initial surface still require re-initialization.
@@ -361,6 +364,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // A tool that became an action of another answers with the call that replaces it, and stays
         // out of tools/list (mcp/moved-tools-answer.ts).
         answerMovedTools(mcp);
+        // A call to a tool this request's permissions do not allow answers SCOPE_DENIED with the word
+        // it needs and is noted for the owner, not "Tool X not found" (mcp/scope-denied-answer.ts).
+        // Only under enforcement, and only for a tool this surface carries.
+        answerScopeDeniedTools(mcp, {
+            missingWords: (name) => (!enforce || (surfaceTools && !surfaceTools.has(name)))
+                ? [] : enforcedScopesForTool(name).filter((word) => !scopeIsCovered(scopes, word)),
+            principal: () => agentGaii,
+        });
         // THE CHAT STARTS SMALL. Everything permitted is registered above; what the chat's own list
         // does not name is switched off here, before the client first lists the tools, and comes
         // back on by purpose (aimeat_tools_find) or when it is called by name.

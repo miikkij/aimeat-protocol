@@ -11,6 +11,9 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-16: password_changed (reset, changed or set) under access, session_token_reused under trouble,
+ *     and operator_acted sentences for an account turned off or on and the operator role given or taken
+ *     (QA audit E2-03, S1-02, E2-04).
  *   2026-10-13: scope_words_kept, filed under access: which of your agents and apps the first start as
  *     4.0.x gave the permissions that version started to check, and which permissions.
  *     app_scope_words_kept beside it: which of your published apps kept permissions their code uses.
@@ -131,6 +134,12 @@ export function line(item) {
       return tr('home.feed.twoFactorArmed', 'You turned on two-step sign-in.');
     case 'two_factor_removed':
       return tr('home.feed.twoFactorRemoved', 'You turned off two-step sign-in.');
+    case 'password_changed':
+      if (d.how === 'reset') return tr('home.feed.passwordReset', 'Your password was reset with a code sent to your email. If you did not do this, reset it again and check your email account.');
+      if (d.how === 'set') return tr('home.feed.passwordSet', 'A password was set for your account, so you can also sign in with your username and this password. If you did not do this, reset the password.');
+      return tr('home.feed.passwordChanged', 'You changed your password.');
+    case 'session_token_reused':
+      return tr('home.feed.sessionTokenReused', 'One of your sign-ins was ended because it was renewed twice. If you were not using another device at that moment, change your password.');
     case 'two_factor_reset_by_operator':
       return tr('home.feed.twoFactorResetByOperator', 'An operator removed two-step sign-in from your account. Turn it back on if this was not arranged with you.');
     case 'memory_accessed_by_operator':
@@ -145,6 +154,10 @@ export function line(item) {
         return tr('home.feed.operatorInstalledSet', 'An operator installed the install package {set} in your account: {packages} packages, and {apps} apps got permissions. You can see and change the permissions of your apps in your settings.')
           .replace('{set}', d.set || '').replace('{packages}', d.packages || '0').replace('{apps}', d.apps || '0');
       }
+      if (d.area === 'account' && d.action === 'disable') return tr('home.feed.operatorAccountDisabled', 'An operator deactivated your account.');
+      if (d.area === 'account' && d.action === 'enable') return tr('home.feed.operatorAccountEnabled', 'An operator turned your account back on.');
+      if (d.area === 'role' && d.action === 'grant') return tr('home.feed.operatorRoleGranted', 'An operator gave you the operator role of this installation.');
+      if (d.area === 'role' && d.action === 'revoke') return tr('home.feed.operatorRoleRevoked', 'An operator took the operator role of this installation away from you.');
       return tr('home.feed.operatorActed', 'An operator made a change in your account ({area}: {action}).')
         .replace('{area}', d.area || '').replace('{action}', d.action || '');
     case 'operator_admin_granted':
@@ -273,12 +286,12 @@ export function kindCategory(kind) {
   // The operator reset sits with 'trouble' rather than with the other two: a second factor that
   // disappeared without the person doing it is the one row on this feed they must not scroll past.
   if (['agent_task_failed', 'workflow_run_failed', 'ai_budget_reached', 'checkout_cancelled',
-    'agent_removed', 'two_factor_reset_by_operator'].includes(k)) return 'trouble';
+    'agent_removed', 'two_factor_reset_by_operator', 'session_token_reused'].includes(k)) return 'trouble';
   if (['payment_received', 'payment_sent', 'checkout_completed', 'app_tool_paid', 'ai_spend_daily',
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
-    'passkey_added', 'passkey_removed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept', 'app_scope_words_kept'].includes(k)) return 'access';
+    'passkey_added', 'passkey_removed', 'password_changed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept', 'app_scope_words_kept'].includes(k)) return 'access';
   return 'system';
 }
 

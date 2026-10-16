@@ -16,6 +16,8 @@
  *   with the running version switched per test: a 4.0.0 run and a 3.26.1 run of the same code.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-token-on-rest.test.ts
  * @version-history
+ *   2026-10-16 — A call by name to aimeat_app_tool_invoke without ext:invoke answers SCOPE_DENIED naming
+ *     the permission, no longer "not found": the test asserted the answer QA audit E5-04 replaced.
  *   v1.0.1 — 2026-10-13 — aimeat_app_tool_invoke is not offered to a caller without ext:invoke, which the
  *     tool now declares (wish-aimeat-app-tool-invoke-ilmoittaa-vain-exchange-write-vaikka-); the route's
  *     refusal is still asserted through aimeat_capabilities_invoke.
@@ -339,7 +341,8 @@ describe('the three MCP tools that reach REST routes, with an MCP OAuth token on
     it('aimeat_app_tool_invoke is not offered to a caller without ext:invoke', async () => {
         const out = await callTool(limitedMcp, 'aimeat_app_tool_invoke', { owner: SELLER, app: APP_FILE, tool: 'echo', input: { query: 'tool' } });
         expect(out.isError).toBe(true);
-        expect(out.text).toContain('aimeat_app_tool_invoke not found');
+        expect(out.text.startsWith('SCOPE_DENIED: ')).toBe(true);
+        expect(out.text).toContain('"ext:invoke"');
         expect(out.data?.result).toBeUndefined();
     });
 });

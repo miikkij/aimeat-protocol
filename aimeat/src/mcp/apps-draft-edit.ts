@@ -21,6 +21,7 @@
  *   import { registerAppDraftEditTools } from './apps-draft-edit.js';
  *   registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-13 — The write, replace and seed results render `served_marks_removed` /
  *     `served_marks_note` from whatever the draft slot reports, through the servedMarksResponse every
@@ -28,6 +29,7 @@
  *   v1.0.0 — 2026-08-16 — Initial implementation.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -93,7 +95,7 @@ export function registerAppDraftEditTools(
                     ...servedMarksResponse(out),
                 });
             } catch (err) {
-                return fail(`Failed to write draft: ${(err as Error).message}`);
+                return withCaughtError(fail(`Failed to write draft: ${(err as Error).message}`), err);
             }
         },
     );
@@ -129,7 +131,7 @@ export function registerAppDraftEditTools(
                     ...servedMarksResponse(out),
                 });
             } catch (err) {
-                return fail(`Failed to edit draft: ${(err as Error).message}`);
+                return withCaughtError(fail(`Failed to edit draft: ${(err as Error).message}`), err);
             }
         },
     );
@@ -164,7 +166,7 @@ export function registerAppDraftEditTools(
                     content: out.content,
                 });
             } catch (err) {
-                return fail(`Failed to read draft: ${(err as Error).message}`);
+                return withCaughtError(fail(`Failed to read draft: ${(err as Error).message}`), err);
             }
         },
     );
@@ -201,7 +203,7 @@ export function registerAppDraftEditTools(
                     ...servedMarksResponse(out),
                 });
             } catch (err) {
-                return fail(`Failed to seed draft: ${(err as Error).message}`);
+                return withCaughtError(fail(`Failed to seed draft: ${(err as Error).message}`), err);
             }
         },
     );

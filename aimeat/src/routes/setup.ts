@@ -13,6 +13,7 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.5.0 -- 2026-10-09 -- The node settings (nodeId, nodeType, genesisUrl, locale) are checked by
  *     services/setup-env.ts before anything is created, and .env is written through its one writer
  *     at mode 0600. A line break in any of them used to add a variable to .env (secrets audit
@@ -36,6 +37,7 @@ import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
 import { hashPassword } from '../services/password.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 import { writePrivateFile } from '../utils/private-file.js';
 import { parseSetupNodeSettings, buildSetupEnv } from '../services/setup-env.js';
 
@@ -84,7 +86,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 nodeId: config.nodeId,
             }));
         } catch (err) {
-            logger.error('Setup status check failed', { error: err });
+            logger.error('Setup status check failed', errorFields(err));
             res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to check setup status'));
         }
     });
@@ -246,7 +248,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 }
             } catch (envErr) {
                 // Non-fatal: .env writing is best-effort
-                logger.warn('Setup wizard could not write .env file', { error: envErr });
+                logger.warn('Setup wizard could not write .env file', errorFields(envErr));
             }
 
             // 6. An OWNER session for auto-login, which is what the wizard does with it: it stores the
@@ -292,7 +294,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 { description: 'Visit the portal', method: 'GET', url: '/v1/portal' },
             ]));
         } catch (err) {
-            logger.error('Setup init failed', { error: err });
+            logger.error('Setup init failed', errorFields(err));
             res.status(500).json(error(config.nodeId, 'INTERNAL', 'Setup failed. Please try again.'));
         }
     });

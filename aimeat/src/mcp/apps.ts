@@ -11,6 +11,7 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-12 — aimeat_app_list and aimeat_app_get carry `listing` (listed, community, unlisted), and
  *     aimeat_app_list returns the apps other owners listed to the node's members.
  *   2026-10-11 — aimeat_app_get carries the deprecated `priceMorsels` mirror of the pacing amount, as the
@@ -103,6 +104,7 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { appListingOf } from '../storage/interface.js';
@@ -315,7 +317,7 @@ export function registerAppsTools(
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to publish app: ${(err as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Failed to publish app: ${(err as Error).message}` }], isError: true }, err);
             }
         },
     );
@@ -377,7 +379,7 @@ export function registerAppsTools(
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to save draft: ${(err as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Failed to save draft: ${(err as Error).message}` }], isError: true }, err);
             }
         },
     );
@@ -449,7 +451,7 @@ export function registerAppsTools(
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to publish draft: ${(err as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Failed to publish draft: ${(err as Error).message}` }], isError: true }, err);
             }
         },
     );
@@ -685,7 +687,7 @@ export function registerAppsTools(
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to delete app: ${(err as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Failed to delete app: ${(err as Error).message}` }], isError: true }, err);
             }
         },
     );

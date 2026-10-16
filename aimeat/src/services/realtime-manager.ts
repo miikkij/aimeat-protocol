@@ -14,6 +14,7 @@
  *   - Cleanup + metrics: idle-room reaper, message/peer counters, getStats()
  *
  * @version-history
+ *   2026-10-16 — A failed snapshot write is logged with errorFields(err) (QA audit E1-04).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Wire + internal types extracted to ./realtime-types.ts (max-file-lines)
  *   v1.2.0 — 2026-09-08 — Deleted two members nothing called: getRoomCount() (getStats().rooms is
@@ -34,6 +35,7 @@ import type { WebSocket } from 'ws';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 import { runAsNode } from '../utils/gaii.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import type {
@@ -589,7 +591,7 @@ export class RealtimeManager {
           createdAt: now,
           updatedAt: now,
         }).catch(err => {
-          logger.warn('Failed to persist Yjs snapshot', { roomId: room.id, docId, err });
+          logger.warn('Failed to persist Yjs snapshot', { roomId: room.id, docId, ...errorFields(err) });
         });
       }
     }

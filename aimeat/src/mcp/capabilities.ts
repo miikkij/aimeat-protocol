@@ -10,6 +10,7 @@
  * @usage Registered by mcp/index.ts per agent session; the shared write lives in
  *   services/capability-record.ts, which the REST routes call as well.
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 - 2026-05-02 - Add create, update, delete, vouch tools
  *   v1.0.0 - 2026-05-02 - Initial: list, get, invoke
@@ -33,6 +34,7 @@
  *     off the owner record, so every agent of an operator holding capability:write carried them.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import {
     createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
 } from '../services/capability-record.js';
@@ -155,7 +157,7 @@ export function registerCapabilitiesTools(
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
                 await recordCapabilityInvocation({ storage }, cap, callerGhii, input, { ok: false, message });
-                return { content: [{ type: 'text' as const, text: `Invoke failed: ${message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Invoke failed: ${message}` }], isError: true }, err);
             }
         },
     );
@@ -184,7 +186,7 @@ export function registerCapabilitiesTools(
                 return { content: [{ type: 'text' as const, text: JSON.stringify(created.value, null, 2) }] };
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
-                return { content: [{ type: 'text' as const, text: `Create failed: ${message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Create failed: ${message}` }], isError: true }, err);
             }
         },
     );

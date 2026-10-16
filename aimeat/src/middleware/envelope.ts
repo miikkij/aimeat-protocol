@@ -14,6 +14,8 @@
  *   - error: build an ok:false envelope with a code/message and default docs hints
  *
  * @version-history
+ *   2026-10-16 — request_id is the id of the request the envelope answers (X-Request-Id and the log
+ *     lines), not a second random id; outside a request it is still a fresh one (QA audit E1-05, F5-09).
  *   v1.2.0 — 2026-08-11 — Every error() carries the support@operators next-action. A caller that
  *     hits a wall now has somewhere to ask on the response itself, instead of guessing.
  *   v1.1.0 — 2026-08-01 — TARGET-058: `meta.provenance` typed on the envelope, so every route that
@@ -21,9 +23,18 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { generateRequestId } from '../utils/tracking-code.js';
+import { currentRequestId } from '../utils/request-context.js';
 import type { AiProvenance } from '../models/ai-provenance-schemas.js';
 
 import { nextStepFor } from './message-audience.js';
+
+/**
+ * The request id an envelope carries: the id of the HTTP request it answers, so the id a caller
+ * copies from a body is the one on the response header and on every log line of that request.
+ */
+export function envelopeRequestId(): string {
+  return currentRequestId() ?? generateRequestId();
+}
 
 export interface HintAction {
   description: string;
@@ -70,7 +81,7 @@ export function success<T>(nodeId: string, data: T, hints?: HintAction[], meta?:
     version: 'v1',
     node: nodeId,
     timestamp: new Date().toISOString(),
-    request_id: generateRequestId(),
+    request_id: envelopeRequestId(),
     data,
     hints: hints ? { next_actions: hints, help_url: '/v1/docs' } : undefined,
     meta,
@@ -122,7 +133,7 @@ export function error(nodeId: string, code: string, message: string, httpStatus?
     version: 'v1',
     node: nodeId,
     timestamp: new Date().toISOString(),
-    request_id: generateRequestId(),
+    request_id: envelopeRequestId(),
     error: { code, message, details },
     hints: {
       next_actions: [

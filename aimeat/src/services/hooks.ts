@@ -44,6 +44,7 @@
  *   const r = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });
  *   if (!r.allowed) return refuse(r.reason);
  * @version-history
+ *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.3.2 — 2026-10-15 — owner_recovery stays listed with nothing firing it, since its route was removed (feature-list audit 171).
  *   v1.3.1 — 2026-10-05 — A hook action's answer is read under a ceiling (secaudit 2026-10, C6).
  *   v1.3.0 — 2026-09-26 — SECURITY (audit A8-3): resolveHookRef(). When a hook runs, only an id#provider
@@ -63,6 +64,7 @@ import type { AimeatConfig, HookName } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { ActionRecord } from '../storage/types/commerce.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { readJson, readText } from '../utils/read-capped.js';
 
@@ -217,7 +219,7 @@ export async function executeHooks(
     try {
         published = await storage.listActions();
     } catch (err) {
-        logger.error(`Extension hook ${hookName}: the actions could not be read`, { error: err });
+        logger.error(`Extension hook ${hookName}: the actions could not be read`, errorFields(err));
         // A gate that cannot read what it is supposed to call has not been satisfied. Same rule as
         // an address that will not answer: fail closed, and say so in the log the operator reads.
         if (kind === 'gate') {
@@ -335,7 +337,7 @@ export async function executeHooks(
             await record(storage, hookName, actionRef, action.displayName, 'ok', response.status,
                 Date.now() - started, true, subject);
         } catch (err) {
-            logger.error(`Extension hook ${hookName}: action "${actionRef}" failed`, { error: err });
+            logger.error(`Extension hook ${hookName}: action "${actionRef}" failed`, errorFields(err));
             await record(storage, hookName, actionRef, action.displayName, 'no_answer', null, Date.now() - started,
                 kind !== 'gate', subject, (err as Error).message?.slice(0, 200));
             // Fail-closed for a gate, and only for a gate. A notify hook's failure is recorded and

@@ -15,6 +15,7 @@
  *   import { registerWorkspaceTransferTool } from './workspace-transfer.js';
  *   registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason, findWsEntry, roleOf });
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-15 — The export answers `truncated` when it reached a limit (feature-list audit #68).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-01 — Extracted from mcp/workspaces.ts (max-file-lines, pure extraction).
@@ -22,6 +23,7 @@
  *   v1.2.0 — 2026-09-29 — The export answers `left_out`, what the classification kept out (TARGET-082 review).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -96,7 +98,7 @@ export function registerWorkspaceTransferTool(
                         const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: ownerGhii, actorName: ownerName, detail: e.message, source: 'workspace_transfer_mcp', blob: buf });
                         return fail(`Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`);
                     }
-                    return fail((e as Error).message || 'Import failed');
+                    return withCaughtError(fail((e as Error).message || 'Import failed'), e);
                 }
             }
             return fail("direction must be 'export' or 'import'.");

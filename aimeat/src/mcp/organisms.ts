@@ -11,6 +11,7 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-15 — The name-invite group gets the session caller, so accepting asks for the person in
  *     person (feature-list audit #57).
  *   2026-10-15 — aimeat_organism_create with a shape answers `workspaces_not_created` beside `workspaces` (feature-list audit #56).
@@ -73,6 +74,7 @@
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -494,7 +496,7 @@ export function registerOrganismsTools(
                 emitChange('organisms');
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ action, level: result.level, [action === 'archive' ? 'archived' : 'restored']: result.count, root: result.root }, null, 2) }] };
             } catch (e) {
-                return { content: [{ type: 'text' as const, text: `Could not ${action}: ${(e as Error).message}` }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: `Could not ${action}: ${(e as Error).message}` }], isError: true }, e);
             }
         },
     );
@@ -675,7 +677,7 @@ export function registerOrganismsTools(
                     const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: `${ownerName}@${config.nodeId}`, actorName: ownerName, detail: e.message, source: 'organism_import_mcp', blob: buf });
                     return { content: [{ type: 'text' as const, text: `Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).` }], isError: true };
                 }
-                return { content: [{ type: 'text' as const, text: (e as Error).message || 'Import failed' }], isError: true };
+                return withCaughtError({ content: [{ type: 'text' as const, text: (e as Error).message || 'Import failed' }], isError: true }, e);
             }
         });
 }

@@ -17,6 +17,7 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-13 — The permission organism:direct (services/fenced-space.ts, ruled by the developer on
  *     2026-10-13). The workspace operations' caller is built on every call with the request's own
  *     scopes (it was built once at registration), and the reopen and the delete hand those scopes to
@@ -167,6 +168,7 @@
  *     defaults to match, so a row space added here died on a `versioned: true` nobody had asked for.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { canWriteNamespaceRule, createOrganismHelpers } from '../routes/organisms/shared.js';
@@ -511,7 +513,7 @@ export function registerWorkspaceTools(
                 // shape, with the code the REST route answers; the older refusals keep their sentence.
                 if (e instanceof WorkspaceMetaError && e.code === 'ACCESS_DENIED') return toolError(e.code, e.message);
                 if (e instanceof WorkspaceMetaError) return fail(e.message);
-                return fail((e as Error).message || 'Update failed');
+                return withCaughtError(fail((e as Error).message || 'Update failed'), e);
             }
         });
 

@@ -25,12 +25,15 @@
  *   NOT FOR THE OPERATOR'S OWN DATA. An operator opening an entry of their own account has nobody to
  *   tell, and a principal that is not a person (no `owner@node` behind it) has no feed to tell.
  * @structure OperatorAccess · recordOperatorAccess(storage, config, access) · OperatorAction ·
- *   recordOperatorAction(storage, config, act)
+ *   recordOperatorAction(storage, config, act) · OperatorNodeAct · recordOperatorNodeAct(act)
  * @usage
  *   await recordOperatorAccess(storage, config, {
  *     operatorGhii, actorGaii: operatorGhii, ownerOf: rec.ownerGaii, action: 'read', key: rec.key,
  *   });
  * @version-history
+ *   2026-10-16 — recordOperatorAction also writes an info log line; recordOperatorNodeAct(): the usage row
+ *     and log line for an operator act on the node itself, which has no person to tell (a setting
+ *     changed; QA audit E2-04, S1-02).
  *   v1.1.0 — 2026-10-05 — recordOperatorAction(): the same trail for an operator's other acts in a
  *     person's account (an install set applied to it first; secaudit 2026-10, S4), account event
  *     `operator_acted`.
@@ -41,6 +44,7 @@ import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf, isValidGHII } from '../utils/gaii.js';
 import { recordUsageCall } from './usage/usage-buffer.js';
 import { recordAccountEvent } from './account-events.js';
+import { logger } from '../utils/logger.js';
 
 /** What the operator did, as the person's feed names it. */
 export type OperatorAccessAction = 'read' | 'search' | 'delete' | 'restore';
@@ -134,6 +138,9 @@ export async function recordOperatorAction(
   const ownerGhii = ownerGhiiOf(act.ownerOf);
   if (!isValidGHII(ownerGhii) || ownerGhii === ownerGhiiOf(act.operatorGhii)) return;
 
+  logger.info(`operator: ${act.area}.${act.action} in ${ownerGhii}`, {
+    operator: act.operatorGhii, actor: act.actorGaii, account: ownerGhii, ...(act.subject !== undefined ? { subject: act.subject } : {}),
+  });
   recordUsageCall({
     ownerGhii: act.operatorGhii,
     actorGaii: act.actorGaii,
@@ -152,4 +159,37 @@ export async function recordOperatorAction(
     data: { operator: act.operatorGhii, area: act.area, action: act.action, ...(act.data ?? {}) },
     subject: act.subject ?? `${act.area}.${act.action}`,
   }, config);
+}
+
+/** An operator act on the node itself: a setting changed, nobody's account touched. */
+export interface OperatorNodeAct {
+  /** The operator's GHII: whose usage stream the row lands in. */
+  operatorGhii: string;
+  /** The exact principal that acted: the operator in person, or their agent holding operator:admin. */
+  actorGaii: string;
+  /** What kind of thing: 'config'. */
+  area: string;
+  /** What was done: 'set', 'reset'. */
+  action: string;
+  /** Short facts for the row and the line: the setting paths changed. Never a value: one may be a secret. */
+  meta?: Record<string, string | number>;
+}
+
+/**
+ * Record an operator's act on the node itself: one usage row in the operator's own stream
+ * (coordinate `<area>.<action>`, listed by GET /v1/admin/usage/calls) and one info log line, so who
+ * changed which setting and when can be answered afterwards (QA audit E2-04). Never throws.
+ */
+export function recordOperatorNodeAct(act: OperatorNodeAct): void {
+  logger.info(`operator: ${act.area}.${act.action}`, { operator: act.operatorGhii, actor: act.actorGaii, ...(act.meta ?? {}) });
+  recordUsageCall({
+    ownerGhii: act.operatorGhii,
+    actorGaii: act.actorGaii,
+    actorKind: 'operator',
+    surface: 'operator',
+    coordinate: `${act.area}.${act.action}`,
+    counterpartyGhii: '',
+    outcome: 'ok',
+    meta: { ...(act.meta ?? {}) },
+  });
 }

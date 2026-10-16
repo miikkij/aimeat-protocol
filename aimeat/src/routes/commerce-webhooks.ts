@@ -29,6 +29,8 @@
  * @structure verifyStripeSignature · event mapping · commerceWebhooksRouter
  * @usage app.use(commerceWebhooksRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-16 — A delivery with a wrong or missing Stripe signature writes a warn line naming the seller
+ *     (never the signature); the refusal log gets it through middleware/refusal-recorder.ts (QA audit E2-08).
  *   v1.1.0 — 2026-10-08 — checkout.session.completed: agent orders from Stripe's Agentic Commerce Suite (AI visibility, layer E).
  *   v1.0.1 — 2026-09-16 — Opens the sealed webhook secret (commerce/psp-secrets.ts).
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
@@ -107,6 +109,11 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
     const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body ?? {}), 'utf-8');
     const signature = req.headers['stripe-signature'];
     if (typeof signature !== 'string' || !verifyStripeSignature(rawBody, signature, secret)) {
+      // A seller whose saved webhook secret is wrong, or was rotated in Stripe, books no payment; this
+      // line is how the operator finds out. The signature itself is never written.
+      log.warn('commerce-webhooks: a Stripe delivery was refused, its signature does not match the webhook secret the seller saved', {
+        seller: ownerGhii, signature_present: typeof signature === 'string', ip: req.ip ?? '',
+      });
       res.status(401).json(error(config.nodeId, 'INVALID_SIGNATURE', 'Stripe signature verification failed'));
       return;
     }

@@ -19,6 +19,10 @@
  * @structure One probe: every tool invoked against a storage whose every method throws.
  * @usage pnpm exec vitest run test/unit/node-mcp-error-flag.test.ts
  * @version-history
+ *   2026-10-16 -- Registered through mcp/tool-registrar.ts, the chain mcp/index.ts uses, against a storage
+ *     that fails the way the Postgres provider does (dbError: `<method> failed: <driver text>`, with the
+ *     driver error as cause). A second assertion: no tool's answer carries the driver text (QA audit
+ *     E1-01, F5-02, E5-01). It passed before while every throw reached the AI as error.message.
  *   v1.0.0 -- 2026-09-07 -- Written with the notify fix it guards.
  */
 import { describe, it, expect } from 'vitest';
@@ -28,6 +32,10 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { registerAllServerTools } from '../../src/mcp/register-all.js';
+import { toolRegistrar } from '../../src/mcp/tool-registrar.js';
+
+/** Driver text a storage failure carries; no tool answer may show it. */
+const DRIVER_TEXT = 'relation "probe_secret_table" does not exist';
 
 /** One plausible value per declared field, from the tool's own published JSON Schema. */
 function probeValue(schema: Record<string, unknown>, depth = 0): unknown {
@@ -58,12 +66,29 @@ describe('the node MCP says when the work behind a tool failed', () => {
     const throwingStorage = new Proxy({}, {
       get(_t, prop) {
         if (typeof prop === 'symbol' || prop === 'then') return undefined;
-        return () => { storageCalls++; throw new Error(`storage refused: ${String(prop)}`); };
+        // The shape of the Postgres provider's dbError(): a sentence naming the method, the driver
+        // error as cause (storage/providers/postgres-kysely/helpers.ts).
+        return () => {
+          storageCalls++;
+          const driver = Object.assign(new Error(DRIVER_TEXT), { code: '42P01', severity: 'ERROR' });
+          throw new Error(`${String(prop)} failed: ${DRIVER_TEXT}`, { cause: driver });
+        };
       },
     }) as unknown as Storage;
 
     const noop = () => {};
     const mcp = new McpServer({ name: 'probe', version: '0.0.0' }, { capabilities: { tools: {} } });
+    // The registration chain of mcp/index.ts, for the duration of registration, as index.ts does it.
+    type ToolFn = (...args: unknown[]) => unknown;
+    const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
+    const originalTool = patchable.tool.bind(mcp) as ToolFn;
+    const originalRegisterTool = patchable.registerTool.bind(mcp) as ToolFn;
+    const chainDeps = {
+      scopes: () => ['*'], principal: () => 'probebot#owner@probe-node', storage: throwingStorage,
+      config: { nodeId: 'probe-node' } as unknown as AimeatConfig,
+    };
+    patchable.tool = toolRegistrar(originalTool, chainDeps);
+    patchable.registerTool = toolRegistrar(originalRegisterTool, chainDeps);
     registerAllServerTools(mcp, {
       storage: throwingStorage,
       // Every optional feature on and every scope held, for the same reason the schema audit does
@@ -80,6 +105,8 @@ describe('the node MCP says when the work behind a tool failed', () => {
       emitResourceUpdated: noop,
       emitResourceListChanged: noop,
     });
+    patchable.tool = originalTool;
+    patchable.registerTool = originalRegisterTool;
 
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 'probe', version: '1.0.0' }, { capabilities: {} });
@@ -88,6 +115,7 @@ describe('the node MCP says when the work behind a tool failed', () => {
     const silent: string[] = [];
     const flagged: string[] = [];
     const neverTouched: string[] = [];
+    const leaked: string[] = [];
     try {
       const listed = await client.listTools();
       expect(listed.tools.length).toBeGreaterThan(250);
@@ -100,18 +128,21 @@ describe('the node MCP says when the work behind a tool failed', () => {
         for (const [name, s] of Object.entries(props)) if (required.has(name)) args[name] = probeValue(s);
 
         const before = storageCalls;
-        let r: { isError?: unknown };
-        try { r = await client.callTool({ name: tool.name, arguments: args }) as { isError?: unknown }; }
+        let r: { isError?: unknown; content?: Array<{ text?: string }> };
+        try { r = await client.callTool({ name: tool.name, arguments: args }) as { isError?: unknown; content?: Array<{ text?: string }> }; }
         catch { flagged.push(tool.name); continue; }   // a throw the SDK turned into an error is an answer
 
         // A tool that never reached storage refused the probe's arguments first, which is its job.
         // It is not measured by this run and it is not counted as a pass either.
         if (storageCalls === before) { neverTouched.push(tool.name); continue; }
+        if ((r?.content ?? []).some((c) => (c.text ?? '').includes('probe_secret_table'))) leaked.push(tool.name);
         if (r?.isError === true) flagged.push(tool.name);
         else silent.push(tool.name);
       }
 
       expect(silent, 'tools that reached a BROKEN storage and answered without isError').toEqual([]);
+      // The driver text is for the log; the AI reads a sentence with the request id (mcp/tool-fault.ts).
+      expect(leaked, 'tools whose answer carried the storage driver text').toEqual([]);
       // An empty `silent` means nothing if the probe drove nothing: most of the surface has to have
       // actually reached storage, or this suite passes by not asking.
       expect(flagged.length, `only ${flagged.length} of ${listed.tools.length} tools reached storage; the probe is not driving the surface`)

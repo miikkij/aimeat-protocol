@@ -13,6 +13,7 @@
  *   - notifications: GET/PATCH preferences with channel/cooldown/quiet-hours/type validation
  *
  * @version-history
+ *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -31,6 +32,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 import { operatorOverride } from '../services/operator-override.js';
 
 export function personalRouter(
@@ -122,7 +124,7 @@ export function personalRouter(
       ]));
       emitChange('personal');
     } catch (err) {
-      logger.error('Failed to anchor personal node', { error: err });
+      logger.error('Failed to anchor personal node', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to register personal node'));
     }
   });
@@ -168,7 +170,7 @@ export function personalRouter(
         },
       ]));
     } catch (err) {
-      logger.error('Failed to get personal node status', { error: err });
+      logger.error('Failed to get personal node status', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get personal node status'));
     }
   });
@@ -202,7 +204,7 @@ export function personalRouter(
         available_slots: config.personalNodeMaxSlots - results.length,
       }));
     } catch (err) {
-      logger.error('Failed to list personal nodes', { error: err });
+      logger.error('Failed to list personal nodes', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to list personal nodes'));
     }
   });
@@ -236,7 +238,7 @@ export function personalRouter(
       }));
       emitChange('personal');
     } catch (err) {
-      logger.error('Failed to update personal node', { error: err });
+      logger.error('Failed to update personal node', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update personal node'));
     }
   });
@@ -286,7 +288,7 @@ export function personalRouter(
       ]));
       emitChange('personal');
     } catch (err) {
-      logger.error('Failed to deregister personal node', { error: err });
+      logger.error('Failed to deregister personal node', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to deregister personal node'));
     }
   });
@@ -326,7 +328,7 @@ export function personalRouter(
         newest: items.length > 0 ? items[items.length - 1].createdAt : null,
       }));
     } catch (err) {
-      logger.error('Failed to get mailbox stats', { error: err });
+      logger.error('Failed to get mailbox stats', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get mailbox stats'));
     }
   });
@@ -407,7 +409,7 @@ export function personalRouter(
       ]));
       emitChange('personal');
     } catch (err) {
-      logger.error('Failed to create push subscription', { error: err });
+      logger.error('Failed to create push subscription', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to create push subscription'));
     }
   });
@@ -440,7 +442,7 @@ export function personalRouter(
       }));
       emitChange('personal');
     } catch (err) {
-      logger.error('Failed to delete push subscription', { error: err });
+      logger.error('Failed to delete push subscription', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to delete push subscription'));
     }
   });
@@ -478,7 +480,7 @@ export function personalRouter(
         max: config.pushMaxSubscriptionsPerNode,
       }));
     } catch (err) {
-      logger.error('Failed to list push subscriptions', { error: err });
+      logger.error('Failed to list push subscriptions', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to list push subscriptions'));
     }
   });
@@ -530,7 +532,7 @@ export function personalRouter(
       }));
       emitChange('personal');
     } catch (err) {
-      logger.error('Failed to send test push notification', { error: err });
+      logger.error('Failed to send test push notification', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to send test push notification'));
     }
   });
@@ -584,7 +586,7 @@ export function personalRouter(
         },
       ]));
     } catch (err) {
-      logger.error('Failed to get notification preferences', { error: err });
+      logger.error('Failed to get notification preferences', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to get notification preferences'));
     }
   });
@@ -698,7 +700,7 @@ export function personalRouter(
       ]));
       emitChange('personal');
     } catch (err) {
-      logger.error('Failed to update notification preferences', { error: err });
+      logger.error('Failed to update notification preferences', errorFields(err));
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to update notification preferences'));
     }
   });

@@ -7,6 +7,8 @@
  *   the prev-token-after-grace reuse path is testable without a 60s wait.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-session-refresh
  * @version-history
+ *   2026-10-16 — The reuse replay leaves the account event session_token_reused on the owner's record
+ *     (QA audit S1-02).
  *   2026-10-16 — Phase 6 asserts that an owner bearer (access token, owner-level access token, the
  *     token it exchanges for, a signed-out session's token) is refused at POST /v1/auth/refresh
  *     without the cookie. It asserted the old renewal as expected (QA audit S1-01).
@@ -186,6 +188,11 @@ async function main() {
         // The whole family is dead: even the current token no longer refreshes.
         const after = await call('/v1/auth/refresh', { cookie: currentRt, csrf: true });
         assert(after.status === 401, `current token should be dead after reuse-revoke, got ${after.status}`);
+        // The person is told on their own record: a reused token is treated as a copy in other hands.
+        const again = await login(username, password);
+        const ev = await fetch(`${BASE}/v1/account/events`, { headers: { Authorization: `Bearer ${again.token}` } });
+        const kinds = ((await ev.json() as any)?.data?.events ?? []).map((e: any) => e.kind);
+        assert(kinds.includes('session_token_reused'), `no session_token_reused on the record; kinds: ${kinds.join(', ')}`);
     });
 
     await test('two-generations-old token is rejected', async () => {

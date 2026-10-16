@@ -13,6 +13,8 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Roles — 2026-10-16 — Granting or revoking the operator role writes the operator trail: a usage row,
+ *     a log line and the account event operator_acted on the person's feed (QA audit S1-02).
  *   Work cost — 2026-10-11 — The admin work list's `cost` carries `toll` (the escrowed pacing amount) and
  *     the deprecated `base_price` mirror, through presentWorkCost (services/morsel.ts).
  *   Backup — 2026-10-09 — GET /v1/admin/backup writes owners and agents through an allowlist and
@@ -58,6 +60,9 @@ import type { PeerInfo } from '../services/federation.js';
 import { deriveTierFlags } from '../services/federation-tiers.js';
 import { performKeyExchange } from '../services/federation-helpers.js';
 import { logger } from '../utils/logger.js';
+import { recordOperatorAction } from '../services/operator-access-audit.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import type { VerifiedToken } from '../auth/jwt.js';
 import { ROOMS } from '../services/home-rooms.js';
 import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED } from '../services/admin-backup-projection.js';
 import { presentWorkCost } from '../services/morsel.js';
@@ -71,6 +76,15 @@ export function adminMonitoringRouter(
     peers?: Map<string, PeerInfo>,
 ): Router {
     const router = Router();
+
+    /** The operator trail for an operator role given or taken (services/operator-access-audit.ts). */
+    const recordRoleChange = async (auth: VerifiedToken, owner: string, action: 'grant' | 'revoke'): Promise<void> => {
+        const actorGaii = resolveIdentity(auth, config.nodeId);
+        await recordOperatorAction(storage, config, {
+            operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ownerOf: `${owner}@${config.nodeId}`,
+            area: 'role', action, subject: 'operator',
+        });
+    };
 
     // GET /v1/admin/work — list all work items (operator only)
     router.get('/v1/admin/work', requireAuth(), requireOperator(storage), async (_req, res) => {
@@ -463,6 +477,9 @@ export function adminMonitoringRouter(
         }
 
         await storage.updateOwner(owner, { roles: [...ownerRecord.roles, 'operator'] });
+        // The largest privilege change on a node leaves a record: the operator's usage row, a log
+        // line and a line on the person's feed (QA audit S1-02).
+        await recordRoleChange(req.auth!, owner, 'grant');
 
         res.json(success(config.nodeId, {
             owner,
@@ -504,6 +521,7 @@ export function adminMonitoringRouter(
         }
 
         await storage.updateOwner(owner, { roles: ownerRecord.roles.filter(r => r !== 'operator') });
+        await recordRoleChange(req.auth!, owner, 'revoke');
 
         res.json(success(config.nodeId, {
             owner,

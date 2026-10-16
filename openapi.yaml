@@ -979,6 +979,11 @@ components:
           format: date-time
         request_id:
           type: string
+          description: >-
+            The id of the request this envelope answers. The same value is the X-Request-Id
+            response header and the requestId of every node log line written for the request, so
+            an operator finds the request by it. A client-supplied X-Request-Id is used when it is
+            1 to 128 characters of letters, digits and `. _ : -`; otherwise the node makes one.
           example: req-a1b2c3d4
         data:
           type: object

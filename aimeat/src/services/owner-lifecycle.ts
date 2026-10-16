@@ -32,6 +32,9 @@
  *   - resolveOperatorAgentName / OPERATOR_AGENT_REFUSAL: re-exported from operator-principal.ts
  * @usage const result = await deactivateOwner(storage, 'alice', 'operator-bob');
  * @version-history
+ *   2026-10-16 — The operator's disable and enable acts take the actor and write the operator trail
+ *     (recordOperatorAction): a usage row, a log line and a line on the person's feed, so a disabled and
+ *     re-enabled account keeps a record of both and of who did them (QA audit E2-04).
  *   v1.2.0 — 2026-09-24 — The operator question moved to services/operator-principal.ts, which asks
  *     it of the PRINCIPAL on every door; resolveOperatorAgentName and OPERATOR_AGENT_REFUSAL are
  *     re-exported from there, and resolveOperatorName, which asked the account alone, is gone.
@@ -42,6 +45,8 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import type { AimeatConfig } from '../config.js';
+import { recordOperatorAction } from './operator-access-audit.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 
 // The operator tools import the question from here; its one home is operator-principal.ts.
@@ -150,17 +155,35 @@ export type OperatorLifecycleResult =
   | { ok: true; result?: OwnerLifecycleResult }
   | { ok: false; status: number; code: string; message: string };
 
-/** The operator's disable act with ITS two refusals — never yourself, and the target must exist —
- *  shared by the HTTP door and the MCP tool. */
-export async function deactivateOwnerByOperator(storage: Storage, target: string, by: string): Promise<OperatorLifecycleResult> {
-  if (target === by) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'You cannot deactivate your own account' };
-  if (!(await storage.getOwner(target))) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Owner not found: ${target}` };
-  return { ok: true, result: await deactivateOwner(storage, target, by) };
+/** Who did an operator act, for the operator trail: the operator in person, or their agent. */
+export interface OperatorTrail {
+  config: Pick<AimeatConfig, 'nodeId' | 'accountEventWindow'>;
+  /** The exact principal that acted (resolveIdentity of the caller). */
+  actorGaii: string;
 }
 
-/** The operator's enable act, same shape. */
-export async function reactivateOwnerByOperator(storage: Storage, target: string): Promise<OperatorLifecycleResult> {
+async function writeTrail(storage: Storage, trail: OperatorTrail | undefined, by: string, target: string, action: 'disable' | 'enable'): Promise<void> {
+  if (!trail) return;
+  await recordOperatorAction(storage, trail.config, {
+    operatorGhii: `${by}@${trail.config.nodeId}`, actorGaii: trail.actorGaii,
+    ownerOf: `${target}@${trail.config.nodeId}`, area: 'account', action,
+  });
+}
+
+/** The operator's disable act with ITS two refusals — never yourself, and the target must exist —
+ *  shared by the HTTP route and the MCP tool. */
+export async function deactivateOwnerByOperator(storage: Storage, target: string, by: string, trail?: OperatorTrail): Promise<OperatorLifecycleResult> {
+  if (target === by) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'You cannot deactivate your own account' };
+  if (!(await storage.getOwner(target))) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Owner not found: ${target}` };
+  const result = await deactivateOwner(storage, target, by);
+  await writeTrail(storage, trail, by, target, 'disable');
+  return { ok: true, result };
+}
+
+/** The operator's enable act, same shape. `by` is the operator's account name, for the trail. */
+export async function reactivateOwnerByOperator(storage: Storage, target: string, by?: string, trail?: OperatorTrail): Promise<OperatorLifecycleResult> {
   if (!(await storage.getOwner(target))) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Owner not found: ${target}` };
   await reactivateOwner(storage, target);
+  if (by) await writeTrail(storage, trail, by, target, 'enable');
   return { ok: true };
 }

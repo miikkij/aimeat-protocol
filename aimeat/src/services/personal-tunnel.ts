@@ -13,6 +13,7 @@
  *   - setNotificationService(): wires optional mailbox-notification delivery
  *
  * @version-history
+ *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.3.0 — 2026-10-12 — mailbox_ack deletes only the items of the node that sends it
  *     (ackMailboxItems); an id of another node's item is left in place and logged
  *     (wish-henkil-kohtaisen-noden-mailbox-ack-poistaa-vain-oman-nodensa).
@@ -30,6 +31,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { MailboxNotificationService } from './mailbox-notification.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 import { runAsNode } from '../utils/gaii.js';
 import { getStats } from './stats.js';
 import { getPromMetrics } from './prometheus.js';
@@ -99,7 +101,7 @@ export class TunnelManager {
     this.storage.updatePersonalNode(nodeId, {
       status: 'online',
       lastSeen: new Date().toISOString(),
-    }).catch(err => logger.error('Failed to update personal node status', { nodeId, error: err }));
+    }).catch(err => logger.error('Failed to update personal node status', { nodeId, ...errorFields(err) }));
 
     // Clear notification cooldown — node is back online (REQ-007)
     this.notificationService?.clearCooldown(nodeId);
@@ -143,7 +145,7 @@ export class TunnelManager {
         logger.error('Invalid tunnel message', {
           event: 'tunnel.error',
           personal_node_id: nodeId,
-          error: err,
+          ...errorFields(err),
         });
       }
     }));
@@ -170,7 +172,7 @@ export class TunnelManager {
       this.storage.updatePersonalNode(nodeId, {
         status: 'offline',
         lastSeen: new Date().toISOString(),
-      }).catch(err => logger.error('Failed to update personal node status on disconnect', { nodeId, error: err }));
+      }).catch(err => logger.error('Failed to update personal node status on disconnect', { nodeId, ...errorFields(err) }));
       logger.info('Personal node disconnected', {
         event: 'tunnel.disconnect',
         personal_node_id: nodeId,
@@ -331,7 +333,7 @@ export class TunnelManager {
         logger.info('Mailbox summary sent to personal node', { nodeId, items: stats.count });
       }
     } catch (err) {
-      logger.error('Failed to send mailbox summary', { nodeId, error: err });
+      logger.error('Failed to send mailbox summary', { nodeId, ...errorFields(err) });
     }
   }
 

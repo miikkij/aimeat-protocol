@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.22.0 — 2026-10-13 — migrateRestScopeKeepWorkingOnce(), chained after migrateAgentReadGrantOnce: on the
  *     first start as 4.0.x, every word the 4.0.0 scope gates check goes to the agents and approved
  *     ecosystem apps that existed before the start (services/rest-scope-keep-working-migration.ts).
@@ -131,6 +132,7 @@ import { createEmailService, setActiveEmailService } from '../services/email.js'
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai-disclosure-sweep.js';
@@ -207,36 +209,36 @@ export async function initializeServices(
   // Seed standardized profile schemas — Phase 0.4
   seedProfileSchemas(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} profile schemas`); })
-    .catch(err => logger.error('Failed to seed profile schemas', { error: err }));
+    .catch(err => logger.error('Failed to seed profile schemas', errorFields(err)));
 
   // Seed CSM template schemas from docs/csm-examples/ — Phase 0.2
   seedCsmTemplates(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} CSM schemas`); })
-    .catch(err => logger.error('Failed to seed CSM schemas', { error: err }));
+    .catch(err => logger.error('Failed to seed CSM schemas', errorFields(err)));
 
   // Seed the generic manifest-format schema (organism.*.meta.manifest) — Phase 3
   seedManifestSchema(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info('Seeded manifest-format schema'); })
-    .catch(err => logger.error('Failed to seed manifest schema', { error: err }));
+    .catch(err => logger.error('Failed to seed manifest schema', errorFields(err)));
 
   // Seed organism template bundles (project object-type CSMs) globally — Phase 3
   seedTemplateBundles(storage, `system@${config.nodeId}`)
     .then(count => { if (count > 0) logger.info(`Seeded ${count} template-bundle CSMs`); })
-    .catch(err => logger.error('Failed to seed template bundles', { error: err }));
+    .catch(err => logger.error('Failed to seed template bundles', errorFields(err)));
 
   // Seed the Design Book's first published parts: the six leiskat, benched like any proposal —
   // a fresh node's Book is never an empty shelf (TARGET-074 phase 5). Then the bench this build
   // runs reads every stored component again, and a proposer whose part no longer passes is told
   // once: a deploy is what changes the bench.
   seedDesignBook(storage, config)
-    .catch(err => logger.error('Failed to seed the Design Book', { error: err }))
+    .catch(err => logger.error('Failed to seed the Design Book', errorFields(err)))
     .then(() => noticeFailingComponents(storage, config))
-    .catch(err => logger.error('Failed to bench the Design Book\'s stored components again', { error: err }));
+    .catch(err => logger.error('Failed to bench the Design Book\'s stored components again', errorFields(err)));
 
   // Seed knowledge packager prompt templates
   seedKnowledgeTemplates(storage, `system@${config.nodeId}`)
     .then(() => logger.info('Knowledge prompt templates seeded'))
-    .catch(err => logger.error('Failed to seed knowledge templates', { error: err }));
+    .catch(err => logger.error('Failed to seed knowledge templates', errorFields(err)));
 
   // AWAITED, unlike the seeders around it, and for the same reason setupAnonymousIdentity above is:
   // a request can arrive for this the moment the port opens. `GET /v1/prompts/playbook/:id` and
@@ -745,6 +747,6 @@ async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): P
     enableAnonymousAuth(ANON_GAII, ANON_OWNER, config.nodeId);
     logger.info('Anonymous mode enabled — unauthenticated requests use shared identity', { gaii: ANON_GAII });
   } catch (err) {
-    logger.error('Failed to setup anonymous identity', { error: err });
+    logger.error('Failed to setup anonymous identity', errorFields(err));
   }
 }

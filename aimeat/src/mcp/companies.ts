@@ -14,6 +14,7 @@
  *   aimeat_company_list, _create, _update, _front_page, _portfolio_publish.
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-08 — aimeat_company_portfolio_publish passes the agent as the page's writer (AI provenance).
  *   2026-10-05 — aimeat_company_create and aimeat_company_update take ai_provenance and ai_provenance_id
  *     for the description and answer the record (secaudit 2026-10, M3 follow-up; the developer's decision).
@@ -24,6 +25,7 @@
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CompanyRecord } from '../models/company-schemas.js';
@@ -89,15 +91,15 @@ export function registerCompanyTools(
     });
 
     /** CompanyError carries the code the REST surface reports; keep the same words here. */
-    const fail = (e: unknown): { content: { type: 'text'; text: string }[]; isError: true } => ({
+    const fail = (e: unknown): { content: { type: 'text'; text: string }[]; isError: true } => withCaughtError({
         content: [{
             type: 'text' as const,
             text: e instanceof CompanyError
                 ? `${e.code}: ${e.message}`
                 : ((e as Error)?.message || 'Company operation failed'),
         }],
-        isError: true,
-    });
+        isError: true as const,
+    }, e);
     const ok = (payload: unknown): { content: { type: 'text'; text: string }[] } => ({
         content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
     });

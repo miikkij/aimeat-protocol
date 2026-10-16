@@ -246,7 +246,7 @@ The rules for secrets (never returned, never logged, destination allowlisted) ar
 
 ### Consent Layer
 
-`authorizeRead()` in `src/services/access-guard.ts` makes the read decision for memory and files: visibility, consent grants and group rules, plus one audit entry per read. The owner can read what their own agents and apps stored; an agent reading its owner's private data goes through the same consent check as anyone else (`.claude/rules/security.md`).
+`authorizeRead()` in `src/services/access-guard.ts` makes the read decision for memory and files: visibility, consent grants and group rules, plus an audit entry for each refused read and each consent grant or revoke (allowed reads are not audited, `src/services/consent.ts`). The owner can read what their own agents and apps stored; an agent reading its owner's private data goes through the same consent check as anyone else (`.claude/rules/security.md`).
 
 ### Data Export
 

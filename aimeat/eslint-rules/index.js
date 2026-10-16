@@ -13,6 +13,7 @@
  *   - noAdhocExtensionCtx: The sandbox context comes from buildExtensionCtx(), not a call-site literal
  *   - noStorageInMcp: An MCP tool calls the service REST calls, never storage directly
  *   - noExpressInService: A service takes the caller, not an Express request, so both doors reach it
+ *   - noErrorObjectLogField: A caught error is logged through errorFields(err), not as an object field
  *   - noRawLocaleFormat: Dates, times and numbers go through the shared formatter, which reads the
  *     reader's own region and clock rather than the page's language
  *
@@ -21,6 +22,7 @@
  *   // Then add to ESLint flat config plugins
  *
  * @version-history
+ *   2026-10-16 — Added no-error-object-log-field (QA audit E1-04, F5-07, S5-07).
  *   v1.0.0 — 2026-03-13 — Initial implementation
  *   v1.1.0 — 2026-08-07 — Added no-direct-auth (session single-source cleanup)
  *   v1.2.0 — 2026-08-10 — Added no-adhoc-extension-ctx (August 2026 audit: one sandbox context)
@@ -38,10 +40,12 @@ import { noAdhocExtensionCtx } from './no-adhoc-extension-ctx.js';
 import { noStorageInMcp } from './no-storage-in-mcp.js';
 import { noExpressInService } from './no-express-in-service.js';
 import { noRawLocaleFormat } from './no-raw-locale-format.js';
+import { noErrorObjectLogField } from './no-error-object-log-field.js';
 
 export default {
   rules: {
     'no-raw-locale-format': noRawLocaleFormat,
+    'no-error-object-log-field': noErrorObjectLogField,
     'file-header': fileHeader,
     'max-file-lines': maxFileLines,
     'no-silent-catch': noSilentCatch,

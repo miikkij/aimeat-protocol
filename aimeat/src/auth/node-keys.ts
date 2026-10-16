@@ -13,6 +13,7 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.3.0 — 2026-10-09 — The database copy of the private key is stored encrypted when the node has
  *     AIMEAT_KEY_PASSPHRASE or AIMEAT_ENCRYPTION_KEY (storage/node-key-at-rest.ts); it was plain text
  *     and read before the protected file (secrets audit 2026-10-09, S4a). A plain row is sealed at boot
@@ -54,6 +55,7 @@ import { initDownloadTokenKeys } from '../services/download-token.js';
 import { initShareTokenKeys } from '../services/share-token.js';
 import { initDraftTokenKeys } from '../services/draft-token.js';
 import { logger } from '../utils/logger.js';
+import { errorFields } from '../utils/error-fields.js';
 import {
   configureNodeKeySecrets, nodeKeySecretsAvailable, NodeKeyLockedError, type NodeKeySecrets,
 } from '../storage/node-key-at-rest.js';
@@ -418,7 +420,7 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
     initDraftTokenKeys(privateKey, publicKey);
     logger.info('Node keys initialized for JWT signing');
   } catch (err) {
-    logger.error('Failed to initialize node keys', { error: err });
+    logger.error('Failed to initialize node keys', errorFields(err));
   }
 }
 

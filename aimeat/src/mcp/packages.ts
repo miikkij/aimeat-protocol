@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-08 — aimeat_package_buy attributes the session to the agent (AI visibility).
  *   2026-10-06 — aimeat_package_buy's auto_renew names the agent on the subscription, so each renewal is
  *     held to its daily purchase limit (secaudit 2026-10 follow-up, A6).
@@ -69,6 +70,7 @@
  *   v1.0.0 — 2026-08-23 — Initial: install, so a chat can turn a shipped package into an owned copy.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -177,7 +179,7 @@ function registerPackageSaleTools(
             });
         } catch (err) {
             const e = err as { code?: string; message?: string };
-            return { ...toolError(e.code ?? 'CHECKOUT_FAILED', e.message ?? String(err)) };
+            return withCaughtError(toolError(e.code ?? 'CHECKOUT_FAILED', e.message ?? String(err)), err);
         }
     });
 }

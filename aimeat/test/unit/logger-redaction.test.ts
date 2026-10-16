@@ -9,12 +9,14 @@
  *   the top level only, so `Authorization`, `apiKey`, `access_token`, a nested `headers.authorization`
  *   and a Bearer inside a message all reached the log.
  * @version-history
+ *   2026-10-16 — An Error under a field is written with its message, stack, own fields and cause, and
+ *     a credential inside it is masked; errorFields() (QA audit E1-04, F5-07, S5-07).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit, finding d1).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PassThrough } from 'node:stream';
 import winston from 'winston';
-import { logger } from '../../src/utils/logger.js';
+import { logger, errorFields } from '../../src/utils/logger.js';
 
 const C = 'CANARY7f3aQx9Lw2';
 const lines: string[] = [];
@@ -120,5 +122,37 @@ describe('logger redaction: key-shaped text in strings', () => {
     const out = await logged(`organism ${uuid} read`, { gaii: 'claude#alice@aimeat-local-001-dev' });
     expect(out).toContain(uuid);
     expect(out).toContain('claude#alice@aimeat-local-001-dev');
+  });
+});
+
+describe('logger: an Error object under a field (QA audit E1-04)', () => {
+  it('writes the message and the stack of an Error passed as a field', async () => {
+    const out = await logged('error probe', { error: new Error('the reason REASON9q') });
+    expect(out).toContain('the reason REASON9q');
+    expect(out).toContain('logger-redaction.test.ts');
+    expect(out).not.toContain('"error":{}');
+  });
+
+  it('writes an Error nested in a plain object, its own fields and its cause', async () => {
+    const cause = Object.assign(new Error('relation "x" does not exist'), { code: '42P01', detail: 'row detail' });
+    const wrapped = new Error('listActions failed: relation "x" does not exist', { cause });
+    const out = await logged('nested error probe', { ctx: { err: wrapped } });
+    expect(out).toContain('listActions failed');
+    expect(out).toContain('42P01');
+    expect(out).toContain('row detail');
+  });
+
+  it('masks a credential inside an Error message and its fields', async () => {
+    const e = Object.assign(new Error(`upstream said Bearer ${C}`), { detail: `token=${C}` });
+    const out = await logged('secret error probe', { error: e });
+    expect(out).toContain('upstream said');
+    expect(out).not.toContain(C);
+  });
+
+  it('errorFields gives the message and the stack, and text for a non-Error', () => {
+    const f = errorFields(new TypeError('x is not a function'));
+    expect(f.error).toBe('x is not a function');
+    expect(f.stack).toContain('TypeError');
+    expect(errorFields('plain')).toEqual({ error: 'plain' });
   });
 });

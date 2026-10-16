@@ -16,6 +16,7 @@
  * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-31 — Initial.
@@ -29,6 +30,7 @@
  *     session's scopes as a fifth parameter.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -61,7 +63,7 @@ export function registerAiJobTools(
 
     const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
     const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
-    const failed = (e: unknown) => err(e instanceof AiJobError ? `${e.code}: ${e.message}` : String((e as Error).message ?? e));
+    const failed = (e: unknown) => withCaughtError(err(e instanceof AiJobError ? `${e.code}: ${e.message}` : String((e as Error).message ?? e)), e);
 
     /** Resolved per call, not at registration: the service belongs to the process and the tool
      *  surface is built per session. A node with no service running says so instead of throwing. */
