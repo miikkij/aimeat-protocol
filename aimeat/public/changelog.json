@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-16",
+      "kind": "feature",
+      "title": {
+        "en": "Bring a presentation into a workspace as an HTML page",
+        "fi": "Tuo esitys työtilaan HTML-sivuna"
+      },
+      "body": {
+        "en": "A document space in a workspace now holds HTML pages beside the Markdown pages: a presentation, a report with charts, or a page with pictures and some interaction. Ask your AI for one, and it writes the page, publishes it, shares it and gives you the link. If your AI cannot connect, the + HTML page button in the workspace gives you a ready-made prompt to run in any AI chat. The page's script runs in an isolated frame. It has no network, it cannot reach your account or anybody else's, and a link in it opens only after the reader confirms the address. The link to a shared HTML page works for 90 days unless you choose another end date, and one press adds 90 more days. The pictures of a shared Markdown page now load for everyone who may read the page. The workspace marks a page that nobody opened or changed in six months, and your AI offers to archive it.",
+        "fi": "Työtilan dokumenttitilassa voi nyt olla Markdown-sivujen rinnalla HTML-sivuja: esitys, raportti kaavioineen tai sivu, jossa on kuvia ja vähän vuorovaikutusta. Pyydä tekoälyäsi tekemään sivu, niin se kirjoittaa, julkaisee ja jakaa sivun ja antaa sinulle linkin. Jos tekoälysi ei saa yhteyttä, työtilan + HTML-sivu -painike antaa valmiin kehotteen, jonka voit ajaa missä tahansa tekoälykeskustelussa. Sivun skripti toimii eristetyssä kehyksessä. Sillä ei ole verkkoyhteyttä, se ei pääse sinun eikä kenenkään muun tiliin, ja sen linkki aukeaa vasta, kun lukija on hyväksynyt osoitteen. Jaetun HTML-sivun linkki toimii 90 päivää, ellet valitse muuta päättymispäivää, ja yhdellä painalluksella saat siihen 90 päivää lisää. Jaetun Markdown-sivun kuvat näkyvät nyt jokaiselle, jolla on oikeus lukea sivu. Työtila merkitsee sivun, jota kukaan ei ole avannut tai muuttanut puoleen vuoteen, ja tekoälysi tarjoutuu arkistoimaan sen."
+      }
+    },
+    {
       "date": "2026-10-15",
       "kind": "feature",
       "title": {
