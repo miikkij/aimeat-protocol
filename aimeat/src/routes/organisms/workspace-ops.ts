@@ -572,7 +572,8 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
    * or an org admin only. services/workspace-share.ts holds the whole rule, end dates and the HTML page
    * default included, and the MCP tool aimeat_workspace_share runs it too. ── */
   router.put('/v1/organisms/:id/workspace/share', requireAuth(), requireScope('memory:write'), async (req, res) => {
-    const r = await setWorkspaceShareOp({ storage, config }, { sub: req.auth!.sub, owner: req.auth!.owner as string | undefined }, {
+    // The resolved caller, as the MCP tool passes it: an organism agent is matched by its GAII.
+    const r = await setWorkspaceShareOp({ storage, config }, { sub: resolveIdentity(req.auth!, config.nodeId), owner: req.auth!.owner as string | undefined }, {
       orgId: req.params.id as string,
       ws: typeof req.query.ws === 'string' ? req.query.ws : '',
       body: (req.body ?? {}) as SetShareBody,
