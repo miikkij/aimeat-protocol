@@ -14,6 +14,8 @@
  * @structure boot · helpers · phases 0-12
  * @usage cd aimeat && node --import tsx test/e2e-connections-social.ts
  * @version-history
+ *   v1.1.0 — 2026-10-16 — Phase 10 holds who may read an owner's publish history and replies: an
+ *     agent only on connections:read-as-owner, and never another owner's items.
  *   v1.0.1 — 2026-10-16 — The node this suite starts follows the run's backend
  *     (test/helpers/own-node-db.ts); it was SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-10-15 — Initial.
@@ -23,6 +25,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
+import * as ed from '@noble/ed25519';
 import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
@@ -416,6 +419,29 @@ try {
     const r = await replies(attempt.fb!, tok);
     assert(r.status === 403, `status ${r.status}`);
   });
+  await test('an agent without connections:read-as-owner sees none of its owner\'s items', async () => {
+    const tok = await agentToken(`noread${stamp % 100000}`, ['connections:read', 'connections:read-through']);
+    const hist = await api('/v1/connections/attempts', { method: 'GET', bearer: tok });
+    assert(hist.status === 200 && (hist.data.data.attempts as any[]).length === 0, `history ${hist.status} ${JSON.stringify(hist.data?.data)}`);
+    const r = await replies(attempt.fb!, tok);
+    assert(r.status === 404, `replies ${r.status}`);
+  });
+  await test('an agent on connections:read-as-owner lists its owner\'s items and reads their replies', async () => {
+    const tok = await agentToken(`ownread${stamp % 100000}`, ['connections:read', 'connections:read-through', 'connections:read-as-owner']);
+    const hist = await api('/v1/connections/attempts', { method: 'GET', bearer: tok });
+    const items = hist.data?.data?.attempts as any[];
+    const fb = items?.find((x) => x.id === attempt.fb);
+    assert(hist.status === 200 && fb && fb.holder === 'owner', `history ${hist.status} ${JSON.stringify(items?.slice(0, 2))}`);
+    const r = await replies(attempt.fb!, tok);
+    assert(r.status === 200 && (r.data.data.replies as any[]).length === 2, `replies ${r.status} ${r.data?.error?.message}`);
+  });
+  await test('read-as-owner never reaches another owner\'s items', async () => {
+    const regB = await api('/v1/agents', { bearer: jwtB, body: { name: `bread${stamp % 100000}`, owner: `sy${stamp}`, display_name: 'b', capabilities: [], scopes: ['connections:read', 'connections:read-through', 'connections:read-as-owner'] } });
+    assert(regB.status === 201, `create agent of B: ${regB.status} ${JSON.stringify(regB.data?.error)}`);
+    const tok = await tokenFor(regB.data.data.agent.gaii, regB.data.data.private_key);
+    const r = await replies(attempt.fb!, tok);
+    assert(r.status === 404, `replies ${r.status}`);
+  });
 
   console.log('\nPhase 11 — the media address');
   await test('an address nothing is held at answers 404', async () => {
@@ -428,6 +454,22 @@ try {
   server.close();
   await (storage as { disconnect?: () => Promise<void> }).disconnect?.();
   try { rmSync(TMP, { recursive: true, force: true }); } catch { /* Windows may still hold the SQLite file */ }
+}
+
+/** An agent of the first owner with exactly `scopes`, and its session JWT. */
+async function agentToken(name: string, scopes: string[]): Promise<string> {
+  const created = await api('/v1/agents', { bearer: jwt, body: { name, owner, display_name: name, capabilities: [], scopes } });
+  assert(created.status === 201, `create agent ${name}: ${created.status} ${JSON.stringify(created.data?.error)}`);
+  return tokenFor(created.data.data.agent.gaii as string, created.data.data.private_key as string);
+}
+
+/** An agent's session JWT from its key, as the device flow's agent signs in. */
+async function tokenFor(gaii: string, privB64: string): Promise<string> {
+  const ts = new Date().toISOString();
+  const sig = await ed.signAsync(new TextEncoder().encode(gaii + ts), Buffer.from(privB64, 'base64'));
+  const tok = await api('/v1/auth/token', { body: { gaii, timestamp: ts, signature: Buffer.from(sig).toString('base64') } });
+  assert(tok.data?.ok === true, `agent token: ${JSON.stringify(tok.data?.error)}`);
+  return tok.data.data.token as string;
 }
 
 /** An app-grant bearer carrying exactly `scopes`: role 'app', which never gets the owner bypass. */

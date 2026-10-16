@@ -26,6 +26,8 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-16 — aimeat_connection_history and aimeat_connection_replies read the owner's published
+ *     items on connections:read-as-owner, through the same holders as the mail tools (Jouni, 2026-10-16).
  *   2026-10-16 — A read of the owner's mailbox by an agent that may name it but lacks
  *     connections:read-as-owner answers READ_AS_OWNER_REQUIRED, naming the permission, instead of
  *     "no such connection" for a connection aimeat_connection_list had just shown it (QA audit F12b-02).
@@ -191,14 +193,15 @@ export function registerConnectionTools(
     //
     // Both call services/connections/history.ts, the functions GET /v1/connections/attempts and
     // POST /v1/connections/attempts/:id/replies call, so the ownership check is the same on every
-    // interface: an item of somebody else's answers NOT_FOUND like one that never existed.
+    // interface: an item of somebody else's answers NOT_FOUND like one that never existed. The
+    // owner's items are read on connections:read-as-owner, as the mail tools read the owner's mail.
 
     mcp.tool('aimeat_connection_history', descriptionFor('aimeat_connection_history'),
         zodShapeFor('aimeat_connection_history'),
         annotationsFor('aimeat_connection_history'),
         async ({ limit }): Promise<TextResult> => {
             if (!config.connectionsEnabled) return toolError('CONNECTIONS_DISABLED', connectionsOffReason);
-            return ok({ attempts: await listPublishHistory(storage, principal(), limit ?? 50) });
+            return ok({ attempts: await listPublishHistory(storage, holders('read'), limit ?? 50) });
         });
 
     mcp.tool('aimeat_connection_replies', descriptionFor('aimeat_connection_replies'),
@@ -210,7 +213,7 @@ export function registerConnectionTools(
             if ('error' in c) return toolError('NO_ENCRYPTION_KEY', c.error);
             // Read from the provider now; nothing is stored. The route's 409 NOT_READABLE and 502
             // REPLIES_UNAVAILABLE arrive here as the same codes.
-            const out = await repliesForAttempt(c, principal(), attempt_id, limit);
+            const out = await repliesForAttempt(c, holders('read'), attempt_id, limit);
             if (!out.ok) return toolError(out.code, out.reason);
             // The same fields the REST route answers in `data`.
             return ok({

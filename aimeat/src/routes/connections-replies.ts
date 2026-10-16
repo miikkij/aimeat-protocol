@@ -15,6 +15,8 @@
  * @structure connectionsRepliesRouter(config, storage)
  * @usage app.use(connectionsRepliesRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The replies read takes the holders the caller may read, so an agent on
+ *     connections:read-as-owner reads the replies to its owner's items (Jouni, 2026-10-16).
  *   v1.0.0 — 2026-10-15 — Initial.
  */
 
@@ -28,6 +30,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { buildOutboundProviders } from '../services/connections/providers.js';
 import { requireEncryptionKey } from '../services/connections/credential.js';
 import { repliesForAttempt } from '../services/connections/history.js';
+import { connectionHoldersOf } from '../services/connections/access.js';
 import { takeHandedOff } from '../services/connections/media-handoff.js';
 
 export function connectionsRepliesRouter(config: AimeatConfig, storage: Storage): Router {
@@ -50,9 +53,14 @@ export function connectionsRepliesRouter(config: AimeatConfig, storage: Storage)
         return;
       }
       const rawLimit = Number(req.body?.limit ?? req.query.limit);
+      // The caller's own items, and the owner's for an agent on connections:read-as-owner
+      // (services/connections/access.ts connectionHoldersOf, purpose 'read').
+      const holders = connectionHoldersOf(
+        resolveIdentity(req.auth!, config.nodeId), `${req.auth!.owner}@${config.nodeId}`, req.auth!.scopes, 'read',
+      );
       const out = await repliesForAttempt(
         { config, storage, providers, key },
-        resolveIdentity(req.auth!, config.nodeId),
+        holders,
         req.params.id as string,
         Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : undefined,
       );

@@ -29,6 +29,7 @@
  *   - PublishAttempt — idempotency key + attribution + quota accounting, written BEFORE the attempt
  * @usage import type { ConnectionRecord } from '../models/connection-schemas.js';
  * @version-history
+ *   2026-10-16 — PublishHistoryItem.holder: own or owner (an agent on connections:read-as-owner).
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1.
  */
 
@@ -120,6 +121,8 @@ export interface ConnectionRecord {
 /** One published item as a history view shows it: the attempt, plus who it went to. */
 export interface PublishHistoryItem {
   id: string;
+  /** Whose item: the caller's own, or the owner's (an agent on connections:read-as-owner). */
+  holder: 'own' | 'owner';
   connectionId: string;
   provider: string;
   accountLabel: string;
