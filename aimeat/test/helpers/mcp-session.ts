@@ -25,6 +25,8 @@
  *   const s = await openSession(BASE, agent.token);
  *   const r = await callTool(s, 'aimeat_memory_list', {});      // { isError, offered, data, text }
  * @version-history
+ *   2026-10-16 — `offered: false` also from the SCOPE_DENIED answer a filtered-out tool now gives
+ *     instead of "Tool X not found" (QA audit E5-04, merged beside W27).
  *   v1.0.1 — 2026-10-16 — callTool reads `offered: false` only from the SDK's sentence about the tool
  *     name; a handler refusal whose text says "not found" counted as not offered (QA audit W27).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27, F06a-01 and siblings).
@@ -166,7 +168,10 @@ export async function callTool(session: McpSession, name: string, args: Record<s
     const text = body?.result?.content?.[0]?.text ?? JSON.stringify(body?.error ?? body ?? {});
     const isError = body?.result?.isError === true || body?.error !== undefined;
     // Only the SDK's own sentence about the tool NAME: a handler's "NOT_FOUND: Contact not found" is a
-    // refusal by an offered tool, and a looser pattern read it as "not offered".
-    const notOffered = isError && /Tool [\w.-]+ (?:not found|disabled)|unknown tool/i.test(text);
+    // refusal by an offered tool, and a looser pattern read it as "not offered". A tool the session's
+    // permissions filtered out answers SCOPE_DENIED with the word it needs (src/mcp/scope-denied-answer.ts,
+    // QA audit E5-04); that sentence ends "so the tool is offered", which no handler writes.
+    const notOffered = isError && (/Tool [\w.-]+ (?:not found|disabled)|unknown tool/i.test(text)
+        || (/^SCOPE_DENIED: /.test(text) && /so the tool is offered\.?/.test(text)));
     return { isError, offered: !notOffered, data: toolJson(body), text };
 }
