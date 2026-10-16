@@ -83,8 +83,7 @@ export async function runBackup(opts: { baseUrl: string; token: string; outFile:
   console.log(`Backup written to ${opts.outFile}: ${d.owners?.length ?? 0} accounts, ${d.agents?.length ?? 0} agents, `
     + `${d.actions?.length ?? 0} actions, ${d.boards?.length ?? 0} boards, and the agents' memory.`);
   console.log('This export is partial. It does not carry the records people keep under their own accounts, organisms, '
-    + 'apps, files or any credential. For a full backup of the node, back up the database and the .env file '
-    + '(docs/operations/backup-and-restore.md).');
+    + 'apps, files or any credential. For a full backup of the node, back up the database and the .env file.');
   for (const line of d.omitted ?? []) console.log(`  Left out: ${line}`);
   return 0;
 }
