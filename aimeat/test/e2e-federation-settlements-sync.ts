@@ -44,6 +44,12 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   2026-10-16 — A refusal from the far node is HTTP 502 PEER_REFUSED on POST /v1/work/request,
+ *     /v1/federation/route and /v1/federation/cross-node/work, with the far node's status (401, 500) only
+ *     in details.peer_status; these tests asserted the far status as the response status (decision 2026-10-16).
+ *   2026-10-16 — The replication queue depth counts only pending rows (decision 2026-10-16): a failed job
+ *     no longer counts toward it, and the debounced catalogue sync is counted where it is enqueued, since
+ *     the flush drains it before the depth could be read.
  *   2026-10-16 — Work forwarded by POST /v1/work/request and refused by the far node is PEER_REFUSED with
  *     the far node's status in details, not that node's body passed through (QA audit F14b-01, F18-01).
  *     The two-real-node half of this subject is e2e-federation-two-real-nodes.ts.
@@ -592,7 +598,7 @@ async function run(): Promise<void> {
             method: 'POST', headers: auth(agentToken),
             body: JSON.stringify({ target_node: FAKE_ID, action_id: 'act-1', provider_gaii: 'provider@elsewhere', input: { q: 'hello' } }),
         });
-        assert(status === 401, `the far node's refusal is passed on: ${status} ${JSON.stringify(body)}`);
+        assert(status === 502 && body.error?.details?.peer_status === 401, `the far node's refusal is a 502 with its 401 in details: ${status} ${JSON.stringify(body)}`);
         assert(body.ok === false && body.error?.code === 'PEER_REFUSED' && body.error?.details?.routed_to === FAKE_ID,
             `a refusal is an error envelope naming the node, not ok: true: ${JSON.stringify(body)}`);
         const arrived = seen.filter(s => s.path === '/v1/work/request').pop();
@@ -610,7 +616,7 @@ async function run(): Promise<void> {
             method: 'POST', headers: auth(A.ownerToken),
             body: JSON.stringify({ target_node: FAKE_ID, action_id: 'act-2', provider_gaii: 'provider@elsewhere', input: { q: 'in person' } }),
         });
-        assert(status === 401, `the far node's refusal is passed on: ${status} ${JSON.stringify(body)}`);
+        assert(status === 502 && body.error?.details?.peer_status === 401, `the far node's refusal is a 502 with its 401 in details: ${status} ${JSON.stringify(body)}`);
         const arrived = seen.filter(s => s.path === '/v1/work/request').pop();
         assert(arrived?.body?.cross_node_requester === A.ownerGhii,
             `the peer is told the person's full identity: ${JSON.stringify(arrived?.body?.cross_node_requester)}`);
@@ -681,7 +687,7 @@ async function run(): Promise<void> {
             body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'made' } }),
         });
         // Said as the far node's refusal, not as this node's own 401 (QA audit F14b-01, F18-01).
-        assert(made.status === 401 && made.body.error?.code === 'PEER_REFUSED' && made.body.error?.details?.peer_status === 401,
+        assert(made.status === 502 && made.body.error?.code === 'PEER_REFUSED' && made.body.error?.details?.peer_status === 401,
             `the far node refuses work without its credential: ${made.status} ${JSON.stringify(made.body)}`);
         const afterMade = await walletOf(A.ownerToken);
         assert(afterMade === before, `a refused route keeps no morsel: ${before} → ${afterMade}`);
@@ -692,7 +698,7 @@ async function run(): Promise<void> {
                 method: 'POST', headers: auth(A.ownerToken),
                 body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'refused' } }),
             });
-            assert(refused.status === 500 && refused.body.error?.code === 'PEER_REFUSED', `the peer's error is passed on: ${refused.status} ${JSON.stringify(refused.body)}`);
+            assert(refused.status === 502 && refused.body.error?.code === 'PEER_REFUSED' && refused.body.error?.details?.peer_status === 500, `the peer's 500 is in details: ${refused.status} ${JSON.stringify(refused.body)}`);
         } finally { modes.work = 'ok'; }
         const afterRefused = await walletOf(A.ownerToken);
         assert(afterRefused === afterMade, `an error answer kept the routing fee: ${afterMade} → ${afterRefused}`);
@@ -711,15 +717,15 @@ async function run(): Promise<void> {
                 method: 'POST', headers: auth(A.ownerToken),
                 body: JSON.stringify({ target_node: FAKE_ID, method: 'POST', path: '/v1/work/request', body: { q: 'route' } }),
             });
-            assert(routed.status === 500, `the target's error is passed on: ${routed.status} ${JSON.stringify(routed.body)}`);
-            assert(routed.body.ok === false && routed.body.error?.code === 'PEER_REFUSED' && routed.body.error?.details?.peer_status === routed.status,
+            assert(routed.status === 502, `the target's error is a 502: ${routed.status} ${JSON.stringify(routed.body)}`);
+            assert(routed.body.ok === false && routed.body.error?.code === 'PEER_REFUSED' && routed.body.error?.details?.peer_status === 500,
                 `a refusal from the far node is an error, not ok: true: ${JSON.stringify(routed.body)}`);
             const submitted = await A.json('/v1/federation/cross-node/work', {
                 method: 'POST', headers: auth(agentToken),
                 body: JSON.stringify({ target_node: FAKE_ID, action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'cross' } }),
             });
-            assert(submitted.status === 500, `the peer's error is passed on: ${submitted.status} ${JSON.stringify(submitted.body)}`);
-            assert(submitted.body.ok === false && submitted.body.error?.code === 'PEER_REFUSED' && submitted.body.error?.details?.peer_status === submitted.status,
+            assert(submitted.status === 502, `the peer's error is a 502: ${submitted.status} ${JSON.stringify(submitted.body)}`);
+            assert(submitted.body.ok === false && submitted.body.error?.code === 'PEER_REFUSED' && submitted.body.error?.details?.peer_status === 500,
                 `a refusal from the far node is an error, not ok: true: ${JSON.stringify(submitted.body)}`);
         } finally { modes.work = 'ok'; }
         const after = await walletOf(A.ownerToken);
@@ -1088,13 +1094,16 @@ async function run(): Promise<void> {
 
     await test('a job whose sync fails is marked failed and stays out of the pending list', async () => {
         const peers = new Map([[SSRF_ID, ssrfPeer()]]);
+        const depthBefore = await A.storage.replicationQueueSize();
         const id = await enqueueCatalogueSync(SSRF_ID, A.config, A.storage);
+        assert(await A.storage.replicationQueueSize() === depthBefore + 1, 'a queued job is depth');
         await drainSyncQueue(A.config, A.storage, peers);
         const pending = await A.storage.dequeueReplication(SSRF_ID, 10);
         assert(!pending.some(e => e.id === id),
             `a failed job must not sit in the pending list waiting to be retried forever: ${JSON.stringify(pending)}`);
+        // The depth is the rows not yet sent (status pending): a failed job is not waiting (decision 2026-10-16).
         const size = await A.storage.replicationQueueSize();
-        assert(size >= 2, `both jobs are still on the queue as rows, sent and failed: ${size}`);
+        assert(size === depthBefore, `a failed job is not depth: ${depthBefore} before, ${size} after`);
     });
 
     await test('a memory write enqueues for replication in instant mode, and never in bulk', async () => {
@@ -1179,11 +1188,18 @@ async function run(): Promise<void> {
         await sleep(120);
         assert(await A.storage.replicationQueueSize() === before, 'bulk mode does not react to a catalogue change');
 
-        notifyCatalogueChange({ ...A.config, syncMode: 'instant' as const, syncBatchDelayMs: 40 }, A.storage, peers);
-        notifyCatalogueChange({ ...A.config, syncMode: 'instant' as const, syncBatchDelayMs: 40 }, A.storage, peers);
-        await sleep(400);
-        assert(await A.storage.replicationQueueSize() > before,
-            'the debounce window must fire once and queue a sync');
+        // Counted where it is enqueued: the flush drains the job at once, and the depth counts only
+        // pending rows, so the depth is back where it was before it could be read (decision 2026-10-16).
+        const enqueued: string[] = [];
+        const realEnqueue = A.storage.enqueueReplication.bind(A.storage);
+        (A.storage as any).enqueueReplication = async (e: Parameters<typeof realEnqueue>[0]) => { enqueued.push(e.type); return realEnqueue(e); };
+        try {
+            notifyCatalogueChange({ ...A.config, syncMode: 'instant' as const, syncBatchDelayMs: 40 }, A.storage, peers);
+            notifyCatalogueChange({ ...A.config, syncMode: 'instant' as const, syncBatchDelayMs: 40 }, A.storage, peers);
+            await sleep(400);
+        } finally { delete (A.storage as any).enqueueReplication; }
+        assert(enqueued.filter(t => t === 'catalogue_sync').length === 1,
+            `the debounce window must fire once and queue one sync: ${JSON.stringify(enqueued)}`);
 
         // The flush waits for its enqueues before it drains (fixed 2026-09-08 in sync-scheduler.ts):
         // until then the drain could reach the queue before the row it was meant to carry was in

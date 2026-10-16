@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — The setup code is issued while the node has no OPERATOR, not only no owner, because the
+ *     no-operator self-heal grants the role too; the line says where to use it in each case (Jouni, 2026-10-16).
+ *   2026-10-16 — A node whose base URL is not loopback and that has no owner issues the one-time setup
+ *     code (services/setup-code.ts) and prints it in the start banner at warn level, with where to
+ *     enter it; POST /v1/setup/init refuses without it (Jouni, 2026-10-16).
+ *   2026-10-16 — The settings loadConfig() set aside reach createServer, which records them on the
+ *     Security page (Jouni, decision 2026-10-16).
  *   2026-10-16 — The posture header says "this node": the test and dev mode warnings are reported on
  *     any node whose public URL is not a loopback address, not only on the public profile (QA audit S1-08).
  *   2026-10-16 — The shutdown handler stops the workflow engine's sweep and the scheduler, and waits
@@ -61,6 +68,7 @@ import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
 import { turnDeprecationWarning } from './services/turn-credentials.js';
 import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-setup-secret.js';
+import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
 
 /** How long shutdown waits for scheduled runs in progress; the process exits 5 s after server.close. */
 const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
@@ -75,7 +83,7 @@ const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
  * @param pkgRoot Package root (aimeat/ dir) — used to read package.json for the version.
  */
 export async function runStart(config: AimeatConfig, sources: ConfigSources, pkgRoot: string): Promise<void> {
-  const { envKeys, fileKeys, cliKeys, fileName } = sources;
+  const { envKeys, fileKeys, cliKeys, fileName, settingFallbacks } = sources;
 
   // Self-heal runtime assets after a package upgrade. The server serves
   // CWD/{public,locales,static} ahead of the package's own copies, so an
@@ -108,14 +116,16 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   // person only through the 0600 file written below, never through a log.
   const generatedAdminSecret = config.adminPassword ? null : randomBytes(16).toString('base64url');
   if (generatedAdminSecret) config.adminPassword = generatedAdminSecret;
-  const { app, tunnelManager, connectTunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName });
+  const { app, tunnelManager, connectTunnelManager, realtimeManager, storage } = await createServer(config, { envKeys, fileKeys, cliKeys, fileName, settingFallbacks });
 
   // The generated secret opens POST /v1/admin/setup/register, so it goes to a file only this
   // user can read, and only while the node has no owner (the `anonymous` system owner of
   // anonymous mode is nobody's and does not count). With an owner, or with a secret the operator
   // set, a file left from an earlier boot is deleted. Secrets audit 2026-10-09, 1.4.
+  let hasOwner = true;
+  let hasOperator = true;
   try {
-    const hasOwner = (await storage.listOwners()).some(o => o.name !== 'anonymous');
+    ({ anyOwner: hasOwner, anyOperator: hasOperator } = await storage.operatorAccountState());
     const written = syncAdminSetupSecretFile({ dir: adminSetupSecretDir(config), secret: generatedAdminSecret, hasOwner });
     if (written.action === 'written') {
       logger.info(`   Admin setup secret: written to ${written.path} (readable by this user only). Use it at ${config.baseUrl}/v1/admin/setup to create the first operator.`);
@@ -125,6 +135,11 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   } catch (err) {
     logger.warn(`Admin setup secret could not be written to a file: ${err instanceof Error ? err.message : String(err)}. Set AIMEAT_ADMIN_PASSWORD to choose the secret yourself.`);
   }
+  // A node others can reach that has no operator: every path that would make an account its operator
+  // (the first-owner setup, the first registration, the no-operator self-heal at registration or
+  // sign-in) asks for this one-time code, which only the start log carries (services/setup-code.ts;
+  // Jouni, 2026-10-16). Printed at warn level, so a node started with AIMEAT_LOG_LEVEL=warn shows it.
+  const setupCode = !hasOperator && setupCodeRequired(config) ? setupCodeGateFor(config).issue() : null;
   const server = app.listen(config.port, (listenError?: Error) => {
     // Express 5 calls this for the server's 'error' event too, not only for 'listening'. Without
     // this check a node whose port was taken printed "AIMEAT node started", ran its schedulers and
@@ -177,6 +192,11 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     }
     logger.info(``);
     logger.info(`   Admin Setup: ${config.baseUrl}/v1/admin/setup`);
+    if (setupCode) {
+      logger.warn(hasOwner
+        ? `   Setup code: ${setupCode}. This node has no operator: send it as setupCode when you register or sign in, and that account becomes the operator; it works once.`
+        : `   Setup code: ${setupCode}. Enter it in the setup wizard at ${config.baseUrl}/v1/setup/wizard to create this node's first owner; it works once.`);
+    }
     logger.info(`──────────────────────────────────────────────────────────`);
 
     // Security warnings

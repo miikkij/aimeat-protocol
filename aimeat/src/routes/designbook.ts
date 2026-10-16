@@ -18,6 +18,9 @@
  *     for one part also the AI-Disclosure and Link headers and `meta.provenance`), so a gallery shows
  *     the AI label a part an AI wrote owes (services/design-book/part-provenance.ts). The preview
  *     carries the record's marks and the visible label, as a published app does.
+ *   2026-10-16 — DELETE /v1/designbook/:id asks memory:purge: it removes the part for good, and
+ *     memory:delete, a default agent scope, now means only a delete that goes to the bin (invariant 8
+ *     as ruled by the developer on 2026-10-16).
  *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.5.0 — 2026-09-26 — GET /v1/designbook/:id names its reader to the service, which answers a
  *     component's `bench` and gives the markup and stylesheet of one that no longer passes only to
@@ -313,7 +316,12 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
 
   // DELETE outright — the cleanup retire cannot be: junk with zero adoptions is removed whole,
   // history included; an adopted part answers PART_IN_USE and points at retire instead.
-  router.delete('/v1/designbook/:id', requireAuth(), requireScope('memory:delete'), async (req: Request, res: Response) => {
+  // `memory:purge`, not `memory:delete`: the part and its history are removed for good, not moved
+  // to the deleted-memory bin, and the rows belong to the Book's own identity, so the proposer has
+  // no bin to restore them from. memory:delete is in every agent's default scopes because what it
+  // removes comes back for the grace period; a removal that cannot come back takes the separate
+  // word (security-development-dna.md, invariant 8).
+  router.delete('/v1/designbook/:id', requireAuth(), requireScope('memory:purge'), async (req: Request, res: Response) => {
     try {
       const isOperator = await isOperatorCaller(storage, req.auth);
       const out = await book.delete(caller(req), isOperator, req.params.id as string);

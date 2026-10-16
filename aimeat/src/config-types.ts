@@ -3,10 +3,11 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description AimeatConfig and its supporting type/interface declarations
- *   (ExtensionHooks, RateLimits, OperatorConfig, LoadConfig* result types).
+ *   (ExtensionHooks, RateLimits, OperatorConfig).
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.17.3 — 2026-10-16 — LoadConfigOptions and LoadConfigResult moved to config-load-types.ts (pure extraction, max-file-lines).
  *   v1.18.0 — 2026-10-16 — PagesConfig mixed in (config-pages.ts): pageHost.
  *   v1.17.2 — 2026-10-14 — otkGraceMs removed with the connectivity-key routes (feature-list audit row 202).
  *   v1.17.1 — 2026-10-10 — federationAudienceRequired names the two versions and the per-peer pin (secaudit 2026-10-10 I21, I22).
@@ -774,26 +775,4 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   consulDatacenter: string;
 }
 
-export interface LoadConfigOptions {
-  /** Path to config file (from --config CLI arg) */
-  configPath?: string;
-  /** CLI bootstrap overrides keyed by dot-path (e.g. { 'node.port': '8080' }) */
-  cliOverrides?: Record<string, string>;
-  /**
-   * Refuse a setting the node does not accept (config-start-check.ts). Default true. `aimeat validate`,
-   * `aimeat init` and `aimeat config` pass false: they exist to show or repair a broken environment.
-   */
-  checkSettings?: boolean;
-}
-
-export interface LoadConfigResult {
-  config: AimeatConfig;
-  /** Dot-paths that resolved from env vars */
-  envKeys: string[];
-  /** Dot-paths that resolved from file config (aimeat.ini / aimeat.json) */
-  fileKeys: string[];
-  /** Dot-paths that resolved from CLI args */
-  cliKeys: string[];
-  /** Name of the file source (e.g. 'file:/path/to/aimeat.ini'), null if no file found */
-  fileName: string | null;
-}
+// LoadConfigOptions and LoadConfigResult moved to config-load-types.ts (pure extraction, 2026-10-16).

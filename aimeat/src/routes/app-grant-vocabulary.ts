@@ -9,6 +9,9 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   2026-10-16 — The consent text says what memory:delete and memory:purge really do: a delete goes to
+ *     the bin first; a purge also covers a whole workspace or organism (invariant 8, ruled by the
+ *     developer on 2026-10-16).
  *   2026-10-15 — mcp:use, calling tools on the owner's attached MCP servers, askable by an app
  *     (feature-list audit #12).
  *   v1.9.0 -- 2026-10-12 -- agent:read, the word the agent list asks from 4.0.0 (auth/rest-scope-gate.ts).
@@ -37,9 +40,11 @@
 export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'memory:read': 'Read your stored memories and data',
   'memory:write': 'Create and update your memories and data',
-  'memory:delete': 'Delete your memories and data',
+  // What memory:delete removes goes to the deleted-memory bin first (Jouni, 2026-10-16).
+  'memory:delete': 'Delete your memories and data (they go to the bin first and can be restored)',
   // 2026-10-02: removing shared workspace records for good, with no grace window to take them back.
-  'memory:purge': 'Delete shared workspace records for good (they cannot be restored)',
+  // 2026-10-16: deleting a whole workspace or organism asks it too.
+  'memory:purge': 'Delete records for good, a whole workspace or organism included (they cannot be restored)',
   'storage:read': 'Read your stored files (images, documents)',
   'storage:write': 'Save and update your stored files (images, documents)',
   'catalogue:read': 'Read the public catalogue/directory',

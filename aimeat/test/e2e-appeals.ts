@@ -27,10 +27,17 @@
  *   - Phase 1: POST /v1/flags/:flagId/appeal — validation, the four target arms, and every refusal
  *   - Phase 2: GET /v1/appeals — the operator arm, the filters, and who is turned away
  *   - Phase 3: POST /v1/appeals/:id/review — upheld leaves the flag standing, overturned dismisses it
+ *   - Phase 4: who decides an organism's appeal — the archive rule (creator or admin, in person or
+ *     through their own agent; an attached agent refused)
  * @usage
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-appeals.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-appeals
  * @version-history
+ *   v1.4.0 — 2026-10-16 — Tests 32-33: the queue follows the same rule; an attached agent lists none of the
+ *     organism's appeals, the creator's own agent lists them (Jouni, 2026-10-16).
+ *   v1.3.0 — 2026-10-16 — Phase 4 (tests 26-31): an attached agent of the creator, a plain member and an
+ *     outside owner are refused the review of an organism's appeal; the creator's own agent and an
+ *     admin in person decide it (Jouni, 2026-10-16).
  *   v1.2.0 — 2026-10-10 — 11b: the operator's refused second appeal leaves no operator_acted event
  *     (secaudit 2026-10-10 I5).
  *   v1.1.0 — 2026-09-08 — The three tests that pinned the wrong answer assert the fix; a fifth
@@ -43,6 +50,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner, ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -501,6 +509,106 @@ await test('25. Overturned: the appeal is decided and the flag is dismissed', as
     assert(!!flag, `the flag is still listed: ${flagBoardPost}`);
     assert(flag.status === 'dismissed', `an overturned appeal dismisses the flag: ${flag.status}`);
     assert(flag.reviewedBy === OP, `the dismissal is attributed: ${flag.reviewedBy}`);
+});
+
+// ─── Phase 4: who decides an appeal on an organism's content ───
+// The rule archiving asks (services/archive.ts archiveRoleOf): the organism's creator or an admin, in
+// person or through one of their own agents; an agent ATTACHED to the organism is a member there,
+// whoever its owner is (Jouni, 2026-10-16). The review read organism.admins for the owner name alone,
+// so the creator's attached agent decided appeals until then.
+console.log('\nPhase 4 — who decides an appeal on an organism\'s content');
+
+const OWNER_D = `appeald${stamp}`;
+let dToken = '';
+let ownAgentOfC = { gaii: '', token: '' };
+let attachedAgentOfC = { gaii: '', token: '' };
+let appealAgenda = '';
+let appealBudget = '';
+
+await test('26. Setup: two more flagged organism records appealed, an admin, a member, and two agents of the creator', async () => {
+    const write = async (leaf: string) => {
+        const r = await json('/v1/memory', {
+            method: 'POST', headers: authed(cToken),
+            body: JSON.stringify({ key: `organism.${organismId}.${leaf}`, value: { note: leaf }, visibility: 'private' }),
+        });
+        assert(r.status === 201, `organism memory ${leaf} ${r.status}: ${JSON.stringify(r.body.error)}`);
+        const f = await json('/v1/flags', {
+            method: 'POST', headers: authed(opToken),
+            body: JSON.stringify({ targetType: 'memory', targetId: `${OWNER_C}@${NODE_ID}::organism.${organismId}.${leaf}`, reason: 'inappropriate', description: 'raised by the appeals suite' }),
+        });
+        assert(f.status === 201, `flag ${leaf} ${f.status}: ${JSON.stringify(f.body.error)}`);
+        const a = await json(`/v1/flags/${f.body.data.id}/appeal`, {
+            method: 'POST', headers: authed(cToken), body: JSON.stringify({ reason: `the ${leaf} belongs here` }),
+        });
+        assert(a.status === 201, `appeal ${leaf} ${a.status}: ${JSON.stringify(a.body.error)}`);
+        return a.body.data.id as string;
+    };
+    appealAgenda = await write('agenda');
+    appealBudget = await write('budget');
+
+    dToken = await makeOwner(OWNER_D);
+    const admin = await json(`/v1/organisms/${organismId}/members`, {
+        method: 'POST', headers: authed(cToken), body: JSON.stringify({ ghii: OWNER_A, role: 'admin' }),
+    });
+    assert(admin.status === 201, `admin add ${admin.status}: ${JSON.stringify(admin.body.error)}`);
+    const member = await json(`/v1/organisms/${organismId}/members`, {
+        method: 'POST', headers: authed(cToken), body: JSON.stringify({ ghii: OWNER_B, role: 'member' }),
+    });
+    assert(member.status === 201, `member add ${member.status}: ${JSON.stringify(member.body.error)}`);
+
+    const SOCIAL = ['social:read', 'social:write', 'memory:read'];
+    ownAgentOfC = await makeAgent(BASE, { name: OWNER_C, token: cToken }, SOCIAL);
+    attachedAgentOfC = await makeAgent(BASE, { name: OWNER_C, token: cToken }, SOCIAL);
+    const at = await json(`/v1/organisms/${organismId}/agents`, {
+        method: 'POST', headers: authed(cToken), body: JSON.stringify({ agent_gaii: attachedAgentOfC.gaii }),
+    });
+    assert(at.status === 201, `attach ${at.status}: ${JSON.stringify(at.body.error)}`);
+});
+
+const review = (token: string, id: string, decision = 'overturned') => json(`/v1/appeals/${id}/review`, {
+    method: 'POST', headers: authed(token), body: JSON.stringify({ decision, note: 'decided by the appeals suite' }),
+});
+
+await test('27. An agent attached to the organism is refused, though its owner created the organism', async () => {
+    const { status, body } = await review(attachedAgentOfC.token, appealAgenda);
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body.error ?? body.data)}`);
+    assert(body.error?.code === 'FORBIDDEN', `code: ${body.error?.code}`);
+});
+
+await test('28. A plain member of the organism is refused', async () => {
+    const { status, body } = await review(bToken, appealAgenda);
+    assert(status === 403 && body.error?.code === 'FORBIDDEN', `expected 403 FORBIDDEN, got ${status} ${body.error?.code}`);
+});
+
+await test('29. An owner outside the organism is refused', async () => {
+    const { status, body } = await review(dToken, appealAgenda);
+    assert(status === 403 && body.error?.code === 'FORBIDDEN', `expected 403 FORBIDDEN, got ${status} ${body.error?.code}`);
+});
+
+await test('30. The creator\'s own agent, not attached to the organism, decides the appeal', async () => {
+    const { status, body } = await review(ownAgentOfC.token, appealAgenda, 'upheld');
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.data.status === 'upheld' && body.data.reviewedBy === ownAgentOfC.gaii, `decided: ${JSON.stringify(body.data)}`);
+});
+
+await test('31. An admin of the organism decides in person', async () => {
+    const { status, body } = await review(aToken, appealBudget);
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.data.status === 'overturned' && body.data.reviewedBy === OWNER_A, `decided: ${JSON.stringify(body.data)}`);
+});
+
+await test('32. The queue: an agent attached to the organism lists none of its appeals', async () => {
+    const { status, body } = await json('/v1/appeals?per_page=100', { headers: authed(attachedAgentOfC.token) });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body.data ?? body.error)}`);
+    assert(body.error?.code === 'FORBIDDEN', `code: ${body.error?.code}`);
+});
+
+await test('33. The queue: the creator\'s own agent lists the organism\'s appeals, and only those', async () => {
+    const { status, body } = await json('/v1/appeals?per_page=100', { headers: authed(ownAgentOfC.token) });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body.error)}`);
+    const ids = (body.data.appeals as any[]).map(a => a.id);
+    for (const id of [appealMemoryOrg, appealAgenda, appealBudget]) assert(ids.includes(id), `the organism's appeal ${id} is listed: ${JSON.stringify(ids)}`);
+    assert(!ids.includes(appealAgent) && !ids.includes(appealBoard), `nothing outside the organism: ${JSON.stringify(ids)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

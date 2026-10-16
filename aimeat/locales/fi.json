@@ -1111,14 +1111,16 @@
           "held_account_names": "Tietueet, jotka päivitys jätti ennalleen",
           "workspace_schema_closed": "Työtilan tilat, jotka hylkäävät jokaisen tietueen",
           "headless_browser": "Palvelimen oma selain ei käynnisty",
-          "scope_words_kept": "Oikeudet, jotka päivitys antoi olemassa oleville agenteille ja sovelluksille"
+          "scope_words_kept": "Oikeudet, jotka päivitys antoi olemassa oleville agenteille ja sovelluksille",
+          "config_setting": "Asetus, jota palvelin ei hyväksynyt, joten se käyttää oletusarvoa"
         },
         "source": {
           "workspace_import": "työtilan tuonti",
           "organism_import": "organismin tuonti",
           "app_backup": "sovelluksen varmuuskopio",
           "full_identity_move": "päivitys käynnistyksessä",
-          "workspace_schema_relock": "työtilojen lukitusten tarkistus käynnistyksessä"
+          "workspace_schema_relock": "työtilojen lukitusten tarkistus käynnistyksessä",
+          "start": "palvelimen käynnistys"
         },
         "kept": "{size} säilytetty",
         "notKept": "ei säilytetty, liian suuri",
@@ -16660,8 +16662,8 @@
             "write": "Kirjoita ja lähetä laskuja sekä kirjaa tositteita sinun nimissäsi."
           },
           "memory": {
-            "delete": "Poista tallennettuja muistiinpanoja, tietueita ja dataa.",
-            "purge": "Poista jaetun työtilan tietueita lopullisesti. Niitä ei voi palauttaa, joten sen tehtävät odottavat aina lupaasi.",
+            "delete": "Poista tallennettuja muistiinpanoja, tietueita ja dataa. Poistettu menee ensin roskakoriin, joten voit palauttaa sen.",
+            "purge": "Poista tietueita lopullisesti: jaetun työtilan tietueita, kokonainen työtila tai kokonainen jaettu tila. Niitä ei voi palauttaa, joten sen tehtävät odottavat aina lupaasi.",
             "read": "Lue tilillesi tallennetut muistiinpanot, tietueet ja data.",
             "write": "Tallenna ja päivitä muistiinpanoja, tietueita ja dataa tilillesi.",
             "read-as-owner": "Lue kaikki, mitä sinä ja muut agenttisi olette tallentaneet, myös yksityiset tietueet, samoin kuin itse luet ne. Ilman tätä agentti lukee vain sen, mikä on jaettu sille.",

@@ -92,9 +92,18 @@ log line. The **destination** a secret is transmitted to must be an allowlisted 
 `AIMEAT_ENCRYPTION_KEY` must be set on any node holding secrets (keys, TOTP). A public node without it must fail loudly.
 
 ### 8. Least privilege by default; consent text must convey real capability
-App/agent default scopes stay minimal; powerful scopes (`ai:use`, `task:write`, `memory:delete`) are
-explicit and separately consented. When a scope's real blast radius exceeds its label ("write your data"
-also lets an app redirect your AI key), fix the boundary (Invariant 2); don't rely on the label.
+App/agent default scopes stay minimal; powerful scopes (`ai:use`, `task:write`, `memory:purge`,
+`agent:delete`) are explicit and separately consented. **Moving a record to the deleted-memory bin may
+be a default; a permanent purge and deleting an organism are explicit and separately consented.** So
+`memory:delete` is in the default agent scopes: every delete it opens puts the record in the bin, where
+the owner restores it for `AIMEAT_MEMORY_DELETE_GRACE_DAYS` (seven by default). A removal that cannot
+come back asks `memory:purge`: wiping a workspace, removing workspace rows, deleting an organism (beside
+`organism:write`, which alone also renames, archives and leaves) and removing a Design Book part. A
+door that `memory:delete` opens and that removes for good is a breach of this invariant, whatever its
+label says (Jouni, 2026-10-16). Two hard deletes stay outside it on purpose: a record's own time to
+live, which the writer chose, and erasing an account or an agent, which removes the identity with its
+records. When a scope's real blast radius exceeds its label ("write your data" also lets an app
+redirect your AI key), fix the boundary (Invariant 2); don't rely on the label.
 
 ### 9. Prove multi-tenant isolation with a test, every time
 Every feature touching identity ships with two E2E checks: **cross-owner** ("B touches A's
@@ -422,7 +431,7 @@ two columns say what a local and a public node should run.
 | `AIMEAT_FEDERATION_OPEN_JOIN` | may be `true` | **`false`** | Self-admitting `visiting` peers. |
 | `AIMEAT_CORS_ALLOWED_ORIGINS` | `*` | explicit origins | Origin allowlist. (The API is Bearer-token. The refresh cookie `aimeat_rt` is `SameSite=strict`, path-scoped and custom-header-guarded (`services/owner-session.ts`); the other cookies are short-lived sign-in-flow cookies scoped to their own callback paths, and the admin setup cookie is `SameSite=Strict` on `/v1/admin`. CORS is defense-in-depth, but `*` is still discouraged on public.) |
 | `AIMEAT_STATS_ACCESS` / `AIMEAT_METRICS_ACCESS` | `public` | `authenticated`/`operator` | Don't leak node internals publicly. |
-| `AIMEAT_SETUP_ALLOWED_IPS` | *(open)* | `127.0.0.1,::1` | Restrict the first-owner setup wizard. |
+| `AIMEAT_SETUP_ALLOWED_IPS` | *(open)* | *(open, or the operator's addresses)* | An extra restriction on the first-owner setup wizard. What closes it on a node whose base URL is not loopback is not a knob: the node prints a one-time setup code in its start log while it has no operator, and `POST /v1/setup/init`, every registration route and the sign-in self-heal grant the operator role only with it (`src/services/setup-code.ts`; Jouni, 2026-10-16). |
 | `AIMEAT_EXT_INSTALL_ROLE` | `owner` | `operator` | Who may install sandboxed extensions. |
 | `AIMEAT_DEFAULT_AGENT_SCOPES` | permissive ok | minimal (`memory:read,catalogue:read`) | Ambient agent scope floor. |
 | `AIMEAT_KEY_PASSPHRASE` / `AIMEAT_ENCRYPTION_KEY` | optional | **required** | Node key + secret encryption at rest. |

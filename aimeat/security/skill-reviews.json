@@ -216,13 +216,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-16",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:30bed3f6559c759fc9c50c98"
+      "digest": "sha256:fdee72f835c1d8c226be6266"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-08",
@@ -245,7 +245,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:75578545eb3e5fb6970d4591"
+      "digest": "sha256:2e00b63ae3d328dd57e257c0"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-11",
@@ -353,7 +353,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:e67448ec6c62883ce8035eb8",
+      "digest": "sha256:e449c6d18b23c2dedeb3268b",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -592,7 +592,7 @@
     },
     "node:aimeat-node-guide": {
       "aimeat/src/routes/agents/device-auth.ts": "562ec994ef35b79c",
-      "aimeat/src/routes/ghii/register-login.ts": "0be3d1061e246093",
+      "aimeat/src/routes/ghii/register-login.ts": "5f61c62761b5e510",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
     "node:ai-transparency": {
@@ -603,7 +603,7 @@
       "aimeat/src/mcp/core-admin.ts": "a2a0d28e157ccf1c"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "a5c97c287a3965de",
+      "aimeat/src/mcp/core.ts": "4437fa12c9ac0130",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "6c99c1ceb71f40ad"
     },
     "node:manage-my-profile-data": {
@@ -729,7 +729,7 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "ae4637931ecd008e",
+      "aimeat/src/routes/memory/bulk.ts": "3d600154729ba344",
       "aimeat/src/routes/memory/key.ts": "bc4ae2e72f0b7f5c",
       "aimeat/src/services/memory-bin.ts": "337c889faa2e6b75",
       "aimeat/src/routes/memory-hands.ts": "7c9bde91c26c70cc",

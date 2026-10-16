@@ -1627,6 +1627,9 @@ components:
           type: string
           description: Ed25519 public key (base64)
           example: MCowBQYDK2VwAyEA...
+        setupCode:
+          type: string
+          description: The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it.
 
     AgentRegistration:
       type: object
@@ -3240,6 +3243,9 @@ components:
           format: email
           description: Optional email for verification and magic link login
           example: jane@example.com
+        setupCode:
+          type: string
+          description: The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it.
         interests:
           type: array
           items:
@@ -9004,7 +9010,12 @@ paths:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
         '403':
-          description: REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by invitation only, or not at all
+          description: >-
+            REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by
+            invitation only, or not at all. SETUP_CODE_REQUIRED / SETUP_CODE_INVALID — the node's base
+            URL is not loopback and it has no operator yet, so this account would become the operator (as
+            its first owner, or by the no-operator self-heal), which needs `setupCode`: the one-time code
+            the node printed in its start log. Once the node has an operator, registration needs no code.
         '409':
           description: Owner name already taken
 
@@ -25333,8 +25344,10 @@ paths:
         ask each other.
 
         When the provider is on another node, the request is passed to that node. A refusal there
-        comes back as this node's error PEER_REFUSED, with that node's status as the status and
-        `details: { routed_to, peer_status, peer_error }`; today every node refuses forwarded work,
+        comes back as 502 PEER_REFUSED with `details: { routed_to, peer_status, peer_error }`:
+        `peer_status` is the status the other node answered, never this response's own status, so a
+        401 there cannot read as the caller's own session ending (until 2026-10-16 that status was
+        passed on as this response's status), and no work item is created; today every node refuses forwarded work,
         because the forwarding node holds no credential of its own there. The 1-morsel routing fee is taken as the call goes out, after
         the node's address is checked (a refused address, 400 INVALID_URL, costs nothing); a balance
         that cannot cover it is refused with 402 INSUFFICIENT_MORSELS. The fee goes back, with a
@@ -25372,6 +25385,12 @@ paths:
           $ref: '#/components/responses/PaymentRequired'
         '429':
           $ref: '#/components/responses/RateLimited'
+        '502':
+          description: >
+            The provider is on another node and that node could not be reached (REMOTE_UNREACHABLE)
+            or refused the request (PEER_REFUSED, with `details.routed_to`, `details.peer_status`,
+            the status it answered, and `details.peer_error`, its own answer). No work item exists
+            and the routing fee was given back.
 
   /v1/work:
     post:
@@ -29334,6 +29353,12 @@ paths:
         minutes, and x-audience naming this node with x-audience-signature (the sending node's
         signature over "aimeat-audience:" + audience + a newline + the signed string). Each signed
         request is answered once (401 REPLAYED the second time); an unsigned one is 401.
+
+        One-release window (decision 2026-10-16): through node 4.0.4 an unsigned request (x-source-node
+        alone, no x-timestamp and no x-signature) is also answered when the peer's own signed heartbeat
+        named version 4.0.2 or older. A peer of unknown or newer version gets the 401. From node 4.0.5
+        only the signed request is answered. The signature headers are therefore required for every
+        peer on 4.0.3 or newer.
       tags: [Federation]
       parameters:
         - name: x-source-node
@@ -33268,7 +33293,9 @@ paths:
         node operator, or to the proposer on their own part. A part any build has adopted
         answers 409 PART_IN_USE — its address must keep meaning something, so it is retired
         instead. This exists because a system that can be littered but never cleaned drifts
-        toward a graveyard nobody can read.
+        toward a graveyard nobody can read. The part does not go to the deleted-memory bin, so a
+        token needs `memory:purge`, the permission for a removal that cannot be undone;
+        `memory:delete` is not enough.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -37679,7 +37706,12 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
-          description: REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by invitation only, or not at all
+          description: >-
+            REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by
+            invitation only, or not at all. SETUP_CODE_REQUIRED / SETUP_CODE_INVALID — the node's base
+            URL is not loopback and it has no operator yet, so this account would become the operator (as
+            its first owner, or by the no-operator self-heal), which needs `setupCode`: the one-time code
+            the node printed in its start log. Once the node has an operator, registration needs no code.
         '409':
           description: Username already taken
           content:
@@ -38886,6 +38918,12 @@ paths:
                           needsSetup:
                             type: boolean
                             description: True if no owners have been registered yet
+                          setupCodeRequired:
+                            type: boolean
+                            description: |
+                              True when the node still needs setup and its base URL is not a loopback
+                              address: POST /v1/setup/init then needs `setupCode`, the one-time code the
+                              node printed in its start log.
                           nodeId:
                             type: string
                             description: Current node identifier
@@ -38932,6 +38970,12 @@ paths:
         created under the node id it runs as. A setting that differs from the running value is
         written to a new .env file and takes effect at the next start, or, when a .env file already
         exists, is not written at all. `settings` reports each one, and `message` says so.
+
+        On a node whose base URL is not a loopback address, the setup also needs `setupCode`: a
+        one-time code the node generates at start while it has no owner and prints in its start log,
+        on the line that starts with "Setup code". It is checked before anything else in the body,
+        used once, and kept in memory only as a hash. A restart issues a new code while the node still
+        has no owner. A node on a loopback address (local development) needs no code.
       tags: [Setup]
       security: []
       requestBody:
@@ -38942,6 +38986,11 @@ paths:
               type: object
               required: [owner]
               properties:
+                setupCode:
+                  type: string
+                  description: |
+                    The one-time code from the node's start log, needed when GET /v1/setup/status says
+                    `setupCodeRequired`. Case, spaces and hyphens do not matter.
                 locale:
                   type: string
                   description: Preferred language (e.g. "en", "fi")
@@ -39037,7 +39086,12 @@ paths:
         '400':
           description: Invalid input (missing username, short password, etc.)
         '403':
-          description: Node already configured (owners exist)
+          description: |
+            `ALREADY_CONFIGURED`: the node has an owner, so setup has run. `SETUP_CODE_REQUIRED`: the
+            node needs its one-time setup code and the request has none, or no code is waiting (restart
+            the node to get one). `SETUP_CODE_INVALID`: the code is not the one in the start log, or
+            another request used it a moment ago. `IP_RESTRICTED`: the setup address allowlist
+            (AIMEAT_SETUP_ALLOWED_IPS) does not include the caller.
 
   # ============================================================
   # Phase 1.5: Data Quality Flags
@@ -39581,8 +39635,11 @@ paths:
       operationId: deleteOrganism
       summary: Delete organism
       description: |
-        Delete an organism. Only organism admins or node operators can delete.
-        This removes all memberships and the associated board.
+        Delete an organism. Only an owner of the organism can delete it.
+        This removes all memberships, the associated board and every record keyed under the
+        organism, every member's included. Nothing goes to the deleted-memory bin, so an agent or
+        app token needs `memory:purge` beside `organism:write`: deleting an organism is consented
+        separately from changing one.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -42534,6 +42591,11 @@ paths:
         POST /v1/notifications/read (which only marks them read), this REMOVES the rows. Owner-scoped:
         only the caller's own notifications are affected. Omit the body (or send `{}`) to clear ALL;
         pass `{ ids: [...] }` to delete just those.
+
+        Needs `memory:delete`. The account holder in person clears for good. An agent or an app
+        grant moves the rows to the deleted-memory bin instead: the answer carries `in_bin: true`
+        and `restorable_until`, and the owner puts a notification back with
+        POST /v1/memory/{key}/restore (its key is listed by GET /v1/memory/deleted) until then.
       tags: [Notifications]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -42545,8 +42607,9 @@ paths:
               properties:
                 ids: { type: array, items: { type: string }, description: Notification ids to clear (omit to clear all) }
       responses:
-        '200': { description: "Count cleared ({ cleared })" }
+        '200': { description: "Count cleared ({ cleared }); from an agent or an app grant also { in_bin: true, restorable_until }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: "SCOPE_DENIED: the token does not hold memory:delete" }
 
   /v1/notifications/settings:
     get:
@@ -43084,9 +43147,12 @@ paths:
     get:
       x-aimeat-scope: { word: 'social:read', enforcedIn: '4.0.0' }
       operationId: listAppeals
-      summary: List appeals (operator only)
+      summary: List appeals (operator, or the organism's creator or an admin)
       description: |
-        List all content moderation appeals. Operator-only endpoint.
+        List content moderation appeals. The operator sees every appeal. An organism's creator or
+        an admin, in person or through one of their own agents, sees the appeals on that organism's
+        content, by the rule the review and archiving ask; an agent attached to the organism sees
+        none of them. Anyone else is refused with 403 FORBIDDEN.
         Supports filtering by status and pagination.
       tags: [Appeals]
       security:
@@ -43128,11 +43194,14 @@ paths:
     post:
       x-aimeat-scope: { word: 'social:write', enforcedIn: '4.0.0' }
       operationId: reviewAppeal
-      summary: Review an appeal (operator only)
+      summary: Review an appeal (operator, or the organism's creator or an admin)
       description: |
-        Review a content moderation appeal. Operator-only endpoint.
-        The operator can uphold the original flag, overturn it, or dismiss
-        the appeal.
+        Decide a content moderation appeal: `upheld` leaves the flag standing, `overturned`
+        dismisses it. The operator decides any appeal. An appeal on an organism's content is also
+        decided by that organism's creator or an admin, in person or through one of their own
+        agents, by the rule archiving asks: an agent attached to the organism is a member there,
+        whoever its owner is, and is refused. A plain member and anyone outside the organism are
+        refused with 403 FORBIDDEN. An appeal already decided answers 409 ALREADY_REVIEWED.
       tags: [Appeals]
       security:
         - BearerAuth: []
@@ -43153,12 +43222,11 @@ paths:
               properties:
                 decision:
                   type: string
-                  enum: [uphold, overturn, dismiss]
+                  enum: [upheld, overturned]
                   description: Appeal review decision
-                reviewNote:
+                note:
                   type: string
-                  maxLength: 2000
-                  description: Operator review note
+                  description: The reviewer's note, stored as the appeal's reviewNote
       responses:
         '200':
           description: Appeal reviewed
@@ -49665,8 +49733,10 @@ paths:
       description: |
         Forward a request to a peer node, directly or through one more relay.
 
-        When the target answers with an error, its status is passed on in an error envelope with the
-        code PEER_REFUSED and the target's answer in `details.peer_error`, and the routing fee goes back.
+        When the target answers with an error, this node answers 502 PEER_REFUSED with
+        `details: { routed_to, peer_status, peer_error }` (the target's status and its answer), and
+        the routing fee goes back. The target's status is never this response's status, so a 401 there
+        cannot read as the caller's own session ending (until 2026-10-16 it was passed on).
 
         TWO POLICIES, BOTH ENFORCED, AND NEITHER REPLACED THE OTHER. This node's own
         `allow_routing` on the TARGET peer decides what it is willing to relay outward, and refuses
@@ -49689,7 +49759,7 @@ paths:
         The fee is taken for a route that is made. It is taken as the first call goes out, after the
         address check; a balance that cannot cover it is refused with 402 INSUFFICIENT_MORSELS and
         nothing is sent. It goes back, with a `federation_routing_return` line in the wallet, when the
-        target cannot be reached (502), when it answers with an error (its status is passed on), and
+        target cannot be reached (502), when it answers with an error (502 PEER_REFUSED), and
         when no relay makes a multi-hop route (404).
 
         WHAT A RECEIVER ANSWERS, on any path a relay reaches, always 403 and never 401. A 401 would
@@ -49722,8 +49792,13 @@ paths:
           $ref: '#/components/responses/PaymentRequired'
         '403':
           description: >
-            This node will not relay to that target (POLICY_DENIED), or the receiving node refused
-            the relay (a RELAY_* code, listed above, passed through with the far end's status).
+            This node will not relay to that target (POLICY_DENIED).
+        '502':
+          description: >
+            The target could not be reached (FEDERATION_ERROR), or it refused the request
+            (PEER_REFUSED, with `details.routed_to`, `details.peer_status`, the status it answered,
+            and `details.peer_error`, its own answer, a RELAY_* refusal listed above among them).
+            The routing fee was given back.
 
   /v1/federation/resolve/{gaii}:
     get:
@@ -49760,10 +49835,12 @@ paths:
         fee is taken from that identity's owner as the call goes out, after the address check: a
         balance that cannot cover it is refused with 402 INSUFFICIENT_MORSELS and nothing is sent.
         The fee goes back, with a `federation_routing_return` line, when the peer cannot be reached
-        (502) or answers with an error: its status is passed on, in an error envelope with the code
-        PEER_REFUSED and the far node's own answer in `details.peer_error` (until 2026-10-15 this was
-        a success envelope, `ok: true`, beside the error status). Work requests do not cross nodes yet:
-        the receiving node asks for a signed-in caller, so a real node answers 401.
+        (502) or answers with an error: then this node answers 502 PEER_REFUSED with
+        `details: { routed_to, peer_status, peer_error }`, the far node's status and its own answer
+        (until 2026-10-15 this was a success envelope, `ok: true`, beside the error status, and until
+        2026-10-16 the far node's status was this response's status, so its 401 read as the caller's
+        own session ending). Work requests do not cross nodes yet: the receiving node asks for a
+        signed-in caller, so a real node refuses and `peer_status` is 401.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -49778,6 +49855,11 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '402':
           $ref: '#/components/responses/PaymentRequired'
+        '502':
+          description: >
+            The peer could not be reached (FEDERATION_ERROR), or it refused the work (PEER_REFUSED,
+            with `details.routed_to`, `details.peer_status`, the status it answered, and
+            `details.peer_error`, its own answer). No work item exists and the routing fee was given back.
 
   /v1/federation/settle:
     post:
@@ -61652,9 +61734,16 @@ paths:
           description: >
             Either this connection was made without the permission that resource needs, in which
             case connecting the account again and approving it is the fix, or the provider has since
-            withdrawn it.
+            withdrawn it. `READ_AS_OWNER_REQUIRED`: the connection is the agent's owner's, which GET
+            /v1/connections lists to it on `connections:use`, and reading what is in it needs
+            `connections:read-as-owner`, which the owner gives on the agent's page under Agents.
+            `details.scope` names that permission. The MCP mail tools answer the same code and
+            sentence. `SCOPE_DENIED`: the caller lacks `connections:read-through`.
         '404':
-          description: No such connection of yours. Somebody else's connection is this same 404.
+          description: >
+            No such connection of yours. Somebody else's connection is this same 404, except the
+            owner's connection read by their agent without `connections:read-as-owner`, which is 403
+            `READ_AS_OWNER_REQUIRED`.
         '409':
           description: The connection was revoked, or its stored permission can no longer be read.
         '413':
@@ -64638,6 +64727,12 @@ paths:
       description: |
         Operator-only. Lists recorded security incidents (e.g. rejected/quarantined uploads),
         newest first, with the count of still-open incidents. Requires the `operator` role.
+
+        A setting whose value the node did not accept at start (from the environment, the config
+        file or a command-line flag) is one incident of type `config_setting`, code
+        `SETTING_NOT_ACCEPTED`, with `setting: { variable, value }`: the node runs that setting's
+        default, and the incident closes by itself at the first start with a value the node accepts.
+        One open incident per setting; a start with the same value adds none.
       security:
         - BearerAuth: []
       responses:
@@ -67968,7 +68063,11 @@ paths:
       operationId: getAdminFederationSyncHealth
       tags: [Federation, Admin]
       summary: Federation replication sync-health metrics
-      description: Operator-only (requireRole('operator')). Reports the current replication queue depth.
+      description: >
+        Operator-only (requireRole('operator')). Reports the current replication queue depth: the
+        rows not yet sent (status pending), on both storage providers. A sent row and a failed row
+        are not counted; a prune removes the sent rows (until 2026-10-16 the count differed between
+        the providers, and then counted every row).
       security:
         - BearerAuth: []
       responses:
@@ -67984,7 +68083,7 @@ paths:
                       data:
                         type: object
                         properties:
-                          queue_depth: { type: integer }
+                          queue_depth: { type: integer, description: 'Replication queue rows not yet sent (status pending).' }
                           timestamp: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -68365,6 +68464,7 @@ paths:
                 locale: { type: string }
                 password: { type: string, description: 'Optional; min 8 chars plus upper/lower/digit and not a common password. A password failing any of those is refused with 400 WEAK_PASSWORD, whose message names the rule that failed.' }
                 email: { type: string, format: email, description: 'Optional; REQUIRED when the email gate is on. Recorded + a verification code sent.' }
+                setupCode: { type: string, description: 'The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it (GET /v1/setup/status says setupCodeRequired).' }
       responses:
         '201':
           description: Identity created
@@ -68403,7 +68503,12 @@ paths:
         '400':
           description: INVALID_INPUT for a bad username or display_name, WEAK_PASSWORD when the password fails a strength rule, or EMAIL_REQUIRED when the node's email gate is on and no email was supplied
         '403':
-          description: REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by invitation only, or not at all
+          description: >-
+            REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by
+            invitation only, or not at all. SETUP_CODE_REQUIRED / SETUP_CODE_INVALID — the node's base
+            URL is not loopback and it has no operator yet, so this account would become the operator (as
+            its first owner, or by the no-operator self-heal), which needs `setupCode`: the one-time code
+            the node printed in its start log. Once the node has an operator, registration needs no code.
         '409':
           description: NAME_TAKEN, or EMAIL_TAKEN when the email is already verified on another account
     put:
@@ -68539,6 +68644,7 @@ paths:
                 totp_code: { type: string }
                 backup_code: { type: string }
                 request_owner_key: { type: boolean, description: Mint a fresh owner keypair (new device with no local key) }
+                setupCode: { type: string, description: 'The one-time setup code from the start log. On a node whose base URL is not loopback and that has no operator, an account signing in becomes the operator only with it; without it the sign-in goes on as a plain owner.' }
       responses:
         '200':
           description: Authenticated

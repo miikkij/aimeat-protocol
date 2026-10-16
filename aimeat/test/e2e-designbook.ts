@@ -9,6 +9,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   2026-10-16 — The proposer's agent is refused the part delete on memory:delete (SCOPE_DENIED naming
+ *     memory:purge) and passes with memory:purge (invariant 8 as ruled by the developer on 2026-10-16).
  *   v1.8.9 — 2026-09-26 — At propose, beside a list of the markup a counter-reset that names list-item
  *     passes, and one that does not and `all: unset` are refused; without a list, list-item in a
  *     counter-reset is refused.
@@ -1464,6 +1466,40 @@ const GOOD_BODY = {
         assert(read.status === 404, `deleted means gone: GET is 404, got ${read.status}`);
         const browse = await json('/v1/designbook?limit=200', { headers: auth(op.token) });
         assert(!browse.body.data.parts.some((p: any) => p.id === junkId), 'deleted means gone from the browse too');
+    });
+
+    // The delete removes the part for good, so an agent needs memory:purge: memory:delete is in every
+    // agent's default scopes because what it removes goes to the bin, and this does not (invariant 8
+    // as ruled by the developer on 2026-10-16). It asked memory:delete until then.
+    await test('the proposer\'s agent needs memory:purge to delete a part; memory:delete is refused', async () => {
+        const ed = await import('@noble/ed25519');
+        const { createHash } = await import('node:crypto');
+        ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+        const agentOf = async (name: string, scopes: string[]): Promise<string> => {
+            const ag = await json('/v1/agents', { method: 'POST', headers: auth(other.token), body: JSON.stringify({ name, owner: other.name, capabilities: ['memory'], scopes }) });
+            assert(ag.status === 201, `register ${name} ${ag.status}: ${JSON.stringify(ag.body?.error)}`);
+            const gaii = ag.body.data.agent.gaii as string;
+            const ts = new Date().toISOString();
+            const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(gaii + ts), Buffer.from(ag.body.data.private_key, 'base64'))).toString('base64');
+            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
+            assert(tok.body.ok === true, `${name} token: ${JSON.stringify(tok.body.error)}`);
+            return tok.body.data.token as string;
+        };
+        const junkId = `junkagent-${Date.now()}`;
+        const prop = await json('/v1/designbook', {
+            method: 'POST', headers: auth(other.token),
+            body: JSON.stringify({ part: { id: junkId, kind: 'fill', title: 'Agent junk', summary: 'Cleared by an agent.', body: GOOD_BODY } }),
+        });
+        assert(prop.status === 201, `propose ${prop.status}: ${JSON.stringify(prop.body?.error)}`);
+        const plain = await agentOf(`dbdel${Date.now() % 100000}`, ['memory:read', 'memory:write', 'memory:delete']);
+        const refused = await json(`/v1/designbook/${junkId}`, { method: 'DELETE', headers: auth(plain) });
+        assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+        assert(String(refused.body.error?.message).includes('memory:purge'), `the refusal names memory:purge: ${refused.body.error?.message}`);
+        assert((await json(`/v1/designbook/${junkId}`, { headers: auth(other.token) })).status === 200, 'the refused delete left the part');
+        const purger = await agentOf(`dbpurge${Date.now() % 100000}`, ['memory:read', 'memory:purge']);
+        const del = await json(`/v1/designbook/${junkId}`, { method: 'DELETE', headers: auth(purger) });
+        assert(del.status === 200 && del.body.data.deleted === true, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+        assert((await json(`/v1/designbook/${junkId}`, { headers: auth(other.token) })).status === 404, 'deleted means gone');
     });
 
     await test('dead is invisible: a retired part leaves the default browse, and only ?status=retired shows the graveyard', async () => {

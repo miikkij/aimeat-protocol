@@ -8,7 +8,11 @@
  *      the GitHub API (AIMEAT_CI_API_FIXTURE), so nothing here reads the network.
  *   2. Every tag workflow runs that check in a job of its own before anything is built or
  *      published, and prepublishOnly runs it and the packed-package start before `npm publish`.
+ *   3. A named reason releases over a nightly sweep that is red, missing or running, and over nothing
+ *      else; without one the check refuses as before (Jouni, decision 2026-10-16).
  * @version-history
+ *   v1.1.0 -- 2026-10-16 -- The named reason for releasing over a red nightly: the environment, the
+ *     tag message, the loud line, the job summary and step output, and the two workflows that pass it.
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W08).
  */
 import { afterAll, describe, expect, it } from 'vitest';
@@ -34,14 +38,15 @@ const OTHER = 'f'.repeat(40);
 const run = (id: number, workflow: string, conclusion: string | null, sha = SHA, status = 'completed') =>
     ({ id, name: workflow, status, conclusion, head_sha: sha, html_url: `https://github.com/${SLUG}/actions/runs/${id}`, created_at: '2026-10-16T10:00:00Z' });
 
-function check(name: string, runs: { ci?: unknown[]; nightly?: unknown[] } | 'offline') {
+function check(name: string, runs: { ci?: unknown[]; nightly?: unknown[] } | 'offline', env: Record<string, string> = {}) {
     const file = join(scratch, `${name}.json`);
     writeFileSync(file, JSON.stringify(runs === 'offline' ? { __offline: true } : {
         [`/repos/${SLUG}/actions/workflows/ci.yml/runs`]: { workflow_runs: runs.ci ?? [] },
         [`/repos/${SLUG}/actions/workflows/e2e-full.yml/runs`]: { workflow_runs: runs.nightly ?? [] },
     }));
     return spawnSync(process.execPath, [SCRIPT, '--no-main-check', '--require=ci.yml,e2e-full.yml'], {
-        cwd: scratch, encoding: 'utf8', env: { ...process.env, AIMEAT_CI_API_FIXTURE: file, AIMEAT_CI_REPO: SLUG },
+        cwd: scratch, encoding: 'utf8',
+        env: { ...process.env, GITHUB_ACTIONS: '', GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: '', AIMEAT_RELEASE_RED_REASON: '', AIMEAT_CI_API_FIXTURE: file, AIMEAT_CI_REPO: SLUG, ...env },
     });
 }
 
@@ -86,6 +91,55 @@ describe('release-ready decides on the runs of the exact commit', () => {
     });
 });
 
+describe('a release over a nightly sweep that is not green names its reason', () => {
+    const REASON = 'fixes a token check that let a refused key read memory';
+    const redNightly = { ci: [run(1, 'CI', 'success')], nightly: [run(5, 'E2E full sweep', 'failure')] };
+
+    it('refuses a red nightly with no reason, and says how to name one', () => {
+        const r = check('red-nightly', redNightly);
+        expect(r.status).toBe(1);
+        expect(r.stderr).toContain(`e2e-full.yml: the newest finished run of this commit is failure: https://github.com/${SLUG}/actions/runs/5`);
+        expect(r.stderr).toContain('Red-Nightly: <reason>');
+        expect(r.stderr).toContain('AIMEAT_RELEASE_RED_REASON');
+    });
+
+    it('passes a red nightly with AIMEAT_RELEASE_RED_REASON, with a loud line naming the reason and the run', () => {
+        const output = join(scratch, 'gh-output.txt');
+        const summary = join(scratch, 'gh-summary.md');
+        writeFileSync(output, ''); writeFileSync(summary, '');
+        const r = check('red-nightly-reason', redNightly, { AIMEAT_RELEASE_RED_REASON: REASON, GITHUB_OUTPUT: output, GITHUB_STEP_SUMMARY: summary });
+        expect(r.status, r.stderr).toBe(0);
+        expect(r.stdout).toContain('RELEASED OVER A NIGHTLY SWEEP THAT IS NOT GREEN. Reason, from AIMEAT_RELEASE_RED_REASON');
+        expect(r.stdout).toContain(REASON);
+        expect(r.stdout).toContain(`https://github.com/${SLUG}/actions/runs/5`);
+        expect(readFileSync(output, 'utf8')).toBe(`red_reason=${REASON}\n`);
+        expect(readFileSync(summary, 'utf8')).toContain(REASON);
+    });
+
+    it('passes a nightly that never ran on the commit when the annotated tag message names the reason', () => {
+        git('-c', 'user.name=T', '-c', 'user.email=t@example.invalid', '-c', 'tag.gpgsign=false', 'tag', '-a', 'v9.9.9', '-m', `v9.9.9\n\nRed-Nightly: ${REASON}`);
+        try {
+            const r = check('tag-reason', { ci: [run(1, 'CI', 'success')], nightly: [] });
+            expect(r.status, r.stderr).toBe(0);
+            expect(r.stdout).toContain('Reason, from the message of tag v9.9.9');
+            expect(r.stdout).toContain('e2e-full.yml: no run of this commit exists');
+        } finally { git('tag', '-d', 'v9.9.9'); }
+    });
+
+    it('a reason does not release over a red CI run', () => {
+        const r = check('red-ci-reason', { ci: [run(3, 'CI', 'failure')], nightly: [run(5, 'E2E full sweep', 'failure')] }, { AIMEAT_RELEASE_RED_REASON: REASON });
+        expect(r.status).toBe(1);
+        expect(r.stderr).toContain('ci.yml: the newest finished run of this commit is failure');
+        expect(r.stdout).not.toContain('RELEASED OVER');
+    });
+
+    it('a reason does not release over an answer GitHub did not give', () => {
+        const r = check('offline-reason', 'offline', { AIMEAT_RELEASE_RED_REASON: REASON });
+        expect(r.status).toBe(1);
+        expect(r.stderr).toContain('GitHub could not be read');
+    });
+});
+
 describe('every release path runs the check before it builds or publishes', () => {
     const workflow = (name: string) => readFileSync(join(REPO, '.github', 'workflows', name), 'utf8');
 
@@ -101,6 +155,19 @@ describe('every release path runs the check before it builds or publishes', () =
             const block = text.slice(text.search(new RegExp(`^ {2}${job}:$`, 'm')));
             expect(block.split('\n').slice(0, 6).join('\n'), `${file}: job ${job} does not need release-gate`).toMatch(/needs: release-gate/);
         }
+    });
+
+    it.each(['publish-mcp.yml', 'release-desktop.yml'])('%s passes its red_reason input to the gate', (file) => {
+        const text = workflow(file);
+        expect(text).toMatch(/workflow_dispatch:\r?\n {4}inputs:\r?\n {6}red_reason:/);
+        expect(text).toContain('AIMEAT_RELEASE_RED_REASON: ${{ inputs.red_reason }}');
+    });
+
+    it('the desktop release notes carry the reason the gate released over a red nightly with', () => {
+        const text = workflow('release-desktop.yml');
+        expect(text).toContain('red_reason: ${{ steps.gate.outputs.red_reason }}');
+        expect(text).toContain('needs: [release-gate, build, sign]');
+        expect(text).toContain("format('Released over a nightly sweep that was not green. Reason: {0}', needs.release-gate.outputs.red_reason)");
     });
 
     it('publish-mcp.yml refuses a tag that does not match server.json and aimeat/package.json', () => {

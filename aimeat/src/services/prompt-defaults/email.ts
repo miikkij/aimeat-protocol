@@ -10,6 +10,9 @@
  * @structure EMAIL_SEEDS — email-mcp
  * @usage import { EMAIL_SEEDS } from './prompt-defaults/email.js';
  * @version-history
+ *   2026-10-16 — The note below was wrong: a node whose stored text is a shipped default takes the new
+ *     text at its next start, and only a text the operator changed is kept (prompt-seeder.ts, with
+ *     the hashes in shipped-hashes.ts). A change to this text adds its hash there.
  *   2026-10-16 — Says that reading the owner's mailbox needs its own permission and what the AI does
  *     when a read answers READ_AS_OWNER_REQUIRED (QA audit F12b-02). Seeds are inserted once, so a node that
  *     already holds this prompt keeps its text until the operator edits it.
