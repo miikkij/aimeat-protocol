@@ -73,6 +73,7 @@ everywhere at once, and say so in the Changes section.
 | the AI a person talks to | their own Claude, ChatGPT or other chat AI, connected here or not; Finnish inflects *tekoäly* as a word and never writes *AI:lle*, *AI:sta* or *AI:n* (2026-10-03, 61 strings rewritten) | your AI | tekoälysi | tu IA |
 | a ready text to copy into an AI | the words the page composes for the person's own AI; the person reads it before the AI runs it, and the work is in its wording. Finnish never says *prompti* | prompt | kehote | prompt |
 | a published web app | one file, runs on their AIMEAT | app | sovellus | aplicación |
+| a page with script inside a workspace | one whole HTML document in a document space, beside the Markdown pages: a presentation, a report with charts, a page with pictures; it runs isolated in a frame with no network and no way into anybody's account, and is shared like any page. Never *applikaatio*, never *sovellus*: it is a page, not an app | HTML page | HTML-sivu | página HTML |
 | sandboxed outside-calling code | holds no key of theirs | extension | laajennus | extensión |
 | a shared group | people and AIs sharing work | organism | organismi | organismo |
 | a shared container | documents and records inside an organism | workspace | työtila | espacio de trabajo |
@@ -323,6 +324,7 @@ service, the directory, the token, the identifier and the username: the test nam
 
 ## Changes
 
+- **2026-10-16**: HTML page (*HTML-sivu*, *página HTML*), for the page with script a workspace holds beside its Markdown pages (wish-kevyet-html-esitykset-ilman-sovellusta-eristetty-html-sivu-j). Jouni's own word was *HTML-sivu*. The Config tab names its host *HTML-sivujen osoite* / *Dirección de las páginas HTML*; the strip above a page says *Käyttäjän tekemä sivu* / *Una página hecha por un usuario*.
 - **2026-10-12**: watch a space (*seurata tilaa*, *seguir un espacio*) and "when something new arrives in a workspace", for the fifth answer to "When it works" on the new-agent page. Retire (*poistaa käytöstä*, *retirar*) is the word the agent's Contracts tab already uses for taking an agent off a workspace, and the new page says the same.
 - **2026-10-11**: pacing amount (*tahdistus*, *ritmo*), the pacing pack (*tahdistuspaketti*, *paquete de ritmo*) and Free (*Maksuton*, *Gratis*), with Jouni's ruling that a morsel is pacing and never a price. The help texts, the tool editor, the offers and services pages, the wallet and the board fields stopped saying price, cost or fee for a morsel amount. Jouni's brief wrote "5 morselia" for the Finnish line; it says *murusta*, by the 2026-10-02 ruling below. Spanish keeps *ritmo* for pacing beside the existing *Ritmo de quemado* for the burn rate, so a line with both says "morsels de ritmo" for the amount.
 - **2026-10-11**: recommended and allowed (*suositus* / *sallittu*, *recomendado* / *permitido*) for the range beside a number setting on the Config tab. Jouni's words: "suositeltava maximi" and "suositeltu range", with a larger number still accepted. *Sallittu* names the ranges the node enforces.

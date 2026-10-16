@@ -11,6 +11,7 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-16 -- e2e-html-pages.ts joins the list (not the guard tier): HTML pages in workspaces and their page host.
  *   2026-10-16 -- e2e-contract.ts joins the list (not the guard tier): selected operations answer what
  *     openapi.yaml declares, field by field (QA audit D3-01).
  *   2026-10-16 -- e2e-mcp-rest-parity.ts joins the list (not the guard tier): one call on the node
@@ -664,6 +665,10 @@ const ALL_SUITES = [
     // The workspace read at production size (2026-10-09): 800 agent-written records and 2000 app
     // rows, timed. A per-record cost passes every functional suite and only shows at this size.
     'test/e2e-workspace-read-scale.ts',
+    // HTML pages in workspaces (2026-10-16): a page in a strict space, its version window, sharing it
+    // with its end date (REST and the MCP tool), the page host's holder, page and files and every
+    // refusal, a member's frame and an outsider's 404, and a shared Markdown page's pictures.
+    'test/e2e-html-pages.ts',
     // The reads whose answer depends on how much a node holds, past each old window (QA audit W31,
     // 2026-10-16): the workspace export, the money totals, the cross-owner listing, owners and agents.
     'test/e2e-production-size.ts',

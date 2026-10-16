@@ -907,13 +907,22 @@
      "plain": "Workspace access requests A member who can see a workspace but not read it asks its creator for access. The creator or an admin sees the requests and the members, then approves (contributor by default, or viewer) or declines. An app's own token can decide; an agent needs the permission to invite. /v1/organisms/:id/workspace-access (/decision, /grant, /revoke), aimeat_workspace_access, aimeat_workspace_member_grant"
     },
     {
+     "slug": "g-6-html-pages-a-presentation-without-an-app",
+     "cells": [
+      "<strong>HTML pages: a presentation without an app</strong>",
+      "Bring a presentation, a report with charts or a page with pictures and some interaction into a workspace as one HTML page, beside the Markdown pages. Your AI writes, publishes and shares it in three calls and hands out the link; a person whose AI cannot connect pastes the page in the workspace, with a ready-made prompt beside it. The page runs in a frame on its own host: its script runs, but it has no network, no storage that outlives the tab, cannot reach your account or anybody's, cannot move the tab or open windows, and a link it holds opens only after the reader confirms the address. Its pictures are inline or files mapped by name. The node writes the page's text into it, so search and every AI read it. Limits: the page holds at most 1 MB of HTML, keeps its last five versions, and libraries load only from cdnjs, jsDelivr and unpkg. A node shows HTML pages only once its operator sets the page host; until then a page is shown as its text.",
+      "<code>aimeat_workspace_write</code> with <code>{ title, html, files? }</code> · <code>aimeat_workspace_share</code> · <code>POST /v1/organisms/:id/workspace/documents/:space/:docId/frame</code> · <code>AIMEAT_PAGE_HOST</code> · skill <code>aimeat-html-page</code>"
+     ],
+     "plain": "HTML pages: a presentation without an app Bring a presentation, a report with charts or a page with pictures and some interaction into a workspace as one HTML page, beside the Markdown pages. Your AI writes, publishes and shares it in three calls and hands out the link; a person whose AI cannot connect pastes the page in the workspace, with a ready-made prompt beside it. The page runs in a frame on its own host: its script runs, but it has no network, no storage that outlives the tab, cannot reach your account or anybody's, cannot move the tab or open windows, and a link it holds opens only after the reader confirms the address. Its pictures are inline or files mapped by name. The node writes the page's text into it, so search and every AI read it. Limits: the page holds at most 1 MB of HTML, keeps its last five versions, and libraries load only from cdnjs, jsDelivr and unpkg. A node shows HTML pages only once its operator sets the page host; until then a page is shown as its text. aimeat_workspace_write with { title, html, files? } · aimeat_workspace_share · POST /v1/organisms/:id/workspace/documents/:space/:docId/frame · AIMEAT_PAGE_HOST · skill aimeat-html-page"
+    },
+    {
      "slug": "g-6-public-workspace-sharing",
      "cells": [
       "<strong>Public workspace sharing</strong>",
-      "Share selected documents and record spaces through a public viewer. Choose open access, a password or an account requirement, and withdraw sharing later.",
-      "<code>/v1/organisms/:id/workspace/share</code>, <code>/v1/organisms/:id/workspace/public/*</code>"
+      "Share selected documents and record spaces through a public viewer, from the workspace or from your AI. Choose open access, a password or an account requirement, and withdraw sharing later. A page, a space or the whole workspace can end at a date; a shared HTML page ends after 90 days unless you set another date, and the Share panel extends it in one click. A shared Markdown page's own pictures load for whoever may read the page. The node records the day each page was last opened and marks a page nobody opened or changed for six months, offering to archive it.",
+      "<code>/v1/organisms/:id/workspace/share</code> (<code>until</code>), <code>aimeat_workspace_share</code>, <code>/v1/organisms/:id/workspace/public/*</code>, <code>/v1/pub/{owner}/{key}?share=</code>"
      ],
-     "plain": "Public workspace sharing Share selected documents and record spaces through a public viewer. Choose open access, a password or an account requirement, and withdraw sharing later. /v1/organisms/:id/workspace/share, /v1/organisms/:id/workspace/public/*"
+     "plain": "Public workspace sharing Share selected documents and record spaces through a public viewer, from the workspace or from your AI. Choose open access, a password or an account requirement, and withdraw sharing later. A page, a space or the whole workspace can end at a date; a shared HTML page ends after 90 days unless you set another date, and the Share panel extends it in one click. A shared Markdown page's own pictures load for whoever may read the page. The node records the day each page was last opened and marks a page nobody opened or changed for six months, offering to archive it. /v1/organisms/:id/workspace/share (until), aimeat_workspace_share, /v1/organisms/:id/workspace/public/*, /v1/pub/{owner}/{key}?share="
     },
     {
      "slug": "g-6-workspace-calendar-in-your-own-calendar-program",
@@ -4060,6 +4069,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 408
+  "rows": 409
  }
 }

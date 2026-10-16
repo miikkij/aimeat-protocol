@@ -10404,6 +10404,7 @@
     "cfg_federation_sync_genesis_memory_cache_ttl_hours": "Genesis cache lifetime",
     "cfg_echat_anonymous": "Anonymous encrypted chat",
     "cfg_node_base_url": "Public base URL",
+    "cfg_node_page_host": "Host of HTML pages",
     "cfg_node_dev_mode": "Development mode",
     "cfg_node_test_mode": "Test mode",
     "cfg_node_anonymous_mode": "Anonymous access",

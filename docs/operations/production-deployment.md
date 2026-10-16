@@ -43,6 +43,29 @@ For each family you turn on:
 
 Names are one label deep: `<app>.apps.example.org`, never `<a>.<b>.apps.example.org`.
 
+### The page host
+
+The HTML pages of workspaces run on one more name, a single host with no family under it:
+`AIMEAT_PAGE_HOST`, for example `pages.example.org`. It is never derived; empty (the default), an
+HTML page is shown as its text. Every page is served from it by path (`/p/<frame token>/`), so
+nothing in DNS, TLS, the proxy or any header grows with the number of pages.
+
+1. Give the name its own DNS record, and a certificate that covers it. A wildcard certificate of the
+   parent (`*.example.org`) covers it; a name that only resolves through a parent wildcard record
+   still needs a server block, because the proxy must route it.
+2. Add a server block for the name that proxies everything to the node with
+   `proxy_set_header Host $host`, and serve nothing else on it. The node answers only the page frame
+   there (`/p/...`); every other path is 404, and `/` goes to the node's own address. The node reads
+   the host from `Host`; it needs no marker header.
+3. Set `AIMEAT_PAGE_HOST=pages.example.org` and restart. The SPA's `frame-src` then names the host.
+4. Check: `curl -sI https://pages.example.org/` answers 302 to the node, and a page's frame address
+   opened in a tab goes to its viewer.
+
+**Why a host of its own.** The page's script runs in an opaque origin (the CSP sandbox), with no
+network exit. The host is the second lock: should a response ever lose its sandbox, the page still
+runs on an origin that holds nobody's session. Do not point the page host at the node's own name or
+an app's.
+
 ## What the proxy must pass through
 
 - **The `Host` header, unchanged** (`proxy_set_header Host $host` in nginx). The node decides from the

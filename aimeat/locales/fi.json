@@ -10403,6 +10403,7 @@
     "cfg_federation_sync_genesis_memory_cache_ttl_hours": "Genesis-välimuistin elinaika",
     "cfg_echat_anonymous": "Anonyymi salattu chat",
     "cfg_node_base_url": "Julkinen perusosoite",
+    "cfg_node_page_host": "HTML-sivujen osoite",
     "cfg_node_dev_mode": "Kehitystila",
     "cfg_node_test_mode": "Testitila",
     "cfg_node_anonymous_mode": "Anonyymi pääsy",

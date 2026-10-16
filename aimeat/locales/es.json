@@ -8947,6 +8947,7 @@
     "cfg_federation_sync_genesis_memory_cache_ttl_hours": "Duración de la caché genesis",
     "cfg_echat_anonymous": "Chat cifrado anónimo",
     "cfg_node_base_url": "URL base pública",
+    "cfg_node_page_host": "Dirección de las páginas HTML",
     "cfg_node_dev_mode": "Modo de desarrollo",
     "cfg_node_test_mode": "Modo de prueba",
     "cfg_node_anonymous_mode": "Acceso anónimo",

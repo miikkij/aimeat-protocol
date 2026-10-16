@@ -41699,6 +41699,14 @@ paths:
         with `ics_url` (put the space's name in place of `<space>`); the node keeps only its SHA-256
         and no later answer shows it. A new key ends the one before; `ics_key: null` clears it;
         absent keeps it. The share state says `has_ics_key`.
+
+        `until` ends a target at a date: `*` (the workspace), `space:<name>` or `<space>/<id>`, each
+        an ISO date in the future, or null to remove the end. Past it the target reads as not shared,
+        at the level that decides. A page this call opens that is an HTML page (a document with
+        `html`) and has no end named anywhere gets 90 days; a Markdown page has no default end.
+        Turning a target off removes its end. The answer carries `viewer_url` (the one page this call
+        shared, else the workspace's viewer) and, for that page, `ends_at`. The MCP tool
+        aimeat_workspace_share runs the same code.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -41711,6 +41719,10 @@ paths:
             schema:
               type: object
               properties:
+                until:
+                  type: object
+                  additionalProperties: { type: string, nullable: true, format: date-time }
+                  description: 'Target (`*`, `space:<name>`, `<space>/<id>`) → ISO end date, or null to remove it'
                 public: { type: boolean, description: 'Whole document portion public?' }
                 spaces:
                   type: object
@@ -41811,6 +41823,12 @@ paths:
         One page is one piece of content, so when it has a provenance record the answer carries it in
         both formats: the `AI-Disclosure` and `Link: <record>; rel="ai-provenance"` headers, and in
         JSON `meta.provenance` plus the document's `ai_provenance` block.
+
+        An HTML page answers `kind: "html"`, its `html`, its text as `markdown`, and `frame_url`: the
+        address its frame loads on the page host, minted for this caller (an hour), or null on a node
+        with no page host. The list read (`/public/documents`) gives each HTML page its `frame_url`
+        and leaves the `html` out. A share's end dates count (`until`). The read records the day the
+        page was opened.
       tags: [Organisms]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
@@ -42146,6 +42164,62 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+
+  /v1/organisms/{id}/workspace/documents/{space}/{docId}/frame:
+    post:
+      operationId: getWorkspacePageFrame
+      summary: The frame address of an HTML page, for a member
+      description: |
+        An HTML page of a document space (a document whose value carries `html`) runs isolated on the
+        node's page host (AIMEAT_PAGE_HOST), in a frame: the CSP sandbox without allow-same-origin,
+        no network exit, framed through a fixed holder whose frame-src is the page host alone. This
+        answers the address a member's view frames, minted for this caller after the workspace read
+        gate and the classification reader; it lasts an hour. `version` is "latest" (default) or
+        "draft". `frame_url` is null on a node with no page host, and the page is then shown as its
+        text (`markdown`). The public document reads hand a shared page its own `frame_url`.
+        Records the day the page was opened.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The document space name }
+        - { name: docId, in: path, required: true, schema: { type: string }, description: The page id }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: string, enum: [latest, draft] }
+      responses:
+        '200': { description: '{ frame_url (null without a page host), version, expires_in, reason? }' }
+        '400': { description: No `ws` }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: 'The caller cannot read the workspace, there is no such document space, or NOT_AN_HTML_PAGE: no HTML page in that copy' }
+
+  /v1/organisms/{id}/workspace/documents/{space}/{docId}/opened:
+    post:
+      operationId: markWorkspacePageOpened
+      summary: Record that a member opened a page today
+      description: |
+        The day each page was last opened lives in one record per workspace (`meta.opened`, a map of
+        `<space>/<id>` to a day), written at most once per page per day. The workspace read returns it
+        as `opened` and the workspace index as `last_opened`, with `stale: true` for a page neither
+        opened nor changed for 180 days, which is offered for archiving. The public reads and the frame
+        address record an open on their own; this is for a page a member's view renders itself.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The document space name }
+        - { name: docId, in: path, required: true, schema: { type: string }, description: The page id }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      responses:
+        '200': { description: '{ recorded: true, day }' }
+        '400': { description: No `ws` }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: The caller cannot read the workspace, or no such space or page }
 
   /v1/organisms/{id}/workspace/documents/{space}/{docId}/section:
     post:
@@ -49354,8 +49428,21 @@ paths:
         read is allowed, on the bytes, a range, HEAD and the handle; the public branch exposes both
         headers to scripts (Access-Control-Expose-Headers), and the handle carries `ai_provenance`.
         A public file's record resolves anonymously at `/v1/provenance/{id}` and by hash.
+
+        `share=<org>/<ws>/<space>/<id>` (each segment URL-encoded) reads a `workspace`-scoped file as
+        the picture of a shared page: it is served when the file is bound to that workspace, the share
+        opens that page now, the caller passes the share's access mode (open, account, or the
+        `X-Share-Token` of a password share), the classification lets the page leave, and the page's
+        published markdown embeds exactly this file. Cache-Control private. The public viewer reads a
+        shared Markdown page's pictures this way.
       tags: [Storage]
       parameters:
+        - name: share
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The shared page this file is a picture of, `<org>/<ws>/<space>/<id>`
         - name: gaii
           in: path
           required: true
