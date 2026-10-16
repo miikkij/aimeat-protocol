@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-16 — node.page_host, the host the HTML pages of workspaces run on (config-schema-pages.ts).
  *   2026-10-16 — node.type takes mirror, as the loader does; the start check (config-start-check.ts) runs these validators over the environment (QA audit D8-02).
  *   2026-10-16 — eudiw.enabled refuses true on every write path (the config route, a stored value and Consul at start), with the reason in `refusal` (QA audit D6-01, F21b-01).
  *   2026-10-15 — metrics.enabled is immutable (restart-required): server-bootstrap/routes-loader.ts reads it once at start to mount the metrics middleware (feature-list audit #181).
@@ -111,6 +112,7 @@ import { eudiwSettingAllowed, EUDIW_SETTING_REFUSAL } from '../config-eudiw-guar
 import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
 import { VISIBILITY_CONFIG_FIELDS } from './config-schema-visibility.js';
 import { DOCSIGN_CONFIG_FIELDS } from './config-schema-docsign.js';
+import { PAGES_CONFIG_FIELDS } from './config-schema-pages.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
 import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
@@ -394,6 +396,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Node (immutable, additional) ──
   { key: 'baseUrl', dotPath: 'node.base_url', envVar: 'AIMEAT_BASE_URL', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Public base URL of this node' },
+  ...PAGES_CONFIG_FIELDS,
   { key: 'devMode', dotPath: 'node.dev_mode', envVar: 'AIMEAT_DEV_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Development mode (localhost webhooks, credential reset preserves data)', adminDisplay: 'visible' },
   { key: 'testMode', dotPath: 'node.test_mode', envVar: 'AIMEAT_TEST_MODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test mode (re-registration wipes account for E2E test isolation)', adminDisplay: 'visible' },
   { key: 'updateCheck', dotPath: 'node.update_check', envVar: 'AIMEAT_UPDATE_CHECK', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Ask npm for a newer AIMEAT (at most every six hours, when an operator opens a page) and show operators a notice in the header when there is one. Off: no request leaves this node and no notice appears' },

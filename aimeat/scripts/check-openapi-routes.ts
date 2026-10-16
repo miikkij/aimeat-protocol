@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.5 — 2026-10-16 — The page host's three routes answered: the page frame (a page), its slash redirect, the holder script.
  *   v1.0.4 — 2026-10-11 — GET /docs/specs/{} answered as a redirect to GET /v1/specs/{name}.
  *   v1.0.3 — 2026-10-05 — GET /v1/libs/aimeat-validate.js answered by the libs family route.
  *   v1.0.2 — 2026-09-26 — GET /app-frame-core.js answered as a static asset (the module it imports).
@@ -76,6 +77,11 @@ const NOT_API: Record<string, string> = {
     'GET /v1/pricing': REDIRECT,
     'GET /app-frame.js': ASSET,
     'GET /app-frame-core.js': ASSET,
+    // The page frame on the page host (routes/page-host.ts): the holder, the stored HTML page and its
+    // files, served only into a frame; the address is minted by the API (frame_url), never typed.
+    'GET /p/{}/{}': PAGE,
+    'GET /p/{}': REDIRECT,
+    'GET /p/_/holder.js': ASSET,
     'GET /apple-touch-icon.png': ASSET,
     'GET /favicon.ico': ASSET,
     'GET /favicon.svg': ASSET,

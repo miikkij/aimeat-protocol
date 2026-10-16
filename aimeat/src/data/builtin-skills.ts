@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-16 -- aimeat-html-page (builtin-skills.html-page.ts): an HTML page in a workspace in three calls, and its rules.
  *   2026-10-16 -- use-app-bound-skills: GET /v1/agents/{name}/skills asks memory:read, except of the agent reading its own (QA audit W35, route-scope triage).
  *   v1.32.0 -- 2026-10-16 -- diagnose-a-workflow: a run past its time limit is an error and the next one
  *     runs, five failures in a row pause a schedule and tell its owner, a run missed while the node was
@@ -188,6 +189,7 @@ import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js
 import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
 import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
 import { ORGANISMS_SKILL_ENTRY } from './builtin-skills.organisms.js';
+import { HTML_PAGE_SKILL_ENTRY } from './builtin-skills.html-page.js';
 import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
 import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
 import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
@@ -220,6 +222,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   ...CONVERSATION_SKILL_ENTRIES,
   GUIDED_JOURNEY_SKILL_ENTRY,
   ORGANISMS_SKILL_ENTRY,
+  HTML_PAGE_SKILL_ENTRY,
   WORKSTATION_SKILL_ENTRY,
   APP_BUILDER_SKILL_ENTRY,
   APP_BUILDER_ATELIER_SKILL_ENTRY,

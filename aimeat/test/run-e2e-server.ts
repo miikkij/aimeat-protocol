@@ -7,6 +7,7 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.11.0 -- 2026-10-16 -- The shared server runs the page host at pages.localhost (AIMEAT_PAGE_HOST).
  *   v1.10.0 -- 2026-10-16 -- The production-settings lane (run-e2e-production-lane.ts): with
  *            --production-settings every suite's node runs test mode, dev mode and anonymous mode off,
  *            the shipped default agent scopes, the admin setup route closed after the first operator
@@ -380,6 +381,9 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         // Same pinning for the portfolio origin — e2e-portfolio-origin self-spawns its own.
         AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false',
         AIMEAT_PORTFOLIO_HOST: '',
+        // The page host is ON at pages.localhost: e2e-html-pages addresses it with a Host header, and
+        // a node without one shows an HTML page as its text, which no suite here relies on.
+        AIMEAT_PAGE_HOST: 'pages.localhost',
 
         // ── Doors into the account, pinned SHUT ──
         // A sign-in provider configured on the developer's machine changes what the door answers:
