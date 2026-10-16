@@ -15,7 +15,11 @@
  *   - GET    /v1/commerce/payout                       which rails can pay this seller
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
+ *   - PUT    /v1/commerce/payout/invoice               invoice credit for items delivered at once
  * @version-history
+ *   2026-10-16 — PUT /v1/commerce/payout/invoice admits the owner's agent holding commerce:sell and
+ *     writes the owner's record through commerce/psp-record.ts, the function aimeat_commerce_invoice_set
+ *     calls; readPsp and writePsp moved there unchanged (the chat path for the S8-03 setting).
  *   2026-10-16 — GET /v1/commerce/payout admits the owner's agent holding commerce:sell and reads the owner's
  *     record, as aimeat_commerce_psp_status does on the node MCP; the payout writes stay owner-only, and
  *     aimeat_commerce_psp_delete now refuses an agent as DELETE /payout/stripe does (QA audit D2-02).
@@ -71,7 +75,8 @@ import { PaymentError } from '../commerce/payment-handlers.js';
 import { paymentChallenge, x402ExactAccepts } from '../commerce/x402.js';
 import { decodeXPayment, getX402Network, getX402Asset, x402SettlementCurrencies } from '../commerce/x402-facilitator.js';
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
-import { sealPspRecord, pspSecretHint } from '../commerce/psp-secrets.js';
+import { pspSecretHint } from '../commerce/psp-secrets.js';
+import { readPsp, writePsp, setInvoiceAcceptImmediate, type PspRecord } from '../commerce/psp-record.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 
@@ -129,38 +134,10 @@ function sendCommerceError(res: Response, config: AimeatConfig, err: unknown, ex
   res.status(500).json(error(config.nodeId, 'COMMERCE_ERROR', e.message ?? 'Unexpected commerce error'));
 }
 
-/** The seller's opaque payment-settings record. Holds the Stripe credentials AND the x402 payout
- *  address side by side, so every write MERGES: one rail's settings must never delete the other's. */
-const PSP_KEY = 'commerce.psp';
 /** An EVM account address — the only shape an x402 stablecoin settlement can pay out to. */
 const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
-
-type PspRecord = { provider?: string; secretKey?: unknown; webhookSecret?: unknown; payTo?: string; address?: string; x402?: { address?: string; payTo?: string }; invoiceImmediate?: boolean };
-
-/** Read the seller's payment settings record (private, owner-scoped). */
-async function readPsp(storage: Storage, ownerGhii: string): Promise<PspRecord> {
-  const rec = await storage.getMemory(ownerGhii, PSP_KEY);
-  return (rec?.value as PspRecord | undefined) ?? {};
-}
-
-/**
- * Write the seller's payment settings record. Callers pass the WHOLE next record (they merged what
- * they keep), and the version/createdAt of the existing one carry forward — a rail setting must not
- * reset the record's history just because the other rail was edited.
- */
-async function writePsp(storage: Storage, ownerGhii: string, next: PspRecord, encKey: Buffer | null): Promise<void> {
-  const existing = await storage.getMemory(ownerGhii, PSP_KEY);
-  const now = new Date().toISOString();
-  // Every write seals the secrets it carries, including a plain one read back from a record that
-  // predates encryption: a record this door touched never leaves it holding a secret in the clear.
-  // A node with no encryption key cannot seal; the door that SETS a secret refuses on such a node,
-  // so the only plain value that can pass here is one that was already stored.
-  const sealed = encKey ? sealPspRecord(encKey, next as Record<string, unknown>).record : next;
-  await storage.setMemory({
-    key: PSP_KEY, ownerGaii: ownerGhii, value: sealed, visibility: 'private', tags: ['commerce'], ttlHours: null,
-    version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-  });
-}
+// The seller's payment-settings record (commerce.psp) is read and written in commerce/psp-record.ts,
+// which the MCP tool aimeat_commerce_invoice_set shares with PUT /v1/commerce/payout/invoice.
 
 
 /** The x402 payout address in any of the shapes the facilitator accepts (extractPayTo mirrors this). */
@@ -358,16 +335,20 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
    * nothing, and such a line cannot be withheld afterwards, so a buyer could take it for a book entry
    * the seller never agreed to (QA audit S8-03). A task the seller can still decline is open to the
    * invoice rail either way. Merges into the record, so the other rails' settings survive.
+   * WHO. The owner in person, or their agent holding commerce:sell, the word aimeat_commerce_invoice_set
+   * declares: it is a selling policy and carries no secret, so a seller's agent can set it from chat as
+   * it reads the payout state. requireRole('agent') keeps an app grant and an ecosystem app out, and
+   * the record is the OWNER's (callerOf().ownerGhii), whoever acts.
    */
-  router.put('/v1/commerce/payout/invoice', requireAuth(), requireRole('owner'), async (req, res) => {
+  router.put('/v1/commerce/payout/invoice', requireAuth(), requireRole('agent'), requireScope('commerce:sell'), async (req, res) => {
     const raw = (req.body ?? {}) as { accept_immediate?: unknown };
     if (typeof raw.accept_immediate !== 'boolean') {
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
         'Send accept_immediate: true to take invoice payment for items delivered as soon as the checkout completes, or false to refuse it.'));
     }
-    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
-    await writePsp(storage, ownerGhii, { ...(await readPsp(storage, ownerGhii)), invoiceImmediate: raw.accept_immediate }, getEncryptionKey(config));
-    return res.json(success(config.nodeId, { accept_immediate: raw.accept_immediate }));
+    const ownerGhii = callerOf(req, config.nodeId, storage).ownerGhii;
+    const accept = await setInvoiceAcceptImmediate(storage, config, ownerGhii, raw.accept_immediate);
+    return res.json(success(config.nodeId, { accept_immediate: accept }));
   });
 
   router.post('/v1/commerce/checkout-sessions', requireAuth(), requireScope('commerce:buy'), async (req, res) => {

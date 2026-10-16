@@ -74,6 +74,12 @@
       },
       "why": "Reviewed 2026-10-11, the node's own read: the existing platform-fee or checkout record, read only to carry its version and creation time into the upsert (moved unchanged from session-service.ts)."
     },
+    "src/commerce/psp-record.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's payment settings record. Moved here from src/routes/commerce.ts on 2026-10-16 with readPsp and writePsp, unchanged."
+    },
     "src/commerce/psp-secrets.ts": {
       "reads": {
         "listAllMemory": 1
@@ -324,12 +330,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's webhook secret, read to verify a signature."
-    },
-    "src/routes/commerce.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's payment settings record."
     },
     "src/routes/connections.ts": {
       "reads": {

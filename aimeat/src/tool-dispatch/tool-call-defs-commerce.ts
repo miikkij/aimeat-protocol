@@ -12,6 +12,7 @@
  * @structure commerceCliTools[] — the handler table, spread by tool-call.ts
  * @usage import { commerceCliTools } from './tool-call-defs-commerce.js';
  * @version-history
+ *   2026-10-16 — aimeat_commerce_invoice_set proxies PUT /v1/commerce/payout/invoice.
  *   2026-10-16 — aimeat_commerce_psp_delete says the route is the owner's in person; GET /v1/commerce/payout,
  *     which psp_status calls, now admits an agent holding commerce:sell (QA audit D2-02).
  *   v1.2.0 — 2026-10-11 — aimeat_offer_price_set writes the pacing amount (`toll_morsels`, `clear_toll`)
@@ -49,6 +50,18 @@ export const commerceCliTools: ConnectCliToolDefinition[] = [
         description: 'Check whether your owner\'s payment-provider credentials are set. The key is shown as its last four characters.',
         input: {},
         handler: ({ client }) => client.get('/v1/commerce/payout'),
+    },
+    {
+        // → PUT /v1/commerce/payout/invoice — the route checks commerce:sell and refuses a value that
+        // is not a boolean (400 INVALID_INPUT), so a missing one is sent as missing.
+        name: 'aimeat_commerce_invoice_set',
+        description: 'Set whether your owner takes invoice payment for items delivered as soon as a checkout completes (off by default).',
+        input: {
+            accept_immediate: { type: 'boolean', required: true, description: 'true takes invoice payment for items delivered at once; false refuses it.' },
+        },
+        handler: ({ client }, input) => client.put('/v1/commerce/payout/invoice', {
+            accept_immediate: optionalBoolean(input, 'accept_immediate'),
+        }),
     },
     {
         // → DELETE /v1/commerce/payout/stripe — removes the card credentials and keeps the x402 address.

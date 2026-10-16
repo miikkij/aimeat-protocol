@@ -7,6 +7,8 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   2026-10-16 — 5c, 5d: aimeat_commerce_invoice_set turns invoice credit on and off for the owner and
+ *     keeps the other rails; an agent without commerce:sell is not offered it and changes nothing.
  *   v1.6.0 — 2026-10-16 — psp_delete is screen-only like psp_set (decision D5; QA audit D2-02): test 5
  *     asserts its refusal and that the key stays, and the owner removes it through DELETE
  *     /v1/commerce/payout/stripe; test 5b holds the merge on that route (the x402 address survives) and
@@ -291,6 +293,30 @@ await test('5b. removing the card key on the Wallet route leaves the stablecoin 
     assert(payout.body.data.stripe.configured === false, `card credentials should be gone: ${JSON.stringify(payout.body.data.stripe)}`);
     assert(String(payout.body.data.x402.address).toLowerCase() === ADDRESS,
         `the payout address must survive: ${JSON.stringify(payout.body.data.x402)}`);
+});
+
+await test('5c. invoice_set turns invoice credit on and off for the owner from chat, and keeps the other rails', async () => {
+    // The chat path for PUT /v1/commerce/payout/invoice (QA audit S8-03): the same function writes
+    // the owner's commerce.psp, so the stablecoin address set in 5b stays.
+    const on = await mcp.call('aimeat_commerce_invoice_set', { accept_immediate: true });
+    assert(!on.isError && on.data.invoice_accept_immediate === true, `turn on: ${on.text}`);
+    const st = await mcp.call('aimeat_commerce_psp_status', {});
+    assert(st.data.invoice_accept_immediate === true, `psp_status reports it: ${st.text}`);
+    const payout = await json('/v1/commerce/payout', { headers: auth(buyerOwner.token) });
+    assert(payout.body.data.invoice?.accept_immediate === true, `the owner's payout page reads it: ${JSON.stringify(payout.body.data.invoice)}`);
+    assert(String(payout.body.data.x402.address).toLowerCase() === '0x1111111111111111111111111111111111111111',
+        `the stablecoin address survives the merge: ${JSON.stringify(payout.body.data.x402)}`);
+    const off = await mcp.call('aimeat_commerce_invoice_set', { accept_immediate: false });
+    assert(!off.isError && off.data.invoice_accept_immediate === false, `turn off: ${off.text}`);
+});
+
+await test('5d. FAILURE: invoice_set is not offered to an agent without commerce:sell, and its call changes nothing', async () => {
+    const { body } = await narrow.rpc('tools/list', {});
+    assert(!body.result.tools.some((t: any) => t.name === 'aimeat_commerce_invoice_set'), 'invoice_set must be filtered (commerce:sell)');
+    const r = await narrow.call('aimeat_commerce_invoice_set', { accept_immediate: true });
+    assert(r.isError && /SCOPE_DENIED/.test(r.text), `the narrow agent's call: ${r.text}`);
+    const payout = await json('/v1/commerce/payout', { headers: auth(buyerOwner.token) });
+    assert(payout.body.data.invoice?.accept_immediate === false, `the refused call changed the setting: ${JSON.stringify(payout.body.data.invoice)}`);
 });
 
 // ─── Phase 3: app-tool manifest + offer pricing (seller side, own owner) ───
