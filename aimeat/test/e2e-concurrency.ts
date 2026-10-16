@@ -6,6 +6,8 @@
  *   parallel settlement, and the wallet balances after each round, asserted exactly.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-concurrency
  * @version-history
+ *   v1.0.3 — 2026-10-16 — 12 to 14 skip with a reason under the runner's high auth limit, and the
+ *     result line counts them, where an early return had counted them as passed (QA audit P1-04).
  *   v1.0.2 — 2026-10-14 — 32: the connectivity-key mint is removed (feature-list audit row 202), so
  *     it answers 404 like the other OTK routes.
  *   v1.0.1 — 2026-10-12 — The two actions are published with their pacing amount as
@@ -17,6 +19,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { registerOwner } from './helpers/owner-login.js';
+import { isSkip, skip } from './helpers/skip.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
@@ -25,6 +28,7 @@ const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
 let passed = 0;
 let failed = 0;
+let skipped = 0;
 const results: string[] = [];
 
 async function test(name: string, fn: () => Promise<void>) {
@@ -38,6 +42,13 @@ async function test(name: string, fn: () => Promise<void>) {
         results.push(`PASS: ${name}`);
         console.log(`  ✅ ${name}`);
     } catch (err: any) {
+        // A test that cannot ask its question here is counted as skipped, never as passed.
+        if (isSkip(err)) {
+            skipped++;
+            results.push(`SKIP: ${name}: ${err.message}`);
+            console.log(`  ⏭ ${name}: ${err.message}`);
+            return;
+        }
         failed++;
         results.push(`FAIL: ${name}: ${err.message}`);
         console.error(`  ❌ ${name}: ${err.message}`);
@@ -352,18 +363,19 @@ await test('11. Fire burst of auth requests exceeding limit', async () => {
     // With high limits, rateLimitResults stays empty — tests 12-14 adapt
 });
 
-await test('12. At least one 429 response (or headers verified)', async () => {
-    if (authLimit > 50) {
-        // High test limits — just verify rate limit headers exist
-        assert(authLimit > 0, 'rate limit headers present');
-        return;
-    }
+// Under the runner the auth limit is pinned at 1000 (run-e2e-server.ts), so 12 to 14 cannot reach a
+// 429 here; they say so as skips (QA audit 2026-10-16, P1-04). The headers are test 10's; the 429 and
+// its Retry-After are proven by the suites that boot a node with a low limit (e2e-auth-tarpit).
+const HIGH_LIMIT = 'the runner pins AIMEAT_RL_AUTH high, so no 429 can be reached without 1000+ requests';
+
+await test('12. At least one 429 response', async () => {
+    if (authLimit > 50) skip(HIGH_LIMIT);
     const limited = rateLimitResults.filter(r => r.status === 429);
     assert(limited.length >= 1, `expected at least one 429, got ${limited.map(r => r.status).join(',')}`);
 });
 
-await test('13. 429 includes Retry-After (or skipped with high limits)', async () => {
-    if (authLimit > 50) return; // skip — can't trigger 429 without firing 1000+ requests
+await test('13. 429 includes Retry-After', async () => {
+    if (authLimit > 50) skip(HIGH_LIMIT);
     const limited = rateLimitResults.find(r => r.status === 429);
     assert(limited !== undefined, 'no 429 found');
     const retryAfter = limited!.headers.get('retry-after');
@@ -376,10 +388,7 @@ await test('13. 429 includes Retry-After (or skipped with high limits)', async (
     const timeout14 = 90_000;
     try {
         const fn14 = async () => {
-            if (authLimit > 50) {
-                console.log('    Skipped (high rate limits — no 429 to recover from)');
-                return;
-            }
+            if (authLimit > 50) skip(HIGH_LIMIT);
             const limitedRes = rateLimitResults.find(r => r.status === 429);
             const retryAfter = Number(limitedRes?.headers.get('retry-after') || '60');
             console.log(`    Waiting ${retryAfter}s for rate limit reset...`);
@@ -399,9 +408,15 @@ await test('13. 429 includes Retry-After (or skipped with high limits)', async (
         results.push('PASS: 14. Wait for window reset → requests succeed');
         console.log('  ✅ 14. Wait for window reset → requests succeed');
     } catch (err: any) {
+        if (isSkip(err)) {
+            skipped++;
+            results.push(`SKIP: 14. Wait for window reset → requests succeed: ${err.message}`);
+            console.log(`  ⏭ 14. Wait for window reset → requests succeed: ${err.message}`);
+        } else {
         failed++;
         results.push(`FAIL: 14. Wait for window reset → requests succeed: ${err.message}`);
         console.error(`  ❌ 14. Wait for window reset → requests succeed: ${err.message}`);
+        }
     }
 }
 
@@ -714,7 +729,7 @@ await test('Cascade-delete owner 2', async () => {
 // ─── Results ───
 console.log('');
 console.log('══════════════════════════════════════════════════════');
-console.log(`Concurrent Access E2E: ${passed} passed, ${failed} failed (${passed + failed} total)`);
+console.log(`Concurrent Access E2E: ${passed} passed, ${failed} failed, ${skipped} skipped (${passed + failed} total)`);
 console.log('══════════════════════════════════════════════════════');
 
 try {

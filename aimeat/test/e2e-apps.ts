@@ -12,6 +12,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-apps
  * @version-history
+ *   v1.14.0 — 2026-10-16 — The icon upload refuses no credential (401), another owner (403) and a file
+ *     over 1 MB (413), and the stored icon survives the refusals (QA audit F10b-06).
  *   v1.0.0 — 2026-06-05 — initial: versions, restore, fork, GHII fallback, 404
  *   v1.1.0 — 2026-06-09 — add Phase 5 cross-owner isolation: a second owner
  *     cannot delete into / overwrite the first owner's app namespace.
@@ -947,6 +949,30 @@ await test('a real picture still goes through, typed by its bytes', async () => 
     const got = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/screenshot`);
     assert(got.status === 200, `screenshot GET ${got.status}`);
     assert(got.headers.get('content-type') === 'image/jpeg', `screenshot served as ${got.headers.get('content-type')}`);
+});
+
+// The icon upload had only its owner's calls under test (QA audit 2026-10-16, F10b-06): nobody had
+// asked what no credential, another owner or an oversized file gets, or whether the icon survives.
+await test('the icon upload refuses no credential, another owner and an oversized file, and keeps the icon', async () => {
+    const before = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/icon`);
+    const kept = Buffer.from(await before.arrayBuffer());
+    assert(before.status === 200 && kept.length > 0, `an icon is there to keep: ${before.status}`);
+
+    const anonymous = await json(`/v1/apps/${ownerName}/${FILENAME}/icon`, { method: 'POST', body: JSON.stringify({ icon: PNG_1x1 }) });
+    assert(anonymous.status === 401, `no credential: expected 401, got ${anonymous.status}`);
+
+    const other = await json(`/v1/apps/${ownerName}/${FILENAME}/icon`, {
+        method: 'POST', body: JSON.stringify({ icon: PNG_1x1 }), headers: { Authorization: `Bearer ${ownerBToken}` },
+    });
+    assert(other.status === 403, `another owner: expected 403, got ${other.status} ${JSON.stringify(other.body?.error)}`);
+
+    // A PNG signature followed by just over a megabyte: refused for its size before anything is stored.
+    const big = Buffer.concat([Buffer.from(PNG_1x1, 'base64'), Buffer.alloc(1024 * 1024 + 16)]).toString('base64');
+    const tooLarge = await json(`/v1/apps/${ownerName}/${FILENAME}/icon`, authed({ method: 'POST', body: JSON.stringify({ icon: big }) }));
+    assert(tooLarge.status === 413 && tooLarge.body?.error?.code === 'TOO_LARGE', `oversized: expected 413 TOO_LARGE, got ${tooLarge.status} ${JSON.stringify(tooLarge.body?.error)}`);
+
+    const after = Buffer.from(await (await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}/icon`)).arrayBuffer());
+    assert(after.equals(kept), 'the refused uploads left the stored icon as it was');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

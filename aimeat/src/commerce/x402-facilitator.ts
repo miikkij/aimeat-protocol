@@ -23,6 +23,8 @@
  *   const asset = getX402Asset(network, session.currency);   // undefined → this currency cannot settle
  *   const reqs = buildExactRequirements({ network, asset, payTo, amountMicros, resource, description });
  * @version-history
+ *   v1.1.1 — 2026-10-16 — The test double refuses a proof whose recipient is not the requirement's
+ *     payTo, as a real facilitator does (QA audit F14a-03).
  *   v1.1.0 — 2026-07-25 — Currency-aware asset registry: EURC joins USDC as a settlement asset on
  *     both Base networks, decimals carried per asset (TARGET-042)
  *   v1.0.0 — 2026-07-18 — Initial x402 facilitator client + network registry + test double (TARGET-042)
@@ -213,6 +215,12 @@ export function testFacilitator(): X402Facilitator {
       const auth = payload?.payload?.authorization;
       if (!auth?.from || !auth?.nonce) return { isValid: false, invalidReason: 'malformed_authorization' };
       if (auth.value !== requirements.maxAmountRequired) return { isValid: false, invalidReason: 'insufficient_value' };
+      // The recipient, as a real facilitator checks it: a proof that pays somebody else is no payment
+      // to this seller. The double checked value and nonce only, so with it in use nothing checked
+      // the recipient at all (QA audit 2026-10-16, F14a-03). Addresses compare without case.
+      if (String(auth.to ?? '').toLowerCase() !== String(requirements.payTo ?? '').toLowerCase()) {
+        return { isValid: false, invalidReason: 'invalid_exact_evm_payload_recipient_mismatch' };
+      }
       if (usedNonces.has(auth.nonce)) return { isValid: false, invalidReason: 'nonce_already_used' };
       return { isValid: true, payer: auth.from };
     },

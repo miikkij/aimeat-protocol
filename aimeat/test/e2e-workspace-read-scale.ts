@@ -32,6 +32,8 @@
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=workspace-read-scale
  * @version-history
+ *   v1.0.1 — 2026-10-16 — The backend skip prints "1 skipped", so the runner shows a skip and not a
+ *     green suite with no test (QA audit P1-04).
  *   v1.0.0 — 2026-10-09 — Initial.
  */
 import { randomUUID } from 'node:crypto';
@@ -75,7 +77,9 @@ const sqlitePath = pinnedSqlitePath();
 const dbUrl = serverDbUrl();
 if (!((provider === 'sqlite' && sqlitePath) || (provider === 'postgres-kysely' && dbUrl))) {
     console.log(`  ⏭  skipped: the ${provider} backend keeps its data inside the server process`);
-    console.log(`\n📊 Results: 0 passed, 0 failed\n`);
+    // Said as a skip, so the runner shows it in its own column and not as a green suite with no test
+    // (QA audit 2026-10-16, P1-04).
+    console.log(`\n📊 Results: 0 passed, 0 failed, 1 skipped\n`);
     process.exit(0);
 }
 

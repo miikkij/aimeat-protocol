@@ -11,6 +11,13 @@
 #      its imports resolved only in the author's worktree. `pnpm boot:smoke` imports the boot path
 #      and refuses when a module throws at load.
 #
+#   3. Push on top of a red CI without saying why. CI runs AFTER a push lands on main, so it stops
+#      nothing by itself; it was red for 236 runs in a row from 2026-10-02 and nobody was told (QA
+#      audit 2026-10-16, P2-01, P8-01). scripts/ci-state.mjs reads main's newest finished CI run
+#      from GitHub; when it is red, a Claude Code session's push needs a `Red-CI: <reason>` trailer
+#      or AIMEAT_RED_CI_REASON, and a person's push gets the same message as a warning. Offline,
+#      the state is unknown and nothing is refused.
+#
 # It also lists, for a Claude Code session, the commits about to go that carry no Session: trailer.
 #
 # WHAT IS NOT HERE, AND WHY (2026-09-05). For a few hours this hook also ran the whole unit suite
@@ -18,11 +25,13 @@
 # commits and several pushes, and a push that costs a quarter of an hour turns a thirty-minute
 # change into a day; the developer's VS Code Sync Changes became a button that did nothing visible.
 # Those checks now live in `pnpm gate` (and `pnpm gate:full` with Postgres), run once when a piece
-# of work is finished, and in CI on every push, where they block a merge and nobody's afternoon.
+# of work is finished, and in CI after every push. CI blocks no push: work goes straight to main,
+# so a red CI run is a report that the session-start hook, `pnpm gate` and step 3 above print.
 
 set -e
 ROOT="$(git rev-parse --show-toplevel)"
 REMOTE="$1"
+. "$(dirname "$0")/lib-pnpm.sh"
 
 git fetch -q "$REMOTE" main 2>/dev/null || true
 BEHIND="$(git rev-list --count HEAD..refs/remotes/$REMOTE/main 2>/dev/null || echo 0)"
@@ -30,6 +39,8 @@ if [ "$BEHIND" != "0" ]; then
   echo "[pre-push] main is $BEHIND commit(s) behind $REMOTE/main: rebase first (git pull --rebase), then push." >&2
   exit 1
 fi
+
+node "$ROOT/aimeat/scripts/ci-state.mjs" --push-check "--range=refs/remotes/$REMOTE/main..HEAD"
 
 # One line per commit: hash, a tab, the Session value, a tab, the subject. The earlier odd/even
 # pairing of a two-line format shifted by one whenever the trailers block emitted an extra blank

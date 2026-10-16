@@ -31,6 +31,7 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   v1.5.0 — 2026-10-16 — The suites whose only refusal is a 401 join the report (QA audit P3-08).
  *   v1.5.0 — 2026-10-16 — The src/static silent catches (per file and per shape) and the silent-catch
  *     exemptions join the report (W25: check:silent-catch gates src/static and counts exemptions).
  *   v1.4.0 — 2026-10-12 — The node MCP tools that `aimeat connect serve` does not offer join the report.
@@ -80,6 +81,7 @@ const RATCHETS: Ratchet[] = [
     { file: 'aimeat/security/config-coverage-exemptions.json', label: 'Settings not in the Config tab', check: 'check:config-coverage', count: exemptMap },
     { file: 'aimeat/security/outbound-fetch-exemptions.json', label: 'Bare outbound fetches', check: 'check:outbound-fetch', count: exemptMap },
     { file: 'aimeat/security/denial-coverage-exemptions.json', label: 'Suites with no denial case', check: 'check:denial-coverage', count: exemptMap },
+    { file: 'aimeat/security/denial-coverage-no-second-principal.json', label: 'Suites refusing no signed-in second caller', check: 'check:denial-coverage', count: exemptMap },
     { file: 'aimeat/security/storage-parity-exemptions.json', label: 'Tables outside the cascades', check: 'check:storage-parity', count: exemptMap },
     { file: 'aimeat/security/connect-serve-parity-exemptions.json', label: 'MCP tools not on connect serve', check: 'check:mcp-tools', count: exemptMap },
     {

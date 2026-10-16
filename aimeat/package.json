@@ -20,6 +20,8 @@
   ],
   "scripts": {
     "postinstall": "node scripts/vendor-libs.mjs --optional",
+    "prepare": "node scripts/hooks-on.mjs",
+    "ci:state": "node scripts/ci-state.mjs",
     "vendor:libs": "node scripts/vendor-libs.mjs",
     "check:vendored": "node scripts/vendor-libs.mjs --check",
     "gen:notices": "tsx scripts/gen-third-party-notices.ts",
@@ -177,7 +179,7 @@
     "audit:mcp-tools": "tsx scripts/audit-mcp-tools.ts",
     "audit:mcp-schemas": "tsx scripts/audit-mcp-schemas.ts",
     "eval:mcp-surface": "tsx test/eval-mcp/surface-weight.ts",
-    "prepublishOnly": "node -e \"require('fs').copyFileSync('../README.md','README.md')\" && pnpm check:licenses && pnpm gen:notices && pnpm build && pnpm check:pack-contents",
+    "prepublishOnly": "node scripts/release-ready.mjs --require=ci.yml,e2e-full.yml && node -e \"require('fs').copyFileSync('../README.md','README.md')\" && pnpm check:licenses && pnpm gen:notices && pnpm build && pnpm check:pack-contents && node scripts/pack-smoke.mjs",
     "perf:bench": "node --import tsx tools/perf-bench/bench.ts",
     "perf:bench:backends": "node --import tsx tools/perf-bench/bench-backends.ts",
     "sync:viewport": "tsx scripts/embed-viewport.ts",

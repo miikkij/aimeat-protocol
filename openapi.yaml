@@ -54522,7 +54522,9 @@ paths:
         a same-owner agent, or an H-2 app-grant token holding `task:write` (a control-plane app such
         as AGENCY). An app may only create tasks for agents belonging to its OWN owner; the created
         task's ownerGaii is always the owner GHII. Starting the task (POST .../{id}/start) likewise
-        accepts the owner or a same-owner app with `task:write`.
+        accepts the owner or a same-owner app with `task:write`. `{name}` may be a bare agent name
+        (resolved under the caller's account) or a whole GAII; an owner whose path names another
+        account's agent is refused with 403, as is the task list below.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
@@ -54631,6 +54633,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     get:
@@ -54708,6 +54712,8 @@ paths:
                             description: Present and true only when the agent itself reads the list while it is stopped. Waiting tasks are left out until it is started.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 

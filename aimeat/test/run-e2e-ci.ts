@@ -10,6 +10,11 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-16 -- The summary has a Skipped column, and a suite that ran no test, skipped itself in the
+ *     guard tier, hit its per-suite time limit or lost its node is red with its own note; a lane whose
+ *     node cannot be restarted reports its suites NOT RUN and the summary is still printed; the node's
+ *     output of a red suite is kept and its tail printed. The lane loop moved to run-e2e-lane.ts and
+ *     the verdicts to scripts/lib/e2e-results.ts (QA audit P1-04, P1-06, P1-07, P1-09, F7b-01).
  *   2026-10-16 -- e2e-schema-lock-rule.ts joins the list (not the guard tier): who may lock which key
  *     pattern, one-row deletes, and a cortex activation asking the same rule (QA audit S2-04, F05a-01, S7-01).
  *   2026-10-16 -- e2e-recorded-events.ts joins the list (not the guard tier): the traces of refusals answered
@@ -332,33 +337,27 @@
  *            is served, and the label's words by medium.
  */
 
-import { spawn, execSync, type ChildProcess } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-    anonymousModeFor,
-    cleanDatabase,
     ensureDatabase,
     laneTarget,
     pinnedEnv,
     reportEnvLeaks,
     resolveTarget,
-    startServer,
-    stopServer,
-    type RunnerTarget,
 } from './run-e2e-server.js';
-import { acquirePortLocks, holdBasePort, lanePortFor, releasePortLocks, suiteOwnPorts } from '../scripts/lib/e2e-ports.js';
+import { holdBasePort, lanePortFor } from '../scripts/lib/e2e-ports.js';
+import { classify, formatHeader, formatRow } from '../scripts/lib/e2e-results.js';
+import { runLane, type SuiteResult } from './run-e2e-lane.js';
+import { clearNodeLogs, nodeLogDir } from './helpers/runner-node-log.js';
 
 /** The worktree this run belongs to, and who it is for the port lock's record: the session, or the worktree's name when it has none. */
 const RUN_WORKTREE = fileURLToPath(new URL('../..', import.meta.url));
 const RUN_SESSION = process.env.AIMEAT_SESSION || basename(RUN_WORKTREE);
 
-/** A suite's source, or nothing when it cannot be read: such a suite has no port to lock. */
-function readSource(suite: string): string {
-    try { return readFileSync(suite, 'utf-8'); } catch { return ''; }
-}
 
 const ALL_SUITES = [
     'test/api-full.ts',
@@ -1230,7 +1229,7 @@ const ALL_SUITES = [
 ];
 
 /**
- * THE GUARD TIER — the suites CI refuses to merge without.
+ * THE GUARD TIER — the suites CI runs after every push, and that a red CI run on main names.
  *
  * Both E2E steps in .github/workflows/ci.yml carried `continue-on-error: true` from the day they were
  * added, so a red sweep has never blocked anything: the whole suite was advisory, and improving it
@@ -1454,6 +1453,7 @@ const GUARD_SUITES = [
 const NOT_SUITES = new Map<string, string>([
     ['run-e2e-ci.ts', 'this runner'],
     ['run-e2e-server.ts', "the runner's server lifecycle, environment pins and database cleanup: imported, never spawned"],
+    ['run-e2e-lane.ts', "the runner's lane loop (restart, run one suite under its time limit, read its result): imported, never spawned"],
     ['run-playwright-ci.ts', 'the Playwright runner; that suite is not run here, frontend changes are verified by driving a real browser'],
     ['manual-dm-helper.ts', 'manual helper for browser verification: it needs a person watching the Inbox tab, and it writes to whichever node DM_BASE names'],
     ['pg-kysely-memory.ts', 'storage-provider integration test: it drives a live Postgres over AIMEAT_TEST_PG_URL with no HTTP server, so it has nothing to say to BASE_URL'],
@@ -1530,7 +1530,7 @@ function guardSuites(): string[] {
         console.error('Re-point the entry, or take it out deliberately and say why in the commit.\n');
         process.exit(1);
     }
-    console.log(`\nGuard tier: ${GUARD_SUITES.length} suites that block a merge. A failure here is a hole, not a flake.`);
+    console.log(`\nGuard tier: ${GUARD_SUITES.length} suites CI runs on every push. A failure here is a hole, not a flake.`);
     return [...GUARD_SUITES];
 }
 
@@ -1735,149 +1735,6 @@ function planLanes(suites: string[], workers: number, pinned: Map<string, number
     return lanes.filter(l => l.length > 0);
 }
 
-interface SuiteResult {
-    name: string; passed: number; failed: number; total: number; time: string; exitCode: number;
-    lane: number;
-    /** Stop + clean + start before this suite, ms; 0 for a lane's first suite. */
-    cycleMs: number;
-    /** The node's anonymous mode for this suite: 'on', 'off', or 'external' (not the runner's). */
-    anonymous: string;
-}
-
-async function runLane(lane: number, target: RunnerTarget, suites: string[], stream: boolean): Promise<SuiteResult[]> {
-    const tag = stream ? '' : `[lane ${lane}] `;
-    const results: SuiteResult[] = [];
-    let server: ChildProcess | null = null;
-
-    // Empty the database BEFORE the first suite, by the same call the loop makes between suites.
-    // The version that ran only between them left suite one on whatever the previous run wrote,
-    // so a solo run of any suite was a run against stale data.
-    if (!target.external) {
-        await cleanDatabase(target);
-        console.log(`${tag}Cleaned ${target.dbType} test database before the first suite.`);
-    }
-
-    try {
-        for (let i = 0; i < suites.length; i++) {
-            const suite = suites[i];
-            const name = basename(suite, '.ts');
-            // The node starts per suite, because the suite decides its anonymous-mode setting
-            // (ANONYMOUS_OFF_SUITES in run-e2e-server.ts). An external node has its own setting.
-            const anonymous = target.external ? 'external' : anonymousModeFor(name) === 'false' ? 'off' : 'on';
-
-            // Clean DB and restart server between suites for isolation. stopServer does not return
-            // until the old process is gone and its port is free, so the delete below cannot fail
-            // on a live file handle and the next suite cannot reach the previous server.
-            let cycleMs = 0;
-            if (!target.external) {
-                const c0 = Date.now();
-                if (server) {
-                    await stopServer(server, target);
-                    server = null;
-                    await cleanDatabase(target);
-                }
-                server = await startServer(target, name);
-                if (i > 0) cycleMs = Date.now() - c0;
-                else console.log(`${tag}Server ready on :${target.port}.\n`);
-            }
-
-            if (stream) {
-                console.log(`\n${'─'.repeat(40)}`);
-                console.log(`  ${name}  (anonymous mode ${anonymous})`);
-                console.log(`${'─'.repeat(40)}`);
-            }
-
-            // The ports this suite binds for itself are taken under the machine-wide lock first
-            // (scripts/lib/e2e-ports.ts): another session that runs the same suite right now holds the
-            // same numbers, and waiting the seconds it needs is the alternative to EADDRINUSE or to
-            // a suite that talks to the other session's stub. The wait is not in the suite's time.
-            const ownPorts = suiteOwnPorts(readSource(suite), Number(target.port));
-            const held = await acquirePortLocks(ownPorts, { suite: name, session: RUN_SESSION }, {
-                onWait: (port, holder) => console.log(`${tag}${name} waits for port ${port}, which ${holder ? `${holder.session} holds for ${holder.suite}` : 'another run holds'}.`),
-            });
-            const t0 = Date.now();
-            let output: string, exitCode: number;
-            try { ({ output, exitCode } = await runTest(suite, name, target, stream)); }
-            finally { releasePortLocks(held); }
-            const elapsed = ((Date.now() - t0) / 1000).toFixed(2);
-            const parsed = parseResults(output);
-            const red = parsed.failed > 0 || exitCode !== 0;
-            if (!stream) {
-                console.log(`${tag}${red ? '✗' : '✓'} ${name}  ${parsed.passed}/${parsed.total} in ${elapsed}s, anonymous mode ${anonymous}`);
-                // A green suite's output is what the summary already says; a red one's is the point.
-                if (red) console.log(output.trimEnd());
-            }
-            results.push({ name, ...parsed, time: `${elapsed}s`, exitCode, lane, cycleMs, anonymous });
-        }
-    } finally {
-        if (server) {
-            // Reported, not thrown: a failure to shut down must not replace whatever error brought
-            // us into this block, which is the thing the reader needs.
-            await stopServer(server, target).catch((e: unknown) => {
-                console.error(`${tag}Could not stop the test server: ${(e as Error).message}`);
-            });
-        }
-    }
-    return results;
-}
-
-// ── Run a single test suite ──
-function runTest(suitePath: string, name: string, target: RunnerTarget, stream: boolean): Promise<{ output: string; exitCode: number }> {
-    return new Promise((settle) => {
-        // The suite gets the SAME pins as the server. A suite derives what it expects from its own
-        // environment, so any pin it cannot see is a place where the two can disagree about what is
-        // being tested: e2e-x402-testnet skips when the off-chain double is in use, could not see
-        // that it was, and so ran its real-network acceptance cases against the double.
-        const child = spawn('node', ['--import', 'tsx', suitePath], {
-            env: { ...process.env, ...pinnedEnv(target, name), E2E_BASE: target.baseUrl },
-            stdio: ['ignore', 'pipe', 'pipe'],
-            cwd: process.cwd(),
-        });
-
-        let output = '';
-        child.stdout?.on('data', (d: Buffer) => {
-            const s = d.toString();
-            output += s;
-            if (stream) process.stdout.write(s);
-        });
-        child.stderr?.on('data', (d: Buffer) => {
-            const s = d.toString();
-            output += s;
-            if (stream) process.stderr.write(s);
-        });
-
-        child.on('close', (code) => {
-            settle({ output, exitCode: code ?? 1 });
-        });
-    });
-}
-
-// ── Parse results from test output ──
-function parseResults(output: string): { passed: number; failed: number; total: number } {
-    const lines = output.split('\n');
-    // Try to find a summary line first (most reliable)
-    const resultLine = lines.filter(l => /\d+ passed.*\d+ failed/.test(l)).pop();
-    if (resultLine) {
-        const m = resultLine.match(/(\d+) passed.*?(\d+) failed/);
-        if (m) {
-            const passed = +m[1];
-            const failed = +m[2];
-            const totalMatch = resultLine.match(/(?:out of |of |total.*?)(\d+)/);
-            const total = totalMatch ? +totalMatch[1] : passed + failed;
-            return { passed, failed, total };
-        }
-    }
-    // Fallback: count ✅ and ❌ emoji lines (handles crashes before summary)
-    let passed = 0;
-    let failed = 0;
-    for (const line of lines) {
-        if (/^\s*✅/.test(line)) passed++;
-        if (/^\s*❌/.test(line)) failed++;
-    }
-    const total = passed + failed;
-    return { passed, failed, total };
-}
-
 // ── Main ──
 async function main() {
     const suites = parseArgs();
@@ -1952,14 +1809,20 @@ async function main() {
                 targets = [TARGET];
             }
         }
-        // allSettled, not all: a lane that dies must not leave the others' servers running.
-        const settled = await Promise.allSettled(lanes.map((s, k) => runLane(k, targets[k], s, lanes.length === 1)));
-        const dead = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected');
-        if (dead.length > 0) {
-            for (const d of dead) console.error(`Lane failed: ${(d.reason as Error).message}`);
-            process.exit(1);
-        }
-        results = settled.flatMap(s => (s as PromiseFulfilledResult<SuiteResult[]>).value);
+        if (!TARGET.external) clearNodeLogs(TARGET.dbType);
+        // allSettled, not all: a lane that dies must not leave the others' servers running. A lane
+        // reports its own restart failures as NOT RUN rows; one that still rejects (a fault in the
+        // runner itself) has its suites reported NOT RUN here, and the summary is printed for every
+        // lane either way (QA audit P1-09).
+        const guards = new Set(GUARD_SUITES.map(g => basename(g, '.ts')));
+        const laneOpts = { session: RUN_SESSION, isGuard: (n: string) => guards.has(n) };
+        const settled = await Promise.allSettled(lanes.map((s, k) => runLane(k, targets[k], s, lanes.length === 1, laneOpts)));
+        results = settled.flatMap((s, k): SuiteResult[] => {
+            if (s.status === 'fulfilled') return s.value;
+            const reason = `lane ${k} failed: ${(s.reason as Error).message.split('\n')[0]}`;
+            console.error(`Lane failed: ${(s.reason as Error).message}`);
+            return lanes[k].map(suite => ({ name: basename(suite, '.ts'), passed: 0, failed: 0, skipped: 0, total: 0, time: '0.00s', exitCode: 1, lane: k, cycleMs: 0, anonymous: '-', notRun: reason }));
+        });
     } catch (e) {
         console.error(`Runner failed: ${(e as Error).message}`);
         process.exit(1);
@@ -1967,7 +1830,9 @@ async function main() {
     // Reported in the order the suites were asked for, whichever lane ran them.
     const order = new Map(suites.map((s, i) => [basename(s, '.ts'), i]));
     results.sort((a, b) => (order.get(a.name) ?? 0) - (order.get(b.name) ?? 0));
-    const anyFailed = results.some(r => r.failed > 0 || r.exitCode !== 0);
+    const guardNames = new Set(GUARD_SUITES.map(g => basename(g, '.ts')));
+    const verdicts = new Map(results.map(r => [r.name, classify(r, { guard: guardNames.has(r.name) })]));
+    const anyFailed = [...verdicts.values()].some(v => v.red);
     const wallMs = Date.now() - wall0;
 
     // Summary
@@ -1975,34 +1840,36 @@ async function main() {
     console.log('  SUMMARY');
     console.log(`${'='.repeat(50)}`);
     console.log('');
-    console.log('Suite'.padEnd(30) + 'Passed'.padEnd(10) + 'Failed'.padEnd(10) + 'Total'.padEnd(10) + 'Time'.padEnd(10) + 'Anon'.padEnd(10) + (lanes.length > 1 ? 'Lane' : ''));
-    console.log('-'.repeat(80));
-    let crashed = 0;
-    for (const r of results) {
-        // A suite that never RAN is not a suite that passed. One with a syntax error exits non-zero
-        // having reported nothing, so `failed` is 0 and the row used to render as a tick beside
-        // "0 0 0" — which reads as "nothing to test here" rather than "this never compiled".
-        const didNotRun = r.exitCode !== 0 && r.total === 0;
-        const status = didNotRun ? '!' : r.failed === 0 ? '✓' : '✗';
-        const note = didNotRun ? `  DID NOT RUN (exit ${r.exitCode})` : '';
-        if (didNotRun) crashed++;
-        console.log(`${status} ${r.name.padEnd(28)}${String(r.passed).padEnd(10)}${String(r.failed).padEnd(10)}${String(r.total).padEnd(10)}${r.time.padEnd(10)}${r.anonymous.padEnd(10)}${lanes.length > 1 ? String(r.lane) : ''}${note}`);
-    }
+    // A suite that never RAN is not a suite that passed, and neither is one that ran no test, skipped
+    // itself, hit its time limit or lost its node: each has its own mark and note (scripts/lib/
+    // e2e-results.ts, QA audit P1-04, P1-06, P1-09, F7b-01). Skipped tests have their own column.
+    console.log(formatHeader(lanes.length > 1));
+    console.log('-'.repeat(90));
+    for (const r of results) console.log(formatRow(r.name, r, verdicts.get(r.name)!, lanes.length > 1));
 
     const totalPassed = results.reduce((s, r) => s + r.passed, 0);
     const totalFailed = results.reduce((s, r) => s + r.failed, 0);
+    const totalSkipped = results.reduce((s, r) => s + r.skipped, 0);
     const totalTests = results.reduce((s, r) => s + r.total, 0);
-    console.log('-'.repeat(80));
-    console.log(`  Total: ${totalPassed} passed, ${totalFailed} failed out of ${totalTests}`);
+    console.log('-'.repeat(90));
+    console.log(`  Total: ${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped out of ${totalTests}`);
     // Where the wall clock went: the suites themselves, and the restarts between them. The second
     // number is the runner's own cost, and it is what --workers divides.
     const suiteMs = results.reduce((s, r) => s + parseFloat(r.time) * 1000, 0);
     const cycles = results.filter(r => r.cycleMs > 0);
     const cycleMs = cycles.reduce((s, r) => s + r.cycleMs, 0);
     console.log(`  Wall ${(wallMs / 1000).toFixed(0)}s over ${lanes.length} lane${lanes.length === 1 ? '' : 's'}: suites ${(suiteMs / 1000).toFixed(0)}s, restarts ${(cycleMs / 1000).toFixed(0)}s across ${cycles.length}${cycles.length ? ` (${(cycleMs / cycles.length / 1000).toFixed(1)}s each)` : ''}`);
-    if (crashed > 0) {
-        console.log(`  ${crashed} suite(s) DID NOT RUN — they exited non-zero without reporting a single test.`);
-    }
+    const count = (status: string) => [...verdicts.values()].filter(v => v.status === status).length;
+    const kinds: Array<[string, string]> = [
+        ['did-not-run', 'DID NOT RUN: they exited non-zero without reporting a single test'],
+        ['empty', 'reported NO TEST: they exited 0 having run nothing'],
+        ['skipped', 'SKIPPED themselves whole (their reason is in their output)'],
+        ['timed-out', 'TIMED OUT and were ended at their time limit'],
+        ['node-died', 'lost their node: it exited while the suite ran'],
+        ['not-run', 'were NOT RUN: their lane could not restart its node'],
+    ];
+    for (const [status, text] of kinds) if (count(status) > 0) console.log(`  ${count(status)} suite(s) ${text}.`);
+    if (anyFailed && !TARGET.external) console.log(`  The node's output for each red suite is kept in ${nodeLogDir()}.`);
     // Repeated from the start of the run, because the summary is the part anyone reads.
     if (unregistered.length > 0) {
         console.log(`  ${unregistered.length} file(s) in test/ are on no list and ran nowhere: ${unregistered.join(', ')}`);

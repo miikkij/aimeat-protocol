@@ -19,6 +19,8 @@
  *   AIMEAT_X402_TEST_FACILITATOR=true), so a normal CI sweep never hits the network.
  * @usage cd aimeat && AIMEAT_X402_ENABLED=true pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402-testnet
  * @version-history
+ *   v1.2.1 — 2026-10-16 — The self-skip prints "0 passed, 0 failed, 1 skipped", so the runner shows the
+ *     suite as skipped in its own column instead of a tick with 0 0 0 (QA audit P1-04, F14a-03).
  *   v1.2.0 — 2026-09-16 — The payout address is set through PUT /v1/commerce/payout/x402.
  *   v1.1.0 — 2026-07-18 — Self-generated throwaway buyer key (gitignored) + on-chain balance gate +
  *     viem EIP-3009 signing; no operator key involved (TARGET-042 criterion 5)
@@ -38,6 +40,8 @@ const KEYFILE = process.env.X402_TEST_KEYFILE ?? resolve(process.cwd(), '.x402-t
 if (process.env.AIMEAT_X402_ENABLED !== 'true' || process.env.AIMEAT_X402_TEST_FACILITATOR === 'true') {
     console.log('\n=== x402 TESTNET E2E — SKIPPED ===');
     console.log('  ⏭  needs AIMEAT_X402_ENABLED=true and the REAL facilitator (unset AIMEAT_X402_TEST_FACILITATOR).');
+    // A skip the runner can see: the summary shows this suite as skipped, never as passed.
+    console.log('\nx402 TESTNET E2E: 0 passed, 0 failed, 1 skipped');
     process.exit(0);
 }
 

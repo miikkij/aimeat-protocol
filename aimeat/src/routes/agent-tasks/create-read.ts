@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.1 — 2026-10-16 — POST and GET /v1/agents/:name/tasks refuse an owner in person whose path names
+ *     another account's agent by its whole GAII (mayActOnAgent); owner B could queue a task on A's
+ *     agent and read its task list (QA audit S2-03, the class of S2-01).
  *   v1.8.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:write on POST /v1/agents/:name/tasks, except for an agent queueing work for itself (the self rule, auth/self-or-scope.ts; the permission text says it creates its own tasks without the word). Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.7.1 — 2026-10-11 — The list reads storage with the resolved agent identity on both branches; an
  *     agent must be that identity (Semgrep owner-data-must-resolve-identity, code scanning 1728-1729).
@@ -36,7 +39,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
-import { isOwnerInPerson } from '../../utils/gaii.js';
+import { isOwnerInPerson, mayActOnAgent } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { createTask } from '../../services/agent-task-write.js';
@@ -93,6 +96,14 @@ export function registerTaskCreateReadRoutes(
     const isApp = callerRoles.includes('app');
     if (!isOwner && !isAgent && !isApp) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only owners, agents, or granted apps may create tasks'));
+      return;
+    }
+    // An owner in person may queue work only on their own agent. The path takes a whole GAII as well
+    // as a bare name, and a whole GAII names whichever account it names: owner B queued a task on
+    // A's agent, filed under A, by sending A's agent's identity (QA audit 2026-10-16, S2-03; the
+    // class closed elsewhere on 2026-10-14 as K1, S2-01).
+    if (isOwner && !mayActOnAgent(req.auth, agentGaii, config.nodeId)) {
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'give work to', listUrl: '/v1/agents' }));
       return;
     }
     if (isAgent && agent.owner !== req.auth!.owner) {
@@ -193,6 +204,13 @@ export function registerTaskCreateReadRoutes(
     const agentGaii = resolveAgentGaii(req, agentName);
     if (!actAsOwner && req.auth!.sub !== agentGaii) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Agents can only access their own tasks'));
+      return;
+    }
+    // The owner's branch reads only the owner's own agent: a whole GAII in the path named another
+    // account's agent, and its task list was read (QA audit 2026-10-16, S2-03). An app grant reads the
+    // owner-scoped list, which its owner GHII already fences.
+    if (isOwnerSession && !mayActOnAgent(req.auth, agentGaii, config.nodeId)) {
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'see the work of', listUrl: '/v1/agents' }));
       return;
     }
 

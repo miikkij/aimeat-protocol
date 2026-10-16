@@ -17,6 +17,9 @@
 # Contract (Claude Code hooks): JSON on stdin, the absolute worktree path as the ONLY stdout,
 # exit 0. Any non-zero exit aborts the creation. Everything else goes to stderr.
 # Never links into another node_modules (docs/pitfalls.md section 13): each worktree installs its own.
+#
+# 2026-10-16 — Sets core.hooksPath so a commit in the new worktree runs the pre-commit hook (QA audit
+# W09, P2-07).
 set -eu
 
 input=$(cat)
@@ -47,8 +50,21 @@ else
   if [ -e "$dir" ]; then echo "worktree-create: $dir exists and is not a registered worktree" >&2; exit 1; fi
   git -C "$repo" fetch origin --quiet >&2 || echo "worktree-create: fetch failed, using the cached origin/main" >&2
   git -C "$repo" worktree add --detach "$dir" origin/main >&2
-  (cd "$dir/aimeat" && pnpm install --frozen-lockfile >&2)
-  (cd "$dir/aimeat" && pnpm test:env:init >&2) || echo "worktree-create: test:env:init did not finish; run it in aimeat/ before E2E" >&2
+  # AIMEAT_WORKTREE_HOOK_SKIP_INSTALL=1 is for the hook's own test, which has no package to install.
+  if [ "${AIMEAT_WORKTREE_HOOK_SKIP_INSTALL:-}" != "1" ]; then
+    (cd "$dir/aimeat" && pnpm install --frozen-lockfile >&2)
+    (cd "$dir/aimeat" && pnpm test:env:init >&2) || echo "worktree-create: test:env:init did not finish; run it in aimeat/ before E2E" >&2
+  fi
+fi
+
+# The git hooks run only when core.hooksPath names .githooks. The root package's prepare script sets
+# it, and this recipe installs in aimeat/ only, so a clone made this way committed and pushed with no
+# hook at all (QA audit 2026-10-16, P2-07). The setting is in the clone's shared config: setting it
+# here turns the hooks on for every worktree of the clone. A relative path resolves against the
+# worktree a hook runs in, so each worktree runs its own .githooks.
+if [ "$(git -C "$dir" config --get core.hooksPath 2>/dev/null || true)" != ".githooks" ]; then
+  git -C "$dir" config core.hooksPath .githooks
+  echo "worktree-create: git hooks turned on (core.hooksPath .githooks)" >&2
 fi
 
 if command -v cygpath >/dev/null 2>&1; then cygpath -w "$dir"; else printf '%s\n' "$dir"; fi

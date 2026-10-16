@@ -1,0 +1,189 @@
+{
+  "note": "Registered E2E suites that ask about no refusal of an AUTHENTICATED second principal: their only refusal is a 401 for a caller with no credential, or a status compared with !== (a positive control). The first version of check:denial-coverage counted any 401 or 403 in a condition, so these passed a gate labelled \"Every suite asks what a second principal gets\" (QA audit 2026-10-16, P3-08). Seeded so the gate can only ratchet down; the `sha` pins each reason to the file it was written about, and editing the suite expires it.",
+  "exempt": {
+    "test/e2e-admin-setup-closed.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "d8957332408a5981"
+    },
+    "test/e2e-agent-capabilities.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "3159e61d0d0b42f5"
+    },
+    "test/e2e-session-refresh.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "e422e8b0aa559cf7"
+    },
+    "test/e2e-app-draft-edit.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "c251b4361225c0cf"
+    },
+    "test/e2e-app-playtest.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "9b67f5553f023adc"
+    },
+    "test/e2e-app-descriptions.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "4ae7df6e656cdb35"
+    },
+    "test/e2e-commerce-own-tools.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "69a05224d5619e15"
+    },
+    "test/e2e-app-tool-money-prices.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "19d6f996cb4ff8ae"
+    },
+    "test/e2e-sse.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "754121e738554726"
+    },
+    "test/e2e-apps-backup.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "cb11e6040c958045"
+    },
+    "test/e2e-calibrator.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "de36d0ed38114392"
+    },
+    "test/e2e-ext-files.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "765fd1689c5b4298"
+    },
+    "test/e2e-extension-fetch-gunzip.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "1b72f3b6c3ac226a"
+    },
+    "test/e2e-agent-token-revocation.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "2db30403b13c7051"
+    },
+    "test/e2e-mcp-sse-parity.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "ae03d38abc355f10"
+    },
+    "test/e2e-federation-nodeinfo.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "4975ef3edf434831"
+    },
+    "test/e2e-app-format-md.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "17b678a77978f628"
+    },
+    "test/e2e-login-by-email.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "e362fa1145529250"
+    },
+    "test/e2e-owner-usage.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "59bb45810c34f164"
+    },
+    "test/e2e-owner-home.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "969f22712dfc22c7"
+    },
+    "test/e2e-ai-capabilities.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "2de48de6e5a2e035"
+    },
+    "test/e2e-app-publish-provenance-doors.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "8b475f27b2fdb2de"
+    },
+    "test/e2e-living-hooks.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "088d7f021c7dfa08"
+    },
+    "test/e2e-appdev-pitfalls.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "de743458c06904ab"
+    },
+    "test/e2e-appdev-overview.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "dad632964cf1e96f"
+    },
+    "test/e2e-dependency-map.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "874c84c948aca23b"
+    },
+    "test/e2e-component-versions.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "9f234ca9ba0ccd56"
+    },
+    "test/e2e-wallet-page.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "e251ffb924c6cb27"
+    },
+    "test/e2e-outbound-organism-sender.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "344eb68170784656"
+    },
+    "test/e2e-anonymous-identity-leaks.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "d55330b1acc8ca87"
+    },
+    "test/e2e-discover.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "722f725772858082"
+    },
+    "test/e2e-memory-discover.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "c8768b770bcd6cc9"
+    },
+    "test/e2e-transparency-page.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "50618b81471d8ac5"
+    },
+    "test/e2e-organism-decision-cap.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "b4a0e1219cb7e8b8"
+    },
+    "test/e2e-mcp-onboarding.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "b6814fc18a6c5c72"
+    },
+    "test/e2e-upload.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "bd91031c578703db"
+    },
+    "test/openrouter.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "4cdaa2abaf06fad5"
+    },
+    "test/e2e-ai-image.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "3a865d1c8487229b"
+    },
+    "test/e2e-chat.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "190f4c48720d44fa"
+    },
+    "test/e2e-interactive-messages.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "325cd1868a004cb8"
+    },
+    "test/e2e-prompt-modules.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "74fce8cdb3ba4426"
+    },
+    "test/e2e-prompt-arms.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "7a3bb7d232431a2c"
+    },
+    "test/e2e-unfurl.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "53f7392fc4b34ad2"
+    },
+    "test/e2e-agent-telemetry.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "a3424daee12e478b"
+    },
+    "test/e2e-ledger.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "50727d4e953eb79b"
+    },
+    "test/e2e-ecosystem-automation.ts": {
+      "reason": "Seeded 2026-10-16 (QA audit P3-08). NOT YET REVIEWED: this suite's only refusal is a 401 for a caller with no credential; it never asks what a second owner, or an agent without the scope, gets. Add a 403 or an MCP refusal for an authenticated second principal, or replace this line with why the surface has none (a 404 that hides another owner's object is a refusal; say so here).",
+      "sha": "0b3da4c400195274"
+    }
+  }
+}

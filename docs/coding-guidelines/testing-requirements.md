@@ -18,11 +18,11 @@ The rule itself is in [CLAUDE.md](../../CLAUDE.md), section "Gates": E2E on both
 - **A failure in a suite you did not touch:** confirm it fails on `main` too, in a separate clean worktree with its own test port and database, report it as pre-existing, and leave it.
 - **Each worktree has its own test environment.** Run `pnpm test:env:init` from `aimeat/`. It writes `.env.test.sqlite` and `.env.test.postgres-kysely` from the committed `*.example` files with a port and a Postgres database derived from the worktree's name, and creates the database. Never copy `.env.test.*` from another checkout: the runner empties its database between suites, so two checkouts sharing one database wipe each other. `AIMEAT_E2E_PORT=<port> pnpm test:env:init --force` takes a port you choose (the script accepts 40251 to 40499). Maintainer sessions take that port from their Lifecycle Central claim. The runner refuses a port that a selected suite hard-codes; choose another free port when that happens.
 
-### Rule 1b: The guard tier is the part CI refuses to merge without
+### Rule 1b: The guard tier is the part CI runs on every push
 
 Both E2E steps in `.github/workflows/ci.yml` carried `continue-on-error: true` from the day they were added, so until 2026-08-15 a red suite had never stopped a merge. The full sweep still cannot be that gate: two hours, and the cleanup race in `docs/pitfalls.md` §18 makes it occasionally wrong about suites nobody touched.
 
-So a named tier blocks instead. `GUARD_SUITES` in `test/run-e2e-ci.ts`, run with `--guards`:
+So a named tier runs on every push instead. CI runs after the push has landed on main and stops nothing by itself; its state is printed by the session-start hook and `pnpm gate`, and the pre-push hook asks a session for a named reason before it pushes on top of a red run (`Red-CI: <reason>` trailer). `GUARD_SUITES` in `test/run-e2e-ci.ts`, run with `--guards`:
 
 ```bash
 pnpm test:e2e:guards:sqlite

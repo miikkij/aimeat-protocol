@@ -28,6 +28,8 @@
  *   has not run it yet.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mail-read-consent
  * @version-history
+ *   v1.3.1 — 2026-10-16 — The backend skip prints "1 skipped", so the runner shows a skip and not a
+ *     green suite with no test (QA audit P1-04).
  *   v1.3.0 — 2026-09-26 — The agents' button calls POST /v1/agents/:name/read-through (test 1b), and
  *     tests 7 and 7b press it as the bell does: the word goes to that agent alone, only the owner in
  *     person may, it is idempotent, an agent that may not use its accounts is NOT_ELIGIBLE, and DELETE
@@ -153,6 +155,8 @@ console.log('\n=== Mail read permission for apps granted before it had a word of
 const storage = await openServerStorage();
 if (!storage) {
     console.log('  (skipped: this backend lives inside the server, so its database cannot be reached from here)');
+    // A skip the runner can see (QA audit 2026-10-16, P1-04): otherwise a tick with 0 0 0.
+    console.log('\n0 passed, 0 failed, 1 skipped');
     process.exit(0);
 }
 

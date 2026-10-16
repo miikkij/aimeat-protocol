@@ -5,6 +5,10 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   v1.5.0 -- 2026-10-16 -- Test 34 asked a '*' agent for words '*' covers and passed on the proposal,
+ *     so it passed with the narrow-only guard removed; 34 and 34b now ask for a word the target lacks
+ *     and accept only the refusal, and 33 presents the used token where only the single-use check can
+ *     answer (QA audit F7c-01, F19b-03). The old 33 and 34 asserted outcomes that hid the defect.
  *   v1.4.0 -- 2026-10-03 -- 27b2b checks that aimeat-first-conversation starts at the profile
  *     interview, in place of the digest that pinned it to the aimeat.io text of 2026-09-18.
  *   v1.3.0 -- 2026-08-16 -- August 2026 test-quality audit: test 27 said node-scope publish is
@@ -920,28 +924,63 @@ await test('32. confirm with the token applies the exact change', async () => {
 });
 
 await test('33. the token is single-use', async () => {
+    // The display name is moved away first (a fresh proposal, confirmed), so presenting the used token
+    // with its own payload has something to apply: only the single-use check can answer it. Asked
+    // while the values still equalled the payload, "nothing to apply" answered before the token was
+    // looked at, and the test passed either way (QA audit 2026-10-16, F19b-03).
+    const moved = await mcpRpc('tools/call', { name: 'aimeat_operator_agent_configure', arguments: { agent_name: agentName, display_name: 'Interim Name' } }, 1150);
+    const movedToken = toolText(moved.body).confirm_token;
+    assert(typeof movedToken === 'string', `interim proposal: ${JSON.stringify(toolText(moved.body)).slice(0, 150)}`);
+    const applied = await mcpRpc('tools/call', { name: 'aimeat_operator_agent_configure', arguments: { agent_name: agentName, display_name: 'Interim Name', confirm_token: movedToken } }, 1151);
+    assert(toolText(applied.body).mode === 'applied', `interim confirm: ${JSON.stringify(toolText(applied.body)).slice(0, 150)}`);
+
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_operator_agent_configure',
         arguments: { agent_name: agentName, display_name: 'Skills Test Agent', confirm_token: confirmToken },
     }, 115);
-    const data = toolText(body);
     const text = body?.result?.content?.[0]?.text ?? '';
-    // Either the values now equal current (nothing to apply) or the token is rejected as used.
-    assert(text.includes('TOKEN_USED') || data.note?.includes('nothing to apply') || (data.diff && Object.keys(data.diff).length === 0),
-        `got: ${text.slice(0, 150)}`);
+    assert(body?.result?.isError === true && text.includes('TOKEN_USED'), `a used token must be refused as used, got: ${text.slice(0, 150)}`);
 });
 
-await test('34. scope WIDENING is rejected even at propose time', async () => {
+// The narrow-only guard is the one control between an agent holding agent:permissions and a wider
+// scope list: the confirm token binds to the caller, so the same agent proposes and confirms. These
+// two ask for a scope the TARGET does not hold and accept only the refusal. The earlier test 34 asked
+// a '*' agent for five words '*' covers and passed on the proposal it got, so it passed with the
+// guard removed (QA audit 2026-10-16, F7c-01, F19b-03).
+let narrowAgentName = '';
+
+await test('34. scope WIDENING is refused at propose time: a narrow sibling asked for a word it lacks', async () => {
+    narrowAgentName = `skills-narrow-${Date.now()}`;
+    const reg = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: narrowAgentName, owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+    });
+    assert(reg.status === 201, `narrow agent: ${reg.status} ${JSON.stringify(reg.body.error)}`);
+
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_operator_agent_configure',
-        arguments: { agent_name: agentName, scopes: ['memory:read', 'memory:write', 'wallet:read', 'consent:manage', 'work:request'] },
+        arguments: { agent_name: narrowAgentName, scopes: ['memory:read', 'memory:write'] },
     }, 116);
     const text = body?.result?.content?.[0]?.text ?? '';
-    const data = toolText(body);
-    // Agents provisioned with '*' may pass the guard; otherwise additions must be refused.
-    const rejected = body?.result?.isError === true && text.includes('Scope additions are not allowed');
-    const wildcarded = data.mode === 'proposal';
-    assert(rejected || wildcarded, `got: ${text.slice(0, 150)}`);
+    assert(body?.result?.isError === true, `a widening must be refused, got: ${text.slice(0, 150)}`);
+    assert(text.includes('Scope additions are not allowed') && text.includes('memory:write'), `refusal names the added word: ${text.slice(0, 150)}`);
+
+    const after = await mcpRpc('tools/call', { name: 'aimeat_operator_agent_configure', arguments: { agent_name: narrowAgentName } }, 1160);
+    const scopes = toolText(after.body).current?.scopes;
+    assert(JSON.stringify(scopes) === JSON.stringify(['memory:read']), `the narrow agent's scopes are unchanged: ${JSON.stringify(scopes)}`);
+});
+
+await test('34b. a \'*\' agent asked for a word no wildcard carries is refused too, for itself', async () => {
+    // commerce:psp is outside every wildcard (utils/scope-coverage.ts). The guard once skipped itself
+    // for a target holding '*' (operator-config.ts v1.1.0), which let an agent widen itself.
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_operator_agent_configure',
+        arguments: { agent_name: agentName, scopes: ['*', 'agent:permissions', 'memory:write-reserved', 'memory:write-as-owner', 'commerce:psp'] },
+    }, 117);
+    const text = body?.result?.content?.[0]?.text ?? '';
+    assert(body?.result?.isError === true && text.includes('Scope additions are not allowed') && text.includes('commerce:psp'),
+        `a '*' target must still be refused a word '*' does not carry, got: ${text.slice(0, 150)}`);
 });
 
 // ─── Phase 8: Workspace scope (2c) ───

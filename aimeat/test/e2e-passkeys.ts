@@ -26,6 +26,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=passkeys
  * @version-history
+ *   v1.3.1 — 2026-10-16 — Passkeys off and two-step sign-in off are failures, not early returns that
+ *     passed 25 tests with no ceremony run; the runner pins both switches on (QA audit F7b-02).
  *   v1.3.0 — 2026-10-09 — An erased account's devices do not sign in the next holder of the released
  *     name (secrets audit 2026-10-09, finding 1.2).
  *   v1.2.0 — 2026-09-24 — Two-step sign-in armed: a device that does not check the person is
@@ -168,8 +170,10 @@ async function main() {
     await test('the node offers passkeys, and this account has none yet', async () => {
         const r = await json('/v1/ghii/passkeys', { headers: auth(aliceToken) });
         assert(r.status === 200, `list: ${r.status} ${JSON.stringify(r.body.error)}`);
+        // The runner pins AIMEAT_PASSKEY_ENABLED on, so "off" here is a defect, not a reason to pass the
+        // rest of the suite by returning early (QA audit 2026-10-16, F7b-02).
         enabled = r.body.data.available === true;
-        if (!enabled) { console.log('    (passkeys are off on this node, skipping the rest)'); return; }
+        assert(enabled, `the node must offer passkeys here (AIMEAT_PASSKEY_ENABLED is pinned on), got available=${JSON.stringify(r.body.data.available)}`);
         assert(r.body.data.count === 0, `a new account has no passkeys, got ${r.body.data.count}`);
     });
 
@@ -500,7 +504,7 @@ async function main() {
     await test('once two-step sign-in is armed, the key with no PIN is refused and leaves no mark', async () => {
         if (!enabled || !carolToken) return;
         const setup = await json('/v1/ghii/totp/setup', { method: 'POST', headers: auth(carolToken), body: '{}' });
-        if (setup.status === 503) { console.log('    (two-step sign-in is off on this node, skipping this part)'); return; }
+        // Two-step sign-in is pinned on by the runner: a 503 is a failure here, not a skip (F7b-02).
         assert(setup.status === 200, `totp setup: ${setup.status} ${JSON.stringify(setup.body.error)}`);
         const verify = await json('/v1/ghii/totp/verify', {
             method: 'POST', headers: auth(carolToken), body: JSON.stringify({ code: codeNow(setup.body.data.totp_secret) }),

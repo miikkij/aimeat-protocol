@@ -22,6 +22,8 @@
  *   e2e-x402-testnet.ts, opted into by setting AIMEAT_X402_TEST_FACILITATOR=false.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402
  * @version-history
+ *   v1.3.0 — 2026-10-16 — 5a: a proof that pays less than the price, or pays another address, is
+ *     refused with X402_VERIFY_FAILED and the session stays open (QA audit F14a-03).
  *   v1.2.0 — 2026-09-16 — Payout settings go through their routes; addresses compare without case.
  *   v1.1.2 — 2026-09-16 — The kept Stripe credential is asserted in its encrypted form (commerce/psp-secrets.ts)
  *   v1.1.1 — 2026-07-25 — Runner pins the x402 env, so the suite no longer inherits the dev .env
@@ -202,6 +204,30 @@ await test('5. Replay the SAME proof on a fresh session → 402 (single-use nonc
         method: 'POST', headers: { ...auth(buyer.token), 'X-PAYMENT': buildXPayment(requirements, BUYER_WALLET, freshNonce()) }, body: JSON.stringify({}),
     });
     assert(ok.status === 200 && ok.body.data.session.status === 'completed', `fresh nonce settles: ${ok.status}`);
+});
+
+// Every proof in this suite copied payTo and the amount from the requirement, so a proof that pays
+// less, or pays somebody else, had never been sent: the handler hands both to the facilitator, and
+// the test double checked the amount only (QA audit 2026-10-16, F14a-03).
+await test('5a. A proof that pays less, or pays another address, is refused and the session stays open', async () => {
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ currency: 'USD', items: [{ agent: seller.vendorGaii, offer_id: 'usd-service' }] }),
+    });
+    assert(create.status === 201, `create ${create.status}`);
+    const id = create.body.data.session.id;
+    const wrong = [
+        ['less than the price', { ...requirements, maxAmountRequired: String(PRICE_MICROS - 1) }],
+        ['to another address', { ...requirements, payTo: `0x${'c'.repeat(40)}` }],
+    ] as const;
+    for (const [label, forged] of wrong) {
+        const r = await json(`/v1/commerce/checkout-sessions/${id}/complete`, {
+            method: 'POST', headers: { ...auth(buyer.token), 'X-PAYMENT': buildXPayment(forged, BUYER_WALLET, freshNonce()) }, body: JSON.stringify({}),
+        });
+        assert(r.status === 402 && r.body.error?.code === 'X402_VERIFY_FAILED', `a proof paying ${label} is refused: ${r.status} ${r.body.error?.code}`);
+    }
+    const after = await json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyer.token) });
+    assert(after.body.data.session.status !== 'completed', `the session was completed by a refused proof: ${after.body.data.session.status}`);
 });
 
 await test('5b. The SAME session cannot be completed twice, however fresh the proof', async () => {

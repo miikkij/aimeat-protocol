@@ -21,6 +21,9 @@ permissions:
 jobs:
   sweep:
     runs-on: ubuntu-latest
+    # A time limit per job (QA audit P1-06); the runner also limits each suite, so a hung suite is
+    # one red row and not a job that runs until GitHub's six-hour default.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -106,6 +109,17 @@ jobs:
           AIMEAT_E2E_NODE_ENTRY: dist
         run: pnpm test:e2e:${{ matrix.backend }}
 
+      # The node's own output for each red suite (the runner keeps it under test-results/e2e-node/
+      # and prints its tail under the suite): a 500 or a crash leaves a stack here (QA audit P1-07).
+      - name: Keep the node logs of the red suites
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-node-logs-${{ matrix.backend }}
+          path: aimeat/test-results/e2e-node/
+          if-no-files-found: ignore
+          retention-days: 14
+
   # THE 4.0.0 HALF OF THE VERSION-AWARE SUITES, EVERY NIGHT. A suite whose expected answer depends on
   # the release (removedOn, helpers/node-release, a *_REMOVED_IN constant) asserts the 3.x answer in
   # the sweep above and the 4.0.0 answer only on a node run as 4.0.0. Until 2026-10-13 that second
@@ -117,6 +131,7 @@ jobs:
   # is not what the release changes, and the sweep above runs both backends at the package version.
   release-4-0-0:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -170,6 +185,44 @@ jobs:
           AIMEAT_BASE_URL: 'http://localhost:40050'
         run: pnpm test
 
+  # THE PACKAGE AN OPERATOR INSTALLS, STARTED EVERY NIGHT (QA audit 2026-10-16, P6-04). Nothing packed
+  # the npm tarball, installed it into an empty directory with production dependencies only and
+  # started it: every other check runs the build inside the checkout, where docs/, public/ and the
+  # development dependencies sit beside dist/, and five packaging defects reached npm that way.
+  # aimeat/scripts/pack-smoke.mjs does it and probes /v1/health, /v1/build (the packed commit),
+  # /v1/spec, a bundled catalogue and a served library; prepublishOnly runs the same script, and a
+  # release waits for this run being green on its commit (scripts/release-ready.mjs).
+  pack-smoke:
+    runs-on: ubuntu-latest
+    # The production install of the packed tarball took 11 to 16 minutes on a loaded workstation.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the node that is packed
+        working-directory: aimeat
+        run: pnpm build
+
+      - name: Pack, install with production dependencies only, start and probe
+        working-directory: aimeat
+        run: node scripts/pack-smoke.mjs
+
   # THE ISSUE IS WRITTEN BY A JOB OF ITS OWN. The sweep installs and runs the whole dependency tree,
   # so it holds a token that can only read; this job holds the one that writes issues and runs
   # nothing but the gh CLI the runner carries. It reads each leg's result from this run (a sweep leg
@@ -178,9 +231,10 @@ jobs:
   # one closes it. Each leg has its own issue title, and no title contains another, because the
   # lookup is a phrase search on the title.
   issue:
-    needs: [sweep, release-4-0-0]
+    needs: [sweep, release-4-0-0, pack-smoke]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       actions: read # read the sweep legs' results from this run
       issues: write # open, comment on and close the nightly-sweep issue
@@ -197,6 +251,9 @@ jobs:
           - job: release-4-0-0
             title: Nightly 4.0.0 run of the version-aware suites is red
             what: The version-aware suites (test/version-aware-suites.txt) run as node **4.0.0** on sqlite
+          - job: pack-smoke
+            title: Nightly start of the packed npm package is red
+            what: The npm tarball packed, installed with production dependencies only and started (aimeat/scripts/pack-smoke.mjs)
     steps:
       - name: Read this leg's result
         id: sweep
@@ -209,8 +266,11 @@ jobs:
           echo "$JOB: ${CONCLUSION:-not found}"
           echo "conclusion=$CONCLUSION" >> "$GITHUB_OUTPUT"
 
+      # Every conclusion but success is red (QA audit P1-06): a leg that hit its time limit ends
+      # as cancelled or timed_out, and one that could not be found answers nothing; both opened no
+      # issue while the condition read only 'failure'.
       - name: Open or update the issue for a red sweep
-        if: steps.sweep.outputs.conclusion == 'failure'
+        if: steps.sweep.outputs.conclusion != 'success'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

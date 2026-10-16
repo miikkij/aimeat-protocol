@@ -21,8 +21,10 @@
  *                   SQLite always, Postgres with --postgres or --full
  *
  *   It prints the plan and the reason for each line before running anything, so a "why did this
- *   take four minutes" has its answer at the top of the log. CI still runs everything on every
- *   push and blocks a merge on it; this is what a person or a session runs before saying done.
+ *   take four minutes" has its answer at the top of the log. CI runs everything after every push
+ *   and blocks no push (work goes straight to main), so the plan also prints main's CI and nightly
+ *   state as GitHub last reported them, and whether this clone's git hooks are on; this is what a
+ *   person or a session runs before saying done.
  * @usage
  *   cd aimeat && pnpm gate                 # what the change reaches
  *   cd aimeat && pnpm gate --postgres      # …plus the Postgres tier when the tier runs
@@ -30,6 +32,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   v1.3.0 -- 2026-10-16 -- The plan prints main's CI state and the nightly sweep's state (QA audit
+ *     P2-01, P4-01, P8-01, P2-03) and says when core.hooksPath is not .githooks (QA audit P2-07).
  *   v1.2.0 -- 2026-10-12 -- More than 40 changed suites go to the runner in a file (--tests-file):
  *     404 of them made a command line Windows refused, and the gate stopped there in 0 s.
  *   v1.1.0 -- 2026-09-07 -- Preserve changed suites under --full, honor --postgres for them,
@@ -41,6 +45,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { describeState, readCiState } from './lib/ci-runs.mjs';
 
 const args = process.argv.slice(2);
 const FULL = args.includes('--full');
@@ -136,7 +141,22 @@ function plan(files: string[], mergeBase: string): Step[] {
     return steps;
 }
 
-function main(): void {
+/**
+ * What a reader of the plan needs before trusting a green gate: is main itself green on GitHub, and
+ * do this clone's hooks run at all. Printed, never decided on: CI's answer is about main, the gate's
+ * about this change (QA audit P2-01, P2-07).
+ */
+async function contextLines(): Promise<string[]> {
+    const lines = describeState(await readCiState({ cwd: ROOT }));
+    let hooks = '';
+    try { hooks = git('config', '--get', 'core.hooksPath'); } catch { hooks = ''; }
+    if (hooks !== '.githooks') {
+        lines.push(`Git hooks: OFF on this clone (core.hooksPath is ${hooks || 'unset'}), so no commit or push check ran. Turn them on: git config core.hooksPath .githooks`);
+    }
+    return lines;
+}
+
+async function main(): Promise<void> {
     const { files, mergeBase } = changedSince(BASE);
     const steps = plan(files, mergeBase);
     console.log(`\n  gate: ${files.length} file(s) changed since ${BASE} (${mergeBase.slice(0, 9)})${FULL ? ', --full' : ''}`);
@@ -146,6 +166,8 @@ function main(): void {
     if (!FULL && !files.some(f => UNIT_REACH.test(f))) skipped.push('unit tests (nothing a test can reach changed)');
     if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard tier (no guarded backend, shared utility, commerce, configuration or bootstrap changes)');
     for (const s of skipped) console.log(`  · skipped: ${s}`);
+    console.log('');
+    for (const line of await contextLines()) console.log(`  ${line}`);
     console.log('');
     if (PLAN_ONLY) return;
 
@@ -164,4 +186,4 @@ function main(): void {
     console.log(`\n  ✓ gate passed in ${((Date.now() - t0) / 1000).toFixed(0)}s: ${steps.length} step(s)${skipped.length ? `, ${skipped.length} skipped for cause` : ''}\n`);
 }
 
-main();
+void main();

@@ -7,6 +7,9 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
+ *   v1.10.0 -- 2026-10-16 -- startServer records the node's whole output per suite
+ *            (helpers/runner-node-log.ts) for a red suite's summary and CI's artifact; the waits on
+ *            real conditions moved unchanged to helpers/runner-ports.ts (QA audit P1-07).
  *   v1.9.1 -- 2026-10-14 -- AIMEAT_OTK_GRACE_MS is gone with the setting (the connectivity-key
  *            routes it timed were removed).
  *   v1.9.0 -- 2026-10-10 -- Wallet signing on (AIMEAT_DOCSIGN_EUDI_ENABLED) with the test-only access
@@ -54,7 +57,8 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
-import { createServer } from 'node:net';
+import { requirePortFree, waitForExit } from './helpers/runner-ports.js';
+import { recordNodeOutput } from './helpers/runner-node-log.js';
 import { existsSync, readFileSync, unlinkSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -297,6 +301,11 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         // for every e2e run so the tunnel suites work in CI too (the .env.test.*
         // files are gitignored, so they can't carry this for CI).
         AIMEAT_CONNECT_TUNNEL_ENABLED: process.env.AIMEAT_CONNECT_TUNNEL_ENABLED ?? 'true',
+        // Passkeys and two-step sign-in are on by default; pinned so a developer's .env or a changed
+        // default cannot turn e2e-passkeys (guard tier) into 25 early returns that pass (QA audit
+        // 2026-10-16, F7b-02). The suite asserts both are on.
+        AIMEAT_PASSKEY_ENABLED: process.env.AIMEAT_PASSKEY_ENABLED ?? 'true',
+        AIMEAT_TOTP_ENABLED: process.env.AIMEAT_TOTP_ENABLED ?? 'true',
         // Visitor geography is off in production until a proxy sets the place headers. On for every
         // e2e run so e2e-app-visitors can stand in for that proxy; a suite that sends no X-Geo-*
         // header is unaffected, because a stream keeps no place until its owner picks a precision.
@@ -634,78 +643,8 @@ export async function cleanDatabase(target: RunnerTarget): Promise<void> {
     }
 }
 
-// ── Waiting for real conditions ──
-function waitForExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
-    if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
-    return new Promise((settle) => {
-        // A declaration, so the timer can be named before it exists: exit cannot fire before the
-        // listener below is attached, and by then the timer is set.
-        function onExit(): void { clearTimeout(timer); settle(true); }
-        const timer = setTimeout(() => { child.off('exit', onExit); settle(false); }, timeoutMs);
-        child.once('exit', onExit);
-    });
-}
-
-function canBind(port: number, host?: string): Promise<boolean> {
-    return new Promise((settle) => {
-        const probe = createServer();
-        probe.once('error', () => settle(false));
-        probe.once('listening', () => probe.close(() => settle(true)));
-        if (host === undefined) probe.listen(port); else probe.listen(port, host);
-    });
-}
-
-/**
- * Binding is the only definitive answer. An HTTP probe can be answered by a DIFFERENT server, which
- * is exactly the confusion this replaces: a suite talking to the previous run's node on the old
- * database, while the runner believed it had started a fresh one.
- *
- * Both address families are tried, because one of them is not an answer. `app.listen(port)` with no
- * host binds `::` dual-stack, and on Windows a fresh `0.0.0.0` bind SUCCEEDS beside it: the first
- * version of this probe used 0.0.0.0 alone, reported a busy port free, and let the run continue
- * against a server it had not started. Free means nothing can take it, from either side.
- */
-async function portIsFree(port: number): Promise<boolean> {
-    // Sequentially: a dual-stack `::` bind and an IPv4 bind held at the same moment collide with
-    // each other, and the probe would report its own socket as somebody else's server.
-    if (!await canBind(port)) return false;
-    return canBind(port, '0.0.0.0');
-}
-
-export async function waitForPortFree(port: number, timeoutMs: number): Promise<boolean> {
-    const deadline = Date.now() + timeoutMs;
-    for (;;) {
-        if (await portIsFree(port)) return true;
-        if (Date.now() >= deadline) return false;
-        await new Promise(r => setTimeout(r, 100));
-    }
-}
-
-/**
- * Who is holding a port, in one line, asked only when the refusal below is already certain.
- *
- * A port that will not come free is the hardest failure in this runner to read after the fact: the
- * message names the port and the moment, and nothing about the holder, so every occurrence has been
- * answered with a re-run and a guess. An AIMEAT node answers /v1/build with its own id and its build
- * stamp, which says at once whether this is one of ours left behind or somebody else's process, and
- * that is the difference between a bug in the runner and a busy machine. Bounded, and it never
- * decides anything: the refusal happens either way.
- */
-async function whoHolds(port: number): Promise<string> {
-    const probe = await fetch(`http://127.0.0.1:${port}/v1/build`, { signal: AbortSignal.timeout(2_000) }).then(
-        async (r) => `An AIMEAT node answers /v1/build on it (HTTP ${r.status}): ${(await r.text()).slice(0, 200)}`,
-        (e: unknown) => `Nothing answers /v1/build on it (${(e as Error).message}), so whatever holds it is not a node that finished starting.`,
-    );
-    return probe;
-}
-
-/** Fail loudly rather than start a second server that cannot bind and then test the first one. */
-export async function requirePortFree(port: number, timeoutMs: number, context: string): Promise<void> {
-    const started = Date.now();
-    if (await waitForPortFree(port, timeoutMs)) return;
-    const holder = await whoHolds(port);
-    throw new Error(`Port ${port} was still bound ${Date.now() - started}ms after ${context}. ${holder} Nothing can be trusted from here: a suite would talk to whichever server holds it, on whichever database that one opened. Clear it with \`AIMEAT_PORT=${port} pnpm exec tsx scripts/kill-port.ts\` (that script reads the env var, not an argument), or give this run a port of its own with AIMEAT_PORT.`);
-}
+// ── Waiting for real conditions: test/helpers/runner-ports.ts ──
+export { waitForPortFree, requirePortFree } from './helpers/runner-ports.js';
 
 // ── Server lifecycle ──
 
@@ -764,6 +703,8 @@ export async function startServer(target: RunnerTarget, suite?: string): Promise
     }
 
     const child = spawn('node', serverArgs, { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
+    // Everything the node says during the suite, kept for a red suite (QA audit P1-07).
+    recordNodeOutput(child, suite ?? 'node', target.dbType);
     // These two generated files belong only to this server. Keep external/user log files intact.
     const authLog = env.AIMEAT_AUTH_LOG_PATH;
     child.once('close', () => {
@@ -787,6 +728,10 @@ export async function startServer(target: RunnerTarget, suite?: string): Promise
         await new Promise(r => setTimeout(r, 300));
     }
     child.kill('SIGKILL');
+    // Gone before the caller hears about it: the runner retries the restart once (run-e2e-lane.ts),
+    // and on Windows a killed node still holds the SQLite file for a moment, which turned the retry's
+    // database clean into EBUSY (QA audit P1-09).
+    await waitForExit(child, SERVER_EXIT_TIMEOUT_MS);
     throw new Error(`Test server (${where}) failed to start within ${SERVER_READY_TIMEOUT_MS}ms.${tail()}`);
 }
 

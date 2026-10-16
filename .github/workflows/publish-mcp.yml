@@ -6,9 +6,45 @@ on:
 permissions:
   contents: read
 
+# A RELEASE WAITS FOR GREEN (QA audit 2026-10-16, P2-02, P6-01, S9-04). The v4.0.0 tag published
+# here 95 seconds after CI started on the same commit, and that CI run ended red. The gate job
+# below refuses unless the tagged commit is on main, the tag names the version server.json and
+# aimeat/package.json carry, and CI and the nightly E2E sweep each have a green run of that exact
+# commit (aimeat/scripts/release-ready.mjs). When the nightly has not run on the commit yet, start
+# "E2E full sweep" for it from the Actions tab and re-run this workflow once it is green.
 jobs:
-  publish:
+  release-gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read # read the CI and nightly runs of the tagged commit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: The tag names the version the manifests carry
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          SERVER="$(jq -r .version server.json)"
+          PKG="$(jq -r .version aimeat/package.json)"
+          echo "tag=$TAG server.json=$SERVER aimeat/package.json=$PKG"
+          if [ "$TAG" != "$SERVER" ] || [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag v$TAG does not match server.json ($SERVER) and aimeat/package.json ($PKG). Bump both, commit, then tag."
+            exit 1
+          fi
+
+      - name: CI and the nightly sweep are green on the tagged commit, and it is on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node aimeat/scripts/release-ready.mjs --sha="$GITHUB_SHA" --require=ci.yml,e2e-full.yml
+
+  publish:
+    needs: release-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -27,9 +63,7 @@ jobs:
         env:
           MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
         run: ./mcp-publisher login dns --domain aimeat.io --private-key "$MCP_PRIVATE_KEY"
-      - name: Set version from tag
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+      # The gate job proved the tag equals server.json's version, so the manifest publishes as
+      # committed; nothing rewrites it here.
       - name: Publish
         run: ./mcp-publisher publish

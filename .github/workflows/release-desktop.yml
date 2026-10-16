@@ -34,7 +34,34 @@ permissions:
   contents: read
 
 jobs:
+  # A RELEASE WAITS FOR GREEN (QA audit 2026-10-16, P2-02, S9-04). The installers carry the node server and feed the
+  # updater, and they were built and published with no test of the tagged commit: desktop-check.yml
+  # ran beside the release and nothing waited for it. A desktop release commit bumps
+  # tauri.conf.json, so desktop-check.yml has a run of it; ci.yml and the nightly sweep are the node.
+  # On a tag the job refuses unless the commit is on main and each workflow named below has a green
+  # run of that exact commit (aimeat/scripts/release-ready.mjs); a run by hand (workflow_dispatch)
+  # publishes nothing, so it passes without asking.
+  release-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read # read the runs of the tagged commit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: The tagged commit is on main and green in ci.yml,e2e-full.yml,desktop-check.yml
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node aimeat/scripts/release-ready.mjs --sha="$GITHUB_SHA" --require=ci.yml,e2e-full.yml,desktop-check.yml
+
   build:
+    needs: release-gate
+    timeout-minutes: 90
     strategy:
       # Every platform runs to the end even when another fails, so one run shows every failure.
       fail-fast: false

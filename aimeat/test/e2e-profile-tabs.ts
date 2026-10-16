@@ -8,6 +8,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=profile-tabs
  * @version-history
+ *   v1.2.2 — 2026-10-16 — Deleting a board post: the author deletes and the post is gone on read,
+ *     another owner's agent and a sibling are refused with 403 and the post stays, the board owner
+ *     may delete another agent's post. The old test accepted 200, 403 or 500 (QA audit F7c-05).
  *   v1.2.1 — 2026-10-12 — The two catalogue services are published with toll_morsels, which node 4.0.0
  *     takes in place of the refused price_morsels (MORSEL_PRICE_REMOVED) and 3.x reads the same, so
  *     the work lifecycle tests no longer cascade. The agent's standard scopes include agent:read,
@@ -1059,12 +1062,43 @@ await test('POST /v1/boards/:id/posts/:pid/react — react to post', async () =>
     assert(body.ok === true, `react: ${JSON.stringify(body.error)}`);
 });
 
-await test('DELETE /v1/boards/:id/posts/:pid — delete own post', async () => {
+// Deleting a post: only its author or the board's owner may, and a deleted post is gone on read. The
+// one test here accepted 200, 403 and 500 with no read-back, so a crash, a refusal of the author or
+// another agent's delete all stayed green (QA audit 2026-10-16, F7c-05).
+const postIdsOf = async (): Promise<string[]> => {
+    const { body } = await authJson(`/v1/boards/${boardId}/posts`, agentToken);
+    const posts = (body.data?.posts || body.data || []) as Array<{ id?: string; post_id?: string }>;
+    return posts.map(p => p.post_id || p.id || '');
+};
+
+await test('DELETE /v1/boards/:id/posts/:pid — another owner\'s agent and a sibling agent are refused, and the post stays', async () => {
+    if (!boardId || !postId) { assert(false, 'no board/post id'); return; }
+    for (const [who, token] of [['another owner\'s agent', agent2Token], ['a sibling agent that neither wrote it nor owns the board', agent3Token]] as const) {
+        const { status, body } = await authJson(`/v1/boards/${boardId}/posts/${postId}`, token, { method: 'DELETE' });
+        assert(status === 403 && body.error?.code === 'ACCESS_DENIED', `${who}: expected 403 ACCESS_DENIED, got ${status} ${JSON.stringify(body.error)}`);
+    }
+    assert((await postIdsOf()).includes(postId), 'the post is still on the board after the refused deletes');
+});
+
+await test('DELETE /v1/boards/:id/posts/:pid — the author deletes its own post, and it is gone on read', async () => {
     if (!boardId || !postId) { assert(false, 'no board/post id'); return; }
     const { status, body } = await authJson(`/v1/boards/${boardId}/posts/${postId}`, agentToken, { method: 'DELETE' });
-    // May fail with scope error if agent doesn't have social:write
-    assert(body.ok === true || status === 403 || status === 500, `delete post: status ${status}: ${JSON.stringify(body.error)}`);
-    if (status !== 200) console.log(`    (post delete: status ${status} — ${body.error?.code || 'unknown'})`);
+    assert(status === 200 && body.data?.deleted === true, `delete own post: ${status} ${JSON.stringify(body.error)}`);
+    assert(!(await postIdsOf()).includes(postId), 'the deleted post is still listed');
+    const again = await authJson(`/v1/boards/${boardId}/posts/${postId}`, agentToken, { method: 'DELETE' });
+    assert(again.status === 404, `a second delete finds nothing: ${again.status}`);
+});
+
+await test('DELETE /v1/boards/:id/posts/:pid — the board owner may delete another agent\'s post', async () => {
+    if (!boardId) { assert(false, 'no board id'); return; }
+    const made = await authJson(`/v1/boards/${boardId}/posts`, agent3Token, {
+        method: 'POST', body: JSON.stringify({ title: 'Sibling post', body: 'Written by the sibling agent' }),
+    });
+    assert(made.body.ok === true, `the sibling posts on the shared board: ${made.status} ${JSON.stringify(made.body.error)}`);
+    const siblingPost = made.body.data?.post_id || made.body.data?.id || '';
+    const { status, body } = await authJson(`/v1/boards/${boardId}/posts/${siblingPost}`, agentToken, { method: 'DELETE' });
+    assert(status === 200 && body.data?.deleted === true, `board owner deletes: ${status} ${JSON.stringify(body.error)}`);
+    assert(!(await postIdsOf()).includes(siblingPost), 'the post the board owner deleted is still listed');
 });
 
 // ══════════════════════════════════════════════════════════════════
