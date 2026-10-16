@@ -10,6 +10,7 @@
  *   resource allowlist and the whole outbound policy chain are the node's answer here too. Nothing
  *   in this file decides anything.
  * @version-history
+ *   2026-10-16 — aimeat_mail_send forwards locale, image_url and image_alt to POST /v1/outbound/send.
  *   2026-10-15 — aimeat_connection_history (GET /v1/connections/attempts) and aimeat_connection_replies
  *     (POST /v1/connections/attempts/:id/replies); aimeat_connection_start forwards account.
  *   2026-10-08 — aimeat_mail_send sends ai_provenance_id inside ai_disclosure (aiprov D9).
@@ -180,6 +181,9 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
             const provId = optionalString(input, 'ai_provenance_id');
             if (disc) body.ai_disclosure = provId ? { level: disc, provenance_id: provId } : disc;
             const theme = optionalString(input, 'theme'); if (theme) body.theme = theme;
+            const locale = optionalString(input, 'locale'); if (locale) body.locale = locale;
+            const imageUrl = optionalString(input, 'image_url'); if (imageUrl) body.image_url = imageUrl;
+            const imageAlt = optionalString(input, 'image_alt'); if (imageAlt) body.image_alt = imageAlt;
             return refuseUnsentSend(await client.post('/v1/outbound/send', body));
         },
     },

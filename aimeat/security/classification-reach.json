@@ -1843,6 +1843,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's own template and theme, sent by the owner; a person's own content is theirs to send."
     },
+    "src/services/outbound/sender-identity.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-16, the node's own read: the sender's own footer record (outbound.sender), or a company's (outbound.sender.<company id>) read from the company owner's memory only after resolveSendingCompany admitted the caller. Every field passes validateSender (single-line, capped, privacy_url https) and is escaped where rendered; the value is the business's own public identity, printed in its own marketing mail."
+    },
     "src/services/own-key-coverage.ts": {
       "reads": {
         "getMemory": 2

@@ -24,6 +24,9 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-10-16 — A campaign email carries the sender footer from the owner's (or the company's)
+ *     outbound.sender record, a lead image, the send's locale, and on marketing the List-Unsubscribe
+ *     and List-Unsubscribe-Post headers; an unusable lead image is refused as INVALID_IMAGE.
  *   2026-10-16 — sendOutbound takes the contact by any id an address-book surface hands out: the
  *     record id, `mail:<record id>` (aimeat_contact_add, aimeat_contact_list) or the identity a person
  *     was linked to (resolveOwnContact). The send looked up the bare record id only, so the id the
@@ -88,7 +91,9 @@ import { isValidEmail } from '../../utils/email-validator.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { MAIL_PREFIX } from '../local-identity.js';
 import { getStream } from '../signals/signal-service.js';
-import { renderCampaignEmail } from './campaign-email.js';
+import { renderCampaignEmail, listUnsubscribeHeaders } from './campaign-email.js';
+import { safeHttpsUrl } from './campaign-markup.js';
+import { loadSenderIdentity } from './sender-identity.js';
 import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
 import { disclosureHeaders, isDeclared, type AiDisclosure } from './ai-disclosure.js';
 import { provenanceForWrite, storeHeldProvenance } from '../ai-provenance.js';
@@ -426,6 +431,10 @@ export interface SendInput {
    */
   signalStreamId?: string;
   signalSubject?: string;
+  /** The language of the layout's own words (unsubscribe, footer): fi (default), en or es. */
+  locale?: string;
+  /** One picture across the top of the card: an https address and the alt text, both required. */
+  image?: { url: string; alt: string };
 }
 
 /** A send that went out. Every other outcome is thrown, so there is no other status to return. */
@@ -490,6 +499,10 @@ async function resolveMailbox(
  * is returned. A refusal or a failure throws OutboundError, and one that wrote a row names it.
  */
 export async function sendOutbound(config: AimeatConfig, storage: Storage, ownerGhii: string, input: SendInput): Promise<SendResult> {
+  // A lead image the caller named but that cannot be shown is a mistake in the request, refused before anything is counted or logged.
+  if (input.image && !(safeHttpsUrl(input.image.url) && input.image.alt?.trim())) {
+    throw new OutboundError('INVALID_IMAGE', 400, 'The lead image needs an https address and alt text (image_url and image_alt).');
+  }
   // The account's send allowance, here rather than on a route, so POST /v1/outbound/send, the MCP
   // tool aimeat_mail_send and a contact message draw on one count for the owner and all their agents
   // (services/account-limits.ts; secaudit 2026-10, C5). Asked before anything is written.
@@ -682,14 +695,22 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
       // owner can call their house style 'clean' if they want to. An id that matches nothing is the
       // default rather than a refusal — see email-theme.ts on why decoration never fails a send.
       const theme = resolveTheme(input.theme, await loadOwnTheme(storage, ownerGhii, input.theme));
+      // The footer's sender: the company's record when a company speaks, else the caller's own (sender-identity.ts).
+      const { sender: senderIdentity } = await loadSenderIdentity(storage, ownerGhii, sender);
       const { html, text } = renderCampaignEmail({
-        subject, body, kind: input.kind, unsubscribeUrl, theme,
+        subject, body, kind: input.kind, unsubscribeUrl, theme, sender: senderIdentity,
         ...(input.links ? { links: input.links } : {}),
         ...(input.fromName ? { brand: input.fromName } : {}),
         ...(trackingUrl ? { trackingUrl } : {}),
+        ...(input.locale ? { locale: input.locale } : {}),
+        ...(input.image ? { image: input.image } : {}),
       });
-      // One place, three paths. Empty when nothing was declared, and then nothing is added.
-      const extraHeaders = disclosureHeaders(aiDisclosure, config);
+      // One place, three paths. Empty when nothing was declared, and then nothing is added. A
+      // marketing message adds the RFC 2369 / 8058 unsubscribe pair (Graph drops it, see send-mail.ts).
+      const extraHeaders = {
+        ...disclosureHeaders(aiDisclosure, config),
+        ...(input.kind === 'marketing' ? listUnsubscribeHeaders(unsubscribeUrl) : {}),
+      };
       // THE ORDER IS THE FEATURE. The caller's own mailbox first, then the company's server, then
       // the node's shared sender. A message a person sends is theirs, and it should look like it in
       // the recipient's inbox and in their own Sent folder; a company's server is the next best

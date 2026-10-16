@@ -10,6 +10,7 @@
  * @structure WorkflowsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
+ *   v2.3.0 -- 2026-10-16 -- The menu find opens one workflow here (useOpenItem, js/open-item.js).
  *   v2.2.0 -- 2026-10-16 -- A failed load is drawn as one (itemsFailed: the could-not-load note with
  *     Retry), never as "no workflows" (QA audit F6-05).
  *   v2.1.0 -- 2026-09-25 -- The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
@@ -32,6 +33,7 @@ import { useConfirm } from '/components/Modal.js';
 import { listAgents } from '/js/services/agents.js';
 import * as wf from '/js/services/workflows.js';
 import { swallowed } from '/js/swallowed.js';
+import { useOpenItem } from '/js/open-item.js';
 import { useLoadState } from '/js/load-state.js';
 import { c, loc, observedWords } from './workflows/frame.js';
 import { renderWorkflowsView } from './workflows/cover.js';
@@ -137,6 +139,8 @@ export default function WorkflowsTab({ showToast }) {
       f.steps.forEach(s => s.agent && loadOffers(s.agent));
     }
   }, [itemById, loadDetail, loadRun, agents.length]);   // eslint-disable-line react-hooks/exhaustive-deps -- loadOffers is declared below and stable in effect
+  // The menu find opens one workflow (js/open-item.js).
+  useOpenItem('workflows', (id) => pickView({ kind: 'detail', id }), !loading);
 
   const setFold = (k, open) => setFolds(f => ({ ...f, [k]: open }));
 

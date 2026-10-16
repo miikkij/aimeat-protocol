@@ -6,6 +6,7 @@
  *   connected, how to start one, and reading and sending through a connected mailbox.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-16 — aimeat_mail_send takes locale, image_url and image_alt, and its body and kind descriptions name the formatting vocabulary and the sender footer.
  *   2026-10-16 — aimeat_connection_history and aimeat_connection_replies reach the owner's published
  *     items on connections:read-as-owner, and the replies read allows one pass per run of an agent the
  *     owner set up for it (Jouni, 2026-10-16).
@@ -176,12 +177,15 @@ export const connectionTools = [
         input: {
             contact_id: { type: 'string', required: true, description: 'A saved recipient. Never a free address.' },
             subject: { type: 'string', required: true, description: 'The subject line.' },
-            body: { type: 'string', required: true, description: 'The message as plain text; the server renders and escapes it.' },
+            body: { type: 'string', required: true, description: "The message as plain text; the server renders and escapes it, and no HTML you write reaches the mail. A blank line starts a paragraph. A small formatting vocabulary is read: '## ' or '### ' at the start of a line is a heading, '- ' at the start of a line is a bullet, '---' alone on a line is a divider, **bold**, and [label](https://address) is a link (https only; any other address stays plain text)." },
             connection_id: { type: 'string', description: 'Send through this connected mailbox of yours.' },
             from_alias: { type: 'string', description: 'A verified alias of that mailbox to send as.' },
-            kind: { type: 'string', description: "'transactional' (default) or 'marketing', which an opt-out blocks and which carries the unsubscribe link.", zod: z.enum(['transactional', 'marketing']) },
+            kind: { type: 'string', description: "'transactional' (default) or 'marketing', which an opt-out blocks and which carries the unsubscribe link and the List-Unsubscribe headers a mail program turns into its own unsubscribe button. When your owner keeps a sender record (memory key outbound.sender: legal_name, business_id, address, privacy_url, reason), a marketing message also carries a footer with who sends it, why the reader gets it and the privacy notice.", zod: z.enum(['transactional', 'marketing']) },
             reply_to: { type: 'string', description: 'Where a reply should go, when it is not the sending address.' },
             theme: { type: 'string', description: "Optional: what the message LOOKS like. A built-in id (clean, space, warm, paper) or one of the owner's own, and theirs wins where both exist. 'clean' is the default and is what went out before themes existed, so a send that names nothing looks exactly as it always did. An id that matches nothing falls back to the default rather than failing — decoration never refuses a send. Read the list, already validated, from GET /v1/outbound/themes." },
+            locale: { type: 'string', description: "Optional: the language of the words the layout adds itself (the unsubscribe link, the sender footer): 'fi' (default), 'en' or 'es'. Your own text is sent as you wrote it.", zod: z.enum(['fi', 'en', 'es']) },
+            image_url: { type: 'string', description: 'Optional: one picture across the top of the message, by its https address. Needs image_alt; without it the send is refused (INVALID_IMAGE).', zod: z.string().max(600) },
+            image_alt: { type: 'string', description: 'The words a reader sees when their mail program blocks the picture, which most do until they allow it. Required with image_url.', zod: z.string().max(200) },
             ai_disclosure: { type: 'string', description: "Optional: mark the message as machine-written in a header. One of none | ai-assisted | ai-generated | autonomous. If YOU wrote the body, declare it — 'ai-generated' when you produced the text, 'ai-assisted' when a person wrote it and you edited. It goes in a HEADER and not in the text, because the audience for it is machines: nobody reading their inbox follows a link to a hash. Declaring it and then asking for it to be left out is not possible.", zod: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']) },
             ai_provenance_id: { type: 'string', description: "Optional, with ai_disclosure: a provenance record of your own that describes this text, the id the node returned when it generated it for you. The header then links that record. A record that is not yours is not attached; the node stamps the message itself instead.", zod: z.string().max(80) },
         },

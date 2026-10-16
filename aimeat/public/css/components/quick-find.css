@@ -6,6 +6,8 @@
  *   keys, and the places in named groups, the chosen one on the dim ground inside a hairline. Colours
  *   from the style, the corner from the theme; a group's name is the row label (poster.css).
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The snippet is shown whole (no 2.6em cut), in the body colour; an item's ids
+ *     on a typewriter line (`quick-find-meta`); the list may take 60vh.
  *   v1.0.1 — 2026-10-15 — The finder takes the width of the box it stands in instead of a 40rem
  *     minimum, which made the "Search everything" dialog scroll sideways.
  *   v1.0.0 — 2026-09-27 — Initial: the values of profile.css .cmdk* (the command palette), under the
@@ -31,7 +33,7 @@
 }
 
 .quick-find-list {
-  max-height: 50vh;
+  max-height: 60vh;
   overflow: auto;
   margin-top: 0.2rem;
 }
@@ -61,12 +63,21 @@
   border-color: var(--border);
 }
 
-.quick-find-label { font-size: 0.9rem; font-weight: 600; }
-.quick-find-sub { font-size: 0.75rem; color: var(--muted); }
+.quick-find-label { font-size: 0.95rem; font-weight: 600; overflow-wrap: anywhere; }
+.quick-find-sub { font-size: 0.78rem; color: var(--text-dim); overflow-wrap: anywhere; }
+/* The found words in their sentence, whole: the server sends a short window around them, and the
+   finder shows all of it (a cut at 2.6em left a second line half drawn; Jouni, 2026-10-16). */
 .quick-find-snippet {
-  font-size: 0.76rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+/* The ids that address the place (a key, a workspace id), quiet and copyable. */
+.quick-find-meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   color: var(--text-dim);
   overflow-wrap: anywhere;
-  max-height: 2.6em;
-  overflow: hidden;
+  user-select: text;
 }
