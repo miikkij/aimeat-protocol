@@ -11,6 +11,8 @@
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.7.0 — 2026-10-17 — SERVED_FONT_FAMILIES takes Newsreader (aimeat-fonts.css v1.5.0), the
+ *     kirjapaino look's text face, so a look and a layout may name it in --ak-font.
  *   v1.6.0 — 2026-10-09 — SERVED_FONT_FAMILIES takes IBM Plex Sans and IBM Plex Mono (aimeat-fonts.css v1.4.0).
  *   v1.5.0 — 2026-10-03 — servedFontFamilies(): the base list and the faces the operator added to the
  *     running node (the font manager); unservedFirstFamily() reads it, so the bench accepts an added face.
@@ -38,6 +40,7 @@ export const SERVED_FONT_FAMILIES: readonly string[] = [
   'Mona Sans', 'Hubot Sans', 'Geist Mono', 'Martian Mono',
   'Press Start 2P', 'Selawik',
   'IBM Plex Sans', 'IBM Plex Mono',
+  'Newsreader',
 ];
 
 /** Faces a browser has without a download, and the generic keywords. Lower case. */

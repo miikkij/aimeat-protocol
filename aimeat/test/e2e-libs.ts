@@ -5,6 +5,7 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.13.5 — 2026-10-17 — The kirjapaino look's block is among the presets the served looks.css must carry.
  *   2026-10-15 — wallet.request: a second ask the same day is refused with ALREADY_GRANTED_TODAY; the two
  *     tests that asked repeatedly up to the cap pinned the defect (feature-list audit 135).
  *   v1.13.4 — 2026-10-12 — The work-test action is published with its pacing amount as
@@ -1243,7 +1244,7 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     const looksCss = withoutComments(looksText);
     for (const preset of ['flat', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster',
         'broadsheet', 'gallery', 'brutalist', 'terminal', 'aurora', 'carnival', 'billboard',
-        'riso', 'stage', 'broadcast', 'lounge', 'dawn', 'workbench']) {
+        'riso', 'stage', 'broadcast', 'lounge', 'dawn', 'workbench', 'kirjapaino']) {
         assert(looksCss.includes(`[data-ak-look='${preset}']`), `the ${preset} preset block must exist`);
         assert(looksText.includes(`@preset-block ${preset}`), `the ${preset} preset must carry its @preset-block tag`);
     }

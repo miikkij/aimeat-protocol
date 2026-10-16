@@ -11,7 +11,8 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | Archivo Black | v23 (400, the only cut) | `archivo-black-latin.woff2`, `archivo-black-latin-ext.woff2` | © Omnibus-Type (https://www.omnibus-type.com) | https://fonts.google.com/specimen/Archivo+Black |
 | Archivo | v23 (variable wght 400–700) | `archivo-var-latin.woff2`, `archivo-var-latin-ext.woff2` | © Omnibus-Type (https://www.omnibus-type.com) | https://fonts.google.com/specimen/Archivo |
 | Space Grotesk | v22 (variable wght 300–700) | `space-grotesk-var-latin.woff2`, `space-grotesk-var-latin-ext.woff2` | © Florian Karsten (https://floriankarsten.com) | https://fonts.google.com/specimen/Space+Grotesk |
-| Fraunces | v38 (variable opsz 9–144, wght 100–900) | `fraunces-var-latin.woff2`, `fraunces-var-latin-ext.woff2` | © The Fraunces Project Authors (https://github.com/undercasetype/fraunces) | https://fonts.google.com/specimen/Fraunces |
+| Fraunces | v38 (variable opsz 9–144, wght 100–900; roman and italic) | `fraunces-var-latin.woff2`, `fraunces-var-latin-ext.woff2`, `fraunces-italic-var-latin.woff2`, `fraunces-italic-var-latin-ext.woff2` | © The Fraunces Project Authors (https://github.com/undercasetype/fraunces) | https://fonts.google.com/specimen/Fraunces |
+| Newsreader | v26 (variable opsz 6–72, wght 200–800; roman and italic) | `newsreader-var-latin.woff2`, `newsreader-var-latin-ext.woff2`, `newsreader-italic-var-latin.woff2`, `newsreader-italic-var-latin-ext.woff2` | © 2020 The Newsreader Project Authors (https://github.com/productiontype/Newsreader) | https://fonts.google.com/specimen/Newsreader |
 | JetBrains Mono | v24 (variable wght 100–800) | `jetbrains-mono-var-latin.woff2`, `jetbrains-mono-var-latin-ext.woff2` | © The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono) | https://fonts.google.com/specimen/JetBrains+Mono |
 | Fjalla One | v16 (400, the only cut) | `fjalla-one-latin.woff2`, `fjalla-one-latin-ext.woff2` | © Sorkin Type (https://www.sorkintype.com) | https://fonts.google.com/specimen/Fjalla+One |
 | DM Sans | v17 (variable opsz 9–40, wght 100–1000) | `dm-sans-var-latin.woff2`, `dm-sans-var-latin-ext.woff2` | © Colophon Foundry (https://www.colophon-foundry.org), Indian Type Foundry | https://fonts.google.com/specimen/DM+Sans |
@@ -60,3 +61,12 @@ Selawik is Microsoft's open-source face built with the metrics of Segoe UI; the 
 are the ones in `Selawik_Release.zip` of its 1.01 release, unchanged and renamed by weight
 (`selawkl` 300, `selawksl` 350, `selawk` 400, `selawksb` 600, `selawkb` 700). Both carry a Reserved
 Font Name, which binds only someone who modifies the font.
+
+Newsreader and the Fraunces italic vendored 2026-10-17 for the kirjapaino look, the printed-letter
+design Jouni chose for the AIMEAT newsletter (Fraunces for display, Newsreader for text). Both are
+Google Fonts' latin and latin-ext subsets, unchanged; Google serves each style of both as one
+variable file, so the look's 400, 600 and italic 400 come from those files. The Fraunces italic is
+the v38 file that matches the roman already here (the roman files are byte-identical to Google's
+v38). Newsreader's licence was read from its upstream repository
+(https://github.com/productiontype/Newsreader/blob/master/OFL.txt): SIL OFL 1.1, copyright 2020 The
+Newsreader Project Authors, no Reserved Font Name.

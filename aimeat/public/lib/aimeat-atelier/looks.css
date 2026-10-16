@@ -1110,3 +1110,155 @@
   --ak-ink-dim:    #a4abbc;
   --ak-line:       #353c4e;
 }
+
+/* @preset-block kirjapaino — a printed letter: black ink on warm paper, a Fraunces masthead over a double rule, Newsreader to read, square corners, one accent mark used sparingly, and the paper stays paper in dark mode.
+   The printed-letter world Jouni chose for the AIMEAT newsletter on 2026-10-16: paper and ink that stay the same in dark mode, Fraunces for the masthead and titles, Newsreader for text, square corners, no shadow and no gradient. The press-rule structure draws the double rule under the bar and the hero and makes the loud action an ink slab; the accent is the palette's, or a Book look part's pair (the design's vermilion is #b3321c), and it is meant for one mark per screen. */
+[data-ak-look='kirjapaino'] {
+  --ak-font-display:      Fraunces, Georgia, 'Times New Roman', serif;
+  --ak-font:              Newsreader, Georgia, 'Times New Roman', serif;
+  --ak-weight-display:    600;
+  --ak-text-hero:         clamp(2.25rem, 5.2vw, 4.125rem);
+  --ak-radius:            0px;
+  --ak-radius-sm:         0px;
+  --ak-radius-pill:       0px;
+  --ak-line-w:            1px;
+  --ak-elev-1:            none;
+  --ak-elev-2:            none;
+  --ak-surface-image:     none;
+  --ak-page-image:        none;
+  --ak-hero-image:        none;
+  --ak-grain:             none;
+  --ak-glass:             var(--ak-bg);
+  --ak-blur:              0px;
+  --ak-display-shadow:    none;
+  --ak-display-stroke:    0;
+  --ak-tilt:              0deg;
+  --ak-grad:              linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
+  --ak-accent-text:       color-mix(in oklab, var(--ak-accent) 74%, var(--ak-ink));
+  --ak-ok-text:           color-mix(in oklab, var(--ak-ok) 42%, var(--ak-ink));
+  --ak-warn-text:         color-mix(in oklab, var(--ak-warn) 36%, var(--ak-ink));
+  --ak-err-text:          color-mix(in oklab, var(--ak-err) 42%, var(--ak-ink));
+  --ak-focus:             var(--ak-ink);
+  --ak-enter-distance:    0px;
+  --ak-enter-stagger:     50ms;
+  --ak-motion:            var(--motion-slow, 320ms);
+  --ak-ambient:           none;
+  --ak-spring-stiffness:  120;
+  --ak-spring-damping:    26;
+  --ak-spring-mass:       1;
+  --ak-bg:                #e9e2d4;
+  --ak-surface:           #f3eee4;
+  --ak-surface-2:         #fbf8f2;
+  --ak-ink:               #16130f;
+  --ak-ink-dim:           #5a5247;
+  --ak-line:              #16130f;
+  --ak-hero-ink:          var(--ak-ink);
+  --ak-hero-ink-dim:      var(--ak-hero-ink);
+  --ak-scrim:             color-mix(in oklab, var(--ak-bg) 78%, transparent);
+  --ak-kinetic:           none;
+}
+/* @preset-block kirjapaino@dark — the world's dark ground (layered by the dark cascade). */
+[data-theme='dark'] [data-ak-look='kirjapaino'], [data-ak-look='kirjapaino'][data-theme='dark'] {
+  --ak-bg:           #e9e2d4;
+  --ak-surface:      #f3eee4;
+  --ak-surface-2:    #fbf8f2;
+  --ak-ink:          #16130f;
+  --ak-ink-dim:      #5a5247;
+  --ak-line:         #16130f;
+  --ak-accent-text:  color-mix(in oklab, var(--ak-accent) 46%, var(--ak-ink));
+  --ak-grad:         linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 80%, var(--ak-bg)), color-mix(in oklab, var(--ak-accent) 80%, var(--ak-bg)));
+}
+/* structure: press-rule — The PRINTED LETTER: the bar and the hero are a masthead on the paper with the double rule under each (3 px of ink, a gap, 1 px of ink), cards are paper ruled in ink, lists are rows between rules, a field is one ink underline, the loud action is an ink slab with paper words, and the page keeps light form controls in dark mode. */
+[data-ak-look='kirjapaino'] { color-scheme: light; }
+[data-ak-look='kirjapaino'] .ak-app__bar {
+  background: var(--ak-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: 0;
+  box-shadow: none;
+  padding-bottom: 16px;
+}
+[data-ak-look='kirjapaino'] .ak-app__bar::after,
+[data-ak-look='kirjapaino'] .ak-hero:not(.ak-hero--image)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  box-sizing: border-box;
+  border-top: 3px solid var(--ak-ink);
+  border-bottom: 1px solid var(--ak-ink);
+  pointer-events: none;
+}
+[data-ak-look='kirjapaino'] .ak-app__bar::after { left: var(--ak-pad); right: var(--ak-pad); }
+[data-ak-look='kirjapaino'] .ak-app__title { letter-spacing: 0.01em; }
+[data-ak-look='kirjapaino'] .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  overflow: visible;
+}
+[data-ak-look='kirjapaino'] .ak-hero:not(.ak-hero--image)::before,
+[data-ak-look='kirjapaino'] .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+[data-ak-look='kirjapaino'] .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: calc(var(--ak-pad) * 1.5) 0 calc(var(--ak-pad) * 1.5 + 8px); }
+[data-ak-look='kirjapaino'] .ak-hero:not([data-ak-variant]) { --ak-hero-title-size: var(--ak-text-hero); }
+[data-ak-look='kirjapaino'] .ak-hero__title { line-height: 1.04; letter-spacing: -0.015em; }
+[data-ak-look='kirjapaino'] .ak-hero__title em, [data-ak-look='kirjapaino'] .ak-hero__title i { font-style: italic; font-weight: 400; }
+[data-ak-look='kirjapaino'] .ak-hero__sub { font-size: clamp(1.125rem, 1.6vw, 1.3rem); line-height: 1.5; max-width: 38rem; }
+[data-ak-look='kirjapaino'] .ak-hero__before {
+  font-family: var(--ak-font);
+  letter-spacing: 0.2em;
+  color: var(--ak-accent-text);
+}
+[data-ak-look='kirjapaino'] .ak-section {
+  border: var(--ak-line-w) solid var(--ak-ink);
+  box-shadow: none;
+}
+[data-ak-look='kirjapaino'] .ak-section__title { line-height: 1.15; }
+[data-ak-look='kirjapaino'] .ak-statrow { gap: 0; border-top: var(--ak-line-w) solid var(--ak-ink); border-bottom: var(--ak-line-w) solid var(--ak-ink); }
+[data-ak-look='kirjapaino'] .ak-statrow__tile {
+  border: 0;
+  border-right: var(--ak-line-w) solid var(--ak-ink);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+[data-ak-look='kirjapaino'] .ak-statrow__tile:last-child { border-right: 0; }
+[data-ak-look='kirjapaino'] .ak-list { gap: 0; }
+[data-ak-look='kirjapaino'] .ak-list__row {
+  border: 0;
+  border-top: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding-inline: 0;
+}
+[data-ak-look='kirjapaino'] .ak-list__row:last-child { border-bottom: var(--ak-line-w) solid var(--ak-line); }
+[data-ak-look='kirjapaino'] .ak-btn { border-color: var(--ak-ink); }
+[data-ak-look='kirjapaino'] .ak-btn--primary {
+  background: var(--ak-ink);
+  color: var(--ak-surface);
+  border-color: var(--ak-ink);
+  box-shadow: none;
+  font-family: var(--ak-font-display);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+[data-ak-look='kirjapaino'] .ak-btn--primary:hover { filter: none; background: color-mix(in oklab, var(--ak-ink) 86%, var(--ak-bg)); }
+[data-ak-look='kirjapaino'] .ak-input:not(.ak-input--range):not(.ak-input--area) {
+  border: 0;
+  border-bottom: 2px solid var(--ak-ink);
+  background: transparent;
+  padding-inline: 0;
+}
+[data-ak-look='kirjapaino'] .ak-input:focus-visible { outline: 2px solid var(--ak-ink); outline-offset: 4px; }
+[data-ak-look='kirjapaino'] .ak-form__label {
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+[data-ak-look='kirjapaino'] input[type='checkbox'], [data-ak-look='kirjapaino'] input[type='radio'] { accent-color: var(--ak-ink); }
+[data-ak-look='kirjapaino'] a { color: var(--ak-ink); text-underline-offset: 3px; }
+[data-ak-look='kirjapaino'] a:hover { color: var(--ak-accent-text); }
