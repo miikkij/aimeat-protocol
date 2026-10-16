@@ -7,6 +7,7 @@
  *   operator notification templates (NotificationTemplate, keyed by (templateId, locale)). The plain
  *   PushSubscription table lives in the node domain. Translated to match the Prisma provider.
  * @version-history
+ *   2026-10-16 — listNotificationTemplates by template id and locale, as on SQLite (QA audit D4-04).
  *   v1.0.0 — 2026-07-15 — Phase 5: notifications on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -115,7 +116,7 @@ export const notificationMethods = {
     return r;
   },
   async listNotificationTemplates(this: PostgresKyselyStorage): Promise<NotificationTemplateRecord[]> {
-    return (await this.db.selectFrom('NotificationTemplate').selectAll().execute()).map(toTemplate);
+    return (await this.db.selectFrom('NotificationTemplate').selectAll().orderBy('templateId').orderBy('locale').execute()).map(toTemplate);
   },
   async deleteAllNotificationTemplates(this: PostgresKyselyStorage): Promise<void> {
     await this.db.deleteFrom('NotificationTemplate').execute();

@@ -9,9 +9,13 @@
  *   stayed unread for longer than they chose, sent to the verified address on their account, at most
  *   once per new batch. Neither pass ever creates a notification; neither runs when the owner has
  *   not asked.
- * @structure sweepHeldPushes · sweepNotificationDigests · listOwnerNotifications (shared read)
+ * @structure sweepHeldPushes · sweepNotificationDigests · listOwnerNotificationRecords and
+ *   listOwnerNotifications (the shared owner-exact reads)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   2026-10-16 — The owner's notifications are read with listMemory on the owner's own identity, every row,
+ *     newest first; the 1000-row window in key order hid an owner's newest rows past 1000. The settings
+ *     scan reads every owner's record instead of the first 5000 (QA audit F13-01).
  *   v1.2.1 — 2026-09-26 — The held-push sweep takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-09-13 — The digest writes only its bookmark, on the record as it is when writing
  *     (updateNotificationSettings). It wrote back the whole record it read before sending the email,
@@ -21,7 +25,7 @@
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { MemoryRecord, Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
 import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
 import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, type NotificationSettings } from './notification-settings.js';
@@ -35,17 +39,34 @@ export interface StoredNotif { id: string; type: string; title: string; body: st
 
 /** Every settings record on the node, by owner: the owners who decided something. */
 async function ownersWithSettings(storage: Storage): Promise<Array<{ ghii: string; settings: NotificationSettings }>> {
-  const { items } = await storage.listAllMemory({ prefix: NOTIF_SETTINGS_KEY, limit: 5000 });
+  // Every owner who decided something, with no window: one record per owner, and a window in key
+  // order would have left out the owners past it (QA audit F13-01).
+  const { items } = await storage.listAllMemory({ prefix: NOTIF_SETTINGS_KEY });
   return items.filter(r => r.key === NOTIF_SETTINGS_KEY).map(r => ({ ghii: r.ownerGaii, settings: normalizeSettings(r.value) }));
+}
+
+/**
+ * Every stored notification of ONE owner, as whole memory records, newest first. Read on the owner's
+ * own identity with no window. A notification lives 90 days (services/notify.ts) and the TTL sweep
+ * removes it after that, so the set is bounded by what one owner received in 90 days.
+ *
+ * NO CROSS-OWNER WINDOW. The mark-read route listed the oldest 500 notification rows of the whole
+ * node and filtered to the caller, so on a node holding more than 500 it marked nothing and answered
+ * 200 with marked: 0; the list read took the owner's first 1000 rows in KEY order, which is oldest
+ * first, so an owner past 1000 never saw the newest (QA audit F13-01, the same defect the GET route
+ * had until 2026-07-18).
+ */
+export async function listOwnerNotificationRecords(storage: Storage, ghii: string): Promise<MemoryRecord[]> {
+  const rows = await storage.listMemory(ghii, { prefix: NOTIF_PREFIX });
+  return rows
+    .filter(r => r.value && typeof r.value === 'object' && (r.value as StoredNotif).id)
+    .sort((a, b) => ((b.value as StoredNotif).createdAt || '').localeCompare((a.value as StoredNotif).createdAt || ''));
 }
 
 /** One owner's stored notifications with their keys and versions, newest first. */
 export async function listOwnerNotifications(storage: Storage, ghii: string): Promise<Array<{ key: string; version: number; createdAt: string; value: StoredNotif }>> {
-  const { items } = await storage.listAllMemory({ prefix: NOTIF_PREFIX, ownerPrefix: ghii, limit: 1000 });
-  return items
-    .filter(r => r.ownerGaii === ghii && r.value && typeof r.value === 'object' && (r.value as StoredNotif).id)
-    .map(r => ({ key: r.key, version: r.version, createdAt: r.createdAt, value: r.value as StoredNotif }))
-    .sort((a, b) => (b.value.createdAt || '').localeCompare(a.value.createdAt || ''));
+  return (await listOwnerNotificationRecords(storage, ghii))
+    .map(r => ({ key: r.key, version: r.version, createdAt: r.createdAt, value: r.value as StoredNotif }));
 }
 
 /**

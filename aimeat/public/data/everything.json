@@ -786,10 +786,10 @@
      "slug": "g-5-files",
      "cells": [
       "<strong>Files</strong>",
-      "Upload in one go or in chunks, resume downloads, set visibility per file. Every file stops at the per-file size the operator sets, 10 MB by default, also when it arrives in chunks: the chunked upload (up to 5 GB) carries a large file only after the operator raises that size. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (<code>AIMEAT.storage</code>) or an AI (<code>aimeat_storage_upload</code>). A file you download cannot run as a page on the node's address.",
+      "Upload in one go or in chunks, resume downloads, set visibility per file. Every file stops at the per-file size the operator sets, 10 MB by default, also when it arrives in chunks: the chunked upload (up to 5 GB) carries a large file only after the operator raises that size. A chunked upload holds no more than one file may be, stays open six hours, completes only when every chunk has arrived, and one account keeps at most four open at a time. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (<code>AIMEAT.storage</code>) or an AI (<code>aimeat_storage_upload</code>). A file you download cannot run as a page on the node's address.",
       "<code>/v1/storage</code>, <code>aimeat_storage_*</code>"
      ],
-     "plain": "Files Upload in one go or in chunks, resume downloads, set visibility per file. Every file stops at the per-file size the operator sets, 10 MB by default, also when it arrives in chunks: the chunked upload (up to 5 GB) carries a large file only after the operator raises that size. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (AIMEAT.storage) or an AI (aimeat_storage_upload). A file you download cannot run as a page on the node's address. /v1/storage, aimeat_storage_*"
+     "plain": "Files Upload in one go or in chunks, resume downloads, set visibility per file. Every file stops at the per-file size the operator sets, 10 MB by default, also when it arrives in chunks: the chunked upload (up to 5 GB) carries a large file only after the operator raises that size. A chunked upload holds no more than one file may be, stays open six hours, completes only when every chunk has arrived, and one account keeps at most four open at a time. A file can be shared with a group or with the members of organism workspaces, in one piece or in chunks, from an app (AIMEAT.storage) or an AI (aimeat_storage_upload). A file you download cannot run as a page on the node's address. /v1/storage, aimeat_storage_*"
     },
     {
      "slug": "g-5-a-file-says-how-it-was-made",
@@ -1054,10 +1054,10 @@
      "slug": "g-6-organism-export-and-import",
      "cells": [
       "<strong>Organism export and import</strong>",
-      "Take an organism out as a bundle and bring it back: its settings and every workspace you can read, with records, documents, images and the rows of its row spaces. Any active member can export, and the bundle holds only what that member can read. Limits: one workspace's export reads at most 10 000 memory records, and at most as many rows as a workspace may hold; when it reaches a limit, the answer says so (<code>truncated</code>). An import refuses rows that would not fit the row quotas before it writes anything.",
+      "Take an organism out as a bundle and bring it back: its settings and every workspace you can read, with records, documents, images and the rows of its row spaces. Any active member can export, and the bundle holds only what that member can read. Limits: one workspace's export reads every memory record up to 200 000, and at most as many rows as a workspace may hold; when it reaches a limit, the answer says so (<code>truncated</code>). An import refuses rows that would not fit the row quotas before it writes anything.",
       "<code>aimeat_organism_export</code>, <code>aimeat_organism_import</code>"
      ],
-     "plain": "Organism export and import Take an organism out as a bundle and bring it back: its settings and every workspace you can read, with records, documents, images and the rows of its row spaces. Any active member can export, and the bundle holds only what that member can read. Limits: one workspace's export reads at most 10 000 memory records, and at most as many rows as a workspace may hold; when it reaches a limit, the answer says so (truncated). An import refuses rows that would not fit the row quotas before it writes anything. aimeat_organism_export, aimeat_organism_import"
+     "plain": "Organism export and import Take an organism out as a bundle and bring it back: its settings and every workspace you can read, with records, documents, images and the rows of its row spaces. Any active member can export, and the bundle holds only what that member can read. Limits: one workspace's export reads every memory record up to 200 000, and at most as many rows as a workspace may hold; when it reaches a limit, the answer says so (truncated). An import refuses rows that would not fit the row quotas before it writes anything. aimeat_organism_export, aimeat_organism_import"
     },
     {
      "slug": "g-6-knowledge-packages",
@@ -3207,10 +3207,10 @@
      "slug": "g-18-cross-node-work-and-settlement",
      "cells": [
       "<strong>Cross-node work and settlement</strong>",
-      "Morsel settlements between nodes are signed. Work requests do not cross nodes yet: the receiving node asks for a credential the sending node does not have. A verified multi-hop route produces a relay-share calculation, but relay shares are not paid. See the current <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/known_gaps.md#gap-001-relay-fee-shares-on-a-multi-hop-settlement-are-computed-and-paid-to-nobody\" target=\"_blank\" rel=\"noopener\">relay-payment limitation</a>.",
+      "Morsel settlements between nodes are signed. Work requests do not cross nodes yet: the receiving node asks for a credential the sending node does not have, so the request is refused there, the answer says so (<code>PEER_REFUSED</code>) and the routing fee is given back. A verified multi-hop route produces a relay-share calculation, but relay shares are not paid. See the current <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/known_gaps.md#gap-001-relay-fee-shares-on-a-multi-hop-settlement-are-computed-and-paid-to-nobody\" target=\"_blank\" rel=\"noopener\">relay-payment limitation</a>.",
       "<code>/v1/federation/settle</code>"
      ],
-     "plain": "Cross-node work and settlement Morsel settlements between nodes are signed. Work requests do not cross nodes yet: the receiving node asks for a credential the sending node does not have. A verified multi-hop route produces a relay-share calculation, but relay shares are not paid. See the current relay-payment limitation. /v1/federation/settle"
+     "plain": "Cross-node work and settlement Morsel settlements between nodes are signed. Work requests do not cross nodes yet: the receiving node asks for a credential the sending node does not have, so the request is refused there, the answer says so (PEER_REFUSED) and the routing fee is given back. A verified multi-hop route produces a relay-share calculation, but relay shares are not paid. See the current relay-payment limitation. /v1/federation/settle"
     },
     {
      "slug": "g-18-genesis-networks",

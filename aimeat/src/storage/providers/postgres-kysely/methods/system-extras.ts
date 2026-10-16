@@ -5,6 +5,7 @@
  * @description System prompts (SystemPrompt + SystemPromptVersion) and the federation replication queue
  *   (ReplicationQueue) for the Postgres+Kysely backend. Translated to match the Prisma provider.
  * @version-history
+ *   2026-10-16 — listSystemPrompts by group and name, as on SQLite (QA audit D4-04).
  *   v1.1.0 — 2026-10-16 — The replication queue answers as the SQLite provider does: a payload comes
  *     back decoded from its JSON text, the depth counts every row on the queue, and a prune also removes
  *     the rows already sent. Found when e2e-federation-settlements-sync first ran its nodes on
@@ -58,7 +59,7 @@ export const systemPromptMethods = {
   async listSystemPrompts(this: PostgresKyselyStorage, opts?: { group?: string }): Promise<SystemPromptRecord[]> {
     let q = this.db.selectFrom('SystemPrompt').selectAll();
     if (opts?.group) q = q.where('group', '=', opts.group);
-    return (await q.execute()).map(toPrompt);
+    return (await q.orderBy('group').orderBy('name').execute()).map(toPrompt);
   },
   async getSystemPrompt(this: PostgresKyselyStorage, id: string): Promise<SystemPromptRecord | null> {
     const r = await this.db.selectFrom('SystemPrompt').selectAll().where('id', '=', id).executeTakeFirst();

@@ -17,6 +17,8 @@
  *   searchTextMemory (+ its private FTS helpers) · archive/unarchive/countArchivedByKeyPrefix
  * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   2026-10-16 — LIVE_SQL and deleteExpiredMemory (QA audit D4-01, E4-01, D4-05); key prefixes are GLOB
+ *     patterns from storage/key-prefix.ts, literal and case-sensitive (QA audit D4-07).
  *   v2.1.1 — 2026-10-05 — The memory methods are in methods/memory.ts now (secaudit 2026-10, M8).
  *   v2.1.0 — 2026-09-08 — countMemoryWithOrigins, for the operator's CORS page.
  *   v2.0.0 — 2026-08-01 — Removed nine dead exports (getMemory, setMemory, listMemory, listAllMemory,
@@ -28,6 +30,7 @@
 import type Database from 'better-sqlite3';
 import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
 import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
+import { globPrefix } from '../../../key-prefix.js';
 
 /** SQL fragment (with leading ` AND`) restricting the `memory.archived` column by filter. Default
  *  `exclude` → active rows only. Shared by every bulk read so archived content stays out of the
@@ -49,6 +52,24 @@ import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/
  * have.
  */
 export const NOT_DELETED_SQL = ' AND deletedAt IS NULL';
+
+/**
+ * isMemoryExpired as a SQL condition (with a leading ` AND`), bound to one `?`: the ISO time of now.
+ * The cross-owner listings take it so their LIMIT, OFFSET and COUNT see live rows only, as the
+ * PostgreSQL twin does (QA audit D4-05). createdAt is an ISO-8601 string, which julianday() reads.
+ */
+export const LIVE_SQL = ' AND (ttlHours IS NULL OR ttlHours = 0 OR julianday(createdAt) + ttlHours / 24.0 >= julianday(?))';
+
+/**
+ * The TTL sweep: every row past its time to live, whoever owns it, in one statement. A hard delete,
+ * as the delete on read is. The cleanup job used to walk agents only and put their rows in the bin,
+ * so a person's own TTL records (notifications, 90 days) waited for a read (QA audit E4-01).
+ */
+export function deleteExpiredMemory(db: Database.Database, nowIso: string): number {
+  return db.prepare(
+    'DELETE FROM memory WHERE ttlHours IS NOT NULL AND ttlHours <> 0 AND julianday(createdAt) + ttlHours / 24.0 < julianday(?)'
+  ).run(nowIso).changes;
+}
 
 export function archivedSql(archived?: ArchiveFilter): string {
   const notDeleted = NOT_DELETED_SQL;
@@ -128,7 +149,7 @@ export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: 
   const placeholders = ownerGaiis.map(() => '?').join(',');
   let sql = `SELECT COUNT(DISTINCT key) AS c FROM memory WHERE ownerGaii IN (${placeholders})`;
   const params: unknown[] = [...ownerGaiis];
-  if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+  if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
   if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
   sql += archivedSql(opts?.archived);
   // NB: does not subtract not-yet-pruned TTL-expired rows (a stat-display approximation); the
@@ -152,8 +173,8 @@ function searchOneFts(db: Database.Database, ftsTable: string, match: string, op
     params.push(...opts.ownerGaiis);
   }
   if (opts?.keyPrefix) {
-    where.push('m.key LIKE ?');
-    params.push(opts.keyPrefix + '%');
+    where.push('m.key GLOB ?');
+    params.push(globPrefix(opts.keyPrefix));
   }
   if (opts?.visibility) {
     where.push('m.visibility = ?');
@@ -212,8 +233,8 @@ export function archiveMemoryByKey(db: Database.Database, keyOrPrefix: string, o
   let keyClause: string;
   const keyParams: unknown[] = [];
   if (match === 'exact') { keyClause = 'key = ?'; keyParams.push(keyOrPrefix); }
-  else if (match === 'subtree') { keyClause = '(key = ? OR key LIKE ?)'; keyParams.push(keyOrPrefix, keyOrPrefix + '.%'); }
-  else { keyClause = 'key LIKE ?'; keyParams.push(keyOrPrefix + '%'); }
+  else if (match === 'subtree') { keyClause = '(key = ? OR key GLOB ?)'; keyParams.push(keyOrPrefix, globPrefix(keyOrPrefix + '.')); }
+  else { keyClause = 'key GLOB ?'; keyParams.push(globPrefix(keyOrPrefix)); }
   const res = db.prepare(
     `UPDATE memory SET archived = 1, archivedAt = ?, archivedBy = ?, archivedRoot = ?
      WHERE ${keyClause} AND archived = 0`
@@ -236,8 +257,8 @@ export function unarchiveMemoryByKey(db: Database.Database, keyOrPrefix: string,
   let keyClause: string;
   const keyParams: unknown[] = [];
   if (match === 'exact') { keyClause = 'key = ?'; keyParams.push(keyOrPrefix); }
-  else if (match === 'subtree') { keyClause = '(key = ? OR key LIKE ?)'; keyParams.push(keyOrPrefix, keyOrPrefix + '.%'); }
-  else { keyClause = 'key LIKE ?'; keyParams.push(keyOrPrefix + '%'); }
+  else if (match === 'subtree') { keyClause = '(key = ? OR key GLOB ?)'; keyParams.push(keyOrPrefix, globPrefix(keyOrPrefix + '.')); }
+  else { keyClause = 'key GLOB ?'; keyParams.push(globPrefix(keyOrPrefix)); }
   const res = db.prepare(
     `UPDATE memory SET archived = 0, archivedAt = NULL, archivedBy = NULL, archivedRoot = NULL
      WHERE archived = 1 AND ${keyClause}`
@@ -251,7 +272,7 @@ export function countArchivedByKeyPrefix(db: Database.Database, keyPrefix: strin
     `SELECT
        SUM(CASE WHEN archived = 0 THEN 1 ELSE 0 END) AS active,
        SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) AS archived
-     FROM memory WHERE key LIKE ?`
-  ).get(keyPrefix + '%') as { active: number | null; archived: number | null };
+     FROM memory WHERE key GLOB ?`
+  ).get(globPrefix(keyPrefix)) as { active: number | null; archived: number | null };
   return { active: row.active ?? 0, archived: row.archived ?? 0 };
 }

@@ -17,6 +17,10 @@
  *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   2026-10-16 — The senders read lists the owner's own agents (getAgentsByOwner), not every agent (QA audit P7-10).
+ *   2026-10-16 — GET and POST /read read the caller's own notifications, every row, through
+ *     listOwnerNotificationRecords. POST /read listed the node's oldest 500 rows of all owners and
+ *     answered marked: 0 for every newer row; GET took the owner's first 1000 rows oldest first (QA audit F13-01).
  *   v1.7.0 -- 2026-09-25 -- GET serves a row's buttons only when the page may run them: an `api`
  *     button whose endpoint is not a door of this node's API, or a button of a kind the page does not
  *     know, is dropped from the answer and logged (services/notify.ts servableNotifActions).
@@ -51,7 +55,7 @@ import {
   readNotificationSettingsStrict, updateNotificationSettings, normalizeSettings, sourceOf, groupOfType, senderKey, prefsFor, readMailLog,
   NOTIF_GROUPS, type NotifSource, type NotificationSettings,
 } from '../services/notification-settings.js';
-import { listOwnerNotifications } from '../services/notification-sweeps.js';
+import { listOwnerNotifications, listOwnerNotificationRecords } from '../services/notification-sweeps.js';
 import { logger } from '../utils/logger.js';
 
 interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string; source?: NotifSource; i18n?: unknown; held?: boolean }
@@ -65,19 +69,14 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
    * fetched 500 rows across ALL owners. On the Kysely (prod) backend that orders by key
    * ASC (notification keys are `notif.<ISO>.<id>`, so ASC = oldest-first), so once the
    * node held >500 notifications total, the window was entirely OLD rows and every recent
-   * notification for every owner fell outside it — the bell silently froze. `ownerPrefix`
-   * restricts the query to THIS owner's rows (bounded by the 90-day TTL); the generous
-   * `limit` then returns effectively all of them regardless of each backend's ordering
-   * (Kysely key-ASC / SQLite updatedAt-DESC), and the JS sort-desc + slice(0,50) below
-   * yields the newest 50 with an accurate unread count. */
+   * notification for every owner fell outside it — the bell silently froze. The read is now
+   * on THIS owner's identity with no window at all (bounded by the 90-day TTL); a window of
+   * 1000 in key order still cut an owner's newest rows past 1000 (QA audit F13-01). The sort
+   * newest first + slice below yields the newest page with an accurate unread count. */
   router.get('/v1/notifications', requireAuth(), requireScope('memory:read'), async (req, res) => {
     const ghii = ownerGhii(req);
-    const { items } = await storage.listAllMemory({ prefix: NOTIF_PREFIX, ownerPrefix: ghii, limit: 1000 });
-    const mine = items
-      .filter(r => r.ownerGaii === ghii)
+    const mine = (await listOwnerNotificationRecords(storage, ghii))
       .map(r => r.value as NotifValue)
-      .filter(v => v && typeof v === 'object' && v.id)
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
       // Who sent it and which group it belongs to travel with every row, derived for the rows
       // written before the source did, so the page and the bell never have to guess. The buttons
       // travel only when the page may run them: the owner's browser runs an `api` button with the
@@ -165,8 +164,9 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       if (g.revoked || !(g.scopes ?? []).includes('notifications:send')) continue;
       add({ kind: 'app', name: g.appName, id: g.app }, { grant_id: g.grantId, granted_at: g.createdAt });
     }
-    for (const a of await storage.listAgents()) {
-      if (a.owner !== owner || !(a.defaultScopes ?? []).includes('notifications:send')) continue;
+    // The owner's own agents, not every agent on the node (QA audit P7-10).
+    for (const a of await storage.getAgentsByOwner(owner)) {
+      if (!(a.defaultScopes ?? []).includes('notifications:send')) continue;
       add({ kind: 'agent', name: a.displayName || a.name, id: a.gaii }, { last_seen: a.lastSeen ?? null });
     }
     const seen = new Set(senders.map(s => s.key as string));
@@ -224,11 +224,12 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
     const idSet = Array.isArray(ids) ? new Set(ids) : null;
-    const { items } = await storage.listAllMemory({ prefix: NOTIF_PREFIX, limit: 500 });
+    // The caller's own rows, all of them (QA audit F13-01): this read was the node's oldest 500
+    // notification rows of every owner, so past 500 it found none of the caller's newer ones.
+    const items = await listOwnerNotificationRecords(storage, ghii);
     let marked = 0;
     const now = new Date().toISOString();
     for (const r of items) {
-      if (r.ownerGaii !== ghii) continue;
       const v = r.value as NotifValue;
       if (!v || v.read) continue;
       if (all || (idSet && idSet.has(v.id))) {

@@ -204,26 +204,31 @@
       });
       if (!initRes.ok) throw new Error(initRes.error?.message || "Chunked upload init failed");
       const uploadId = initRes.data.upload_id;
-      const session = getSession2();
-      for (let i = 0; i < totalChunks; i++) {
-        const start = i * chunkSize;
-        const end = Math.min(start + chunkSize, file.size);
-        const chunk = file.slice(start, end);
-        const buf = await chunk.arrayBuffer();
-        const r = await fetch(NODE_URL + "/v1/storage/upload/" + uploadId + "/" + i, {
-          method: "PUT",
-          headers: {
-            "Authorization": "Bearer " + session.jwt,
-            "Content-Type": "application/octet-stream"
-          },
-          body: buf
-        });
-        if (!r.ok) throw new Error("Chunk " + i + " upload failed: " + r.status);
-        if (opts?.onProgress) opts.onProgress({ chunk: i, total: totalChunks, percent: Math.round((i + 1) / totalChunks * 100) });
+      try {
+        const session = getSession2();
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * chunkSize;
+          const end = Math.min(start + chunkSize, file.size);
+          const chunk = file.slice(start, end);
+          const buf = await chunk.arrayBuffer();
+          const r = await fetch(NODE_URL + "/v1/storage/upload/" + uploadId + "/" + i, {
+            method: "PUT",
+            headers: {
+              "Authorization": "Bearer " + session.jwt,
+              "Content-Type": "application/octet-stream"
+            },
+            body: buf
+          });
+          if (!r.ok) throw new Error("Chunk " + i + " upload failed: " + r.status);
+          if (opts?.onProgress) opts.onProgress({ chunk: i, total: totalChunks, percent: Math.round((i + 1) / totalChunks * 100) });
+        }
+        const completeRes = await authFetch2("/v1/storage/upload/" + uploadId + "/complete", { method: "POST" });
+        if (!completeRes.ok) throw new Error(completeRes.error?.message || "Chunked upload complete failed");
+        return completeRes.data;
+      } catch (err) {
+        await authFetch2("/v1/storage/upload/" + uploadId, { method: "DELETE" }).catch((abortErr) => console.warn("[aimeat storage] could not abort upload " + uploadId + ":", abortErr));
+        throw err;
       }
-      const completeRes = await authFetch2("/v1/storage/upload/" + uploadId + "/complete", { method: "POST" });
-      if (!completeRes.ok) throw new Error(completeRes.error?.message || "Chunked upload complete failed");
-      return completeRes.data;
     },
     // Abort a chunked upload
     async abortUpload(uploadId) {

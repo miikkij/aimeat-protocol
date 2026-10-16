@@ -11,6 +11,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-10-16 — The dashboard's checkout counts, money volume and platform-fee receivable read every
+ *     record under their prefix (storage/memory-pages.ts), not the first 2000 in key order (QA audit S8-10).
  *   2026-10-16 — Setup's owner row, profile row and welcome bonus are written in one transaction, and
  *     a failed profile write is no longer swallowed (QA audit E6-02).
  *   2026-10-16 — Disabling and enabling an account writes the operator trail (QA audit E2-04).
@@ -83,6 +85,7 @@ import { isOperatorCaller } from '../services/operator-override.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../services/admin-setup-secret.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { listAllMemoryPages } from '../storage/memory-pages.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -411,7 +414,9 @@ export function adminRouter(
         const moneyVolume: Record<string, number> = {};   // completed money-sale gross, by currency
         const operatorMoneyFees: Record<string, number> = {}; // operator's platform-fee cut, by currency
         try {
-            const { items: sessionRecs } = await storage.listAllMemory({ prefix: 'commerce.session.', limit: 2000 });
+            // Every record, page by page: a window of 2000 in key order made these totals short past
+            // 2000 records with nothing to say so (QA audit S8-10).
+            const { items: sessionRecs } = await listAllMemoryPages(storage, { prefix: 'commerce.session.' });
             for (const r of sessionRecs) {
                 const v = r.value as { status?: string; currency?: string; total?: number } | undefined;
                 const status = v?.status ?? 'open';
@@ -423,7 +428,7 @@ export function adminRouter(
                 }
             }
             // Operator platform-fee records for money sales (commerce.platform-fee.*).
-            const { items: feeRecs } = await storage.listAllMemory({ prefix: 'commerce.platform-fee.', limit: 2000 });
+            const { items: feeRecs } = await listAllMemoryPages(storage, { prefix: 'commerce.platform-fee.' });
             for (const r of feeRecs) {
                 const v = r.value as { fee?: number; currency?: string } | undefined;
                 if (v?.currency && v.fee) operatorMoneyFees[v.currency] = (operatorMoneyFees[v.currency] ?? 0) + v.fee;

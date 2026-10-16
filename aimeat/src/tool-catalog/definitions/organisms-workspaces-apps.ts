@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-16 — aimeat_organism_export names the export ceiling it now has, 200 000 memory records (QA audit F06c-01).
  *   2026-10-15 — aimeat_organism_invitation_respond says accepting is the person's own (feature-list audit #57).
  *   2026-10-15 — aimeat_organism_create names `workspaces_not_created` in its description (feature-list audit #56).
  *     aimeat_organism_export says any active member may export, as GET /v1/organisms/:id/export
@@ -698,7 +699,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_organism_export',
-        description: 'Export a whole organism (its settings + every workspace you can read, with its records, documents, images and row spaces) as one base64 ZIP backup. Any active member may export; the bundle holds only what that member can read. The answer lists `truncated` when a workspace reached an export limit (10 000 memory records, or the most rows a workspace may hold), and `left_out` for what the classification kept back. Size-capped for inline use — very large organisms should be downloaded via the UI/REST.',
+        description: 'Export a whole organism (its settings + every workspace you can read, with its records, documents, images and row spaces) as one base64 ZIP backup. Any active member may export; the bundle holds only what that member can read. The answer lists `truncated` when a workspace reached an export limit (200 000 memory records, or the most rows a workspace may hold), and `left_out` for what the classification kept back. Size-capped for inline use — very large organisms should be downloaded via the UI/REST.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Export Organism', readOnlyHint: true },

@@ -24,6 +24,7 @@
  *   - Phase 3: the owner applies it
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-update-widening
  * @version-history
+ *   2026-10-16 — The in-process nodes take the run's backend through ownNodeDb (QA audit P1-02).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F08c-03).
  */
 
@@ -34,6 +35,7 @@ import type { AimeatConfig } from '../src/config.js';
 import type { Storage } from '../src/storage/interface.js';
 import type { Server } from 'node:http';
 import { suitePort } from './helpers/free-port.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -70,16 +72,15 @@ async function bootNode(port: number, nodeId: string, repository: boolean): Prom
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
-
     const { config } = loadConfig({});
+    // The run's backend: SQLite in memory on a SQLite run, a database of its own on PostgreSQL.
+    Object.assign(config, (await ownNodeDb(`update-widening-${port}`, { memory: true })).config);
     config.port = port;
     config.nodeId = nodeId;
     config.baseUrl = `http://127.0.0.1:${port}`;
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
     config.packagesEnabled = true;
     config.packageFederationEnabled = true;
     config.packageCreateRole = 'owner';

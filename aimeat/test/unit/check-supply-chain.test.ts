@@ -5,6 +5,8 @@
  *   case is a file's text in and a list of findings out.
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-supply-chain.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-16 — A job named in SECRET_JOB_EXEMPTIONS may read the secret it names beside
+ *     dependency code, and any other secret in it is still refused (QA audit W30).
  *   v1.1.2 — 2026-09-29 — A checkout without the desktop resources folder scans clean (the ENOENT
  *     incident of 2026-09-29).
  *   v1.1.1 — 2026-09-29 — The exemption case passes its own entry: the real list is empty since the
@@ -16,7 +18,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { commandFindings, composeFindings, modelFindings, scan, workflowFindings } from '../../scripts/check-supply-chain.js';
+import { commandFindings, composeFindings, modelFindings, scan, workflowFindings, SECRET_JOB_EXEMPTIONS } from '../../scripts/check-supply-chain.js';
 
 const PIN = '0000000000000000000000000000000000000000';
 const SHA = 'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc';
@@ -255,4 +257,30 @@ describe('check:supply-chain, tools/systemone', () => {
     expect(modelFindings('docker/x/Dockerfile', '# pip install torch, the old way\nFROM x')).toEqual([]);
     expect(rules(modelFindings('docker/compose.yaml', '#   CPU:  JEFF_API_KEYS=devkey docker compose up -d --build'))).toEqual(['model-key']);
   });
+});
+
+describe('a job that must hand one named secret to the code it tests', () => {
+    const job = (secret: string) => `name: e2e
+on: push
+permissions:
+  contents: read
+jobs:
+  stripe-testmode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@${PIN} # v7
+        with:
+          persist-credentials: false
+      - run: pnpm install --frozen-lockfile
+      - name: Test
+        env:
+          KEY: \${{ secrets.${secret} }}
+        run: pnpm test:stripe-testmode
+`;
+    it('the secret its entry names is allowed, and another secret in the same job is still refused', () => {
+        expect(SECRET_JOB_EXEMPTIONS['e2e-full.yml#stripe-testmode']?.secrets).toEqual(['STRIPE_TEST_SECRET_KEY']);
+        expect(rules(workflowFindings('.github/workflows/e2e-full.yml', job('STRIPE_TEST_SECRET_KEY')))).toEqual([]);
+        expect(rules(workflowFindings('.github/workflows/e2e-full.yml', job('NPM_TOKEN')))).toEqual(['secret-and-deps']);
+        expect(rules(workflowFindings('.github/workflows/other.yml', job('STRIPE_TEST_SECRET_KEY')))).toEqual(['secret-and-deps']);
+    });
 });

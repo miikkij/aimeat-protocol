@@ -27,6 +27,7 @@
  *   environment variable and the ecosystem route, not storage.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-scope-ceiling
  * @version-history
+ *   2026-10-16 — The node of its own takes the run's backend through ownNodeDb (QA audit P1-02).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F03a-01).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -34,6 +35,7 @@ import { rmSync } from 'node:fs';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { suitePort } from './helpers/free-port.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { generateKeyPair } from '../src/auth/keypair.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -164,9 +166,12 @@ const DB_PATH = `test/.scope-ceiling-${PORT}-${Date.now()}.db`;
 let node: ChildProcess | null = null;
 
 async function startNode(): Promise<void> {
-    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH], {
+    // The run's backend: the SQLite file below on a SQLite run, a database of its own on PostgreSQL.
+    const db = await ownNodeDb('scope-ceiling', { sqlitePath: DB_PATH });
+    node = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
         env: {
             ...process.env,
+            ...db.env,
             AIMEAT_PORT: PORT, AIMEAT_BASE_URL: NODE_BASE,
             AIMEAT_MAX_AGENT_SCOPES: 'memory:*,catalogue:read', AIMEAT_MAX_ECO_SCOPES: 'memory:read',
             AIMEAT_ANONYMOUS: 'false', AIMEAT_EE_DISABLED: 'true', AIMEAT_APP_ORIGIN_ENABLED: 'false',

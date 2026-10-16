@@ -6,18 +6,20 @@
  *   /v1/storage itself to get round it (aimeat-apps wish
  *   wish-aimeat-storage-upload-stores-a-file-for-a-workspace, 2026-09-29).
  * @version-history
+ *   v1.1.0 — 2026-10-16 — uploadChunked() aborts its upload on the node when a chunk fails (QA audit
+ *     F05b-02); the recorder keeps each call's method.
  *   v1.0.0 — 2026-09-29 — Initial.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 
-const calls: { path: string; body: any }[] = [];
+const calls: { path: string; body: any; method?: string }[] = [];
 
 beforeEach(() => {
     calls.length = 0;
     const session = {
         ghii: 'alice@n', owner: 'alice', jwt: 'tok',
-        fetch: async (path: string, opts?: { body?: string }) => {
-            calls.push({ path, body: opts?.body ? JSON.parse(opts.body) : null });
+        fetch: async (path: string, opts?: { body?: string; method?: string }) => {
+            calls.push({ path, body: opts?.body ? JSON.parse(opts.body) : null, method: opts?.method });
             return { ok: true, data: { upload_id: 'u1', key: 'k' } };
         },
     };
@@ -64,6 +66,15 @@ describe('AIMEAT.storage sends the workspace or group a file is shared with', ()
         await storage.uploadChunked(file, { key: 'big.bin', visibility: 'workspace', workspace_ref: 'org1/ws1' });
         const init = calls.find(c => c.path === '/v1/storage/upload/init');
         expect(init?.body).toMatchObject({ key: 'big.bin', visibility: 'workspace', workspace_ref: 'org1/ws1' });
+    });
+
+    it('uploadChunked() aborts the upload on the node when a chunk fails, and still throws', async () => {
+        const storage = await lib();
+        (globalThis as any).fetch = async () => ({ ok: false, status: 413, json: async () => ({}) });
+        await expect(storage.uploadChunked(new Blob(['hello']), { key: 'fails.bin' })).rejects.toThrow(/Chunk 0 upload failed: 413/);
+        const abort = calls.find(c => c.path === '/v1/storage/upload/u1' && c.method === 'DELETE');
+        expect(abort).toBeTruthy();
+        expect(calls.some(c => c.path === '/v1/storage/upload/u1/complete')).toBe(false);
     });
 
     it('a private upload sends no binding at all', async () => {

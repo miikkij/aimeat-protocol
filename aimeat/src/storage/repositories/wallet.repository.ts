@@ -10,6 +10,7 @@
  *   - addTransaction / getTransactions(gaii) / listAllTransactions: append + per-gaii / global reads
  *
  * @version-history
+ *   2026-10-16 — getTransactions states its order: newest first, on every backend (QA audit D4-04).
  *   2026-10-15 — sumTransactionsByType: per-type totals computed in the database, for the admin dashboard's all-time figures (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
  *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
@@ -21,6 +22,8 @@ import type { WalletTransaction } from '../interface.js';
 
 export interface WalletRepository {
   addTransaction(tx: WalletTransaction): Promise<WalletTransaction>;
+  /** The principal's newest `limit` transactions, NEWEST FIRST on every backend (timestamp, then id).
+   *  SQLite returned the same window oldest first until 2026-10-16 (QA audit D4-04). */
   getTransactions(gaii: string, limit?: number): Promise<WalletTransaction[]>;
   /** One transaction by its exact tracking code and type, or null. Replay guards use this instead
    *  of scanning a bounded recent list: a settlement that scrolled out of the window used to look

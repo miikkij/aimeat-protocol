@@ -223,6 +223,105 @@ jobs:
         working-directory: aimeat
         run: node scripts/pack-smoke.mjs
 
+  # THE CARD RAIL AGAINST STRIPE ITSELF, IN TEST MODE (QA audit W30, 2026-10-16). Every other money
+  # test settles through the in-process test.money handler, which a production node does not register,
+  # so nothing ran the Stripe handler to success. This job runs the handler against Stripe (a payment
+  # and its refund, the hold rail, a kept card, a decline) and one card sale through the node, with the
+  # repository secret STRIPE_TEST_SECRET_KEY: a test-mode key of an account kept for this. Without the
+  # secret both steps report their cases as SKIPPED (vitest's skip, and the runner's Skipped count),
+  # never as passed. Both refuse a key that is not a test-mode key.
+  stripe-testmode:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+      - name: Prepare the E2E env file (from the committed example)
+        working-directory: aimeat
+        run: cp .env.test.sqlite.example .env.test.sqlite
+
+      - name: Reserve the E2E port range
+        run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=40000-40999
+
+      - name: The Stripe handler against Stripe test mode
+        working-directory: aimeat
+        env:
+          STRIPE_TEST_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+        run: pnpm test:stripe-testmode
+
+      - name: A card sale through the node, settled on Stripe test mode
+        if: ${{ !cancelled() }}
+        working-directory: aimeat
+        env:
+          STRIPE_TEST_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+        run: node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-stripe-testmode
+
+  # THE UPGRADE EVERY SELF-HOSTED NODE TAKES (QA audit P6-05, 2026-10-16). The current code starts on a
+  # database that the previous release tag created and wrote, on each backend, and its schema is held to
+  # a fresh one (test/upgrade-from-release.ts). The sweep above starts every suite on a database the
+  # current code made, so a CREATE without its ALTER or a migration that fails over rows passed it. The
+  # full history is fetched because the release is found with git describe.
+  upgrade-from-release:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [sqlite, postgres-kysely]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: appuser
+          POSTGRES_PASSWORD: devpassword123
+          POSTGRES_DB: aimeat_kysely_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Upgrade from the previous release (${{ matrix.backend }})
+        working-directory: aimeat
+        env:
+          AIMEAT_DB: ${{ matrix.backend }}
+          DATABASE_URL: postgresql://appuser:devpassword123@localhost:5432/aimeat_kysely_e2e
+        run: pnpm test:upgrade
+
   # THE ISSUE IS WRITTEN BY A JOB OF ITS OWN. The sweep installs and runs the whole dependency tree,
   # so it holds a token that can only read; this job holds the one that writes issues and runs
   # nothing but the gh CLI the runner carries. It reads each leg's result from this run (a sweep leg
@@ -231,7 +330,7 @@ jobs:
   # one closes it. Each leg has its own issue title, and no title contains another, because the
   # lookup is a phrase search on the title.
   issue:
-    needs: [sweep, release-4-0-0, pack-smoke]
+    needs: [sweep, release-4-0-0, pack-smoke, stripe-testmode, upgrade-from-release]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -254,6 +353,15 @@ jobs:
           - job: pack-smoke
             title: Nightly start of the packed npm package is red
             what: The npm tarball packed, installed with production dependencies only and started (aimeat/scripts/pack-smoke.mjs)
+          - job: stripe-testmode
+            title: Nightly Stripe test-mode run is red
+            what: The Stripe card handler and a card sale against **Stripe test mode**
+          - job: upgrade-from-release (sqlite)
+            title: Nightly upgrade from the previous release is red on sqlite
+            what: The current code started on a **sqlite** database written by the previous release
+          - job: upgrade-from-release (postgres-kysely)
+            title: Nightly upgrade from the previous release is red on postgres-kysely
+            what: The current code started on a **postgres-kysely** database written by the previous release
     steps:
       - name: Read this leg's result
         id: sweep

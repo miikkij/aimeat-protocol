@@ -14,6 +14,8 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01). A prefix in every filter
+ *     is a literal, case-sensitive string on both backends (QA audit D4-07).
  *   2026-10-15 — searchText states the one match rule for both backends; searchMemory is one owner's searchText (feature-list audit #52).
  *   v1.3.0 — 2026-10-12 — bulkBinMemory: the batched workspace record delete puts rows in the bin.
  *   v1.2.0 — 2026-09-08 — countMemoryWithOrigins: how many records carry a CORS list of their own,
@@ -325,6 +327,13 @@ export interface MemoryRepository {
    * earlier container cascade (or, in a multi-writer workspace, a co-owner's copy). Returns rows restored.
    */
   unarchiveMemoryByKey(keyOrPrefix: string, opts?: { match?: 'exact' | 'prefix' | 'subtree' }): Promise<number>;
+  /**
+   * TTL SWEEP — delete every row, of any owner, whose time to live passed before `nowIso`, in one
+   * statement, and return how many went. A hard delete, the same as SQLite's delete on read: the
+   * writer chose the expiry. Called by the core memory-ttl-cleanup job on both backends (QA audit
+   * D4-01, E4-01: on PostgreSQL no statement deleted by TTL, and the job walked agents only).
+   */
+  deleteExpiredMemory(nowIso: string): Promise<number>;
   /** Count active vs archived memory rows under a key prefix (for "N active, M archived" overview counts). */
   countArchivedByKeyPrefix(keyPrefix: string): Promise<{ active: number; archived: number }>;
 }

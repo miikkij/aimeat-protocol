@@ -60,8 +60,9 @@ systemctl start aimeat
 
 **Back up, node running:** copy the database with SQLite's own online backup, which writes one
 consistent file, for example `sqlite3 /var/lib/aimeat/aimeat.db ".backup '/backup/aimeat.db'"`. Do not
-copy the live `.db` file alone: it can miss what is still in the `-wal` file. (The online form is
-standard SQLite and was not exercised on a node for this guide.)
+copy the live `.db` file alone: it can miss what is still in the `-wal` file. The online form and the
+stopped-node copy above are both run end to end by `test/e2e-backup-restore.ts`: a record, a stored
+file and a sealed secret come back, and a session issued before the backup still works.
 
 **Restore:** stop the node, put the database files (all of those you backed up), `.env` and the key
 file back in their places, and start it.
@@ -88,8 +89,9 @@ systemctl start aimeat
 
 At start the node applies any migration the backup does not have yet, in order, each once; so a
 backup taken on an older version restores onto a newer one. Restoring a newer backup onto an older
-version is not supported. (This procedure was not exercised on a node for this guide: the machine it
-was written on has no PostgreSQL client tools.)
+version is not supported. This procedure is run end to end by `test/e2e-backup-restore.ts` on
+PostgreSQL wherever `pg_dump` and `pg_restore` are installed, which the nightly sweep's machine has;
+without them that half of the test reports itself as skipped.
 
 ## Test the restore
 

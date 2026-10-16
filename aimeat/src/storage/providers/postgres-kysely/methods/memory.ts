@@ -9,6 +9,10 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-10-16 — deleteExpiredMemory: the TTL sweep as one DELETE (QA audit D4-01, E4-01). listAllMemory
+ *     and listAllMemoryMeta take the TTL test, the order, the limit and the offset in SQL and the total
+ *     from a COUNT (QA audit D4-05). Every key and owner prefix is a literal, case-sensitive prefix
+ *     through likePrefix (QA audit D4-07).
  *   2026-10-16 -- setMemory on a trackable key reads the row FOR UPDATE inside a transaction, so two
  *     concurrent writers no longer both write version N+1 and lose the first value from the history
  *     (QA audit D4-10, F10b-02).
@@ -44,6 +48,7 @@ import type { MemoryMetaRow, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionR
 import type { PostgresKyselyStorage } from '../index.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { buildSearchBlob, byteSize, isLive, jsonb, rowToMeta, rowToRecord } from '../helpers.js';
+import { likePrefix } from '../../../key-prefix.js';
 
 type ListOpts = { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter };
 type CountOpts = { prefix?: string; visibility?: string; archived?: ArchiveFilter };
@@ -74,12 +79,50 @@ function applyArchive(q: any, archived?: ArchiveFilter) {
 const isVisible = (r: any): boolean => isLive(r) && !r.deletedAt;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyList(q: any, opts?: ListOpts) {
-  if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
+  if (opts?.prefix) q = q.where('key', 'like', likePrefix(opts.prefix));
   if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
   if (typeof opts?.maxFlags === 'number') q = q.where('flagCount', '<=', opts.maxFlags);
   q = applyArchive(q, opts?.archived);
   if (opts?.tags?.length) q = q.where(sql<boolean>`"tags" @> ${sql.val(opts.tags)}`);   // array-contains-all
   return q;
+}
+
+type AllOpts = { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean };
+
+/** isLive as a WHERE clause: no TTL, or created + TTL is not yet past `now` (helpers.ts isLive). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function liveSql(q: any, now: Date) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return q.where((eb: any) => eb.or([
+    eb('ttlHours', 'is', null),
+    eb('ttlHours', '=', 0),
+    eb(sql`"createdAt" + ("ttlHours" * interval '1 hour')`, '>=', now),
+  ]));
+}
+
+/** The filters of the cross-owner listing, all in SQL so a LIMIT can follow them. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyAll(q: any, opts: AllOpts | undefined, now: Date) {
+  if (opts?.prefix) q = q.where('key', 'like', likePrefix(opts.prefix));
+  if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', likePrefix(opts.ownerPrefix));
+  // Excluded IN SQL, not after the slice: a windowed read whose window is entirely unwanted
+  // rows would otherwise come back empty (how the landing ticker emptied itself).
+  if (opts?.excludeOwnerPrefix) q = q.where('ownerGaii', 'not like', likePrefix(opts.excludeOwnerPrefix));
+  if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
+  // Drop `.version.N` workspace history rows in SQL (hot read paths always discard them).
+  if (opts?.excludeVersionRows) q = q.where('key', 'not like', '%.version.%');
+  return liveSql(applyArchive(q, opts?.archived), now);
+}
+
+/**
+ * Order and window. Key order unless newestFirst; ownerGaii breaks a tie, because two owners can hold
+ * the same key and a reader that pages with offset must see each row exactly once. The offset applies
+ * with a limit only, as it always did here.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function windowAll(q: any, opts: AllOpts | undefined) {
+  q = opts?.newestFirst ? q.orderBy('updatedAt', 'desc').orderBy('key').orderBy('ownerGaii') : q.orderBy('key').orderBy('ownerGaii');
+  return opts?.limit ? q.limit(opts.limit).offset(opts.offset ?? 0) : q;
 }
 
 const META_COLS = ['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'allowedOrigins',
@@ -319,8 +362,8 @@ export const memoryMethods = {
   async listAllDeletedMemory(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
     const base = () => {
       let q = this.db.selectFrom('Memory').where('deletedAt', 'is not', null);
-      if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', opts.ownerPrefix + '%');
-      if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
+      if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', likePrefix(opts.ownerPrefix));
+      if (opts?.prefix) q = q.where('key', 'like', likePrefix(opts.prefix));
       return q;
     };
     const counted = await base().select(({ fn }) => fn.countAll<string>().as('n')).executeTakeFirst();
@@ -338,6 +381,21 @@ export const memoryMethods = {
     return Number(r.numDeletedRows ?? 0);
   },
 
+  /**
+   * The TTL sweep: every row past its time to live, whoever owns it, in one statement. Until
+   * 2026-10-16 no statement on this backend deleted by TTL: reads hid an expired row and the cleanup
+   * job listed through a read that had already hidden it, so the row stayed, counted against the key
+   * ceiling and the byte budget, and blocked a create-only write to its key (QA audit D4-01, E4-01).
+   * A hard delete, as SQLite's delete on read always was: the owner set the expiry when writing.
+   */
+  async deleteExpiredMemory(this: PostgresKyselyStorage, nowIso: string): Promise<number> {
+    const r = await this.db.deleteFrom('Memory')
+      .where('ttlHours', 'is not', null).where('ttlHours', '<>', 0)
+      .where(sql`"createdAt" + ("ttlHours" * interval '1 hour')`, '<', new Date(nowIso))
+      .executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
+  },
+
   async deleteAllMemory(this: PostgresKyselyStorage, ownerGaii: string): Promise<number> {
     const r = await this.db.deleteFrom('Memory').where('ownerGaii', '=', ownerGaii).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
@@ -345,12 +403,12 @@ export const memoryMethods = {
 
   async deleteMemorySubtree(this: PostgresKyselyStorage, ownerGaii: string, baseKey: string): Promise<number> {
     const r = await this.db.deleteFrom('Memory').where('ownerGaii', '=', ownerGaii)
-      .where(eb => eb.or([eb('key', '=', baseKey), eb('key', 'like', baseKey + '.%')])).executeTakeFirst();
+      .where(eb => eb.or([eb('key', '=', baseKey), eb('key', 'like', likePrefix(baseKey + '.'))])).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
   },
 
   async deleteMemoryByPrefix(this: PostgresKyselyStorage, keyPrefix: string): Promise<number> {
-    const r = await this.db.deleteFrom('Memory').where('key', 'like', keyPrefix + '%').executeTakeFirst();
+    const r = await this.db.deleteFrom('Memory').where('key', 'like', likePrefix(keyPrefix)).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
   },
 
@@ -391,7 +449,7 @@ export const memoryMethods = {
   // history, and e2e-agent-crew's "thirteen publishes keep the last ten" counted thirteen.
   async listMemoryKeysByPrefix(this: PostgresKyselyStorage, keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]> {
     const rows = await applyArchive(
-      this.db.selectFrom('Memory').select(['ownerGaii', 'key']).where('key', 'like', keyPrefix + '%'),
+      this.db.selectFrom('Memory').select(['ownerGaii', 'key']).where('key', 'like', likePrefix(keyPrefix)),
     ).execute() as Array<{ ownerGaii: string; key: string }>;
     return rows.map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
   },
@@ -421,7 +479,7 @@ export const memoryMethods = {
   async countMemory(this: PostgresKyselyStorage, ownerGaiis: string[], opts?: CountOpts): Promise<number> {
     if (ownerGaiis.length === 0) return 0;
     let q = this.db.selectFrom('Memory').select(sql<number>`count(distinct "key")`.as('n')).where('ownerGaii', 'in', ownerGaiis);
-    if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
+    if (opts?.prefix) q = q.where('key', 'like', likePrefix(opts.prefix));
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
     q = applyArchive(q, opts?.archived);
     const r = await q.executeTakeFirst();
@@ -472,7 +530,7 @@ export const memoryMethods = {
       .select(sql<number>`ts_rank("searchTsv", to_tsquery('simple', ${tsquery}))`.as('score'))
       .where(sql<boolean>`"searchTsv" @@ to_tsquery('simple', ${tsquery})`);
     if (opts?.ownerGaiis?.length) q = q.where('ownerGaii', 'in', opts.ownerGaiis);
-    if (opts?.keyPrefix) q = q.where('key', 'like', opts.keyPrefix + '%');
+    if (opts?.keyPrefix) q = q.where('key', 'like', likePrefix(opts.keyPrefix));
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
     if (typeof opts?.maxFlags === 'number') q = q.where('flagCount', '<=', opts.maxFlags);
     q = applyArchive(q, opts?.archived);
@@ -480,44 +538,25 @@ export const memoryMethods = {
     return rows.filter(isLive).map(r => ({ record: rowToRecord(r), score: Number((r as { score: number }).score) }));
   },
 
-  async listAllMemory(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryRecord[]; total: number }> {
-    let q = this.db.selectFrom('Memory').selectAll();
-    if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
-    if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', opts.ownerPrefix + '%');
-    // Excluded IN SQL, not after the slice: a windowed read whose window is entirely unwanted
-    // rows would otherwise come back empty (how the landing ticker emptied itself).
-    if (opts?.excludeOwnerPrefix) q = q.where('ownerGaii', 'not like', opts.excludeOwnerPrefix + '%');
-    if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
-    // Drop `.version.N` workspace history rows in SQL (hot read paths always discard them).
-    if (opts?.excludeVersionRows) q = q.where('key', 'not like', '%.version.%');
-    q = applyArchive(q, opts?.archived);
-    // Default stays key order (many callers enumerate rather than page); newestFirst is what a
-    // limited "most recent" read must ask for — key order made `limit` return an alphabetical
-    // slice here while SQLite returned the newest rows for the same call.
-    const ordered = opts?.newestFirst ? q.orderBy('updatedAt', 'desc') : q.orderBy('key');
-    const all = (await ordered.execute()).filter(isLive);
-    const total = all.length;
-    const start = opts?.offset ?? 0;
-    const items = (opts?.limit ? all.slice(start, start + opts.limit) : all).map(rowToRecord);
-    return { items, total };
+  async listAllMemory(this: PostgresKyselyStorage, opts?: AllOpts): Promise<{ items: MemoryRecord[]; total: number }> {
+    // THE WINDOW IS TAKEN IN SQL (QA audit D4-05). This read loaded every matching row, values
+    // included, dropped expired rows in JavaScript and then sliced the page, so the cost of a page of
+    // 50 grew with the whole table on the production backend while SQLite ran LIMIT/OFFSET. The TTL
+    // test is now a WHERE clause (liveSql), so the slice and the total are taken over live rows only,
+    // as before, and the total is a COUNT.
+    const now = new Date();
+    const counted = await applyAll(this.db.selectFrom('Memory').select(sql<string>`count(*)`.as('n')), opts, now).executeTakeFirst();
+    const rows = await windowAll(applyAll(this.db.selectFrom('Memory').selectAll(), opts, now), opts).execute();
+    return { items: rows.map(rowToRecord), total: Number(counted?.n ?? 0) };
   },
 
-  async listAllMemoryMeta(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryMetaRow[]; total: number }> {
+  async listAllMemoryMeta(this: PostgresKyselyStorage, opts?: AllOpts): Promise<{ items: MemoryMetaRow[]; total: number }> {
     // listAllMemory with the META_COLS projection: same filters and windowing, no `value` column
     // ever leaves the database (see memory.repository.ts).
-    let q = this.db.selectFrom('Memory').select(META_COLS);
-    if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
-    if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', opts.ownerPrefix + '%');
-    if (opts?.excludeOwnerPrefix) q = q.where('ownerGaii', 'not like', opts.excludeOwnerPrefix + '%');
-    if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
-    if (opts?.excludeVersionRows) q = q.where('key', 'not like', '%.version.%');
-    q = applyArchive(q, opts?.archived);
-    const ordered = opts?.newestFirst ? q.orderBy('updatedAt', 'desc') : q.orderBy('key');
-    const all = (await ordered.execute()).filter(isLive);
-    const total = all.length;
-    const start = opts?.offset ?? 0;
-    const items = (opts?.limit ? all.slice(start, start + opts.limit) : all).map(rowToMeta);
-    return { items, total };
+    const now = new Date();
+    const counted = await applyAll(this.db.selectFrom('Memory').select(sql<string>`count(*)`.as('n')), opts, now).executeTakeFirst();
+    const rows = await windowAll(applyAll(this.db.selectFrom('Memory').select(META_COLS), opts, now), opts).execute();
+    return { items: rows.map(rowToMeta), total: Number(counted?.n ?? 0) };
   },
 
   async listMemoryHistory(this: PostgresKyselyStorage, ownerGaii: string, key: string, opts?: { limit?: number }): Promise<MemoryVersionRecord[]> {
@@ -532,8 +571,8 @@ export const memoryMethods = {
 
   async archiveMemoryByKey(this: PostgresKyselyStorage, keyOrPrefix: string, opts: { archivedRoot: string; archivedBy: string; archivedAt: string; match?: 'exact' | 'prefix' | 'subtree' }): Promise<number> {
     let q = this.db.updateTable('Memory').set({ archived: true, archivedRoot: opts.archivedRoot, archivedBy: opts.archivedBy, archivedAt: new Date(opts.archivedAt) }).where('archived', '=', false);
-    if (opts.match === 'prefix') q = q.where('key', 'like', keyOrPrefix + '%');
-    else if (opts.match === 'subtree') q = q.where(eb => eb.or([eb('key', '=', keyOrPrefix), eb('key', 'like', keyOrPrefix + '.%')]));
+    if (opts.match === 'prefix') q = q.where('key', 'like', likePrefix(keyOrPrefix));
+    else if (opts.match === 'subtree') q = q.where(eb => eb.or([eb('key', '=', keyOrPrefix), eb('key', 'like', likePrefix(keyOrPrefix + '.'))]));
     else q = q.where('key', '=', keyOrPrefix);
     const r = await q.executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0);
@@ -548,8 +587,8 @@ export const memoryMethods = {
     const match = opts?.match ?? 'subtree';   // default subtree, matching the SQLite repo
     let q = this.db.updateTable('Memory').set({ archived: false, archivedRoot: null, archivedBy: null, archivedAt: null }).where('archived', '=', true);
     if (match === 'exact') q = q.where('key', '=', keyOrPrefix);
-    else if (match === 'prefix') q = q.where('key', 'like', keyOrPrefix + '%');
-    else q = q.where(eb => eb.or([eb('key', '=', keyOrPrefix), eb('key', 'like', keyOrPrefix + '.%')]));
+    else if (match === 'prefix') q = q.where('key', 'like', likePrefix(keyOrPrefix));
+    else q = q.where(eb => eb.or([eb('key', '=', keyOrPrefix), eb('key', 'like', likePrefix(keyOrPrefix + '.'))]));
     const r = await q.executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0);
   },
@@ -565,7 +604,7 @@ export const memoryMethods = {
         sql<number>`count(*) FILTER (WHERE archived = false)`.as('active'),
         sql<number>`count(*) FILTER (WHERE archived = true)`.as('archived'),
       ])
-      .where('key', 'like', keyPrefix + '%')
+      .where('key', 'like', likePrefix(keyPrefix))
       .executeTakeFirst();
     return { active: Number(r?.active ?? 0), archived: Number(r?.archived ?? 0) };
   },

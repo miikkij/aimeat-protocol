@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-10-16 — operatorAccountState: two EXISTS queries (QA audit P7-10).
  *   2026-10-11 — stoppedAt and stoppedBy on create and read (migration 0101). updateAgent passes them through.
  *   2026-10-02 — taskStart on create and read (migration 0092). updateAgent passes it through.
  *   2026-09-26 — deleteAgent settles the agent's work first (settleDeletedAgentWorkDb in
@@ -124,6 +125,13 @@ export const identityMethods = {
   },
   async listOwners(this: PostgresKyselyStorage): Promise<OwnerRecord[]> {
     return (await this.db.selectFrom('Owner').selectAll().execute()).map(toOwnerRecord);
+  },
+  async operatorAccountState(this: PostgresKyselyStorage): Promise<{ anyOwner: boolean; anyOperator: boolean }> {
+    const r = await this.db.selectNoFrom([
+      sql<boolean>`exists(select 1 from "Owner" where "name" <> 'anonymous')`.as('anyOwner'),
+      sql<boolean>`exists(select 1 from "Owner" where 'operator' = any("roles"))`.as('anyOperator'),
+    ]).executeTakeFirst();
+    return { anyOwner: !!r?.anyOwner, anyOperator: !!r?.anyOperator };
   },
   async updateOwner(this: PostgresKyselyStorage, name: string, updates: Partial<OwnerRecord>): Promise<OwnerRecord | null> {
     const data: Record<string, unknown> = {};

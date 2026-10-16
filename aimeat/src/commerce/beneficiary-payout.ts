@@ -27,6 +27,7 @@
  *   // provider signs q.accepts[0] → X-PAYMENT
  *   const r = await settleBeneficiaryPayout(storage, config, { ...same, payload });
  * @version-history
+ *   2026-10-16 — The payout quote sums every released entry, not those in the first 1000 records (QA audit S8-10).
  *   v1.0.0 — 2026-07-30 — Initial: the provider-signed x402 leg that pays a beneficiary for real.
  */
 import type { AimeatConfig } from '../config.js';
@@ -70,7 +71,8 @@ export async function quoteBeneficiaryPayout(
   args: { providerGhii: string; beneficiaryGhii: string; currency?: string },
 ): Promise<BeneficiaryPayoutQuote> {
   const currency = (args.currency ?? 'EUR').toUpperCase();
-  const all = await listBeneficiaryEntries(storage, args.beneficiaryGhii, 1000);
+  // Every entry: the payout amount is a sum, and a window of 1000 made it short (QA audit S8-10).
+  const all = await listBeneficiaryEntries(storage, args.beneficiaryGhii);
   // `released` is the payable state: accrued means the provider has not agreed to pay it yet, and
   // paid means it already left. Anything else is not owed today.
   const entries = all

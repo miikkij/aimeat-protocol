@@ -25,6 +25,10 @@
  *   v1.5.1 — 2026-09-26 — A person's inbox and sent list read their ecosystem apps' identities beside
  *     their agents' (services/db/owner-identity.ts identitiesActingFor), so work on an action an app of
  *     theirs published, a cortex's action among them, reaches the person (secaudit 2026-09, R4 3).
+ *   2026-10-16 — Work the provider's node refused is an error result, PEER_REFUSED with the far node's
+ *     status and answer in details, and a warn line; it was the far node's own body passed through as
+ *     this node's answer (a 401 that read as the caller's own session ending), and the MCP tool
+ *     answered "routed" whatever came back (QA audit F14b-01, F18-01).
  *   v1.5.0 — 2026-09-26 — Work for a provider on another node checks the node's address first, then
  *     takes the 1-morsel routing fee as the call goes out (routingFee, services/morsel.ts). The fee
  *     goes back when the node cannot be reached or answers with an error (secaudit 2026-09, R4 6).
@@ -203,7 +207,21 @@ export async function createWorkItem(
       logger.warn('Failed to forward work request to remote node', { nodeUrl: resolved.nodeUrl, error: String(err) });
       return { error: `Remote node ${resolved.nodeId} unreachable`, status: 502, code: 'REMOTE_UNREACHABLE' };
     }
-    if (!resp.ok) await fee.giveBack();
+    if (!resp.ok) {
+      // REFUSED BY THE FAR NODE, SAID AS SUCH (QA audit F14b-01, F18-01). A node takes forwarded work
+      // only from a signed-in caller of its own, which a forwarding node is not, so today every real
+      // peer refuses this request (the feature list's "Cross-node work and settlement" row says so).
+      // The far node's own answer used to be passed through as this node's, and the MCP tool said
+      // "routed"; nothing on either node said why. The fee goes back, nothing was held here.
+      await fee.giveBack();
+      const peerError = (remoteResult && typeof remoteResult === 'object' && 'error' in remoteResult) ? remoteResult.error : remoteResult;
+      logger.warn('The provider node refused forwarded work', { node: resolved.nodeId, status: resp.status });
+      return {
+        error: 'The provider\'s node refused the work request, so nothing was created there and nothing was held here. Its own answer is in details; the routing fee was given back.',
+        status: resp.status, code: 'PEER_REFUSED',
+        details: { routed_to: resolved.nodeId, peer_status: resp.status, peer_error: peerError ?? null },
+      };
+    }
     return { forwarded: true, remoteStatus: resp.status, remoteResult };
   }
 

@@ -6,6 +6,9 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   2026-10-16 — Tests 31b-31f: a missing chunk, a checksum mismatch, another principal on the three
+ *     session routes, a chunk past what the upload declared, and the open-session and declared-size
+ *     ceilings (QA audit F05b-02).
  *   v1.6.0 — 2026-10-10 — Tests 16j-16n: a 9 MB file, larger than one slice of the sliced read, comes
  *     back whole through `Range: bytes=0-`, a range across slice boundaries and a plain download, and
  *     another owner's agent is refused it.
@@ -737,6 +740,95 @@ await test('31. Completing aborted upload → 404', async () => {
         body: JSON.stringify({}),
     });
     assert(status === 404, `expected 404, got ${status}`);
+});
+
+// QA audit F05b-02: complete took whatever chunks had arrived, so a lost chunk gave 201 and a damaged
+// file; nothing tested the checksum refusal or another principal on the three session routes; a
+// chunk index or size past what the upload declared was accepted; and a principal could open
+// sessions without end, each holding its bytes in the node process.
+const chunkInit = (token: string, key: string, chunkSize: number, totalChunks: number) => json('/v1/storage/upload/init', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ key, mime_type: 'application/octet-stream', visibility: 'private', chunk_size: chunkSize, total_chunks: totalChunks }),
+});
+const putChunk = (token: string, id: string, i: number, bytes: Buffer) => rawFetch(`/v1/storage/upload/${id}/${i}`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/octet-stream' }, body: bytes,
+});
+const completeUpload = (token: string, id: string, body: Record<string, unknown> = {}) =>
+    json(`/v1/storage/upload/${id}/complete`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(body) });
+
+await test('31b. Complete with a chunk missing → 400 CHUNKS_MISSING naming it; with every chunk → 201 and the whole file', async () => {
+    const init = await chunkInit(agentAToken, 'chunked-gap.bin', 100, 3);
+    assert(init.status === 201, `init ${init.status}`);
+    const id = init.body.data.upload_id;
+    assert((await putChunk(agentAToken, id, 0, Buffer.alloc(100, 0x30))).status === 200, 'chunk 0');
+    assert((await putChunk(agentAToken, id, 2, Buffer.alloc(40, 0x32))).status === 200, 'chunk 2');
+    const gap = await completeUpload(agentAToken, id);
+    assert(gap.status === 400 && gap.body.error?.code === 'CHUNKS_MISSING', `gap: ${gap.status} ${JSON.stringify(gap.body.error)}`);
+    assert(JSON.stringify(gap.body.error?.details?.missing) === '[1]', `missing: ${JSON.stringify(gap.body.error?.details)}`);
+    assert((await putChunk(agentAToken, id, 1, Buffer.alloc(100, 0x31))).status === 200, 'chunk 1');
+    const done = await completeUpload(agentAToken, id);
+    assert(done.status === 201 && done.body.data.size === 240 && done.body.data.chunks_assembled === 3, `done: ${done.status} ${JSON.stringify(done.body.data ?? done.body.error)}`);
+});
+
+await test('31c. A checksum that does not match → 400 CHECKSUM_MISMATCH, and nothing is stored', async () => {
+    const init = await chunkInit(agentAToken, 'chunked-sum.bin', 100, 1);
+    const id = init.body.data.upload_id;
+    assert((await putChunk(agentAToken, id, 0, Buffer.alloc(50, 0x41))).status === 200, 'chunk 0');
+    const r = await completeUpload(agentAToken, id, { checksum_sha256: '0'.repeat(64) });
+    assert(r.status === 400 && r.body.error?.code === 'CHECKSUM_MISMATCH', `checksum: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const read = await rawFetch('/v1/storage/chunked-sum.bin', { headers: { Authorization: `Bearer ${agentAToken}` } });
+    assert(read.status === 404, `the refused file was stored: ${read.status}`);
+    await json(`/v1/storage/upload/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${agentAToken}` } });
+});
+
+await test('31d. Another person, a sibling agent and the owner may not PUT, complete or abort someone\'s upload (403 each); the upload survives', async () => {
+    const init = await chunkInit(agentAToken, 'chunked-mine.bin', 100, 1);
+    const id = init.body.data.upload_id;
+    for (const [who, token] of [['another person', owner2Token], ['a sibling agent', agentBToken], ['the owner', ownerToken]] as const) {
+        const put = await putChunk(token, id, 0, Buffer.alloc(10, 0x58));
+        assert(put.status === 403, `${who} PUT: ${put.status}`);
+        const done = await completeUpload(token, id);
+        assert(done.status === 403, `${who} complete: ${done.status}`);
+        const del = await json(`/v1/storage/upload/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+        assert(del.status === 403, `${who} abort: ${del.status}`);
+    }
+    assert((await putChunk(agentAToken, id, 0, Buffer.alloc(20, 0x4d))).status === 200, 'the uploader still sends');
+    const done = await completeUpload(agentAToken, id);
+    assert(done.status === 201 && done.body.data.size === 20, `the uploader completes: ${done.status} ${JSON.stringify(done.body.data ?? done.body.error)}`);
+});
+
+await test('31e. A chunk index past total_chunks → 400, a chunk larger than chunk_size → 413 CHUNK_TOO_LARGE', async () => {
+    const init = await chunkInit(agentAToken, 'chunked-bounds.bin', 100, 2);
+    const id = init.body.data.upload_id;
+    const past = await putChunk(agentAToken, id, 2, Buffer.alloc(10));
+    assert(past.status === 400, `index past the end: ${past.status}`);
+    const big = await putChunk(agentAToken, id, 0, Buffer.alloc(101));
+    const bigBody = await big.json() as any;
+    assert(big.status === 413 && bigBody.error?.code === 'CHUNK_TOO_LARGE', `oversized chunk: ${big.status} ${JSON.stringify(bigBody.error)}`);
+    await json(`/v1/storage/upload/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${agentAToken}` } });
+});
+
+await test('31f. A declared file larger than one file may be → 413 at init; a fifth open upload → 429 TOO_MANY_UPLOADS', async () => {
+    const huge = await chunkInit(agentAToken, 'chunked-huge.bin', 10 * 1024 * 1024, 200);
+    assert(huge.status === 413, `declared 2 GB: ${huge.status} ${JSON.stringify(huge.body.error)}`);
+    const ids: string[] = [];
+    for (let i = 0; i < 4; i++) {
+        const r = await chunkInit(agentAToken, `chunked-open-${i}.bin`, 100, 1);
+        assert(r.status === 201, `open ${i}: ${r.status} ${JSON.stringify(r.body.error)}`);
+        ids.push(r.body.data.upload_id);
+    }
+    const fifth = await chunkInit(agentAToken, 'chunked-open-5.bin', 100, 1);
+    assert(fifth.status === 429 && fifth.body.error?.code === 'TOO_MANY_UPLOADS', `fifth: ${fifth.status} ${JSON.stringify(fifth.body.error)}`);
+    // Another principal's count is its own.
+    const other = await chunkInit(agentBToken, 'chunked-other.bin', 100, 1);
+    assert(other.status === 201, `another principal opens: ${other.status} ${JSON.stringify(other.body.error)}`);
+    for (const id of [...ids, other.body.data.upload_id]) {
+        const tok = id === other.body.data.upload_id ? agentBToken : agentAToken;
+        await json(`/v1/storage/upload/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${tok}` } });
+    }
+    const again = await chunkInit(agentAToken, 'chunked-open-6.bin', 100, 1);
+    assert(again.status === 201, `after aborting, a new upload opens: ${again.status}`);
+    await json(`/v1/storage/upload/${again.body.data.upload_id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${agentAToken}` } });
 });
 
 // ─── Phase 9: Error Paths ───

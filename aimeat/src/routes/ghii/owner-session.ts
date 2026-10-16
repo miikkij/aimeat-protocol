@@ -17,6 +17,8 @@
  * @structure completeOwnerLogin(config, storage, req, res, args) -> writes the response itself
  * @usage await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
  * @version-history
+ *   2026-10-16 — The no-operator self-heal asks storage.operatorAccountState instead of loading every owner
+ *     on each sign-in of an account that is not an operator (QA audit P7-10).
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-04 — Extracted verbatim from routes/ghii/register-login.ts.
  */
@@ -95,8 +97,9 @@ export async function completeOwnerLogin(
 
   // Self-heal: if no operator exists anywhere, promote this user
   if (ownerRecord && !isOperatorAccount(ownerRecord)) {
-    const allOwners = await storage.listOwners();
-    const hasOperator = allOwners.some(isOperatorAccount);
+    // One EXISTS query, not the whole owner table: every sign-in of an account that is not an
+    // operator asks this (QA audit P7-10).
+    const { anyOperator: hasOperator } = await storage.operatorAccountState();
     if (!hasOperator) {
       roles.push('operator');
       await storage.updateOwner(loginName, { roles: [...ownerRecord.roles, 'operator'] });

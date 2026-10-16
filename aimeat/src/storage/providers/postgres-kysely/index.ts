@@ -18,6 +18,7 @@
  *   v1.11.0 — 2026-10-16 — The pool has time limits (connection wait, statement, lock, idle in
  *     transaction) and logs a connection wait that hit its limit (QA audit E6-07); savepoint() for
  *     a tolerant step inside a transaction (QA audit E6-01).
+ *   2026-10-16 — chunkedUploads is the shared ChunkedUploadStore, which honours the session expiry (QA audit F05b-02).
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
  *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
  *     bound transaction, so every existing `this.db` call joins an open one without being changed.
@@ -38,7 +39,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
 import { POOL_LIMITS, logPoolWaitTimeouts, type PoolLimits } from './pool-limits.js';
-import type { ChunkedUploadRecord, MemoryRecord, Storage } from '../../interface.js';
+import type { MemoryRecord, Storage } from '../../interface.js';
+import { ChunkedUploadStore } from '../../chunked-upload-store.js';
 import type { DB } from './db-types.js';
 import { runMigrations } from './migrate.js';
 import { checkServerVersion } from './server-version.js';
@@ -127,8 +129,8 @@ export class PostgresKyselyStorage {
   readonly pool: pg.Pool;
   /** Resolves once the schema migrations have been applied — awaited by the storage factory. */
   readonly ready: Promise<void>;
-  /** Transient chunked-upload buffer (never persisted), same as the other backends. */
-  readonly chunkedUploads = new Map<string, ChunkedUploadRecord>();
+  /** Transient chunked-upload sessions (never persisted), one expiry rule with SQLite (storage/chunked-upload-store.ts). */
+  readonly chunkedUploads = new ChunkedUploadStore();
 
   constructor(connectionString: string, limits: PoolLimits = POOL_LIMITS) {
     // TIME LIMITS (QA audit E6-07). Without them a database that stops answering, or twenty

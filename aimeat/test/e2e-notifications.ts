@@ -6,6 +6,8 @@
  *   without notifications:send gets 403), mark-read, the inline-actions security invariant (a
  *   client-supplied actions field is rejected), and the DM reply action end-to-end.
  * @version-history
+ *   2026-10-16 — 14b: mark read finds a newer owner's rows on a node holding more than 500; 14c: an owner
+ *     holding more than 1000 sees the newest, and the count and mark read reach every row (QA audit F13-01).
  *   v1.4.0 — 2026-09-25 — A notification's buttons are the node's own (tests 24–30). No principal
  *     writes a `notif.` record on any memory door (the agent writing as its owner, the owner, an app
  *     grant), a record planted straight into storage is served without its off-node buttons, and the
@@ -191,8 +193,9 @@ await test('13. Dismiss is owner-scoped: A\'s own notification for the same thre
 // 500 notification keys across ALL owners — then filter to the caller. Once >500 existed,
 // every recent notification fell outside the window and the bell silently froze. This seeds
 // one owner past that threshold and asserts their newest notification is still returned.
+let C14: Awaited<ReturnType<typeof setupOwner>>;
 await test('14. REGRESSION: the newest notification is returned even with >500 total', async () => {
-    const C = await setupOwner('c');
+    const C = C14 = await setupOwner('c');
     const TARGET = 520; // comfortably over the old 500-row global cap
     const chunk = 20;
     for (let i = 0; i < TARGET; i += chunk) {
@@ -218,6 +221,65 @@ await test('14. REGRESSION: the newest notification is returned even with >500 t
     assert(list.body.data.unread > 500, `unread reflects all of the owner's unread (>500), got ${list.body.data.unread}`);
 });
 
+// QA audit F13-01. Mark-read listed the node's OLDEST 500 notification rows of all owners and then
+// filtered to the caller, so once the node held more than 500 it found none of a newer owner's rows
+// and answered 200 with marked: 0. After test 14 the node holds more than 520, all older than D's.
+await test('14b. REGRESSION: mark read finds a newer owner\'s rows when the node holds more than 500', async () => {
+    const D = await setupOwner('d');
+    // A new account already holds what the node told it at sign-up; count from there.
+    const base = (await json('/v1/notifications', { headers: auth(D.token) })).body.data.unread as number;
+    for (let i = 0; i < 3; i++) {
+        const r = await json('/v1/notifications', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ title: `d-${i}`, type: 'bulk' }) });
+        assert(r.status === 201, `create ${r.status}`);
+    }
+    const before = await json('/v1/notifications', { headers: auth(D.token) });
+    assert(before.body.data.unread === base + 3, `D has ${base + 3} unread: ${before.body.data.unread}`);
+    const one = before.body.data.notifications[0].id;
+    const byId = await json('/v1/notifications/read', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ ids: [one] }) });
+    assert(byId.status === 200 && byId.body.data.marked === 1, `mark one by id: ${byId.status} ${JSON.stringify(byId.body.data)}`);
+    const all = await json('/v1/notifications/read', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ all: true }) });
+    assert(all.status === 200 && all.body.data.marked === base + 2, `mark the rest: ${all.status} ${JSON.stringify(all.body.data)}`);
+    const after = await json('/v1/notifications', { headers: auth(D.token) });
+    assert(after.body.data.unread === 0, `the bell clears: ${after.body.data.unread}`);
+    // Another owner's rows were not touched: C still has its unread ones.
+    const c = await json('/v1/notifications?limit=1', { headers: auth(C14.token) });
+    assert(c.body.data.unread > 500, `C's unread stay: ${c.body.data.unread}`);
+});
+
+// QA audit F13-01, the read half. The list took the owner's first 1000 rows in KEY order, which is
+// oldest first, so an owner holding more than 1000 never saw the newest. 1005 older rows are planted
+// straight into storage (1005 HTTP calls would be minutes), then one is created through the route.
+await test('14c. REGRESSION: an owner holding more than 1000 notifications still sees the newest, and the count is all of them', async () => {
+    const provider = (process.env.AIMEAT_DB ?? 'sqlite') as StorageProvider;
+    if (provider !== 'sqlite' && provider !== 'postgres-kysely') { console.log(`     (skipped: the ${provider} backend lives inside the server)`); return; }
+    const E = await setupOwner('e');
+    const base = (await json('/v1/notifications', { headers: auth(E.token) })).body.data.total as number;
+    const storage: Storage = await createStorage({ provider, sqlitePath: serverSqlitePath(), dbUrl: serverDbUrl() });
+    const t0 = Date.now() - 3_600_000;
+    try {
+        const rows = Array.from({ length: 1005 }, (_, i) => {
+            const at = new Date(t0 + i * 1000).toISOString();
+            const id = randomBytes(8).toString('hex');
+            return {
+                key: `notif.${at}.${id.slice(0, 8)}`, ownerGaii: ghiiOf(E.name), visibility: 'private' as const, tags: ['notif'],
+                value: { id, type: 'bulk', title: `old-${i}`, body: '', link: '', read: false, createdAt: at },
+                ttlHours: 24, version: 1, createdAt: at, updatedAt: at,
+            };
+        });
+        for (let i = 0; i < rows.length; i += 200) {
+            for (const r of rows.slice(i, i + 200)) await storage.setMemory(r);
+        }
+    } finally { await (storage as unknown as { close?: () => unknown }).close?.(); }
+    const marker = `newest-e-${Date.now()}`;
+    const created = await json('/v1/notifications', { method: 'POST', headers: auth(E.token), body: JSON.stringify({ title: marker, type: 'bulk' }) });
+    assert(created.status === 201, `create ${created.status}`);
+    const list = await json('/v1/notifications', { headers: auth(E.token) });
+    assert(list.status === 200, `list ${list.status}`);
+    assert(list.body.data.notifications[0]?.title === marker, `the newest is on top: ${list.body.data.notifications[0]?.title}`);
+    assert(list.body.data.total === base + 1006 && list.body.data.unread >= 1006, `every row is counted: total ${list.body.data.total}, unread ${list.body.data.unread}`);
+    const all = await json('/v1/notifications/read', { method: 'POST', headers: auth(E.token), body: JSON.stringify({ all: true }) });
+    assert(all.body.data.marked >= 1006 && all.body.data.marked <= base + 1006, `mark read reaches every row: ${all.body.data.marked}`);
+});
 
 // -- The Notifications page in the poster face (2026-08-30): sources, settings, mute, senders, devices --
 

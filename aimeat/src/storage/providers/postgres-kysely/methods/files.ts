@@ -7,6 +7,8 @@
  *   create is upsert (re-upload replaces), sumStorageBytesForOwners is one cross-identity aggregate,
  *   listStorageFiles omits the bytes.
  * @version-history
+ *   2026-10-16 — The chunked-upload methods go through the shared ChunkedUploadStore: an expired session reads
+ *     as gone and is swept, which this backend never did (QA audit F05b-02).
  *   v1.0.0 — 2026-07-15 — Phase 5: storage files on Postgres+Kysely.
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
  *   v1.2.0 — 2026-08-15 — TARGET-063: getStorageFileMeta and readStorageFileRange (database-side
@@ -226,19 +228,21 @@ export const fileMethods = {
 
   // ── Chunked uploads (transient, in-memory — matches the other backends) ──
   async createChunkedUpload(this: PostgresKyselyStorage, record: ChunkedUploadRecord): Promise<ChunkedUploadRecord> {
-    this.chunkedUploads.set(record.uploadId, record);
-    return record;
+    return this.chunkedUploads.create(record);
   },
   async getChunkedUpload(this: PostgresKyselyStorage, uploadId: string): Promise<ChunkedUploadRecord | null> {
-    return this.chunkedUploads.get(uploadId) ?? null;
+    return this.chunkedUploads.get(uploadId);
   },
   async addChunk(this: PostgresKyselyStorage, uploadId: string, chunkIndex: number, data: Buffer): Promise<boolean> {
-    const upload = this.chunkedUploads.get(uploadId);
-    if (!upload) return false;
-    upload.receivedChunks.set(chunkIndex, data);
-    return true;
+    return this.chunkedUploads.addChunk(uploadId, chunkIndex, data);
   },
   async deleteChunkedUpload(this: PostgresKyselyStorage, uploadId: string): Promise<boolean> {
     return this.chunkedUploads.delete(uploadId);
+  },
+  async chunkedUploadsHeldBy(this: PostgresKyselyStorage, ownerGaii: string): Promise<{ sessions: number; bytes: number }> {
+    return this.chunkedUploads.heldBy(ownerGaii);
+  },
+  async sweepExpiredChunkedUploads(this: PostgresKyselyStorage): Promise<number> {
+    return this.chunkedUploads.sweep();
   },
 };

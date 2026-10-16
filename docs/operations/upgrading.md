@@ -17,7 +17,10 @@ version 4.0.0 removed and what an operator or a client changes before a 3.x node
 ## The update
 
 An update is a stop, an install and a start. Every database change the version brings runs by itself
-at start, in order, each once, and the node always starts; nobody runs a script by hand.
+at start, in order, each once; nobody runs a script by hand. A change that fails is undone and stops
+the start with the file named, and the database stays as it was before that change. The nightly test
+`test/upgrade-from-release.ts` starts each new build on a database the previous release wrote, on
+SQLite and on PostgreSQL.
 
 1. **Back up** the database, `.env` and the node's key file ([backup and restore](backup-and-restore.md)).
 2. **Tell the people who use the node** when it will be down, if it matters to them.
