@@ -19,10 +19,17 @@
  *   viewer, so the page never fills a tab of its own and never shows under its own address with
  *   nothing around it. Only the node's own pages may frame it (frame-ancestors).
  *
+ *   THE HOLDER. The viewer frames `/p/<token>/`, a fixed document of this host
+ *   (src/static/page-frame-holder.html), and the holder frames `index.html`, the page. A frame
+ *   navigates only where its parent's frame-src allows, and the holder's allows this host alone, so a
+ *   page that sends its frame to another site, or to an app that would read from the address what was
+ *   typed into the page, is refused by the browser. Framed straight by the node's own page, the page
+ *   could go wherever that page may frame, the app hosts included.
+ *
  *   The token (services/page-frame-token.ts) names the one record to serve; the node minted it after
  *   the caller passed the page's gate. A public page's share is read again here on every load, so a
  *   page whose share ended or was turned off stops loading at once.
- * @structure pageHostRouter(config, storage) — GET/HEAD /p/:token/{*path}
+ * @structure pageHostRouter(config, storage) — GET /p/_/holder.js · GET/HEAD /p/:token/{*path} (the holder, index.html, the page's files)
  * @usage app.use(pageHostRouter(config, storage)); // only answers on the page host
  * @version-history
  *   v1.0.0 — 2026-10-16 — Initial (HTML pages in workspaces).
@@ -34,9 +41,9 @@ import { verifyPageFrameToken, PageFrameTokenError, type PageFrameClaims } from 
 import { findWorkspaceRecord } from '../services/workspace-write.js';
 import { readShareMetaOf, isDocPublicAt, publicViewerPath } from '../services/workspace-share.js';
 import {
-    isHtmlPageValue, pageFrameCsp, pageOriginOf, pageFileNameOk, isServablePageFileType, PAGE_PERMISSIONS_POLICY,
+    isHtmlPageValue, pageFrameCsp, pageHolderCsp, pageOriginOf, pageFileNameOk, isServablePageFileType, PAGE_PERMISSIONS_POLICY,
 } from '../services/html-page.js';
-import { withPageFrameShim } from '../utils/app-frame-assets.js';
+import { withPageFrameShim, pageFrameHolderHtml, pageFrameHolderScript } from '../utils/app-frame-assets.js';
 import { localAccountName } from '../utils/gaii.js';
 import { decodeUriSegment } from '../utils/uri-decode.js';
 import { logger } from '../utils/logger.js';
@@ -99,7 +106,19 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
     const pageOrigin = pageOriginOf(config);
     // An unparseable baseUrl has no apex to name in frame-ancestors, and leaves the page host inert.
     const apexOrigin = URL.canParse(config.baseUrl) ? new URL(config.baseUrl).origin : '';
-    const csp = pageOrigin && apexOrigin ? pageFrameCsp(pageOrigin, apexOrigin) : '';
+    // The page is framed by its holder (this host) inside the node's own page, so both are its ancestors.
+    const csp = pageOrigin && apexOrigin ? pageFrameCsp(pageOrigin, `${pageOrigin} ${apexOrigin}`) : '';
+    const holderCsp = pageOrigin && apexOrigin ? pageHolderCsp(pageOrigin, apexOrigin) : '';
+
+    /** The headers every response of the page host carries: no Referer may carry a token to a library host. */
+    const common = (res: Response, policy: string): void => {
+        res.removeHeader('X-Frame-Options');
+        res.setHeader('Content-Security-Policy', policy);
+        res.setHeader('Permissions-Policy', PAGE_PERMISSIONS_POLICY);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Referrer-Policy', 'no-referrer');
+        res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    };
 
     const serve = async (req: Request, res: Response): Promise<void> => {
         if (!req.pageOrigin || !csp) { sendText(res, 404, 'Not found'); return; }
@@ -113,12 +132,14 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
         }
         const raw = req.params.path;
         const path = Array.isArray(raw) ? raw.join('/') : (typeof raw === 'string' ? raw : '');
-        const isPage = path === '' || path === 'index.html';
+        // `/p/<token>/` is the holder the viewer frames; `index.html` beside it is the page itself.
+        const isHolder = path === '';
+        const isPage = path === 'index.html';
         // Into a frame only. A browser that opens the address in a tab of its own is sent to the
         // page's viewer; one that says nothing about where the response goes is told so, because the
         // frame is the one place this page is allowed to run.
         const dest = req.get('sec-fetch-dest');
-        if (dest === 'document' || (isPage && dest && dest !== 'iframe')) { res.redirect(302, viewerOf(config, claims)); return; }
+        if (dest === 'document' || ((isHolder || isPage) && dest && dest !== 'iframe')) { res.redirect(302, viewerOf(config, claims)); return; }
         if (!dest) { sendText(res, 403, `This page opens inside its viewer: ${viewerOf(config, claims)}`); return; }
 
         const key = `organism.${claims.org}.w.${claims.ws}.${claims.ns}.${claims.id}.${claims.r}`;
@@ -129,15 +150,19 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
+        if (isHolder) {
+            const holder = pageFrameHolderHtml();
+            if (!holder) { sendText(res, 500, 'This page could not be loaded.'); return; }
+            common(res, holderCsp);
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-cache');
+            if (req.method === 'HEAD') { res.end(); return; }
+            res.send(holder);
+            return;
+        }
         // The same headers on the page and on every file of it: a file the frame navigates to is as
         // sandboxed as the page.
-        res.removeHeader('X-Frame-Options');
-        res.setHeader('Content-Security-Policy', csp);
-        res.setHeader('Permissions-Policy', PAGE_PERMISSIONS_POLICY);
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-        // The token is in the path: no Referer may carry it to a library host the page loads from.
-        res.setHeader('Referrer-Policy', 'no-referrer');
-        res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+        common(res, csp);
 
         if (isPage) {
             const buf = withPageFrameShim(rec.value.html);
@@ -165,10 +190,23 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
             if (!res.headersSent) sendText(res, 500, 'This page could not be loaded.');
         });
     };
+    // The holder's script: the same for every page, so it carries no token and may be cached.
+    router.get('/p/_/holder.js', (req, res, next) => {
+        if (!req.pageOrigin) { next(); return; }
+        const script = pageFrameHolderScript();
+        if (!script) { sendText(res, 404, 'Not found'); return; }
+        res.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+        res.send(script);
+    });
     // The address of the page without its slash: the page's relative file names would resolve one
     // level up, so it moves to the address that ends in one.
+    // Express matches `/p/:token` with a trailing slash too (non-strict routing), so the address
+    // that already ends in one goes on to the route below.
     router.get('/p/:token', (req, res, next) => {
-        if (!req.pageOrigin) { next(); return; }
+        if (!req.pageOrigin || req.path.endsWith('/')) { next(); return; }
         res.redirect(301, `/p/${encodeURIComponent(String(req.params.token))}/`);
     });
     router.get('/p/:token/{*path}', (req, res, next) => { if (!req.pageOrigin) { next(); return; } guarded(req, res); });

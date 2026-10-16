@@ -1,0 +1,24 @@
+/**
+ * @file html-page-frame.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description An HTML page of a workspace in its frame (components/HtmlPageFrame.js): the strip above
+ *   it, which the page cannot reach, and the frame. The frame keeps a reading height on a desktop and
+ *   on a phone and fills the screen in full screen. Reads only the tokens in theme.css.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 -- 2026-10-16 -- Initial (HTML pages in workspaces).
+ */
+
+.html-page-frame { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+.html-page-frame-strip { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; min-width: 0; }
+.html-page-frame-note { flex: 1 1 14rem; min-width: 0; color: var(--text-dim); font-size: var(--text-sm); }
+.html-page-frame-ask { padding: .5rem .75rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--shape-corner); }
+.html-page-frame-url { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text); }
+.html-page-frame-frame { display: block; width: 100%; height: 75vh; min-height: 420px; border: 1px solid var(--border); border-radius: var(--shape-corner); background: var(--bg); }
+.html-page-frame:fullscreen { background: var(--bg); padding: .5rem; }
+.html-page-frame:fullscreen .html-page-frame-frame { flex: 1; height: auto; min-height: 0; }
+
+@media (max-width: 640px) {
+  .html-page-frame-frame { height: 70vh; min-height: 320px; }
+}

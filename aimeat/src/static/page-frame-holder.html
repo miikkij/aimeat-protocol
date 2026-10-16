@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
+<title>Page</title>
+<!--
+  The page frame's holder (routes/page-host.ts). The viewer frames this document; this document
+  frames the page itself (index.html beside it). It exists for one rule: a frame may navigate only to
+  what its PARENT's frame-src allows, and this parent allows the page host alone. A page that sends
+  its frame to another site, or to an app that would read what was typed into the page from the
+  address, is refused by the browser. The script beside it passes a link the page asks to open on to
+  the viewer, and nothing else. Served from disk unchanged; it holds no data.
+-->
+<style>html,body{margin:0;height:100%;background:transparent}iframe{display:block;border:0;width:100%;height:100%}</style>
+</head>
+<body>
+<iframe src="index.html" sandbox="allow-scripts allow-forms allow-modals" referrerpolicy="no-referrer" title="Page"></iframe>
+<script src="/p/_/holder.js"></script>
+</body>
+</html>

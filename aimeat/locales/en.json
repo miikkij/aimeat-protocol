@@ -25116,5 +25116,41 @@
   "places.kw.admin.federation": "peers, relay, other servers",
   "places.kw.admin.genesis": "peers, seed peers",
   "places.kw.admin.design-lab": "components, UI library, design",
-  "places.kw.admin.themes": "fonts, colours, colors, theme, style, palette"
+  "places.kw.admin.themes": "fonts, colours, colors, theme, style, palette",
+  "pageFrame": {
+    "loading": "Loading the page…",
+    "loadFailed": "The page could not be loaded.",
+    "noHost": "This service does not show HTML pages yet, so the page is shown as text.",
+    "madeByUser": "A page made by a user. It runs apart and cannot reach your account.",
+    "fullScreen": "Full screen",
+    "report": "Report",
+    "reported": "Thank you. The people who run this service will look at the page.",
+    "reportFailed": "The report did not go through. Try again.",
+    "reportSignIn": "Sign in to report this page.",
+    "openAsk": "The page wants to open this address:",
+    "openYes": "Open",
+    "openNo": "Cancel",
+    "frameTitle": "HTML page: {title}"
+  },
+  "htmlPage": {
+    "newPage": "HTML page",
+    "kind": "Kind",
+    "kindValue": "HTML page",
+    "lastOpened": "Last opened",
+    "stale": "Nobody has opened or changed this page in six months.",
+    "editorLead": "Paste a whole HTML page here, or read it from a file. The page runs in an isolated frame: it has no network, and it cannot reach anybody's account.",
+    "fromFile": "Read from a file",
+    "orPaste": "…or paste the HTML below",
+    "pastePlaceholder": "Paste the HTML here",
+    "size": "{kb} kB of {max} kB",
+    "empty": "The page has no HTML yet.",
+    "tooBig": "The page is larger than 1 MB. Use smaller or fewer pictures.",
+    "fileUnreadable": "The file could not be read.",
+    "promptLead": "Is your AI not connected to this service? Copy this prompt into any AI, paste its answer in the field above, and save.",
+    "topicPlaceholder": "What the page is about",
+    "copyPrompt": "Copy the prompt",
+    "promptCopied": "Copied",
+    "shareEnds": "ends {date}",
+    "shareExtend": "Extend 90 days"
+  }
 }

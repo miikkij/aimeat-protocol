@@ -14,6 +14,9 @@
  * @structure PublicWorkspaceViewer (default export)
  * @usage route /v1/publicworkspaceviewer?org=<id>&ws=<ws>[&type=<space>&id=<docId>]
  * @version-history
+ *   v1.4.0 — 2026-10-16 — An HTML page renders in its frame (components/HtmlPageFrame.js) from the
+ *     frame_url the read hands out, with Report for a signed-in visitor. A Markdown page's own
+ *     pictures load for whoever the share admits (?share= on /v1/pub, with the read's headers).
  *   v1.2.0 — 2026-07-10 — TARGET-025 share access modes: a 401 SHARE_PASSWORD_REQUIRED renders a
  *     password prompt (unlock → X-Share-Token kept in sessionStorage per org+ws, sent on reads);
  *     SHARE_ACCOUNT_REQUIRED renders a sign-in-required state (the read retries with the shell
@@ -38,8 +41,46 @@ import { Markdown } from '/components/Markdown.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
+import { HtmlPageFrame } from '/components/HtmlPageFrame.js';
 
 const html = htm.bind(h);
+
+/** The image addresses a page's Markdown embeds from the node (`![…](/v1/pub/…)`). */
+const PUB_IMG_RE = /!\[[^\]]*\]\((\/v1\/pub\/[^\s)]+)\)/g;
+
+/**
+ * A shared Markdown page's own pictures. They are scoped to the workspace's members, so a plain
+ * <img> gets nothing for a visitor; asked with the page they are in (?share=) and with the share's
+ * token or the session, the node serves them to whoever may read the page (share-file-pass.ts), and
+ * they are shown from blob: addresses. A picture that does not load keeps its address.
+ */
+function SharedMarkdown({ org, ws, doc, readHeaders, onWikiLink }) {
+  const [text, setText] = useState(doc.markdown || '');
+  useEffect(() => {
+    let cancelled = false; const made = [];
+    const raw = doc.markdown || '';
+    setText(raw);
+    const urls = [...new Set([...raw.matchAll(PUB_IMG_RE)].map(m => m[1]))];
+    if (!urls.length) return undefined;
+    const ref = [org, ws, doc.type, doc.id].map(encodeURIComponent).join('/');
+    const headers = readHeaders();
+    (async () => {
+      let out = raw;
+      for (const u of urls) {
+        try {
+          const res = await fetch(`${u}${u.includes('?') ? '&' : '?'}share=${encodeURIComponent(ref)}`, { headers });
+          if (!res.ok) continue;
+          const blobUrl = URL.createObjectURL(await res.blob());
+          made.push(blobUrl);
+          out = out.split(u).join(blobUrl);
+        } catch (err) { swallowed('public-workspace-viewer: image', err); }
+      }
+      if (!cancelled) setText(out);
+    })();
+    return () => { cancelled = true; made.forEach(b => URL.revokeObjectURL(b)); };
+  }, [org, ws, doc.type, doc.id, doc.markdown, readHeaders]);
+  return html`<${Markdown} text=${text} onWikiLink=${onWikiLink} />`;
+}
 
 const docKey = (d) => `${d.type}/${d.id}`;
 // A DOM-id-safe anchor for each stacked page so the TOC can scroll to it.
@@ -64,16 +105,38 @@ export default function PublicWorkspaceViewer() {
   const [unlockErr, setUnlockErr] = useState(null);
   const [unlockBusy, setUnlockBusy] = useState(false);
 
+  // The headers every read of this share carries: the SPA session JWT when signed in (members and
+  // account-mode visitors pass the gate) and the stored share token when this workspace was
+  // unlocked with a password. The pictures of a shared page are read with the same ones.
+  const readHeaders = useCallback(() => {
+    const headers = /** @type {Record<string, string>} */ ({ ...authHeaders() });
+    let st = null;
+    try { st = sessionStorage.getItem(shareTokenKey(org, ws)); } catch { /* storage unavailable */ }   // eslint-disable-line aimeat/no-silent-catch -- storage unavailable
+    if (st) headers['X-Share-Token'] = st;
+    return headers;
+  }, [org, ws]);
+
+  // Report an HTML page to the people who run this node. Reporting needs an account.
+  const reportPage = useCallback(async (d) => {
+    const auth = authHeaders();
+    if (!auth || !Object.keys(auth).length) return 'signin';
+    try {
+      const res = await fetch('/v1/flags', {
+        method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetType: 'memory', targetId: `workspace-page:${org}/${ws}/${d.type}/${d.id}`, reason: 'inappropriate',
+          description: `Shared HTML page "${d.title || d.id}" at ${window.location.origin}/v1/publicworkspaceviewer?org=${encodeURIComponent(org)}&ws=${encodeURIComponent(ws)}&type=${encodeURIComponent(d.type)}&id=${encodeURIComponent(d.id)}`,
+        }),
+      });
+      return res.ok || res.status === 409;
+    } catch (err) { swallowed('public-workspace-viewer: report', err); return false; }
+  }, [org, ws]);
+
   const load = useCallback(async () => {
     if (!org || !ws) { setDocs([]); return; }
     setError(null);
     try {
-      // Attach the SPA session JWT when signed in (members + account-mode visitors pass the gate)
-      // and the stored share token when this workspace was unlocked with a password.
-      const headers = /** @type {Record<string, string>} */ ({ ...authHeaders() });
-      let st = null;
-      try { st = sessionStorage.getItem(shareTokenKey(org, ws)); } catch { /* storage unavailable */ }   // eslint-disable-line aimeat/no-silent-catch -- storage unavailable
-      if (st) headers['X-Share-Token'] = st;
+      const headers = readHeaders();
       const res = await fetch(`/v1/organisms/${encodeURIComponent(org)}/workspace/public/documents?ws=${encodeURIComponent(ws)}`, { headers });
       if (res.status === 404) { setDocs([]); setGate(null); return; }
       if (res.status === 401) {
@@ -97,7 +160,7 @@ export default function PublicWorkspaceViewer() {
       setError((e && e.message) || 'Failed to load');
       setDocs([]);
     }
-  }, [org, ws, type, id]);
+  }, [org, ws, type, id, readHeaders]);
 
   // Exchange the typed password for a share token (kept per org+ws in sessionStorage), then reload.
   const unlock = useCallback(async (e) => {
@@ -274,7 +337,9 @@ export default function PublicWorkspaceViewer() {
         ${visibleDocs.length > 0
           ? visibleDocs.map(d => html`
               <article class="pwv-doc" id=${anchorId(d)} data-pwv-key=${docKey(d)}>
-                <${Markdown} text=${d.markdown || ''} onWikiLink=${onWikiLink} />
+                ${d.kind === 'html'
+                  ? html`<${HtmlPageFrame} src=${d.frame_url || null} title=${d.title || ''} text=${d.markdown || ''} onReport=${() => reportPage(d)} />`
+                  : html`<${SharedMarkdown} org=${org} ws=${ws} doc=${d} readHeaders=${readHeaders} onWikiLink=${onWikiLink} />`}
               </article>
             `)
           : html`<div class="pwv-state">${t('pwv.selectDocument') || 'Select a document.'}</div>`

@@ -34,6 +34,7 @@
  *   const res = await appendToDocument({ storage, config }, caller,
  *     { organismId, wsId, space: 'notes', id: 'doc-x', markdown: '## Found\n\n…' });
  * @version-history
+ *   v1.5.0 — 2026-10-16 — An HTML page is refused (NOT_A_MARKDOWN_PAGE): its text is written from its HTML.
  *   v1.4.0 — 2026-10-13 — The caller carries the session's scopes, and the organism namespace rule
  *     is asked with them: a session that covers organism:direct edits a document of a space that
  *     names extensions directly (services/fenced-space.ts, ruled by the developer on 2026-10-13).
@@ -61,6 +62,7 @@ import { resolveSpace, type WriteObjectType } from './workspace-write-items.js';
 import { archivedRefusal } from './workspace-write-guards.js';
 import { memoryCeilings } from './memory-ceilings.js';
 import { validateMemoryWrite } from './schema-validator.js';
+import { isHtmlPageValue } from './html-page.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
 import { storeHeldProvenance } from './ai-provenance.js';
 import { provenanceForDocEdit } from './workspace-doc-provenance.js';
@@ -281,6 +283,12 @@ async function editDocument(
                 `"${target.id}" is not stored as a document object, so it has no markdown to edit. Rewrite it with aimeat_workspace_write as { title, markdown }.`);
         }
         const doc = value as Record<string, unknown>;
+        // An HTML page's text is written from its HTML (services/html-page.ts); editing the text
+        // would change what search reads and nothing a reader sees, so the page is rewritten instead.
+        if (isHtmlPageValue(doc)) {
+            throw new WorkspaceDocError('NOT_A_MARKDOWN_PAGE', 422,
+                `"${target.id}" is an HTML page, and its text is written from its HTML. Rewrite the page with aimeat_workspace_write as { title, html }.`);
+        }
         const current = doc.markdown;
         if (typeof current !== 'string') {
             throw new WorkspaceDocError('NOT_A_DOCUMENT', 422,

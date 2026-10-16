@@ -11,6 +11,8 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.14.0 -- 2026-10-16 -- The SPA's frame-src names the page host (config.pageHost), where an HTML
+ *     page of a workspace runs in its frame (routes/page-host.ts).
  *   v1.13.1 -- 2026-09-26 -- /app-frame-core.js, the module /app-frame.js imports (shared with the App
  *     Catalog's preview), is served with no-cache like the script that imports it.
  *   v1.13.0 -- 2026-09-25 -- The isolated frame (audit A7-1): /app-frame.js, the script of the page
@@ -79,6 +81,7 @@ import { buildAuthMd } from '../services/auth-md.js';
 import { resolveAssetDir } from './asset-dirs.js';
 import { appOriginServiceWorker } from '../utils/app-sw-source.js';
 import { appFrameHostScript, appFrameCoreScript } from '../utils/app-frame-assets.js';
+import { pageOriginOf } from '../services/html-page.js';
 
 /**
  * This module's own directory, which is what asset-dirs.ts measures the asset trees against:
@@ -151,6 +154,11 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     const h = config.appHost;
     appFrameSrc = ` ${scheme}://${h} ${scheme}://*.${h} ${scheme}://${h}:* ${scheme}://*.${h}:*`;
   }
+
+  // The page frame (routes/page-host.ts): the SPA frames the one page host, where an HTML page of a
+  // workspace runs. Its exact origin, never a family. Empty without a page host.
+  const pageOrigin = pageOriginOf(config);
+  const pageFrameSrc = pageOrigin ? ` ${pageOrigin}` : '';
 
   // Dev tree, compiled tree, npm install or scaffolded CWD — asset-dirs.ts holds the layouts.
   const publicDir = resolveAssetDir('public', __dirname, process.cwd());
@@ -253,7 +261,7 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
         "connect-src 'self' wss: ws:",
         "img-src 'self' data: blob:",
         "font-src 'self'",
-        `frame-src 'self' blob: data:${appFrameSrc}`,
+        `frame-src 'self' blob: data:${appFrameSrc}${pageFrameSrc}`,
         "object-src 'none'",
         "base-uri 'self'",
       ].join('; '));

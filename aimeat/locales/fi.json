@@ -25096,5 +25096,41 @@
   "places.kw.admin.federation": "vertaiset, muut palvelimet",
   "places.kw.admin.genesis": "vertaiset",
   "places.kw.admin.design-lab": "komponentit, käyttöliittymäkirjasto, suunnittelu",
-  "places.kw.admin.themes": "fontit, värit, teema, tyyli, paletti"
+  "places.kw.admin.themes": "fontit, värit, teema, tyyli, paletti",
+  "pageFrame": {
+    "loading": "Ladataan sivua…",
+    "loadFailed": "Sivua ei voitu ladata.",
+    "noHost": "Tämä palvelu ei vielä näytä HTML-sivuja, joten sivu näkyy tekstinä.",
+    "madeByUser": "Käyttäjän tekemä sivu. Se toimii erillään eikä pääse tiliisi.",
+    "fullScreen": "Koko näyttö",
+    "report": "Ilmoita",
+    "reported": "Kiitos. Palvelun ylläpitäjät tarkistavat sivun.",
+    "reportFailed": "Ilmoitus ei mennyt perille. Yritä uudelleen.",
+    "reportSignIn": "Kirjaudu sisään, niin voit ilmoittaa sivusta.",
+    "openAsk": "Sivu haluaa avata tämän osoitteen:",
+    "openYes": "Avaa",
+    "openNo": "Peruuta",
+    "frameTitle": "HTML-sivu: {title}"
+  },
+  "htmlPage": {
+    "newPage": "HTML-sivu",
+    "kind": "Laji",
+    "kindValue": "HTML-sivu",
+    "lastOpened": "Viimeksi avattu",
+    "stale": "Kukaan ei ole avannut tai muuttanut tätä sivua kuuteen kuukauteen.",
+    "editorLead": "Liitä tähän kokonainen HTML-sivu tai lue se tiedostosta. Sivu toimii eristetyssä kehyksessä: sillä ei ole verkkoyhteyttä, eikä se pääse kenenkään tiliin.",
+    "fromFile": "Lue tiedostosta",
+    "orPaste": "…tai liitä HTML alle",
+    "pastePlaceholder": "Liitä HTML tähän",
+    "size": "{kb} kt / {max} kt",
+    "empty": "Sivulla ei ole vielä HTML:ää.",
+    "tooBig": "Sivu on yli 1 Mt. Käytä pienempiä tai vähemmän kuvia.",
+    "fileUnreadable": "Tiedostoa ei voitu lukea.",
+    "promptLead": "Eikö tekoälysi ole yhteydessä tähän palveluun? Kopioi tämä kehote mihin tahansa tekoälyyn, liitä sen vastaus yllä olevaan kenttään ja tallenna.",
+    "topicPlaceholder": "Mistä sivu kertoo",
+    "copyPrompt": "Kopioi kehote",
+    "promptCopied": "Kopioitu",
+    "shareEnds": "päättyy {date}",
+    "shareExtend": "Jatka 90 päivää"
+  }
 }

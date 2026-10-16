@@ -10,6 +10,7 @@
  * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   v2.24.0 -- 2026-10-16 -- A shared page with an end date says when its link ends, with "Extend 90 days" beside it.
  *   v2.23.0 -- 2026-10-02 -- The question marks that explain the workspace settings: workspace.autonomy, workspace.member_changes, workspace.publish_gate (components/HelpTip.js).
  *   2026-09-25 -- Settings: "Members' changes", the workspace's rule for a change from a member who is
  *     neither its creator nor an admin (made at once, or waits for approval).
@@ -185,6 +186,9 @@ export function renderSettingsPanel(ctx) {
     <//>`;
 }
 
+/** How far "Extend" moves a page's end date: the 90 days an HTML page's open link lasts (src/services/html-page.ts). */
+const SHARE_EXTEND_DAYS = 90;
+
 export function renderShareTab(ctx) {
   const { share, docTypes, shareBusy, patchShare, objectsFor, wsT, isDocPublic, sharePw, setSharePw, showToast, anythingPublic, orgId, wsId } = ctx;
   const pwWords = t('organisms.sharePasswordPlaceholder') || 'Share password (4–128 chars)';
@@ -227,7 +231,10 @@ export function renderShareTab(ctx) {
                             return html`
                               <${Row} key=${'shd' + d.id}>
                                 <${Cell}><${Check} checked=${on} disabled=${shareBusy} onChange=${(v) => patchShare({ docs: { [`${ot.name}/${d.id}`]: v } })}>${d.title || d.id}<//><//>
-                                <${Doors}>${on ? html`<${Action} small href=${orgService.publicViewerUrl(orgId, wsId, { type: ot.name, id: d.id })} newTab>${t('organisms.openLink') || 'open ↗'}<//>` : null}<//>
+                                <${Doors}>${on ? html`
+                                  ${share.until?.[`${ot.name}/${d.id}`] ? html`<${Mark}>${(t('htmlPage.shareEnds') || 'ends {date}').replace('{date}', fmtDate(share.until[`${ot.name}/${d.id}`]))}<//>
+                                    <${Action} small disabled=${shareBusy} onClick=${() => patchShare({ until: { [`${ot.name}/${d.id}`]: new Date(Date.now() + SHARE_EXTEND_DAYS * 86_400_000).toISOString() } })}>${t('htmlPage.shareExtend')}<//>` : null}
+                                  <${Action} small href=${orgService.publicViewerUrl(orgId, wsId, { type: ot.name, id: d.id })} newTab>${t('organisms.openLink') || 'open ↗'}<//>` : null}<//>
                               <//>`;
                           })}
                         <//>`}

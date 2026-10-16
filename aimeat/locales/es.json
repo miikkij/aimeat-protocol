@@ -22901,5 +22901,41 @@
   "places.kw.admin.federation": "pares, otros servidores",
   "places.kw.admin.genesis": "pares",
   "places.kw.admin.design-lab": "componentes, biblioteca de interfaz, diseño",
-  "places.kw.admin.themes": "fuentes, colores, tema, estilo, paleta"
+  "places.kw.admin.themes": "fuentes, colores, tema, estilo, paleta",
+  "pageFrame": {
+    "loading": "Cargando la página…",
+    "loadFailed": "No se pudo cargar la página.",
+    "noHost": "Este servicio aún no muestra páginas HTML, así que la página se muestra como texto.",
+    "madeByUser": "Una página hecha por un usuario. Funciona aparte y no puede acceder a tu cuenta.",
+    "fullScreen": "Pantalla completa",
+    "report": "Denunciar",
+    "reported": "Gracias. Quienes gestionan este servicio revisarán la página.",
+    "reportFailed": "La denuncia no se envió. Inténtalo de nuevo.",
+    "reportSignIn": "Inicia sesión para denunciar esta página.",
+    "openAsk": "La página quiere abrir esta dirección:",
+    "openYes": "Abrir",
+    "openNo": "Cancelar",
+    "frameTitle": "Página HTML: {title}"
+  },
+  "htmlPage": {
+    "newPage": "Página HTML",
+    "kind": "Tipo",
+    "kindValue": "Página HTML",
+    "lastOpened": "Abierta por última vez",
+    "stale": "Nadie ha abierto ni cambiado esta página en seis meses.",
+    "editorLead": "Pega aquí una página HTML completa o léela de un archivo. La página funciona en un marco aislado: no tiene red y no puede acceder a la cuenta de nadie.",
+    "fromFile": "Leer de un archivo",
+    "orPaste": "…o pega el HTML abajo",
+    "pastePlaceholder": "Pega el HTML aquí",
+    "size": "{kb} kB de {max} kB",
+    "empty": "La página aún no tiene HTML.",
+    "tooBig": "La página ocupa más de 1 MB. Usa imágenes más pequeñas o menos imágenes.",
+    "fileUnreadable": "No se pudo leer el archivo.",
+    "promptLead": "¿Tu IA no está conectada a este servicio? Copia este prompt en cualquier IA, pega su respuesta en el campo de arriba y guarda.",
+    "topicPlaceholder": "De qué trata la página",
+    "copyPrompt": "Copiar el prompt",
+    "promptCopied": "Copiado",
+    "shareEnds": "termina el {date}",
+    "shareExtend": "Ampliar 90 días"
+  }
 }
