@@ -28,7 +28,6 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from './server.js';
 import { loadConfig } from './config.js';
 import { logger } from './utils/logger.js';
-import { errorFields } from './utils/error-fields.js';
 import { HELP_TEXT, CONNECT_HELP_TEXT } from './index-help.js';
 import { runConnectCli } from './index-connect.js';
 import { runStart } from './index-start.js';

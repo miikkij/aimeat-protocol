@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-16 — meteredCoordinateOf moved to commerce/metered-coordinate.ts, unchanged, to keep this file under 800 lines.
  *   2026-10-16 — A failed fulfilment after the collect words the buyer's message from the refund's outcome: only a refund the rail confirmed says "refunded"; a payment taken and not returned (x402, a failed Stripe refund) says so, names the checkout reference, and is stored as `commerce.undelivered.{id}` under the seller, logged and told to the operator (QA audit F5-01, F7e-01, S8-05).
  *   2026-10-16 — completeSession claims the session (open → completing, compare-and-swap) before the
  *     pacing and the collect, puts it back on a refusal, and records the collected tracking code
@@ -68,6 +69,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext, PaymentHandler, CheckoutAttribution, RefundOutcome } from './types.js';
+import { meteredCoordinateOf } from './metered-coordinate.js';
 import { refundCollected, refundSentence, recordUndeliveredPayment } from './undelivered-payment.js';
 import { getPaymentHandler, listPaymentHandlers, LEGACY_MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { chargePacing, pacingReceipt } from '../services/metered-settlement.js';
@@ -419,24 +421,6 @@ export async function cancelSession(
  * rethrows, leaving the session open for retry. Payout/fee legs run after fulfillment and are
  * best-effort ordered — the buyer's money moves exactly once.
  */
-/**
- * The metered coordinate a checkout line is sold under, or null when it has none.
- *
- * A beneficiary split is declared against the same `(ext, action)` pair a contract is keyed on, so
- * a purchase made through checkout has to resolve to that same pair or the seller's declared split
- * would apply on one route and be silently skipped on the other. Agent offers have no such
- * coordinate today and return null, which means their revenue is not split.
- */
-function meteredCoordinateOf(sellable: Sellable): { ext: string; action: string } | null {
-  if (sellable.kind === 'app-tool') {
-    return { ext: `apptool:${sellable.sellerOwner}/${sellable.agentName}`, action: sellable.offerId };
-  }
-  if (sellable.kind === 'ext-call') {
-    return { ext: sellable.agentName, action: sellable.offerId };
-  }
-  return null;
-}
-
 /**
  * Book the seller's beneficiary shares for one settled checkout line.
  *
