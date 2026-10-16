@@ -10,6 +10,8 @@
  * @structure emailHashOf; ProvisionEmailTakenError; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   2026-10-16 — createdAccountIsOperator asks storage.operatorAccountState (two EXISTS queries) instead of
+ *     loading every owner on each registration (QA audit P7-10).
  *   v1.9.0 — 2026-10-16 — createAccountRows(): the owner row, the profile row and the welcome bonus in
  *     one transaction, used by provisionOwner and every account-creating route; a failure after the
  *     owner row had left a taken name nobody could sign in with (QA audit E6-02).
@@ -45,7 +47,6 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
-import { isOperatorAccount } from '../utils/operator-account.js';
 import { promoteContactsForVerifiedEmail } from './contacts.js';
 import { applyAppInvitesForVerifiedEmail } from './app-member-invites.js';
 import { executeHooks } from './hooks.js';
@@ -225,9 +226,9 @@ export interface ProvisionedOwner {
  * owner only", so who became operator depended on the route (feature-list audit 19).
  */
 export async function createdAccountIsOperator(storage: Storage): Promise<boolean> {
-  const allOwners = await storage.listOwners();
-  const realOwners = allOwners.filter(o => o.name !== 'anonymous');
-  return realOwners.length === 0 || !allOwners.some(isOperatorAccount);
+  // Two EXISTS queries, not the whole owner table: every registration asks this (QA audit P7-10).
+  const { anyOwner, anyOperator } = await storage.operatorAccountState();
+  return !anyOwner || !anyOperator;
 }
 
 /**

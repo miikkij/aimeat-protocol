@@ -21,6 +21,8 @@
  *   POST /v1/commerce/beneficiary/release · GET+POST /v1/commerce/beneficiary/approvals
  * @usage app.use(commerceBeneficiariesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — earnings and obligations total every entry and return the newest `limit` of them, with
+ *     `total` beside `count`; the totals were sums of a window (QA audit S8-10).
  *   2026-10-16 — POST /v1/commerce/beneficiary-splits calls declareSplit and both split routes answer
  *     with splitView (commerce/beneficiary-split-declare.ts), which aimeat_commerce_beneficiary_split_set
  *     uses too; a split now names its author, `created_by` (QA audit D2-08).
@@ -133,15 +135,18 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
   router.get('/v1/commerce/beneficiary/earnings', requireAuth(), requireScope('wallet:read'), async (req: Request, res: Response) => {
     const beneficiaryGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const status = typeof req.query.status === 'string' ? req.query.status : null;
-    const all = await listBeneficiaryEntries(storage, beneficiaryGhii, limitOf(req.query.limit));
-    const entries = status ? all.filter(e => e.status === status) : all;
+    // Totals over EVERY entry, the list capped at the newest `limit` (QA audit S8-10).
+    const all = await listBeneficiaryEntries(storage, beneficiaryGhii);
+    const matching = status ? all.filter(e => e.status === status) : all;
+    const entries = matching.slice(0, limitOf(req.query.limit));
     const gate = await beneficiaryEligibility(storage, config, beneficiaryGhii);
     return res.json(success(config.nodeId, {
       beneficiary: beneficiaryGhii,
       verification: { state: gate.state, payable: gate.eligible, reason: gate.reason, message: gate.message },
-      totals: totalsOf(entries),
+      totals: totalsOf(matching),
       entries: entries.map(entryView),
       count: entries.length,
+      total: matching.length,
       note: 'A share is owed by the PROVIDER, not by the buyer. It comes out of what the provider earned. '
         + '`accrued` means booked and unpaid; it becomes payable once your account is verified.',
     }));
@@ -151,13 +156,15 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
   router.get('/v1/commerce/beneficiary/obligations', requireAuth(), requireScope('wallet:read'), async (req: Request, res: Response) => {
     const providerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const status = typeof req.query.status === 'string' ? req.query.status : null;
-    const all = await listBeneficiaryObligations(storage, providerGhii, limitOf(req.query.limit, 1000));
-    const entries = status ? all.filter(e => e.status === status) : all;
+    const all = await listBeneficiaryObligations(storage, providerGhii);
+    const matching = status ? all.filter(e => e.status === status) : all;
+    const entries = matching.slice(0, limitOf(req.query.limit, 1000));
     return res.json(success(config.nodeId, {
       provider: providerGhii,
-      totals: totalsOf(entries),
+      totals: totalsOf(matching),
       entries: entries.map(e => ({ ...entryView(e), beneficiary: e.beneficiaryGhii })),
       count: entries.length,
+      total: matching.length,
     }, [
       { description: 'Release one', method: 'POST', url: '/v1/commerce/beneficiary/release' },
     ]));

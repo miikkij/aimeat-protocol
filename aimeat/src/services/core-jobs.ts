@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-16 — memory-ttl-cleanup is one provider DELETE over every owner (storage.deleteExpiredMemory);
+ *     it removed nothing on PostgreSQL and skipped every row not owned by an agent (QA audit D4-01, E4-01).
  *   2026-10-16 — The work timeout and the dispute timeout write the refund and the status that stops a
  *     repeat in one transaction, after reading the status again (QA audit E6-03).
  *   2026-10-15 — The work timeout and the dispute timeout store the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
@@ -294,23 +296,13 @@ async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage): Promis
 }
 
 async function runMemoryTtlCleanupJob(storage: Storage): Promise<void> {
-  // Memory trace 2026-08-17: this job used to list every agent's memory WITH VALUES just to
-  // read ttlHours — measured at +368 MB of native churn per cron run on production, the
-  // largest single eater left after the WASM fix. The meta projection carries ttlHours and
-  // createdAt without ever loading a value, so the sweep now costs kilobytes.
-  const now = Date.now();
-  const allAgents = await storage.listAgents();
-  for (const agent of allAgents) {
-    const metas = await storage.listMemoryMeta(agent.gaii);
-    for (const mem of metas) {
-      if (mem.ttlHours) {
-        const expiresAt = new Date(mem.createdAt).getTime() + mem.ttlHours * 3_600_000;
-        if (now > expiresAt) {
-          await storage.deleteMemory(agent.gaii, mem.key);
-        }
-      }
-    }
-  }
+  // ONE STATEMENT, EVERY OWNER (QA audit D4-01, E4-01). This job walked storage.listAgents() and
+  // deleted what listMemoryMeta returned as expired. On PostgreSQL listMemoryMeta had already dropped
+  // the expired rows, so nothing was ever deleted there, and on both backends a person's own TTL
+  // records (one notification per row, 90 days) were outside the walk. The provider now deletes by
+  // TTL in SQL, as pruneExpiredBoardPosts does for board posts.
+  const removed = await storage.deleteExpiredMemory(new Date().toISOString());
+  if (removed > 0) logger.info(`Memory TTL sweep removed ${removed} expired record(s)`);
 }
 
 async function runBoardPostTtlCleanupJob(storage: Storage): Promise<void> {

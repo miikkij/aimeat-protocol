@@ -14,6 +14,11 @@
  *   - exportWorkspace(storage, config, { orgId, ws, exporterGaii, exportedAt }) -> { buffer, filename }
  * @usage import { exportWorkspace } from '../services/workspace-export.js';
  * @version-history
+ *   2026-10-16 -- The export reads every memory record of the workspace, page by page
+ *     (storage/memory-pages.ts), up to EXPORT_RECORD_LIMIT (200 000), which is named in `truncated`
+ *     when reached. It read one window of 10 000 in key order, so a larger workspace lost its tail,
+ *     and the tail can hold the workspace's own meta.manifest: a member who is not a manager was then
+ *     refused the workspace and the organism bundle skipped it (QA audit F06c-01).
  *   2026-10-15 -- The row spaces (`backing: 'rows'`) are in the export as `rows`
  *     (services/workspace-transfer-rows.ts), and a limit the export reached (10 000 memory records,
  *     or the most rows a workspace may hold) is named in `truncated` and returned by
@@ -52,6 +57,7 @@ import type { ContentReader } from './classification/reader.js';
 import { leaveMemories, leftOutOf, type LeftOut } from './classification-exits.js';
 import { logger } from '../utils/logger.js';
 import { collectRowSpaces, type ExportRow, type ExportTruncation } from './workspace-transfer-rows.js';
+import { listAllMemoryPages } from '../storage/memory-pages.js';
 
 export type { ExportRow, ExportTruncation } from './workspace-transfer-rows.js';
 
@@ -89,8 +95,14 @@ export interface WorkspaceExportJson {
   truncated?: ExportTruncation[];
 }
 
-/** The most memory records (records, documents, versions, meta) one workspace export reads. */
-export const EXPORT_RECORD_LIMIT = 10000;
+/**
+ * The most memory records (records, documents, versions, meta) one workspace export reads. A ceiling
+ * against holding an unbounded set in memory, far above what the publish routes create in practice;
+ * reaching it is named in `truncated`. Until 2026-10-16 it was 10 000 and read as one window.
+ */
+export const EXPORT_RECORD_LIMIT = 200_000;
+/** Rows per page of that read. */
+export const EXPORT_PAGE_SIZE = 5000;
 
 /** Pull storage keys out of an image URL: /v1/storage/<key> or /v1/pub/<ghii>/<key>. */
 const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
@@ -117,9 +129,11 @@ export async function collectWorkspace(
     isActiveMemberOwner = !!m && m.status === 'active';
   }
 
-  // `total` is the count past the limit too, so a workspace larger than the export reads is named in
-  // `truncated` instead of arriving as a smaller backup without a word (feature-list audit #68).
-  const { items, total: recordTotal } = await storage.listAllMemory({ prefix: `${root}.`, limit: EXPORT_RECORD_LIMIT });
+  // EVERY record, page by page (QA audit F06c-01). One window of 10 000 in key order cut a larger
+  // workspace's tail, and meta.* sorts after most namespaces, so the manifest itself could fall out.
+  // `total` is the count past the ceiling too, so a workspace larger than the export reads is named
+  // in `truncated` instead of arriving as a smaller backup without a word (feature-list audit #68).
+  const { items, total: recordTotal } = await listAllMemoryPages(storage, { prefix: `${root}.` }, EXPORT_PAGE_SIZE, EXPORT_RECORD_LIMIT);
 
   // SECURITY (C-5): membership of the organism is not access to every workspace in it. The live read
   // decides per workspace, on its manifest record — an org manager reads all, the manifest's own

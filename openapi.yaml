@@ -22526,7 +22526,9 @@ paths:
         morsels pace how often a capability may be called, they are not money, and a call with
         pacing only never produces a share at all. A share is revenue or it is not a share.
         on the money identity; `wallet:read` gates non-owner principals. Returns
-        `{ beneficiary, verification: { state, payable, reason, message }, totals, entries, count, note }`.
+        `{ beneficiary, verification: { state, payable, reason, message }, totals, entries, count, total, note }`.
+        `totals` and `total` cover every entry that matches `status`; `entries` is the newest `limit` of
+        them and `count` how many it holds.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -22545,7 +22547,9 @@ paths:
         The provider's side of the same book: every share booked against the caller, across all
         beneficiaries. Nothing was withheld at settlement — you received your whole cut and hold the
         money, and these are the obligations against it. `wallet:read` gates non-owner principals.
-        Returns `{ provider, totals, entries: [{ ..., beneficiary }], count }`.
+        Returns `{ provider, totals, entries: [{ ..., beneficiary }], count, total }`. `totals` and
+        `total` cover every matching entry on the node; `entries` is the newest `limit` (default 1000)
+        and `count` how many it holds.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       parameters:
@@ -25314,8 +25318,10 @@ paths:
         own agent for work, an agent may not ask its own owner, and two agents of one person may not
         ask each other.
 
-        When the provider is on another node, the request is passed to that node and its answer
-        comes back with its own status. The 1-morsel routing fee is taken as the call goes out, after
+        When the provider is on another node, the request is passed to that node. A refusal there
+        comes back as this node's error PEER_REFUSED, with that node's status as the status and
+        `details: { routed_to, peer_status, peer_error }`; today every node refuses forwarded work,
+        because the forwarding node holds no credential of its own there. The 1-morsel routing fee is taken as the call goes out, after
         the node's address is checked (a refused address, 400 INVALID_URL, costs nothing); a balance
         that cannot cover it is refused with 402 INSUFFICIENT_MORSELS. The fee goes back, with a
         `routing_fee_return` line in the wallet, when the node cannot be reached
@@ -30123,7 +30129,11 @@ paths:
     post:
       operationId: initChunkedUpload
       summary: Initiate chunked upload
-      description: Start a multi-part file upload for large files.
+      description: >
+        Start a multi-part file upload for large files. The session lives six hours and holds its
+        chunks in the node until complete or abort. One session may hold no more than one file may be
+        (the smaller of the per-file ceiling and the chunked ceiling), and one principal may have four
+        sessions open at once.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -30167,6 +30177,10 @@ paths:
             An anonymous principal targeted a key outside `anonymous/*`, or the key is under
             `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot doors
             write.
+        '413':
+          description: QUOTA_EXCEEDED — the declared chunks make a file larger than one file on this node may be.
+        '429':
+          description: TOO_MANY_UPLOADS — the caller already has four uploads open; complete or abort one first.
 
   /v1/storage/upload/{id}/{chunk}:
     put:
@@ -30196,6 +30210,16 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: A chunk index past the upload's `total_chunks`, or not a non-negative integer.
+        '403':
+          description: The upload belongs to another principal.
+        '404':
+          description: No such upload, or it expired.
+        '413':
+          description: >
+            CHUNK_TOO_LARGE — the chunk is larger than the upload's `chunk_size`; QUOTA_EXCEEDED — with
+            this chunk the upload would be larger than one file on this node may be.
 
   /v1/storage/upload/{id}/complete:
     post:
@@ -30234,6 +30258,15 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '201':
           description: Assembled and stored; `data` carries key, owner_gaii, size, visibility, versioned_url and `ai_provenance`.
+        '400':
+          description: >
+            CHUNKS_MISSING — the chunks are not exactly 0..n-1 (n is `total_chunks` when declared,
+            otherwise one past the highest index sent); `details.missing` lists up to 50 of them.
+            CHECKSUM_MISMATCH — `checksum_sha256` differs from the assembled bytes. No chunks → INVALID_INPUT.
+        '403':
+          description: The upload belongs to another principal.
+        '413':
+          description: The shared write refused the file (a ceiling or the quota). The upload is ended and its chunks freed.
 
   /v1/storage/upload/{id}:
     delete:
@@ -41375,8 +41408,8 @@ paths:
         JSON payload instead of the binary (for programmatic/MCP callers). What the classification
         keeps out of an export (TARGET-082) is named in `workspace.json` `leftOut` and, in base64
         mode, in `left_out` (ClassificationLeftOut items). The rows of the workspace's row spaces
-        (`backing: 'rows'`) are in `workspace.json` `rows`. A limit the export reached (10 000 memory
-        records, or the most rows a workspace may hold) is named in `workspace.json` `truncated`
+        (`backing: 'rows'`) are in `workspace.json` `rows`. A limit the export reached (200 000 memory
+        records, read in pages, or the most rows a workspace may hold) is named in `workspace.json` `truncated`
         (`{ what: records|rows, namespace?, exported, total }`), in base64 mode in `truncated`, and on
         the binary download by the header `X-Aimeat-Export-Truncated: true`.
       tags: [Organisms]

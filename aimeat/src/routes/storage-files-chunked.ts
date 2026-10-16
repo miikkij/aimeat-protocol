@@ -17,6 +17,11 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   2026-10-16 -- Bounds and completeness (QA audit F05b-02). The bytes a session may hold are the
+ *     smaller of the chunked ceiling and the per-file ceiling complete enforces, checked at init and on
+ *     every chunk; a principal holds at most MAX_OPEN_UPLOADS sessions; a chunk index past total_chunks
+ *     and a chunk larger than chunk_size are refused; complete refuses a session whose chunks are not
+ *     exactly 0..n-1; and a complete the shared write refuses ends the session, so its bytes are freed.
  *   v1.4.1 -- 2026-10-11 -- The `files` change of an upload goes to the uploader's streams unless
  *     the file is one other people read (event-bus.ts emitRecordChange). All four were global.
  *   v1.4.0 -- 2026-10-08 -- Complete takes ai_provenance / ai_provenance_id and answers with the
@@ -58,6 +63,16 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
 
     // Max chunked file size (configurable, default 5 GB)
     const MAX_CHUNKED_FILE_SIZE = config.storageMaxChunkedFileSizeGb * 1024 * 1024 * 1024;
+    // WHAT ONE SESSION MAY HOLD: the smaller of that and the per-file ceiling, because complete hands
+    // the bytes to the shared write, which refuses a file over the per-file ceiling (default 10 MB).
+    // Checking only the 5 GB figure let a session buffer gigabytes in the node process that complete
+    // would then refuse, and the refused bytes stayed (QA audit F05b-02).
+    const MAX_SESSION_BYTES = Math.min(MAX_CHUNKED_FILE_SIZE, config.storageMaxFileSizeMb * 1024 * 1024);
+    // How many sessions one principal may have open at once. The bytes live in the node process, so the
+    // count is what bounds one account's share of it.
+    const MAX_OPEN_UPLOADS = 4;
+    const sessionCeilingText = () => MAX_SESSION_BYTES === MAX_CHUNKED_FILE_SIZE
+      ? `${config.storageMaxChunkedFileSizeGb} GB` : `${config.storageMaxFileSizeMb} MB`;
 
     // -----------------------------------------------
     // Chunked Upload — Large file support
@@ -94,11 +109,20 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 6 * 3600_000).toISOString(); // 6 hours
 
-        // M-4: Reject if declared total size exceeds max chunked file size (5GB)
+        // M-4: Reject if the declared total is more than one file may be, here before any chunk.
+        // The last chunk may be short, so the smallest file this declaration allows is what is compared.
         const chunkSz = chunk_size ?? 10 * 1024 * 1024;
-        if (total_chunks && chunkSz * total_chunks > MAX_CHUNKED_FILE_SIZE) {
+        if (total_chunks && chunkSz * (total_chunks - 1) + 1 > MAX_SESSION_BYTES) {
             res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-                `Declared file size (${total_chunks} chunks × ${chunkSz} bytes) exceeds max chunked file size of 5 GB`));
+                `The file you declared (${total_chunks} chunks of ${chunkSz} bytes) is larger than one file on this node may be (${sessionCeilingText()}). Upload a smaller file.`,
+                undefined, { declared_bytes: chunkSz * total_chunks, max_bytes: MAX_SESSION_BYTES }));
+            return;
+        }
+        const held = await storage.chunkedUploadsHeldBy(gaii);
+        if (held.sessions >= MAX_OPEN_UPLOADS) {
+            res.status(429).json(error(config.nodeId, 'TOO_MANY_UPLOADS',
+                `You already have ${held.sessions} uploads open. Complete or abort one of them before you start another.`,
+                undefined, { open_uploads: held.sessions, max_open_uploads: MAX_OPEN_UPLOADS, abort: 'DELETE /v1/storage/upload/{upload_id}' }));
             return;
         }
 
@@ -150,22 +174,39 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             return;
         }
 
-        const chunks: Buffer[] = [];
-        for await (const chunk of req) {
-            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-        }
-        const data = Buffer.concat(chunks);
-
-        // M-4: Running total size check — reject early if exceeding 5GB
-        let currentTotal = data.length;
-        for (const [, buf] of upload.receivedChunks) {
-            currentTotal += buf.length;
-        }
-        if (currentTotal > MAX_CHUNKED_FILE_SIZE) {
-            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-                `Total uploaded size (${currentTotal} bytes) exceeds max chunked file size of 5 GB`));
+        if (upload.totalChunks !== undefined && chunkIndex >= upload.totalChunks) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                `This upload has ${upload.totalChunks} chunks, numbered 0 to ${upload.totalChunks - 1}, so there is no chunk ${chunkIndex}.`,
+                undefined, { chunk_index: chunkIndex, total_chunks: upload.totalChunks }));
             return;
         }
+
+        // Read the body with a running ceiling: past what one chunk may be, or past what the session may
+        // hold with the chunks already in, the bytes read so far are dropped and the rest is read and
+        // discarded. Leaving the loop early would destroy the request, and the refusal with it.
+        const chunkLimit = upload.chunkSize;
+        let already = 0;
+        for (const [i, buf] of upload.receivedChunks) if (i !== chunkIndex) already += buf.length;
+        const chunks: Buffer[] = [];
+        let size = 0;
+        let refused: { code: string; status: number; message: string; details: Record<string, unknown> } | null = null;
+        for await (const chunk of req) {
+            if (refused) continue;
+            const b = typeof chunk === 'string' ? Buffer.from(chunk) : chunk as Buffer;
+            size += b.length;
+            if (size > chunkLimit) {
+                refused = { status: 413, code: 'CHUNK_TOO_LARGE', message: `A chunk of this upload may be at most ${chunkLimit} bytes, the chunk_size it was started with. Send smaller chunks.`, details: { chunk_size: chunkLimit } };
+            } else if (already + size > MAX_SESSION_BYTES) {
+                refused = { status: 413, code: 'QUOTA_EXCEEDED', message: `This upload is now larger than one file on this node may be (${sessionCeilingText()}). Abort it and upload a smaller file.`, details: { max_bytes: MAX_SESSION_BYTES } };
+            }
+            if (refused) { chunks.length = 0; continue; }
+            chunks.push(b);
+        }
+        if (refused) {
+            res.status(refused.status).json(error(config.nodeId, refused.code, refused.message, undefined, refused.details));
+            return;
+        }
+        const data = Buffer.concat(chunks);
 
         const added = await storage.addChunk(uploadId, chunkIndex, data);
         if (!added) {
@@ -196,6 +237,18 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         }
         if (upload.receivedChunks.size === 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No chunks uploaded'));
+            return;
+        }
+        // EVERY CHUNK, OR NO FILE (QA audit F05b-02). Complete concatenated whatever indices arrived,
+        // so a lost chunk gave 201 and a damaged file. The chunks must be exactly 0..n-1, where n is
+        // total_chunks when the upload declared it and otherwise one past the highest index sent.
+        const expected = upload.totalChunks ?? (Math.max(...upload.receivedChunks.keys()) + 1);
+        const missing: number[] = [];
+        for (let i = 0; i < expected && missing.length < 50; i++) if (!upload.receivedChunks.has(i)) missing.push(i);
+        if (missing.length > 0) {
+            res.status(400).json(error(config.nodeId, 'CHUNKS_MISSING',
+                'Some chunks of this upload have not arrived, so it cannot be completed. Send the missing chunks and complete again.',
+                undefined, { missing, expected_chunks: expected, received_chunks: upload.receivedChunks.size, send_chunk: `PUT /v1/storage/upload/${uploadId}/{index}` }));
             return;
         }
         // How the bytes were made, stated where the whole file is first known: here.
@@ -237,6 +290,10 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             provenance: stated.provenance,
         });
         if (!written.ok) {
+            // The write refused the file (a ceiling, the quota, the key), and trying the same bytes again
+            // cannot change that, so the session ends here and its bytes are freed. They stayed in the
+            // node process until a restart (QA audit F05b-02).
+            await storage.deleteChunkedUpload(uploadId);
             res.status(written.status).json(error(config.nodeId, written.code, written.message));
             return;
         }

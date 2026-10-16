@@ -8,6 +8,8 @@
  * @structure walletMethods
  * @usage Object.assign(SqliteStorage.prototype, walletMethods) in ../index.ts
  * @version-history
+ *   2026-10-16 — getTransactions returns newest first, as PostgreSQL does; it reversed its newest-first
+ *     window, so page 1 of the wallet history was the oldest rows here (QA audit D4-04).
  *   2026-10-15 — sumTransactionsByType: per-type totals in one GROUP BY (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
  *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
@@ -92,9 +94,9 @@ export const walletMethods = {
   async getTransactions(this: SqliteStorage, gaii: string, limit = 50): Promise<WalletTransaction[]> {
     const identity = this.resolveGhii(gaii) ?? gaii;
     const rows = this.db.prepare(
-      'SELECT * FROM wallet_transactions WHERE gaii = ? ORDER BY timestamp DESC LIMIT ?'
+      'SELECT * FROM wallet_transactions WHERE gaii = ? ORDER BY timestamp DESC, id DESC LIMIT ?'
     ).all(identity, limit) as Record<string, unknown>[];
-    return rows.reverse().map(r => this.deserializeTransaction(r));
+    return rows.map(r => this.deserializeTransaction(r));
   },
 
   async findTransactionByTrackingCode(this: SqliteStorage, gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null> {

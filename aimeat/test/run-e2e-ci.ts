@@ -41,6 +41,12 @@
  *     a named extension.
  *   2026-10-13 -- e2e-app-scope-allowance.ts joins the list (not the guard tier): a published app that
  *     worked on a 3.x node keeps the scope words its code needs, on its own node on 40478.
+ *   2026-10-16 -- e2e-production-size.ts joins the list (not the guard tier): the size-dependent reads
+ *     past their old windows (QA audit W31). A suite line `⏭ SKIPPED: <what> — <why>` is counted as
+ *     skipped: the summary shows a Skipped column, a suite that ran nothing but skips gets "-" and
+ *     SKIPPED instead of a tick, and the total names the skipped count. A skip was a tick beside
+ *     0/0, which read as passed (QA audit W30: the Stripe test-mode run without a key, and
+ *     e2e-backup-restore's PostgreSQL half without pg_dump).
  *   2026-10-13 -- e2e-rest-scope-keep-working.ts joins the list (not the guard tier): an agent that
  *     worked on a 3.x node keeps the scope words 4.0.0 started to check, across boots of its own node
  *     on 40477 (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
@@ -658,6 +664,19 @@ const ALL_SUITES = [
     // The workspace read at production size (2026-10-09): 800 agent-written records and 2000 app
     // rows, timed. A per-record cost passes every functional suite and only shows at this size.
     'test/e2e-workspace-read-scale.ts',
+    // The reads whose answer depends on how much a node holds, past each old window (QA audit W31,
+    // 2026-10-16): the workspace export, the money totals, the cross-owner listing, owners and agents.
+    'test/e2e-production-size.ts',
+    // The node backup of docs/operations/backup-and-restore.md, taken and restored on a node of its
+    // own (QA audit P6-06): SQLite's online backup and the stopped copy, or pg_dump and pg_restore.
+    'test/e2e-backup-restore.ts',
+    // A card sale settled on Stripe test mode (QA audit W30). Skipped, and counted as skipped, without
+    // STRIPE_TEST_SECRET_KEY; the nightly job stripe-testmode passes the repository secret.
+    'test/e2e-stripe-testmode.ts',
+    // Work and settlement between two real nodes, with no stand-in on either end (QA audit W30):
+    // settlement lands, cross-node work is refused honestly, and the three outbound senders are
+    // accepted by a real receiver.
+    'test/e2e-federation-two-real-nodes.ts',
     // The remote MCP proxy: attach against a real upstream MCP server this suite starts
     // itself, the tool cache, calling, the cross-owner 404 and the scope split. Here and
     // not only in the unit suites because those run on SQLite alone, and this is what
@@ -1503,6 +1522,7 @@ const NOT_SUITES = new Map<string, string>([
     ['manual-dm-helper.ts', 'manual helper for browser verification: it needs a person watching the Inbox tab, and it writes to whichever node DM_BASE names'],
     ['pg-kysely-memory.ts', 'storage-provider integration test: it drives a live Postgres over AIMEAT_TEST_PG_URL with no HTTP server, so it has nothing to say to BASE_URL'],
     ['e2e-email.ts', 'disabled; the reason and the date are on the commented-out entry in ALL_SUITES'],
+    ['upgrade-from-release.ts', 'installs the previous release in a second dependency tree before it starts any node; the nightly job upgrade-from-release runs it on both backends (pnpm test:upgrade)'],
 ]);
 
 // Filled by reconcileSuiteList so the summary can repeat the finding. A warning printed before a
@@ -1781,6 +1801,7 @@ function planLanes(suites: string[], workers: number, pinned: Map<string, number
     }
     return lanes.filter(l => l.length > 0);
 }
+
 
 // ── Main ──
 async function main() {

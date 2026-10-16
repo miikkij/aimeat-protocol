@@ -9,6 +9,7 @@
  *   that shows and lets out everything.
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-export-rows.test.ts
  * @version-history
+ *   2026-10-16 — A workspace past one read page (10 050 records, the manifest at the end of key order) is exported whole (QA audit F06c-01).
  *   2026-10-15 — Initial (feature-list audit #68).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -122,4 +123,21 @@ describe('the row spaces in a workspace export and import', () => {
     const { json } = await collect(baseConfig, over);
     expect(json.truncated).toContainEqual({ what: 'records', exported: 2, total: EXPORT_RECORD_LIMIT + 5 });
   });
+
+  // QA audit F06c-01. The export read ONE window of 10 000 records in key order. Records in a namespace
+  // that sorts before `meta.` (here `alerts.`) pushed the workspace's own manifest out of it, and the
+  // rest of the tail went with it, in a 200 answer.
+  it('a workspace larger than one read page is exported whole, its manifest included', async () => {
+    const N = 10_050;
+    const rows = Array.from({ length: N }, (_, i) => ({
+      key: `${ROOT}.alerts.a${String(i).padStart(6, '0')}.latest`, ownerGaii: ALICE, value: { n: i },
+      visibility: 'private' as const, tags: [], ttlHours: null, version: 1, createdAt: at, updatedAt: at,
+    }));
+    await storage.bulkSetMemory!(rows);
+    const { json } = await collect();
+    expect(json.manifest).toEqual(MANIFEST);
+    expect(json.objects.filter(o => o.namespace === 'alerts')).toHaveLength(N);
+    expect(json.objects.filter(o => o.namespace === 'notes')).toHaveLength(1);
+    expect(json.truncated).toEqual([]);
+  }, 60_000);
 });

@@ -11,6 +11,10 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-storage.js"></script>
  *   await AIMEAT.storage.upload(file); await AIMEAT.storage.download('key');
  * @version-history
+ *   2026-10-16 — A failed abort after a failed chunked upload is logged, not swallowed (QA audit W25 ratchet).
+ *   v1.4.0 — 2026-10-16 — uploadChunked aborts its upload on the node when a chunk or the complete
+ *     fails, so the session and its bytes do not stay behind; the node now keeps at most four open
+ *     uploads per account (QA audit F05b-02).
  *   v1.3.0 — 2026-09-29 — upload() and uploadChunked() send the group or workspace a file is shared
  *     with (group_id, workspace_ref, workspaceRefs). They sent only key, data, type and visibility,
  *     so a 'workspace' file was refused for naming no workspace and apps posted to /v1/storage
@@ -208,30 +212,39 @@ const storage = {
     if (!initRes.ok) throw new Error(initRes.error?.message || 'Chunked upload init failed');
     const uploadId = initRes.data.upload_id;
 
-    // Upload chunks
-    const session = getSession();
-    for (let i = 0; i < totalChunks; i++) {
-      const start = i * chunkSize;
-      const end = Math.min(start + chunkSize, file.size);
-      const chunk = file.slice(start, end);
-      const buf = await chunk.arrayBuffer();
+    // Upload chunks, then complete. A failure on the way aborts the upload on the node: the session
+    // holds its chunks there for six hours otherwise, and counts against the four an account may have open.
+    try {
+      const session = getSession();
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * chunkSize;
+        const end = Math.min(start + chunkSize, file.size);
+        const chunk = file.slice(start, end);
+        const buf = await chunk.arrayBuffer();
 
-      const r = await fetch(NODE_URL + '/v1/storage/upload/' + uploadId + '/' + i, {
-        method: 'PUT',
-        headers: {
-          'Authorization': 'Bearer ' + session.jwt,
-          'Content-Type': 'application/octet-stream',
-        },
-        body: buf,
-      });
-      if (!r.ok) throw new Error('Chunk ' + i + ' upload failed: ' + r.status);
-      if (opts?.onProgress) opts.onProgress({ chunk: i, total: totalChunks, percent: Math.round(((i + 1) / totalChunks) * 100) });
+        const r = await fetch(NODE_URL + '/v1/storage/upload/' + uploadId + '/' + i, {
+          method: 'PUT',
+          headers: {
+            'Authorization': 'Bearer ' + session.jwt,
+            'Content-Type': 'application/octet-stream',
+          },
+          body: buf,
+        });
+        if (!r.ok) throw new Error('Chunk ' + i + ' upload failed: ' + r.status);
+        if (opts?.onProgress) opts.onProgress({ chunk: i, total: totalChunks, percent: Math.round(((i + 1) / totalChunks) * 100) });
+      }
+
+      const completeRes = await authFetch('/v1/storage/upload/' + uploadId + '/complete', { method: 'POST' });
+      if (!completeRes.ok) throw new Error(completeRes.error?.message || 'Chunked upload complete failed');
+      return completeRes.data;
+    } catch (err) {
+      // Best effort: a node that already ended the session answers 404, which changes nothing here.
+      // A failed abort is logged, because the session then holds one of the four open slots for six
+      // hours; the upload's own error is what the caller gets.
+      await authFetch('/v1/storage/upload/' + uploadId, { method: 'DELETE' })
+        .catch((abortErr) => console.warn('[aimeat storage] could not abort upload ' + uploadId + ':', abortErr));
+      throw err;
     }
-
-    // Complete
-    const completeRes = await authFetch('/v1/storage/upload/' + uploadId + '/complete', { method: 'POST' });
-    if (!completeRes.ok) throw new Error(completeRes.error?.message || 'Chunked upload complete failed');
-    return completeRes.data;
   },
 
   // Abort a chunked upload

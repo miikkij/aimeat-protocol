@@ -7,6 +7,7 @@
  *   all balance ops resolve any GAII/GEAI/bare-name to the owner GHII first (agents hold no balance).
  *   Translated 1:1 from the SQLite/Prisma implementations.
  * @version-history
+ *   2026-10-16 — getTransactions breaks a timestamp tie by id, the order SQLite uses (QA audit D4-04).
  *   2026-10-15 — sumTransactionsByType: per-type totals in one GROUP BY (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
  *     summed by the database; the daily mint ceiling read only the newest 10 000 rows (feature-list audit 176).
@@ -61,7 +62,7 @@ export const walletMethods = {
   },
   async getTransactions(this: PostgresKyselyStorage, gaii: string, limit = 50): Promise<WalletTransaction[]> {
     const identity = (await resolveGhii(this.db, gaii)) ?? gaii;
-    const rows = await this.db.selectFrom('Transaction').selectAll().where('gaii', '=', identity).orderBy('timestamp', 'desc').limit(limit).execute();
+    const rows = await this.db.selectFrom('Transaction').selectAll().where('gaii', '=', identity).orderBy('timestamp', 'desc').orderBy('id', 'desc').limit(limit).execute();
     return rows.map(mapTx);
   },
   async findTransactionByTrackingCode(this: PostgresKyselyStorage, gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null> {

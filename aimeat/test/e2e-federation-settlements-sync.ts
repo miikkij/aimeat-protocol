@@ -44,6 +44,9 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   2026-10-16 — Work forwarded by POST /v1/work/request and refused by the far node is PEER_REFUSED with
+ *     the far node's status in details, not that node's body passed through (QA audit F14b-01, F18-01).
+ *     The two-real-node half of this subject is e2e-federation-two-real-nodes.ts.
  *   2026-10-16 — QA audit F3-01, F1-04, S6-06. The memory-queue test asserted only that the drain took
  *     the job off the pending list, which the drain did by marking it sent without a request; it now
  *     asserts the replicate request at the fake peer, one pending job per key and peer, a failed send
@@ -677,7 +680,9 @@ async function run(): Promise<void> {
             method: 'POST', headers: auth(A.ownerToken),
             body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'made' } }),
         });
-        assert(made.status === 401, `the far node refuses work without its credential: ${made.status} ${JSON.stringify(made.body)}`);
+        // Said as the far node's refusal, not as this node's own 401 (QA audit F14b-01, F18-01).
+        assert(made.status === 401 && made.body.error?.code === 'PEER_REFUSED' && made.body.error?.details?.peer_status === 401,
+            `the far node refuses work without its credential: ${made.status} ${JSON.stringify(made.body)}`);
         const afterMade = await walletOf(A.ownerToken);
         assert(afterMade === before, `a refused route keeps no morsel: ${before} → ${afterMade}`);
 
@@ -687,7 +692,7 @@ async function run(): Promise<void> {
                 method: 'POST', headers: auth(A.ownerToken),
                 body: JSON.stringify({ action_id: 'act-fee', provider_gaii: `bot#someone@${FAKE_ID}`, input: { q: 'refused' } }),
             });
-            assert(refused.status === 500, `the peer's error is passed on: ${refused.status} ${JSON.stringify(refused.body)}`);
+            assert(refused.status === 500 && refused.body.error?.code === 'PEER_REFUSED', `the peer's error is passed on: ${refused.status} ${JSON.stringify(refused.body)}`);
         } finally { modes.work = 'ok'; }
         const afterRefused = await walletOf(A.ownerToken);
         assert(afterRefused === afterMade, `an error answer kept the routing fee: ${afterMade} → ${afterRefused}`);

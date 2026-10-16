@@ -1,6 +1,6 @@
 /**
  * @file test/unit/storage-conformance.test.ts
- * @description The semantic contract between the two storage providers. `Storage` composes 44
+ * @description The semantic contract between the two storage providers. `Storage` composes 73
  *   repository interfaces implemented twice by hand, and TypeScript proves the signatures match
  *   while nothing proves the behaviour does. The August 2026 audit's H-30 is exactly that gap: on
  *   SQLite `deleteOwner` clears eleven owner-scoped tables plus a per-agent cascade, on production
@@ -21,6 +21,8 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   2026-10-16 -- The header counts 73 repository interfaces (it said 44). What a list returns, compared as a
+ *     sequence, is in storage-conformance-lists.test.ts (QA audit P4-09).
  *   v1.21.0 -- 2026-10-09 -- deleteAgent takes the agent's connections, the delegations over them and
  *     its own app clients on every provider, and leaves the owner's (secrets audit 2026-10-09, F2/F3).
  *   v1.20.0 -- 2026-09-26 -- The start step for credentials, on every provider: a name no account holds

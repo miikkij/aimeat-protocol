@@ -20,9 +20,14 @@
  *   await bookBeneficiaryShares(storage, { lines, trackingCode, fromGhii, unit, currency, ... });
  *   const owed = await listBeneficiaryEntries(storage, beneficiaryGhii);
  * @version-history
+ *   2026-10-16 — Both reads return every entry, newest first, and `limit` caps what is returned, not
+ *     what is read. The earnings read took the beneficiary's first N records in key order, and the
+ *     obligations read the first 1000 records of every beneficiary on the node before filtering on the
+ *     provider, so totals and payouts were short past those counts (QA audit S8-10).
  *   v1.0.0 — 2026-07-30 — Initial: the accrual half of multi-beneficiary revenue splitting.
  */
 import type { Storage } from '../storage/interface.js';
+import { listAllMemoryPages } from '../storage/memory-pages.js';
 import type { SplitLine } from './beneficiary-split.js';
 
 /** One line in a beneficiary's book — a share of one settled call. */
@@ -118,12 +123,15 @@ export async function bookBeneficiaryShares(
   return booked;
 }
 
-/** What a beneficiary is owed and has been paid, newest first. */
+/**
+ * What a beneficiary is owed and has been paid, newest first. Every record of the beneficiary is
+ * read, on their own identity; `limit` caps how many entries come back, after the sort.
+ */
 export async function listBeneficiaryEntries(
-  storage: Storage, beneficiaryGhii: string, limit = 200,
+  storage: Storage, beneficiaryGhii: string, limit = Infinity,
 ): Promise<Array<BeneficiaryEntry & { trackingCode: string }>> {
-  const { items } = await storage.listAllMemory({ prefix: 'commerce.benefit.', ownerPrefix: beneficiaryGhii, limit });
-  return flatten(items);
+  const items = await storage.listMemory(beneficiaryGhii, { prefix: 'commerce.benefit.' });
+  return flatten(items).slice(0, limit);
 }
 
 /**
@@ -131,12 +139,14 @@ export async function listBeneficiaryEntries(
  *
  * A prefix scan filtered on `fromGhii` rather than a mirrored per-provider record: the obligation has
  * one authoritative row, and both parties read the same one. Same shape `listAllEntitlements` already
- * uses, and the same cost — bounded by the scan limit, not by the provider's own volume.
+ * uses. The scan reads every record under the prefix, page by page (storage/memory-pages.ts): a
+ * window of 1000 records across every beneficiary dropped this provider's entries past it.
+ * `limit` caps how many entries come back, after the sort.
  */
 export async function listBeneficiaryObligations(
-  storage: Storage, providerGhii: string, limit = 1000,
+  storage: Storage, providerGhii: string, limit = Infinity,
 ): Promise<Array<BeneficiaryEntry & { trackingCode: string; beneficiaryGhii: string }>> {
-  const { items } = await storage.listAllMemory({ prefix: 'commerce.benefit.', limit });
+  const { items } = await listAllMemoryPages(storage, { prefix: 'commerce.benefit.' });
   const out: Array<BeneficiaryEntry & { trackingCode: string; beneficiaryGhii: string }> = [];
   for (const rec of items) {
     const trackingCode = rec.key.slice('commerce.benefit.'.length);
@@ -144,7 +154,7 @@ export async function listBeneficiaryObligations(
       if (e.fromGhii === providerGhii) out.push({ ...e, trackingCode, beneficiaryGhii: rec.ownerGaii });
     }
   }
-  return out.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
+  return out.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? '')).slice(0, limit);
 }
 
 /**

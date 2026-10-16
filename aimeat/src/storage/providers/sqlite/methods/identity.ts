@@ -8,6 +8,7 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   2026-10-16 — operatorAccountState: two EXISTS queries (QA audit P7-10).
  *   v1.3.0 — 2026-10-14 — deleteOwner runs the 28 identity columns left undecided through
  *     eraseAccountRecords (repos/account-records-erasure.ts): deleted with the account, or kept under
  *     the erasure's pseudonym (QA audit 2026-10-14, K3).
@@ -67,6 +68,14 @@ export const identityMethods = {
   async listOwners(this: SqliteStorage): Promise<OwnerRecord[]> {
     const rows = this.db.prepare('SELECT * FROM owners').all() as Record<string, unknown>[];
     return rows.map(r => this.deserializeOwner(r));
+  },
+
+  async operatorAccountState(this: SqliteStorage): Promise<{ anyOwner: boolean; anyOperator: boolean }> {
+    const r = this.db.prepare(
+      `SELECT EXISTS(SELECT 1 FROM owners WHERE name <> 'anonymous') AS anyOwner,
+              EXISTS(SELECT 1 FROM owners, json_each(owners.roles) WHERE json_each.value = 'operator') AS anyOperator`
+    ).get() as { anyOwner: number; anyOperator: number };
+    return { anyOwner: !!r.anyOwner, anyOperator: !!r.anyOperator };
   },
 
   async updateOwner(this: SqliteStorage, name: string, updates: Partial<OwnerRecord>): Promise<OwnerRecord | null> {

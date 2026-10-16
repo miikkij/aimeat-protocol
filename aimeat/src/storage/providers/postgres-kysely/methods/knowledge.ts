@@ -6,6 +6,7 @@
  *   package reviews (KnowledgeReview). Translated 1:1 from the Prisma implementation. findBrokenLinks
  *   walks the contributor's links and checks both endpoints via getMemory.
  * @version-history
+ *   2026-10-16 — listReviews in timestamp order, as on SQLite; a caller takes the last one as the latest (QA audit D4-04).
  *   v1.1.0 — 2026-09-09 — getLink and listAllReviews deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: knowledge on Postgres+Kysely.
  */
@@ -61,7 +62,7 @@ export const knowledgeMethods = {
     return r;
   },
   async listReviews(this: PostgresKyselyStorage, packageId: string): Promise<OperatorReviewRecord[]> {
-    return (await this.db.selectFrom('KnowledgeReview').selectAll().where('packageId', '=', packageId).execute()).map(toReview);
+    return (await this.db.selectFrom('KnowledgeReview').selectAll().where('packageId', '=', packageId).orderBy('timestamp', 'asc').orderBy('id', 'asc').execute()).map(toReview);
   },
   async deleteReviewsByOperator(this: PostgresKyselyStorage, gaii: string): Promise<number> {
     const r = await this.db.deleteFrom('KnowledgeReview').where('operatorGaii', '=', gaii).executeTakeFirst();

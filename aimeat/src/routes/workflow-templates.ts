@@ -13,6 +13,7 @@
  *   - GET /v1/templates/workflow-create-chat       make a new one in a chat without MCP
  * @usage app.use(workflowTemplatesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — The owner's agents come from getAgentsByOwner, not a filter over every agent (QA audit P7-10).
  *   2026-10-16 — workflow-improve-mcp asks workflow:read; workflow-create-chat asks agent:read and memory:read, the words of the routes that serve the agents and offers it writes into the prompt (QA audit P3-03).
  *   v1.0.0 — 2026-08-30 — Initial.
  */
@@ -28,7 +29,8 @@ import { loc } from '../services/workflow/engine-util.js';
 
 /** The offers that can be a step, one line each, for the chat that cannot read them itself. */
 async function agentsAndOffers(storage: Storage, config: AimeatConfig, ownerName: string): Promise<string> {
-  const agents = (await storage.listAgents()).filter(a => a.owner === ownerName);
+  // The owner's own agents, not every agent on the node filtered here (QA audit P7-10).
+  const agents = await storage.getAgentsByOwner(ownerName);
   const lines: string[] = [];
   for (const a of agents) {
     const offers = (await readAgentOffers(storage, config, ownerName, a.name))

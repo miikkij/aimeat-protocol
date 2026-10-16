@@ -36,7 +36,7 @@ Three checks hold the two providers together. All three run in `pnpm check:fast`
 
 `pnpm typecheck` does not catch a method that one provider lacks: each provider class declares `interface … extends Storage` and merges its methods at runtime, so the compiler assumes every method is there. A missing method throws when it is called. `check:storage-file-parity` is the check that finds it.
 
-`test/unit/storage-conformance.test.ts` is the behavioural half: it runs the same scenarios (delete cascade, listing order, one-time spends) against both providers and requires the same result. Without `DATABASE_URL` it checks SQLite only.
+`test/unit/storage-conformance.test.ts` is the behavioural half: it runs the same scenarios (delete cascade, listing order, one-time spends) against both providers and requires the same result. `test/unit/storage-conformance-lists.test.ts` does the same for what a list returns, compared as a sequence rather than a set: the TTL sweep, a key prefix that is literal and case-sensitive, the cross-owner listing window, wallet history order and the lists that had no order on PostgreSQL. Without `DATABASE_URL` both check SQLite only.
 
 ---
 
@@ -254,7 +254,7 @@ What proves a storage change, from fastest to slowest:
 | `pnpm check:storage-file-parity` | a method in a different file, or in one provider only |
 | `pnpm check:storage-parity` | an owner-scoped table that one cascade leaves behind |
 | `pnpm check:migration-hashes` | an edited migration, or a new one without its hash line |
-| `test/unit/storage-conformance.test.ts` | the two providers returning different results for the same scenario |
+| `test/unit/storage-conformance.test.ts`, `test/unit/storage-conformance-lists.test.ts` | the two providers returning different results, or the same rows in a different order, for the same scenario |
 | `--test=<suite>` on both `.env.test.*` files | the feature's own behaviour on each backend |
 | `pnpm gate --postgres` | all of the above that the change reaches, plus the guard tier on both backends |
 

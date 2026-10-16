@@ -11,6 +11,8 @@
  *   - chunked-upload methods: create/get/addChunk/delete for resumable uploads
  *
  * @version-history
+ *   2026-10-16 — chunkedUploadsHeldBy and sweepExpiredChunkedUploads; every chunked-upload read honours
+ *     the session expiry on both backends (QA audit F05b-02).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive (portfolio catalog N+1)
  *   v1.2.0 — 2026-08-15 — TARGET-063: getStorageFileMeta + readStorageFileRange, so serving a byte
@@ -58,4 +60,8 @@ export interface FileRepository {
   getChunkedUpload(uploadId: string): Promise<ChunkedUploadRecord | null>;
   addChunk(uploadId: string, chunkIndex: number, data: Buffer): Promise<boolean>;
   deleteChunkedUpload(uploadId: string): Promise<boolean>;
+  /** How many live chunked-upload sessions one principal holds, and how many chunk bytes in them. */
+  chunkedUploadsHeldBy(ownerGaii: string): Promise<{ sessions: number; bytes: number }>;
+  /** Drop every expired chunked-upload session and its bytes; returns how many went. */
+  sweepExpiredChunkedUploads(): Promise<number>;
 }

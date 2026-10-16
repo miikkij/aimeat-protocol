@@ -15,6 +15,7 @@
  *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
+ *   2026-10-16 — chunkedUploads is the shared ChunkedUploadStore (QA audit F05b-02).
  *   v1.15.0 — 2026-10-16 — savepoint(): a tolerant step inside a transaction (QA audit E6-01).
  *   v1.14.0 — 2026-10-05 — The method groups are wired from files named after their
  *     postgres-kysely/methods twins; consentMethods is bound directly now that governance.ts, which
@@ -51,7 +52,8 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import type { Storage, ChunkedUploadRecord } from '../../interface.js';
+import type { Storage } from '../../interface.js';
+import { ChunkedUploadStore } from '../../chunked-upload-store.js';
 import { initializeSchema } from './schema.js';
 
 import type { SqliteInternals } from './methods/internal.js';
@@ -129,7 +131,7 @@ const txContext = new AsyncLocalStorage<SqliteStorage>();
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- intentional class+interface merge: the interface below declares the methods Object.assign installs on the prototype.
 export class SqliteStorage {
   db: Database.Database;
-  chunkedUploads = new Map<string, ChunkedUploadRecord>();
+  chunkedUploads = new ChunkedUploadStore();
 
   /**
    * Depth of the transaction open on this instance. SQLite gives the whole process ONE connection, so

@@ -24,6 +24,9 @@
  *     test/run-e2e-ci.ts --test=memory-doors
  *
  * @version-history
+ *   2026-10-16 — The TTL sweep takes a person's expired record out of the key count, and a create-only
+ *     write of the key succeeds after it (QA audit D4-01, E4-01). The comment on the read test no longer
+ *     says the read deletes: only SQLite's does.
  *   2026-10-16 — The bulk write refuses an entry whose visibility the single write refuses (`workspace`, an unknown word) and writes the rest (QA audit list review).
  *   2026-10-15 — A copy past a schema lock is refused with 422 (feature-list audit #51). The hands on a
  *     key count a delete and come back newest first across the owner's namespaces (feature-list audit #50).
@@ -461,10 +464,39 @@ await test('a record past its ttl_hours reads as 404 and is gone from the keyspa
 
   const stale = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: agentAuth() });
   assert(stale.status === 404, `after the TTL: expected 404, got ${stale.status}`);
-  // The read DELETES it, so the listing must agree: a 404 that left the row behind would keep
-  // charging the key ceiling for something no read can reach.
+  // The listing must agree with the read. Only SQLite deletes the row on read; on PostgreSQL the row
+  // is hidden here and removed by the TTL sweep, which the next test fires.
   const list = await json(`/v1/memory?prefix=${encodeURIComponent(key)}`, { headers: agentAuth() });
   assert((list.body.data?.items ?? []).length === 0, `the expired row survived the read: ${JSON.stringify(list.body.data?.items)}`);
+});
+
+// QA audit D4-01, E4-01. On PostgreSQL no statement deleted a row by TTL: every read hid it, and the
+// cleanup job listed through a read that had already hidden it. The job also walked agents only, so a
+// person's own TTL record waited for a read on SQLite too. The row kept counting in the key count and
+// against the ceiling. The key is NEVER read here, because SQLite deletes an expired row when a read
+// meets it, and the sweep is what this test asks about.
+await test('the TTL sweep removes a person\'s expired record from the key count, and the key can be created again', async () => {
+  const prefix = `memdoors.sweep${Date.now()}.`;
+  const key = `${prefix}lease`;
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ key, value: { holder: 'first' }, visibility: 'private', ttl_hours: 0.0003 }),
+  });
+  assert(w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+  await sleep(2000);
+  const fired = await json('/v1/admin/scheduler/jobs/core:memory-ttl-cleanup/trigger', { method: 'POST', headers: ownerAuth() });
+  assert(fired.status === 200, `trigger ${fired.status}: ${JSON.stringify(fired.body?.error)}`);
+  assert(fired.body.data?.job?.lastRunResult === 'success', `the sweep ran but failed: ${fired.body.data?.job?.lastRunError}`);
+  const counted = await json(`/v1/memory?count=true&prefix=${encodeURIComponent(prefix)}`, { headers: ownerAuth() });
+  assert(counted.status === 200, `count ${counted.status}`);
+  assert(counted.body.data?.count === 0, `the expired row still counts: ${counted.body.data?.count}`);
+  // A create-only write is the lease pattern: with the expired row still in the table it answered 409
+  // "at version 0, and this write expected 0" on PostgreSQL.
+  const again = await json('/v1/memory', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ key, value: { holder: 'second' }, visibility: 'private', expected_version: 0 }),
+  });
+  assert(again.status === 201, `create-only write after expiry: ${again.status} ${JSON.stringify(again.body?.error)}`);
 });
 
 // ─── Phase 5: the per-key refusals ───

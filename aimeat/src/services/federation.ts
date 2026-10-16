@@ -11,6 +11,9 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   2026-10-16 — The heartbeat cycle is the exported runHeartbeatCycle, which startHeartbeatJob schedules.
+ *     It was a closure only the five-minute timer could reach, so no test ever ran it against a real
+ *     peer or a dead one, nor the grace purge it carries (QA audit F18-03). Behaviour unchanged.
  *   2026-10-16 — The service summary fetch is signed as this node for the peer (signedGetHeaders; QA
  *     audit S6-09).
  *   v1.8.1 — 2026-10-10 — PeerInfo.deliveryProofAt: the delivery-proof pin (secaudit 2026-10-10 I21).
@@ -249,16 +252,27 @@ function peerStaggerMs(localNodeId: string, peerNodeId: string, intervalMs: numb
 /** Cached service summary hashes per peer for change detection. */
 const peerSummaryHashes = new Map<string, string>();
 
-export function startHeartbeatJob(
+/** The heartbeat interval; each peer is pinged in its own staggered slot within it. */
+const HEARTBEAT_BASE_INTERVAL_MS = 5 * 60_000;
+
+/**
+ * One heartbeat cycle: purge the de-peered peers whose grace has ended, then ping every active or
+ * degraded peer that is due, with a signed heartbeat that names the peer (audienceProof), and record
+ * the outcome: active and last-seen on a 2xx, degraded after 3 failures in a row and offline after 10.
+ *
+ * Exported so a test can run a cycle against a real peer and a dead one (QA audit F18-03); the node
+ * runs it from startHeartbeatJob. `opts.everyPeer` ignores the per-peer stagger, which otherwise
+ * lets each peer through only in its own slot of the five-minute interval.
+ */
+export async function runHeartbeatCycle(
     config: AimeatConfig,
     storage: Storage,
     peers: Map<string, PeerInfo>,
     networkDirectory?: Map<string, ServiceSummary>,
-): ReturnType<typeof setInterval> {
-    const BASE_INTERVAL_MS = 5 * 60_000;
+    opts: { everyPeer?: boolean } = {},
+): Promise<void> {
+    const BASE_INTERVAL_MS = HEARTBEAT_BASE_INTERVAL_MS;
     const TIMEOUT_MS = config.federationTimeoutMs;
-
-    async function heartbeatCycle(): Promise<void> {
         // ── De-peering grace period enforcement ──
         const depeeringPeers = [...peers.entries()].filter(([, p]) => p.status === 'depeering');
         for (const [key, peer] of depeeringPeers) {
@@ -294,7 +308,7 @@ export function startHeartbeatJob(
             // Per-peer stagger: skip this peer if not yet due
             const stagger = peerStaggerMs(config.nodeId, peer.nodeId, BASE_INTERVAL_MS);
             const cyclePhase = Date.now() % BASE_INTERVAL_MS;
-            if (Math.abs(cyclePhase - stagger) > BASE_INTERVAL_MS * 0.3) continue;
+            if (!opts.everyPeer && Math.abs(cyclePhase - stagger) > BASE_INTERVAL_MS * 0.3) continue;
 
             try {
                 // A heartbeat says "I am up". `stats` says how many agents and actions this node
@@ -440,14 +454,22 @@ export function startHeartbeatJob(
                 storage.saveFederationPeer(peer).catch(err => { logger.warn('failures: continuing after a suppressed failure', { error: String(err) }); });
             }
         }
-    }
+}
+
+export function startHeartbeatJob(
+    config: AimeatConfig,
+    storage: Storage,
+    peers: Map<string, PeerInfo>,
+    networkDirectory?: Map<string, ServiceSummary>,
+): ReturnType<typeof setInterval> {
+    const BASE_INTERVAL_MS = HEARTBEAT_BASE_INTERVAL_MS;
 
     // Jittered scheduling: ±25% random offset per cycle
     function scheduleNext(): void {
         const jitter = BASE_INTERVAL_MS * 0.25 * (Math.random() * 2 - 1);
         const nextMs = Math.max(30_000, BASE_INTERVAL_MS + jitter);
         setTimeout(() => {
-            heartbeatCycle().catch(err => {
+            runHeartbeatCycle(config, storage, peers, networkDirectory).catch(err => {
                 logger.error('Heartbeat cycle failed', { error: (err as Error).message });
             });
             scheduleNext();

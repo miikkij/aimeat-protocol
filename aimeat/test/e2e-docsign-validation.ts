@@ -25,6 +25,7 @@
  *   - Phase 3: aimeat_docsign_validate, called and refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=docsign-validation
  * @version-history
+ *   2026-10-16 — The in-process node takes the run's backend through ownNodeDb (QA audit P1-02).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F03b-04, W27).
  */
 import { randomBytes } from 'node:crypto';
@@ -34,6 +35,7 @@ import type { Server } from 'node:http';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { suitePort } from './helpers/free-port.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 import { buildTrustWorld, type TrustWorld } from './fixtures/docsign/trust-world.js';
@@ -95,10 +97,11 @@ async function run(): Promise<void> {
         process.env.AIMEAT_ADMIN_PASSWORD = randomBytes(16).toString('base64url');
         process.env.AIMEAT_NODE_ID = `aimeat-test-001-dsv${Date.now() % 100000}`;
         process.env.AIMEAT_BASE_URL = nodeUrl;
-        process.env.AIMEAT_STORAGE = 'memory';
         const { config } = loadConfig({});
+        // The run's backend: SQLite in memory on a SQLite run, a database of its own on PostgreSQL.
+        Object.assign(config, (await ownNodeDb('docsign-validation', { memory: true })).config);
         Object.assign(config, {
-            port, baseUrl: nodeUrl, devMode: true, testMode: true, storageProvider: 'memory',
+            port, baseUrl: nodeUrl, devMode: true, testMode: true,
             docsignEnabled: true, docsignOnlineChecks: true, docsignLotlUrl: world.lotlUrl, docsignLotlSignerSha256: [world.lotlSignerSha256],
             docsignTrustAnchorsPath: '', docsignMaxMb: 1,
         });

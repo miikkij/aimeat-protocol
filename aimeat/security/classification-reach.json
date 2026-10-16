@@ -23,9 +23,11 @@
     "src/commerce/beneficiary-book.ts": {
       "reads": {
         "getMemory": 4,
-        "listAllMemory": 3
+        "listAllMemory": 1,
+        "listMemory": 1,
+        "listAllMemoryPages": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's beneficiary ledger (commerce.benefit.*): read-to-update and ledger listings for its owner."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's beneficiary ledger (commerce.benefit.*): read-to-update and ledger listings for its owner. 2026-10-16 (QA audit S8-10): the beneficiary's own entries are read with listMemory on their own identity, and a provider's obligations with listAllMemoryPages over every commerce.benefit.* record, so totals are not sums of a window."
     },
     "src/commerce/beneficiary-payout.ts": {
       "reads": {
@@ -206,9 +208,9 @@
     },
     "src/routes/admin.ts": {
       "reads": {
-        "listAllMemory": 2
+        "listAllMemoryPages": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce ledger records aggregated into dashboard counts."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Commerce ledger records aggregated into dashboard counts. 2026-10-16 (QA audit S8-10): read to the end with listAllMemoryPages instead of a 2000-record window."
     },
     "src/routes/agent-activity.ts": {
       "reads": {
@@ -537,10 +539,9 @@
     },
     "src/routes/notifications.ts": {
       "reads": {
-        "listAllMemory": 2,
         "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Node-written notification records listed, marked read or cleared for their owner."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Node-written notification records listed, marked read or cleared for their owner. 2026-10-16 (QA audit F13-01): the list and mark-read go through listOwnerNotificationRecords (services/notification-sweeps.ts), on the owner's own identity."
     },
     "src/routes/openrouter.ts": {
       "reads": {
@@ -1171,12 +1172,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The pack-proofs record, read to append a proof."
     },
-    "src/services/core-jobs.ts": {
-      "reads": {
-        "listMemoryMeta": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Value-free memory metadata for the TTL cleanup job."
-    },
     "src/services/cortex-lifecycle.ts": {
       "reads": {
         "getMemory": 1
@@ -1764,9 +1759,10 @@
     },
     "src/services/notification-sweeps.ts": {
       "reads": {
-        "listAllMemory": 2
+        "listAllMemory": 1,
+        "listMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Settings and node-generated notification records for the morning push."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Settings and node-generated notification records for the morning push. 2026-10-16 (QA audit F13-01): one owner's notifications are read with listMemory on that owner's identity (listOwnerNotificationRecords), for the bell, mark-read and both sweeps."
     },
     "src/services/notify.ts": {
       "reads": {
@@ -2342,11 +2338,11 @@
     },
     "src/services/workspace-export.ts": {
       "reads": {
-        "listAllMemory": 1,
+        "listAllMemoryPages": 1,
         "listStorageFiles": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-16 (QA audit F06c-01): the records are read to the end with listAllMemoryPages and pass the same reader."
     },
     "src/services/workspace-import.ts": {
       "reads": {

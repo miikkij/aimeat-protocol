@@ -28,6 +28,9 @@
  *   cd aimeat && pnpm check:classification-reach --shrink   # lower counts that fell; nothing else
  *   cd aimeat && pnpm check:classification-reach --seed     # rewrite from the tree, keeping reasons
  * @version-history
+ *   v1.2.0 — 2026-10-16 — listAllMemoryPages (storage/memory-pages.ts) counts as a content read: it is
+ *     listAllMemory read to the end page by page, and a read through it must stay on the list (QA audit
+ *     S8-10, F06c-01).
  *   v1.1.0 — 2026-09-29 — TARGET-082 review: counts the reads the seed missed (listMemoryHistory,
  *     listDeletedMemory, listAllDeletedMemory, listMemoryKeysByPrefix, readStorageFileRange,
  *     listStorageFilesForOwners) and the download-token mint (generateDownloadToken), and a memory
@@ -65,7 +68,7 @@ export const CONTENT_READS = new Set([
  * `generateDownloadToken` is here because a minted download token hands a file's bytes to whoever
  * holds it, later and without asking again: the mint is the read, so the file passes the reader first.
  */
-export const WRAPPER_READS = new Set(['getOwnerScopeMemory', 'listOwnerScopeMemory', 'generateDownloadToken']);
+export const WRAPPER_READS = new Set(['getOwnerScopeMemory', 'listOwnerScopeMemory', 'generateDownloadToken', 'listAllMemoryPages']);
 export const MEMORY_DB_READS = new Set(['getOwnerScope', 'listOwnerScope', 'listOwnerScopeMeta', 'searchOwnerScope']);
 
 const SKIP_DIRS = new Set([path.join(SRC, 'storage'), path.join(SRC, 'static'), path.join(SRC, 'generated')]);

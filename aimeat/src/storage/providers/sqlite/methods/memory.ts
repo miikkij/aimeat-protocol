@@ -8,6 +8,9 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01); listAllMemory and
+ *     listAllMemoryMeta filter expired rows in SQL and break order ties by owner (QA audit D4-05); key
+ *     prefixes are literal, case-sensitive GLOB patterns (QA audit D4-07).
  *   2026-10-15 — setMemory and createMemoryIfAbsent write searchValues (the text the FTS index holds, storage/search-text.ts); searchMemory is one owner's searchText (feature-list audit #52).
  *   v1.1.0 — 2026-10-12 — bulkBinMemory: many rows into the bin in one transaction.
  *   v1.0.0 — 2026-10-05 — 27 methods (setMemory, listMemoryHistory, createMemoryIfAbsent, …) moved here from
@@ -28,8 +31,9 @@ import {
   sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql,
   archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo,
   unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo,
-  NOT_DELETED_SQL,
+  NOT_DELETED_SQL, LIVE_SQL, deleteExpiredMemory as deleteExpiredMemoryRepo,
 } from '../repos/memory.js';
+import { globPrefix } from '../../../key-prefix.js';
 
 /** The projected columns, in one place so the three reads below cannot drift apart on what META means. */
 const META_COLS = 'key, ownerGaii, visibility, groupId, workspaceRef, allowedOrigins, aiProvenanceId, '
@@ -221,8 +225,8 @@ export const memoryMethods = {
     const params: unknown[] = [ownerGaii];
 
     if (opts?.prefix) {
-      sql += ' AND key LIKE ?';
-      params.push(opts.prefix + '%');
+      sql += ' AND key GLOB ?';
+      params.push(globPrefix(opts.prefix));
     }
     if (opts?.visibility) {
       sql += ' AND visibility = ?';
@@ -269,18 +273,18 @@ export const memoryMethods = {
     const params: unknown[] = [];
 
     if (opts?.ownerPrefix) {
-      whereClauses += ' AND ownerGaii LIKE ?';
-      params.push(opts.ownerPrefix + '%');
+      whereClauses += ' AND ownerGaii GLOB ?';
+      params.push(globPrefix(opts.ownerPrefix));
     }
     // Excluded IN SQL, not after the slice: a windowed read whose window is entirely unwanted
     // rows would otherwise come back empty (how the landing ticker emptied itself).
     if (opts?.excludeOwnerPrefix) {
-      whereClauses += ' AND ownerGaii NOT LIKE ?';
-      params.push(opts.excludeOwnerPrefix + '%');
+      whereClauses += ' AND ownerGaii NOT GLOB ?';
+      params.push(globPrefix(opts.excludeOwnerPrefix));
     }
     if (opts?.prefix) {
-      whereClauses += ' AND key LIKE ?';
-      params.push(opts.prefix + '%');
+      whereClauses += ' AND key GLOB ?';
+      params.push(globPrefix(opts.prefix));
     }
     if (opts?.visibility) {
       whereClauses += ' AND visibility = ?';
@@ -292,6 +296,9 @@ export const memoryMethods = {
       whereClauses += " AND key NOT LIKE '%.version.%'";
     }
     whereClauses += archivedSql(opts?.archived);
+    // Live rows only, in SQL, so the page and the total agree with PostgreSQL (QA audit D4-05).
+    whereClauses += LIVE_SQL;
+    params.push(new Date().toISOString());
 
     const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
 
@@ -306,7 +313,7 @@ export const memoryMethods = {
     // already does: this moves the LOCAL backend onto production's behaviour and leaves production's
     // untouched, which is the only direction that cannot break a live node.
     const offset = opts?.offset ?? 0;
-    const orderSql = opts?.newestFirst ? ' ORDER BY updatedAt DESC' : ' ORDER BY key';
+    const orderSql = opts?.newestFirst ? ' ORDER BY updatedAt DESC, key, ownerGaii' : ' ORDER BY key, ownerGaii';
     const rows = (opts?.limit
       ? this.db.prepare('SELECT * FROM memory' + whereStr + orderSql + ' LIMIT ? OFFSET ?').all(...params, opts.limit, offset)
       : this.db.prepare('SELECT * FROM memory' + whereStr + orderSql).all(...params)
@@ -361,8 +368,8 @@ export const memoryMethods = {
   async listAllDeletedMemory(this: SqliteStorage, opts?: { prefix?: string; ownerPrefix?: string; limit?: number; offset?: number }): Promise<{ items: MemoryRecord[]; total: number }> {
     let where = ' WHERE deletedAt IS NOT NULL';
     const params: unknown[] = [];
-    if (opts?.ownerPrefix) { where += ' AND ownerGaii LIKE ?'; params.push(opts.ownerPrefix + '%'); }
-    if (opts?.prefix) { where += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.ownerPrefix) { where += ' AND ownerGaii GLOB ?'; params.push(globPrefix(opts.ownerPrefix)); }
+    if (opts?.prefix) { where += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
 
     const { cnt } = this.db.prepare('SELECT COUNT(*) AS cnt FROM memory' + where).get(...params) as { cnt: number };
     const offset = opts?.offset ?? 0;
@@ -380,6 +387,11 @@ export const memoryMethods = {
       'DELETE FROM memory WHERE deletedAt IS NOT NULL AND deletedAt < ?'
     ).run(cutoffIso);
     return result.changes;
+  },
+
+  /** The TTL sweep across every owner, one statement (repos/memory.ts deleteExpiredMemory). */
+  async deleteExpiredMemory(this: SqliteStorage, nowIso: string): Promise<number> {
+    return deleteExpiredMemoryRepo(this.db, nowIso);
   },
 
   /** STILL A HARD DELETE, deliberately. This is owner erasure — the cascade behind account deletion
@@ -536,8 +548,8 @@ export const memoryMethods = {
   // 'subtree' match archiveMemoryByKey uses). Replaces the per-key gated deletes a record teardown ran.
   async deleteMemorySubtree(this: SqliteStorage, ownerGaii: string, baseKey: string): Promise<number> {
     const result = this.db.prepare(
-      'DELETE FROM memory WHERE ownerGaii = ? AND (key = ? OR key LIKE ?)'
-    ).run(ownerGaii, baseKey, baseKey + '.%');
+      'DELETE FROM memory WHERE ownerGaii = ? AND (key = ? OR key GLOB ?)'
+    ).run(ownerGaii, baseKey, globPrefix(baseKey + '.'));
     return result.changes;
   },
 
@@ -545,7 +557,7 @@ export const memoryMethods = {
   // ONE statement (the AFTER DELETE trigger keeps both FTS tables in sync per row). Backs the workspace/
   // organism wipe, replacing its per-key deleteMemory loop over thousands of rows.
   async deleteMemoryByPrefix(this: SqliteStorage, keyPrefix: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM memory WHERE key LIKE ?').run(keyPrefix + '%');
+    const result = this.db.prepare('DELETE FROM memory WHERE key GLOB ?').run(globPrefix(keyPrefix));
     return result.changes;
   },
 
@@ -597,7 +609,7 @@ export const memoryMethods = {
   // only the two columns, never the value). ACTIVE rows only (archived = 0), matching object_delete's
   // scan — an archived record is not deletable. Backs the batched record delete's addressing scan.
   async listMemoryKeysByPrefix(this: SqliteStorage, keyPrefix: string): Promise<{ ownerGaii: string; key: string }[]> {
-    return this.db.prepare('SELECT ownerGaii, key FROM memory WHERE key LIKE ? AND archived = 0 AND deletedAt IS NULL').all(keyPrefix + '%') as { ownerGaii: string; key: string }[];
+    return this.db.prepare('SELECT ownerGaii, key FROM memory WHERE key GLOB ? AND archived = 0 AND deletedAt IS NULL').all(globPrefix(keyPrefix)) as { ownerGaii: string; key: string }[];
   },
   async listMemoryMeta(this: SqliteStorage, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): Promise<MemoryMetaRow[]> {
     // META projection: select metadata + byteSize, NEVER the `value` column (the whole point — a
@@ -605,7 +617,7 @@ export const memoryMethods = {
     // are read only to prune lazily-expired rows, then dropped from the result.
     let sql = `SELECT ${META_COLS} FROM memory WHERE ownerGaii = ?`;
     const params: unknown[] = [ownerGaii];
-    if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
 
@@ -633,7 +645,7 @@ export const memoryMethods = {
     const ph = ownerGaiis.map(() => '?').join(',');
     let sql = `SELECT * FROM memory WHERE ownerGaii IN (${ph})`;
     const params: unknown[] = [...ownerGaiis];
-    if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
@@ -653,7 +665,7 @@ export const memoryMethods = {
     const ph = ownerGaiis.map(() => '?').join(',');
     let sql = `SELECT ${META_COLS} FROM memory WHERE ownerGaii IN (${ph})`;
     const params: unknown[] = [...ownerGaiis];
-    if (opts?.prefix) { sql += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     sql += archivedSql(opts?.archived);
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
@@ -677,19 +689,20 @@ export const memoryMethods = {
     // the database. Lazily-expired rows are pruned here the same way the other meta reads do.
     let whereClauses = '';
     const params: unknown[] = [];
-    if (opts?.ownerPrefix) { whereClauses += ' AND ownerGaii LIKE ?'; params.push(opts.ownerPrefix + '%'); }
-    if (opts?.excludeOwnerPrefix) { whereClauses += ' AND ownerGaii NOT LIKE ?'; params.push(opts.excludeOwnerPrefix + '%'); }
-    if (opts?.prefix) { whereClauses += ' AND key LIKE ?'; params.push(opts.prefix + '%'); }
+    if (opts?.ownerPrefix) { whereClauses += ' AND ownerGaii GLOB ?'; params.push(globPrefix(opts.ownerPrefix)); }
+    if (opts?.excludeOwnerPrefix) { whereClauses += ' AND ownerGaii NOT GLOB ?'; params.push(globPrefix(opts.excludeOwnerPrefix)); }
+    if (opts?.prefix) { whereClauses += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
     if (opts?.visibility) { whereClauses += ' AND visibility = ?'; params.push(opts.visibility); }
     if (opts?.excludeVersionRows) { whereClauses += " AND key NOT LIKE '%.version.%'"; }
-    whereClauses += archivedSql(opts?.archived);
+    whereClauses += archivedSql(opts?.archived) + LIVE_SQL;
+    params.push(new Date().toISOString());
     const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
 
     const countRow = this.db.prepare('SELECT COUNT(*) as cnt FROM memory' + whereStr).get(...params) as { cnt: number };
     // The same order and the same default as listAllMemory beside it, which is now the same as the
     // Postgres backend's: key unless the caller asked for recency, and no implicit ceiling.
     const offset = opts?.offset ?? 0;
-    const orderSql = opts?.newestFirst ? ' ORDER BY updatedAt DESC' : ' ORDER BY key';
+    const orderSql = opts?.newestFirst ? ' ORDER BY updatedAt DESC, key, ownerGaii' : ' ORDER BY key, ownerGaii';
     const cols = `SELECT ${META_COLS} FROM memory`;
     const rows = (opts?.limit
       ? this.db.prepare(cols + whereStr + orderSql + ' LIMIT ? OFFSET ?').all(...params, opts.limit, offset)

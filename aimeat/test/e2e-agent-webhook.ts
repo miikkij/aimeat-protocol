@@ -4,6 +4,14 @@
  *   handling of the webhook secret.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-webhook
  * @version-history
+ *   v1.2.0 — 2026-10-16 — A real receiver (QA audit F07a-01). The suite starts a loopback HTTP listener
+ *     and registers it, so the delivery is RECEIVED: the X-AIMEAT-Signature is recomputed over the body
+ *     that arrived with the webhook secret, the event header and the envelope are read, a 2xx answer
+ *     gives delivered: true and the success stamp, a 500 gives a failed delivery, and a real event
+ *     (task.queued, from a queued task) arrives signed through the dispatcher. The httpbin.org
+ *     addresses are gone: the node resolved them over DNS when the webhook was stored, so the suite
+ *     failed on a machine without internet, and the "unreachable" test passed on any failure. The
+ *     unreachable address is now a closed loopback port. Test 5's comment named 192.0.2.1.
  *   v1.1.0 — 2026-10-09 — 3b: the operator's admin backup carries no webhook secret or URL (secrets
  *     audit 2026-10-09, finding 1.9).
  *   v1.0.0 — pre-dates the header standard.
@@ -50,7 +58,9 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 }
 
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
+import * as http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
@@ -82,10 +92,43 @@ let agentToken = '';
 let agentPrivKey = '';
 const agentName = 'webhookbot';
 
-// A publicly routable test URL that will accept POST (used for registration, not for delivery)
-const WEBHOOK_URL = 'https://httpbin.org/post';
-// A valid public domain that refuses connections (port 12345 not open)
-const UNREACHABLE_URL = 'https://httpbin.org:12345/webhook-test';
+// ─── The receiver: a loopback listener that records every delivery and answers with `receiverStatus` ───
+interface Delivery { path: string; headers: http.IncomingHttpHeaders; raw: string; body: any }
+const received: Delivery[] = [];
+let receiverStatus = 200;
+const receiver = http.createServer((req, res) => {
+    let raw = '';
+    req.on('data', c => { raw += c.toString(); });
+    req.on('end', () => {
+        let body: any;
+        try { body = JSON.parse(raw); } catch { body = { _unparsed: raw }; }
+        received.push({ path: req.url ?? '', headers: req.headers, raw, body });
+        res.writeHead(receiverStatus, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: receiverStatus < 300 }));
+    });
+});
+await new Promise<void>(r => receiver.listen(0, '127.0.0.1', () => r()));
+const RECEIVER_PORT = (receiver.address() as AddressInfo).port;
+// The test server runs with AIMEAT_ALLOW_PRIVATE_EGRESS, so a loopback address is a valid webhook.
+const WEBHOOK_URL = `http://127.0.0.1:${RECEIVER_PORT}/hook`;
+// A loopback port that was free a moment ago and is closed now: the connection is refused at once,
+// with no DNS and no network in the way.
+const closedPort = await new Promise<number>(r => { const s = http.createServer(); s.listen(0, '127.0.0.1', () => { const p = (s.address() as AddressInfo).port; s.close(() => r(p)); }); });
+const UNREACHABLE_URL = `http://127.0.0.1:${closedPort}/webhook-test`;
+
+/** The signature a receiver recomputes: HMAC-SHA256 over the exact bytes that arrived. */
+function expectedSignature(secret: string, raw: string): string {
+    return `sha256=${createHmac('sha256', secret).update(raw).digest('hex')}`;
+}
+async function waitForDelivery(pred: (d: Delivery) => boolean, ms = 15_000): Promise<Delivery> {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+        const hit = received.find(pred);
+        if (hit) return hit;
+        await sleep(100);
+    }
+    throw new Error(`no matching delivery within ${ms} ms; received: ${JSON.stringify(received.map(d => ({ path: d.path, event: d.headers['x-aimeat-event'] })))}`);
+}
 
 console.log('\n=== AIMEAT Agent Webhook E2E Test ===\n');
 
@@ -225,7 +268,7 @@ await test('5. POST webhook test (unreachable URL -> delivered=false)', async ()
     });
     assert(putStatus === 200, `PUT status ${putStatus}`);
 
-    // Now test delivery -- should fail since 192.0.2.1 is non-routable
+    // Now test delivery: the port is closed, so the connection is refused
     const { status, body } = await json(`/v1/agents/${agentName}/webhook/test`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -235,6 +278,43 @@ await test('5. POST webhook test (unreachable URL -> delivered=false)', async ()
     assert(body.data.status === 'failed', `status: ${body.data.status}`);
     assert(typeof body.data.error === 'string' && body.data.error.length > 0, `error: ${body.data.error}`);
     assert(typeof body.data.latency_ms === 'number', `latency_ms type: ${typeof body.data.latency_ms}`);
+});
+
+// QA audit F07a-01: no test RECEIVED a delivery, so the signature, the body and delivered: true were
+// asserted nowhere. These tests read what arrives at the listener.
+const SIGNING_SECRET = 'receiver-checks-this-secret-0123456789';
+
+await test('5b. POST webhook test to a live receiver: delivered, signed with the webhook secret over the body that arrived', async () => {
+    const put = await json(`/v1/agents/${agentName}/webhook`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ url: WEBHOOK_URL, secret: SIGNING_SECRET }),
+    });
+    assert(put.status === 200, `PUT ${put.status}: ${JSON.stringify(put.body)}`);
+    receiverStatus = 200;
+    received.length = 0;
+    const { status, body } = await json(`/v1/agents/${agentName}/webhook/test`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200 && body.data.delivered === true && body.data.status === 'success' && body.data.http_status === 200,
+        `answer: ${status} ${JSON.stringify(body.data)}`);
+    const d = await waitForDelivery(x => x.headers['x-aimeat-event'] === 'webhook.test');
+    assert(d.path === '/hook', `path: ${d.path}`);
+    assert(d.headers['content-type']?.startsWith('application/json') === true, `content-type: ${d.headers['content-type']}`);
+    assert(d.headers['x-aimeat-signature'] === expectedSignature(SIGNING_SECRET, d.raw),
+        `the signature does not verify over the body: ${d.headers['x-aimeat-signature']}`);
+    assert(d.headers['x-aimeat-signature'] !== expectedSignature('some-other-secret-0123456789', d.raw), 'any secret verifies');
+    assert(d.body.event === 'webhook.test' && d.body.agent === agentGaii, `body: ${d.raw.slice(0, 200)}`);
+    const cfg = await json(`/v1/agents/${agentName}/webhook`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(typeof cfg.body.data.last_success === 'string', `the success is stamped: ${JSON.stringify(cfg.body.data)}`);
+});
+
+await test('5c. A receiver that answers 500 is a failed delivery with its status, not a success', async () => {
+    receiverStatus = 500;
+    received.length = 0;
+    try {
+        const { status, body } = await json(`/v1/agents/${agentName}/webhook/test`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(status === 200 && body.data.delivered === false && body.data.status === 'failed' && body.data.http_status === 500,
+            `answer: ${status} ${JSON.stringify(body.data)}`);
+        await waitForDelivery(x => x.headers['x-aimeat-event'] === 'webhook.test');
+    } finally { receiverStatus = 200; }
 });
 
 // ─── Phase 6: Delivery log ───
@@ -253,6 +333,36 @@ await test('6. GET webhook log returns deliveries', async () => {
     assert(typeof latest.status === 'string', `status type: ${typeof latest.status}`);
     assert(typeof latest.latencyMs === 'number' || typeof latest.latency_ms === 'number',
         'has latency field');
+});
+
+// A real event, through the dispatcher every node event uses (services/webhook-dispatcher.ts), not the
+// test route: a queued task tells the agent with task.queued (task.approved when the owner's autonomy
+// setting starts it at once), signed the same way, with a delivery id and the v1 envelope.
+await test('6a. A queued task reaches the receiver as a signed task event in the v1 envelope, and is logged as delivered', async () => {
+    received.length = 0;
+    receiverStatus = 200;
+    const t = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Webhook task', description: 'Delivered to the receiver', status: 'queued' }),
+    });
+    assert(t.status === 201, `task ${t.status}: ${JSON.stringify(t.body?.error)}`);
+    const taskId = t.body.data.task.id;
+    const d = await waitForDelivery(x => ['task.queued', 'task.approved'].includes(String(x.headers['x-aimeat-event'])));
+    assert(d.headers['x-aimeat-signature'] === expectedSignature(SIGNING_SECRET, d.raw), 'the task event signature does not verify');
+    assert(/^[0-9a-f-]{36}$/.test(String(d.headers['x-aimeat-delivery'])), `delivery id: ${d.headers['x-aimeat-delivery']}`);
+    assert(d.body.event === d.headers['x-aimeat-event'] && d.body.agent_gaii === agentGaii && d.body.version,
+        `envelope: ${d.raw.slice(0, 300)}`);
+    assert(d.body.data?.task_id === taskId, `task id in the event: ${JSON.stringify(d.body.data)}`);
+    // The dispatcher records the outcome after the response; give it a moment.
+    let logged: any = null;
+    for (let i = 0; i < 50 && !logged; i++) {
+        const log = await json(`/v1/agents/${agentName}/webhook/log`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        logged = (log.body.data.deliveries as any[]).find(x => x.event === d.body.event && x.status === 'success');
+        if (!logged) await sleep(100);
+    }
+    assert(!!logged, 'the delivery log has no success entry for the task event');
+    const cfg = await json(`/v1/agents/${agentName}/webhook`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(cfg.body.data.fail_count === 0, `a success resets the fail count: ${cfg.body.data.fail_count}`);
 });
 
 // ─── Phase 6b: Integration subtab composite (mount fold) ───
@@ -365,6 +475,8 @@ await test('Cascade-delete owner', async () => {
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
 });
+
+receiver.close();
 
 // ─── Summary ───
 console.log(`\n${'='.repeat(50)}`);

@@ -8,6 +8,7 @@
  * @structure fileMethods
  * @usage Object.assign(SqliteStorage.prototype, fileMethods) in ../index.ts
  * @version-history
+ *   2026-10-16 — The chunked-upload methods go through the shared ChunkedUploadStore (QA audit F05b-02).
  *   v1.1.0 — 2026-10-08 — aiProvenanceId is written, read on every path, and set alone by
  *     setStorageFileProvenance (AI provenance for stored files; Postgres 0096).
  *   v1.0.0 — 2026-10-05 — createChunkedUpload, getChunkedUpload, addChunk, deleteChunkedUpload moved here
@@ -59,32 +60,27 @@ export const fileMethods = {
   // ══════════════════════════════════════════════════════════
 
   async createChunkedUpload(this: SqliteStorage, record: ChunkedUploadRecord): Promise<ChunkedUploadRecord> {
-    this.chunkedUploads.set(record.uploadId, record);
-    return record;
+    return this.chunkedUploads.create(record);
   },
 
   async getChunkedUpload(this: SqliteStorage, uploadId: string): Promise<ChunkedUploadRecord | null> {
-    const record = this.chunkedUploads.get(uploadId) ?? null;
-    if (record && new Date(record.expiresAt).getTime() < Date.now()) {
-      this.chunkedUploads.delete(uploadId);
-      return null;
-    }
-    return record;
+    return this.chunkedUploads.get(uploadId);
   },
 
   async addChunk(this: SqliteStorage, uploadId: string, chunkIndex: number, data: Buffer): Promise<boolean> {
-    const record = this.chunkedUploads.get(uploadId);
-    if (!record) return false;
-    if (new Date(record.expiresAt).getTime() < Date.now()) {
-      this.chunkedUploads.delete(uploadId);
-      return false;
-    }
-    record.receivedChunks.set(chunkIndex, data);
-    return true;
+    return this.chunkedUploads.addChunk(uploadId, chunkIndex, data);
   },
 
   async deleteChunkedUpload(this: SqliteStorage, uploadId: string): Promise<boolean> {
     return this.chunkedUploads.delete(uploadId);
+  },
+
+  async chunkedUploadsHeldBy(this: SqliteStorage, ownerGaii: string): Promise<{ sessions: number; bytes: number }> {
+    return this.chunkedUploads.heldBy(ownerGaii);
+  },
+
+  async sweepExpiredChunkedUploads(this: SqliteStorage): Promise<number> {
+    return this.chunkedUploads.sweep();
   },
   async createStorageFile(this: SqliteStorage, file: StorageFileRecord): Promise<StorageFileRecord> {
     // Settled here, in the provider, because it is the one door every write goes through: sixteen

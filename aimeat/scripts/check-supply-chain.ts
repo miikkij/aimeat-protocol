@@ -46,12 +46,16 @@
  *                           in code, in a compose file and in the commands the README hands out.
  *
  *   A job that truly needs a write permission and dependency code together goes in
- *   WRITE_JOB_EXEMPTIONS with its reason, and a file that must break a file rule goes in
- *   FILE_EXEMPTIONS the same way. Both are empty; adding to either is a decision.
+ *   WRITE_JOB_EXEMPTIONS with its reason, a job that must hand one named secret to the code it tests
+ *   goes in SECRET_JOB_EXEMPTIONS with the secret and its reason, and a file that must break a file
+ *   rule goes in FILE_EXEMPTIONS the same way. Adding to any of them is a decision.
  * @structure workflowFindings(file, text) · commandFindings(file, text) · modelFindings(file, text)
  *   · composeFindings(file, text) · main() reads the three trees and prints `file:line  rule  what to do`
  * @usage cd aimeat && pnpm check:supply-chain
  * @version-history
+ *   v1.2.0 — 2026-10-16 — SECRET_JOB_EXEMPTIONS: a job may read a NAMED secret beside dependency code
+ *     when the entry says why; any other secret in that job is still refused. One entry, the nightly
+ *     Stripe test-mode job, whose test is the code that must hold the key (QA audit W30).
  *   v1.1.2 — 2026-09-29 — The desktop resources folder is read only when it exists: it holds no
  *     tracked file any more, so a clean clone has none and the scan crashed with ENOENT.
  *   v1.1.1 — 2026-09-29 — FILE_EXEMPTIONS is empty: the desktop app no longer ships the agent-runtime
@@ -88,6 +92,22 @@ export interface Finding { file: string; line: number; rule: string; fix: string
  * another, and the publishing job only downloads the built files and runs the publishing action.
  */
 export const WRITE_JOB_EXEMPTIONS: Readonly<Record<string, string>> = {};
+
+/**
+ * Jobs allowed to read named secrets while they run dependency code, `<workflow file>#<job id>` with
+ * the secrets and the reason. A secret not named in the entry is still refused, and an entry that
+ * names no job, gives no reason or names no secret is refused itself.
+ */
+export const SECRET_JOB_EXEMPTIONS: Readonly<Record<string, { secrets: readonly string[]; reason: string }>> = {
+  'e2e-full.yml#stripe-testmode': {
+    secrets: ['STRIPE_TEST_SECRET_KEY'],
+    reason: 'The test is the dependency code: it runs the Stripe card handler against Stripe test mode, so the '
+      + 'process under test has to hold the key. The key is a TEST-MODE secret of a Stripe account kept for this '
+      + 'test, which moves no real money, and both tests refuse a key that is not a test-mode key before any call. '
+      + 'The job holds only contents: read, installs from the pinned lockfile, and passes the secret to the two '
+      + 'steps that run the tests, not to the install (QA audit W30, ruled in the brief of 2026-10-16).',
+  },
+};
 
 /** File rules a file may break, `<file>#<rule>` with the reason. An entry nothing matches is refused. */
 export const FILE_EXEMPTIONS: Readonly<Record<string, string>> = {};
@@ -321,7 +341,9 @@ export function workflowFindings(file: string, text: string): Finding[] {
         }
         const jobNode = job as { range?: [number, number, number] | null };
         const jobText = jobNode.range ? text.slice(jobNode.range[0], jobNode.range[2]) : '';
-        const secrets = [...new Set([...topSecrets, ...[...jobText.matchAll(SECRET_REF)].map(m => m[1]).filter(s => s !== 'GITHUB_TOKEN')])];
+        const allowedSecrets = new Set(SECRET_JOB_EXEMPTIONS[`${path.posix.basename(file)}#${jobId}`]?.secrets ?? []);
+        const secrets = [...new Set([...topSecrets, ...[...jobText.matchAll(SECRET_REF)].map(m => m[1]).filter(s => s !== 'GITHUB_TOKEN')])]
+            .filter(s => !allowedSecrets.has(s));
         if (secrets.length) {
             out.push({ file, line: deps.line, rule: 'secret-and-deps', fix: `job "${jobId}" reads ${secrets.map(s => `secrets.${s}`).join(', ')} and runs ${deps.what}: use the secret in a job of its own that runs no dependency code` });
         }
@@ -547,6 +569,13 @@ export function scan(root: string, fileExemptions: Readonly<Record<string, strin
         findings.push(...workflowFindings(file, text));
         const jobs = child(parseDocument(text).contents, 'jobs');
         if (isMap(jobs)) for (const p of jobs.items) jobIds.add(`${f}#${String(valueOf(p.key))}`);
+    }
+    for (const [key, entry] of Object.entries(SECRET_JOB_EXEMPTIONS)) {
+        // Held to the job it names when its workflow is in the tree being read; a scan of another tree
+        // (a test's temporary checkout) has no such workflow and nothing to hold it to.
+        const inThisTree = root === REPO || workflows.includes(key.split('#')[0]!);
+        if (inThisTree && !jobIds.has(key)) findings.push({ file: 'aimeat/scripts/check-supply-chain.ts', line: 1, rule: 'exemption', fix: `SECRET_JOB_EXEMPTIONS names ${key}, which is no job; remove the entry` });
+        if (!entry.reason.trim() || entry.secrets.length === 0) findings.push({ file: 'aimeat/scripts/check-supply-chain.ts', line: 1, rule: 'exemption', fix: `SECRET_JOB_EXEMPTIONS entry ${key} names no secret or gives no reason` });
     }
     for (const [key, reason] of Object.entries(WRITE_JOB_EXEMPTIONS)) {
         if (!jobIds.has(key)) findings.push({ file: 'aimeat/scripts/check-supply-chain.ts', line: 1, rule: 'exemption', fix: `WRITE_JOB_EXEMPTIONS names ${key}, which is no job; remove the entry` });

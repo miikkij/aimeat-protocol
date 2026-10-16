@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-16 — aimeat_commerce_beneficiary_earnings totals every entry and returns the newest `limit`,
+ *     with `total` beside `count` (QA audit S8-10).
  *   2026-10-16 — aimeat_commerce_beneficiary_split_set calls declareSplit
  *     (commerce/beneficiary-split-declare.ts), the validation and write POST /v1/commerce/beneficiary-splits
  *     uses: the author is the calling agent, not its owner, a refusal is INVALID_INPUT, and pool mode
@@ -534,18 +536,21 @@ export function registerCommerceTools(
         annotationsFor('aimeat_commerce_beneficiary_earnings'),
         async ({ role, status, limit }) => {
             const max = limit ?? 200;
+            // Totals over every entry, the list capped at the newest `max` (QA audit S8-10).
             if (role === 'provider') {
-                const all = await listBeneficiaryObligations(storage, ownerGhii, max);
-                const entries = status ? all.filter(e => e.status === status) : all;
-                return ok({ role: 'provider', provider: ownerGhii, totals: totalsOf(entries), entries, count: entries.length });
+                const all = await listBeneficiaryObligations(storage, ownerGhii);
+                const matching = status ? all.filter(e => e.status === status) : all;
+                const entries = matching.slice(0, max);
+                return ok({ role: 'provider', provider: ownerGhii, totals: totalsOf(matching), entries, count: entries.length, total: matching.length });
             }
-            const all = await listBeneficiaryEntries(storage, ownerGhii, max);
-            const entries = status ? all.filter(e => e.status === status) : all;
+            const all = await listBeneficiaryEntries(storage, ownerGhii);
+            const matching = status ? all.filter(e => e.status === status) : all;
+            const entries = matching.slice(0, max);
             const gate = await beneficiaryEligibility(storage, config, ownerGhii);
             return ok({
                 role: 'beneficiary', beneficiary: ownerGhii,
                 verification: { state: gate.state, payable: gate.eligible, reason: gate.reason, message: gate.message },
-                totals: totalsOf(entries), entries, count: entries.length,
+                totals: totalsOf(matching), entries, count: entries.length, total: matching.length,
                 note: 'A share is owed by the PROVIDER, not by the buyer. It comes out of what the provider earned.',
             });
         },

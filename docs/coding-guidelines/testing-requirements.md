@@ -89,7 +89,7 @@ pnpm gate --postgres
 
 ### Storage conformance
 
-`pnpm exec vitest run test/unit/storage-conformance.test.ts` tests SQLite locally and PostgreSQL when `DATABASE_URL` is set. A configured but unavailable PostgreSQL database fails the suite. Set `AIMEAT_CONFORMANCE_REQUIRE_POSTGRES=true` to require a URL as well. The same holds for every unit file that reads `DATABASE_URL`: `pnpm test:unit:postgres` runs all of them against `DATABASE_URL` with that flag, CI runs it in its PostgreSQL service job, and `pnpm gate` runs it whenever its PostgreSQL legs run. A new two-provider unit file calls `requirePostgresWhenAsked()` from `test/unit/postgres-arm.ts`; `test/unit/postgres-unit-files.test.ts` refuses one that does not. A local SQLite-only pass is not PostgreSQL evidence.
+`pnpm exec vitest run test/unit/storage-conformance.test.ts test/unit/storage-conformance-lists.test.ts` tests SQLite locally and PostgreSQL when `DATABASE_URL` is set. A configured but unavailable PostgreSQL database fails the suite. Set `AIMEAT_CONFORMANCE_REQUIRE_POSTGRES=true` to require a URL as well; CI does this in its PostgreSQL service job. A local SQLite-only pass is not PostgreSQL evidence.
 
 ---
 
