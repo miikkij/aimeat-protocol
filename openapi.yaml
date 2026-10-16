@@ -25325,8 +25325,10 @@ paths:
         ask each other.
 
         When the provider is on another node, the request is passed to that node. A refusal there
-        comes back as this node's error PEER_REFUSED, with that node's status as the status and
-        `details: { routed_to, peer_status, peer_error }`; today every node refuses forwarded work,
+        comes back as 502 PEER_REFUSED with `details: { routed_to, peer_status, peer_error }`:
+        `peer_status` is the status the other node answered, never this response's own status, so a
+        401 there cannot read as the caller's own session ending (until 2026-10-16 that status was
+        passed on as this response's status), and no work item is created; today every node refuses forwarded work,
         because the forwarding node holds no credential of its own there. The 1-morsel routing fee is taken as the call goes out, after
         the node's address is checked (a refused address, 400 INVALID_URL, costs nothing); a balance
         that cannot cover it is refused with 402 INSUFFICIENT_MORSELS. The fee goes back, with a
@@ -25364,6 +25366,12 @@ paths:
           $ref: '#/components/responses/PaymentRequired'
         '429':
           $ref: '#/components/responses/RateLimited'
+        '502':
+          description: >
+            The provider is on another node and that node could not be reached (REMOTE_UNREACHABLE)
+            or refused the request (PEER_REFUSED, with `details.routed_to`, `details.peer_status`,
+            the status it answered, and `details.peer_error`, its own answer). No work item exists
+            and the routing fee was given back.
 
   /v1/work:
     post:
@@ -49682,8 +49690,10 @@ paths:
       description: |
         Forward a request to a peer node, directly or through one more relay.
 
-        When the target answers with an error, its status is passed on in an error envelope with the
-        code PEER_REFUSED and the target's answer in `details.peer_error`, and the routing fee goes back.
+        When the target answers with an error, this node answers 502 PEER_REFUSED with
+        `details: { routed_to, peer_status, peer_error }` (the target's status and its answer), and
+        the routing fee goes back. The target's status is never this response's status, so a 401 there
+        cannot read as the caller's own session ending (until 2026-10-16 it was passed on).
 
         TWO POLICIES, BOTH ENFORCED, AND NEITHER REPLACED THE OTHER. This node's own
         `allow_routing` on the TARGET peer decides what it is willing to relay outward, and refuses
@@ -49706,7 +49716,7 @@ paths:
         The fee is taken for a route that is made. It is taken as the first call goes out, after the
         address check; a balance that cannot cover it is refused with 402 INSUFFICIENT_MORSELS and
         nothing is sent. It goes back, with a `federation_routing_return` line in the wallet, when the
-        target cannot be reached (502), when it answers with an error (its status is passed on), and
+        target cannot be reached (502), when it answers with an error (502 PEER_REFUSED), and
         when no relay makes a multi-hop route (404).
 
         WHAT A RECEIVER ANSWERS, on any path a relay reaches, always 403 and never 401. A 401 would
@@ -49739,8 +49749,13 @@ paths:
           $ref: '#/components/responses/PaymentRequired'
         '403':
           description: >
-            This node will not relay to that target (POLICY_DENIED), or the receiving node refused
-            the relay (a RELAY_* code, listed above, passed through with the far end's status).
+            This node will not relay to that target (POLICY_DENIED).
+        '502':
+          description: >
+            The target could not be reached (FEDERATION_ERROR), or it refused the request
+            (PEER_REFUSED, with `details.routed_to`, `details.peer_status`, the status it answered,
+            and `details.peer_error`, its own answer, a RELAY_* refusal listed above among them).
+            The routing fee was given back.
 
   /v1/federation/resolve/{gaii}:
     get:
@@ -49777,10 +49792,12 @@ paths:
         fee is taken from that identity's owner as the call goes out, after the address check: a
         balance that cannot cover it is refused with 402 INSUFFICIENT_MORSELS and nothing is sent.
         The fee goes back, with a `federation_routing_return` line, when the peer cannot be reached
-        (502) or answers with an error: its status is passed on, in an error envelope with the code
-        PEER_REFUSED and the far node's own answer in `details.peer_error` (until 2026-10-15 this was
-        a success envelope, `ok: true`, beside the error status). Work requests do not cross nodes yet:
-        the receiving node asks for a signed-in caller, so a real node answers 401.
+        (502) or answers with an error: then this node answers 502 PEER_REFUSED with
+        `details: { routed_to, peer_status, peer_error }`, the far node's status and its own answer
+        (until 2026-10-15 this was a success envelope, `ok: true`, beside the error status, and until
+        2026-10-16 the far node's status was this response's status, so its 401 read as the caller's
+        own session ending). Work requests do not cross nodes yet: the receiving node asks for a
+        signed-in caller, so a real node refuses and `peer_status` is 401.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -49795,6 +49812,11 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '402':
           $ref: '#/components/responses/PaymentRequired'
+        '502':
+          description: >
+            The peer could not be reached (FEDERATION_ERROR), or it refused the work (PEER_REFUSED,
+            with `details.routed_to`, `details.peer_status`, the status it answered, and
+            `details.peer_error`, its own answer). No work item exists and the routing fee was given back.
 
   /v1/federation/settle:
     post:
@@ -67998,7 +68020,11 @@ paths:
       operationId: getAdminFederationSyncHealth
       tags: [Federation, Admin]
       summary: Federation replication sync-health metrics
-      description: Operator-only (requireRole('operator')). Reports the current replication queue depth.
+      description: >
+        Operator-only (requireRole('operator')). Reports the current replication queue depth: the
+        rows not yet sent (status pending), on both storage providers. A sent row and a failed row
+        are not counted; a prune removes the sent rows (until 2026-10-16 the count differed between
+        the providers, and then counted every row).
       security:
         - BearerAuth: []
       responses:
@@ -68014,7 +68040,7 @@ paths:
                       data:
                         type: object
                         properties:
-                          queue_depth: { type: integer }
+                          queue_depth: { type: integer, description: 'Replication queue rows not yet sent (status pending).' }
                           timestamp: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'

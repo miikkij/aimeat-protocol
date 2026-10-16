@@ -9,6 +9,8 @@
  * @structure systemPromptMethods, replicationQueueMethods
  * @usage Object.assign(SqliteStorage.prototype, systemPromptMethods, replicationQueueMethods) in ../index.ts
  * @version-history
+ *   2026-10-16 — replicationQueueSize counts only pending rows, on both providers; the prune still removes sent
+ *     rows (decision 2026-10-16, test/unit/replication-queue-parity.test.ts).
  *   v1.0.0 — 2026-10-05 — enqueueReplication, dequeueReplication, markReplicationSent, markReplicationFailed,
  *     pruneReplicationQueue, replicationQueueSize, deserializeReplicationEntry moved here from
  *     federation-oauth.ts; 10 methods (deserializeSystemPrompt, deserializeSystemPromptVersion,
@@ -193,7 +195,9 @@ export const replicationQueueMethods = {
   },
 
   async replicationQueueSize(this: SqliteStorage): Promise<number> {
-    const row = this.db.prepare('SELECT COUNT(*) as cnt FROM replication_queue').get() as { cnt: number };
+    // The rows not yet sent: a sent or failed row is not waiting, and sync-health reads the depth as
+    // the backlog it throttles on (decision 2026-10-16).
+    const row = this.db.prepare("SELECT COUNT(*) as cnt FROM replication_queue WHERE status = 'pending'").get() as { cnt: number };
     return row.cnt;
   },
 

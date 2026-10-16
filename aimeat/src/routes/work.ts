@@ -12,6 +12,8 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   2026-10-16 — Work the provider's node refused answers HTTP 502 PEER_REFUSED; the far node's status is
+ *     only in details.peer_status, so its 401 cannot read as the caller's own session ending (decision 2026-10-16).
  *   2026-10-16 — The escrow hold and the work item's creation are one transaction (QA audit E6-03).
  *   2026-10-15 — Rate and reject store the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   v1.7.0 — 2026-10-11 — The escrow holds the action's pacing amount (`toll`, was `basePrice`) plus
@@ -90,6 +92,23 @@ export { getWebhookLog } from '../services/work-lifecycle.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
+}
+
+/**
+ * The text an MCP tool shows for a createWorkItem refusal: `CODE: message`. For PEER_REFUSED it
+ * also names the other node, the status it answered and its own answer, because the MCP result has
+ * no `details` field and "its answer is in details" pointed at nothing (decision 2026-10-16).
+ */
+export function workErrorText(result: { code?: string; error?: string; details?: unknown }): string {
+  const base = `${result.code}: ${result.error}`;
+  if (result.code !== 'PEER_REFUSED' || !result.details || typeof result.details !== 'object') return base;
+  const d = result.details as { routed_to?: unknown; peer_status?: unknown; peer_error?: unknown };
+  const pe = d.peer_error;
+  const answer = pe && typeof pe === 'object'
+    ? [(pe as { code?: unknown }).code, (pe as { message?: unknown }).message].filter(v => typeof v === 'string' && v).join(': ')
+    : (typeof pe === 'string' ? pe : '');
+  return `${base} The other node (${String(d.routed_to ?? 'unknown')}) refused it with HTTP ${String(d.peer_status ?? '?')}`
+    + (answer ? ` and answered: ${answer.slice(0, 500)}` : ' and gave no readable answer') + '.';
 }
 
 /**
@@ -218,7 +237,9 @@ export async function createWorkItem(
       logger.warn('The provider node refused forwarded work', { node: resolved.nodeId, status: resp.status });
       return {
         error: 'The provider\'s node refused the work request, so nothing was created there and nothing was held here. Its own answer is in details; the routing fee was given back.',
-        status: resp.status, code: 'PEER_REFUSED',
+        // 502, never the far node's own status: a client that ends its session on any 401 read the
+        // far node's refusal as the end of its own (decision 2026-10-16). The far status is in details.
+        status: 502, code: 'PEER_REFUSED',
         details: { routed_to: resolved.nodeId, peer_status: resp.status, peer_error: peerError ?? null },
       };
     }

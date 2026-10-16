@@ -11,6 +11,9 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   2026-10-16 — serviceSummaryRequestHeaders: through node 4.0.4 the service summary request goes in the
+ *     older unsigned form (x-source-node alone) to a peer on 4.0.2 or older, or of unknown version, with a
+ *     log line for the unknown one; signed to a newer peer, and to every peer from 4.0.5 (decision 2026-10-16).
  *   2026-10-16 — The heartbeat cycle is the exported runHeartbeatCycle, which startHeartbeatJob schedules.
  *     It was a closure only the five-minute timer could reach, so no test ever ran it against a real
  *     peer or a dead one, nor the grace purge it carries (QA audit F18-03). Behaviour unchanged.
@@ -46,6 +49,7 @@ import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from './sign
 import { computeCatalogueHash } from '../utils/catalogue-hash.js';
 import { recordHeartbeatOutcome } from './federation-availability.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../config-federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 import { forgetPeer } from './peer-origin.js';
@@ -256,6 +260,32 @@ const peerSummaryHashes = new Map<string, string>();
 const HEARTBEAT_BASE_INTERVAL_MS = 5 * 60_000;
 
 /**
+ * The headers of the service summary request to `peer`. Signed as this node for that peer
+ * (signedGetHeaders) unless serviceSummaryForm says the peer gets the older form, `x-source-node`
+ * alone: through node 4.0.4 a peer on 4.0.2 or older, or one whose version this node has not heard
+ * in a signed heartbeat, gets that form; from UNSIGNED_SERVICE_SUMMARY_REMOVED_IN (4.0.5) no peer
+ * does (decision 2026-10-16). Throws when the signed form is due and this node has no key.
+ */
+export async function serviceSummaryRequestHeaders(
+    config: AimeatConfig, peer: Pick<PeerInfo, 'nodeId' | 'softwareVersion'>, nodeKey: { privateKey: string } | null,
+): Promise<Record<string, string>> {
+    const chosen = serviceSummaryForm(peer.softwareVersion);
+    if (chosen.form === 'unsigned') {
+        if (chosen.reason === 'peer-unknown') {
+            logger.info('Service summary request sent unsigned: the peer\'s software version is not known yet', {
+                peer: peer.nodeId, signed_only_from: UNSIGNED_SERVICE_SUMMARY_REMOVED_IN,
+            });
+        }
+        return { 'Accept': 'application/json', 'x-source-node': config.nodeId };
+    }
+    if (!nodeKey) throw new Error('This node has no signing key');
+    return {
+        'Accept': 'application/json',
+        ...await signedGetHeaders(nodeKey.privateKey, config.nodeId, peer.nodeId, { purpose: SERVICE_SUMMARY_PURPOSE }),
+    };
+}
+
+/**
  * One heartbeat cycle: purge the de-peered peers whose grace has ended, then ping every active or
  * degraded peer that is due, with a signed heartbeat that names the peer (audienceProof), and record
  * the outcome: active and last-seen on a 2xx, degraded after 3 failures in a row and offline after 10.
@@ -376,16 +406,11 @@ export async function runHeartbeatCycle(
                                     // Hash changed or first time -- fetch full summary
                                     logger.info(`Service summary hash changed for peer ${peer.nodeId}, fetching summary`);
                                     try {
-                                        // Signed as this node, for that peer, once (QA audit S6-09).
-                                        if (!nodeKey) throw new Error('This node has no signing key');
+                                        // Signed as this node, for that peer, once (QA audit S6-09), or the
+                                        // older form to an older peer through 4.0.4 (decision 2026-10-16).
                                         const summaryResp = await peerFetch(
                                             `${peer.url}/v1/federation/service-summary`,
-                                            {
-                                                headers: {
-                                                    'Accept': 'application/json',
-                                                    ...await signedGetHeaders(nodeKey.privateKey, config.nodeId, peer.nodeId, { purpose: SERVICE_SUMMARY_PURPOSE }),
-                                                },
-                                            },
+                                            { headers: await serviceSummaryRequestHeaders(config, peer, nodeKey) },
                                             { timeoutMs: TIMEOUT_MS },
                                         );
                                         if (!summaryResp.ok) throw new Error(summaryResp.message);
