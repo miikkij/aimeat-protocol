@@ -33,13 +33,17 @@
  *
  *   THE SEED. 44 files did this on 2026-08-11 and are listed below. The list only shrinks: a new
  *   MCP file that reaches for storage fails the build, and every conversion deletes a line here.
- *   `pnpm check:shared-impl` reports the same number, and the two are meant to fall together.
+ *   An exempt file is not free inside: `pnpm check:shared-impl` holds each one to a ceiling of
+ *   direct-call lines that fails in both directions, and holds this list to its ceilings.
  * @structure
- *   - EXEMPT — the 44 that predate the rule
+ *   - EXEMPT — the files that predate the rule and still call storage directly
  *   - noStorageInMcp: the rule module
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.1.0 — 2026-10-16 — A member receiver (`deps.storage.x()`) counts as a direct call, as the bare
+ *     identifier does; appdev-pitfalls.ts left EXEMPT, it calls storage no more; check:shared-impl
+ *     now holds each exempt file to a per-file ceiling (QA audit P3-09).
  *   v1.0.1 — 2026-09-29 — core-resources.ts inherits core.ts's line: the resource templates moved out.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit: enforcing the architecture the drift ignored).
  */
@@ -64,7 +68,6 @@ const EXEMPT = new Set([
   'src/mcp/agent-tasks.ts',
   'src/mcp/agent-telemetry.ts',
   'src/mcp/app-template-proposals.ts',
-  'src/mcp/appdev-pitfalls.ts',
   'src/mcp/apps.ts',
   'src/mcp/apps-fork.ts',              // pure extraction out of apps.ts (max-file-lines), same backlog
   'src/mcp/boards.ts',
@@ -127,7 +130,9 @@ export const noStorageInMcp = {
         const callee = node.callee;
         if (callee?.type !== 'MemberExpression') return;
         const obj = callee.object;
-        const isStorage = obj?.type === 'Identifier' && obj.name === 'storage';
+        // The bare `storage`, or a member receiver: `deps.storage.getX()`, `this.storage.getX()`.
+        const isStorage = (obj?.type === 'Identifier' && obj.name === 'storage')
+          || (obj?.type === 'MemberExpression' && !obj.computed && obj.property?.type === 'Identifier' && obj.property.name === 'storage');
         if (!isStorage) return;
         context.report({ node, messageId: 'direct' });
       },

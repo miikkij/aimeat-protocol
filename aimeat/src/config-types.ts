@@ -777,6 +777,11 @@ export interface LoadConfigOptions {
   configPath?: string;
   /** CLI bootstrap overrides keyed by dot-path (e.g. { 'node.port': '8080' }) */
   cliOverrides?: Record<string, string>;
+  /**
+   * Refuse a setting the node does not accept (config-start-check.ts). Default true. `aimeat validate`,
+   * `aimeat init` and `aimeat config` pass false: they exist to show or repair a broken environment.
+   */
+  checkSettings?: boolean;
 }
 
 export interface LoadConfigResult {

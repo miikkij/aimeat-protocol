@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Node identity, storage, security, modes, economy, features, quota config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.0.2 — 2026-10-16 — AIMEAT_BURN_RATE states its default as the loader prints it (QA audit D8-04).
  *   v1.0.1 — 2026-10-14 — AIMEAT_OTK_GRACE_MS removed with the connectivity-key routes.
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
  */
@@ -183,7 +184,7 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
           envVar: 'AIMEAT_BURN_RATE',
           description: 'Fraction of morsels destroyed per transaction (0 to 1)',
           value: String(config.burnRate),
-          defaultVal: '0.10',
+          defaultVal: '0.1',
         },
         {
           envVar: 'AIMEAT_MAX_OPERATOR_MINT_PER_DAY',

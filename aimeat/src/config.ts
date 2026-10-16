@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.29.0 — 2026-10-16 — loadConfig() refuses to start on a setting the node does not accept and treats an empty number or fixed-set setting as unset (config-start-check.ts; QA audit D8-02, P6-03, D6-02); `checkSettings: false` for validate, init and config. The five settings no code read are removed: AIMEAT_CAPABILITY_PUBLISHERS, _MIN_PUBLISHER_TRUST, _PUBLISHER_ALLOWLIST, _LOG_RETENTION_DAYS and AIMEAT_PACKAGE_FEDERATION_AUTO_ACCEPT (QA audit D8-05). A config file may name a setting with no schema row by its variable name, and the load line counts what was applied and names what was skipped (QA audit D8-03). The Consul block moved to config-consul.ts (pure extraction).
  *   v1.28.1 — 2026-10-14 — otkGraceMs (AIMEAT_OTK_GRACE_MS) removed: the connectivity-key routes it timed are gone (feature-list audit row 202).
  *   v1.28.0 — 2026-10-12 — SHIPPED_DEFAULT_AGENT_SCOPES carries agent:read, the word of the owner's agent list.
  *   v1.27.0 — 2026-10-12 — aiProvenance comes from aiProvenanceFromEnv (config-ai-label.ts): from 4.0.0 a public node records provenance whatever AIMEAT_AI_PROVENANCE says (Core 2026-11 PROV-07).
@@ -134,6 +135,8 @@ import { isPrivateHost } from './config-private-host.js';
 // modules that import it from here keep working; the move was not meant to be visible.
 export { securityPostureWarnings } from './config-posture.js';
 import { assertEudiwNotHalfBuilt } from './config-eudiw-guard.js';
+import { assertStartSettings } from './config-start-check.js';
+import { consulDefaults } from './config-consul.js';
 
 /**
  * The scopes an agent is approved with when nobody names any (AIMEAT_DEFAULT_AGENT_SCOPES unset).
@@ -145,7 +148,7 @@ import { assertEudiwNotHalfBuilt } from './config-eudiw-guard.js';
 export const SHIPPED_DEFAULT_AGENT_SCOPES = 'memory:read,memory:write,memory:delete,catalogue:read,organism:read,agent:read';
 
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
-  const { configPath, cliOverrides } = options ?? {};
+  const { configPath, cliOverrides, checkSettings = true } = options ?? {};
 
   // ── Source tracking for provenance ──
   const cliKeys: string[] = [];
@@ -173,17 +176,19 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   // 3. Load file config and populate process.env for unset values
   const fileSource = loadFileSource(configPath);
   if (fileSource) {
+    const unknown: string[] = [];
     for (const [dotPath, value] of Object.entries(fileSource.values)) {
-      const envVar = DOT_PATH_TO_ENV[dotPath];
-      if (envVar && process.env[envVar] === undefined) {
-        process.env[envVar] = value;
-        fileKeys.push(dotPath);
-      }
+      // A setting with no schema row is written under its variable name (aimeat init does that).
+      const envVar = DOT_PATH_TO_ENV[dotPath] ?? (/^AIMEAT_[A-Z0-9_]+$/.test(dotPath) ? dotPath : undefined);
+      if (!envVar) unknown.push(dotPath);
+      else if (process.env[envVar] === undefined) { process.env[envVar] = value; fileKeys.push(dotPath); }
     }
-    console.log(`[config] Loaded ${Object.keys(fileSource.values).length} values from ${fileSource.name}`);
+    console.log(`[config] Loaded ${fileKeys.length} values from ${fileSource.name}${unknown.length ? `; skipped ${unknown.length} keys this node does not know: ${unknown.join(', ')}` : ''}`);
   }
 
   // ── Build config from process.env (now includes CLI + env + file layers) ──
+  // A value the Config tab would refuse refuses the start too (config-start-check.ts).
+  if (checkSettings) assertStartSettings(process.env);
   const nodeType = (process.env.AIMEAT_NODE_TYPE ?? 'full') as NodeType;
   if (!['full', 'relay', 'mirror', 'personal'].includes(nodeType)) {
     throw new Error(`Invalid AIMEAT_NODE_TYPE: ${nodeType}. Must be 'full', 'relay', 'mirror', or 'personal'.`);
@@ -669,7 +674,6 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     templateReviewsEnabled: process.env.AIMEAT_TEMPLATE_REVIEWS_ENABLED !== 'false',
     templateDiscussionsEnabled: process.env.AIMEAT_TEMPLATE_DISCUSSIONS_ENABLED !== 'false',
     packageFederationEnabled: process.env.AIMEAT_PACKAGE_FEDERATION_ENABLED === 'true',
-    packageFederationAutoAccept: process.env.AIMEAT_PACKAGE_FEDERATION_AUTO_ACCEPT === 'true',
     packageRepository: process.env.AIMEAT_PACKAGE_REPOSITORY === 'true',
     packagePeerCap: parseInt(process.env.AIMEAT_PACKAGE_PEER_CAP ?? '500', 10),
     installSetPath: process.env.AIMEAT_INSTALL_SET || null,
@@ -682,12 +686,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // CORS
     capabilityPublishing: (process.env.AIMEAT_CAPABILITY_PUBLISHING ?? 'disabled') as 'disabled' | 'self_only' | 'moderated' | 'open',
-    capabilityPublishers: (process.env.AIMEAT_CAPABILITY_PUBLISHERS ?? 'all_users') as 'all_users' | 'trusted_only' | 'allowlist',
-    capabilityMinPublisherTrust: parseInt(process.env.AIMEAT_CAPABILITY_MIN_PUBLISHER_TRUST ?? '50', 10),
-    capabilityPublisherAllowlist: (process.env.AIMEAT_CAPABILITY_PUBLISHER_ALLOWLIST ?? '').split(',').map(s => s.trim()).filter(Boolean),
     capabilityWebhooks: (process.env.AIMEAT_CAPABILITY_WEBHOOKS ?? 'disabled') as 'disabled' | 'allowlist_only' | 'open',
     capabilityWebhookDomainAllowlist: (process.env.AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST ?? '').split(',').map(s => s.trim()).filter(Boolean),
-    capabilityLogRetentionDays: parseInt(process.env.AIMEAT_CAPABILITY_LOG_RETENTION_DAYS ?? '30', 10),
     // Count a capability's DIRECT calls (an app or agent calling POST /v1/ext/<name>/<action>) into its
     // stats as well as the proxy calls, which are always counted. Off by default: it is one write per
     // call on the node's hottest path, and a node that does not read the numbers should not pay for them.
@@ -739,13 +739,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // The front page's signage example exists only where the operator names a screen to show.
     get signageEnabled(): boolean { return (this.siteLinks?.signage ?? '').trim() !== ''; },
 
-    // Consul
-    consulEnabled: process.env.AIMEAT_CONSUL_ENABLED === 'true',
-    consulUrl: process.env.AIMEAT_CONSUL_URL ?? 'http://localhost:8500',
-    consulPrefix: process.env.AIMEAT_CONSUL_PREFIX ?? 'aimeat/config',
-    consulToken: process.env.AIMEAT_CONSUL_TOKEN ?? '',
-    consulWatchIntervalSeconds: parseInt(process.env.AIMEAT_CONSUL_WATCH_INTERVAL ?? '30', 10),
-    consulDatacenter: process.env.AIMEAT_CONSUL_DATACENTER ?? '',
+    ...consulDefaults(),
 
     rlGlobal,
     rlAuth,

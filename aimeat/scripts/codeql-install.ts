@@ -15,19 +15,21 @@
  *   1. `--from <codeql executable>`: registers a CLI already on disk, if its version is the pinned one.
  *   2. The pointer already names the pinned version: says so and stops.
  *   3. A `codeql` on CODEQL_CLI or PATH with the pinned version: registers it.
- *   4. Otherwise downloads the pinned bundle for this platform from github/codeql-action's release
- *      (about 660 MB), checks it against the release's own sha256, unpacks it under
- *      `~/.aimeat/tools/<tag>/` and registers it.
+ *   4. Otherwise downloads the pinned bundle for this platform from github/codeql-action's public
+ *      release over HTTPS (about 660 MB, no GitHub CLI and no sign-in), checks it against the
+ *      release's own sha256, unpacks it under `~/.aimeat/tools/<tag>/` and registers it.
  *   The pin is CODEQL_BUNDLE in scripts/inventory/field-reach-facts.ts, the same release ci.yml uses.
  * @structure versionOf() · register() · download() · main()
  * @usage cd aimeat && pnpm codeql:install [--from <path to codeql executable>]
- *   (the download needs the GitHub CLI, signed in)
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The download reads the public release URL with fetch instead of `gh release download`: a machine without the GitHub CLI, or with one not signed in, could not install CodeQL, and `pnpm check:fast` refused there (QA audit D8-09, P9).
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { homedir, tmpdir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { CODEQL_BUNDLE, CODEQL_POINTER } from './inventory/field-reach-facts.js';
@@ -59,6 +61,18 @@ async function sha256(file: string): Promise<string> {
     return h.digest('hex');
 }
 
+/** The public address of one asset of the pinned release. A public release needs no sign-in. */
+function releaseUrl(asset: string): string {
+    return `https://github.com/github/codeql-action/releases/download/${CODEQL_BUNDLE.tag}/${asset}`;
+}
+
+/** Streams `url` into `file`, following GitHub's redirect to its download host. */
+async function fetchTo(url: string, file: string): Promise<void> {
+    const res = await fetch(url, { redirect: 'follow' });
+    if (!res.ok || !res.body) throw new Error(`${url} answered HTTP ${res.status}`);
+    await pipeline(Readable.fromWeb(res.body as import('node:stream/web').ReadableStream), createWriteStream(file));
+}
+
 /** Download, verify and unpack the pinned bundle; returns the executable's path. */
 async function download(): Promise<string> {
     const asset = `codeql-bundle-${PLATFORM}.tar.gz`;
@@ -66,8 +80,8 @@ async function download(): Promise<string> {
     const tmp = mkdtempSync(join(tmpdir(), 'aimeat-codeql-'));
     try {
         console.log(`  downloading ${asset} from ${CODEQL_BUNDLE.tag} (about 660 MB)…`);
-        execFileSync('gh', ['release', 'download', CODEQL_BUNDLE.tag, '--repo', 'github/codeql-action',
-            '--pattern', asset, '--pattern', `${asset}.checksum.txt`, '--dir', tmp], { stdio: 'inherit' });
+        await fetchTo(releaseUrl(`${asset}.checksum.txt`), join(tmp, `${asset}.checksum.txt`));
+        await fetchTo(releaseUrl(asset), join(tmp, asset));
         const expected = readFileSync(join(tmp, `${asset}.checksum.txt`), 'utf-8').trim().split(/\s+/)[0].toLowerCase();
         const actual = await sha256(join(tmp, asset));
         if (actual !== expected) throw new Error(`${asset}: sha256 ${actual} is not the release's ${expected}`);

@@ -10,6 +10,10 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-16 -- e2e-contract.ts joins the list (not the guard tier): selected operations answer what
+ *     openapi.yaml declares, field by field (QA audit D3-01).
+ *   2026-10-16 -- e2e-mcp-rest-parity.ts joins the list (not the guard tier): one call on the node
+ *     MCP tool and on its REST route answers the same (QA audit D2-05, D2-06, D2-08, F12b-01).
  *   2026-10-16 -- The summary has a Skipped column, and a suite that ran no test, skipped itself in the
  *     guard tier, hit its per-suite time limit or lost its node is red with its own note; a lane whose
  *     node cannot be restarted reports its suites NOT RUN and the summary is still printed; the node's
@@ -809,6 +813,7 @@ const ALL_SUITES = [
     'test/e2e-proactive-mode.ts',
     'test/e2e-mcp-boards.ts',
     'test/e2e-mcp-extensions.ts',
+    'test/e2e-mcp-rest-parity.ts',
     'test/e2e-mcp-knowledge.ts',
     'test/e2e-mcp-appdev-pitfalls.ts',
     'test/e2e-app-template-proposals.ts',
@@ -839,6 +844,8 @@ const ALL_SUITES = [
     'test/e2e-invite-grants.ts',
     'test/e2e-contact-picker.ts',
     'test/e2e-contacts.ts',
+    // The answers of selected operations against openapi.yaml: status, schema, no undeclared field.
+    'test/e2e-contract.ts',
     'test/e2e-agent-offers.ts',
     'test/e2e-commerce.ts',
     'test/e2e-commerce-holds.ts',

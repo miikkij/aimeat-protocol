@@ -20,6 +20,8 @@
 
 **Update 2026-10-13 (node 4.0.0 released, session cc-joumii-release-4-0-0).** The reference node runs as 4.0.0, so every **met (4.0.0)** row is met by the released node. PACE-11 is closer: a capability's pacing amount is `cost.toll_morsels`, and a knowledge package's is `sharing.toll_morsels`. The old names `cost.morsels` and `sharing.morsel_price` are accepted with the Deprecation headers and refused from node 5.0.0 (ruling `decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll`; `aimeat/src/services/toll-morsels-names.ts`). The board's "post cost" wording is still open, so PACE-11 stays a gap. The counts above are not recomputed.
 
+**Update 2026-10-16 (QA audit, node 4.0.3).** The list at the end is recomputed for the released node: **10 requirements are open**, ID-11, AUTH-06, DATA-06, HTTP-01, HTTP-02 and DISC-03 (Base), PACE-05 and PACE-11 (Pacing), FED-06 and FED-16 (Federation). ID-10, AUTH-11 and MCP-06 are met (their rows below now say so), and PACE-04 is met since 2026-10-15: the daily allowance credits each person once and writes a ledger row (`aimeat/src/services/daily-allowance.ts`). The node claims its profiles with these open requirements, as Core §0.3 allows: discovery lists them in `profile_gaps` (`aimeat/src/services/core-discovery.ts`, `CORE_OPEN_REQUIREMENTS`), and `aimeat/test/unit/core-open-requirements.test.ts` fails when that list and the open rows of this file differ. The per-status counts at the top of this section still describe `9902b6287`; the open list is the current one.
+
 Status words: **met** · **met (4.0.0)** (met from the release the requirement is normative in; the code gates it by the running version, and 3.x keeps the old behaviour with the Deprecation headers) · **partial** (met, with a stated shortfall, or not verified on every path) · **gap** (not met) · **n/a** (a rule for readers or editors, no node behaviour to check).
 
 ## What changed since the reviewed draft
@@ -65,7 +67,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | ID-07 | met | `aimeat/src/services/db/owner-identity.ts:61-73`; `aimeat/src/services/db/memory-db-service.ts:192-245`; `aimeat/src/services/access-guard.ts:104-116` | |
 | ID-08 | met | Writes go to the resolved identity (`aimeat/src/utils/gaii.ts:383-414`); the owner's write for an agent is the `agent` field `aimeat/src/models/schemas.ts:133-135` | |
 | ID-09 | met | `aimeat/src/services/owner-lifecycle.ts:74-135` (one transaction: disable, sessions, PATs, app grants, device auths, enrolment grants, MCP refresh tokens, then tunnels); `aimeat/src/auth/jwt.ts:140-143`; `aimeat/src/auth/middleware.ts:273-278`; SCIM `aimeat/src/services/scim-users.ts:129,242-247` | |
-| ID-10 | **gap** | Agent delete revokes sessions by GAII `aimeat/src/routes/agents/management.ts:591-599` | The agent tokens minted at e-mail and sign-in link verification carry no `jti` and no session row (`aimeat/src/routes/ghii/web-verify.ts:416,554`), so they survive the agent's deletion until they expire. Agent existence is checked at mint only (`aimeat/src/auth/effective-scopes.ts:95-104`). |
+| ID-10 | met | `aimeat/src/routes/ghii/web-verify.ts` (the verification tokens carry a session row) | Closed 2026-10-12: deleting the agent revokes these tokens with its other sessions. |
 | ID-11 | **gap** | `aimeat/src/services/owner-erasure.ts:90-273`; `aimeat/src/storage/providers/sqlite/methods/identity.ts:88-185`; Postgres cascade `aimeat/src/storage/providers/postgres-kysely/methods/owner-cascade.ts:191-283` | Erasure looks memberships up by GHII (`owner-erasure.ts:124`) while memberships are keyed by the bare owner name (`aimeat/src/services/organism-namespace-access.ts:53-54`), so organism memberships may survive. Not verified that organism content written by the deleted owner loses the name. |
 | ID-12 | met | `aimeat/src/routes/owners/export.ts:97` | Files are exported as metadata, without bytes. |
 
@@ -83,7 +85,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | AUTH-08 | met | `aimeat/src/auth/effective-scopes.ts:57-113` | |
 | AUTH-09 | met | Owner approval `aimeat/src/routes/agents/device-auth.ts:695-714,762-763`. Same-owner approval `device-auth.ts:337-353` (the approver must be an agent of the same owner and hold `agent:write`; applications and ecosystem principals never approve), `:470-497` (a scope beyond the approving agent's own leaves the request pending for the owner; `approvedBy` names the approver) | Met under the ruling of 2026-10-12 (Q4). The operator can switch same-owner approval off (`sameOwnerAutoApprove`, default on). |
 | AUTH-10 | met | `aimeat/src/routes/agents/constants.ts:25`; `aimeat/src/routes/agents/device-auth.ts:359,533,608` | |
-| AUTH-11 | **gap** | Existence, signature, five-minute window and active owner `aimeat/src/routes/auth.ts:182-288`; window `aimeat/src/auth/signed-request.ts:40-47`; scopes re-read `aimeat/src/routes/auth.ts:254` | The renewal signature is not spent, so it can be replayed within five minutes. The MCP OAuth path does spend it (`aimeat/src/mcp/oauth.ts:210`). |
+| AUTH-11 | met | `aimeat/src/routes/auth.ts` (`spendSignature`) | Closed 2026-10-12: a renewal signature works once. |
 | AUTH-12 | met | `aimeat/src/services/ecosystem-refresh.ts:32,70-93`; `aimeat/src/routes/auth.ts:480-506`; pin `aimeat/src/routes/ecosystem-apps.ts:359-397` | |
 | AUTH-13 | met | `ECO_REAPPROVAL_SECONDS` 365 days, `aimeat/src/services/ecosystem-refresh.ts:32` | |
 | AUTH-14 | met | `aimeat/src/auth/middleware.ts:665-667` | |
@@ -199,7 +201,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | PACE-01 | met | `aimeat/src/storage/providers/sqlite/repos/ghii-resolve.ts:20-36`; `aimeat/src/utils/gaii.ts:508-513` | |
 | PACE-02 | met | Job `aimeat/src/services/core-jobs.ts:60,218-224`; 50 a day, cap 500 `aimeat/src/config.ts:315-316` | The job credits once per agent, so an owner with several agents gets several credits up to the cap. |
 | PACE-03 | met | `aimeat/src/storage/providers/sqlite/methods/wallet.ts:21-61`; `aimeat/src/storage/providers/postgres-kysely/methods/wallet.ts:75-117` | |
-| PACE-04 | **gap** | Ledger rows `aimeat/src/storage/providers/sqlite/methods/wallet.ts:66-86` | The daily allowance job writes no ledger row (`aimeat/src/services/core-jobs.ts:218-224`). |
+| PACE-04 | met | `aimeat/src/services/daily-allowance.ts` | Closed 2026-10-15: the allowance credits each person once and writes a ledger row. |
 | PACE-05 | **gap** | `isMoneyCurrency` `aimeat/src/commerce/money.ts:49-54`; ACP and UCP refuse a non-money session `aimeat/src/commerce/protocol-money.ts:34-74`; morsel handler removed `aimeat/src/commerce/payment-handlers.ts:19-21,57` | Marketplace listing rows still carry `{ unit: 'morsels', basePrice: n }` (`aimeat/src/services/exchange-source-terms.ts:89-90`). |
 | PACE-06 | met | `aimeat/src/commerce/pacing-pack.ts:1-107` (inside the daily mint cap, `:95-102`) | Off by default. |
 | PACE-07 | met | `aimeat/src/models/offer-schemas.ts:167-189`; `aimeat/src/models/app-tool-schemas.ts:107-139`; `aimeat/src/storage/types/organisms-federation.ts:380-398` | |
@@ -290,7 +292,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | MCP-03 | met | `aimeat/src/mcp/index.ts:188-201` | |
 | MCP-04 | met | `aimeat/src/mcp/index.ts:498-517` | |
 | MCP-05 | met | `aimeat/src/mcp/oauth.ts:633-675`; `aimeat/src/services/protected-resource.ts:104-116` | |
-| MCP-06 | **gap** | S256 only when a method is sent, `aimeat/src/mcp/oauth.ts:128-132` | `code_challenge` is optional; the verifier is checked only when a challenge was stored (`oauth.ts:233-235,480-491`). |
+| MCP-06 | met | `aimeat/src/mcp/oauth-binding.ts` | Closed: S256 PKCE is required from 4.0.0. |
 | MCP-07 | met (4.0.0) | Binding: every MCP OAuth access token names the MCP endpoint as `aud`, a `resource` that is not this node's MCP endpoint is refused from 4.0.0 (`aimeat/src/mcp/oauth-binding.ts` `resourceRefusal`, `mcpResourceOf`). Refusal at the MCP endpoint: a token whose `aud` names another resource is refused in every release (`mcpAudienceRefusal`, called from `aimeat/src/mcp/index.ts` `authenticate`). Refusal on REST: a token bound to the MCP endpoint is refused from 4.0.0 with 401 `invalid_token` (`aimeat/src/auth/mcp-token-on-rest.ts`, asked by `optionalAuth` and `requireAuth` in `aimeat/src/auth/middleware.ts`); the node's own MCP tools that reach REST routes for the session carry an in-process pass bound to the token (`aimeat/src/auth/loopback-pass.ts`). Tests: `aimeat/test/unit/mcp-oauth-binding.test.ts`, `aimeat/test/unit/mcp-token-on-rest.test.ts` (4.0.0 and 3.26.1), `aimeat/test/e2e-mcp-token-rest.ts` | Before 4.0.0 an MCP OAuth token on a REST route is accepted with the Deprecation headers and counted (`mcp_token_on_rest`). A token without `aud` is not judged on REST, because the node's chat and the commerce fulfilment mint MCP-client tokens without one for REST use. The WebSocket upgrades and the connector tunnel attach verify tokens on their own and do not ask the audience. |
 | MCP-08 | met (SHOULD) | `aimeat/src/mcp/oauth.ts:78-160` | |
 | MCP-09 | partial | `aimeat/src/tool-catalog/definitions/types.ts:71-74`; `aimeat/src/tool-catalog/scopes.ts:191-215`; `aimeat/src/mcp/index.ts:288-315` | A tool's scope equals its route's by declaration, and no check compares them. `AIMEAT_MCP_ENFORCE_SCOPES=false` switches scope checks off on MCP (`aimeat/src/config.ts:614`). |
@@ -320,7 +322,7 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 
 ## The 31 gaps in one list, with their wishes
 
-The list was written as the work for node 4.0.0; a gap still open in the released node stays open under its wish. The wish column names the record in the Lifecycle Central wish bucket that carries the fix. Items 1 to 8, 13, 14, 16, 20, 21, 23, 25 and 28 are closed in code since 2026-10-12 (see the updates under "Answer first"); they stay in the list so the numbering holds.
+The list was written as the work for node 4.0.0; a gap still open in the released node stays open under its wish. The wish column names the record in the Lifecycle Central wish bucket that carries the fix. Items 1 to 9, 12 to 14, 16, 17, 20, 21, 23, 25 and 28 to 30 are closed in code (see the updates under "Answer first"); they stay in the list so the numbering holds. The open ones are listed here: ID-11, AUTH-06, DATA-06, PACE-05, PACE-11, FED-06, FED-16, HTTP-01, HTTP-02, DISC-03.
 
 | # | ID | What is missing | Kind | Wish |
 |---|---|---|---|---|

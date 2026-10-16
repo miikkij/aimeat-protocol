@@ -1303,6 +1303,10 @@ components:
                 regardless. Distinct from `precautionary`, where applicability was never established
                 rather than decided.
               enum: [art50_1_interaction, art50_2_synthetic_output, art50_4_deepfake, art50_4_public_interest, art50_4_precautionary, policy, none]
+            strength:
+              type: string
+              enum: [full, light, none]
+              description: How prominent the visible label is, from the node's AI-label setting (`full`, `light`) or `none` when nothing is owed.
             short:
               type: object
               additionalProperties: { type: string }
@@ -1579,6 +1583,9 @@ components:
           enum: [GET, POST, PUT, DELETE, HEAD]
         url:
           type: string
+        note:
+          type: string
+          description: A sentence on how to use the action (an example header, a condition).
         example_body:
           type: object
 
@@ -2093,6 +2100,9 @@ components:
       properties:
         key:
           type: string
+        exists:
+          type: boolean
+          description: On a single read, true for a hit; a soft miss (`?soft=1`) answers 200 with false and a null value.
         value: {}
         bytes:
           type: integer
@@ -3609,6 +3619,55 @@ components:
         updatedAt:
           type: string
           format: date-time
+        creatorGhii:
+          type: string
+          description: Deprecated mirror of `owners[0]`, kept for older readers. Read `owners`.
+        owners:
+          type: array
+          description: The organism's owners (GHIIs). Every owner has the same authority.
+          items: { type: string }
+        admins:
+          type: array
+          items: { type: string }
+        members:
+          type: array
+          description: Member GHIIs, shown as the roster visibility allows.
+          items: { type: string }
+        agentGaiis:
+          type: array
+          description: Agents attached to the organism.
+          items: { type: string }
+        maxMembers:
+          type: integer
+        memberVisibility:
+          type: string
+          enum: [public, authenticated, members, admins]
+          description: Who may see the member roster. Unset means authenticated.
+        agentAccess:
+          type: string
+          enum: [all, listed]
+          description: Which members' agents the organism admits. Unset means all.
+        moderationConfig:
+          type: object
+          properties:
+            flagsEnabled: { type: boolean }
+            autoHideThreshold: { type: integer }
+            appealsEnabled: { type: boolean }
+        memoryNamespace:
+          type: string
+          description: The memory namespace the organism's records live under.
+        semantic:
+          type: object
+          additionalProperties: true
+        archived:
+          type: boolean
+          description: Read-only, and left out of AI-facing material by default.
+        archivedAt:
+          type: string
+          format: date-time
+        archivedBy:
+          type: string
+          description: The identity (GHII or GAII) that archived it.
 
     OrganismMembershipRecord:
       type: object
@@ -8357,17 +8416,33 @@ paths:
                     properties:
                       data:
                         type: object
+                        required: [token, expires_at, ttl_seconds, identity, roles]
                         properties:
                           token:
                             type: string
                           expires_at:
                             type: string
                             format: date-time
-                          role:
-                            type: string
-                            enum: [agent, owner, operator]
-                          gaii:
-                            $ref: '#/components/schemas/GAII'
+                          ttl_seconds:
+                            type: integer
+                            description: The token's lifetime in seconds.
+                          identity:
+                            type: object
+                            description: Who the token names. `gaii` is present for an agent, absent for the owner-key login.
+                            required: [owner, node]
+                            properties:
+                              gaii:
+                                $ref: '#/components/schemas/GAII'
+                              owner:
+                                type: string
+                              node:
+                                type: string
+                          roles:
+                            type: array
+                            description: The roles on the token, `["agent"]` for an agent renewal.
+                            items:
+                              type: string
+                              enum: [agent, owner, operator]
         '401':
           $ref: '#/components/responses/Unauthorized'
         '410':
@@ -8391,8 +8466,11 @@ paths:
             answers `403 ACCOUNT_DISABLED`.
           * **Agent (Bearer):** an agent sends its valid Bearer access token and gets a new one with
             roles `['agent']` and its current stored scopes.
-          * **Owner bearer (refused):** an owner access token, an owner-level personal access token,
-            or the token one exchanges for, sent with no refresh cookie, answers
+          * **Access-token session (refused):** a credential made from a personal access token (the raw
+            token, or a JWT from the exchange or the PAT cookie) answers `403 FORBIDDEN` with
+            `details.renew_at`: exchange the access token again at `POST /v1/auth/token/exchange`,
+            which re-checks that the token is still live.
+          * **Owner bearer (refused):** an owner access token sent with no refresh cookie answers
             `403 OWNER_REFRESH_USES_COOKIE`. An owner session renews only with its cookie; a program
             holds a personal access token instead. An app grant answers `403` and renews at
             `POST /v1/app-grants/token`; a session from another node answers `403` and signs in again.
@@ -8439,7 +8517,11 @@ paths:
         '401':
           description: Not authenticated, or for an ecosystem app ECO_KEY_PROOF_REQUIRED, ECO_KEY_PROOF_INVALID or ECO_REAPPROVAL_REQUIRED
         '403':
-          description: OWNER_REFRESH_USES_COOKIE for an owner bearer without the refresh cookie; FORBIDDEN for an app grant or a session from another node; ACCOUNT_DISABLED for a deactivated account
+          description: >
+            OWNER_REFRESH_USES_COOKIE for an owner bearer without the refresh cookie; FORBIDDEN for a
+            credential made from a personal access token (renew at POST /v1/auth/token/exchange, named
+            in details.renew_at), an app grant or a session from another node. A cookie refresh of a
+            deactivated account answers ACCOUNT_DISABLED.
 
   /v1/auth/revoke:
     post:
@@ -11850,6 +11932,9 @@ paths:
                             description: approved = same-owner auto-approval fired; poll device-token once for credentials
                           auto_approved:
                             type: boolean
+                          user_instructions:
+                            type: string
+                            description: What the agent tells its owner, and how it polls for the token, in one sentence an agent can repeat.
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -11882,20 +11967,38 @@ paths:
                   enum: ['urn:ietf:params:oauth:grant-type:device_code']
       responses:
         '200':
-          description: Agent credentials (when approved)
+          description: |
+            Agent credentials (when approved). A flat OAuth-shaped object, NOT the node's envelope:
+            an RFC 8628 client reads `access_token` at the top level. `token` is the same string under
+            the name the rest of this API uses. A second poll with the same `device_code` within two
+            minutes returns the same credentials; after that the row and its private key are gone.
           content:
             application/json:
               schema:
                 type: object
+                required: [access_token, token, token_type, gaii, privateKey, scopes]
                 properties:
+                  access_token:
+                    type: string
+                    description: The agent's JWT.
+                  token:
+                    type: string
+                    description: The same JWT as `access_token`.
+                  token_type:
+                    type: string
+                    enum: [Bearer]
                   gaii:
                     $ref: '#/components/schemas/GAII'
                   name:
                     type: string
                   owner:
                     type: string
+                  expires_at:
+                    type: string
+                    format: date-time
                   privateKey:
                     type: string
+                    description: The agent's Ed25519 private key (base64). Renew the token with it at `POST /v1/auth/token`.
                   publicKey:
                     type: string
                   scopes:
@@ -11904,6 +12007,11 @@ paths:
                       type: string
                   morselBalance:
                     type: integer
+                    description: Always 0; the pace belongs to the owner.
+                  next_steps:
+                    type: object
+                    additionalProperties: true
+                    description: What to fetch next (skill bundle, handbook, onboarding), each with method, URL and auth.
         '400':
           description: |
             Authorization pending, denied, expired, or invalid.
@@ -12387,12 +12495,33 @@ paths:
                     properties:
                       data:
                         type: object
+                        required: [agent, private_key, public_key]
                         properties:
-                          gaii:
-                            $ref: '#/components/schemas/GAII'
-                          agent_key:
+                          agent:
+                            type: object
+                            required: [gaii]
+                            properties:
+                              gaii:
+                                $ref: '#/components/schemas/GAII'
+                              display_name: { type: [string, 'null'] }
+                              description: { type: [string, 'null'] }
+                              capabilities:
+                                type: array
+                                items: { type: string }
+                              scopes:
+                                type: array
+                                items: { type: string }
+                              trust_score: { type: number }
+                              morsel_balance: { type: integer }
+                              created_at: { type: string, format: date-time }
+                          private_key:
                             type: string
-                            description: Agent's Ed25519 public key
+                            description: The agent's Ed25519 private key (base64). Shown once; sign `gaii + timestamp` with it at `POST /v1/auth/token`.
+                          public_key:
+                            type: string
+                            description: The agent's Ed25519 public key (base64).
+                          note:
+                            type: string
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -16881,7 +17010,9 @@ paths:
           description: 'When "meta", omit each entry''s `value` and report its size in `bytes` instead — fast for listing thousands of keys (values fetched per-key on demand).'
       responses:
         '200':
-          description: Memory listing with quota info
+          description: |
+            Memory listing with quota info. With `count=true`, `data` holds `count` alone. With
+            `include=meta`, each item carries `bytes` in place of `value`.
           content:
             application/json:
               schema:
@@ -16890,23 +17021,62 @@ paths:
                   - type: object
                     properties:
                       data:
-                        type: array
-                        items:
-                          $ref: '#/components/schemas/MemoryEntry'
-                      total:
-                        type: integer
-                      quota:
                         type: object
-                        description: Agent memory quota usage
                         properties:
-                          max_keys:
+                          count:
                             type: integer
-                          used_keys:
+                            description: With `count=true`, the number of matching keys and nothing else.
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              required: [key, visibility, version]
+                              properties:
+                                key: { type: string }
+                                owner_gaii: { type: string, description: The identity the record is stored under. }
+                                value: {}
+                                bytes: { type: integer, description: With include=meta, the value's size in place of the value. }
+                                visibility: { $ref: '#/components/schemas/Visibility' }
+                                zone: { type: string }
+                                tags:
+                                  type: array
+                                  items: { type: string }
+                                version: { type: integer }
+                                flagCount: { type: integer }
+                                created_at: { type: string, format: date-time }
+                                updated_at: { type: string, format: date-time }
+                                ai_provenance_id:
+                                  type: [string, 'null']
+                                  description: The record of how this was made; null is unstated.
+                                also_under:
+                                  type: array
+                                  description: Owner-scope listings only. The same key under other identities of the same owner, shadowed by this one.
+                                  items: { type: string }
+                                classificationWarning:
+                                  type: object
+                                  additionalProperties: true
+                                  description: Present when the record is classified with a warning an AI is to be told.
+                          total:
                             type: integer
-                          max_bytes:
+                          shown:
                             type: integer
-                          used_bytes:
-                            type: integer
+                            description: Present when `limit` cut the list.
+                          truncated:
+                            type: boolean
+                          hint:
+                            type: string
+                          quota:
+                            type: object
+                            description: Memory quota usage, summed over everything that matched.
+                            properties:
+                              max_keys:
+                                type: integer
+                              used_keys:
+                                type: integer
+                              max_bytes:
+                                type: integer
+                              used_bytes:
+                                type: integer
 
   /v1/datamap/apps/{owner}/{filename}:
     get:
@@ -17594,6 +17764,14 @@ paths:
     put:
       operationId: updateMemory
       summary: Update memory (optimistic locking)
+      description: |
+        Updates an existing record. It is the same write as `POST /v1/memory` with
+        `expected_version` (one implementation, `services/memory-write.ts`), so the same refusals
+        apply and the same effects follow: an archived record, or one in an archived workspace or
+        organism, answers `409 ARCHIVED`; a write starts a workflow waiting for the key, runs the
+        Tracked Response check, updates an EXCHANGE listing, and pushes to a connected ecosystem app.
+        A field left out keeps its stored value; a visibility or tag edit keeps the record's AI
+        provenance statement. A successful answer may carry `warnings` (SHADOWED_BY_OWNER_COPY).
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -17625,11 +17803,21 @@ paths:
                 version:
                   type: integer
                   description: Expected current version (optimistic lock)
+                group_id:
+                  type: string
+                  description: With visibility `group`, the group that reads the record.
+                ai_provenance_id:
+                  type: string
+                  description: Attach an AI provenance record of your own account to the new value.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '409':
-          description: Version conflict (optimistic lock failure)
+          description: |
+            VERSION_CONFLICT (optimistic lock failure; `details.current_version`, `details.your_version`),
+            or ARCHIVED: the record, its workspace or its organism is archived (read-only).
+        '413':
+          description: QUOTA_EXCEEDED, the value or the account's memory budget is over its limit.
         '422':
           description: >
             Nothing was written. UNDECLARED_SPACE: a workspace record whose space the workspace manifest does
@@ -22277,7 +22465,9 @@ paths:
         so it can redirect a share you already committed and can never enlarge its own payout; the key is
         stripped before the buyer sees the result. Always written for the CALLER's own resolved owner: the
         revenue being given away has to be the giver's. Requires scope `exchange:beneficiary`.
-        Returns `{ split, note }`.
+        Returns `{ split, note }`; the split names its author in `created_by`, the calling principal
+        (an agent's GAII when an agent declared it). Every refusal is 400 INVALID_INPUT, and the node MCP
+        tool aimeat_commerce_beneficiary_split_set answers the same.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -26767,15 +26957,17 @@ paths:
         authentication. `data` carries `node_id`, `type`, `protocol` (`aimeat`), `version` (the API
         path version, `v1`), `software_version`, `public_key`, the capability set, the federation
         settings and `endpoints`. From node 4.0.0 it also carries `protocol_version` (`2026-11`) and
-        `profiles` (the Core profiles the node claims); before 4.0.0 both are left out, because a
-        3.x node does not yet keep the edition's removals. `payment_bindings` lists the payment
+        `profiles` (the Core profiles the node claims) and `profile_gaps` (for each claimed profile
+        with a requirement the node does not meet yet, the requirement ids, e.g.
+        `{"Base": ["AUTH-06"]}`; Core §0.3: a client reads a listed requirement as not met); before
+        4.0.0 all three are left out, because a 3.x node does not yet keep the edition's removals. `payment_bindings` lists the payment
         bindings the node accepts (`stripe`, `invoice`, `ucp`, `acp`, `x402`), empty while commerce
         is off. `endpoints.mcp` is the MCP endpoint. `endpoints.auth` is a string, as it has been
         since v1 began: the owner sign-in, `/v1/ghii/login` (until 2026-10-12 it named
         `/v1/auth/token`, whose owner branch 4.0.0 removes). `endpoints.sign_in` is an object naming
         each way to get a token: `owner_password`, `owner_refresh`, `agent_device_authorization`,
         `agent_device_token`, `agent_token_renewal` and `mcp_oauth_metadata`. The bootstrap document (`GET /`) carries the
-        same `protocol_version`, `profiles` and `payment_bindings` in `this_node`.
+        same `protocol_version`, `profiles`, `profile_gaps` and `payment_bindings` in `this_node`.
       tags: [Catalogue]
       responses:
         '200':
@@ -35649,7 +35841,32 @@ paths:
                     type: string
       responses:
         '201':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: The registered client, as a bare OAuth object (RFC 7591), not the AIMEAT envelope. `client_secret` is shown once.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [client_id, client_secret, client_name, redirect_uris, token_endpoint_auth_method, grant_types]
+                properties:
+                  client_id: { type: string }
+                  client_secret: { type: string }
+                  client_name: { type: string }
+                  redirect_uris:
+                    type: array
+                    items: { type: string }
+                  token_endpoint_auth_method: { type: string, enum: [client_secret_post] }
+                  grant_types:
+                    type: array
+                    items: { type: string, enum: [authorization_code, refresh_token] }
+        '400':
+          description: invalid_request (no client_name), as a bare OAuth error object.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, example: invalid_request }
+                  error_description: { type: string }
 
   /v1/mcp/authorize:
     get:
@@ -35754,7 +35971,18 @@ paths:
                     - { type: array, items: { type: string } }
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: The access and refresh token, as a bare OAuth object (RFC 6749 §5.1), not the AIMEAT envelope.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access_token, token_type, expires_in, refresh_token, scope]
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string, enum: [Bearer] }
+                  expires_in: { type: integer, description: Seconds until the access token expires. }
+                  refresh_token: { type: string }
+                  scope: { type: string, example: 'aimeat:full' }
         '400':
           description: invalid_request, invalid_grant (wrong or missing verifier, expired or used code) or invalid_target.
           content:
@@ -36188,11 +36416,18 @@ paths:
                         allOf:
                           - $ref: '#/components/schemas/ConsentGrant'
                           - type: object
+                            required: [id, status, granted_at]
                             properties:
                               id:
                                 type: string
-                              created_at:
+                              status:
                                 type: string
+                                description: active when created.
+                              granted_at:
+                                type: string
+                                format: date-time
+                              revoked_at:
+                                type: [string, 'null']
                                 format: date-time
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -47006,7 +47241,10 @@ paths:
         The consumer read: resolves every SkillRef linked to the agent into manifest + file
         bodies (manifest_only=true skips bodies). Unresolvable refs are reported in an
         `unresolved` array, never silently dropped. Owner sessions may read any of their
-        agents; an agent may read only itself.
+        agents; an agent may read only itself, and needs no scope for its own record. Every other
+        principal (an app grant, an ecosystem app, an agent naming another agent) needs
+        `memory:read`, the scope `GET /v1/skills` asks for the same data, and gets
+        `403 SCOPE_DENIED` without it.
       tags: [Skills]
       security:
         - BearerAuth: []
@@ -47024,7 +47262,7 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '403':
-          $ref: '#/components/responses/Forbidden'
+          description: SCOPE_DENIED without memory:read (an agent reading itself excepted), or FORBIDDEN for an agent naming another agent
     post:
       operationId: linkAgentSkill
       summary: Link a skill to an agent
@@ -47527,7 +47765,7 @@ paths:
     get:
       operationId: getWorkflowImprovePrompt
       summary: The prompt for improving one workflow with the owner's own AI over MCP
-      description: The owner's name, node and the workflow's id and title are substituted in. The text is the managed prompt `workflow-improve-mcp`.
+      description: The owner's name, node and the workflow's id and title are substituted in. The text is the managed prompt `workflow-improve-mcp`. Readable by the owner or a principal holding `workflow:read`, the scope every `GET /v1/workflows` route asks; without it the answer is `403 SCOPE_DENIED`, before the workflow is looked up.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -47541,6 +47779,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          description: SCOPE_DENIED without workflow:read
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -47561,13 +47801,15 @@ paths:
     get:
       operationId: getWorkflowCreateChatPrompt
       summary: The prompt for designing a workflow in a chat that has no MCP
-      description: The owner's agents and their workflow-compatible offers are written into the prompt; the chat answers with one JSON block the person pastes back on the Workflows page.
+      description: The owner's agents and their workflow-compatible offers are written into the prompt; the chat answers with one JSON block the person pastes back on the Workflows page. Readable by the owner or a principal holding both `agent:read` (the scope of `GET /v1/agents`) and `memory:read` (the scope of `GET /v1/agents/{name}/offers`), because the prompt carries what those two routes serve; without either the answer is `403 SCOPE_DENIED`.
       tags: [Workflows]
       security:
         - BearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: SCOPE_DENIED without agent:read or without memory:read
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -71713,7 +71955,7 @@ paths:
               type: object
               required: [contact_id, kind]
               properties:
-                contact_id: { type: string }
+                contact_id: { type: string, description: 'A saved contact of the caller''s address book: the contact record id, the `mail:<record id>` that GET /v1/contacts and POST /v1/contacts return for a person, or the identity (GHII) they return once that person proved the address here. Another account''s contact answers 404 NOT_FOUND.' }
                 kind: { type: string, enum: [transactional, marketing, invoice] }
                 subject: { type: string, maxLength: 300 }
                 body: { type: string, maxLength: 20000 }

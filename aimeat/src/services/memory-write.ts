@@ -29,6 +29,7 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.16.0 — 2026-10-16 — PUT /v1/memory/:key writes through here (QA audit D2-03, F05a-03): `valueUnchanged` + `keptProvenanceId` keep the stored provenance on a metadata-only edit, and an overwrite keeps the record's flag count, CORS origin list and version tracking instead of resetting them.
  *   2026-10-16 — A write of an agent's live crew definition that changes its browser site list is
  *     refused unless the owner writes it in person (403 OWNER_APPROVES_SITES, crewSitesWriteRefusal;
  *     QA audit F07b-02).
@@ -176,6 +177,13 @@ export interface MemoryWriteInput {
     expectedVersion?: number;
     declaredProvenanceId?: string;
     declaredProvenance?: Parameters<typeof provenanceForWrite>[1]['declared'];
+    /**
+     * The value is the stored one and only metadata changes (a visibility or tag edit through
+     * PUT /v1/memory/:key). No new provenance statement is made about bytes that already have one:
+     * the record keeps `keptProvenanceId`, the id it carried.
+     */
+    valueUnchanged?: boolean;
+    keptProvenanceId?: string;
     /** Which road this came down, for the provenance record: 'mcp.memory_write', 'rest.memory' … */
     pipeline: string;
     /**
@@ -494,7 +502,10 @@ export async function writeMemoryRecord(
     });
     if (declarationRefusal) return { ok: false, status: 403, code: 'SCOPE_DENIED', message: declarationRefusal.message };
     const held: AiProvenanceRecordRow[] = [];
-    const aiProvenanceId = await provenanceForWrite(storage, {
+    // A metadata-only edit keeps the statement the stored bytes already have, unless the caller
+    // attaches another one.
+    const keepsProvenance = input.valueUnchanged && !input.declaredProvenanceId && !input.declaredProvenance;
+    const aiProvenanceId = keepsProvenance ? input.keptProvenanceId : await provenanceForWrite(storage, {
         principal: caller.principal,
         scopes: caller.scopes,
         content: memoryContentBytes(input.value),
@@ -524,6 +535,12 @@ export async function writeMemoryRecord(
         version: existing ? existing.version + 1 : 1,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
+        // What belongs to the record rather than to this write survives it. Both providers write
+        // these columns from the record on an update, so leaving them out reset a key's moderation
+        // flag count, its CORS origin list and its version tracking on every overwrite.
+        ...(existing?.flagCount !== undefined ? { flagCount: existing.flagCount } : {}),
+        ...(existing?.allowedOrigins !== undefined ? { allowedOrigins: existing.allowedOrigins } : {}),
+        ...(existing?.trackable !== undefined ? { trackable: existing.trackable } : {}),
     };
     const record = await storage.transaction(async () => {
         let landed: MemoryRecord | null;

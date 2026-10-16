@@ -40,20 +40,30 @@ case "$name" in
   ''|*[!A-Za-z0-9._-]*|.*) echo "worktree-create: refusing name '$name' (letters, digits, . _ - only)" >&2; exit 1 ;;
 esac
 
+# pnpm, or corepack's when pnpm is not on PATH. Decided BEFORE `git worktree add`: a missing pnpm
+# used to fail the install after the worktree was registered, and the next attempt took the
+# "reusing" branch and skipped the install (QA audit P9, 2026-10-16).
+if command -v pnpm >/dev/null 2>&1; then pm="pnpm"
+elif command -v corepack >/dev/null 2>&1; then pm="corepack pnpm"
+else echo "worktree-create: neither pnpm nor corepack is on PATH; see docs/coding-guidelines/getting-started.md (A new machine)" >&2; exit 1
+fi
+
 common=$(git -C "$from" rev-parse --path-format=absolute --git-common-dir)
 repo=$(dirname "$common")
 dir="$repo/.worktrees/$name"
 
 if git -C "$repo" worktree list --porcelain | grep -qx "worktree $dir"; then
   echo "worktree-create: reusing $dir" >&2
+  # A worktree an earlier attempt registered but never installed gets its install now.
+  if [ ! -d "$dir/aimeat/node_modules" ]; then (cd "$dir/aimeat" && $pm install --frozen-lockfile >&2); fi
 else
   if [ -e "$dir" ]; then echo "worktree-create: $dir exists and is not a registered worktree" >&2; exit 1; fi
   git -C "$repo" fetch origin --quiet >&2 || echo "worktree-create: fetch failed, using the cached origin/main" >&2
   git -C "$repo" worktree add --detach "$dir" origin/main >&2
   # AIMEAT_WORKTREE_HOOK_SKIP_INSTALL=1 is for the hook's own test, which has no package to install.
   if [ "${AIMEAT_WORKTREE_HOOK_SKIP_INSTALL:-}" != "1" ]; then
-    (cd "$dir/aimeat" && pnpm install --frozen-lockfile >&2)
-    (cd "$dir/aimeat" && pnpm test:env:init >&2) || echo "worktree-create: test:env:init did not finish; run it in aimeat/ before E2E" >&2
+    (cd "$dir/aimeat" && $pm install --frozen-lockfile >&2)
+    (cd "$dir/aimeat" && $pm test:env:init >&2) || echo "worktree-create: test:env:init did not finish; run it in aimeat/ before E2E" >&2
   fi
 fi
 

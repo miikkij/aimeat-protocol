@@ -5,7 +5,8 @@
  * @description CLI config validator — checks environment, file configs, and DB for
  *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
  *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.
- * @version-history v1.3.0 — 2026-08-08 — Validate the Code of Practice signature
+ * @version-history v1.3.1 — 2026-10-16 — AIMEAT_NODE_TYPE takes personal, as the loader does (QA audit D8-02).
+ *   v1.3.0 — 2026-08-08 — Validate the Code of Practice signature
  *   (AIMEAT_AI_COP_SECTIONS / _SIGNED_ON): unknown sections, a missing or malformed
  *   date, and Section 1 signed by a node that does not run the models;
  *   v1.2.0 — 2026-08-01 — Validate AIMEAT_AI_LABEL_PUBLIC + the AI
@@ -64,8 +65,8 @@ export function validateEnv(): ValidationResult[] {
 
   // ── Node Type ──
   const nodeType = env.AIMEAT_NODE_TYPE;
-  if (nodeType !== undefined && !['full', 'relay', 'mirror'].includes(nodeType)) {
-    results.push({ level: 'error', variable: 'AIMEAT_NODE_TYPE', message: `Invalid node type "${nodeType}". Must be "full", "relay", or "mirror".` });
+  if (nodeType !== undefined && !['full', 'relay', 'mirror', 'personal'].includes(nodeType)) {
+    results.push({ level: 'error', variable: 'AIMEAT_NODE_TYPE', message: `Invalid node type "${nodeType}". Must be "full", "relay", "mirror", or "personal".` });
   } else if (!nodeType) {
     results.push({ level: 'info', variable: 'AIMEAT_NODE_TYPE', message: 'Not set. Default: full' });
   }

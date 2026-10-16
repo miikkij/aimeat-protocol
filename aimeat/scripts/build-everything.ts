@@ -25,6 +25,7 @@
  *   pnpm check:everything            # fail when the committed artefacts are stale
  * @structure inline · parse · main
  * @version-history
+ *   2026-10-16 — The build refuses a node version named outside the stamp line ("against node X"), which went stale at a release (QA audit P8-09).
  *   2026-10-15 — The stamp's version comes from aimeat/package.json, not the list's header line,
  *     and the rendered header line carries it (feature-list audit #5).
  *   v1.1.0 - 2026-09-15 - Generate complete Markdown and HTML with feature anchors alongside JSON.
@@ -244,6 +245,11 @@ function render(): { data: string; meta: string; markdown: string; html: string;
   }
   if (parsed.counts.rows !== expected) throw new Error(`parsed ${parsed.counts.rows} rows, the source has ${expected}: a row was dropped`);
   if (parsed.groups.some((g) => g.rows.length === 0)) throw new Error('a group parsed with no rows');
+  // The node version is named once, in the stamp, which takes it from package.json. A second
+  // "against node X" in the text went stale at the 4.0.0 release and told /v1/everything readers the
+  // page described 3.26.1 (QA audit P8-09).
+  const stale = /against node (\d+\.\d+\.\d+)/.exec(md);
+  if (stale) throw new Error(`the feature list names node ${stale[1]} outside its stamp line; the stamp carries the version from package.json, so leave the version out of the text`);
   const meta = { rows: parsed.counts.rows, groups: parsed.counts.groups, version: parsed.stamp?.version ?? null, date: parsed.stamp?.date ?? null };
   return { data: JSON.stringify(parsed, null, 1) + '\n', meta: JSON.stringify(meta, null, 1) + '\n', markdown: renderMarkdown(md, parsed), html: renderHtml(parsed), counts: parsed.counts, stamp: parsed.stamp };
 }

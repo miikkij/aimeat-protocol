@@ -20,9 +20,10 @@ When you add a config option, touch every layer below. A setting that misses one
 5. **Add the prompt** to the wizard:
    - Decide which use cases need it (`public`, `personal`, `dev`, `custom`).
    - Add it to `askCoreSettings()`, `askEconomySettings()`, `askAllAdvancedSettings()` or `askOperatorSettings()`.
-   - Add the env var to `CONFIG_DEFAULTS` in `presets.ts`, so the summary can tell a changed value from the default.
-6. **Write it to the `.env`.** Add the variable to a section in `generateEnvContent()` (`init-wizard/generate.ts`). The writer emits only the variables its sections name, so a variable missing there is dropped from the file the wizard writes.
+   - Add the env var to `CONFIG_DEFAULTS` in `presets.ts`, so the summary can tell a changed value from the default. `test/unit/config-stated-defaults.test.ts` holds each entry to what `loadConfig()` resolves with no setting.
+   - A yes/no question whose loader default is on writes `false` for a "No": writing nothing leaves the default.
+6. **Write it to the `.env`.** Add the variable to a section in `generateEnvContent()` (`init-wizard/generate.ts`). A variable no section names is still written, under "Other settings", and `test/unit/init-wizard-writers.test.ts` fails until it has a section. The JSON and INI writers place a variable by its `CONFIG_FIELDS` dot-path, or under its own name when it has no row, and the same test reads each file back through `loadConfig()`.
 7. **Update `aimeat/.env.example`** with the new variable, its default, and a comment.
-8. **Show it in `aimeat config`**: add it to the matching section in `src/utils/env-config/sections-*.ts`.
-9. **Validate it in `aimeat validate`** (`src/utils/env-validator.ts`) if the setting has rules a bad value would break.
+8. **Show it in `aimeat config`**: add it to the matching section in `src/utils/env-config/sections-*.ts`. Its `defaultVal` is held to the loader by `test/unit/config-stated-defaults.test.ts`.
+9. **Validate it in `aimeat validate`** (`src/utils/env-validator.ts`) if the setting has rules a bad value would break. The start itself runs the row's `validate` (or its `choices`) over the environment and refuses a value it does not accept (`src/config-start-check.ts`); a fixed-set setting without a row goes in `START_ONLY_CHOICES` there.
 10. **Verify:** `pnpm typecheck`, `pnpm check:config-coverage`, `pnpm check:config-tab`, `pnpm check:locales`, then `pnpm gate` when the work is finished.

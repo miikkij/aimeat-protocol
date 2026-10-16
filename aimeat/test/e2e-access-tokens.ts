@@ -9,6 +9,7 @@
  *   cookie + access overview.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-access-tokens
  * @version-history
+ *   2026-10-16 — Phase 6: a Bearer refresh of an owner PAT without grant_operator on an operator account, or of its exchanged JWT, never gains operator and is sent to the exchange; a revoked PAT's JWT cannot be renewed; an operator session still refreshes to operator (QA audit P3-03).
  *   v1.2.0 — 2026-10-09 — Phase 1c: a replayed PAT mint (same Idempotency-Key) is answered 409 and
  *            never carries the token again (secrets audit 2026-10-09, finding 1.8).
  *   v1.1.0 — 2026-07-29 — Add the owner-only minting/list/revoke denials for a scoped agent session,
@@ -315,6 +316,51 @@ async function main() {
   await test('GET /v1/access/overview is owner-only (agent/scoped session → 403)', async () => {
     const ag = await api('/v1/access/overview', { method: 'GET', bearer: scopedJwt });
     assert(ag.status === 403, `agent overview should be 403 (owner-only), got ${ag.status}`);
+  });
+
+  // QA audit P3-03: the Bearer branch of POST /v1/auth/refresh minted the ACCOUNT's roles, so an
+  // owner-level PAT made without grant_operator on an operator account (resolvePat gives it
+  // ['owner']), or a JWT exchanged from one, came back with 'operator' after one refresh, and the
+  // new JWT outlived a revoke of the PAT, renewable again and again.
+  console.log('\nPhase 6 — A Bearer refresh never widens, and a PAT is renewed only from the PAT');
+  await test('an owner PAT without grant_operator on an operator account never refreshes to operator', async () => {
+    const c = await api('/v1/access/tokens', { bearer: jwtA, body: { label: 'owner-no-op', grant_owner: true } });
+    assert(c.status === 201, `create owner token on the operator account: ${c.status} ${c.data?.error?.message}`);
+    const pat = c.data.data.token;
+    const x = await api('/v1/auth/token/exchange', { bearer: pat });
+    assert(x.status === 200, `exchange: ${x.status}`);
+    const exchanged = x.data.data.access_token;
+    assert(!jwtRoles(exchanged).includes('operator'), `the exchanged JWT has no operator: ${jwtRoles(exchanged)}`);
+    for (const [what, bearer] of [['the raw PAT', pat], ['the exchanged JWT', exchanged]] as const) {
+      const r = await api('/v1/auth/refresh', { bearer });
+      const roles = r.status === 200 ? jwtRoles(r.data.data.token) : [];
+      assert(!roles.includes('operator'), `SECURITY: refreshing ${what} returned operator: ${JSON.stringify(roles)}`);
+      assert(r.status === 403 && r.data?.error?.details?.renew_at === '/v1/auth/token/exchange',
+        `refreshing ${what} is sent to the exchange: ${r.status} ${JSON.stringify(r.data?.error)}`);
+    }
+  });
+
+  await test('a JWT exchanged from a revoked PAT cannot be renewed', async () => {
+    const c = await api('/v1/access/tokens', { bearer: jwtB, body: { label: 'revoked-then-refresh', grant_owner: true } });
+    assert(c.status === 201, `create: ${c.status}`);
+    const x = await api('/v1/auth/token/exchange', { bearer: c.data.data.token });
+    assert(x.status === 200, `exchange: ${x.status}`);
+    const del = await api(`/v1/access/tokens/${c.data.data.id}`, { method: 'DELETE', bearer: jwtB });
+    assert(del.status === 200, `revoke: ${del.status}`);
+    const r = await api('/v1/auth/refresh', { bearer: x.data.data.access_token });
+    assert(r.status !== 200, `SECURITY: a revoked PAT's JWT was renewed: ${r.status}`);
+    assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.data?.error)}`);
+  });
+
+  await test('an ordinary operator session still refreshes to operator, and a non-operator session to owner only', async () => {
+    const op = await api('/v1/auth/refresh', { bearer: jwtA });
+    assert(op.status === 200, `operator session refresh: ${op.status} ${JSON.stringify(op.data?.error)}`);
+    const opRoles = jwtRoles(op.data.data.token);
+    assert(opRoles.includes('owner') && opRoles.includes('operator'), `the operator session keeps operator: ${opRoles}`);
+    const plain = await api('/v1/auth/refresh', { bearer: jwtB });
+    assert(plain.status === 200, `owner session refresh: ${plain.status}`);
+    const plainRoles = jwtRoles(plain.data.data.token);
+    assert(plainRoles.includes('owner') && !plainRoles.includes('operator'), `the owner session stays owner: ${plainRoles}`);
   });
 
   console.log('\n─────────────────────────────────────');

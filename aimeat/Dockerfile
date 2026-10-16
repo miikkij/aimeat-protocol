@@ -1,5 +1,5 @@
 FROM node:24-alpine AS base
-RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 WORKDIR /app
 
 # Build: install all deps, then compile TypeScript.

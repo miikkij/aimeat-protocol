@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description .env / .json / .ini config-file generators for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-16 — Every answer reaches the .env: operator identity, AI transparency, consent, the commerce fee mode and the global rate limit have sections, and a key no section names goes under "Other settings". The JSON writer nests schema dot-paths (it wrote camelCase names the loader skips) and the INI writer keeps dot-less paths at the top level; a setting with no schema row goes under its variable name (QA audit D8-03).
  *   v1.3.1 — 2026-10-11 — The app-origin comment says what DNS and TLS it needs instead of naming a
  *     file in the gitignored docs/internal folder, which no operator has.
  *   v1.3.0 — 2026-10-09 — A string value is written through utils/env-file.ts envLine, which refuses a
@@ -21,6 +22,9 @@ import { ENV_TO_DOT_PATH } from '../../services/config-schema.js';
 import { envLine } from '../../utils/env-file.js';
 
 // ── .env generation ─────────────────────────────────────────────────
+
+/** The section that takes a setting no other section names. */
+export const OTHER_SETTINGS_TITLE = 'Other settings';
 
 export function generateEnvContent(settings: Record<string, string>): string {
   const lines: string[] = [
@@ -51,6 +55,25 @@ export function generateEnvContent(settings: Record<string, string>): string {
       title: 'Operator / Admin',
       vars: [
         { key: 'AIMEAT_ADMIN_PASSWORD', comment: 'Auto-generated on startup if not set' },
+      ],
+    },
+    {
+      title: 'Operator identity (privacy policy and terms)',
+      vars: [
+        { key: 'AIMEAT_OPERATOR_TYPE', comment: 'natural_person | company | organisation | association' },
+        { key: 'AIMEAT_OPERATOR_NAME', comment: 'Who runs this node, as the privacy page and the terms name them. Without these the two pages answer 503.' },
+        { key: 'AIMEAT_OPERATOR_BUSINESS_ID' },
+        { key: 'AIMEAT_OPERATOR_ADDRESS' },
+        { key: 'AIMEAT_OPERATOR_COUNTRY' },
+        { key: 'AIMEAT_OPERATOR_EMAIL' },
+        { key: 'AIMEAT_OPERATOR_SECURITY_EMAIL' },
+        { key: 'AIMEAT_OPERATOR_HOSTING_NAME' },
+        { key: 'AIMEAT_OPERATOR_HOSTING_LOCATION' },
+        { key: 'AIMEAT_OPERATOR_HOSTING_URL' },
+        { key: 'AIMEAT_OPERATOR_SUPERVISORY_NAME' },
+        { key: 'AIMEAT_OPERATOR_SUPERVISORY_URL' },
+        { key: 'AIMEAT_OPERATOR_EFFECTIVE_DATE', comment: 'The day the privacy policy and terms take effect (YYYY-MM-DD)' },
+        { key: 'AIMEAT_OPERATOR_POLICY_UPDATED' },
       ],
     },
     {
@@ -93,6 +116,34 @@ export function generateEnvContent(settings: Record<string, string>): string {
       title: 'Features',
       vars: [
         { key: 'AIMEAT_EXTENDED_FEATURES' },
+      ],
+    },
+    {
+      title: 'Rate limits',
+      vars: [
+        { key: 'AIMEAT_RL_GLOBAL', comment: 'Requests per second per caller, all routes (default: 300)' },
+      ],
+    },
+    {
+      title: 'AI transparency',
+      vars: [
+        { key: 'AIMEAT_AI_PROVENANCE', comment: 'Record which AI produced what (always on for a public node from 4.0.0)' },
+        { key: 'AIMEAT_AI_PROVENANCE_DETAIL', comment: 'full | minimal' },
+        { key: 'AIMEAT_AI_LABEL_PUBLIC', comment: 'How eagerly a visible AI label is shown: strict | light | off' },
+        { key: 'AIMEAT_AI_SUPERVISORY_NAME', comment: 'The AI market-surveillance authority named on the AI provenance page' },
+        { key: 'AIMEAT_AI_SUPERVISORY_URL' },
+        { key: 'AIMEAT_AI_COP_SECTIONS', comment: 'Sections of the EU AI Code of Practice this operator signed' },
+        { key: 'AIMEAT_AI_COP_SIGNED_ON', comment: 'The day it was signed (YYYY-MM-DD)' },
+      ],
+    },
+    {
+      title: 'Consent',
+      vars: [
+        { key: 'AIMEAT_CONSENT_ENABLED', comment: 'Consent layer enabled' },
+        { key: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS' },
+        { key: 'AIMEAT_COOKIE_CONSENT_ENABLED', comment: 'Show the cookie banner' },
+        { key: 'AIMEAT_COOKIE_CONSENT_CATEGORIES', comment: 'Comma-separated cookie categories' },
+        { key: 'AIMEAT_COOKIE_CONSENT_POLICY_URL' },
       ],
     },
     {
@@ -185,6 +236,8 @@ export function generateEnvContent(settings: Record<string, string>): string {
       vars: [
         { key: 'AIMEAT_MARKETPLACE_ENABLED', comment: 'Enable marketplace features' },
         { key: 'AIMEAT_MARKETPLACE_TX_FEE_PERCENT', comment: 'Transaction fee percentage' },
+        { key: 'AIMEAT_MARKETPLACE_FEE_MODE', comment: 'Where the marketplace fee goes: operator (credited to the node operator) or burn' },
+        { key: 'AIMEAT_COMMERCE_FEE_PERCENT', comment: 'Checkout fee percentage (empty: the marketplace transaction fee)' },
       ],
     },
     {
@@ -221,6 +274,13 @@ export function generateEnvContent(settings: Record<string, string>): string {
     },
   ];
 
+  // Every answer reaches the file. A key no section names is written under "Other settings", so a
+  // step that sets a new variable cannot lose it the way the 27 operator, AI and consent answers were
+  // lost until 2026-10-16; test/unit/init-wizard-writers.test.ts fails when one lands there.
+  const named = new Set(sections.flatMap(s => s.vars.map(v => v.key)));
+  const others = Object.keys(settings).filter(k => !named.has(k)).sort();
+  if (others.length > 0) sections.push({ title: OTHER_SETTINGS_TITLE, vars: others.map(key => ({ key })) });
+
   for (const section of sections) {
     const hasValues = section.vars.some(v => v.key in settings);
     if (!hasValues) continue;
@@ -245,74 +305,57 @@ export function generateEnvContent(settings: Record<string, string>): string {
   return lines.join('\n');
 }
 
-export function generateJsonContent(settings: Record<string, string>): string {
-  const keyMap: Record<string, string> = {
-    AIMEAT_NODE_ID: 'nodeId',
-    AIMEAT_PORT: 'port',
-    AIMEAT_NODE_TYPE: 'nodeType',
-    AIMEAT_BASE_URL: 'baseUrl',
-    AIMEAT_STORAGE: 'storageProvider',
-    AIMEAT_SQLITE_PATH: 'sqlitePath',
-    DATABASE_URL: 'db',
-    AIMEAT_ADMIN_PASSWORD: 'adminPassword',
-    AIMEAT_DEV_MODE: 'devMode',
-    AIMEAT_ANONYMOUS: 'anonymousMode',
-    AIMEAT_JWT_TTL: 'jwtTtlSeconds',
-    AIMEAT_ACCESS_TTL: 'accessTtlSeconds',
-    AIMEAT_REFRESH_IDLE_DAYS: 'refreshIdleDays',
-    AIMEAT_REFRESH_ABSOLUTE_DAYS: 'refreshAbsoluteDays',
-    AIMEAT_REFRESH_GRACE_MS: 'refreshGraceMs',
-    AIMEAT_WELCOME_BONUS: 'welcomeBonus',
-    AIMEAT_DAILY_ALLOWANCE: 'dailyAllowance',
-    AIMEAT_DAILY_ALLOWANCE_CAP: 'dailyAllowanceCap',
-    AIMEAT_BURN_RATE: 'burnRate',
-    AIMEAT_MAX_OPERATOR_MINT_PER_DAY: 'maxOperatorMintPerDay',
-    AIMEAT_BOARD_POST_BASE_COST: 'boardPostBaseCost',
-    AIMEAT_BOARD_POST_COST_PER_KB: 'boardPostCostPerKb',
-    AIMEAT_EXTENDED_FEATURES: 'extendedFeaturesEnabled',
-    AIMEAT_MEMORY_QUOTA_MB: 'memoryQuotaMb',
-    AIMEAT_MEMORY_MAX_VALUE_SIZE_KB: 'memoryMaxValueSizeKb',
-    AIMEAT_MEMORY_MAX_KEYS: 'memoryMaxKeysPerAgent',
-    AIMEAT_STORAGE_QUOTA_MB: 'storageQuotaMb',
-    AIMEAT_STORAGE_MAX_FILE_SIZE_MB: 'storageMaxFileSizeMb',
-    AIMEAT_MAX_ACTIONS_PER_AGENT: 'maxActionsPerAgent',
-    AIMEAT_APP_MAX_SIZE_MB: 'appMaxSizeMb',
-    AIMEAT_AGENT_PORTING_FEE: 'agentPortingFeeMorsels',
-    AIMEAT_MAX_RELAY_HOPS: 'maxRelayHops',
-    AIMEAT_FEDERATION_ROLE: 'federationRole',
-    AIMEAT_GENESIS_URL: 'genesisUrl',
-    AIMEAT_INDEXNOW_KEY: 'indexNowKey',
-    AIMEAT_SITE_ENABLED: 'siteEnabled',
-    AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB: 'siteMaxTemplateSizeKb',
-    AIMEAT_SITE_CACHE_TTL_SECONDS: 'siteCacheTtlSeconds',
-  };
+/**
+ * Where a setting goes in a config file: its schema dot-path (`node.id`, `storage.type`), or, for a
+ * setting with no schema row (AIMEAT_APP_HOST, AIMEAT_KEY_PASSPHRASE), its variable name at the top
+ * level, which loadConfig() reads as that variable. Until 2026-10-16 the JSON writer used camelCase
+ * names (`nodeId`, `storageProvider`) that the loader does not know, so every key was skipped and
+ * the node started on in-memory storage while the log said the values were loaded.
+ */
+function filePath(envKey: string): string[] {
+  const dotPath = ENV_TO_DOT_PATH[envKey];
+  return dotPath ? dotPath.split('.') : [envKey];
+}
 
+/** A wizard answer as a JSON value: whole numbers, decimals and true/false typed, the rest text. */
+function jsonValue(val: string): unknown {
+  if (/^\d+$/.test(val)) return parseInt(val, 10);
+  if (/^\d+\.\d+$/.test(val)) return parseFloat(val);
+  if (val === 'true') return true;
+  if (val === 'false') return false;
+  return val;
+}
+
+export function generateJsonContent(settings: Record<string, string>): string {
   const cfg: Record<string, unknown> = {};
   for (const [envKey, val] of Object.entries(settings)) {
-    const jsonKey = keyMap[envKey] ?? envKey;
-    if (/^\d+$/.test(val)) cfg[jsonKey] = parseInt(val, 10);
-    else if (/^\d+\.\d+$/.test(val)) cfg[jsonKey] = parseFloat(val);
-    else if (val === 'true') cfg[jsonKey] = true;
-    else if (val === 'false') cfg[jsonKey] = false;
-    else cfg[jsonKey] = val;
+    const parts = filePath(envKey);
+    let node = cfg;
+    for (const part of parts.slice(0, -1)) {
+      const next = node[part];
+      if (next !== undefined && (typeof next !== 'object' || next === null)) {
+        throw new Error(`Config path ${parts.join('.')} collides with a value at ${part}`);
+      }
+      node = (next ?? (node[part] = {})) as Record<string, unknown>;
+    }
+    node[parts[parts.length - 1]] = jsonValue(val);
   }
-
   return JSON.stringify(cfg, null, 2) + '\n';
 }
 
 export function generateIniContent(settings: Record<string, string>): string {
-  // Build INI structure using dot-path sections from ENV_TO_DOT_PATH
+  // A dot-path's last part is the key and the rest the section; a dot-path with no dot
+  // (database_url, admin_password) and a variable name stay at the top level, which the loader reads
+  // as that path. They were put under [node] before 2026-10-16, which the loader read as
+  // node.database_url and skipped.
+  const top: Record<string, string> = {};
   const sections: Record<string, Record<string, string>> = {};
   for (const [envKey, val] of Object.entries(settings)) {
-    const dotPath = ENV_TO_DOT_PATH[envKey];
-    if (!dotPath) continue;
-    const parts = dotPath.split('.');
-    const section = parts.length > 1 ? parts.slice(0, -1).join('.') : 'node';
-    const key = parts[parts.length - 1];
-    if (!sections[section]) sections[section] = {};
-    sections[section][key] = val;
+    const parts = filePath(envKey);
+    if (parts.length === 1) { top[parts[0]] = val; continue; }
+    const section = parts.slice(0, -1).join('.');
+    (sections[section] ??= {})[parts[parts.length - 1]] = val;
   }
-  // Add a comment header
   const header = '; AIMEAT Node Configuration (INI format)\n; Generated by aimeat init\n\n';
-  return header + ini.stringify(sections);
+  return header + ini.stringify({ ...top, ...sections });
 }

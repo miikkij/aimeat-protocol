@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Use-case preset defaults and CONFIG_DEFAULTS map for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.0.1 — 2026-10-16 — CONFIG_DEFAULTS says what the loader does for extensions (on, any owner installs), push (on) and the burn rate, held by a unit test (QA audit D8-04).
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)
  */
 
@@ -59,7 +60,8 @@ export function buildPresets(cfg: AimeatConfig): Record<Exclude<UseCase, 'custom
   };
 }
 
-// Defaults from config.ts for summary comparison
+// Defaults from config.ts for summary comparison. test/unit/config-stated-defaults.test.ts holds
+// each one to what loadConfig() resolves with no environment, so a changed loader default fails there.
 export const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_NODE_ID: 'aimeat-local-001-dev',
   AIMEAT_PORT: '40050',
@@ -80,7 +82,7 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_WELCOME_BONUS: '100',
   AIMEAT_DAILY_ALLOWANCE: '50',
   AIMEAT_DAILY_ALLOWANCE_CAP: '500',
-  AIMEAT_BURN_RATE: '0.10',
+  AIMEAT_BURN_RATE: '0.1',
   AIMEAT_MAX_OPERATOR_MINT_PER_DAY: '10000',
   AIMEAT_BOARD_POST_BASE_COST: '5',
   AIMEAT_BOARD_POST_COST_PER_KB: '2',
@@ -119,7 +121,7 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_SITE_ENABLED: 'true',
   AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB: '512',
   AIMEAT_SITE_CACHE_TTL_SECONDS: '60',
-  AIMEAT_PUSH_ENABLED: 'false',
+  AIMEAT_PUSH_ENABLED: 'true',
   AIMEAT_VAPID_PUBLIC_KEY: '',
   AIMEAT_VAPID_PRIVATE_KEY: '',
   AIMEAT_VAPID_SUBJECT: 'mailto:admin@aimeat.example.com',
@@ -181,10 +183,10 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_REALTIME_ENABLED: 'true',
   AIMEAT_REALTIME_MAX_ROOMS: '100',
   AIMEAT_REALTIME_MAX_PEERS_PER_ROOM: '20',
-  AIMEAT_EXTENSIONS_ENABLED: 'false',
+  AIMEAT_EXTENSIONS_ENABLED: 'true',
   AIMEAT_EXT_MAX_MEMORY_MB: '64',
   AIMEAT_EXT_TIMEOUT_MS: '5000',
-  AIMEAT_EXT_INSTALL_ROLE: 'operator',
+  AIMEAT_EXT_INSTALL_ROLE: 'owner',
   AIMEAT_MAX_EXTENSIONS_PER_OWNER: '10',
   AIMEAT_APP_HOST: '',
   AIMEAT_APP_ORIGIN_ENABLED: 'false',

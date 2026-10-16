@@ -20,16 +20,24 @@
  *   A rule nobody can follow by accident is not a rule. This makes the isolated case the default
  *   one, so a session gets it by running the setup rather than by remembering to hand-edit two
  *   files and knowing that two different variables name the same port.
- * @structure slugOf · portFor · render · ensureDatabase · main
+ * @structure slugOf · portFor · render · databaseOf · ensureDatabase · reportPortConflicts · main
  * @usage cd aimeat && pnpm test:env:init            (refuses to overwrite an existing file)
  *        cd aimeat && pnpm test:env:init --force    (rewrites them)
  *        AIMEAT_E2E_PORT=40282 pnpm test:env:init   (take the port your claim names)
+ *        AIMEAT_TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/x pnpm test:env:init --force
+ *                                                  (your PostgreSQL account instead of the CI one)
  * @version-history
+ *   v1.1.0 — 2026-10-16 — Takes the PostgreSQL account from AIMEAT_TEST_DATABASE_URL (the examples carry
+ *     the CI service's appuser:devpassword123, which a developer's server does not have); creates the
+ *     database the env file NAMES, so a run over existing files creates a missing one even when the file
+ *     came from another worktree, and says so instead of "Nothing rewritten"; warns when another
+ *     worktree's env files use the same port or something already answers on it (QA audit D8-09, P9).
  *   v1.0.0 — 2026-09-07 — Written for the incident "Kaksi E2E-ajoa samaan aikaan turmelee toistensa
  *     tulokset molempiin suuntiin".
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
+import { portConflicts } from './lib/worktree-ports.js';
 
 const FORCE = process.argv.includes('--force');
 const AIMEAT_DIR = process.cwd();
@@ -79,14 +87,31 @@ function render(example: string, port: number, database: string | null): string 
 
   if (database) {
     out = out.replace(/\/aimeat_kysely_e2e\?/, `/${database}?`);
+    // A developer's PostgreSQL rarely has the CI service's account, so the URL can come from the
+    // environment. Its database part is replaced by this worktree's, which is the point of the file.
+    const own = process.env.AIMEAT_TEST_DATABASE_URL?.trim();
+    if (own) {
+      const u = new URL(own);
+      u.pathname = `/${database}`;
+      if (!u.searchParams.has('schema')) u.searchParams.set('schema', 'public');
+      out = out.replace(/^DATABASE_URL=.*$/m, `DATABASE_URL="${u.toString()}"`);
+    }
   }
   return `# Written by scripts/test-env-init.ts for this worktree. Re-run it with --force to refresh.\n`
     + `# The port and the database are this worktree's own — see the header of that script for why.\n`
     + out;
 }
 
-/** Create the database if it is not there. Connects to `postgres`, because you cannot create the one you are in. */
-async function ensureDatabase(url: string, database: string): Promise<void> {
+/** The database a DATABASE_URL names: the path after the host, without the query. */
+function databaseOf(url: string): string {
+  return decodeURIComponent(new URL(url).pathname.replace(/^\//, ''));
+}
+
+/**
+ * Create the database if it is not there; true when it created one. Connects to `postgres`, because
+ * you cannot create the one you are in.
+ */
+async function ensureDatabase(url: string, database: string): Promise<boolean> {
   const { Client } = await import('pg');
   const admin = new Client({ connectionString: url.replace(/\/[^/?]+(\?|$)/, '/postgres$1') });
   await admin.connect();
@@ -94,12 +119,13 @@ async function ensureDatabase(url: string, database: string): Promise<void> {
     const { rows } = await admin.query('SELECT 1 FROM pg_database WHERE datname = $1', [database]);
     if (rows.length > 0) {
       console.log(`  database ${database} is already there`);
-      return;
+      return false;
     }
     // The name is derived from a directory name and passed through slugOf, so it carries only
     // [a-z0-9_] — but an identifier cannot be a bound parameter, so it is quoted rather than trusted.
     await admin.query(`CREATE DATABASE "${database.replace(/"/g, '""')}"`);
     console.log(`  created database ${database}`);
+    return true;
   } finally {
     await admin.end();
   }
@@ -111,6 +137,7 @@ async function main(): Promise<void> {
   const database = `aimeat_kysely_e2e_${slug}`;
 
   console.log(`\nWorktree ${slug}\n  port     ${port}\n  database ${database}\n`);
+  await reportPortConflicts(port);
 
   const files: Array<{ example: string; target: string; db: string | null }> = [
     { example: '.env.test.sqlite.example', target: '.env.test.sqlite', db: null },
@@ -144,8 +171,14 @@ async function main(): Promise<void> {
     process.exitCode = 1;
     return;
   }
+  // The database the FILE names, which is the one every suite opens. It is this worktree's own when
+  // the file was written here, and another name when the file was copied from elsewhere; a run over
+  // existing files used to create the derived name and leave the named one missing.
+  const named = databaseOf(url);
+  if (named !== database) console.log(`  the env file names database ${named}, not ${database}; using the file's`);
+  let created = false;
   try {
-    await ensureDatabase(url, database);
+    created = await ensureDatabase(url, named);
   } catch (err) {
     // NAMED, not summarised. node-postgres carries the reason in `code` and leaves `message` EMPTY
     // for the connection failures — a first run of this printed "could not create X: " with nothing
@@ -171,14 +204,33 @@ async function main(): Promise<void> {
     } else {
       console.error('  The env files are written. Create the database yourself with:');
     }
-    console.error(`    createdb ${database}`);
+    console.error(`    createdb ${named}`);
+    if (e.code === '28P01' || e.code === '28000') {
+      console.error("  The account in DATABASE_URL is refused. The examples carry the CI service's account");
+      console.error('  (appuser:devpassword123). Give yours and rewrite the files:');
+      console.error('    AIMEAT_TEST_DATABASE_URL=postgresql://<user>:<password>@localhost:5432/x pnpm test:env:init --force');
+    }
     process.exitCode = 1;
     return;
   }
 
   console.log(wrote > 0
     ? '\nDone. Claim this port on the board before you run anything.\n'
-    : '\nNothing rewritten. --force if you meant to.\n');
+    : created
+      ? '\nThe env files were already there; the database they name is created now.\n'
+      : '\nNothing rewritten and nothing created: the files and the database were already there. --force rewrites the files.\n');
+}
+
+/**
+ * Says when the port is not this worktree's alone: another checkout's env files name it, or a
+ * process answers on it now. A warning, not a refusal: the claims board decides who holds a port,
+ * and a server answering may be this worktree's own.
+ */
+async function reportPortConflicts(port: number): Promise<void> {
+  const { sharedWith, held } = await portConflicts(AIMEAT_DIR, port);
+  for (const where of sharedWith) console.warn(`  ! ${where} uses port ${port} too. Two E2E runs on one port stop each other.`);
+  if (held) console.warn(`  ! port ${port} is held by a running process now (a test server of this or another worktree?).`);
+  if (sharedWith.length > 0) console.warn('    Take a free port from the claims board: AIMEAT_E2E_PORT=<port> pnpm test:env:init --force');
 }
 
 void main();

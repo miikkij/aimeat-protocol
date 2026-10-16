@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Core-settings wizard step (identity, storage, admin, network role, push/SMTP/metrics/site) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.0.1 — 2026-10-16 — A "No" to push notifications writes AIMEAT_PUSH_ENABLED=false: the loader's default is on (QA audit D8-03).
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)
  */
 
@@ -352,6 +353,9 @@ export async function askCoreSettings(
         t,
       );
       settings.AIMEAT_VAPID_SUBJECT = subject;
+    } else {
+      // The loader's default is on, so a "No" that writes nothing would leave push on.
+      settings.AIMEAT_PUSH_ENABLED = 'false';
     }
 
     // ── Email / SMTP ──

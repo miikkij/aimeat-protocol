@@ -24,6 +24,7 @@
  * @version-history
  *   2026-10-16 — Each refusal marks the response it recorded, so middleware/refusal-recorder.ts does not
  *     write it again; the envelope carries the request id (QA audit S1-02, E1-05).
+ *   v1.5.0 — 2026-10-16 — The 401 and 403 refusals answer the node's error envelope (envelope.ts error()), with `node` and `request_id` (QA audit D3-01).
  *   v1.4.0 — 2026-10-12 — denyInvalidToken: 401 INVALID_TOKEN with `Bearer error="invalid_token"`,
  *     for an MCP-bound token on a REST route from 4.0.0 (./mcp-token-on-rest.ts).
  *   v1.3.0 — 2026-09-30 — denyScope403 notes an agent's refusal (services/agent-refusals.ts), so it
@@ -39,10 +40,11 @@ import type { Request, Response } from 'express';
 import { getStats } from '../services/stats.js';
 import { getPromMetrics } from '../services/prometheus.js';
 import { recordAuthFailure, markRefusalRecorded, type AuthFailureContext } from '../services/auth-audit.js';
-import { envelopeRequestId } from '../middleware/envelope.js';
 import { resourceMetadataUrl } from '../services/protected-resource.js';
 import { sessionConfig } from './node-auth.js';
 import { noteAgentRefusal } from '../services/agent-refusals.js';
+import { error } from '../middleware/envelope.js';
+import { currentNodeId } from '../utils/gaii.js';
 
 /**
  * What the refusal log needs, lifted off the request.
@@ -193,18 +195,14 @@ export function denyScope403(
   res.status(403).json(errorEnvelope('SCOPE_DENIED', message));
 }
 
+/**
+ * The refusal in the node's error envelope (middleware/envelope.ts error()), with the node id and a
+ * request id like every other error answer. This copy wrote the envelope by hand and left both out,
+ * so a 401 or 403 from the auth middleware did not match the contract's AimeatEnvelope, which
+ * e2e-contract.ts found (QA audit D3-01; Core 2026-11 HTTP-01).
+ */
 function errorEnvelope(code: string, message: string) {
-  return {
-    ok: false,
-    protocol: 'aimeat',
-    version: 'v1',
-    timestamp: new Date().toISOString(),
-    request_id: envelopeRequestId(),
-    error: { code, message },
-    hints: {
-      next_actions: [
-        { description: 'Authenticate to get a JWT token', method: 'POST', url: '/v1/auth/token' },
-      ],
-    },
-  };
+  return error(currentNodeId() ?? '', code, message, undefined, undefined, [
+    { description: 'Authenticate to get a JWT token', method: 'POST', url: '/v1/auth/token' },
+  ]);
 }

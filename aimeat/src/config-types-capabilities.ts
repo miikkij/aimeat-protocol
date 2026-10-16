@@ -7,18 +7,15 @@
  * @structure CapabilitiesConfig
  * @usage import type { CapabilitiesConfig } from './config-types-capabilities.js';
  * @version-history
+ *   v1.1.0 — 2026-10-16 — capabilityPublishers, capabilityMinPublisherTrust, capabilityPublisherAllowlist and capabilityLogRetentionDays removed: no code acted on them, and the first was reported as the node's policy (QA audit D8-05).
  *   v1.0.0 — 2026-09-24 — Moved from config-types.ts (a pure move).
  */
 
 export interface CapabilitiesConfig {
   // Capabilities
   capabilityPublishing: 'disabled' | 'self_only' | 'moderated' | 'open';
-  capabilityPublishers: 'all_users' | 'trusted_only' | 'allowlist';
-  capabilityMinPublisherTrust: number;
-  capabilityPublisherAllowlist: string[];
   capabilityWebhooks: 'disabled' | 'allowlist_only' | 'open';
   capabilityWebhookDomainAllowlist: string[];
-  capabilityLogRetentionDays: number;
   /** Count direct extension calls into capability stats (proxy calls always count). Default false. */
   capabilityCallCounting: boolean;
 }

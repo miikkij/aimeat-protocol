@@ -115,6 +115,7 @@
     "test:e2e:guards:postgres-kysely": "tsx scripts/kill-test-servers.ts && node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --guards --workers=2",
     "test:e2e:guards": "pnpm test:e2e:guards:sqlite && pnpm test:e2e:guards:postgres-kysely",
     "test:env:init": "tsx scripts/test-env-init.ts",
+    "machine:check": "tsx scripts/machine-check.ts",
     "test:e2e:sqlite": "tsx scripts/kill-test-servers.ts && node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --workers=4",
     "test:e2e:postgres-kysely": "tsx scripts/kill-test-servers.ts && node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --workers=4",
     "test:e2e:coverage": "tsx scripts/e2e-coverage.ts",
@@ -272,7 +273,7 @@
   "bugs": {
     "url": "https://github.com/miikkij/aimeat-protocol/issues"
   },
-  "packageManager": "pnpm@10.27.0",
+  "packageManager": "pnpm@10.30.3+sha512.c961d1e0a2d8e354ecaa5166b822516668b7f44cb5bd95122d590dd81922f606f5473b6d23ec4a5be05e7fcd18e8488d47d978bbe981872f1145d06e9a740017",
   "dependencies": {
     "@a2a-js/sdk": "^1.3.0",
     "@ag-ui/core": "^1.0.1",

@@ -21,6 +21,7 @@
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
  *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
  *     bound transaction, so every existing `this.db` call joins an open one without being changed.
+ *   v1.11.0 — 2026-10-16 — `ready` reads the server version first and warns below the supported range (server-version.ts; QA audit D8-12).
  *   v1.10.0 — 2026-10-10 — The pool and its clients have `error` listeners: a connection that ends
  *     while idle or in use is logged and its query rejects. Without them the event was an uncaught
  *     exception and the node process exited.
@@ -40,6 +41,7 @@ import { POOL_LIMITS, logPoolWaitTimeouts, type PoolLimits } from './pool-limits
 import type { ChunkedUploadRecord, MemoryRecord, Storage } from '../../interface.js';
 import type { DB } from './db-types.js';
 import { runMigrations } from './migrate.js';
+import { checkServerVersion } from './server-version.js';
 import { logger } from '../../../utils/logger.js';
 import { memoryMethods } from './methods/memory.js';
 import { systemMethods } from './methods/system.js';
@@ -161,7 +163,7 @@ export class PostgresKyselyStorage {
       });
     });
     this.rootDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: this.pool }) });
-    this.ready = runMigrations(this.pool);
+    this.ready = checkServerVersion(this.pool).then(() => runMigrations(this.pool));
   }
 
   /** The handle every method uses: the transaction bound to this async context, else the pool. */

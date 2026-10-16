@@ -24,6 +24,10 @@
  *   recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   2026-10-16 — sendOutbound takes the contact by any id an address-book surface hands out: the
+ *     record id, `mail:<record id>` (aimeat_contact_add, aimeat_contact_list) or the identity a person
+ *     was linked to (resolveOwnContact). The send looked up the bare record id only, so the id the
+ *     aimeat_mail_send description points to was refused on every surface (QA audit F12b-01).
  *   2026-10-15 — SendInput.mailboxHolder: an agent sending through a mailbox of its own names it; the
  *     book stays the owner's (feature-list audit 129).
  *   2026-10-08 — sendOutbound stamps the message with a provenance record (Mint-3 for an agent),
@@ -82,6 +86,7 @@ import {
 import { resolveSendingCompany } from './company-sender-access.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { MAIL_PREFIX } from '../local-identity.js';
 import { getStream } from '../signals/signal-service.js';
 import { renderCampaignEmail } from './campaign-email.js';
 import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
@@ -266,6 +271,26 @@ export async function requireOwnContact(storage: Storage, ownerGhii: string, id:
   const contact = await storage.getOutboundContact(id);
   if (!contact || contact.ownerGhii !== ownerGhii) throw new OutboundError('NOT_FOUND', 404, 'Contact not found');
   return contact;
+}
+
+/** The most rows of one address book searched for a contact linked to an identity. */
+const LINKED_CONTACT_SCAN = 2000;
+
+/**
+ * The contact a send names, by any id an address-book surface hands out: the record id, the
+ * `mail:<record id>` that aimeat_contact_add and aimeat_contact_list return for a person, or the
+ * identity (GHII) they return once that person proved the address here. Absent and not-yours answer
+ * identically (404), as requireOwnContact does.
+ */
+export async function resolveOwnContact(storage: Storage, ownerGhii: string, ref: string): Promise<OutboundContactRecord> {
+  const mailId = ref.startsWith(MAIL_PREFIX) ? ref.slice(MAIL_PREFIX.length) : null;
+  const byId = await storage.getOutboundContact(mailId ?? ref);
+  if (byId && byId.ownerGhii === ownerGhii) return byId;
+  if (!mailId && ref.includes('@')) {
+    const linked = (await storage.listOutboundContacts({ ownerGhii, limit: LINKED_CONTACT_SCAN })).find(c => c.ghii === ref);
+    if (linked) return linked;
+  }
+  throw new OutboundError('NOT_FOUND', 404, 'Contact not found');
 }
 
 /** Records a bounce; the third one suppresses the address until the owner clears it. */
@@ -506,7 +531,8 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // broken by two people who each believed they were keeping it.
   const bookOwner = sender ? sender.bookOwner : ownerGhii;
 
-  const contact = await requireOwnContact(storage, bookOwner, input.contactId);
+  // Any id an address-book surface hands out: record id, `mail:<id>`, or the linked identity.
+  const contact = await resolveOwnContact(storage, bookOwner, input.contactId);
 
   // Gate 2: suppression beats everything.
   if (contact.suppressedAt) {

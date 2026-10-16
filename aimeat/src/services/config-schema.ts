@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-16 — node.type takes mirror, as the loader does; the start check (config-start-check.ts) runs these validators over the environment (QA audit D8-02).
  *   2026-10-16 — eudiw.enabled refuses true on every write path (the config route, a stored value and Consul at start), with the reason in `refusal` (QA audit D6-01, F21b-01).
  *   2026-10-15 — metrics.enabled is immutable (restart-required): server-bootstrap/routes-loader.ts reads it once at start to mount the metrics middleware (feature-list audit #181).
  *   v1.33.0 — 2026-10-15 — connections.facebook_*, instagram_* and reddit_* client settings; the provider
@@ -99,7 +100,9 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
-import type { AimeatConfig } from '../config.js';
+// From config-types.ts, not config.ts: config.ts imports this file, and config-start-check.ts and
+// config-consul.ts, which config.ts also imports, would close a cycle through it (check:deps).
+import type { AimeatConfig } from '../config-types.js';
 import type { SiteLinksConfig } from '../config-types-site-links.js';
 import type { OperatorConfig } from '../config-types.js';
 import type { ConfigFieldShape } from './config-field-def.js';
@@ -135,7 +138,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Node (immutable) ──
   { key: 'nodeId', dotPath: 'node.id', envVar: 'AIMEAT_NODE_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'Unique node identifier' },
   { key: 'port', dotPath: 'node.port', envVar: 'AIMEAT_PORT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 65535, immutable: true, description: 'HTTP listen port', range: '1-65535' },
-  { key: 'nodeType', dotPath: 'node.type', envVar: 'AIMEAT_NODE_TYPE', type: 'string', validate: v => ['full', 'personal', 'relay'].includes(v as string), immutable: true, description: 'Node type: full, relay, or personal' },
+  { key: 'nodeType', dotPath: 'node.type', envVar: 'AIMEAT_NODE_TYPE', type: 'string', validate: v => ['full', 'relay', 'mirror', 'personal'].includes(v as string), immutable: true, description: 'Node type: full, relay, mirror, or personal' },
   { key: 'storageProvider', dotPath: 'storage.type', envVar: 'AIMEAT_STORAGE', type: 'string', validate: v => ['sqlite', 'memory', 'postgres', 'postgresql', 'postgres-kysely'].includes(v as string), immutable: true, description: 'Storage backend type' },
   { key: 'dbUrl', dotPath: 'database_url', envVar: 'DATABASE_URL', type: 'string', validate: () => true, immutable: true, description: 'Database connection URL', adminDisplay: 'hidden' },
   { key: 'sqlitePath', dotPath: 'sqlite_path', envVar: 'AIMEAT_SQLITE_PATH', type: 'string', validate: () => true, immutable: true, description: 'SQLite database file path', adminDisplay: 'hidden' },

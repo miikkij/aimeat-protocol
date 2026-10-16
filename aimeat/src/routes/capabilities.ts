@@ -10,6 +10,7 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   v1.6.1 — 2026-10-16 — The list's policy no longer carries `publishers`: the setting behind it was enforced nowhere (QA audit D8-05).
  *   2026-10-16 — POST, PUT and DELETE /v1/capabilities admit the owner's agent holding capability:write, the
  *     word aimeat_capabilities_create/_update/_delete declare, and POST/DELETE /:id/vouch admit the owner's
  *     agent holding the same word, which aimeat_capabilities_vouch now declares too: the node MCP, the connector MCP and /local/call (which call
@@ -229,7 +230,6 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       ...result,
       policy: {
         publishing: config.capabilityPublishing,
-        publishers: config.capabilityPublishers,
         webhooks: config.capabilityWebhooks,
         // Whether direct extension calls are counted into stats; proxy calls always are.
         call_counting: config.capabilityCallCounting,

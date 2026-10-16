@@ -19,6 +19,7 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-10-16 — GET /v1/agents/:name/skills asks memory:read (requireScopeUnlessSelf: an agent's own record excepted), as GET /v1/skills does for the same data (QA audit P3-03).
  *   v1.8.0 -- 2026-10-12 -- requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/skills. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.7.0 -- 2026-10-09 -- GET /v1/skills/:name and its /zip answer a caller who is not signed in, with
  *     public skills only (Jouni's decision of 2026-10-09: a public skill is readable without sign-in).
@@ -62,6 +63,7 @@ import {
   listSkillsByBinding, setSkillVisibility, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
+import { requireScopeUnlessSelf } from '../auth/self-or-scope.js';
 
 export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -389,8 +391,14 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
-  /* ── GET /v1/agents/:name/skills — linked skills, resolved (the crewaimeat consumer read) ── */
-  router.get('/v1/agents/:name/skills', requireAuth(), async (req, res) => {
+  /* ── GET /v1/agents/:name/skills — linked skills, resolved (the crewaimeat consumer read).
+   *    memory:read, the word GET /v1/skills and GET /v1/agents/:name/skills/links ask for the same
+   *    data; an agent reading its own record passes without it, so the crewaimeat liaison keeps
+   *    reading its own skills. Before 2026-10-16 only the agent role was confined, and an app grant
+   *    or ecosystem app of the owner read every agent's skills with no scope. requireScope rather
+   *    than requireRestScope: the gate is new after the 4.0.0 keep-working grant ran, so it has no
+   *    deprecation window and no entry in REST_SCOPE_KEEP_WORKING_WORDS to answer to. ── */
+  router.get('/v1/agents/:name/skills', requireAuth(), requireScopeUnlessSelf('memory:read', config.nodeId), async (req, res) => {
     try {
       if (isAnonymous(req)) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Authentication required'));

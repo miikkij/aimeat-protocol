@@ -13,13 +13,14 @@
  *   - GET /v1/templates/workflow-create-chat       make a new one in a chat without MCP
  * @usage app.use(workflowTemplatesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — workflow-improve-mcp asks workflow:read; workflow-create-chat asks agent:read and memory:read, the words of the routes that serve the agents and offers it writes into the prompt (QA audit P3-03).
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { getWorkflow, readAgentOffers } from '../services/workflow/store.js';
@@ -58,7 +59,9 @@ export function workflowTemplatesRouter(config: AimeatConfig, storage: Storage):
   };
 
   // GET /v1/templates/workflow-improve-mcp?id=<workflow id>
-  router.get('/v1/templates/workflow-improve-mcp', requireAuth(), async (req: Request, res: Response) => {
+  // workflow:read, the word every GET /v1/workflows route asks: the 404 versus the title answers
+  // whether a workflow id exists and what it is called.
+  router.get('/v1/templates/workflow-improve-mcp', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = String(req.query.id ?? '').trim();
     if (!id) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Say which workflow: pass its id as ?id=')); return; }
     const def = await getWorkflow(storage, `${req.auth!.owner}@${config.nodeId}`, id);
@@ -71,8 +74,11 @@ export function workflowTemplatesRouter(config: AimeatConfig, storage: Storage):
     await serve(req, res, 'workflow-create-mcp', {});
   });
 
-  // GET /v1/templates/workflow-create-chat — the agents and offers ride inside the prompt
-  router.get('/v1/templates/workflow-create-chat', requireAuth(), async (req: Request, res: Response) => {
+  // GET /v1/templates/workflow-create-chat — the agents and offers are written into the prompt.
+  // agent:read AND memory:read: the prompt lists every agent of the owner (GET /v1/agents asks
+  // agent:read) and each agent's offers with their ids and write keys (GET /v1/agents/:name/offers
+  // asks memory:read), so a caller gets here only what those two routes would give it.
+  router.get('/v1/templates/workflow-create-chat', requireAuth(), requireScope('agent:read'), requireScope('memory:read'), async (req: Request, res: Response) => {
     await serve(req, res, 'workflow-create-chat', { agents_and_offers: await agentsAndOffers(storage, config, req.auth!.owner as string) });
   });
 

@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-16 -- use-app-bound-skills: GET /v1/agents/{name}/skills asks memory:read, except of the agent reading its own (QA audit W35, route-scope triage).
  *   v1.32.0 -- 2026-10-16 -- diagnose-a-workflow: a run past its time limit is an error and the next one
  *     runs, five failures in a row pause a schedule and tell its owner, a run missed while the node was
  *     down is logged as skipped with "Missed:" (QA audit E4-03, E4-04, E4-07).
@@ -474,6 +475,8 @@ Before driving any app, check for them.
    \`GET /v1/apps/{owner}/{filename}/skills\` needs no sign-in, and lists public skills only.
    \`aimeat_skill_list\` and \`GET /v1/skills\` read your owner's library and ask \`memory:read\`
    (node 4.0.0 refuses a call without it; before that the call works and says it is deprecated).
+   \`GET /v1/agents/{name}/skills\` (an agent's linked skills) asks \`memory:read\` too, except of
+   the agent reading its own.
 
 ## Authoring app expertise
 Put the binding in the SKILL.md frontmatter so it travels with the skill:

@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: MIT
  * @description Realtime, load-balancer, extensions, generator, app-origin, cortex, portfolio, agent-scope, moderation, setup, consul, metrics config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.2 — 2026-10-16 — The stated defaults of AIMEAT_EXT_INSTALL_ROLE (owner), AIMEAT_APP_ORIGIN_ENABLED (on for a public profile) and AIMEAT_DEFAULT_AGENT_SCOPES say what the loader does (QA audit D8-04).
  *   v1.1.1 — 2026-10-10 — The static TURN pair says it is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23).
  *   v1.1.0 — 2026-10-09 — AIMEAT_TURN_SECRET and AIMEAT_TURN_TTL_SECONDS; the static TURN pair is marked deprecated.
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
  */
 
-import type { AimeatConfig } from '../../config.js';
+import { SHIPPED_DEFAULT_AGENT_SCOPES, type AimeatConfig } from '../../config.js';
 import type { ConfigSection } from './shared.js';
 import { mask } from './shared.js';
 
@@ -164,9 +165,9 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
         },
         {
           envVar: 'AIMEAT_EXT_INSTALL_ROLE',
-          description: 'Role required to install extensions (operator | owner)',
+          description: 'Role required to install extensions (operator | owner). A public node should run operator.',
           value: config.extInstallRole,
-          defaultVal: 'operator',
+          defaultVal: 'owner',
         },
         {
           envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER',
@@ -181,9 +182,9 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
       entries: [
         {
           envVar: 'AIMEAT_APP_ORIGIN_ENABLED',
-          description: 'Serve user apps from a separate *.apps.<domain> origin to isolate them from the operator session. Requires DNS + wildcard TLS.',
+          description: 'Serve user apps from a separate *.apps.<domain> origin to isolate them from the operator session. Requires DNS + wildcard TLS. On by default when AIMEAT_SECURITY_PROFILE is public.',
           value: config.appOriginEnabled ? 'true' : 'false',
-          defaultVal: 'false',
+          defaultVal: config.securityProfile === 'public' ? 'true' : 'false',
         },
         {
           envVar: 'AIMEAT_APP_HOST',
@@ -258,7 +259,7 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
           envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES',
           description: 'Default scopes granted to new agents',
           value: config.defaultAgentScopes.join(', '),
-          defaultVal: 'memory:read, memory:write, memory:delete, catalogue:read',
+          defaultVal: SHIPPED_DEFAULT_AGENT_SCOPES.split(',').join(', '),
         },
         {
           envVar: 'AIMEAT_MAX_AGENT_SCOPES',

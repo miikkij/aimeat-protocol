@@ -7,9 +7,11 @@ suite, and pass the same gate the maintainers pass.
 ## What you need
 
 - **Node.js 24 or later** and **pnpm 10** (`corepack enable` gives you the version that each
-  `package.json` names in `packageManager`).
+  `package.json` names in `packageManager`). `cd aimeat && pnpm machine:check` lists what your
+  machine lacks; [A new machine](docs/coding-guidelines/getting-started.md#a-new-machine) has the
+  whole path, including a PostgreSQL account other than the CI one and CodeQL without the GitHub CLI.
 - **Git.** On Windows, run the commands below in Git Bash or PowerShell; both work.
-- **PostgreSQL** only if your change touches storage or you want to run the production backend.
+- **PostgreSQL 16 or 17** only if your change touches storage or you want to run the production backend.
   SQLite needs no server, and it is the default for everything below.
 
 ## Set up

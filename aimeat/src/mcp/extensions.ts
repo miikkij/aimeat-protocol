@@ -9,8 +9,12 @@
  *   - registerExtensionsTools() — registers all extension tools and resources on an McpServer instance
  * @usage
  *   import { registerExtensionsTools } from './extensions.js';
- *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
+ *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-16 — aimeat_extension_invoke runs services/extension-invoke.ts, the sequence
+ *     POST /v1/ext/:extName/:actionId runs: the error text is redacted of credential-shaped text, the
+ *     call duration and count are recorded, a version pin (name@version) resolves, the app membership
+ *     and ctx.buy reach the script, and a refusal reads `CODE: message` (QA audit D2-05).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   v2.9.1 — 2026-10-09 — aimeat_extension_invoke decrypts secret config for the field it is bound to
  *     (SecretBinding; secrets audit 2026-10-09, 1.1).
@@ -73,21 +77,14 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { withCaughtError } from './tool-fault.js';
 import { buildExtensionRecordFromManifest } from '../services/extension-manifest.js';
-import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields } from '../services/extension-secrets.js';
-import { getEncryptionKey } from '../services/encryption.js';
+import { getExtSecretKeys, maskSecretFields } from '../services/extension-secrets.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { executeExtensionAction } from '../services/extension-runtime.js';
-import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, unavailableEmail, sandboxLimits } from '../services/extension-ctx.js';
-import { capabilitiesOfRecord } from '../services/extension-capability-declaration.js';
-import { attachExtensionWorkspace } from '../services/extension-workspace.js';
-import { maybeExtensionAi, getActiveAiJobService } from '../services/ai-jobs/index.js';
 import { enforcePaywall } from '../routes/extensions/paywall.js';
 import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
-import { takeDesignations } from '../commerce/beneficiary-designation.js';
-import type { ExtensionCtx } from '../services/extension-runtime.js';
-import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
-import { makeExtensionDataPackage } from '../services/datapackage/ext-capability.js';
+import { localAccountName } from '../utils/gaii.js';
+import { invokeExtensionAction } from '../services/extension-invoke.js';
+import { capabilitiesOfRecord } from '../services/extension-capability-declaration.js';
 import { canManageExtensionAs, type ExtensionCaller } from '../routes/extensions/permissions.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import {
@@ -96,7 +93,6 @@ import {
 import { getActiveScheduler } from '../services/scheduler.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
-import { makeExtensionFiles } from '../services/extension-files.js';
 import { annotationsFor } from './annotations.js';
 import { dependencyIndex, dependentsOf, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -118,6 +114,8 @@ export function registerExtensionsTools(
     /** The session's caller (services/caller-context.ts), for the ownership guard on
      *  activate/deactivate/delete and the caller an action runs as. */
     caller: () => CallerContext,
+    /** The session's current bearer, which an action's ctx.buy re-presents to the node's routes. */
+    getToken?: () => string | undefined,
 ): void {
     const agentGaii = getAgentGaii();
     /** The caller's owner GHII, the key the app listing decides visibility by. */
@@ -140,12 +138,6 @@ export function registerExtensionsTools(
      */
     function resolveCaller(): ExtensionCaller {
         return caller().auth;
-    }
-
-    /** The caller an action runs as, in the shape the sandbox context and the workspace capability take. */
-    function actionCaller(): { gaii: string; owner: string; roles: string[]; scopes: string[] } {
-        const session = caller();
-        return { gaii: session.principal, owner: session.owner, roles: [...session.roles], scopes: [...session.scopes] };
     }
 
     // ── Resource: extension details ──
@@ -249,161 +241,42 @@ export function registerExtensionsTools(
     );
 
     // ── Tool 2: aimeat_extension_invoke ──
+    // The sequence is services/extension-invoke.ts, the one POST /v1/ext/:extName/:actionId runs:
+    // the version pin, the app membership, the paywall, the sandbox context with ctx.buy, the refund,
+    // the call duration and count, the accrual and the redacted failure text. This tool renders the
+    // answer as text. Cross-owner invocation is intended (an extension is a sellable capability), and
+    // the paywall inside the sequence is what makes it safe.
     mcp.tool(
         'aimeat_extension_invoke',
         descriptionFor('aimeat_extension_invoke'),
         zodShapeFor('aimeat_extension_invoke'),
         annotationsFor('aimeat_extension_invoke'),
         async ({ extension_name, action_id, input, instance_id }) => {
-            const ext = await storage.getExtension(extension_name);
-            if (!ext) {
-                return { content: [{ type: 'text' as const, text: `Extension "${extension_name}" not found` }], isError: true };
-            }
-
-            if (ext.status !== 'active') {
-                return { content: [{ type: 'text' as const, text: `Extension "${extension_name}" is not active` }], isError: true };
-            }
-
-            const action = ext.actions.find(a => a.id === action_id);
-            if (!action) {
-                return { content: [{ type: 'text' as const, text: `Action "${action_id}" not found in extension "${extension_name}"` }], isError: true };
-            }
-
-            // If instance_id provided, validate the instance exists and is active
-            if (instance_id) {
-                const instance = await storage.getExtensionInstance(extension_name, instance_id);
-                if (!instance) {
-                    return { content: [{ type: 'text' as const, text: `Instance "${instance_id}" not found for extension "${extension_name}"` }], isError: true };
-                }
-                if (instance.status !== 'active') {
-                    return { content: [{ type: 'text' as const, text: `Instance "${instance_id}" of extension "${extension_name}" is not active` }], isError: true };
-                }
-            }
-
-            // Determine memory namespace (instance-scoped or extension-scoped)
-            const extMemoryOwner = instance_id
-                ? `ext:${ext.name}.${instance_id}`
-                : `ext:${ext.name}`;
-
-            // The paywall, over MCP too. Cross-owner invocation is intended here (an extension is a
-            // sellable capability, and getExtension resolves by name across owners), so the paywall
-            // is what makes it safe: the owner and their own principals are free, everyone else
-            // pays or holds an entitlement. This tool executed the script without asking, so a
-            // priced action was free through a tool call and metered over HTTP.
+            const session = caller();
+            // A paywall refusal is recorded, not sent, and rendered below in the tool's own words.
             const refusal = createRefusalRecorder();
-            const pay = await enforcePaywall({
-                config, storage, ext, action, callerGaii: agentGaii, res: refusal,
-                // An MCP session is an agent acting for its owner: no pay token, no internal pass,
-                // no named app tool, and no app grant that would need spend permission. The roles are
-                // the session caller's; the scopes stay empty, as they always were on this call.
-                session: { roles: [...caller().roles], scopes: [], appGrantId: null },
+            const out = await invokeExtensionAction({
+                config, storage, enforcePaywall,
+                extRef: extension_name,
+                instanceId: instance_id || undefined,
+                actionId: action_id,
+                input: input ?? {},
+                // An MCP session is an agent acting for its owner: no pay token, no internal pass, no
+                // named app tool and no app grant. Its roles and scopes are the session's.
+                caller: {
+                    gaii: session.principal, metered: session.principal, owner: session.owner, kind: session.kind,
+                    roles: [...session.roles], scopes: [...session.scopes], appGrantId: null,
+                },
+                paywall: { res: refusal },
+                // ctx.buy re-presents the session's own bearer to the node's routes, as REST does.
+                bearer: getToken?.() ?? '',
             });
-            if (!pay.ok) {
+            if (out.kind === 'paywall') {
                 return { content: [{ type: 'text' as const, text: refusal.refusal ? refusalText(refusal.refusal) : 'The call was refused.' }], isError: true };
             }
-
-            // One builder for the sandbox context (services/extension-ctx.ts). Building it here by
-            // hand is how this door came to differ from the HTTP one in four ways at once: no
-            // charset detection beyond the header, a memory.set that ignored a request for a private
-            // value and wrote public regardless, no email, and no paywall above.
-            // The caller's organism workspace, as this session's agent with this session's scopes,
-            // when the manifest declares it (services/extension-workspace.ts). A refusal reaches
-            // the caller as the action's error text, which carries the service's code and words.
-            // Each consumer gets its own copy, so nothing the script does to ctx.caller reaches the
-            // lists the workspace capability and ctx.files decide on.
-            const runAs = actionCaller();
-            const wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id, caller: actionCaller() });
-            const ctx: ExtensionCtx = buildExtensionCtx({
-                config, storage, extMemoryOwner,
-                extension: { name: ext.name, owner: ext.installedBy },
-                capabilities: capabilitiesOfRecord(ext),
-                workspace: wsCap.workspace,
-                // The session's own scopes, the same list the workspace capability above is built
-                // with. A script that holds a permission word must see the same answer through this
-                // MCP tool as through the HTTP route, or the word means two things.
-                caller: runAs,
-                // Decrypted for the VM as routes/extensions/actions.ts does; the { encrypted } wrapper would silently break the script.
-                extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config), { extension: ext.name }),
-                instance: instance_id ? {
-                    id: instance_id,
-                    config: decryptSecretFields((await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config), { extension: ext.name, instance: instance_id }),
-                } : undefined,
-                logPrefix: `[ext:${ext.name}${instance_id ? ':' + instance_id : ''}]`,
-                // Same ctx.files the REST door builds: reads are authorized as the caller, writes
-                // land in the caller's own storage under ext/{name}/. Without it, an action that
-                // stores a file works over REST and answers UNAVAILABLE over MCP.
-                files: makeExtensionFiles({
-                    config, storage,
-                    callerGaii: runAs.gaii,
-                    callerOwner: runAs.owner,
-                    callerRoles: [...runAs.roles], callerScopes: [...runAs.scopes],
-                    extName: ext.name,
-                }),
-                // Same capability as the REST road, and deliberately the same TARGET: a data package
-                // an agent produces lands in its OWNER's namespace, not the agent's, so the address
-                // does not change with the producer. ctx.files stays agent-scoped — an arbitrary
-                // file belongs to whoever asked for it; a published package belongs to the account.
-                datapackage: makeExtensionDataPackage({
-                    config, storage,
-                    ownerGhii: ownerGhiiOf(agentGaii),
-                    producedBy: { gaii: agentGaii, kind: 'agent', ref: `${ext.name}/${action_id}` },
-                }),
-                // The shared wallet, so this door has the per-call debit ceiling too. Its own copy
-                // refused a negative amount but had no ceiling, which is the guard that bounds how
-                // much a single call can take from the caller's balance.
-                wallet: buildExtensionWallet({ config, storage, callerGaii: agentGaii, extName: ext.name }),
-                // Background model calls, on the same terms as the REST road: billed to the
-                // extension's INSTALLER, read from the record and never from the caller.
-                ai: maybeExtensionAi({
-                    service: getActiveAiJobService(), extName: ext.name, extOwner: ext.installedBy,
-                    nodeId: config.nodeId, createdBy: agentGaii,
-                }),
-                notify: buildExtensionNotify({
-                    storage, config, extName: ext.name,
-                    recipientGaii: agentGaii,
-                    recipientOwner: localAccountName(agentGaii),
-                }),
-                // No SMTP identity belongs to an MCP session. Refusing with a logged false is the
-                // behaviour every extension was written against; an absent capability would turn
-                // ctx.email(...) into a TypeError inside the guest.
-                email: unavailableEmail(ext.name, 'not available via MCP'),
-            });
-
-            try {
-                const limits = sandboxLimits(ext.limits, config);
-                const raw = await executeExtensionAction(action.scriptContent, ctx, input ?? {}, limits);
-
-                emitResourceUpdated(agentGaii, `aimeat://extensions/${encodeURIComponent(extension_name)}`);
-
-                // The designation is stripped either way — the key is the seller's commercial
-                // business, not a fact about the answer, and the REST door has always removed it.
-                // What this door used to skip was ACCRUING it: a seller who promised a third party
-                // a share of their revenue got that share credited for calls that came over HTTP
-                // and nothing for calls that came through an agent, which is the same money and a
-                // different answer. An internal hop accrues nothing here, because the upstream door
-                // holds the settlement and is the only one that can.
-                const shared = pay.upstream ? { designations: [], result: raw } : takeDesignations(raw);
-                if (pay.accrue) await pay.accrue(shared.designations);
-                const result = shared.result;
-
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify(result, null, 2),
-                    }],
-                };
-            } catch (err) {
-                // Never keep payment for a call that did not deliver. The HTTP door has refunded on
-                // a script throw since the paywall existed; this one charged and kept it, so the
-                // same failure cost the buyer money through one door and nothing through the other.
-                if (pay.refund) await pay.refund();
-                const message = (err as Error).message;
-                logger.error(`MCP extension action failed: ${extension_name}/${action_id}`, { error: message, caller: agentGaii });
-                return {
-                    content: [{ type: 'text' as const, text: `Action "${action_id}" failed: ${message}` }],
-                    isError: true,
-                };
-            }
+            if (out.kind === 'refused') return { ...toolError(out.code, out.message) };
+            emitResourceUpdated(agentGaii, `aimeat://extensions/${encodeURIComponent(out.extName)}`);
+            return { content: [{ type: 'text' as const, text: JSON.stringify(out.result, null, 2) }] };
         },
     );
 

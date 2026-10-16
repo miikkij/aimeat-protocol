@@ -36,6 +36,9 @@
  *   - Phase 8: aimeat_app_delete, both refusal arms and the real delete
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-extensions-apps
  * @version-history
+ *   2026-10-16 — Test 17 asserts INSTANCE_INACTIVE and the REST route's sentence: the tool runs the
+ *     route's sequence now (services/extension-invoke.ts), so a paused instance is answered the same
+ *     way on both surfaces. The old assertion pinned the tool's own wording (QA audit D2-05).
  *   2026-10-11 — The `expensive` action has a money price; its 9999-morsel price asserted the old model (a morsel amount is pacing now, clamped to the per-use ceiling, and it ran).
  *   2026-09-27 —The versions tests call aimeat_app_manage (action versions).
  *   v1.2.0 — 2026-09-13 — Test 23b: upload mode carries cortex_agents to the PUT and refuses a
@@ -497,7 +500,7 @@ await test('17. …and a PAUSED instance is refused with the reason, not with "n
         extension_name: EXT, action_id: 'echo', input: { q: 'tenant' }, instance_id: 'tenant-a',
     });
     assert(r.isError, `a paused instance ran the action: ${r.text}`);
-    assert(r.text.includes('is not active'), `wrong refusal: ${r.text}`);
+    assert(r.text.includes('INSTANCE_INACTIVE') && r.text.includes('switched off'), `wrong refusal: ${r.text}`);
 });
 
 await test('18. A priced action from another owner\'s agent meets the paywall over MCP too', async () => {

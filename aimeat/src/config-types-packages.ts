@@ -8,6 +8,7 @@
  * @structure PackagesConfig
  * @usage import type { PackagesConfig } from './config-types-packages.js';
  * @version-history
+ *   v1.2.1 — 2026-10-16 — packageFederationAutoAccept removed: no code read it (QA audit D8-05).
  *   v1.2.0 — 2026-10-02 — packagePeerCap: the most packages-only peers a repository registers.
  *   v1.1.0 — 2026-09-28 — installSetPath and installSetSecretsPath: the install set a new node
  *     applies at start-up (services/install-set-startup.ts).
@@ -25,7 +26,6 @@ export interface PackagesConfig {
   templateReviewsEnabled: boolean;
   templateDiscussionsEnabled: boolean;
   packageFederationEnabled: boolean;
-  packageFederationAutoAccept: boolean;
   /** Package repository role: a private package also reaches entitled peer nodes (package-entitlements.ts). */
   packageRepository: boolean;
   /**

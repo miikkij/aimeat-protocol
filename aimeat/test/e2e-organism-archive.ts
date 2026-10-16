@@ -7,6 +7,7 @@
  *   independently-archived record archived when its container is unarchived; organism archive flips
  *   the org flag; and only the creator/admin may archive (non-member 403).
  * @version-history
+ *   v1.1.0 — 2026-10-16 — 5b/5c: PUT /v1/memory/:key on the archived record (the Memory page and AIMEAT.data.update() use it) is refused with 409 ARCHIVED like POST, and the record keeps its value (QA audit D2-03, F05a-03).
  *   v1.0.0 — 2026-06-26 — Initial: record/workspace/organism archive + cascade + smart restore + guard.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-archive
@@ -106,6 +107,23 @@ await test('4. Archive search (?archived=only) + ?includeArchived=true surface t
 await test('5. Write guard: writing to the archived record is rejected (409 ARCHIVED)', async () => {
     const r = await writeRec(A.token, 't1', { id: 't1', title: 'edited', status: 'open' });
     assert(r.status === 409 && r.body.error?.code === 'ARCHIVED', `expected 409 ARCHIVED, got ${r.status} ${JSON.stringify(r.body.error)}`);
+});
+
+await test('5b. Write guard: a PUT update of the archived record is rejected too (409 ARCHIVED)', async () => {
+    const key = `${root()}.shared.tasks.t1.latest`;
+    const g = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(A.token) });
+    assert(g.status === 200, `read archived ${g.status}: ${JSON.stringify(g.body.error)}`);
+    const r = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ value: { id: 't1', title: 'put edit', status: 'open' }, version: g.body.data.version }) });
+    assert(r.status === 409 && r.body.error?.code === 'ARCHIVED', `expected 409 ARCHIVED, got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    const after = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(A.token) });
+    assert(after.body.data.version === g.body.data.version && after.body.data.value?.title !== 'put edit', 'the archived record must keep its value and version');
+});
+
+await test('5c. Write guard: a metadata-only PUT (tags) of the archived record is rejected too', async () => {
+    const key = `${root()}.shared.tasks.t1.latest`;
+    const g = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(A.token) });
+    const r = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ tags: ['changed'], version: g.body.data.version }) });
+    assert(r.status === 409 && r.body.error?.code === 'ARCHIVED', `expected 409 ARCHIVED, got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
 });
 
 await test('6. Unarchive the record restores it', async () => {
