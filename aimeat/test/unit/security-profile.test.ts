@@ -21,6 +21,8 @@
  *   brackets (fixed in config-private-host.ts v1.0.1).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-profile.test.ts
  * @version-history
+ *   2026-10-16 — The posture fixtures carry the four knobs W20 added to the public-node warnings
+ *     (metrics access, extension install role, AI provider allowlist, default agent scopes).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F20-02).
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -128,6 +130,7 @@ describe('securityPostureWarnings', () => {
         anonymousMode: true, allowPrivateEgress: true, federationOpenJoin: true, encryptionKey: '',
         corsAllowedOrigins: ['*'], statsAccess: 'public', aiProvenance: false,
         aiFixedBaseUrlOverrides: 'openai=https://proxy.example.org', testMoneyHandler: false,
+        metricsAccess: 'public', extInstallRole: 'owner', aiProviderAllowlist: [], defaultAgentScopes: ['*'],
     } as unknown as AimeatConfig);
     /** The same node with every one of those settings safe. */
     const safe = (): AimeatConfig => ({
@@ -135,6 +138,7 @@ describe('securityPostureWarnings', () => {
         anonymousMode: false, allowPrivateEgress: false, federationOpenJoin: false, encryptionKey: 'k'.repeat(64),
         corsAllowedOrigins: ['https://node.example.org'], statsAccess: 'operator', aiProvenance: true,
         aiFixedBaseUrlOverrides: '', testMoneyHandler: false,
+        metricsAccess: 'operator', extInstallRole: 'operator', aiProviderAllowlist: ['api.openai.com'], defaultAgentScopes: ['memory:read'],
     } as unknown as AimeatConfig);
 
     it('names each unsafe setting on a public node', () => {
@@ -143,6 +147,8 @@ describe('securityPostureWarnings', () => {
             /^AIMEAT_ANONYMOUS=true/, /^AIMEAT_ALLOW_PRIVATE_EGRESS=true/, /^AIMEAT_FEDERATION_OPEN_JOIN=true/,
             /^AIMEAT_ENCRYPTION_KEY is unset/, /^AIMEAT_CORS_ALLOWED_ORIGINS=\*/, /^AIMEAT_STATS_ACCESS=public/,
             /^AIMEAT_AI_LABEL_PUBLIC=off was REFUSED/, /^AIMEAT_AI_PROVENANCE=false/, /^AIMEAT_AI_FIXED_BASEURL_OVERRIDES was REFUSED/,
+            // The rest of the knob table (QA audit S10-05, F7d-05).
+            /^AIMEAT_METRICS_ACCESS=public/, /^AIMEAT_EXT_INSTALL_ROLE=owner/, /^AIMEAT_AI_PROVIDER_ALLOWLIST is empty/, /^AIMEAT_DEFAULT_AGENT_SCOPES holds */,
         ];
         for (const re of expected) expect(w.some((line) => re.test(line)), `${re} in ${JSON.stringify(w)}`).toBe(true);
         expect(w).toHaveLength(expected.length);

@@ -117,7 +117,7 @@ describe('every release path runs the check before it builds or publishes', () =
     it('the nightly starts the packed package, and its red leg opens an issue', () => {
         const text = workflow('e2e-full.yml');
         expect(text).toContain('run: node scripts/pack-smoke.mjs');
-        expect(text).toContain('needs: [sweep, release-4-0-0, pack-smoke]');
+        expect(text).toMatch(/needs: \[sweep, release-4-0-0, pack-smoke[\],]/);
         expect(text).toContain("if: steps.sweep.outputs.conclusion != 'success'");
     });
 });
