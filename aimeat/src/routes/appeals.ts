@@ -11,6 +11,9 @@
  *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
  *
  * @version-history
+ *   2026-10-16 — GET /v1/appeals lists an organism's appeals by archiveRoleOf too: the creator or an admin,
+ *     in person or through their own agent; an attached agent sees none. It read organism.admins for the
+ *     owner name alone (Jouni, 2026-10-16).
  *   2026-10-16 — POST /v1/appeals/:id/review decides the organism arm with archiveRoleOf (services/archive.ts),
  *     the rule archiving asks: the creator or an admin, in person or through one of their own agents; an
  *     agent attached to the organism is refused whoever its owner is. It read organism.admins for the
@@ -193,25 +196,21 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
 
         const isOperator = await isOperatorCaller(storage, req.auth);
 
-        // Resolve caller's GHII for organism admin check
-        let callerGhii: string | null = null;
-        if (!isOperator) {
-            const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner);
-            callerGhii = ghiiRecord?.ghii ?? null;
-        }
-
-        // Find organism IDs where the caller is an admin
+        // Find the organisms whose appeals the caller decides: the creator or an admin, in person or
+        // through one of their own agents, by the rule the review and archiving ask (services/archive.ts
+        // archiveRoleOf). An agent attached to the organism is a member there and sees none. The list
+        // read organism.admins for the owner name alone until 2026-10-16 (Jouni, 2026-10-16).
         let adminOrgIds: Set<string> | null = null;
-        if (!isOperator && callerGhii) {
+        if (!isOperator) {
             adminOrgIds = new Set<string>();
-            const allOrganisms = await storage.listOrganisms();
-            for (const org of allOrganisms) {
-                // admins[] holds the bare owner name everywhere it is written (organism-lifecycle,
-                // membership, workspace-access); comparing it to the GHII alone matched nothing, so
-                // the organism-admin arm was unreachable until 2026-09-08 (e2e-appeals).
-                if (org.admins.includes(callerGhii) || org.admins.includes(req.auth!.owner as string)) {
-                    adminOrgIds.add(org.id);
-                }
+            const principal = resolveIdentity(req.auth!, config.nodeId);
+            // The owner's memberships name the candidate organisms; archiveRoleOf decides the role.
+            for (const m of await storage.listMembershipsByGhii(req.auth!.owner as string)) {
+                if (adminOrgIds.has(m.organismId)) continue;
+                const org = await storage.getOrganism(m.organismId);
+                if (!org) continue;
+                const role = await archiveRoleOf(storage, org, { principal, ownerName: req.auth!.owner });
+                if (role === 'creator' || role === 'admin') adminOrgIds.add(org.id);
             }
         }
 

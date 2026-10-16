@@ -14,6 +14,8 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   v1.7.1 -- 2026-10-16 -- The code refusal is setupCodeRefusal (services/setup-code.ts), the one the
+ *     registration routes answer for the first account too (Jouni, 2026-10-16).
  *   v1.7.0 -- 2026-10-16 -- On a node whose base URL is not loopback, POST /v1/setup/init takes
  *     `setupCode`, the one-time code the start log prints while the node has no owner, and refuses
  *     403 SETUP_CODE_REQUIRED without it and SETUP_CODE_INVALID with a wrong one, before it reads
@@ -54,7 +56,7 @@ import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
 import { writePrivateFile } from '../utils/private-file.js';
 import { parseSetupNodeSettings, buildSetupEnv, setupSettingOutcomes, setupMessage, type SetupEnvWrite } from '../services/setup-env.js';
-import { setupCodeGateFor, setupCodeRequired } from '../services/setup-code.js';
+import { setupCodeGateFor, setupCodeRequired, setupCodeRefusal, SETUP_CODE_USED_MESSAGE } from '../services/setup-code.js';
 
 const __dirname_setup = dirname(fileURLToPath(import.meta.url));
 
@@ -91,19 +93,6 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
     // The one-time setup code of a node others can reach (services/setup-code.ts). The start log
     // (index-start.ts) issues it through the same gate.
     const codeGate = setupCodeGateFor(config);
-    const setupCodeRefusal = (input: unknown): { code: string; message: string } | null => {
-        if (!setupCodeRequired(config)) return null;
-        if (!codeGate.pending) {
-            return { code: 'SETUP_CODE_REQUIRED', message: 'This node needs a one-time setup code to create its first owner, and none is waiting. Restart the node, then enter the code its start log prints.' };
-        }
-        if (typeof input !== 'string' || input.trim() === '') {
-            return { code: 'SETUP_CODE_REQUIRED', message: 'This node needs its one-time setup code to create the first owner. Look in the node\'s start log for the line that starts with "Setup code", and enter that code in the setup wizard.' };
-        }
-        if (!codeGate.matches(input)) {
-            return { code: 'SETUP_CODE_INVALID', message: 'That setup code is not right. Copy the code from the node\'s start log, from the line that starts with "Setup code", and try again.' };
-        }
-        return null;
-    };
 
     // GET /v1/setup/status — Check if node needs setup
     router.get('/v1/setup/status', async (_req, res) => {
@@ -160,7 +149,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
 
             // On a node others can reach, the one-time code from the start log, before anything else
             // is read (services/setup-code.ts; Jouni, 2026-10-16).
-            const codeRefusal = setupCodeRefusal(req.body?.setupCode);
+            const codeRefusal = setupCodeRefusal(config, req.body?.setupCode);
             if (codeRefusal) {
                 res.status(403).json(error(config.nodeId, codeRefusal.code, codeRefusal.message));
                 return;
@@ -235,11 +224,14 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             const now = new Date().toISOString();
             const ghii = `${username}@${config.nodeId}`;
             const passwordHash = await hashPassword(password);
-            // The code is used here, checked and cleared in one synchronous step, so of two requests
-            // carrying it only one creates the owner. It waits again if the owner cannot be created.
+            // The code is used here, checked and taken in one synchronous step, so of two requests
+            // carrying it (this route or a registration route, services/owner-provisioning.ts) only
+            // one creates the first owner. Taken from the gate itself rather than through
+            // claimFirstOwnerSetupCode, because this route makes an operator whatever the owner count
+            // says by now. It waits again if the owner cannot be created.
             const codeNeeded = setupCodeRequired(config);
             if (codeNeeded && !codeGate.take(req.body?.setupCode)) {
-                res.status(403).json(error(config.nodeId, 'SETUP_CODE_INVALID', 'The setup code was used a moment ago by another setup request. Reload the setup page: if the node now has an owner, sign in.'));
+                res.status(403).json(error(config.nodeId, 'SETUP_CODE_INVALID', SETUP_CODE_USED_MESSAGE));
                 return;
             }
             const ownerRecord = await storage.transaction(async () => {
