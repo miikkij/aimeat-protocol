@@ -41,6 +41,9 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-10-16 — A marketing newsletter: the sender footer from outbound.sender, the List-Unsubscribe
+ *     and List-Unsubscribe-Post headers, the body vocabulary escaped, a lead image; the RFC 8058
+ *     one-click POST to the header's address opts the reader out and the next newsletter is refused.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-15 —The registration invite on a mailing node answers `sent`, and GET / offers it in getting_started (feature-list audit #23).
  *   2026-10-16 — The mailed registration link is accepted end to end: the account the person names, its session, its password, and a second accept refused INVITE_USED (QA audit F02a-04).
@@ -209,6 +212,9 @@ const KEY_CODE = 'KeyAccess9x';
 const regInviteEmail = `edreg${STAMP}@aimeat.test`;
 const contactInviteEmail = `edcon${STAMP}@aimeat.test`;
 const outboundEmail = `edout${STAMP}@aimeat.test`;
+const newsletterEmail = `ednews${STAMP}@aimeat.test`;
+let newsletterContactId = '';
+let newsletterUnsubscribeUrl = '';
 const ORG_NAME = `Email Delivery Org ${STAMP}`;
 
 async function run(): Promise<void> {
@@ -645,6 +651,99 @@ async function run(): Promise<void> {
         // them to sendMail(), so an AI disclosure declared on the send never reached the message.
         assert(mail.headers['x-ai-disclosure'] === 'ai-generated',
             `the declared AI disclosure must be a header on the message, got ${JSON.stringify(mail.headers['x-ai-disclosure'])}`);
+    });
+
+    await test('a marketing newsletter carries the sender footer, the List-Unsubscribe pair and its structure, all escaped', async () => {
+        const sender = await json('/v1/memory', {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({
+                key: 'outbound.sender', visibility: 'private',
+                value: {
+                    legal_name: 'Uutiset Oy', business_id: '1234567-8', address: 'Katu 1, 00100 Helsinki',
+                    privacy_url: 'https://uutiset.example/tietosuoja',
+                    reason: { fi: 'Saat tämän, koska tilasit uutiskirjeen.', en: 'You get this because you subscribed to our newsletter.' },
+                },
+            }),
+        });
+        assert(sender.status === 200 || sender.status === 201, `sender record ${sender.status}: ${short(sender.body)}`);
+        const read = await json('/v1/outbound/sender', { headers: bearer(opToken) });
+        assert(read.status === 200 && read.body.data.ok === true && read.body.data.sender?.legal_name === 'Uutiset Oy',
+            `GET /v1/outbound/sender: ${read.status} ${short(read.body)}`);
+
+        const contact = await json('/v1/outbound/contacts', {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({ name: 'Tilaaja', email: newsletterEmail }),
+        });
+        assert(contact.status === 201, `contact ${contact.status}: ${short(contact.body)}`);
+        newsletterContactId = contact.body.data.contact.id as string;
+
+        smtp!.clear();
+        const body = [
+            '## What is new', 'This is **important**, read [the post](https://uutiset.example/post?a=1&b=2).', '',
+            '- first', '- second', '', '---', '',
+            '<script>alert(1)</script> [bad](javascript:alert(1)) <img src=x onerror=alert(1)>',
+        ].join('\n');
+        const r = await json('/v1/outbound/send', {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({
+                contact_id: newsletterContactId, kind: 'marketing', subject: 'Newsletter 1', body, locale: 'en',
+                image_url: 'https://uutiset.example/cover.png', image_alt: 'Cover',
+            }),
+        });
+        assert(r.status === 200, `newsletter send ${r.status}: ${short(r.body)}`);
+        const mail = await smtp!.waitForMail(newsletterEmail, /Newsletter 1/);
+
+        const lu = /^<(https?:\/\/[^>]+\/v1\/outbound\/unsubscribe\?token=[\w-]+)>$/.exec(mail.headers['list-unsubscribe'] ?? '');
+        assert(lu !== null, `List-Unsubscribe: ${JSON.stringify(mail.headers['list-unsubscribe'])}`);
+        assert(mail.headers['list-unsubscribe-post'] === 'List-Unsubscribe=One-Click',
+            `List-Unsubscribe-Post: ${JSON.stringify(mail.headers['list-unsubscribe-post'])}`);
+        newsletterUnsubscribeUrl = lu[1];
+
+        // mail.text is the decoded HTML part and text part together.
+        for (const needle of ['Uutiset Oy', 'Business ID 1234567-8', 'Katu 1, 00100 Helsinki',
+            'You get this because you subscribed to our newsletter.', '>Privacy notice</a>', '>Unsubscribe</a>',
+            'href="https://uutiset.example/tietosuoja"', '>What is new</h2>', '<strong style="font-weight:700;">important</strong>',
+            'href="https://uutiset.example/post?a=1&amp;b=2"', 'alt="Cover"', 'Privacy notice: https://uutiset.example/tietosuoja']) {
+            assert(mail.text.includes(needle), `the message must carry ${JSON.stringify(needle)}`);
+        }
+        // The HTML part only: the text/plain part carries the caller's words as they were, which is
+        // what plain text is.
+        const htmlStart = mail.text.indexOf('<!DOCTYPE html>');
+        assert(htmlStart >= 0, 'the message must have an HTML part');
+        const html = mail.text.slice(htmlStart, mail.text.indexOf('</html>', htmlStart));
+        assert(!/<script|href="javascript:|<img src=x/i.test(html), 'nothing the caller wrote may become markup');
+        assert(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'), 'the script text arrives escaped');
+    });
+
+    await test('the one-click POST to the List-Unsubscribe address opts the reader out, and the next newsletter is refused', async () => {
+        assert(newsletterUnsubscribeUrl, 'needs the previous case');
+        // RFC 8058: the mail program posts multipart/form-data with List-Unsubscribe=One-Click.
+        const form = new FormData();
+        form.set('List-Unsubscribe', 'One-Click');
+        const url = newsletterUnsubscribeUrl.replace(/^https?:\/\/[^/]+/, BASE);
+        const first = await fetch(url, { method: 'POST', body: form, redirect: 'manual' });
+        const firstBody = await first.json() as { ok: boolean; data?: { unsubscribed?: boolean } };
+        assert(first.status === 200 && firstBody.data?.unsubscribed === true, `one-click: ${first.status} ${short(firstBody)}`);
+
+        const list = await json('/v1/outbound/contacts', { headers: bearer(opToken) });
+        const row = (list.body.data.contacts as Array<{ id: string; optedOut: boolean }>).find(c => c.id === newsletterContactId);
+        assert(row?.optedOut === true, `the contact must be opted out, got ${short(row)}`);
+
+        // Idempotent, and in the urlencoded form RFC 8058 also allows.
+        const again = await fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click',
+        });
+        assert(again.status === 200, `a second one-click: ${again.status}`);
+
+        smtp!.clear();
+        const refused = await json('/v1/outbound/send', {
+            method: 'POST', headers: bearer(opToken),
+            body: JSON.stringify({ contact_id: newsletterContactId, kind: 'marketing', subject: 'Newsletter 2', body: 'x' }),
+        });
+        assert(refused.status === 422 && refused.body.error?.code === 'OPTED_OUT',
+            `second newsletter: expected 422 OPTED_OUT, got ${refused.status} ${short(refused.body)}`);
+        await sleep(500);
+        assert(smtp!.mailTo(newsletterEmail).length === 0, 'nothing may reach an opted-out reader');
     });
 
     console.log('\nPhase 5 — the refusals');

@@ -26,6 +26,7 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-16 — aimeat_mail_send takes locale, image_url and image_alt, as POST /v1/outbound/send does.
  *   2026-10-16 — aimeat_connection_history and aimeat_connection_replies read the owner's published
  *     items on connections:read-as-owner, through the same holders as the mail tools (Jouni, 2026-10-16).
  *   2026-10-16 — A read of the owner's mailbox by an agent that may name it but lacks
@@ -312,7 +313,7 @@ export function registerConnectionTools(
         mcp.tool('aimeat_mail_send', descriptionFor('aimeat_mail_send'),
             zodShapeFor('aimeat_mail_send'),
             annotationsFor('aimeat_mail_send'),
-            async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, ai_provenance_id, theme }): Promise<TextResult> => {
+            async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, ai_provenance_id, theme, locale, image_url, image_alt }): Promise<TextResult> => {
                 try {
                     // THE OUTBOUND DOOR, NOT AROUND IT. Saved contact, suppression, opt-out, the
                     // daily allowance, the unsubscribe link and the append-only log all happen in
@@ -335,6 +336,9 @@ export function registerConnectionTools(
                         ...(reply_to ? { replyTo: reply_to } : {}),
                         ...(ai_disclosure ? { aiDisclosure: { level: ai_disclosure, ...(ai_provenance_id ? { provenanceId: ai_provenance_id } : {}) } } : {}),
                         ...(theme ? { theme } : {}),
+                        ...(locale ? { locale } : {}),
+                        // The service refuses an image without alt text (INVALID_IMAGE), as the REST route does.
+                        ...(image_url ? { image: { url: image_url, alt: image_alt ?? '' } } : {}),
                     });
                     // No `channel`: it says whether the address has an account here, which only the
                     // owner in person reads (routes/outbound.ts seesAccounts), and a tool session is
