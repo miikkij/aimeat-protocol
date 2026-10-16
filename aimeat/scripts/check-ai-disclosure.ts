@@ -25,9 +25,13 @@
  *   5. locale parity              — every aiLabel.* key in every locale shipped, no [TODO:xx]
  *   6. the build prompt           — the transparency non-negotiable is still literally in it
  *   7. derived visibility         — both providers' PUBLICLY_LINKED cover the declared containers
+ *   8. label views                — every view showing recorded content draws AiLabel, and the
+ *                                   routes that decide or carry the label still do (lib/check-ai-label-views.ts)
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.8.0 — 2026-10-16 — Assertion 8, label views (lib/check-ai-label-views.ts): every view that shows
+ *     content a record describes draws AiLabel, and the routes that decide or carry the label still do.
  *   v1.7.2 — 2026-10-09 — aimeat_docsign_request_create reviewed without provenance (a signing request's label).
  *   v1.7.1 — 2026-10-08 — aimeat_skill_publish is on the required list (aiprov E12).
  *   v1.7.0 — 2026-10-05 — Whether a tool carries ai_provenance, and whether it takes free text, is read from
@@ -71,6 +75,7 @@ import { dirname, join, relative } from 'node:path';
 import { createConnectorChecks, CONNECTOR_MCP_DIR, CONNECTOR_SHELL_WRAPPER } from './lib/check-ai-disclosure-connector.js';
 import { captureServer, captureConnector } from './inventory/mcp-capture.js';
 import { createAiSdkBoundaryCheck, AI_GATEWAY, AI_ADAPTERS_DIR } from './lib/check-ai-sdk-boundary.js';
+import { createAiLabelViewsCheck, LABEL_VIEWS, LABEL_ROUTES } from './lib/check-ai-label-views.js';
 import { PUBLICLY_LINKED_CONTAINERS } from '../src/storage/types/ai-provenance.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -721,7 +726,8 @@ function listProtected(): void {
   console.log(`  4. vocabulary          — ${EXTERNAL_VOCABULARY.length} value tokens confined to ${ADAPTERS}`);
   console.log(`  5. locales             — every aiLabel.* key in ${shippedLocales().join(' + ')}, no [TODO:xx]`);
   console.log(`  6. build prompt        — ${BUILD_PROMPT_NON_NEGOTIABLES.length} literals must be present`);
-  console.log(`  7. derived visibility  — ${PUBLICLY_LINKED_CONTAINERS.map(c => c.name).join(', ')} on both providers\n`);
+  console.log(`  7. derived visibility  — ${PUBLICLY_LINKED_CONTAINERS.map(c => c.name).join(', ')} on both providers`);
+  console.log(`  8. label views         — ${LABEL_VIEWS.length} views draw AiLabel, ${LABEL_ROUTES.length} routes decide or carry it\n`);
 }
 
 if (process.argv.includes('--list')) {
@@ -738,6 +744,7 @@ checkVocabularyContainment();
 checkLocaleParity();
 checkBuildPrompt();
 checkPubliclyLinkedContainers();
+createAiLabelViewsCheck({ root, stripped, fail }).check();
 
 if (failures.length) {
   console.error(`\n✖ ${failures.length} AI-disclosure violation(s):\n`);

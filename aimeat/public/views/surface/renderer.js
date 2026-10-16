@@ -25,6 +25,8 @@
  *   const { layout, freeform, ready } = useSurfaceLayout('home');
  *   html`<${SurfaceRenderer} surface="home" layout=${layout} freeform=${freeform} ctx=${ctx} />`
  * @version-history
+ *   2026-10-16: The layout read's `freeform_provenance` reaches each block as `provenance` (state
+ *     `freeformProvenance`), so a passage shows the AI label it owes.
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
  *   v1.0.0 — 2026-08-26 — Initial.
  */
@@ -49,7 +51,7 @@ const loading = new Map();
  * so a caller never has to decide what an unconfigured node looks like.
  */
 export function useSurfaceLayout(surface) {
-  const [state, setState] = useState({ layout: null, freeform: {}, ready: false, failed: false });
+  const [state, setState] = useState({ layout: null, freeform: {}, freeformProvenance: {}, ready: false, failed: false });
 
   const load = useCallback(async () => {
     try {
@@ -57,6 +59,8 @@ export function useSurfaceLayout(surface) {
       setState({
         layout: r?.data?.layout ?? null,
         freeform: r?.data?.freeform ?? {},
+        // Each passage's record, keyed like `freeform`: the AI label a passage owes.
+        freeformProvenance: r?.data?.freeform_provenance ?? {},
         ready: true,
         failed: false,
       });
@@ -64,7 +68,7 @@ export function useSurfaceLayout(surface) {
       // The caller falls back to its own built-in tree. Recorded rather than swallowed: a layout
       // that silently never loads looks exactly like a node nobody has configured.
       swallowed(`surface: layout ${surface}`, err);
-      setState({ layout: null, freeform: {}, ready: true, failed: true });
+      setState({ layout: null, freeform: {}, freeformProvenance: {}, ready: true, failed: true });
     }
   }, [surface]);
 
@@ -135,7 +139,7 @@ function titleOf(block, locale) {
   return '';
 }
 
-function Block({ block, ctx, freeform, locale }) {
+function Block({ block, ctx, freeform, freeformProvenance, locale }) {
   const [, bump] = useState(0);
   const Cmp = componentFor(block.id, () => bump(n => n + 1));
   if (Cmp === undefined) return null;    // still loading; the block appears when it arrives
@@ -147,6 +151,7 @@ function Block({ block, ctx, freeform, locale }) {
         props=${block.props ?? {}}
         title=${titleOf(block, locale)}
         text=${freeform?.[block.key] ?? ''}
+        provenance=${freeformProvenance?.[block.key] ?? null}
         blockKey=${block.key} />
     <//>`;
 }
@@ -157,7 +162,7 @@ function Block({ block, ctx, freeform, locale }) {
  * `ctx` is the only surface-specific input — what a block needs that it cannot fetch for itself,
  * such as the router's navigate. A block that needs data goes and gets it.
  */
-export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, locale = 'en' }) {
+export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, freeformProvenance = {}, locale = 'en' }) {
   const blocks = Array.isArray(layout?.blocks) ? layout.blocks : [];
   if (blocks.length === 0) return null;
 
@@ -167,10 +172,10 @@ export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, locale = 'en'
       const heading = titleOf(block, locale);
       return html`
         <${Band} tight=${true} title=${heading} key=${block.key}>
-          ${kids.map(child => html`<${Block} key=${child.key} block=${child} ctx=${ctx} freeform=${freeform} locale=${locale} />`)}
+          ${kids.map(child => html`<${Block} key=${child.key} block=${child} ctx=${ctx} freeform=${freeform} freeformProvenance=${freeformProvenance} locale=${locale} />`)}
         <//>`;
     }
-    return html`<${Block} key=${block.key} block=${block} ctx=${ctx} freeform=${freeform} locale=${locale} />`;
+    return html`<${Block} key=${block.key} block=${block} ctx=${ctx} freeform=${freeform} freeformProvenance=${freeformProvenance} locale=${locale} />`;
   })}`;
 }
 

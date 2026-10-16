@@ -27,6 +27,8 @@
  *   const svc = new SurfaceLayoutService(config, storage);
  *   const { layout, degraded } = await svc.resolve('home');
  * @version-history
+ *   v1.3.0 — 2026-10-16 — readFreeformWithProvenance: each passage's provenance record id beside its
+ *     words, so the page shows the AI label a passage owes; the layout read dropped it.
  *   v1.2.0 — 2026-10-08 — A portal passage is stored public (the portal is read without a session), so
  *     its provenance record resolves for a visitor; a member surface's stays 'owner'. Every passage gets
  *     provenanceForWrite's answer (an undeclared agent passage is stamped) with the node's switch, the
@@ -161,12 +163,23 @@ export class SurfaceLayoutService {
 
     /** The words behind the free-form blocks in a layout, keyed by the block's own key. */
     async readFreeform(layout: SurfaceLayout): Promise<Record<string, string>> {
-        const out: Record<string, string> = {};
+        return (await this.readFreeformWithProvenance(layout)).text;
+    }
+
+    /**
+     * The same words, and the provenance record each passage carries (an AI wrote it), keyed the
+     * same way, so the page can show the label a passage owes.
+     */
+    async readFreeformWithProvenance(layout: SurfaceLayout): Promise<{ text: Record<string, string>; provenance: Record<string, string> }> {
+        const text: Record<string, string> = {};
+        const provenance: Record<string, string> = {};
         for (const [key, entry] of Object.entries(layout.freeform ?? {})) {
             const record = await this.storage.getMemory(SITE_OWNER_GAII, freeformKey(entry.ref));
-            if (record && typeof record.value === 'string') out[key] = record.value;
+            if (!record || typeof record.value !== 'string') continue;
+            text[key] = record.value;
+            if (record.aiProvenanceId) provenance[key] = record.aiProvenanceId;
         }
-        return out;
+        return { text, provenance };
     }
 
     // ── Writing ──

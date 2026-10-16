@@ -10,6 +10,8 @@
  *   origin in the rail. Reads the public endpoints; the Art. 50(4) label stays under the headline.
  * @structure PublicKnowledgeViewer · BrowseView · DetailView · entryToMarkdown · buildFullMarkdown
  * @version-history
+ *   v2.5.0 -- 2026-10-16 -- Each entry shows the AI label its own record says it owes (the export's
+ *     entry_provenance), beside the package's.
  *   v2.4.0 -- 2026-09-26 -- The figure's "of how many" is the Figure strip's own cut (.og-strip-of), moved unchanged from .kp-of (a move).
  *   v2.3.0 -- 2026-09-13 -- V2: compose shared page headlines; keep measured sizes on view roots.
  *   v2.2.0 -- 2026-09-13 -- V2: compose public reader section headlines with poster-section-title.
@@ -232,6 +234,7 @@ function DetailView({ packageId, onBack }) {
   const [reputation, setReputation] = useState(null);
   const [links, setLinks] = useState([]);
   const [entryData, setEntryData] = useState({});
+  const [entryProvenance, setEntryProvenance] = useState({});   // entry name → its record (the export's entry_provenance)
   const [closed, setClosed] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -248,7 +251,10 @@ function DetailView({ packageId, onBack }) {
       else setError(pkgResult.reason?.message || t('pkv.notFound'));
       if (repResult.status === 'fulfilled') setReputation(repResult.value?.data || null);
       if (linksResult.status === 'fulfilled') { const l = linksResult.value?.data?.links || linksResult.value?.data || []; setLinks(Array.isArray(l) ? l : []); }
-      if (exportResult.status === 'fulfilled') setEntryData(exportResult.value?.entry_data || exportResult.value?.data?.entry_data || {});
+      if (exportResult.status === 'fulfilled') {
+        setEntryData(exportResult.value?.entry_data || exportResult.value?.data?.entry_data || {});
+        setEntryProvenance(exportResult.value?.entry_provenance || exportResult.value?.data?.entry_provenance || {});
+      }
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -325,6 +331,7 @@ function DetailView({ packageId, onBack }) {
           return html`<section class=${`og-sec kp-entry-sec ${i === 0 && !manifest.synthesis?.description ? 'og-sec--first' : ''}`} id=${'kp-pe-' + i} key=${entry.key}>
             <div class="og-sec-h"><h2 class="poster-section-title"><span class="kp-num">${String(i + 1).padStart(2, '0')}</span> ${entry.title || entryName}</h2><div class="og-doors"><button type="button" class="og-door og-door--quiet" onClick=${() => toggle(entry.key)}>${isClosed ? c('open') : c('close')}</button></div></div>
             ${isClosed ? null : html`
+              <${AiLabel} record=${entryProvenance[entryName]?.record} recordUrl=${entryProvenance[entryName]?.record_url} />
               ${content ? html`<p>${entryToText(content)}</p>` : html`<p class="og-empty">${t('pkv.entryUnavailable')}</p>`}
               ${erefs.length ? html`<div class="kp-refs">${erefs.map((r, j) => html`<div class="kp-ref" key=${j}><i class=${r.verified ? '' : 'kp-ref--no'}>${r.verified ? c('verified') : c('unverified')}</i>${r.url ? html`<a href=${r.url} target="_blank" rel="noopener">${r.title || r.url} ↗</a>` : html`<span>${r.title || c('untitled')}</span>`}</div>`)}</div>` : null}
               ${rels.length ? html`<div class="kp-rels">${rels.map((r, j) => { const tg = target(r.key); return html`<span class="kp-rel" key=${j}><b>${relWord(r.relation)}</b>${tg ? (tg.title || r.key) : r.key}</span>`; })}</div>` : null}`}

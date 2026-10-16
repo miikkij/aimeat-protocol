@@ -14,6 +14,8 @@
  * @structure HTML_PAGE_SKILL_ENTRY
  * @usage import { HTML_PAGE_SKILL_ENTRY } from './builtin-skills.html-page.js';
  * @version-history
+ *   v1.1.0 — 2026-10-16 — "Say how the page was made": ai_provenance on the write, and when the
+ *     shared page shows the AI label. A file its classification keeps back does not load.
  *   v1.0.0 — 2026-10-16 — Initial.
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -65,6 +67,11 @@ chart, a page with pictures. Choose something else when:
 Find a document space first with \`aimeat_workspace_read\` (the index lists the spaces and their
 pages). Only the workspace's creator or an organism admin, or their own agent, may share. To stop
 sharing: \`aimeat_workspace_share\` with \`shared: false\`.
+
+**Say how the page was made.** Pass \`ai_provenance\` on the write (\`level\`, your own \`model\`, and
+\`human_involvement\` only if the person read the substance and could reject it). Silence is recorded
+as model-written. A page shared on an open link then shows the EU AI label in the strip around its
+frame, as the law asks; behind a password or for signed-in readers only it owes none.
 
 ## The rules a page follows
 

@@ -3092,10 +3092,10 @@
      "slug": "g-17-visible-labels",
      "cells": [
       "<strong>Visible labels</strong>",
-      "Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. The sentence names the kind of thing (&quot;AI made this audio&quot;), and whether a label is owed is decided when the content is served, so content made public later carries the label it now owes. Apps get it without writing code.",
-      "served pages, <code>aimeat-ai</code>"
+      "Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. The sentence names the kind of thing (&quot;AI made this audio&quot;), and whether a label is owed is decided when the content is served, so content made public later carries the label it now owes. Apps get it without writing code. The label is drawn on every page that shows recorded content: shared workspace pages and HTML pages (in the strip around the page's frame), the member's own workspace views, knowledge packages and each of their entries, portfolios, the front page's passages and board posts, and Design Book parts. A page shared on an open link counts as public; one behind a password or only for signed-in accounts does not, so it owes no label. A person saving a page in the workspace editor says whether an AI made it, and the answer becomes the page's record.",
+      "served pages, <code>aimeat-ai</code>, <code>ai_provenance</code> on <code>POST /v1/organisms/:id/workspace/drafts</code> and <code>POST /v1/memory</code>"
      ],
-     "plain": "Visible labels Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. The sentence names the kind of thing (\"AI made this audio\"), and whether a label is owed is decided when the content is served, so content made public later carries the label it now owes. Apps get it without writing code. served pages, aimeat-ai"
+     "plain": "Visible labels Where a person reads content that is owed a label, the official EU icon and a plain sentence appear, linking to the record. The sentence names the kind of thing (\"AI made this audio\"), and whether a label is owed is decided when the content is served, so content made public later carries the label it now owes. Apps get it without writing code. The label is drawn on every page that shows recorded content: shared workspace pages and HTML pages (in the strip around the page's frame), the member's own workspace views, knowledge packages and each of their entries, portfolios, the front page's passages and board posts, and Design Book parts. A page shared on an open link counts as public; one behind a password or only for signed-in accounts does not, so it owes no label. A person saving a page in the workspace editor says whether an AI made it, and the answer becomes the page's record. served pages, aimeat-ai, ai_provenance on POST /v1/organisms/:id/workspace/drafts and POST /v1/memory"
     },
     {
      "slug": "g-17-detection-by-hash",
@@ -3128,10 +3128,10 @@
      "slug": "g-17-compliance-register",
      "cells": [
       "<strong>Compliance register</strong>",
-      "The operator's AI-use report, snapshots, use-case register and risk questionnaire; each account can read its own slice.",
+      "The operator's AI-use report, snapshots, use-case register and risk questionnaire; each account can read its own slice. The counts of public AI-made content include what an open workspace share serves to anyone, and the report says which shares count.",
       "<code>/v1/admin/compliance/*</code>, <code>/v1/compliance/report/mine</code>, <code>aimeat_compliance_*</code>"
      ],
-     "plain": "Compliance register The operator's AI-use report, snapshots, use-case register and risk questionnaire; each account can read its own slice. /v1/admin/compliance/*, /v1/compliance/report/mine, aimeat_compliance_*"
+     "plain": "Compliance register The operator's AI-use report, snapshots, use-case register and risk questionnaire; each account can read its own slice. The counts of public AI-made content include what an open workspace share serves to anyone, and the report says which shares count. /v1/admin/compliance/*, /v1/compliance/report/mine, aimeat_compliance_*"
     },
     {
      "slug": "g-17-gdpr-export-and-erasure",

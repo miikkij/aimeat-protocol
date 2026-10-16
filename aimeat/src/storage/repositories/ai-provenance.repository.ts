@@ -20,6 +20,8 @@
  * @usage
  *   import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
  * @version-history
+ *   v1.5.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every share candidate in a report's
+ *     population that the SQL rule counts private, for the compliance counts. No migration.
  *   v1.4.0 — 2026-10-08 — workspaceProvenanceLinks(): the candidates for a record a workspace share
  *     link serves to anyone, which the SQL visibility rule cannot see (aiprov E1). No migration.
  *   v1.3.0 — 2026-10-08 — Facets carry the minted reason and the medium; the list filter is
@@ -110,10 +112,18 @@ export interface AiProvenanceRepository {
    * one of these records (`ids`) or a record with this content hash (`contentHash`). A share link
    * serves such a record to anyone without changing its stored visibility, so the SQL rule above
    * cannot see it; whether the share actually opens a candidate is decided in
-   * routes/organisms/share-provenance.ts, by the same collectors the share routes serve with. Applies no
-   * authorization: a candidate is not an answer. At most `limit` rows (default 200).
+   * services/share-provenance.ts, by the same collectors the share routes serve with. Applies no
+   * authorization: a candidate is not an answer. At most `limit` rows (default 200, at most 1000).
+   *
+   * `scan` asks for every candidate in a report's population instead: the records of one owner
+   * (`ownerGhii`) or of the node, generated since a day (`since`), that the SQL rule does NOT count
+   * public, so a report can add those a share opens without counting any twice. At most `limit`
+   * rows, up to 5000.
    */
-  workspaceProvenanceLinks(query: { ids?: string[]; contentHash?: string; limit?: number }): Promise<WorkspaceProvenanceLink[]>;
+  workspaceProvenanceLinks(query: {
+    ids?: string[]; contentHash?: string; limit?: number;
+    scan?: { ownerGhii?: string; since?: string };
+  }): Promise<WorkspaceProvenanceLink[]>;
 }
 
 /** One published workspace record that carries a provenance record (workspaceProvenanceLinks). */

@@ -11,6 +11,7 @@
  * @structure writeHtmlPage · getPageFrame · markPageOpened · htmlPagePrompt · HTML_PAGE_MAX_BYTES
  * @usage import * as htmlPages from '/js/services/html-pages.js';
  * @version-history
+ *   v1.1.0 — 2026-10-16 — writeHtmlPage takes the person's `aiProvenance` declaration.
  *   v1.0.0 — 2026-10-16 — Initial (HTML pages in workspaces).
  */
 import { apiPost } from '/js/api.js';
@@ -22,9 +23,15 @@ export const HTML_PAGE_MAX_BYTES = 1024 * 1024;
 const docPath = (orgId, space, docId) =>
   `/v1/organisms/${encodeURIComponent(orgId)}/workspace/documents/${encodeURIComponent(space)}/${encodeURIComponent(docId)}`;
 
-/** Write an HTML page as a draft. `value` is { title, html, files? }; the node writes its text. */
-export async function writeHtmlPage(orgId, ws, space, id, value) {
-  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/drafts`, { ws, space, id, value });
+/**
+ * Write an HTML page as a draft. `value` is { title, html, files? }; the node writes its text.
+ * `aiProvenance`, when given, is the person's declaration of how the page was made.
+ * @param {{ aiProvenance?: Record<string, unknown> }} [opts]
+ */
+export async function writeHtmlPage(orgId, ws, space, id, value, opts = {}) {
+  const { aiProvenance } = opts;
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/drafts`,
+    { ws, space, id, value, ...(aiProvenance ? { ai_provenance: aiProvenance } : {}) });
 }
 
 /** The frame address of a page, its published copy or the draft: { frame_url, reason? }. */

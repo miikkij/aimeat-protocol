@@ -24,6 +24,7 @@
  * @structure default export Landing({ navigate })
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v7.1.0 — 2026-10-16 — The layout's passages carry their records (freeformProvenance), for the AI label.
  *   v7.0.0 — 2026-09-14 — The message frame's page (TARGET-075): the fallback tree mirrors the
  *     new DEFAULT_LAYOUTS.portal, built from landing-v2*.js. The arrival logic is untouched.
  *   v6.1.0 — 2026-08-28 — The page renders nothing until the layout answer arrives (or fails):
@@ -193,6 +194,7 @@ export default function Landing({ navigate }) {
         <${SurfaceRenderer}
           layout=${surface.layout}
           freeform=${surface.freeform}
+          freeformProvenance=${surface.freeformProvenance}
           ctx=${{ navigate }}
           locale=${getLocale()} />
       </div>`;

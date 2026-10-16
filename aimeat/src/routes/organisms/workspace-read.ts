@@ -51,6 +51,9 @@
  *     who can read the workspace.
  *   v1.13.0 — 2026-10-16 — The workspace read carries `opened`, the day each page was last opened
  *     (services/workspace-opened.ts), to a caller who can read the workspace.
+ *   v1.14.0 — 2026-10-16 — A published page or record an open share serves to anyone carries the
+ *     label it owes there (`_aiProvenance` decided as public, sharedPublishedProvenanceIds). Each
+ *     item carries `_writtenBy`, the account that holds it, for a member to read who made a page.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -74,6 +77,7 @@ import { provenanceForWrite, ProvenanceScopeError } from '../../services/ai-prov
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
 import { fresherRec } from './shared.js';
+import { sharedPublishedProvenanceIds } from '../../services/share-provenance.js';
 import { loadWorkspaceContent } from '../../services/workspace-content.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
@@ -130,12 +134,15 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // TARGET-058: the provenance records attached to anything in this workspace, in ONE query for
     // the whole read. It used to be one lookup per distinct id — an N+1 that grew with the workspace
     // rather than with the traffic, so the busiest workspaces paid the most. Empty on a workspace
-    // nothing agent-written touched, which is the common case.
-    const provenanceById = await loadServedProvenanceMany(
-      storage, config, readable.map(r => r.aiProvenanceId));
-
+    // nothing agent-written touched, which is the common case. What an open share serves to anyone
+    // is public, and a member sees the label it owes there (sharedPublishedProvenanceIds).
     const manifestRec = reader ? (canReadWorkspace ? manRec : undefined) : byKey.get(`${nsRoot}meta.manifest`);
     const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;
+    const alsoPublic = ws && manifest
+      ? await sharedPublishedProvenanceIds(storage, config, id, ws, manifest, readable)
+      : undefined;
+    const provenanceById = await loadServedProvenanceMany(
+      storage, config, readable.map(r => r.aiProvenanceId), { alsoPublic });
     const readme = (reader ? await metaOf('meta.readme', readable) : byKey.get(`${nsRoot}meta.readme`))?.value ?? null;
     // Apps pinned to this workspace (meta.apps binding record) — presentation/launch-context only.
     const appsRec = reader ? await metaOf('meta.apps', readable) : byKey.get(`${nsRoot}meta.apps`);
@@ -201,7 +208,9 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
         const warned = classificationWarningOf(rec);
         return {
           ...(v as Record<string, unknown>),
-          _createdAt: rec.createdAt, _updatedAt: rec.updatedAt, _version: rec.version,
+          // `_writtenBy`: the account that holds this copy (an agent's page is held in its owner's
+          // name; its record's generator names the agent), so a member reads who made a page.
+          _createdAt: rec.createdAt, _updatedAt: rec.updatedAt, _version: rec.version, _writtenBy: rec.ownerGaii,
           ...(prov ? { _aiProvenance: prov.record, _aiProvenanceUrl: prov.recordUrl } : {}),
           // TARGET-082: an AI shown a warning-classified record is told so, on the record it reads.
           ...(warned ? { _classificationWarning: warned } : {}),

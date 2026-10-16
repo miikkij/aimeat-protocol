@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — The image of a shared page carries the AI label decided for the share's reader
+ *     (public on an open share); it was decided as private.
  *   2026-10-16 — GET /v1/pub/:gaii/{key}?share=<org>/<ws>/<space>/<id>: a workspace-scoped image of a
  *     page shared outside its organism, for whoever the share admits (routes/organisms/share-file-pass.ts).
  *   2026-10-16 — GET /v1/pub/:gaii/{key}: a file that is not public needs storage:read from a
@@ -184,8 +186,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     /** The file's AI-provenance marks (`AI-Disclosure`, `Link: rel="ai-provenance"`) on a response
      *  whose read is ALREADY authorized: provenance travels with the content it describes. `full`
      *  for the owner's own view; anyone else gets the record as AIMEAT_AI_PROVENANCE_DETAIL allows. */
-    const markProvenance = async (res: Response, file: StorageFileRecord, full: boolean): Promise<ServedProvenance | undefined> => {
-        const p = await loadServedProvenance(storage, config, file.aiProvenanceId, { full });
+    // `visibility`: the surface the route knows the file is served on (a shared page's image); without
+    // it the visibility predicate decides.
+    const markProvenance = async (res: Response, file: StorageFileRecord, full: boolean, visibility?: 'public' | 'private'): Promise<ServedProvenance | undefined> => {
+        const p = await loadServedProvenance(storage, config, file.aiProvenanceId, { full, ...(visibility ? { surface: { visibility } } : {}) });
         setProvenanceHeaders(res, p);
         return p;
     };
@@ -519,9 +523,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // A workspace-scoped image of a page shared outside the organism, asked for with the page it is
         // in (?share=<org>/<ws>/<space>/<id>): served to whoever that page's share admits
         // (routes/organisms/share-file-pass.ts). The file keeps its visibility.
-        if (req.query.share !== undefined && await sharedPageAdmitsFile(organismHelpers(), { storage, config }, req, file, gaii, key)) {
+        const sharedOn = req.query.share !== undefined ? await sharedPageAdmitsFile(organismHelpers(), { storage, config }, req, file, gaii, key) : null;
+        if (sharedOn) {
             if (await hiddenFromCaller()) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found')); return; }
-            await markProvenance(res, file, false);
+            await markProvenance(res, file, false, sharedOn);
             res.setHeader('Cache-Control', 'private, max-age=300');
             if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));

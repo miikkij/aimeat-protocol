@@ -44,6 +44,9 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.10.0 — 2026-10-16 — The loaders take `alsoPublic`: records a route knows an open workspace
+ *     share serves to anyone, which the SQL predicate cannot see. A shared page was decided as private
+ *     and owed no label on the share, while GET /v1/provenance/:id counted it public.
  *   v1.9.1 — 2026-10-09 — The JSON-LD escapes every non-ASCII character, so a localized fallback model
  *     name or a reviewer's name keeps the served app document ASCII.
  *   v1.9.0 — 2026-10-08 — The disclosure is decided when the record is SERVED, against the item's
@@ -120,6 +123,12 @@ export interface ServedProvenance {
 export interface ServeOptions {
   full?: boolean;
   surface?: ServedSurface;
+  /**
+   * Records the route KNOWS anyone can read through something the SQL predicate cannot see: an open
+   * workspace share (services/workspace-share.ts shareIsOpen). Served as public; the rest still ask
+   * the predicate. Ignored when `surface.visibility` is given.
+   */
+  alsoPublic?: ReadonlySet<string>;
 }
 
 /**
@@ -145,7 +154,7 @@ export async function loadServedProvenance(
   const row = await storage.getAiProvenance(provenanceId);
   if (!row) return undefined;
   const visibility = opts?.surface?.visibility
-    ?? ((await publiclyResolvable(storage, [row.id])).has(row.id) ? 'public' : 'private');
+    ?? (opts?.alsoPublic?.has(row.id) || (await publiclyResolvable(storage, [row.id])).has(row.id) ? 'public' : 'private');
   return servedProvenanceOf(config, row, { ...opts, surface: { ...opts?.surface, visibility } });
 }
 
@@ -172,9 +181,10 @@ export async function loadServedProvenanceMany(
   const rows = await storage.getAiProvenanceMany(ids);
   // One predicate query for the page when the route did not say the items' visibility.
   const known = opts?.surface?.visibility;
-  const pub = known ? undefined : await publiclyResolvable(storage, rows.map((r) => r.id));
+  const also = opts?.alsoPublic;
+  const pub = known ? undefined : await publiclyResolvable(storage, rows.filter((r) => !also?.has(r.id)).map((r) => r.id));
   for (const row of rows) {
-    const visibility = known ?? (pub?.has(row.id) ? 'public' : 'private');
+    const visibility = known ?? (also?.has(row.id) || pub?.has(row.id) ? 'public' : 'private');
     out.set(row.id, servedProvenanceOf(config, row, { ...opts, surface: { ...opts?.surface, visibility } }));
   }
   return out;

@@ -10,6 +10,7 @@
  * @structure PRIMARY_FIELD (const), Workspace
  * @usage import { Workspace } from '/views/profile/organisms/workspace.js';
  * @version-history
+ *   2026-10-16 — A page saved with "An AI made this" ticked carries the declaration as its provenance (js/page-authorship.js).
  *   2026-10-16 — An HTML page is saved through the drafts route (js/services/html-pages.js), which checks it and writes its text.
  *   2026-10-16 — Opening one document from elsewhere moves to workspace-open-doc.js (max-file-lines),
  *     which also takes the record's whole key and opens it in a workspace already open.
@@ -86,6 +87,7 @@ import { HeadDesc } from '/components/SubHeading.js';
 import { Row as Line } from '/components/Layout.js';
 import * as orgService from '/js/services/organisms.js';
 import * as htmlPages from '/js/services/html-pages.js';
+import { aiDeclarationFor } from '/js/page-authorship.js';
 import { getGhii } from '/js/services/auth.js';
 import { copyToClipboard } from '/js/utils.js';
 import { recordRecent } from '/js/recents.js';
@@ -424,9 +426,11 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     setBusy(true);
     try {
       // An HTML page goes through the drafts route, which checks it and writes its text (src/services/html-page.ts).
+      // A ticked "An AI made this" is saved as the page's provenance (js/page-authorship.js).
+      const aiProvenance = aiDeclarationFor(page);
       const r = typeof page.html === 'string'
-        ? await htmlPages.writeHtmlPage(orgId, wsId, ot.name, id, { title: page.title, html: page.html, ...(page.files ? { files: page.files } : {}) })
-        : await orgService.writeDraft(orgId, wsId, ot.namespace, id, { id, title: page.title, markdown: page.markdown });
+        ? await htmlPages.writeHtmlPage(orgId, wsId, ot.name, id, { title: page.title, html: page.html, ...(page.files ? { files: page.files } : {}) }, { aiProvenance })
+        : await orgService.writeDraft(orgId, wsId, ot.namespace, id, { id, title: page.title, markdown: page.markdown }, { aiProvenance });
       if (r?.ok === false) { showToast(r?.error?.message || 'Document rejected'); }
       else {
         // Filing it under the section is a change to the workspace's sections: the door says whether it

@@ -35,6 +35,9 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.2.0 — 2026-10-16 — The roll-up and the unlabelled detail take the node's configuration, so
+ *     content an open workspace share serves to anyone counts as public; both rings state the rule
+ *     (`shares-open-only`).
  *   v1.1.1 — 2026-10-08 — The transparency roll-up and the unlabelled detail take the node's label posture.
  *   v1.1.0 — 2026-10-03 — Gap kind font-licence-unknown: a face the operator added without a licence
  *     or a copyright holder (the font manager, services/themes/fonts.ts), in the node-wide report.
@@ -177,9 +180,21 @@ export function monthWindow(month: string): { from: string; to: string; days: nu
  * than their own. Handing them the operator's wording would be the report claiming a reach the
  * reader does not have, which is the same defect as a total that reads as coverage — one level up.
  */
+/**
+ * Which workspace shares count as public, in both rings: the rule every surface decides a shared
+ * page's AI label with (services/workspace-share.ts shareIsOpen), stated where the counts are read.
+ */
+const SHARES_OPEN_ONLY: ComplianceLimit = {
+  code: 'shares-open-only',
+  text: 'A workspace page shared on an open link counts as public here. One shared behind a password '
+    + 'or only with signed-in accounts does not: its readers are not the general public, so no AI '
+    + 'label is owed and it is not counted as public.',
+};
+
 function notCoveredForOwner(config: AimeatConfig, transparencyNote: string): ComplianceLimit[] {
   return [
     { code: 'no-record', text: transparencyNote },
+    SHARES_OPEN_ONLY,
     {
       code: 'owner-this-node-only',
       text: 'Only what you did here. Anything you published elsewhere — on another installation, on '
@@ -232,6 +247,7 @@ function notCovered(config: AimeatConfig, transparencyNote: string): ComplianceL
     // The absent-record rule is lifted from the roll-up's own scope note rather than restated, so
     // the two can never come to say different things about the same absence.
     { code: 'no-record', text: transparencyNote },
+    SHARES_OPEN_ONLY,
     {
       code: 'this-node-only',
       text: 'Only this node. Content published on a federation peer, on someone\'s personal node, or '
@@ -419,7 +435,7 @@ export async function buildComplianceReport(
   const owner = opts.ownerGhii;
   const questionnaire = await effectiveQuestionnaire(storage, config.nodeId);
   const [transparency, usage, consent, rawUseCases] = await Promise.all([
-    buildAiTransparencyReport(storage, { sinceDays: window.days, ownerGhii: owner, labelPolicy: config.aiLabelPublic }),
+    buildAiTransparencyReport(storage, { sinceDays: window.days, ownerGhii: owner, labelPolicy: config.aiLabelPublic, config }),
     aiUsage(storage, window.from, window.to, owner),
     consentTotals(storage, config, window.from, owner),
     readUseCases(storage, config.nodeId),
@@ -461,9 +477,9 @@ export async function buildComplianceReport(
 
 /** The unlabelled rows behind the count, for the surface that shows a list rather than a number. */
 export async function complianceUnlabelledDetail(
-  storage: Storage, sinceDays: number, limit = 50, labelPolicy?: AimeatConfig['aiLabelPublic'],
+  storage: Storage, sinceDays: number, limit = 50, labelPolicy?: AimeatConfig['aiLabelPublic'], config?: AimeatConfig,
 ): Promise<{ total: number; shown: number; items: unknown[] }> {
-  const found = await listUnlabelledPublic(storage, { sinceDays, limit, labelPolicy });
+  const found = await listUnlabelledPublic(storage, { sinceDays, limit, labelPolicy, config });
   // `total` beside a capped list, always: a truncated list without one reads as the whole story,
   // which is exactly how a compliance report comes to overstate its own coverage.
   return { total: found.total, shown: found.items.length, items: found.items };

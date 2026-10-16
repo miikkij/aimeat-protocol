@@ -18,8 +18,10 @@
  *   and the page's published text embeds exactly this file. The file keeps its visibility; nothing is
  *   made public, and a page that stops being shared stops opening its pictures with it.
  * @structure sharedPageAdmitsFile(H, deps, req, file, ownerGaii, key)
- * @usage if (await sharedPageAdmitsFile(H, { storage, config }, req, file, gaii, key)) { …serve… }
+ * @usage const served = await sharedPageAdmitsFile(H, { storage, config }, req, file, gaii, key); if (served) { …serve… }
  * @version-history
+ *   v1.1.0 — 2026-10-16 — Answers the visibility the file is served on (or null), so its AI label is
+ *     decided for the share's reader; it was decided as private.
  *   v1.0.0 — 2026-10-16 — Initial.
  */
 import type { Request } from 'express';
@@ -29,6 +31,7 @@ import { readerFor } from '../../services/classification/reader.js';
 import { pubEmbedUrl } from '../../services/doc-images.js';
 import { decodeUriSegment } from '../../utils/uri-decode.js';
 import type { OrganismHelpers } from './shared.js';
+import { shareServedVisibility } from '../../services/workspace-share.js';
 
 /** `<org>/<ws>/<space>/<id>`, each segment URL-encoded, or null. */
 function parseShareRef(raw: unknown): { org: string; ws: string; type: string; id: string } | null {
@@ -39,7 +42,11 @@ function parseShareRef(raw: unknown): { org: string; ws: string; type: string; i
     return { org, ws, type, id };
 }
 
-/** Does the shared page this request names admit this workspace-scoped file? */
+/**
+ * Does the shared page this request names admit this workspace-scoped file? Answers the visibility
+ * the file is then served on, which its AI label is decided against (public on an open share,
+ * services/workspace-share.ts shareServedVisibility), or null when it is not admitted.
+ */
 export async function sharedPageAdmitsFile(
     H: Pick<OrganismHelpers, 'readShareMeta' | 'collectPublicDocs' | 'shareGateDenied'>,
     deps: { storage: Storage; config: AimeatConfig },
@@ -47,18 +54,18 @@ export async function sharedPageAdmitsFile(
     file: { visibility: string; workspaceRef?: string },
     ownerGaii: string,
     key: string,
-): Promise<boolean> {
-    if (file.visibility !== 'workspace') return false;
+): Promise<'public' | 'private' | null> {
+    if (file.visibility !== 'workspace') return null;
     const ref = parseShareRef(req.query.share);
-    if (!ref) return false;
-    if (!(file.workspaceRef ?? '').split(/\s+/).includes(`${ref.org}/${ref.ws}`)) return false;
+    if (!ref) return null;
+    if (!(file.workspaceRef ?? '').split(/\s+/).includes(`${ref.org}/${ref.ws}`)) return null;
     const organism = await deps.storage.getOrganism(ref.org);
-    if (!organism) return false;
+    if (!organism) return null;
     const share = await H.readShareMeta(ref.org, ref.ws);
     const found = await H.collectPublicDocs(ref.org, ref.ws, share, { type: ref.type, id: ref.id });
-    if (found.count === 0) return false;
-    if (await H.shareGateDenied(req, organism, ref.org, ref.ws, share)) return false;
+    if (found.count === 0) return null;
+    if (await H.shareGateDenied(req, organism, ref.org, ref.ws, share)) return null;
     const [doc] = await found.release(readerFor(deps, req.auth));
-    if (!doc) return false;
-    return doc.markdown.includes(pubEmbedUrl(ownerGaii, key));
+    if (!doc) return null;
+    return doc.markdown.includes(pubEmbedUrl(ownerGaii, key)) ? shareServedVisibility(share) : null;
 }

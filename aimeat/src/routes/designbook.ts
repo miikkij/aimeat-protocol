@@ -14,6 +14,10 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.7.0 — 2026-10-16 — The two read routes carry each part's provenance (`ai_provenance` per part;
+ *     for one part also the AI-Disclosure and Link headers and `meta.provenance`), so a gallery shows
+ *     the AI label a part an AI wrote owes (services/design-book/part-provenance.ts). The preview
+ *     carries the record's marks and the visible label, as a published app does.
  *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.5.0 — 2026-09-26 — GET /v1/designbook/:id names its reader to the service, which answers a
  *     component's `bench` and gives the markup and stylesheet of one that no longer passes only to
@@ -50,6 +54,10 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { WriteProvenance } from '../services/app-ui/service.js';
 import { DesignBookService } from '../services/design-book/service.js';
+import { partProvenanceIds } from '../services/design-book/part-provenance.js';
+import { applyServeMarks } from '../services/app-serve-marks.js';
+import { detectLocale } from '../i18n.js';
+import { loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders, envelopeMeta } from '../services/ai-provenance-marks.js';
 import { DesignBookError } from '../services/design-book/validate.js';
 import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { getAppTemplates } from '../data/app-templates.js';
@@ -122,7 +130,11 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
         q: req.query.q as string | undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
       });
-      res.json(success(config.nodeId, { parts: rows, count: rows.length }, [
+      // Each part carries its own record, `ai_provenance`: a gallery labels the parts an AI wrote.
+      const recordOf = await partProvenanceIds(storage, config, rows.map(r => r.id));
+      const served = await loadServedProvenanceMany(storage, config, [...recordOf.values()]);
+      const parts = rows.map(r => ({ ...r, ...provenanceItemBlock(served.get(recordOf.get(r.id) ?? '')) }));
+      res.json(success(config.nodeId, { parts, count: rows.length }, [
         { description: 'Read one part whole', method: 'GET', url: '/v1/designbook/{id}' },
         { description: 'Propose a part (the bench runs first)', method: 'POST', url: '/v1/designbook' },
       ]));
@@ -151,9 +163,13 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       if (out.part.status !== 'published' && !isSignedIn(req)) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
       }
-      res.json(success(config.nodeId, out, [
+      // One part is one piece of content: its record rides the AI-Disclosure and Link headers,
+      // `meta.provenance` and the part's own `ai_provenance`.
+      const prov = await loadServedProvenance(storage, config, (await partProvenanceIds(storage, config, [out.part.id])).get(out.part.id));
+      setProvenanceHeaders(res, prov);
+      res.json(success(config.nodeId, { ...out, part: { ...out.part, ...provenanceItemBlock(prov) } }, [
         { description: 'Adopt into one of your apps', method: 'POST', url: `/v1/designbook/${encodeURIComponent(out.part.id)}/adopt` },
-      ]));
+      ], envelopeMeta(prov)));
     } catch (err) { refuse(res, err); }
   });
 
@@ -221,7 +237,14 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // withholding it means a <script> that ever got past the bench is still refused by the CSP.
       // Its <style> blocks need none: style-src allows inline styles without one.
       const nonce = part?.kind === 'component' ? undefined : res.locals.cspNonce as string | undefined;
-      res.type('html').send(injectCspNonce(html, nonce));
+      // A part an AI wrote is shown with its marks and the visible AI label, as a published app is
+      // (services/app-serve-marks.ts); the gallery frames this page, so the label sits on it.
+      const prov = part ? await loadServedProvenance(storage, config, (await partProvenanceIds(storage, config, [part.id])).get(part.id)) : undefined;
+      setProvenanceHeaders(res, prov);
+      const marked = prov
+        ? applyServeMarks(html, { provenance: prov, visibleLabel: { config, locale: detectLocale(req.headers['accept-language']) }, isDocument: true }).toString('utf-8')
+        : html;
+      res.type('html').send(injectCspNonce(marked, nonce));
     } catch (err) { refuse(res, err); }
   });
 

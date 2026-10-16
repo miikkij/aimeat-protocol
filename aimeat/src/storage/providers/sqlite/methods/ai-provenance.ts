@@ -17,6 +17,9 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.6.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every workspace share candidate of one
+ *     owner or the node since a day that PUBLICLY_LINKED does not count, up to 5000. Mirrors the
+ *     Postgres provider.
  *   v1.5.1 — 2026-10-09 — The legal-page clause of PUBLICLY_LINKED is an uncorrelated IN, evaluated
  *     once per statement instead of once per id. Mirrors the Postgres provider.
  *   v1.4.0 — 2026-10-08 — PUBLICLY_LINKED covers a public stored file (storage_files.aiProvenanceId):
@@ -226,21 +229,30 @@ export const aiProvenanceMethods = {
   },
 
   // ── Workspace share candidates (aiprov E1) — kept apart from PUBLICLY_LINKED above on purpose:
-  //    whether a share link opens one of these is decided in routes/organisms/share-provenance.ts. ──
+  //    whether a share link opens one of these is decided in services/share-provenance.ts. ──
   async workspaceProvenanceLinks(
-    this: SqliteStorage, query: { ids?: string[]; contentHash?: string; limit?: number },
+    this: SqliteStorage,
+    query: { ids?: string[]; contentHash?: string; limit?: number; scan?: { ownerGhii?: string; since?: string } },
   ): Promise<WorkspaceProvenanceLink[]> {
     const ids = [...new Set(query.ids ?? [])].slice(0, ID_CHUNK);
-    if (ids.length === 0 && !query.contentHash) return [];
-    const limit = Math.min(Math.max(query.limit ?? 200, 1), 1000);
+    const scan = query.scan;
+    if (ids.length === 0 && !query.contentHash && !scan) return [];
+    const limit = Math.min(Math.max(query.limit ?? 200, 1), scan ? 5000 : 1000);
     const match: string[] = [];
     const params: unknown[] = [];
-    if (ids.length) { match.push(`p.id IN (${ids.map(() => '?').join(',')})`); params.push(...ids); }
-    if (query.contentHash) { match.push('p.contentHash = ?'); params.push(query.contentHash); }
+    // A scan is a report's population that the SQL rule does not count public; ids and a hash match either.
+    if (scan) {
+      match.push(`NOT (${PUBLICLY_LINKED})`);
+      if (scan.ownerGhii) { match.push('p.ownerGhii = ?'); params.push(scan.ownerGhii); }
+      if (scan.since) { match.push('p.generatedAt >= ?'); params.push(scan.since); }
+    } else {
+      if (ids.length) { match.push(`p.id IN (${ids.map(() => '?').join(',')})`); params.push(...ids); }
+      if (query.contentHash) { match.push('p.contentHash = ?'); params.push(query.contentHash); }
+    }
     return this.db.prepare(
       `SELECT p.id AS provenanceId, m.ownerGaii AS ownerGaii, m.key AS key
          FROM ai_provenance p JOIN memory m ON m.aiProvenanceId = p.id
-        WHERE (${match.join(' OR ')}) AND m.deletedAt IS NULL AND m.archived = 0
+        WHERE (${match.join(scan ? ' AND ' : ' OR ')}) AND m.deletedAt IS NULL AND m.archived = 0
           AND m.key LIKE 'organism.%.w.%.latest'
         LIMIT ?`
     ).all(...params, limit) as WorkspaceProvenanceLink[];

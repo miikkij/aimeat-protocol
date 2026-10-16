@@ -3,8 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The shapes a workspace share is described in, and what a share hands out. Moved out
- *   of shared.ts unchanged so shared-public.ts can name them without importing shared.ts, which
- *   imports it (an import cycle, check:deps). shared.ts re-exports them, so no importer changes.
+ *   of shared.ts unchanged so the public collectors (services/workspace-public-collectors.ts, once
+ *   routes/organisms/shared-public.ts) can name them without importing shared.ts, which imports
+ *   them (an import cycle, check:deps). shared.ts re-exports them, so no importer changes.
  * @structure ShareAccess · ShareMeta · ResolvedShare · PublicDoc · PublicRecord
  * @usage import type { ResolvedShare } from './share-types.js';
  * @version-history

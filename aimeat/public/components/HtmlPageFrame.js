@@ -11,10 +11,14 @@
  *   The frame here holds the page host's holder, a fixed document of the node that frames the page
  *   itself; the holder keeps its own origin (allow-same-origin), so the page's frame-ancestors can
  *   name it, while the page inside runs in an opaque origin by its own sandbox.
+ *   The strip carries the AI label the page's record says it owes (components/ai-label.js, which
+ *   draws nothing when none is owed), and for the workspace's members the name of who made it.
  *   A page passes the parts; it never writes a class. The look is css/components/html-page-frame.css.
- * @structure HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error })
- * @usage html`<${HtmlPageFrame} src=${doc.frame_url} title=${doc.title} text=${doc.markdown} onReport=${report} />`
+ * @structure HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author })
+ * @usage html`<${HtmlPageFrame} src=${doc.frame_url} title=${doc.title} text=${doc.markdown} onReport=${report} provenance=${{ record, recordUrl }} />`
  * @version-history
+ *   v1.1.0 — 2026-10-16 — `provenance`: the AI label in the strip and above the text fallback.
+ *     `author`: a member reads who made the page (Jouni, 2026-10-16: members only).
  *   v1.0.0 — 2026-10-16 — Initial (HTML pages in workspaces).
  */
 import { h } from 'preact';
@@ -24,6 +28,7 @@ import { t } from '/js/i18n.js';
 import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Markdown } from '/components/Markdown.js';
+import { AiLabel } from '/components/ai-label.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -31,7 +36,7 @@ const html = htm.bind(h);
 /** Only web and mail addresses are ever opened, whatever the page sent. */
 const openable = (u) => typeof u === 'string' && u.length <= 4096 && /^(https?:|mailto:)/i.test(u);
 
-export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error }) {
+export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author }) {
   const wrap = useRef(null);
   const frame = useRef(null);
   const [asked, setAsked] = useState(null);       // the address the page asked to open
@@ -64,17 +69,23 @@ export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading,
 
   if (loading) return html`<${Note} kind="loading">${t('pageFrame.loading')}<//>`;
   if (error) return html`<${Note} error>${t('pageFrame.loadFailed')}<//>`;
+  // The AI label the page's record says it owes; the component draws nothing when none is owed.
+  const label = provenance ? html`<${AiLabel} record=${provenance.record} recordUrl=${provenance.recordUrl} />` : null;
   if (!src) {
     return html`
       <div class="html-page-frame">
         <${Note} kind="quiet">${t('pageFrame.noHost')}<//>
+        ${label}
         <${Markdown} text=${text || ''} />
       </div>`;
   }
+  // Who made the page is shown to the workspace's members only (Jouni, 2026-10-16); a visitor reads that a user made it.
+  const madeBy = author ? (t('pageFrame.madeBy') || '{name} made this page. It runs apart and cannot reach your account.').replace('{name}', author) : t('pageFrame.madeByUser');
   return html`
     <div class="html-page-frame" ref=${wrap}>
       <div class="html-page-frame-strip">
-        <span class="html-page-frame-note">${t('pageFrame.madeByUser')}</span>
+        <span class="html-page-frame-note">${madeBy}</span>
+        ${label}
         <${Action} small onClick=${fullScreen}>${t('pageFrame.fullScreen')}<//>
         ${onReport ? html`<${Action} small tone="text" onClick=${report}>${t('pageFrame.report')}<//>` : null}
       </div>

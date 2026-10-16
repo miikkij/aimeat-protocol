@@ -37,6 +37,7 @@
  *   import { adminComplianceRouter } from './routes/admin-compliance.js';
  *   app.use(adminComplianceRouter(config, storage));
  * @version-history
+ *   v1.1.2 — 2026-10-16 — The unlabelled detail counts what an open workspace share serves to anyone as public.
  *   v1.1.1 — 2026-10-08 — The unlabelled detail is decided under the node's label posture.
  *   v1.1.0 — 2026-08-23 — A report can be kept on demand, and the index says which of the kept ones
  *     came from the schedule. The schedule used to be the only thing that could keep one.
@@ -98,7 +99,7 @@ export function adminComplianceRouter(config: AimeatConfig, storage: Storage): R
       operator, gaps: report.gaps.length, usecases: report.register.usecases.length,
     });
 
-    const detail = await complianceUnlabelledDetail(storage, 30, 50, config.aiLabelPublic);
+    const detail = await complianceUnlabelledDetail(storage, 30, 50, config.aiLabelPublic, config);
     res.json(success(config.nodeId, { ...report, unlabelled_detail: detail }, [
       { description: 'The register this report compares against', method: 'GET', url: '/v1/admin/compliance/usecases' },
       { description: 'The node\'s public transparency statement', method: 'GET', url: '/v1/ai-transparency' },

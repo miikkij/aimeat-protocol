@@ -314,7 +314,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:4b903e832155f9e55f11a9ed"
+      "digest": "sha256:01a49d54d27ef517dc9507df"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-16",
@@ -325,7 +325,7 @@
         "aimeat/src/services/workspace-opened.ts",
         "aimeat/src/routes/page-host.ts"
       ],
-      "digest": "sha256:59bbc89502290f5d7dc3d52b",
+      "digest": "sha256:f047f5e0c3aad8a8ef224fff",
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
@@ -483,7 +483,7 @@
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:ce6df61801b4aabfe8ac7dee"
+      "digest": "sha256:0290575c0cc3f379081bc472"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -663,7 +663,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "88f12d046f64e676"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "f4093757d23c40ef"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -714,7 +714,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/cli/connect/mcp/local-server.ts": "8843e486d97c7154",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "88f12d046f64e676",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "f4093757d23c40ef",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "1d994833dc454b72",
       "aimeat/src/services/agent-task-rules.ts": "920bd83aa13aebf4"
@@ -769,9 +769,9 @@
     "node:aimeat-html-page": {
       "aimeat/src/services/html-page.ts": "4017c2f005e63477",
       "aimeat/src/services/page-frame.ts": "96108b74f3403752",
-      "aimeat/src/services/workspace-share.ts": "1dc1bc9c8a107092",
+      "aimeat/src/services/workspace-share.ts": "f06bcb2621c780f2",
       "aimeat/src/services/workspace-opened.ts": "5a9837a77b3b4530",
-      "aimeat/src/routes/page-host.ts": "d9f4be948d687923"
+      "aimeat/src/routes/page-host.ts": "d6c07c412bb4d6e1"
     }
   }
 }

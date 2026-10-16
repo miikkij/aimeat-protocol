@@ -1473,6 +1473,14 @@ components:
           description: The words behind each free-form block, keyed by block key.
           additionalProperties:
             type: string
+        freeform_provenance:
+          type: object
+          description: |
+            The provenance of each free-form passage that has one, keyed like `freeform`: how its
+            words were made, with the label it owes decided as the passage is stored (a portal
+            passage is public). The page shows the AI label from it. Absent from the write answers.
+          additionalProperties:
+            $ref: '#/components/schemas/AiProvenanceItemBlock'
         source:
           type: string
           enum: [stored, default]
@@ -33104,7 +33112,10 @@ paths:
         proven where it lands), with its lifecycle status and how many builds have
         adopted it. Published parts
         are what everyone builds from. PUBLIC for the published shelf — a caller without a
-        session sees published parts only; signing in adds the parts still in proposal.
+        session sees published parts only; signing in adds the parts still in proposal. A part
+        an AI wrote carries its `ai_provenance` block (AiProvenanceItemBlock), so a gallery shows
+        the AI label it owes; GET /v1/designbook/{id} adds `meta.provenance` and the AI-Disclosure
+        and Link headers, and the preview carries the marks and the visible label.
         Retired parts appear in NO default listing (dead is invisible); ask for them by name
         with status=retired. A component whose stored markup or stylesheet no longer passes the
         bench this node runs appears in no listing and not on the map, because nobody can take it.
@@ -39829,9 +39840,12 @@ paths:
         member only sees records their consent/visibility allows.
 
         Each returned record object carries underscore-prefixed read metadata that is never
-        persisted back: `_createdAt`, `_updatedAt`, `_version`, and — when the record has an AI
+        persisted back: `_createdAt`, `_updatedAt`, `_version`, `_writtenBy` (the account that
+        holds this copy; an agent's page is held in its owner's name and its record's generator
+        names the agent), and — when the record has an AI
         provenance record attached — `_aiProvenance` (the `aimeat.provenance/v1` document, projected
-        for `AIMEAT_AI_PROVENANCE_DETAIL`) plus `_aiProvenanceUrl`. Absence means UNSTATED, never
+        for `AIMEAT_AI_PROVENANCE_DETAIL`) plus `_aiProvenanceUrl`. Its disclosure is decided as
+        public while an open workspace share serves the record to anyone. Absence means UNSTATED, never
         "a human wrote it". An AI shown a warning-classified record (TARGET-082) finds
         `_classificationWarning` (ClassificationWarning) on it, and `classificationWarnings` lists
         every such record of the read, the manifest and readme included.
@@ -47769,7 +47783,11 @@ paths:
     get:
       operationId: exportKnowledgePackage
       summary: Export knowledge package
-      description: Export a knowledge package in portable format.
+      description: |
+        Export a knowledge package in portable format: the manifest, the public entries it may
+        hand out (`entry_data`, keyed by entry name), and `entry_provenance` with the same keys:
+        each entry's provenance block (AiProvenanceItemBlock) when it has one, so a viewer labels
+        an entry an AI wrote and an importer keeps how it was made.
       tags: [Knowledge]
       parameters:
         - name: id

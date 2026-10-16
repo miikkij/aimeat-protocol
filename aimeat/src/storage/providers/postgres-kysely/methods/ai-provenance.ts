@@ -17,6 +17,9 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.6.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every workspace share candidate of one
+ *     owner or the node since a day that publiclyLinked does not count, up to 5000, for the
+ *     compliance counts (services/share-provenance.ts sharePublicInScope).
  *   v1.5.1 — 2026-10-09 — The legal-page clause of publiclyLinked is an uncorrelated IN, evaluated once
  *     per statement. The correlated EXISTS scanned every App manifest once per id: 800 ids against
  *     2000 App rows took 3.2 s locally, and the claims workspace read 9 s on aimeat.io.
@@ -240,17 +243,26 @@ export const aiProvenanceMethods = {
   },
 
   // ── Workspace share candidates (aiprov E1) — kept apart from publiclyLinked above on purpose:
-  //    whether a share link opens one of these is decided in routes/organisms/share-provenance.ts. ──
+  //    whether a share link opens one of these is decided in services/share-provenance.ts. ──
   async workspaceProvenanceLinks(
-    this: PostgresKyselyStorage, query: { ids?: string[]; contentHash?: string; limit?: number },
+    this: PostgresKyselyStorage,
+    query: { ids?: string[]; contentHash?: string; limit?: number; scan?: { ownerGhii?: string; since?: string } },
   ): Promise<WorkspaceProvenanceLink[]> {
     const ids = [...new Set(query.ids ?? [])].slice(0, ID_CHUNK);
-    if (ids.length === 0 && !query.contentHash) return [];
-    const limit = Math.min(Math.max(query.limit ?? 200, 1), 1000);
-    const match = sql<boolean>`(${sql.join([
-      ...(ids.length ? [sql`p."id" IN (${sql.join(ids)})`] : []),
-      ...(query.contentHash ? [sql`p."contentHash" = ${query.contentHash}`] : []),
-    ], sql` OR `)})`;
+    const scan = query.scan;
+    if (ids.length === 0 && !query.contentHash && !scan) return [];
+    const limit = Math.min(Math.max(query.limit ?? 200, 1), scan ? 5000 : 1000);
+    // A scan is a report's population that the SQL rule does not count public; ids and a hash match either.
+    const match = scan
+      ? sql<boolean>`(${sql.join([
+        sql`NOT (${publiclyLinked('p."id"')})`,
+        ...(scan.ownerGhii ? [sql`p."ownerGhii" = ${scan.ownerGhii}`] : []),
+        ...(scan.since ? [sql`p."generatedAt" >= ${scan.since}`] : []),
+      ], sql` AND `)})`
+      : sql<boolean>`(${sql.join([
+        ...(ids.length ? [sql`p."id" IN (${sql.join(ids)})`] : []),
+        ...(query.contentHash ? [sql`p."contentHash" = ${query.contentHash}`] : []),
+      ], sql` OR `)})`;
     const rows = await sql<WorkspaceProvenanceLink>`
       SELECT p."id" AS "provenanceId", m."ownerGaii" AS "ownerGaii", m."key" AS "key"
         FROM "AiProvenance" p JOIN "Memory" m ON m."aiProvenanceId" = p."id"

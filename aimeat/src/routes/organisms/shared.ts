@@ -8,6 +8,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-10-16 — The public collectors are imported from services/workspace-public-collectors.ts,
+ *     where they moved unchanged.
  *   2026-10-16 — readShareMeta, redactShare and memberRole delegate to services/workspace-share.ts,
  *     which the share MCP tool runs too; the share has end dates (`until`). An HTML page publishes
  *     under its own version window (services/html-page.ts htmlPageRetention).
@@ -92,7 +94,7 @@ import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspa
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
-import { createPublicCollectors } from './shared-public.js';
+import { createPublicCollectors } from '../../services/workspace-public-collectors.js';
 import { logger } from '../../utils/logger.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 

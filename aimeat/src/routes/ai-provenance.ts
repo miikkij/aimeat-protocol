@@ -73,7 +73,7 @@ import {
 } from '../models/ai-provenance-schemas.js';
 import { mintProvenance, projectForDetail } from '../services/ai-provenance.js';
 import { servedDisclosure } from '../services/ai-provenance-marks.js';
-import { publiclyResolvableWithShares, findShareOpenedProvenanceByHash } from './organisms/share-provenance.js';
+import { publiclyResolvableWithShares, findShareOpenedProvenanceByHash } from '../services/share-provenance.js';
 import { prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { provenancePage, provenanceNotFoundPage } from '../services/ai-provenance-page.js';
 import { detectLocale } from '../i18n.js';
@@ -209,7 +209,7 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     const owner = callerOwner(req);
     const found = await storage.findAiProvenanceByHash(hash, owner ? { ownerGhii: owner } : undefined);
     // The records an open workspace share serves to anyone, which the SQL rule cannot see
-    // (routes/organisms/share-provenance.ts, aiprov E1). Up to the same page size, listed once.
+    // (services/share-provenance.ts, aiprov E1). Up to the same page size, listed once.
     const shared = await findShareOpenedProvenanceByHash(storage, config, hash, new Set(found.map(r => r.id)), 20 - found.length);
     const rows = [...found, ...shared];
     // An anonymous caller only ever receives public rows; an owner's own may be private. The answer

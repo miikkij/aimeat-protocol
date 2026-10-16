@@ -19,6 +19,8 @@
  * @structure memoryContentBytes · legacyMemoryContentBytes · canonicalJson · memoryContentHashes ·
  *   documentContentBytes
  * @version-history
+ *   v1.3.0 -- 2026-10-16 -- documentContentBytes(): an HTML page's record describes its html, the
+ *     document the page host serves; it described the markdown the node derives from it.
  *   v1.2.0 -- 2026-10-08 -- documentContentBytes(): a workspace document's record describes its
  *     markdown, the text a reader is served, not the stored {title, markdown} object (aiprov E13).
  *   v1.1.0 -- 2026-10-08 -- memoryContentBytes() serialises a non-string value canonically (sorted
@@ -86,12 +88,14 @@ export function memoryContentHashes(value: unknown): string[] {
  * The bytes a workspace DOCUMENT's record describes: its markdown, which is what every reader of a
  * document is served (the public share, the workspace read, the in-place edit tools). The stored
  * value is `{ title, markdown }`, and a record about that object could never be found by a reader
- * hashing the page they were given. Anything that is not a document with markdown falls back to
- * memoryContentBytes().
+ * hashing the page they were given. An HTML page (`{ title, html, markdown }`) is described by its
+ * html, the document the page host serves; its markdown is text the node derived from it. Anything
+ * that is not a document falls back to memoryContentBytes().
  */
 export function documentContentBytes(value: unknown): string {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const markdown = (value as { markdown?: unknown }).markdown;
+    const { html, markdown } = value as { html?: unknown; markdown?: unknown };
+    if (typeof html === 'string') return html;
     if (typeof markdown === 'string') return markdown;
   }
   return memoryContentBytes(value);

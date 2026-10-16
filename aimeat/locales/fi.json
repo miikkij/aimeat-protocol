@@ -3520,7 +3520,8 @@
         "owner-this-node-only": "Vain se mitä olet tehnyt täällä. Kaikki mitä olet julkaissut muualla, toisessa asennuksessa tai omassa henkilökohtaisessa, on näiden lukujen ulkopuolella.",
         "owner-your-slice": "Vain sinun omasi. Mikään tällä sivulla ei kerro kenenkään muun toiminnasta, eikä kukaan muu näe sinun tietojasi täältä.",
         "owner-register-is-the-operators": "Kirjaukset siitä mihin tekoälyä käytetään pitää se, joka pyörittää tätä asennusta, et sinä. Alla näkyvät ne merkinnät, jotka koskevat sinun tiliäsi. Jos jotain sinun toimintaasi puuttuu, se on keskustelu hänen kanssaan eikä asia jonka voit korjata täältä.",
-        "owner-provenance-off": "Kirjaus on kytketty pois tästä asennuksesta, mikä ei ole sinun asetuksesi. Mitään ei kirjattu, joten jokainen yllä oleva luku on nolla siitä syystä eikä siksi ettet olisi tehnyt mitään."
+        "owner-provenance-off": "Kirjaus on kytketty pois tästä asennuksesta, mikä ei ole sinun asetuksesi. Mitään ei kirjattu, joten jokainen yllä oleva luku on nolla siitä syystä eikä siksi ettet olisi tehnyt mitään.",
+        "shares-open-only": "Työtilan sivu, joka on jaettu avoimella linkillä, lasketaan tässä julkiseksi. Salasanan taakse tai vain kirjautuneille jaettua sivua ei lasketa: sen lukijat eivät ole suurta yleisöä, joten sivulle ei tarvita tekoälymerkintää eikä sitä lasketa julkiseksi."
       },
       "gapFonts": "Fontit ilman lisenssitietoa",
       "toFonts": "Fontteihin"
@@ -25112,11 +25113,17 @@
   "places.kw.admin.genesis": "vertaiset",
   "places.kw.admin.design-lab": "komponentit, käyttöliittymäkirjasto, suunnittelu",
   "places.kw.admin.themes": "fontit, värit, teema, tyyli, paletti",
+  "aiDeclare": {
+    "htmlPage": "Tekoäly teki tämän sivun",
+    "document": "Tekoäly kirjoitti tämän sivun",
+    "hint": "Kun sivu jaetaan avoimella linkillä, sen lukijat näkevät tekoälymerkinnän, kuten EU:n tekoälysäädös edellyttää."
+  },
   "pageFrame": {
     "loading": "Ladataan sivua…",
     "loadFailed": "Sivua ei voitu ladata.",
     "noHost": "Tämä palvelu ei vielä näytä HTML-sivuja, joten sivu näkyy tekstinä.",
     "madeByUser": "Käyttäjän tekemä sivu. Se toimii erillään eikä pääse tiliisi.",
+    "madeBy": "Sivun teki {name}. Se toimii erillään eikä pääse tiliisi.",
     "fullScreen": "Koko näyttö",
     "report": "Ilmoita",
     "reported": "Kiitos. Palvelun ylläpitäjät tarkistavat sivun.",
