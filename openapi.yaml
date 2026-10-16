@@ -29334,6 +29334,12 @@ paths:
         minutes, and x-audience naming this node with x-audience-signature (the sending node's
         signature over "aimeat-audience:" + audience + a newline + the signed string). Each signed
         request is answered once (401 REPLAYED the second time); an unsigned one is 401.
+
+        One-release window (decision 2026-10-16): through node 4.0.4 an unsigned request (x-source-node
+        alone, no x-timestamp and no x-signature) is also answered when the peer's own signed heartbeat
+        named version 4.0.2 or older. A peer of unknown or newer version gets the 401. From node 4.0.5
+        only the signed request is answered. The signature headers are therefore required for every
+        peer on 4.0.3 or newer.
       tags: [Federation]
       parameters:
         - name: x-source-node

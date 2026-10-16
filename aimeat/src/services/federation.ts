@@ -11,6 +11,9 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   2026-10-16 — fetchServiceSummary: a peer of unknown version that refuses the unsigned service summary
+ *     request with 401 is asked once more with the signed one, and from then on (until restart) gets the
+ *     signed form, so two nodes on the new code lose no heartbeat round (decision 2026-10-16).
  *   2026-10-16 — serviceSummaryRequestHeaders: through node 4.0.4 the service summary request goes in the
  *     older unsigned form (x-source-node alone) to a peer on 4.0.2 or older, or of unknown version, with a
  *     log line for the unknown one; signed to a newer peer, and to every peer from 4.0.5 (decision 2026-10-16).
@@ -53,7 +56,7 @@ import { serviceSummaryForm, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../conf
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 import { forgetPeer } from './peer-origin.js';
-import { peerFetch } from '../utils/peer-fetch.js';
+import { peerFetch, type PeerAnswer } from '../utils/peer-fetch.js';
 
 /** Cache of resolved GAIIs to their hosting node URL. TTL: 5 minutes. Expiry used to be
  * checked only on read, so every GAII ever resolved kept a permanent entry (memory audit
@@ -264,13 +267,15 @@ const HEARTBEAT_BASE_INTERVAL_MS = 5 * 60_000;
  * (signedGetHeaders) unless serviceSummaryForm says the peer gets the older form, `x-source-node`
  * alone: through node 4.0.4 a peer on 4.0.2 or older, or one whose version this node has not heard
  * in a signed heartbeat, gets that form; from UNSIGNED_SERVICE_SUMMARY_REMOVED_IN (4.0.5) no peer
- * does (decision 2026-10-16). Throws when the signed form is due and this node has no key.
+ * does (decision 2026-10-16). `signed` asks for the signed form whatever the window says (the retry
+ * and a peer known to take it). Throws when the signed form is due and this node has no key.
  */
 export async function serviceSummaryRequestHeaders(
     config: AimeatConfig, peer: Pick<PeerInfo, 'nodeId' | 'softwareVersion'>, nodeKey: { privateKey: string } | null,
+    signed = false,
 ): Promise<Record<string, string>> {
     const chosen = serviceSummaryForm(peer.softwareVersion);
-    if (chosen.form === 'unsigned') {
+    if (!signed && chosen.form === 'unsigned') {
         if (chosen.reason === 'peer-unknown') {
             logger.info('Service summary request sent unsigned: the peer\'s software version is not known yet', {
                 peer: peer.nodeId, signed_only_from: UNSIGNED_SERVICE_SUMMARY_REMOVED_IN,
@@ -283,6 +288,32 @@ export async function serviceSummaryRequestHeaders(
         'Accept': 'application/json',
         ...await signedGetHeaders(nodeKey.privateKey, config.nodeId, peer.nodeId, { purpose: SERVICE_SUMMARY_PURPOSE }),
     };
+}
+
+/** Peers of unknown version that refused the unsigned service summary request and took the signed one, since this process started. */
+const signedSummaryPeers = new Set<string>();
+
+/**
+ * GET the peer's service summary in the form the window gives it (serviceSummaryRequestHeaders).
+ * A peer of unknown version that answers the unsigned request with 401 runs the signed-only receiver
+ * (4.0.3 or newer), so it is asked once more with the signed request, and a 2xx to that puts it in
+ * signedSummaryPeers: it gets the signed form from then on. Without the retry, two nodes on the new
+ * code that had not yet heard each other's heartbeat lost one round of the directory (decision 2026-10-16).
+ */
+export async function fetchServiceSummary(
+    config: AimeatConfig, peer: Pick<PeerInfo, 'nodeId' | 'softwareVersion' | 'url'>, nodeKey: { privateKey: string } | null, timeoutMs: number,
+): Promise<PeerAnswer> {
+    const url = `${peer.url}/v1/federation/service-summary`;
+    const known = signedSummaryPeers.has(peer.nodeId);
+    const first = await peerFetch(url, { headers: await serviceSummaryRequestHeaders(config, peer, nodeKey, known) }, { timeoutMs });
+    const sentUnsigned = !known && serviceSummaryForm(peer.softwareVersion).reason === 'peer-unknown';
+    if (!(sentUnsigned && first.ok && first.status === 401)) return first;
+    const retry = await peerFetch(url, { headers: await serviceSummaryRequestHeaders(config, peer, nodeKey, true) }, { timeoutMs });
+    if (retry.ok && retry.status >= 200 && retry.status < 300) {
+        signedSummaryPeers.add(peer.nodeId);
+        logger.info('Service summary: the peer refused the unsigned request and took the signed one; it gets the signed form from now on', { peer: peer.nodeId });
+    }
+    return retry;
 }
 
 /**
@@ -408,11 +439,7 @@ export async function runHeartbeatCycle(
                                     try {
                                         // Signed as this node, for that peer, once (QA audit S6-09), or the
                                         // older form to an older peer through 4.0.4 (decision 2026-10-16).
-                                        const summaryResp = await peerFetch(
-                                            `${peer.url}/v1/federation/service-summary`,
-                                            { headers: await serviceSummaryRequestHeaders(config, peer, nodeKey) },
-                                            { timeoutMs: TIMEOUT_MS },
-                                        );
+                                        const summaryResp = await fetchServiceSummary(config, peer, nodeKey, TIMEOUT_MS);
                                         if (!summaryResp.ok) throw new Error(summaryResp.message);
 
                                         if (summaryResp.status >= 200 && summaryResp.status < 300) {
