@@ -85,12 +85,10 @@ describe('the lane holds the values the code ships', () => {
             const { config } = loadConfig({ configPath: resolve('data/no-such-config.ini') });
             const rl = PRODUCTION_SETTINGS.rateLimits;
             expect(Number(rl.AIMEAT_RL_GLOBAL)).toBe(config.rateLimits.global.max);
-            expect(Number(rl.AIMEAT_RL_AUTH)).toBe(config.rateLimits.auth.max);
             expect(Number(rl.AIMEAT_RL_WORK)).toBe(config.rateLimits.work.max);
             expect(Number(rl.AIMEAT_RL_MEMORY)).toBe(config.rateLimits.memory.max);
             expect(Number(rl.AIMEAT_RL_BOARDS)).toBe(config.rateLimits.boards.max);
             expect(Number(rl.AIMEAT_RL_REGISTRATION_INVITES)).toBe(config.rateLimits.registrationInvites.max);
-            expect(Number(rl.AIMEAT_RL_AUTH_CHALLENGE)).toBe(config.rateLimits.authChallenge.max);
         } finally {
             Object.assign(process.env, saved);
         }

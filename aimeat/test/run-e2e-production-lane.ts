@@ -20,9 +20,10 @@
  *   guard tier: alone, on a freshly deleted database, three identical green runs on both backends.
  *   The list may only shrink; test/unit/production-lane.test.ts holds its size.
  *
- *   RATE LIMITS. The production values of the limits keyed by the caller's identity (global, auth,
- *   work, memory, boards, the AI and invite tiers) apply. The two limits keyed by the source address
- *   alone (registrations and sign-ins per minute) stay raised for every suite, because every request
+ *   RATE LIMITS. The production values of the limits keyed by the caller's identity (global, work,
+ *   memory, boards, the invite tier) apply. The limits a caller meets before it has a credential,
+ *   which are keyed by the source address alone (registrations and sign-ins per minute, the auth and
+ *   auth-challenge tiers that issue tokens), stay raised for every suite, because every request
  *   of a test run comes from one loopback address, which no production node sees for all of its
  *   users; at five registrations a minute the tier would measure the clock. The sign-in limiter's
  *   production answer is tested by e2e-auth-tarpit on a node of its own.
@@ -30,6 +31,9 @@
  * @usage
  *   node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --guards --production-settings
  * @version-history
+ *   2026-10-16 — The auth and auth-challenge tiers stay raised: they meet a caller before its
+ *     credential, keyed by the one loopback address, and e2e-account-doors hit 10 token requests a
+ *     second on SQLite in the guard run.
  *   2026-10-16 — Initial (QA audit P1-01, P1-08, P7-03, P7-05, F03a-02, S1-08, F7d).
  */
 
@@ -54,8 +58,8 @@ export const PRODUCTION_SETTINGS: Record<SettingGroup, Record<string, string>> =
     adminSetup: { AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR: 'false' },
     // The code defaults of src/config.ts loadConfig() for the identity-keyed tiers.
     rateLimits: {
-        AIMEAT_RL_GLOBAL: '300', AIMEAT_RL_AUTH: '20', AIMEAT_RL_WORK: '60', AIMEAT_RL_MEMORY: '120',
-        AIMEAT_RL_BOARDS: '60', AIMEAT_RL_REGISTRATION_INVITES: '5', AIMEAT_RL_AUTH_CHALLENGE: '300',
+        AIMEAT_RL_GLOBAL: '300', AIMEAT_RL_WORK: '60', AIMEAT_RL_MEMORY: '120',
+        AIMEAT_RL_BOARDS: '60', AIMEAT_RL_REGISTRATION_INVITES: '5',
     },
 };
 
