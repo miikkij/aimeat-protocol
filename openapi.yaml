@@ -71998,7 +71998,7 @@ paths:
       operationId: sendOutboundMessage
       tags: [Outbound]
       summary: Send a message through the policied door
-      description: 'The one send path. Recipient is a SAVED contact id, never a free address. Policy chain: suppression (422 SUPPRESSED) → marketing opt-out (422 OPTED_OUT) → rolling 24 h daily limit (429 DAILY_LIMIT) → channel selection (AIMEAT inbox first when the recipient has an identity here, email fallback; marketing email carries the unsubscribe link). Compose directly (subject+body), from a template (memory record outbound.template.{template_id} with {{var}} substitution), or from an invoice (invoice_id attaches the PDF + Finvoice XML and updates the invoice''s deliveryStatus). Every outcome lands in the send log. Only a send that went out answers 200; one that did not answers 502 or 503 SEND_FAILED, and is still in the send log.'
+      description: 'The one send path. Recipient is a SAVED contact id, never a free address. Policy chain: suppression (422 SUPPRESSED) → marketing opt-out (422 OPTED_OUT) → rolling 24 h daily limit (429 DAILY_LIMIT) → channel selection (AIMEAT inbox first when the recipient has an identity here, email fallback; marketing email carries the unsubscribe link and the headers List-Unsubscribe: <https://…/v1/outbound/unsubscribe?token=…> and List-Unsubscribe-Post: List-Unsubscribe=One-Click (RFC 2369, RFC 8058), except through an Outlook mailbox, where Microsoft Graph accepts only x- headers). When the sender keeps a sender record (memory key outbound.sender, or outbound.sender.{company_id} in the company owner''s memory for a company send; see GET /v1/outbound/sender), a marketing email carries a footer under the card with the legal name, business id, address, why the reader gets the message, the privacy notice and the unsubscribe link. Without the record the email is unchanged. Compose directly (subject+body), from a template (memory record outbound.template.{template_id} with {{var}} substitution), or from an invoice (invoice_id attaches the PDF + Finvoice XML and updates the invoice''s deliveryStatus). Every outcome lands in the send log. Only a send that went out answers 200; one that did not answers 502 or 503 SEND_FAILED, and is still in the send log.'
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
@@ -72011,11 +72011,33 @@ paths:
                 contact_id: { type: string, description: 'A saved contact of the caller''s address book: the contact record id, the `mail:<record id>` that GET /v1/contacts and POST /v1/contacts return for a person, or the identity (GHII) they return once that person proved the address here. Another account''s contact answers 404 NOT_FOUND.' }
                 kind: { type: string, enum: [transactional, marketing, invoice] }
                 subject: { type: string, maxLength: 300 }
-                body: { type: string, maxLength: 20000 }
+                body:
+                  type: string
+                  maxLength: 20000
+                  description: >-
+                    Plain text. No HTML the caller writes reaches the message: the server escapes
+                    everything and builds every tag itself from a small, closed vocabulary. A blank
+                    line starts a paragraph and a single line break stays a line break. At the start
+                    of a line, `## ` is a heading and `### ` a smaller one, `- ` is a bullet
+                    (consecutive bullets are one list), and `---` alone on a line is a divider.
+                    Inside any of them, `**bold**` is bold and `[label](https://address)` is a link;
+                    only https addresses without credentials become links, and any other link
+                    syntax stays literal text. The plain-text part of the email shows the same
+                    structure, with every link address spelled out. A template's body
+                    (outbound.template.{id}) is read the same way.
                 template_id: { type: string }
                 variables: { type: object, additionalProperties: { type: string } }
                 invoice_id: { type: string }
                 reply_to: { type: string, format: email }
+                locale:
+                  type: string
+                  enum: [fi, en, es]
+                  description: 'The language of the words the layout adds itself: the unsubscribe line and the sender footer. Default fi. The subject and the body are sent as written.'
+                image_url:
+                  type: string
+                  maxLength: 600
+                  description: 'One lead picture across the top of the card, by its https address. Requires image_alt. An address that is not https, carries credentials, or comes without alt text is refused with 400 INVALID_IMAGE before anything is sent or logged. Most mail programs block pictures until the reader allows them, so the alt text is what most readers see first.'
+                image_alt: { type: string, maxLength: 200, description: 'The lead picture''s alt text. Required with image_url.' }
                 theme:
                   type: string
                   maxLength: 40
@@ -72279,6 +72301,106 @@ paths:
       responses:
         '200': { description: Confirmation page (text/html) }
         '400': { description: Malformed link }
+    post:
+      operationId: outboundUnsubscribeOneClick
+      tags: [Outbound]
+      summary: RFC 8058 one-click unsubscribe (no auth)
+      description: >-
+        What a mail program posts when the reader presses its own unsubscribe button: the address in
+        the message's List-Unsubscribe header, with the body `List-Unsubscribe=One-Click`, as
+        multipart/form-data or application/x-www-form-urlencoded. Sets the contact's opt-out with no
+        page and no redirect. A POST and not a GET, because link scanners fetch every link in a
+        message and must not unsubscribe anybody. Token-based, rate-limited per address together
+        with the GET, and idempotent. An unknown token answers exactly as a known one, so the
+        endpoint never confirms whether an address exists.
+      parameters: [{ name: token, in: query, required: true, schema: { type: string, maxLength: 100 } }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [List-Unsubscribe]
+              properties:
+                List-Unsubscribe: { type: string, enum: [One-Click] }
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [List-Unsubscribe]
+              properties:
+                List-Unsubscribe: { type: string, enum: [One-Click] }
+      responses:
+        '200':
+          description: Unsubscribed, or an unknown token (the same answer)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          unsubscribed: { type: boolean, enum: [true] }
+        '400': { description: 'INVALID_TOKEN (no or malformed token) or INVALID_INPUT (no List-Unsubscribe=One-Click in the body)' }
+        '429': { $ref: '#/components/responses/AimeatError' }
+  /v1/outbound/sender:
+    get:
+      operationId: getOutboundSender
+      tags: [Outbound]
+      summary: The sender identity a marketing email's footer carries, validated
+      description: >-
+        Reads the sender record and says what the footer will show and what it could not use, before
+        anybody sends. The record is a memory value the sender keeps: `outbound.sender` for their own
+        sending, or `outbound.sender.{company_id}` in the company owner's memory for a company's.
+        Shape: { legal_name, business_id?, address?, privacy_url?, reason?: { fi?, en?, es? },
+        transactional? }. Strings are single-line and capped (legal_name 140, business_id 40,
+        address 200, each reason 300); privacy_url must be https. A field that fails is left out of
+        the footer and listed in `problems`; a send is never refused over it. Without legal_name
+        there is no footer. A company send fills a missing legal_name, business_id or address from
+        the company's registration, and never uses a person's own record. `transactional: true` also
+        puts the name, business id, address and privacy link (not the reason or the unsubscribe
+        link) on transactional and invoice email.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: company_id, in: query, schema: { type: string }, description: 'A company the caller may send as. Another company answers 404, as an unknown one does.' }
+      responses:
+        '200':
+          description: The record as the footer will use it
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key: { type: string, description: 'The memory key the record lives under.' }
+                          found: { type: boolean }
+                          ok: { type: boolean, description: 'A footer will be rendered and nothing in the record was dropped.' }
+                          sender:
+                            type: object
+                            nullable: true
+                            properties:
+                              legal_name: { type: string }
+                              business_id: { type: string }
+                              address: { type: string }
+                              privacy_url: { type: string }
+                              reason: { type: object, additionalProperties: { type: string } }
+                              transactional: { type: boolean }
+                          problems:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                field: { type: string }
+                                why: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/signals/streams:
     post:

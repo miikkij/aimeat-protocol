@@ -21,9 +21,12 @@
  * @structure
  *   - MailboxSender / resolveMailboxSender  -- which mailbox, and may this caller use it
  *   - sendThroughMailbox                    -- Gmail's raw MIME, or Graph's JSON message
+ *   - graphMessageHeaders                   -- the x- headers Graph accepts
  *   - listSendAsAliases                     -- the verified addresses a Gmail mailbox may send as
  * @usage const sender = await resolveMailboxSender(ctx, principal, connectionId, alias);
  * @version-history
+ *   v1.2.0 — 2026-10-16 — graphMessageHeaders: the Graph path passes only x- headers, so a marketing
+ *     message's List-Unsubscribe pair does not make Graph refuse the send. Gmail's MIME path keeps them.
  *   v1.1.0 — 2026-09-26 — ALIAS_NOT_VERIFIED names only the alias that was asked for. The addresses a
  *     mailbox may send as are listed by aimeat_mail_aliases, which takes connections:read-through,
  *     and the refusal says so (secaudit 2026-09, A5-1).
@@ -234,8 +237,8 @@ export async function sendThroughMailbox(
             // Graph accepts a CUSTOM header only when its name begins with x-, which is why the
             // disclosure header carries that prefix rather than the IETF draft's bare name: one
             // header that works on both providers beats two that each work on one.
-            ...(message.headers && Object.keys(message.headers).length
-              ? { internetMessageHeaders: Object.entries(message.headers).map(([name, value]) => ({ name, value })) }
+            ...(graphMessageHeaders(message.headers).length
+              ? { internetMessageHeaders: graphMessageHeaders(message.headers) }
               : {}),
             ...(message.attachments?.length ? {
               attachments: message.attachments.map(a => ({
@@ -266,6 +269,16 @@ export async function sendThroughMailbox(
     });
     return { ok: false, error: 'MAILBOX_UNREACHABLE' };
   }
+}
+
+/**
+ * The headers Microsoft Graph will take: only names beginning with x-. Graph refuses the whole send
+ * with InvalidInternetMessageHeader when one other name is in the list, so the List-Unsubscribe pair
+ * a marketing message carries is left off on this path rather than costing the message. Graph sets
+ * no List-Unsubscribe of its own; the unsubscribe link in the message body still works.
+ */
+export function graphMessageHeaders(headers: Record<string, string> | undefined): Array<{ name: string; value: string }> {
+  return Object.entries(headers ?? {}).filter(([name]) => /^x-/i.test(name)).map(([name, value]) => ({ name, value }));
 }
 
 /** RFC 5322 bytes for Gmail, which takes the whole message rather than its parts. */

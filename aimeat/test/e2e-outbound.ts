@@ -13,6 +13,9 @@
  *   reason EMAIL_DISABLED. That answer is what "every policy gate passed" looks like: a refusal from
  *   a gate is 400, 403, 404, 422 or 429 and never reaches the transport.
  * @version-history
+ *   v1.7.0 — 2026-10-16 — 16b: the RFC 8058 one-click POST (no sign-in, unknown token answered as a
+ *     known one, a wrong or missing body refused); 16c: GET /v1/outbound/sender reads the record back
+ *     validated, per owner, and a foreign company is 404; 16d: an unusable lead image is INVALID_IMAGE.
  *   v1.6.0 — 2026-10-08 — D9 (aiprov): another account's provenance_id is not attached to a send, the
  *     sender's own is and is named in the answer, and an agent's send is stamped model-written.
  *   v1.5.1 — 2026-10-06 — The recipient's code-key address is marked verified with
@@ -640,6 +643,62 @@ await test('16. the public unsubscribe answers identically for unknown tokens (n
   assert(res.status === 200, `expected 200, got ${res.status}`);
   const html = await res.text();
   assert(html.includes('Unsubscribed'), 'unsubscribe page missing');
+});
+
+await test('16b. the RFC 8058 one-click POST needs no sign-in, answers an unknown token as a known one, and refuses a wrong body', async () => {
+  const post = (query: string, init: RequestInit) => fetch(`${BASE}/v1/outbound/unsubscribe${query}`, { method: 'POST', ...init });
+  const form = new FormData();
+  form.set('List-Unsubscribe', 'One-Click');
+  const unknown = await post('?token=definitely-not-a-token', { body: form });
+  assert(unknown.status === 200, `unknown token: expected 200, got ${unknown.status}`);
+  const unknownBody = await unknown.json() as { ok: boolean; data?: { unsubscribed?: boolean } };
+  assert(unknownBody.ok === true && unknownBody.data?.unsubscribed === true, `unknown token body: ${JSON.stringify(unknownBody)}`);
+  const urlencoded = await post('?token=definitely-not-a-token', {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click',
+  });
+  assert(urlencoded.status === 200, `urlencoded body: expected 200, got ${urlencoded.status}`);
+  const noBody = await post('?token=definitely-not-a-token', {});
+  assert(noBody.status === 400, `no body: expected 400, got ${noBody.status}`);
+  const wrong = await post('?token=definitely-not-a-token', {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=Maybe',
+  });
+  assert(wrong.status === 400, `wrong body: expected 400, got ${wrong.status}`);
+  const noToken = await post('', { body: form });
+  assert(noToken.status === 400, `no token: expected 400, got ${noToken.status}`);
+});
+
+await test('16c. the sender record is read back validated, is each owner\'s own, and a foreign company is 404', async () => {
+  const before = await json('/v1/outbound/sender', { headers: authed(B.token) });
+  assert(before.status === 200 && before.body.data.found === false && before.body.data.sender === null,
+    `no record yet: ${before.status} ${JSON.stringify(before.body)}`);
+  const write = await json('/v1/memory', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ key: 'outbound.sender', visibility: 'private', value: { legal_name: 'Toinen Oy', privacy_url: 'javascript:alert(1)' } }),
+  });
+  assert(write.status === 200 || write.status === 201, `record write: ${write.status}`);
+  const read = await json('/v1/outbound/sender', { headers: authed(B.token) });
+  assert(read.status === 200 && read.body.data.found === true && read.body.data.ok === false, `read: ${JSON.stringify(read.body)}`);
+  assert(read.body.data.sender.legal_name === 'Toinen Oy' && read.body.data.sender.privacy_url === undefined,
+    `the bad privacy address is left out: ${JSON.stringify(read.body.data.sender)}`);
+  assert((read.body.data.problems as Array<{ field: string }>).some(p => p.field === 'privacy_url'), 'and reported');
+  const other = await json('/v1/outbound/sender', { headers: authed(A.token) });
+  assert(other.status === 200 && other.body.data.found === false, `owner A must not read B's record: ${JSON.stringify(other.body.data)}`);
+  const foreign = await json('/v1/outbound/sender?company_id=no-such-company', { headers: authed(A.token) });
+  assert(foreign.status === 404, `unknown company: expected 404, got ${foreign.status}`);
+  const narrow = await json('/v1/outbound/sender', { headers: authed(narrowAgentToken) });
+  assert(narrow.status === 403, `an agent without outbound:send: expected 403, got ${narrow.status}`);
+  const clean = await json('/v1/memory/outbound.sender', { method: 'DELETE', headers: authed(B.token) });
+  assert(clean.status === 200 || clean.status === 204, `cleanup: ${clean.status}`);
+});
+
+await test('16d. a lead image without alt text, or not on https, is refused before anything is logged', async () => {
+  for (const image of [{ image_url: 'https://cdn.example/a.png' }, { image_url: 'data:image/png;base64,AAAA', image_alt: 'x' }]) {
+    const r = await json('/v1/outbound/send', {
+      method: 'POST', headers: authed(B.token),
+      body: JSON.stringify({ contact_id: 'any', kind: 'marketing', subject: 'S', body: 'B', ...image }),
+    });
+    assert(r.status === 400 && r.body.error?.code === 'INVALID_IMAGE', `${JSON.stringify(image)}: ${r.status} ${JSON.stringify(r.body.error)}`);
+  }
 });
 
 /**

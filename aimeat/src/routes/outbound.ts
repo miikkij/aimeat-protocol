@@ -13,6 +13,9 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-16 — POST /v1/outbound/unsubscribe: the RFC 8058 one-click opt-out a mail program posts to
+ *     the List-Unsubscribe address. GET /v1/outbound/sender: the footer's sender record, validated. The
+ *     send takes locale, image_url and image_alt.
  *   2026-10-15 — POST /v1/outbound/send sends through an agent's own mailbox when it names one, as the
  *     MCP tool does (feature-list audit 129).
  *   2026-10-08 — POST /v1/outbound/send answers with the message's ai_provenance_id (aiprov D9).
@@ -60,6 +63,8 @@ import { resolveCompanyScope } from '../services/finance/company-scope.js';
 import { FinanceError } from '../services/finance/errors.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { mailboxHolderFor } from '../services/connections/access.js';
+import { resolveSendingCompany } from '../services/outbound/company-sender-access.js';
+import { loadSenderIdentity, senderRecordOut } from '../services/outbound/sender-identity.js';
 
 const ContactSchema = z.object({
   name: z.string().min(1).max(140),
@@ -115,6 +120,11 @@ const SendSchema = z.object({
   signal_stream_id: z.string().max(64).optional(),
   /** The sender's own opaque token for this recipient. Never an address, never a name. */
   signal_subject: z.string().max(64).optional(),
+  /** The language of the words the layout adds itself: the unsubscribe line and the sender footer. */
+  locale: z.enum(['fi', 'en', 'es']).optional(),
+  /** One picture across the top of the card. sendOutbound refuses it without https or alt text. */
+  image_url: z.string().max(600).optional(),
+  image_alt: z.string().max(200).optional(),
 }).strict();
 
 /**
@@ -326,6 +336,8 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         connectionId: b.connection_id, fromAlias: b.from_alias,
         ...(disclosure ? { aiDisclosure: disclosure } : {}),
         links: b.links, signalStreamId: b.signal_stream_id, signalSubject: b.signal_subject,
+        ...(b.locale ? { locale: b.locale } : {}),
+        ...(b.image_url ? { image: { url: b.image_url, alt: b.image_alt ?? '' } } : {}),
       });
       // 200 ONLY FOR A SEND THAT WENT OUT. A send the channel refused, or one with no transport,
       // is logged and then THROWN by sendOutbound as SEND_FAILED (502 or 503, the row and the reason
@@ -377,6 +389,35 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
     }]));
   });
 
+  // ── Sender identity ───────────────────────────────────────────────────────
+  //
+  // The footer a marketing email carries, read from the record the owner keeps (outbound.sender, or
+  // outbound.sender.<company id> for a company) and VALIDATED, for the same reason the themes route
+  // exists: the send path drops an unusable field rather than refusing the send, so a broken privacy
+  // address would otherwise be found by a recipient. See services/outbound/sender-identity.ts.
+
+  router.get('/v1/outbound/sender', requireAuth(), requireScope('outbound:send'), async (req, res) => {
+    const owner = resolve(req);
+    const companyId = typeof req.query.company_id === 'string' && req.query.company_id ? req.query.company_id : undefined;
+    const company = companyId
+      ? await resolveSendingCompany(storage, owner, companyId, resolveIdentity(req.auth!, config.nodeId))
+      : null;
+    if (companyId && !company) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Company not found'));
+      return;
+    }
+    const loaded = await loadSenderIdentity(storage, owner, company);
+    // The record lives in the book owner's memory; only they can store it, so only they get the hint.
+    const canWrite = !company || company.bookOwner === owner;
+    res.json(success(config.nodeId, {
+      key: loaded.key,
+      found: loaded.found,
+      ok: !!loaded.sender && loaded.problems.length === 0,
+      sender: loaded.sender ? senderRecordOut(loaded.sender) : null,
+      problems: loaded.problems,
+    }, canWrite ? [{ description: 'Store the sender record', method: 'PUT', url: `/v1/memory/${loaded.key}` }] : undefined));
+  });
+
   // ── Send log ──────────────────────────────────────────────────────────────
 
   router.get('/v1/outbound/log', requireAuth(), requireScope('outbound:send'), async (req, res) => {
@@ -423,7 +464,10 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── Public unsubscribe (token-based, NO auth — an opt-out behind a login is not one) ──
 
-  router.get('/v1/outbound/unsubscribe', rateLimit({ windowMs: 60_000, max: 30, keyBy: 'ip' }), async (req, res) => {
+  // One limiter for both methods: the link and the one-click POST spend the same allowance per address.
+  const unsubscribeLimit = rateLimit({ windowMs: 60_000, max: 30, keyBy: 'ip' });
+
+  router.get('/v1/outbound/unsubscribe', unsubscribeLimit, async (req, res) => {
     const token = typeof req.query.token === 'string' ? req.query.token : '';
     if (!token || token.length > 100) {
       res.status(400).send('Invalid unsubscribe link');
@@ -444,5 +488,52 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       + '</body></html>');
   });
 
+  /**
+   * RFC 8058 one-click unsubscribe. A mail program that shows its own unsubscribe button POSTs
+   * `List-Unsubscribe=One-Click` to the address in the message's List-Unsubscribe header, which is
+   * the same tokenised address the link uses, and expects the opt-out without a page or a redirect.
+   * A POST, because link scanners fetch every GET in a message and must not unsubscribe anybody.
+   * Same token, same limiter and the same answer for an unknown token as the GET; doing it twice is
+   * the same as doing it once.
+   */
+  router.post('/v1/outbound/unsubscribe', unsubscribeLimit, async (req, res) => {
+    const token = typeof req.query.token === 'string' ? req.query.token : '';
+    if (!token || token.length > 100) {
+      res.status(400).json(error(config.nodeId, 'INVALID_TOKEN', 'Invalid unsubscribe link'));
+      return;
+    }
+    if (!(await isOneClickBody(req))) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Expected the RFC 8058 body List-Unsubscribe=One-Click'));
+      return;
+    }
+    const contact = await storage.findOutboundContactByToken(token);
+    // Unknown token answers the same as success, as on the GET: no address is confirmed.
+    if (contact && !contact.optedOut) {
+      await setOptOut(storage, contact, true);
+      emitChange('outbound', contact.ownerGhii);
+    }
+    res.json(success(config.nodeId, { unsubscribed: true }));
+  });
+
   return router;
+}
+
+/** The most of a multipart one-click body this reads; the real one is under 300 bytes. */
+const ONE_CLICK_MAX_BYTES = 16 * 1024;
+
+/**
+ * Whether the POST carries `List-Unsubscribe=One-Click`. RFC 8058 says the body SHOULD be
+ * multipart/form-data and MAY be urlencoded. The urlencoded form is parsed by the global body
+ * parser (server.ts); multipart is not, so its raw bytes are read here, up to a small cap.
+ */
+async function isOneClickBody(req: Request): Promise<boolean> {
+  const parsed = req.body as Record<string, unknown> | undefined;
+  if (parsed && typeof parsed === 'object' && parsed['List-Unsubscribe'] === 'One-Click') return true;
+  if (!/^multipart\/form-data/i.test(req.headers['content-type'] ?? '')) return false;
+  let raw = '';
+  for await (const chunk of req) {
+    raw += typeof chunk === 'string' ? chunk : (chunk as Buffer).toString('utf-8');
+    if (raw.length > ONE_CLICK_MAX_BYTES) return false;
+  }
+  return /name="?List-Unsubscribe"?[^\r\n]*\r?\n(?:[^\r\n]+\r?\n)*\r?\nOne-Click\r?\n/.test(raw);
 }
