@@ -8,6 +8,7 @@
  *   subdomain-served app HTML and the bridge page is framable only by app origins.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-silent.ts
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-06-20 — Initial (H-2 seamless secure app SSO).
  *   v1.1.0 — 2026-07-19 — Phase 4 (scope-upgrade + own-app visible flow, Band Jam findings):
  *     silent re-request with MORE scopes upgrades the own-app grant in place (refresh follows);
@@ -42,6 +43,7 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
@@ -81,14 +83,15 @@ function cleanupDb() { for (const f of [DB_PATH, DB_PATH + '-wal', DB_PATH + '-s
 
 async function startServer(): Promise<ChildProcess> {
     cleanupDb();
+    const db = await ownNodeDb(PORT, { sqlitePath: DB_PATH });
     const env = {
-        ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
+        ...process.env, ...db.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
         AIMEAT_APP_HOST: APP_HOST, AIMEAT_APP_ORIGIN_ENABLED: 'true',
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_DEFAULT_AGENT_SCOPES: '*',
         // A short refresh grace, so a replayed previous token can be tested without a minute's wait.
         AIMEAT_REFRESH_GRACE_MS: '1500',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the silent-app node' });
 }

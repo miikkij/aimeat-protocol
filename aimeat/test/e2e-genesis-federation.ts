@@ -14,8 +14,8 @@
  *   the whole of genesis-memory-cache.ts, and the four matches* predicates in federation-helpers.ts.
  *   test/helpers/fake-genesis-peer.ts is that second world, on loopback inside this process.
  *
- *   IT BOOTS ITS OWN NODE IN PROCESS on :40321 with its own SQLite file in a temp directory, the
- *   pattern of e2e-mail-connections. 40321 rather than 40320 because e2e-setup-and-verification.ts
+ *   IT BOOTS ITS OWN NODE IN PROCESS on :40321 with its own database on the run's backend
+ *   (test/helpers/own-node-db.ts), the pattern of e2e-mail-connections. 40321 rather than 40320 because e2e-setup-and-verification.ts
  *   already defaults its second node to 40320.
  *
  *   CROSS-FEDERATION IS OFF AT BOOT AND ON AFTERWARDS. The node's own genesis sync scheduler fires
@@ -31,6 +31,8 @@
  *   the 404s and the denials
  * @usage cd aimeat && node --import tsx test/e2e-genesis-federation.ts
  * @version-history
+ *   2026-10-16 — The node this suite starts follows the run's backend (test/helpers/own-node-db.ts);
+ *     it was SQLite on both runs (QA audit P1-02).
  *   2026-10-15 — Phase 7 reads as the approved fake federation, signed for this node; an unsigned read is
  *     refused, and a consent covers only the keys its pattern names (feature-list audit 166).
  *   v1.3.0 -- 2026-10-12 -- Two fixtures move to the 4.0.0 form, neither of them this suite's subject:
@@ -52,6 +54,7 @@ import { join } from 'node:path';
 import type { Server } from 'node:http';
 import * as ed from '@noble/ed25519';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -70,10 +73,6 @@ Object.assign(process.env, {
     AIMEAT_ANONYMOUS_MODE: 'true',
     AIMEAT_LOG_LEVEL: 'error',
     LOG_LEVEL: process.env.LOG_LEVEL ?? 'error',
-    AIMEAT_STORAGE: 'sqlite',
-    AIMEAT_DB: 'sqlite',
-    AIMEAT_DB_PATH: join(TMP, 'genesis.db'),
-    AIMEAT_SQLITE_PATH: join(TMP, 'genesis.db'),
     AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
     // Off at boot: see the header. Turned on below, after the server is up.
     AIMEAT_CROSS_FEDERATION_ENABLED: 'false',
@@ -99,6 +98,7 @@ type GenesisSyncService = import('../src/services/genesis-sync.js').GenesisSyncS
 type FakeGenesisPeer = import('./helpers/fake-genesis-peer.js').FakeGenesisPeer;
 
 const { config } = loadConfig({});
+Object.assign(config, (await ownNodeDb(String(PORT), { sqlitePath: join(TMP, 'genesis.db') })).config);
 config.port = PORT;
 const NODE_ID = config.nodeId;
 const { app, storage } = await createNode(config);

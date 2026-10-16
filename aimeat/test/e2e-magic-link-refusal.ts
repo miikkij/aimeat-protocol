@@ -20,12 +20,11 @@
  *   secret comes out of the message the node actually sent.
  *
  *   It runs its own node on its own port because SMTP is process-wide configuration, and the shared
- *   E2E server has email off. That node is SQLite whichever backend the runner was started with:
- *   what is under test is the ORDER of a route's checks, which no storage provider can change, and
- *   standing a Postgres database up per suite to prove the same statement twice is not worth it.
+ *   E2E server has email off. That node follows the run's backend (test/helpers/own-node-db.ts).
  *   `E2E_MAGIC_LINK_PORT` moves it (default 40289, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-refusal
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-09 — The program endpoint answers no owner key and leaves the registered one in
  *     force (secrets audit 2026-10-09, S2).
  *   v1.1.0 — 2026-09-29 — The emailed link is GET /v1/ghii/magic-link/open, the browser endpoint; it
@@ -42,6 +41,7 @@ import { join } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { seedPassword } from './helpers/seed-password.js';
+import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 
 const PORT = Number(process.env.E2E_MAGIC_LINK_PORT ?? 40289);
 const SMTP_PORT = PORT + 1;
@@ -85,7 +85,7 @@ const bearer = (t: string) => ({ Authorization: `Bearer ${t}` });
  * the public key the node holds against the one registration returned (storedPublicKey).
  */
 async function ownerToken(owner: string): Promise<{ status: number; token: string }> {
-    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'magic.db') });
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: db!.dbUrl || db!.sqlitePath });
     const r = await ownerSignIn(BASE, owner);
     return { status: r.status, token: (r.body?.data?.token ?? '') as string };
 }
@@ -197,12 +197,15 @@ let node: ChildProcess | null = null;
 let nodeLog = '';
 let sink: Server | null = null;
 const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-magiclink-'));
+let db: OwnNodeDb | null = null;
 
 async function startNode(): Promise<void> {
-    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'magic.db'), '--port', String(PORT)], {
+    db = await ownNodeDb(String(PORT), { sqlitePath: join(dbDir, 'magic.db') });
+    node = spawn('node', [...nodeEntryArgs(), 'start', ...db.args, '--port', String(PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,
+            ...db.env,
             AIMEAT_PORT: String(PORT),
             AIMEAT_BASE_URL: BASE,
             AIMEAT_DEFAULT_AGENT_SCOPES: '*',

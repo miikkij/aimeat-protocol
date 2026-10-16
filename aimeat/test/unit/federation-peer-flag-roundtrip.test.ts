@@ -19,6 +19,7 @@
  * @structure One round-trip per tier, plus the legacy-row defaults.
  * @usage pnpm exec vitest run test/unit/federation-peer-flag-roundtrip.test.ts
  * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.2.0 — 2026-10-10 — The delivery-proof pin (deliveryProofAt) on federation and genesis peers
  *     round-trips, and a save without it keeps it (secaudit 2026-10-10 I21).
  *   v1.1.0 — 2026-09-25 — A peer's own relay-claim setting and its last claimed and unclaimed relay
@@ -26,11 +27,14 @@
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { rmSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, FederationPeerRecord } from '../../src/storage/interface.js';
 import { deriveTierFlags, type PeerTier } from '../../src/services/federation-tiers.js';
+
+requirePostgresWhenAsked('federation-peer-flag-roundtrip');
 
 const SQLITE_PATH = `./test/.peerflags-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';

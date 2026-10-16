@@ -13,12 +13,18 @@
  * @structure
  *   - NodeCard / FederationBook types
  *   - buildNodeCard(config, storage) — this node's card (or { listed:false } when opted out)
- *   - bookSignString() · getActiveBook() · storeActiveBook()
+ *   - bookSignString() · legacyBookSignString() · verifyBookSignature() · getActiveBook() · storeActiveBook()
  *   - assembleBook(config, storage, peers) — primary: fetch peer cards + own → sign → store
  * @usage import { buildNodeCard, assembleBook, getActiveBook } from './federation-book.js';
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial federation book (node-card + primary assembly + signed doc).
  *   v1.0.1 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
+ *   v1.1.0 — 2026-10-16 — The book is signed over canonical JSON (sorted keys). It was signed over
+ *     JSON.stringify of the stored object, whose key order a PostgreSQL jsonb column does not keep,
+ *     so a book served from a PostgreSQL node failed verification on every leaf (401
+ *     INVALID_SIGNATURE). Verification takes the canonical form first and then the legacy string,
+ *     so a book from a peer on an earlier version still verifies (QA audit P1-02, found when
+ *     e2e-federation-book first ran on PostgreSQL).
  *   v1.1.0 — 2026-10-16 — getActiveBook and storeActiveBook let a failed read propagate instead of
  *     answering "no book": pullBook no longer replaces a newer stored book and assembleBook no longer
  *     restarts book_version at 1 after a failed read (QA audit F2-06).
@@ -34,6 +40,7 @@ import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { sign, verify } from '../auth/keypair.js';
 import { peerKeyCache } from './federation-helpers.js';
 import { logger } from '../utils/logger.js';
+import { canonicalJson } from '../utils/memory-content.js';
 
 export const FEDERATION_BOOK_GAII = '__federation_book__';
 export const FEDERATION_BOOK_KEY = 'federation-book.active';
@@ -63,10 +70,38 @@ export interface FederationBook {
   nodes: NodeCard[];
 }
 
-/** Canonical string the primary signs (and leaves verify) for a book — excludes `signature`. */
+/** The book without its signature: what is signed. */
+function unsigned(book: FederationBook): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(book).filter(([k]) => k !== 'signature'));
+}
+
+/**
+ * The string the primary signs and a leaf verifies — canonical JSON (sorted keys) of the book
+ * without `signature`. Canonical because the book is stored as a memory value, and a PostgreSQL
+ * jsonb column gives the keys back in its own order: a signature over JSON.stringify of the stored
+ * object failed verification on every leaf of a PostgreSQL primary.
+ */
 export function bookSignString(book: FederationBook): string {
-  const rest = Object.fromEntries(Object.entries(book).filter(([k]) => k !== 'signature'));
-  return JSON.stringify(rest);
+  return canonicalJson(unsigned(book));
+}
+
+/** The string a node before v1.1.0 of this file signed: JSON.stringify in the order the book arrived. */
+export function legacyBookSignString(book: FederationBook): string {
+  return JSON.stringify(unsigned(book));
+}
+
+/**
+ * Does `signature` verify the book with `publicKey`? The canonical form first, then the legacy
+ * string, so a primary on an earlier version (which signs the legacy way) still reaches its leaves.
+ */
+export async function verifyBookSignature(publicKey: string, book: FederationBook): Promise<boolean> {
+  if (!book.signature) return false;
+  const attempt = (msg: string) => verify(publicKey, msg, book.signature!).catch(err => {
+    logger.warn('verifyBookSignature: a malformed key or signature counts as a failed check', { error: String(err) });
+    return false;
+  });
+  if (await attempt(bookSignString(book))) return true;
+  return attempt(legacyBookSignString(book));
 }
 
 function sha256(s: string): string {
@@ -234,7 +269,7 @@ export async function pullBook(config: AimeatConfig, storage: Storage, peers: Ma
   const issuer = peers.get(book.issued_by) ?? [...peers.values()].find(p => p.nodeId === book.issued_by);
   const issuerKey = issuer?.publicKey || peerKeyCache.get(book.issued_by)?.publicKey;
   if (!issuerKey) return { ok: false, status: 403, code: 'UNKNOWN_ISSUER', message: `Book issuer ${book.issued_by} is not a known peer` };
-  const sigOk = book.signature ? await verify(issuerKey, bookSignString(book), book.signature).catch(err => { logger.warn('pullBook: continuing after a suppressed failure', { error: String(err) }); return false; }) : false;
+  const sigOk = await verifyBookSignature(issuerKey, book);
   if (!sigOk) return { ok: false, status: 401, code: 'INVALID_SIGNATURE', message: 'Book signature verification failed' };
 
   const current = await getActiveBook(storage);

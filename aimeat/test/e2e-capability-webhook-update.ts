@@ -15,6 +15,7 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capability-webhook-update
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.2 — 2026-10-08 — The allowlist node listens on 31100 + lane % 100 (suitePort).
  *   v1.0.1 — 2026-10-02 —The allowlist node listens on a port the operating system picks
  *     (helpers/free-port.ts); 41104 was held by a database connection on two Postgres sweeps.
@@ -23,6 +24,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
@@ -188,12 +190,13 @@ function cleanupAltDb() {
 
 async function startAllowlistNode(): Promise<ChildProcess> {
     cleanupAltDb();
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', ALT_DB], {
+    const db = await ownNodeDb(ALT_PORT, { sqlitePath: ALT_DB });
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
         env: {
             ...process.env,
             AIMEAT_PORT: ALT_PORT,
             AIMEAT_BASE_URL: ALT_BASE,
-            AIMEAT_DB_PATH: ALT_DB,
+            ...db.env,
             AIMEAT_CAPABILITY_WEBHOOKS: 'allowlist_only',
             AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST: 'hooks.example.test',
         },

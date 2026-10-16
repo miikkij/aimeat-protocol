@@ -5,6 +5,10 @@
  * @description System prompts (SystemPrompt + SystemPromptVersion) and the federation replication queue
  *   (ReplicationQueue) for the Postgres+Kysely backend. Translated to match the Prisma provider.
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The replication queue answers as the SQLite provider does: a payload comes
+ *     back decoded from its JSON text, the depth counts every row on the queue, and a prune also removes
+ *     the rows already sent. Found when e2e-federation-settlements-sync first ran its nodes on
+ *     PostgreSQL (QA audit P1-02); test/unit/replication-queue-parity.test.ts holds both providers to it.
  *   v1.0.0 — 2026-07-15 — Phase 5: system prompts + replication queue on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -13,6 +17,7 @@ import type { ReplicationQueueEntry, SystemPromptRecord, SystemPromptVersionReco
 import type { ReplicationQueue, SystemPrompt, SystemPromptVersion } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
+import { logger } from '../../../../utils/logger.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoN = (t: Date | string | null | undefined): string | null => (t == null ? null : iso(t));
@@ -30,9 +35,21 @@ function toVersion(r: Selectable<SystemPromptVersion>): SystemPromptVersionRecor
     changedBy: r.changedBy, changeNote: r.changeNote ?? undefined, changedAt: iso(r.changedAt),
   };
 }
+/** The payload as enqueued: stored as JSON text, decoded on the way out like the SQLite provider does. */
+function decodePayload(raw: unknown): unknown {
+  if (typeof raw !== 'string') return raw ?? null;
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    // A payload enqueued as plain text is not JSON and stays text; said once in the log.
+    logger.debug('replication queue: a payload that is not JSON is returned as text', { error: String(err) });
+    return raw;
+  }
+}
+
 function toQueue(r: Selectable<ReplicationQueue>): ReplicationQueueEntry {
   return {
-    id: r.id, type: r.type as ReplicationQueueEntry['type'], payload: r.payload ?? undefined, targetPeers: r.targetPeers ?? [],
+    id: r.id, type: r.type as ReplicationQueueEntry['type'], payload: decodePayload(r.payload), targetPeers: r.targetPeers ?? [],
     attempts: r.attempts, status: r.status as ReplicationQueueEntry['status'], createdAt: iso(r.createdAt), lastAttemptAt: isoN(r.lastAttemptAt),
   };
 }
@@ -104,11 +121,14 @@ export const replicationQueueMethods = {
     await this.db.updateTable('ReplicationQueue').set({ status: 'failed', lastAttemptAt: new Date(), attempts: sql`"attempts" + 1` }).where('id', 'in', ids).execute();
   },
   async pruneReplicationQueue(this: PostgresKyselyStorage, maxAge: Date): Promise<number> {
-    const r = await this.db.deleteFrom('ReplicationQueue').where('createdAt', '<', maxAge).executeTakeFirst();
+    // Aged rows and the rows already sent, as on SQLite: a sent row has done its work.
+    const r = await this.db.deleteFrom('ReplicationQueue')
+      .where(eb => eb.or([eb('createdAt', '<', maxAge), eb('status', '=', 'sent')])).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
   },
   async replicationQueueSize(this: PostgresKyselyStorage): Promise<number> {
-    const r = await this.db.selectFrom('ReplicationQueue').select(sql<number>`count(*)`.as('n')).where('status', '=', 'pending').executeTakeFirst();
+    // Every row on the queue, as on SQLite (sync-health reads it as the queue depth).
+    const r = await this.db.selectFrom('ReplicationQueue').select(sql<number>`count(*)`.as('n')).executeTakeFirst();
     return Number(r?.n ?? 0);
   },
 };

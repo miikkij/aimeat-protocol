@@ -18,9 +18,11 @@
  *   schedulers over ONE store, which is what two processes on one database are.
  * @usage cd aimeat && pnpm exec vitest run test/unit/scheduler-fire-claim.test.ts
  * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.0.0 — 2026-10-04 — Initial.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { rmSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
@@ -33,6 +35,8 @@ vi.mock('../../src/utils/logger.js', async (importOriginal) => {
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { Scheduler } from '../../src/services/scheduler.js';
 import type { ScheduledJobRecord, Storage } from '../../src/storage/interface.js';
+
+requirePostgresWhenAsked('scheduler-fire-claim');
 
 const SQLITE_PATH = `./test/.fireclaim-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';

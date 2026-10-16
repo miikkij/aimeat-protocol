@@ -8,6 +8,7 @@
  *   numbers are four seconds a step to a thirty-second ceiling, which is the right cost for an
  *   attacker and the wrong length for a test.
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 — 2026-09-06 — Every assertion about a log line WAITS for it. The node answers before it
  *     appends, so reading the file the instant a call returns is a race, and the refusal this suite
  *     cares most about is the one that loses it: "refuses CHEAPLY" means the 429 comes back while
@@ -19,6 +20,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { existsSync, unlinkSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -90,8 +92,9 @@ function cleanupDb() {
 
 async function startServer(): Promise<ChildProcess> {
     cleanupDb();
+    const db = await ownNodeDb(PORT, { sqlitePath: DB_PATH });
     const env = {
-        ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
+        ...process.env, ...db.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
         AIMEAT_AUTH_LOG_PATH: LOG,
         AIMEAT_LOGIN_TARPIT_ENABLED: 'true',
         AIMEAT_LOGIN_TARPIT_FREE: String(FREE),
@@ -103,7 +106,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_LOGIN_RATE_LIMIT_MAX: '500',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the tarpit node' });
 }

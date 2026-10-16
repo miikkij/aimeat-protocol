@@ -32,6 +32,7 @@
  *   heartbeat timeout.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-personal-tunnel
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.3.0 — 2026-10-12 — Phase 5: a second owner's node acks the first node's item id and the item
  *     stays. It failed on the source, where the ack deleted any id it was sent.
  *   v1.2.0 — 2026-10-09 — The socket opens with a ticket (POST /v1/ws/ticket, then ?ticket=), as the SDK
@@ -55,6 +56,7 @@ import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -646,10 +648,12 @@ let hbDir = '';
 
 async function startHeartbeatNode(): Promise<void> {
     hbDir = mkdtempSync(join(tmpdir(), 'aimeat-tunnel-hb-'));
-    hbNode = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(hbDir, 'tunnel.db'), '--port', String(HB_PORT)], {
+    const db = await ownNodeDb(String(HB_PORT), { sqlitePath: join(hbDir, 'tunnel.db') });
+    hbNode = spawn('node', [...nodeEntryArgs(), 'start', ...db.args, '--port', String(HB_PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,
+            ...db.env,
             AIMEAT_PORT: String(HB_PORT),
             AIMEAT_BASE_URL: HB_BASE,
             AIMEAT_NODE_TYPE: 'full',
@@ -657,7 +661,6 @@ async function startHeartbeatNode(): Promise<void> {
             // through the bootstrap route answered with the SPA's HTML once in four runs.
             AIMEAT_NODE_ID: HB_NODE_ID,
             AIMEAT_NODE_KEY_PATH: join(hbDir, 'node-key.json'),
-            AIMEAT_SQLITE_PATH: join(hbDir, 'tunnel.db'),
             AIMEAT_PERSONAL_NODES_ENABLED: 'true',
             // The whole point of this node: a threshold short enough to watch. The monitor's own
             // interval is floored at 10 s in startHeartbeatMonitor, so 12 s is the smallest

@@ -3,14 +3,19 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Actual erasure and same-name recreation on both providers.
- * @version-history 1.0.0 2026-09-27 Private memory, consent and remote credential boundaries.
+ * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
+ *   1.0.0 2026-09-27 Private memory, consent and remote credential boundaries.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { randomUUID } from 'node:crypto';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import { eraseOwner } from '../../src/services/owner-erasure.js';
+
+requirePostgresWhenAsked('owner-reuse-contract');
 
 type TestStorage = Storage & { close(): void | Promise<void> };
 const names = ['sqlite', ...(process.env.DATABASE_URL ? ['postgres-kysely'] : [])];

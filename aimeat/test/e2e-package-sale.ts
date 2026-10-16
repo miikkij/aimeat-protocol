@@ -26,6 +26,7 @@
  *   - Phase 10: an unused packages-only peer is removed after 30 days; a seller is kept (finding F)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-sale
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-16 — Phase 7: the refused-sale assertion matched only the word "refunded", which the old
  *     fixed text "Payment refunded" carried whatever the rail did; it now asserts the sentence for a
  *     confirmed refund and that no undelivered record is written. New case: the instrument
@@ -47,6 +48,7 @@ import { runAutoRenewals } from '../src/services/packages/sale/package-renewals.
 import { runAsNode } from '../src/utils/gaii.js';
 import { cleanupPackagePeers } from '../src/services/packages/peer/package-peer-limits.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 let passed = 0;
 let failed = 0;
@@ -78,11 +80,10 @@ async function bootNode(port: number, nodeId: string, repository: boolean, extra
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
     const { config } = loadConfig({});
     Object.assign(config, {
         port, nodeId, baseUrl: `http://127.0.0.1:${port}`, devMode: true, testMode: true, adminPassword: adminPw,
-        storageProvider: 'memory', packagesEnabled: true, packageFederationEnabled: true, packageCreateRole: 'owner',
+        ...(await ownNodeDb(String(port), { memory: true })).config, packagesEnabled: true, packageFederationEnabled: true, packageCreateRole: 'owner',
         packageRepository: repository, testMoneyHandler: true,
     }, extra);
     const { app, storage } = await createServer(config);

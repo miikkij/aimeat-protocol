@@ -17,6 +17,7 @@
  *
  *   Port 40433: checked against every other suite before it was picked.
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-09-17 — Initial.
  */
 
@@ -28,6 +29,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const PORT = 40433;
 
@@ -47,15 +49,13 @@ await test('a node whose port is already taken exits non-zero, names the port, a
     await new Promise<void>((resolve, reject) => { holder.once('error', reject); holder.listen(PORT, () => resolve()); });
     const dir = mkdtempSync(join(tmpdir(), 'aimeat-portinuse-'));
     try {
-        const dbPath = join(dir, 'node.db');
-        const child = spawn(process.execPath, [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', dbPath], {
+        const db = await ownNodeDb(String(PORT), { sqlitePath: join(dir, 'node.db') });
+        const child = spawn(process.execPath, [...nodeEntryArgs(), 'start', ...db.args], {
             env: {
                 ...process.env,
                 AIMEAT_PORT: String(PORT),
                 AIMEAT_BASE_URL: `http://127.0.0.1:${PORT}`,
-                AIMEAT_STORAGE: 'sqlite',
-                AIMEAT_SQLITE_PATH: dbPath,
-                DATABASE_URL: '',
+                ...db.env,
                 AIMEAT_LOG_LEVEL: 'info',
                 AIMEAT_ANONYMOUS: 'false',
             },

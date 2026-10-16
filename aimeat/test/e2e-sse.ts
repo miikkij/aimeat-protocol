@@ -11,6 +11,7 @@
  *     3. An app-grant stream does NOT mark the owner present. Only a real owner session may.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sse.ts
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-11 — Phase 6: one owner's private record and file are not another owner's
  *     event, a public record still is, and so is the write that takes it private. The last test
  *     of v1.0.0 measured the leak and left it; this closes it.
@@ -23,6 +24,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const PORT = process.env.E2E_SSE_PORT ?? '40268';
 const BASE = `http://localhost:${PORT}`;
@@ -55,12 +57,13 @@ function cleanupDb() {
 
 async function startServer(): Promise<ChildProcess> {
     cleanupDb();
+    const db = await ownNodeDb(String(PORT), { sqlitePath: DB_PATH });
     const env = {
-        ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
+        ...process.env, ...db.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
         AIMEAT_APP_HOST: APP_HOST, AIMEAT_APP_ORIGIN_ENABLED: 'true',
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_RL_MEMORY: '1000',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the SSE node' });
 }

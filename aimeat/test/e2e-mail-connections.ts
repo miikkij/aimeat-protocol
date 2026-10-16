@@ -15,11 +15,14 @@
  *   before the wire, so the real service code runs with no request leaving the machine.
  *
  *   IT BOOTS THE NODE IN PROCESS, the pattern of e2e-attachment-sweep and e2e-money-audit, on its
- *   own port and its own SQLite file in a temp directory. Nothing here touches a shared node.
+ *   own port and its own database on the run's backend (test/helpers/own-node-db.ts). Nothing here
+ *   touches a shared node.
  * @structure boot (env, node, fake upstreams) · helpers · 16 phases, from discovery to the advice a
  *   dead connection gives
  * @usage cd aimeat && node --import tsx test/e2e-mail-connections.ts
  * @version-history
+ *   v1.3.2 — 2026-10-16 — The node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite on both runs (QA audit P1-02).
  *   v1.3.1 — 2026-10-09 — A round starts as the owner's browser does and finishes with its cookie
  *     (secrets audit 2026-10-09, chapter 2).
  *   v1.3.0 — 2026-09-28 — store: true on the attachment read: a Gmail and a Graph attachment become
@@ -43,6 +46,7 @@ import { join } from 'node:path';
 import type { Server } from 'node:http';
 import type { RecordedCall } from './helpers/fake-mail-upstreams.js';
 import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const PORT = parseInt(process.env.E2E_MAIL_PORT ?? '40286', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -62,8 +66,6 @@ Object.assign(process.env, {
   // The logger reads LOG_LEVEL, not the AIMEAT_ one beside it, so both are set: this suite
   // deliberately drives failure paths that log a warning each, and the assertions are the report.
   LOG_LEVEL: process.env.LOG_LEVEL ?? 'error',
-  AIMEAT_STORAGE: 'sqlite',
-  AIMEAT_SQLITE_PATH: join(TMP, 'mail.db'),
   AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
   AIMEAT_CONNECTIONS_ENABLED: 'true',
   AIMEAT_CONNECT_GOOGLE_CLIENT_ID: 'google-client-id',
@@ -100,6 +102,7 @@ type ConnectionCredential = import('../src/models/connection-schemas.js').Connec
 type ConnectionRecord = import('../src/models/connection-schemas.js').ConnectionRecord;
 
 const { config } = loadConfig({});
+Object.assign(config, (await ownNodeDb(String(PORT), { sqlitePath: join(TMP, 'mail.db') })).config);
 config.port = PORT;
 const NODE_ID = config.nodeId;
 const { app, storage } = await createServer(config);

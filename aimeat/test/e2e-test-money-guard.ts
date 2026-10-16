@@ -12,6 +12,7 @@
  *   URL, the way the E2E runner and `pnpm sandbox` start a node: test.money works and nothing warns.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=test-money-guard
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v2.0.0 — 2026-10-13 — Ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s:
  *     the flag works on a public node so the money path can be tested in production; the public
  *     node's Security page keeps it critical. A node with the flag off is the negative control.
@@ -21,6 +22,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 const PORT_PUBLIC = process.env.E2E_TMG_PUBLIC_PORT ?? '40486';
 const PORT_LOCAL = process.env.E2E_TMG_LOCAL_PORT ?? '40487';
@@ -40,9 +42,11 @@ interface Node { proc: ChildProcess; base: string; dbPath: string }
 /** Start a node on loopback, with `publicUrl` as the address it believes others reach it at. */
 async function startNode(port: string, publicUrl: string, label: string, testMoney: boolean): Promise<Node> {
   const dbPath = `test/.tmg-${label}-${Date.now()}.db`;
-  const proc = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', dbPath], {
+  const db = await ownNodeDb(port, { sqlitePath: dbPath });
+  const proc = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
     env: {
       ...process.env,
+      ...db.env,
       AIMEAT_PORT: port, AIMEAT_BASE_URL: publicUrl,
       AIMEAT_TEST_MONEY_HANDLER: testMoney ? 'true' : 'false', AIMEAT_COMMERCE_ENABLED: 'true',
       // The operator sells pacing capacity for money: a money checkout line any fresh node can sell.

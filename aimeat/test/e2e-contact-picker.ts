@@ -11,12 +11,14 @@
  *   Starts its OWN server, like e2e-app-silent: the shared runner pins AIMEAT_APP_HOST to '' (the
  *   app origin family off), and every assertion here is about which app an origin resolves to.
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-08-17 — Initial.
  */
 // Run: cd aimeat && pnpm exec node --import tsx test/e2e-contact-picker.ts
 
 import { randomBytes, createHash } from 'node:crypto';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { waitForServer } from './helpers/wait-for-server.js';
@@ -36,12 +38,13 @@ function cleanupDb() {
 
 async function startServer(): Promise<ChildProcess> {
     cleanupDb();
+    const db = await ownNodeDb(PORT, { sqlitePath: DB_PATH });
     const env = {
-        ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
+        ...process.env, ...db.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE, AIMEAT_NODE_ID: NODE_ID,
         AIMEAT_APP_HOST: APP_HOST, AIMEAT_APP_ORIGIN_ENABLED: 'true',
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the contact-picker node' });
 }

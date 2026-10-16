@@ -22,9 +22,9 @@
  *
  *   IT RUNS ITS OWN NODE. SMTP is process-wide configuration and the shared E2E server has email
  *   off, so this spawns a node of its own on its own port with AIMEAT_SMTP_* pointed at the sink in
- *   this process. That node is SQLite whichever backend the runner was started with: what is under
- *   test is a service and a set of templates, and no storage provider changes what a template
- *   renders. `E2E_EMAIL_PORT` moves it (default 40294, with the SMTP sink one port above).
+ *   this process. That node's database follows the run's backend (test/helpers/own-node-db.ts), and
+ *   the suite seeds passwords into that same database. `E2E_EMAIL_PORT` moves it (default 40294,
+ *   with the SMTP sink one port above).
  *
  *   THE TRANSPORT AUTHENTICATES. AIMEAT_SMTP_USER is set, so `createEmailService()` builds its
  *   transport down the `auth:` branch and the sink counts the AUTH command. Without it that branch
@@ -41,6 +41,8 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   2026-10-15 —The registration invite on a mailing node answers `sent`, and GET / offers it in getting_started (feature-list audit #23).
  *   2026-10-16 — The mailed registration link is accepted end to end: the account the person names, its session, its password, and a second accept refused INVITE_USED (QA audit F02a-04).
  *   2026-10-16 — The password reset limit is one bucket per address: a fourth reset carrying another identity's token is refused (QA audit F02a-02).
  *   2026-10-15 — The registration invite on a mailing node answers `sent`, and GET / offers it in getting_started (feature-list audit #23).
@@ -55,6 +57,7 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -110,7 +113,7 @@ const short = (v: unknown): string => JSON.stringify(v).slice(0, 300);
  * signs in with it (helpers/seed-password.ts).
  */
 async function ownerToken(owner: string): Promise<string> {
-    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: join(dbDir, 'email.db') });
+    await seedPassword(owner, OWNER_PASSWORD, { sqlitePath: db!.dbUrl || db!.sqlitePath });
     const r = await ownerSignIn(BASE, owner);
     assert(r.status === 200 && r.body?.data?.token, `owner token for ${owner}: ${r.status} ${short(r.body)}`);
     return r.body.data.token as string;
@@ -142,12 +145,15 @@ let node: ChildProcess | null = null;
 let nodeLog = '';
 let smtp: FakeSmtp | null = null;
 const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-email-'));
+let db: OwnNodeDb | null = null;
 
 async function startNode(): Promise<void> {
-    node = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'email.db'), '--port', String(PORT)], {
+    db = await ownNodeDb(String(PORT), { sqlitePath: join(dbDir, 'email.db') });
+    node = spawn('node', [...nodeEntryArgs(), 'start', ...db.args, '--port', String(PORT)], {
         cwd: process.cwd(),
         env: {
             ...process.env,
+            ...db.env,
             AIMEAT_PORT: String(PORT),
             AIMEAT_BASE_URL: BASE,
             AIMEAT_DEFAULT_AGENT_SCOPES: '*',

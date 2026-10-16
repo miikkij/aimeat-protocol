@@ -17,6 +17,7 @@
  *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-14 — 17n, 17o: tier "places" and "places/admin", where things are on the node's own
  *     pages, the same on MCP and REST, and a part that does not exist on both.
  *   2026-10-10 — 17j: an area longer than one part is split, and each part names the next (the
@@ -39,6 +40,7 @@ import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn, registerOwner } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -126,8 +128,10 @@ function cleanupDb() {
 
 async function startServer(): Promise<ChildProcess> {
     cleanupDb();
+    const db = await ownNodeDb(String(PORT), { sqlitePath: DB_PATH });
     const env = {
         ...process.env,
+        ...db.env,
         AIMEAT_PORT: PORT,
         AIMEAT_BASE_URL: BASE,
         AIMEAT_NODE_ID: NODE_ID,
@@ -137,7 +141,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_MEMORY: '1000', AIMEAT_RL_CATALOGUE: '10000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the orientation node' });
 }

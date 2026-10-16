@@ -28,6 +28,7 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-15 — With no runner the bundled agent is proposed to the owner (result proposed, a waiting
  *     proposal); it asserted `pending`, which nobody could approve. The apply with a runner withdraws
  *     that proposal (feature-list audit #90).
@@ -63,6 +64,7 @@ import { publishSkill } from '../src/services/skills.js';
 import { signedPackageHeaders } from '../src/services/packages/peer/package-node-auth.js';
 import { refreshInstalledPackages, UPDATES_ENDED_SENTENCE } from '../src/services/packages/peer/package-upstream-refresh.js';
 import type { Storage } from '../src/storage/interface.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -97,7 +99,6 @@ async function bootNode(port: number, nodeId: string, repository: boolean, extra
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     config.port = port;
@@ -106,7 +107,7 @@ async function bootNode(port: number, nodeId: string, repository: boolean, extra
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
+    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
     config.packagesEnabled = true;
     config.packageFederationEnabled = true;
     config.packageCreateRole = 'owner';

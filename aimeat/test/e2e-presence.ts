@@ -7,9 +7,12 @@
  *   an `unknown` update evicts it, and bad-signature / non-peer pushes are rejected. Also checks the
  *   push-side snapshot the flush loop would send (via the in-process tracker singleton).
  *
- *   Node: port 40272, aimeat-test-001-presence (memory storage, in-process — same pattern as the
- *   federation-* suites, so the test shares the server's PresenceTracker instance).
+ *   Node: port 40272, aimeat-test-001-presence (a database of its own on the run's backend,
+ *   test/helpers/own-node-db.ts; in-process — same pattern as the federation-* suites, so the test
+ *   shares the server's PresenceTracker instance).
  * @version-history
+ *   v1.2.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02).
  *   v1.2.0 -- 2026-10-12 -- pushPresence adds the audience proof (audienceProof) to every push. Node
  *     4.0.0 refuses a push without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), and the
  *     proof is not this suite's subject. Test 14 still fails on the signature (wrong key), test 15
@@ -33,6 +36,7 @@ import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../src/services/presence.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -64,16 +68,15 @@ async function bootNode(): Promise<Server> {
   process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
   process.env.AIMEAT_NODE_ID = NODE_ID;
   process.env.AIMEAT_BASE_URL = BASE;
-  process.env.AIMEAT_STORAGE = 'memory';
 
   const { config } = loadConfig({});
+  Object.assign(config, (await ownNodeDb(String(PORT), { memory: true })).config);
   config.port = PORT;
   config.nodeId = NODE_ID;
   config.baseUrl = BASE;
   config.devMode = true;
   config.testMode = true;
   config.adminPassword = adminPw;
-  config.storageProvider = 'memory';
 
   const { app } = await createServer(config);
   return new Promise<Server>((resolve) => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });

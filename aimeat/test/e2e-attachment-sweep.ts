@@ -6,12 +6,15 @@
  *   message rows directly, and calls sweepReferenceAttachments().
  * @usage cd aimeat && pnpm exec tsx test/e2e-attachment-sweep.ts
  * @version-history
+ *   v1.0.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02).
  *   v1.0.0 -- 2026-06-16 -- Initial: retry-on-available + TTL-expiry coverage for the attachment sweep.
  */
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { sweepReferenceAttachments } from '../src/services/attachment-duplication.js';
 import type { DirectMessageRecord } from '../src/storage/interface.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -24,12 +27,11 @@ process.env.AIMEAT_PORT = '40282';
 process.env.AIMEAT_NODE_ID = 'aimeat-local-001-dev';
 process.env.AIMEAT_DEV_MODE = 'true';
 process.env.AIMEAT_TEST_MODE = 'true';
-process.env.AIMEAT_STORAGE = 'memory';
 process.env.AIMEAT_ADMIN_PASSWORD = 'x';
 
 const { config } = loadConfig({});
+Object.assign(config, (await ownNodeDb('40282', { memory: true })).config);
 config.nodeId = 'aimeat-local-001-dev';
-config.storageProvider = 'memory';
 config.messageRetryTtlHours = 168;   // 7 days
 
 const { storage } = await createServer(config);
@@ -89,7 +91,6 @@ await test('2. Held attachment older than the TTL is expired (not retried foreve
 });
 
 await test('3. Expired attachment is not retried again', async () => {
-  const m0 = await storage.getDirectMessage('msg-old', recipient);
   // Even if bytes become available, an already-expired attachment is terminal.
   await storage.createStorageFile({
     key: 'missing-key', ownerGaii: sender, visibility: 'private',

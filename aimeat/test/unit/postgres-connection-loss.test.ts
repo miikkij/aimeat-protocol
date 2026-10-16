@@ -20,12 +20,16 @@
  *   same way storage-conformance.test.ts skips its Postgres arm.
  * @usage cd aimeat && node --env-file=.env.test.postgres-kysely node_modules/vitest/vitest.mjs run test/unit/postgres-connection-loss.test.ts
  * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL and has no DATABASE_URL fails here instead of passing on SQLite alone (QA audit P4-02).
  *   v1.0.0 — 2026-10-10 — Initial (postgres-kysely provider v1.10.0).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 import { sql, type Kysely } from 'kysely';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
+
+requirePostgresWhenAsked('postgres-connection-loss');
 
 const PG_URL = process.env.DATABASE_URL ?? '';
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));

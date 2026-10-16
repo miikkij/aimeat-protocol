@@ -10,6 +10,7 @@
  *   Node C (contributor):  port 40262, node ID aimeat-node-001-testc
  *
  * @version-history
+ *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 -- 2026-05-21 -- Initial multi-node federation E2E tests
  *   v1.1.0 -- 2026-05-21 -- Add cross-catalogue discovery tests
  *   v1.2.0 -- 2026-08-12 -- Security audit H-14: the ping tests now sign the way the heartbeat
@@ -43,6 +44,7 @@ import { loadConfig } from '../src/config.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from '../src/services/signed-node-request.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 // ─── Ed25519 setup ───
 ed.hashes.sha512 = (m: Uint8Array) =>
@@ -120,7 +122,6 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     // Override config directly in case loadConfig cached old values
@@ -130,7 +131,7 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
+    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
     config.federationAuthPolicy = 'all_peers';
 
     const { app, storage } = await createServer(config);

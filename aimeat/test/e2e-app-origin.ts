@@ -10,6 +10,7 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.8.0 — 2026-09-24 — Phase 5: a builder holding a development right, drafter or full, cannot
  *     mint a frame grant (A6-6). The owner's own session still can.
  *   v1.7.0 — 2026-09-18 — Phase 11: a page whose owner opted it in is counted when it is fetched on
@@ -41,6 +42,7 @@
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phases 1–2).
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -99,8 +101,10 @@ function cleanupDb() {
 
 async function startServer(): Promise<ChildProcess> {
     cleanupDb();
+    const db = await ownNodeDb(PORT, { sqlitePath: DB_PATH });
     const env = {
         ...process.env,
+        ...db.env,
         AIMEAT_PORT: PORT,
         AIMEAT_BASE_URL: BASE,
         AIMEAT_NODE_ID: NODE_ID,
@@ -115,7 +119,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_MAX_APPS_PER_AGENT: '200',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', DB_PATH],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     return waitForServer(child, BASE, { label: 'the app-origin node' });
 }

@@ -12,6 +12,7 @@
  *     shareCatalogue off, a stranger node, a changed key, federation off
  *   - Phase 5: scope and identity refusals
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.2 — 2026-10-08 — The two nodes listen on 31200 and 31300 plus the lane's last two digits
  *     (suitePort): a port handed out by the system can be taken by another suite while a node boots.
  *   v1.0.1 — 2026-10-06 —The two nodes listen on ports the operating system hands out, so the suite
@@ -28,6 +29,7 @@ import { loadConfig } from '../src/config.js';
 import { generateKeyPair } from '../src/auth/keypair.js';
 import type { Server } from 'node:http';
 import { suitePort } from './helpers/free-port.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -69,7 +71,6 @@ async function bootNode(port: number, nodeId: string, packageFederation: boolean
     process.env.AIMEAT_ADMIN_PASSWORD = adminPw;
     process.env.AIMEAT_NODE_ID = nodeId;
     process.env.AIMEAT_BASE_URL = `http://127.0.0.1:${port}`;
-    process.env.AIMEAT_STORAGE = 'memory';
 
     const { config } = loadConfig({});
     config.port = port;
@@ -78,7 +79,7 @@ async function bootNode(port: number, nodeId: string, packageFederation: boolean
     config.devMode = true;
     config.testMode = true;
     config.adminPassword = adminPw;
-    config.storageProvider = 'memory';
+    Object.assign(config, (await ownNodeDb(String(port), { memory: true })).config);
     config.packagesEnabled = true;
     config.packageFederationEnabled = packageFederation;
     config.packageCreateRole = 'owner';
@@ -391,7 +392,7 @@ await test('A source signing with a different key than the pinned one is refused
 await test('A signature that does not check out is refused before anything is written', async () => {
     // A fresh group on B, so the pinned-key check above cannot be what refuses this one. B's record
     // of A carries a key that is not A's, so A's real signature must fail verification.
-    const before = await bPackageNames();
+    await bPackageNames();
     const stranger = await generateKeyPair();
     await B.json(`/v1/federation/peers/${encodeURIComponent(A.nodeId)}`, {
         method: 'PUT', headers: auth(B.ownerToken), body: JSON.stringify({ public_key: stranger.publicKey }),

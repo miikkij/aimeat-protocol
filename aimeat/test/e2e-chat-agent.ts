@@ -15,9 +15,8 @@
  *
  *   IT RUNS ITS OWN NODE because AIMEAT_GOOSE_BIN is process-wide configuration, and it runs TWO:
  *   one pointed at the fake agent (test/helpers/fake-goose-acp.ts), and a second pointed at a path
- *   that names no binary at all, which is the only way to reach the child `error` handler. Both are
- *   SQLite whichever backend the runner was started with: what is under test is a child process and
- *   the ordering of a stream, which no storage provider changes.
+ *   that names no binary at all, which is the only way to reach the child `error` handler. Each
+ *   node's database follows the run's backend (test/helpers/own-node-db.ts), one database per port.
  *
  *   THE SHIM IS NOT A SHELL SCRIPT. goose-acp spawns `spawn(bin, ['acp'])` with the arguments fixed,
  *   and Node 24 on Windows refuses to spawn a .cmd or .bat without `shell:true`. So `bin` is node
@@ -37,6 +36,7 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.3.0 — 2026-10-02 — The cancel is counted as the notification goose obeys, and asserted to stop
  *     the agent; the turn ceiling: asked for an answer past twelve tool calls, and ended by the node
  *     in the person's language when even that does not answer.
@@ -51,6 +51,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 import { startFakeAiProvider, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
@@ -92,9 +93,10 @@ async function startNode(opts: {
     const peerLog = join(dbDir, 'peer.jsonl');
     const base = `http://127.0.0.1:${opts.port}`;
     let output = '';
+    const db = await ownNodeDb(String(opts.port), { sqlitePath: join(dbDir, 'chat.db') });
 
     const proc = spawn(process.execPath, [
-        'src/index.ts', 'start', '--db', 'sqlite', '--db-path', join(dbDir, 'chat.db'), '--port', String(opts.port),
+        'src/index.ts', 'start', ...db.args, '--port', String(opts.port),
     ], {
         cwd: process.cwd(),
         env: {
@@ -109,8 +111,7 @@ async function startNode(opts: {
             AIMEAT_PORT: String(opts.port),
             AIMEAT_BASE_URL: base,
             AIMEAT_NODE_ID: NODE_ID,
-            AIMEAT_DB: 'sqlite',
-            AIMEAT_DB_PATH: join(dbDir, 'chat.db'),
+            ...db.env,
             // The warnings this suite asserts on are logged at info and warn.
             AIMEAT_LOG_LEVEL: 'info',
             AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY

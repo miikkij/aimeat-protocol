@@ -5,7 +5,7 @@
  *   src/routes/setup.ts could only ever be half tested on a shared node, because the thing it does
  *   happens once: POST /v1/setup/init refuses everything after the first owner exists. So this suite
  *   asserts the refusal on the shared node and then SPAWNS TWO NODES OF ITS OWN, each on a fresh
- *   empty SQLite file, to drive the creation itself — one for the imported-key arm, one for the
+ *   empty database on the run's backend (test/helpers/own-node-db.ts), to drive the creation itself — one for the imported-key arm, one for the
  *   generated-keypair arm, because a node can only be initialised once and the two arms are mutually
  *   exclusive.
  *
@@ -43,6 +43,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-setup-verification.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-and-verification
  * @version-history
+ *   2026-10-16 — The nodes this suite starts follow the run's backend (test/helpers/own-node-db.ts);
+ *     they were SQLite on both runs (QA audit P1-02).
  *   2026-10-16 — Tests 4, 6 and 10: the status gives the running node type and port; an init whose
  *     settings match reports each one unchanged; an init on a node with a .env reports the node id,
  *     port and genesis URL as not written, names the .env and does not say setup is complete
@@ -72,6 +74,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -129,12 +132,13 @@ async function makeOwner(base: string, name: string): Promise<string> {
 /**
  * A node of our own on a fresh empty database. The environment is the runner's own pin list
  * (test/run-e2e-server.ts pinnedEnv) narrowed to what a setup node needs: its own port, its own
- * SQLite file, no inherited DATABASE_URL, no third-party credentials, and the two verification
- * flags this suite turns on.
+ * empty database on the run's backend (test/helpers/own-node-db.ts, one per port) in place of the
+ * inherited DATABASE_URL, no third-party credentials, and the two verification flags this suite
+ * turns on.
  */
 async function spawnNode(port: string, extraEnv: Record<string, string> = {}): Promise<{ child: ChildProcess; base: string; dir: string }> {
     const dir = mkdtempSync(join(tmpdir(), 'aimeat-setup-'));
-    const dbPath = join(dir, 'setup.db');
+    const db = await ownNodeDb(`setup-${port}`, { sqlitePath: join(dir, 'setup.db') });
     const base = `http://localhost:${port}`;
     const env = {
         ...process.env,
@@ -142,9 +146,7 @@ async function spawnNode(port: string, extraEnv: Record<string, string> = {}): P
         AIMEAT_BASE_URL: base,
         AIMEAT_NODE_ID: NODE_ID,
         AIMEAT_NODE_TYPE: 'full',
-        AIMEAT_STORAGE: 'sqlite',
-        AIMEAT_SQLITE_PATH: dbPath,
-        DATABASE_URL: '',
+        ...db.env,
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000',
         AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '1000', AIMEAT_LOGIN_RATE_LIMIT_MAX: '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
@@ -162,7 +164,7 @@ async function spawnNode(port: string, extraEnv: Record<string, string> = {}): P
         AIMEAT_ANONYMOUS: 'false',
         ...extraEnv,
     };
-    const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', dbPath],
+    const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args],
         { env, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     try {
         await waitForServer(child, base, { label: `the node on port ${port}` });
@@ -512,12 +514,12 @@ try {
         // those routes unreachable today, and it is asserted rather than assumed.
         const dir = mkdtempSync(join(tmpdir(), 'aimeat-eudiw-'));
         try {
-            const child = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', join(dir, 'x.db')], {
+            const db = await ownNodeDb(`eudiw-${SECOND_PORT}`, { sqlitePath: join(dir, 'x.db') });
+            const child = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], {
                 env: {
                     ...process.env,
                     AIMEAT_PORT: SECOND_PORT, AIMEAT_BASE_URL: `http://localhost:${SECOND_PORT}`,
-                    AIMEAT_NODE_ID: NODE_ID, AIMEAT_STORAGE: 'sqlite',
-                    AIMEAT_SQLITE_PATH: join(dir, 'x.db'), DATABASE_URL: '',
+                    AIMEAT_NODE_ID: NODE_ID, ...db.env,
                     AIMEAT_EUDIW_ENABLED: 'true',
                 },
                 stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd(),

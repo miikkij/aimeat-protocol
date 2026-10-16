@@ -22,6 +22,7 @@
 //     stays up. A request with no secret is refused with 401 as well.
 //
 // Version history:
+//   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
 //   2026-10-16 — capabilities_create over /local/call now SAVES the agent's private capability: POST
 //     /v1/capabilities admits the owner's agent holding capability:write, as the node MCP tool always
 //     did. The assertion pinned the old owner-only answer (ACCESS_DENIED), which was the defect: the same
@@ -52,6 +53,7 @@ import { stringify as yamlStringify } from 'yaml';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { waitForServer } from './helpers/wait-for-server.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
   new Uint8Array(createHash('sha512').update(m).digest());
@@ -1107,10 +1109,12 @@ await test('`aimeat connect tui --once` with no daemon running exits 1 and says 
 console.log('\nPhase 6 — Degraded fallback (node with the tunnel disabled)');
 
 await test('Start a second node with AIMEAT_CONNECT_TUNNEL_ENABLED=false', async () => {
-  node2 = spawn('node', [...nodeEntryArgs(), 'start', '--db', 'sqlite', '--db-path', node2Db, '--port', String(NODE2_PORT)], {
+  const db2 = await ownNodeDb(String(NODE2_PORT), { sqlitePath: node2Db });
+  node2 = spawn('node', [...nodeEntryArgs(), 'start', ...db2.args, '--port', String(NODE2_PORT)], {
     cwd: process.cwd(),
     env: {
       ...process.env,
+      ...db2.env,
       AIMEAT_PORT: String(NODE2_PORT),
       AIMEAT_BASE_URL: NODE2_BASE,
       AIMEAT_CONNECT_TUNNEL_ENABLED: 'false',

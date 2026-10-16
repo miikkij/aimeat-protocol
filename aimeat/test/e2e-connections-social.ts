@@ -7,12 +7,15 @@
  *   rule, a subreddit post), X articles and threads, Mastodon text with no file, and the replies
  *   reader on every network that has one, LinkedIn's refusal included.
  *
- *   It boots the node in process on its own port and SQLite file, the pattern of
- *   e2e-publish-upstreams, and replaces globalThis.fetch (helpers/fake-social-upstreams.ts), so the
- *   real service code runs and nothing leaves the machine.
+ *   It boots the node in process on its own port and its own database on the run's backend
+ *   (test/helpers/own-node-db.ts), the pattern of e2e-publish-upstreams, and replaces
+ *   globalThis.fetch (helpers/fake-social-upstreams.ts), so the real service code runs and nothing
+ *   leaves the machine.
  * @structure boot · helpers · phases 0-12
  * @usage cd aimeat && node --import tsx test/e2e-connections-social.ts
  * @version-history
+ *   v1.0.1 — 2026-10-16 — The node this suite starts follows the run's backend
+ *     (test/helpers/own-node-db.ts); it was SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-10-15 — Initial.
  */
 import { randomBytes, createHash } from 'node:crypto';
@@ -21,6 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
 import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
+import { ownNodeDb } from './helpers/own-node-db.js';
 
 // A fixed own port, like the other in-process suites: the runner takes it under its port lock.
 const PORT = parseInt(process.env.E2E_SOCIAL_PORT ?? '40327', 10);
@@ -36,8 +40,6 @@ Object.assign(process.env, {
   AIMEAT_ANONYMOUS: 'false',
   AIMEAT_LOG_LEVEL: 'error',
   LOG_LEVEL: process.env.LOG_LEVEL ?? 'error',
-  AIMEAT_STORAGE: 'sqlite',
-  AIMEAT_SQLITE_PATH: join(TMP, 'social.db'),
   AIMEAT_ALLOW_PRIVATE_EGRESS: 'true',
   AIMEAT_CONNECTIONS_ENABLED: 'true',
   AIMEAT_CONNECT_GOOGLE_CLIENT_ID: 'google-client-id',
@@ -69,6 +71,7 @@ const { loadConfig } = await import('../src/config.js');
 const { installSocialUpstreams } = await import('./helpers/fake-social-upstreams.js');
 
 const { config } = loadConfig({});
+Object.assign(config, (await ownNodeDb(String(PORT), { sqlitePath: join(TMP, 'social.db') })).config);
 config.port = PORT;
 const { app, storage } = await createServer(config);
 await (storage as { ready?: Promise<unknown> }).ready;
@@ -86,7 +89,7 @@ async function api(path: string, opts: { method?: string; body?: unknown; bearer
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (opts.bearer) headers.Authorization = `Bearer ${opts.bearer}`;
   const res = await fetch(`${BASE}${path}`, { method: opts.method ?? 'POST', headers, body: opts.body ? JSON.stringify(opts.body) : undefined, redirect: 'manual' });
-  let data: any = null;
+  let data: any;
   try { data = await res.json(); } catch { data = null; /* a plain-text answer or a redirect */ }
   return { status: res.status, data };
 }
