@@ -14,6 +14,8 @@
  *   import { securityPostureWarnings } from './config-posture.js';
  *   for (const w of securityPostureWarnings(config)) logger.warn(w);
  * @version-history
+ *   2026-10-16 — The admin-setup line of the public-node table is not written again: the test-switch
+ *     warning above already names AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR on any node others reach.
  *   2026-10-16 — The other test-only settings (x402 test facilitator, test mode, dev mode, admin setup
  *     open, Finvoice mock, fake connection address) are reported as ACTIVE on a non-loopback node, as
  *     the test money handler is (utils/test-switches.ts; QA audit D8-01).
@@ -68,7 +70,8 @@ export function securityPostureWarnings(config: AimeatConfig): string[] {
   // The rest of the knob table in security-development-dna.md §3 (QA audit S10-05, F7d-05).
   if (config.metricsAccess === 'public') w.push('AIMEAT_METRICS_ACCESS=public — the Prometheus metrics are exposed to anyone.');
   if (config.extInstallRole !== 'operator') w.push(`AIMEAT_EXT_INSTALL_ROLE=${config.extInstallRole} — any account may install a sandboxed extension. A public node should set operator.`);
-  if (config.adminSetupOpenAfterFirstOperator) w.push('AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=true — the admin password alone makes another operator account after the first one.');
+  // AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR is named above by testSwitchesOnPublicNode, on any
+  // node others can reach, so it is not written a second time here.
   if ((config.aiProviderAllowlist ?? []).length === 0) w.push('AIMEAT_AI_PROVIDER_ALLOWLIST is empty — an AI provider address may point at any host, and the decrypted key is sent there.');
   const powerful = (config.defaultAgentScopes ?? []).filter(s => s === '*' || POWERFUL_AGENT_SCOPES.includes(s));
   if (powerful.length > 0) w.push(`AIMEAT_DEFAULT_AGENT_SCOPES holds ${powerful.join(', ')} — an agent approved without a named list gets a scope invariant 8 keeps explicit and separately consented.`);

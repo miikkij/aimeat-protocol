@@ -14,6 +14,7 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-fault-injection.test.ts
  *        DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/storage-fault-injection.test.ts
  * @version-history
+ *   2026-10-16 — A run that asks for PostgreSQL without DATABASE_URL fails here (postgres-arm.ts, QA audit P4-02).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W26).
  */
 import { randomUUID } from 'node:crypto';
@@ -30,10 +31,12 @@ import { deliverWork } from '../../src/services/work-lifecycle.js';
 import { recordAppAudit, readAppAudit } from '../../src/services/app-audit.js';
 import { PostgresKyselyStorage } from '../../src/storage/providers/postgres-kysely/index.js';
 import { logger } from '../../src/utils/logger.js';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
 
 const SQLITE_PATH = `./test/.fault-injection-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
 const NODE = 'fault-node';
+requirePostgresWhenAsked('storage-fault-injection');
 
 interface Provider { name: 'sqlite' | 'postgres-kysely'; storage: Storage }
 const provs: Provider[] = [];
