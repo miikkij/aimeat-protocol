@@ -19,6 +19,9 @@
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial federation book (node-card + primary assembly + signed doc).
  *   v1.0.1 — 2026-10-05 — The operator accounts are found with isOperatorAccount (secaudit 2026-10, C2).
+ *   v1.1.0 — 2026-10-16 — getActiveBook and storeActiveBook let a failed read propagate instead of
+ *     answering "no book": pullBook no longer replaces a newer stored book and assembleBook no longer
+ *     restarts book_version at 1 after a failed read (QA audit F2-06).
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -120,18 +123,21 @@ export async function buildNodeCard(config: AimeatConfig, storage: Storage): Pro
   return card;
 }
 
-/** Read the active book from storage (no module cache — safe across in-process node instances). */
+/**
+ * Read the active book from storage (no module cache — safe across in-process node instances).
+ * Answers null only when no book is stored; a failed read throws. The callers that write decide on
+ * this answer (a version check, the next book_version), and taking a failed read as "no book" let an
+ * older book replace a newer one and restarted the version at 1.
+ */
 export async function getActiveBook(storage: Storage): Promise<FederationBook | null> {
-  try {
-    const rec = await storage.getMemory(FEDERATION_BOOK_GAII, FEDERATION_BOOK_KEY);
-    if (rec) return rec.value as unknown as FederationBook;
-  } catch (err) { logger.warn('getActiveBook: none', { error: String(err) }); }
-  return null;
+  const rec = await storage.getMemory(FEDERATION_BOOK_GAII, FEDERATION_BOOK_KEY);
+  return rec ? rec.value as unknown as FederationBook : null;
 }
 
 export async function storeActiveBook(storage: Storage, book: FederationBook): Promise<void> {
   const now = new Date().toISOString();
-  const existing = await storage.getMemory(FEDERATION_BOOK_GAII, FEDERATION_BOOK_KEY).catch(err => { logger.warn('storeActiveBook: continuing after a suppressed failure', { error: String(err) }); return null; });
+  // A failed read stops the write: the memory record's own version would restart at 1 otherwise.
+  const existing = await storage.getMemory(FEDERATION_BOOK_GAII, FEDERATION_BOOK_KEY);
   await storage.setMemory({
     key: FEDERATION_BOOK_KEY,
     ownerGaii: FEDERATION_BOOK_GAII,

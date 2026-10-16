@@ -11,6 +11,8 @@
  * @structure renderCover · secInbox · secSenders · secDevices · quietFold · howFold
  * @usage import { renderCover } from './notifications/cover.js';
  * @version-history
+ *   v1.17.0 -- 2026-10-16 -- A failed first load of the inbox shows the could-not-load note with Retry
+ *     instead of "nothing here" (ctx.itemsFailed) (QA audit F6-05).
  *   v1.16.0 -- 2026-10-02 -- The question marks that explain the quiet hours: notify.throttle, notify.breakthrough (components/HelpTip.js).
  *   v1.15.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Tabs in the fold tone; List via frame.js; More; the groups under the AIMEAT row on the sun edge Box; the devices as framed Cards, the one you are on current, a switched-off digest off; the quiet hours as Fields with Switch, TextField, Choice; Roads; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.14.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -60,6 +62,7 @@ import { Row as Line } from '/components/Layout.js';
 import { groupWord, kindWord, sourceName, titleOf } from '/js/services/notifications.js';
 import { c, rel, day, firstLine, Switch, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
 import { Hint } from '/components/Hint.js';
+import { LoadFailed } from '/js/load-state.js';
 
 const PAGE = 12;
 const GROUPS = ['organisms', 'messages', 'workflows', 'apps', 'account', 'other'];
@@ -129,7 +132,8 @@ function secInbox(ctx) {
   ]} />`;
   return html`
     <${PageSection} id="nt-inbox" num="01" title=${c('secInbox')} count=${`${ctx.items.length} · ${c('secInboxSub')}`} doors=${doors} first>
-      ${ctx.loading && !ctx.items.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+      ${ctx.itemsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />`
+        : ctx.loading && !ctx.items.length ? html`<${Note} kind="loading">${t('common.loading')}<//>`
         : !shown.length ? html`<${Note} kind="quiet">${ctx.items.length ? c('emptyFiltered') : c('emptyInbox')}<//>`
         : inboxRows(ctx, shown)}
       ${list.length > shown.length ? html`<${More} onMore=${() => ctx.setShowAll(true)} label=${c('showRest', { n: list.length - shown.length })} />` : null}

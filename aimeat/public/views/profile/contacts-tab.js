@@ -10,6 +10,8 @@
  * @structure ContactsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'contacts'.
  * @version-history
+ *   v2.2.0 — 2026-10-16 — A failed load is drawn as one (contactsFailed: the could-not-load note with
+ *     Retry), never as "nobody yet" (QA audit F6-05).
  *   v2.1.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Kontaktien sivu", direction A).
  *     People, people without an account and agents under their people are three sections instead
@@ -28,6 +30,7 @@ import * as contactsService from '/js/services/contacts.js';
 import * as messagesService from '/js/services/messages.js';
 import { listOrganisms, inviteMember } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState } from '/js/load-state.js';
 import { c, nameOf, parts } from './contacts/frame.js';
 import { renderContactsView } from './contacts/cover.js';
 
@@ -37,6 +40,9 @@ const openTabEvent = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-ope
 export default function ContactsTab({ showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [contacts, setContacts] = useState([]);
+  // A failed first load is drawn as one, never as "nobody yet" (contacts stays [] until a load works).
+  const contactsLoad = useLoadState();
+  const { ok: contactsLoadOk, fail: contactsLoadFail } = contactsLoad;
   const [truncated, setTruncated] = useState(false);
   const [blockedCount, setBlockedCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -70,11 +76,12 @@ export default function ContactsTab({ showToast }) {
         contactsService.listContacts({ state: 'blocked' }).catch(err => { swallowed('contacts-tab: blocked', err); return []; }),
       ]);
       setContacts(list);
+      contactsLoadOk();
       setTruncated(false);
       setBlockedCount(blocked.length);
-    } catch (err) { swallowed('contacts-tab', err); }
+    } catch (err) { swallowed('contacts-tab', err); contactsLoadFail(err); }
     finally { setLoading(false); }
-  }, []);
+  }, [contactsLoadOk, contactsLoadFail]);
 
   const loadPerson = useCallback(async (id) => {
     const row = contacts.find(r => r.contact_id === id);
@@ -254,7 +261,7 @@ export default function ContactsTab({ showToast }) {
   }
 
   const ctx = {
-    contacts, people, noAccount, agents, truncated, blockedCount, loading, view, folds, road, who, busy, q, searchOpen, peopleFilter, showAll, agentsFilter,
+    contacts, contactsFailed: contactsLoad.failed, reload: () => load(), people, noAccount, agents, truncated, blockedCount, loading, view, folds, road, who, busy, q, searchOpen, peopleFilter, showAll, agentsFilter,
     form, formResolve, editing, personData, orgChooser, myOrganisms, me: myGhii, ConfirmUI,
     rowOf, personOf, pickView, openPerson, setFold, openAdd, setRoad, setWho, setQ, setSearchOpen, setPeopleFilter, setShowAll, setAgentsFilter,
     setForm, resetForm, setEditing, openTab, message, openConversation,

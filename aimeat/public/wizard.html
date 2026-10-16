@@ -529,7 +529,7 @@ body {
       <div class="field">
         <label data-i18n="wizard.node.nameLabel">Node Name</label>
         <div class="hint" data-i18n="wizard.node.nameHint">A unique identifier for your node on the network (e.g. my-node-001)</div>
-        <input type="text" id="nodeId" value="aimeat-local-001" placeholder="aimeat-local-001">
+        <input type="text" id="nodeId" value="" placeholder="aimeat-local-001-dev">
       </div>
 
       <div class="field">
@@ -847,6 +847,16 @@ var T = {
     "wizard.init.successDetail": "Redirecting to the portal...",
     "wizard.init.error": "Setup failed",
     "wizard.init.tryAgain": "Go back and fix the issue",
+    "wizard.init.accountReady": "Your account is ready, and you are the operator of this node.",
+    "wizard.init.settingsIntro": "The node keeps running with its current settings. This is what happened to the settings you changed:",
+    "wizard.init.settingWritten": "Saved to the .env file and used after the node restarts. Until then the node uses",
+    "wizard.init.settingNotWritten": "Not saved. The node keeps using",
+    "wizard.init.restartNeeded": "Restart the node to use the saved settings.",
+    "wizard.init.toPortal": "Continue to the portal",
+    "wizard.init.settingNodeId": "Node name",
+    "wizard.init.settingNodeType": "Node type",
+    "wizard.init.settingPort": "Port",
+    "wizard.init.settingGenesis": "Genesis node",
 
     "wizard.validate.usernameRequired": "Username is required",
     "wizard.validate.usernameFormat": "3-30 chars: lowercase letters, numbers, hyphens, underscores",
@@ -931,6 +941,16 @@ var T = {
     "wizard.init.successDetail": "Ohjataan portaaliin...",
     "wizard.init.error": "Alustus epäonnistui",
     "wizard.init.tryAgain": "Palaa taaksepäin ja korjaa ongelma",
+    "wizard.init.accountReady": "Tilisi on valmis, ja sinä ylläpidät tätä solmua.",
+    "wizard.init.settingsIntro": "Solmu toimii edelleen nykyisillä asetuksillaan. Muuttamillesi asetuksille kävi näin:",
+    "wizard.init.settingWritten": "Tallennettu .env-tiedostoon. Solmu ottaa arvon käyttöön, kun se käynnistyy uudelleen. Siihen asti solmu käyttää arvoa",
+    "wizard.init.settingNotWritten": "Ei tallennettu. Solmu käyttää edelleen arvoa",
+    "wizard.init.restartNeeded": "Käynnistä solmu uudelleen, niin se ottaa tallennetut asetukset käyttöön.",
+    "wizard.init.toPortal": "Jatka portaaliin",
+    "wizard.init.settingNodeId": "Solmun nimi",
+    "wizard.init.settingNodeType": "Solmun tyyppi",
+    "wizard.init.settingPort": "Portti",
+    "wizard.init.settingGenesis": "Genesis-solmu",
 
     "wizard.validate.usernameRequired": "Käyttäjänimi puuttuu",
     "wizard.validate.usernameFormat": "3–30 merkkiä: pieniä kirjaimia, numeroita, väliviivoja ja alaviivoja",
@@ -1145,7 +1165,7 @@ function validateAndGoStep4() {
 // Build Summary
 // ────────────────────────────────────────────────────────────────────
 function buildSummary() {
-  var nodeId = document.getElementById('nodeId').value.trim() || 'aimeat-local-001';
+  var nodeId = document.getElementById('nodeId').value.trim() || runningNodeId;
   var nodeType = document.querySelector('input[name="nodeType"]:checked').value;
   var port = document.getElementById('nodePort').value || '40050';
   var mode = getIdentityMode();
@@ -1194,7 +1214,7 @@ function doInit() {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> ' + t('wizard.init.working');
 
-  var nodeId = document.getElementById('nodeId').value.trim() || 'aimeat-local-001';
+  var nodeId = document.getElementById('nodeId').value.trim() || runningNodeId;
   var nodeType = document.querySelector('input[name="nodeType"]:checked').value;
   var port = parseInt(document.getElementById('nodePort').value) || 40050;
   var mode = getIdentityMode();
@@ -1251,17 +1271,33 @@ function doInit() {
 
       // Hide buttons, show success
       document.getElementById('step5Buttons').classList.add('hidden');
-      document.getElementById('initResult').innerHTML =
-        '<div style="text-align:center; margin-top:1.5rem;">' +
-          '<div class="success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
-          '<div style="font-size:1.2rem; font-weight:700; color:var(--success); margin-bottom:.5rem;">' + t('wizard.init.success') + '</div>' +
-          '<div style="color:var(--muted);">' + t('wizard.init.successDetail') + '</div>' +
-        '</div>';
-
-      // Redirect after 2 seconds
-      setTimeout(function() {
-        window.location.href = '/v1/portal';
-      }, 2000);
+      var lines = settingLines(d.settings);
+      if (!lines) {
+        // Every node setting matched the running node: the node really is ready as it runs.
+        document.getElementById('initResult').innerHTML =
+          '<div style="text-align:center; margin-top:1.5rem;">' +
+            '<div class="success-icon"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>' +
+            '<div style="font-size:1.2rem; font-weight:700; color:var(--success); margin-bottom:.5rem;">' + t('wizard.init.success') + '</div>' +
+            '<div style="color:var(--muted);">' + t('wizard.init.successDetail') + '</div>' +
+          '</div>';
+        setTimeout(function() {
+          window.location.href = '/v1/portal';
+        }, 2000);
+      } else {
+        // Some setting was written for the next start or not saved at all: say which, and let the
+        // person read it before going on, instead of "Your node is ready!" and a redirect.
+        var restart = d.restart_required ? '<p>' + escapeHtml(t('wizard.init.restartNeeded')) + '</p>' : '';
+        document.getElementById('initResult').innerHTML =
+          '<div class="status-msg success" style="margin-top:1.5rem;">' +
+            '<div style="font-size:1.1rem; font-weight:700; margin-bottom:.5rem;">' + escapeHtml(t('wizard.init.accountReady')) + '</div>' +
+            '<p>' + escapeHtml(t('wizard.init.settingsIntro')) + '</p>' +
+            '<ul>' + lines + '</ul>' + restart +
+            '<div class="btn-row"><button class="btn btn-primary" id="toPortalBtn">' + escapeHtml(t('wizard.init.toPortal')) + '</button></div>' +
+          '</div>';
+        document.getElementById('toPortalBtn').addEventListener('click', function() {
+          window.location.href = '/v1/portal';
+        });
+      }
     } else {
       // Error
       var msg = (result.data && result.data.error && result.data.error.message) || t('wizard.init.error');
@@ -1289,6 +1325,44 @@ function escapeHtml(str) {
   return d.innerHTML;
 }
 
+// The running node's values, from GET /v1/setup/status. The node id field falls back to this.
+var runningNodeId = 'aimeat-local-001-dev';
+
+function applyRunningDefaults(s) {
+  if (typeof s.nodeId === 'string' && s.nodeId) {
+    runningNodeId = s.nodeId;
+    var idField = document.getElementById('nodeId');
+    idField.value = s.nodeId;
+    idField.placeholder = s.nodeId;
+  }
+  if (typeof s.nodeType === 'string') {
+    var radio = document.querySelector('input[name="nodeType"][value="' + s.nodeType + '"]');
+    if (radio) selectRadio(radio.closest('.radio-card'), 'nodeType', s.nodeType);
+  }
+  if (typeof s.port === 'number') {
+    document.getElementById('nodePort').value = String(s.port);
+  }
+}
+
+// What POST /v1/setup/init did with each node setting, as lines a person reads.
+function settingLines(settings) {
+  var names = {
+    node_id: t('wizard.init.settingNodeId'),
+    node_type: t('wizard.init.settingNodeType'),
+    port: t('wizard.init.settingPort'),
+    genesis_url: t('wizard.init.settingGenesis')
+  };
+  var html = '';
+  (settings || []).forEach(function(s) {
+    if (s.status === 'unchanged') return;
+    var what = s.status === 'written' ? t('wizard.init.settingWritten') : t('wizard.init.settingNotWritten');
+    html += '<li><strong>' + escapeHtml(names[s.setting] || s.setting) + ': ' + escapeHtml(String(s.requested)) + '</strong>. ' +
+      escapeHtml(what) + ' ' + escapeHtml(String(s.running === null ? '-' : s.running)) + '.' +
+      (s.reason ? '<br><span style="color:var(--muted);">' + escapeHtml(s.reason) + '</span>' : '') + '</li>';
+  });
+  return html;
+}
+
 // ────────────────────────────────────────────────────────────────────
 // On Load — check setup status
 // ────────────────────────────────────────────────────────────────────
@@ -1301,6 +1375,9 @@ function escapeHtml(str) {
         window.location.href = '/v1/portal';
         return;
       }
+      // The form starts from the values the node runs with, so an untouched form changes nothing.
+      // The running node takes none of these: a changed one waits for a restart (QA audit F1-03).
+      applyRunningDefaults(d.data || {});
       // Show step 1
       document.getElementById('step1').classList.add('visible');
     })

@@ -10,10 +10,14 @@
  *   - listAgents / deleteAgent / updateAgentScopes / setMaxConcurrentTasks: agent CRUD + config
  *   - getAgentCors / setAgentCors: per-agent CORS origins
  *   - offersWorkspaceContract / contractNamesOf / adoptContractTask / getAgentEngagements: workspace-contract tags
- *   - getAgentGroups / saveAgentGroups: owner-scoped custom agent grouping (memory `agents.groups`)
+ *   - getAgentGroups / getAgentGroupsStrict / saveAgentGroups: owner-scoped custom agent grouping
+ *     (memory `agents.groups`). The forgiving read is for drawing; a save is built on the strict read
+ *     (docs/pitfalls.md section 84).
  *   - isOwnerStartedAgent / listChatSessions / listChatInstances / deleteChatInstance: chat/MCP session management
  *
  * @version-history
+ *   v1.2.0 — 2026-10-16 — getAgentGroupsStrict beside the forgiving read, for the page that saves the
+ *     whole group record (QA audit F6-04).
  *   v1.1.0 — 2026-08-31 — listChatSessions selects on `mode === 'workstation'` (the field the node
  *     already sets from the reported platform) instead of a `session-` name prefix that no MCP client
  *     has ever used. The prefix stays as the legacy half of the test, because the prompt this tab
@@ -145,13 +149,16 @@ export async function setAgentCors(name, origins) {
  *  devices/browsers. A group is { id, name, agents: [agentName] }; an agent
  *  belongs to at most one group, and any agent not listed in a group renders
  *  under "Ungrouped". The per-browser collapsed/expanded state is NOT stored
- *  here — it lives in localStorage (see agents-tab.js). */
+ *  here — it lives in localStorage (see agents-tab.js). Throws when the read fails: the page saves
+ *  the whole record, so it reads with this one and refuses to save what it did not load. */
+export async function getAgentGroupsStrict() {
+  const resp = await apiGet('/v1/memory?prefix=agents.groups');
+  const item = (resp?.data?.items || []).find(i => i.key === 'agents.groups');
+  return Array.isArray(item?.value?.groups) ? item.value.groups : [];
+}
+/** The groups, [] when the read fails. For drawing only: saving it erases every group. */
 export async function getAgentGroups() {
-  try {
-    const resp = await apiGet('/v1/memory?prefix=agents.groups');
-    const item = (resp?.data?.items || []).find(i => i.key === 'agents.groups');
-    return Array.isArray(item?.value?.groups) ? item.value.groups : [];
-  } catch (err) { swallowed('agents: item', err); return []; }
+  try { return await getAgentGroupsStrict(); } catch (err) { swallowed('agents: getAgentGroups', err); return []; }
 }
 
 /** Persist the owner's custom agent groups. */

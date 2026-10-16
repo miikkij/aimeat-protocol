@@ -88,8 +88,8 @@
       "why": "Inbound settlements and relay hops verified with the pinned key after gatePeer('allowSettlement'); the outbound settle is operator-only, to an active peer, with validateOutboundUrl first."
     },
     "src/routes/federation-sync/catalogue-trust.ts": {
-      "count": 2,
-      "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue'). The catalogue sync reads the same pinned key again, after its own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
+      "count": 4,
+      "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue'). The catalogue sync reads the same pinned key again, after its own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3). A peer's trust notice: gatePeer (an active peer with a key), its signature against the pinned key, then the same key for the audience proof naming this node; the notice is stored and acts on nothing (QA audit S6-06, 2026-10-16)."
     },
     "src/routes/federation-sync/messaging.ts": {
       "count": 7,
@@ -100,8 +100,8 @@
       "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off."
     },
     "src/routes/federation-sync/templates.ts": {
-      "count": 6,
-      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); outbound only to active peers sharing the catalogue. The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7). The listing reads it once more for the audience headers and single use of a signed GET (signedGetRefusal; QA audit S6-09, 2026-10-16)."
+      "count": 4,
+      "why": "Template listing: inbound verified with the pinned key after gatePeer('shareCatalogue'); the outbound sync moved to services/federation-remote-templates.ts (2026-10-16). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7)."
     },
     "src/routes/ghii/register-login.ts": {
       "count": 8,
@@ -135,9 +135,13 @@
       "count": 1,
       "why": "gatePeer refuses a peer with no key; peerTakesMessages reads no url or key beyond that."
     },
-    "src/services/federation-peer-remove.ts": {
+    "src/services/federation-remote-templates.ts": {
+      "count": 1,
+      "why": "The template listing sync asks active peers that share the catalogue, with validateOutboundUrl first and safeFetch, signed as this node; what it stores is named with the peer it was fetched from, never the peer's own claim (QA audit F1-04, 2026-10-16)."
+    },
+    "src/services/federation-trust-notice.ts": {
       "count": 2,
-      "why": "The emergency de-peering notice goes to the other active peers, with validateOutboundUrl and safeFetch."
+      "why": "A trust notice goes to the active peers except its target, with validateOutboundUrl first and peerFetch (no redirect, a time limit, a read ceiling); each is signed for that peer with the audience proof naming its node id. Only the peer's answer is read (QA audit S6-06, 2026-10-16)."
     },
     "src/services/federation.ts": {
       "count": 7,

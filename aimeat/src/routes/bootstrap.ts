@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-10-16 — The health check's storage probe has a 5 s limit and answers degraded when it is hit,
+ *     instead of waiting on a stalled database (QA audit E6-07).
  *   2026-10-15 — The owner_scope note says private records need memory:read-as-owner (feature-list audit #42).
  *   2026-10-15 — getting_started is told whether the email service is enabled, so a node without mail does not offer the registration invite (feature-list audit #23).
  *   v1.7.0 — 2026-10-12 — GET / this_node carries what /.well-known/aimeat says about the protocol:
@@ -129,6 +131,8 @@ const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10
  */
 const LLMS_INDEX_TEMPLATE = readFileSync(resolve(__dirname, '../../public/llms-index-template.txt'), 'utf-8');
 const LLMS_FULL_TEMPLATE = readFileSync(resolve(__dirname, '../../public/llms-full-template.txt'), 'utf-8');
+/** How long GET /v1/health waits for the storage probe before it answers degraded (QA audit E6-07). */
+const HEALTH_STORAGE_PROBE_MS = 5_000;
 
 export function bootstrapRouter(
   config: AimeatConfig,
@@ -733,14 +737,22 @@ export function bootstrapRouter(
       }
     }
 
-    // Storage health probe
+    // Storage health probe, with its own time limit: a database that stops answering made this
+    // request wait without end, so the health check did not answer at all (QA audit E6-07). The
+    // pool's own limits end the query later; the probe answers degraded first.
+    let probeTimer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await storage.listOwners();
+      await Promise.race([
+        storage.listOwners(),
+        new Promise((_, reject) => { probeTimer = setTimeout(() => reject(new Error(`storage did not answer within ${HEALTH_STORAGE_PROBE_MS} ms`)), HEALTH_STORAGE_PROBE_MS); }),
+      ]);
       subsystems.storage = { healthy: true };
     } catch (err) {
-      logger.warn('bootstrap: suppressed failure, continuing', { error: String(err) });
+      logger.warn('health: the storage probe failed; answering degraded', { error: String(err) });
       subsystems.storage = { healthy: false };
       degraded = true;
+    } finally {
+      clearTimeout(probeTimer);
     }
 
     if (Object.keys(subsystems).length > 0) {

@@ -13,6 +13,15 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Trust advisory sent — 2026-10-16 — POST /v1/admin/federation/trust-advisory sends the stored
+ *     advisory to the active peers at once as a signed notice (services/federation-trust-notice.ts)
+ *     and answers each peer's outcome; it said the advisory would be broadcast on the next sync cycle,
+ *     which nothing did (QA audit S6-06).
+ *   Restore outcome — 2026-10-16 — POST /v1/admin/restore runs services/admin-restore.ts: a record that
+ *     already exists is counted as a duplicate, any other failure is counted and logged at error level,
+ *     and `restored` is false when one occurred; a body whose lists are not lists is refused with 400.
+ *     Every create error was logged as a skipped duplicate and the answer always said `restored: true`
+ *     (QA audit P6-07).
  *   Roles — 2026-10-16 — Granting or revoking the operator role writes the operator trail: a usage row,
  *     a log line and the account event operator_acted on the person's feed (QA audit S1-02).
  *   Work cost — 2026-10-11 — The admin work list's `cost` carries `toll` (the escrowed pacing amount) and
@@ -43,7 +52,7 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord, WalletTransaction } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { RoleGrantSchema, validateBody } from '../models/schemas.js';
@@ -65,7 +74,9 @@ import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import type { VerifiedToken } from '../auth/jwt.js';
 import { ROOMS } from '../services/home-rooms.js';
 import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED } from '../services/admin-backup-projection.js';
+import { restoreBackup } from '../services/admin-restore.js';
 import { presentWorkCost } from '../services/morsel.js';
+import { sendTrustNotice, type TrustAdvisoryType } from '../services/federation-trust-notice.js';
 
 const POLL_INTERVAL_MS = 10_000;
 const MAX_POLL_DURATION_MS = 30 * 60_000;
@@ -412,52 +423,19 @@ export function adminMonitoringRouter(
     });
 
     // POST /v1/admin/restore — import data from backup (operator only)
+    // A record that already exists is counted as a duplicate; any other failure is counted, logged at
+    // error level, and makes `restored` false (services/admin-restore.ts; QA audit P6-07).
     router.post('/v1/admin/restore', requireAuth(), requireOperator(storage), async (req, res) => {
-        const { owners, agents, actions, boards, agent_data } = req.body ?? {};
-        const imported = { owners: 0, agents: 0, actions: 0, boards: 0, memories: 0 };
-
-        if (owners) {
-            for (const o of owners) {
-                try { await storage.createOwner(o); imported.owners++; } catch (err) { logger.warn('POST /v1/admin/restore: skip duplicates', { error: String(err) }); }
-            }
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const notList = ['owners', 'agents', 'actions', 'boards'].filter(k => body[k] !== undefined && !Array.isArray(body[k]));
+        if (notList.length > 0 || (body.agent_data !== undefined && (typeof body.agent_data !== 'object' || body.agent_data === null))) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'The restore body is not an aimeat backup: owners, agents, actions and boards must be lists, and agent_data an object. Send the `data` part of the file `aimeat backup` wrote.',
+                400, { fields: notList }));
+            return;
         }
-        if (agents) {
-            for (const a of agents) {
-                try { await storage.createAgent(a); imported.agents++; } catch (err) { logger.warn('POST /v1/admin/restore: skip duplicates', { error: String(err) }); }
-            }
-        }
-        if (actions) {
-            for (const a of actions) {
-                try { await storage.createAction(a); imported.actions++; } catch (err) { logger.warn('POST /v1/admin/restore: skip duplicates', { error: String(err) }); }
-            }
-        }
-        if (boards) {
-            for (const b of boards) {
-                try { await storage.createBoard(b); imported.boards++; } catch (err) { logger.warn('POST /v1/admin/restore: skip duplicates', { error: String(err) }); }
-            }
-        }
-        if (agent_data) {
-            for (const [, data] of Object.entries(
-                agent_data as Record<string, { memories?: MemoryRecord[]; transactions?: WalletTransaction[] }>,
-            )) {
-                if (data.memories) {
-                    for (const m of data.memories) {
-                        await storage.setMemory(m);
-                        imported.memories++;
-                    }
-                }
-                if (data.transactions) {
-                    for (const tx of data.transactions) {
-                        await storage.addTransaction(tx);
-                    }
-                }
-            }
-        }
-
-        res.json(success(config.nodeId, {
-            restored: true,
-            imported,
-        }));
+        const outcome = await restoreBackup(storage, body);
+        res.json(success(config.nodeId, outcome));
         emitChange('config');
     });
 
@@ -546,9 +524,17 @@ export function adminMonitoringRouter(
             return;
         }
 
-        // Note: Trust broadcast requires peers map which admin router doesn't have access to.
-        // Store the advisory and let the federation service pick it up.
-        const advisoryRecord = {
+        if (typeof target_node !== 'string' || !/^[A-Za-z0-9._-]{1,128}$/.test(target_node)
+            || typeof reason !== 'string' || reason.length > 1000) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_node must be a node id and the reason at most 1000 characters.'));
+            return;
+        }
+
+        // Stored first, then sent to every active peer as a signed notice (services/federation-trust-
+        // notice.ts), each peer's answer read. The receiving node stores it for its operator and acts on
+        // nothing. Until 2026-10-16 the answer said it would be broadcast on the next sync cycle, and
+        // nothing sent it (QA audit S6-06).
+        const advisoryRecord: Record<string, unknown> = {
             id: `adv-${randomBytes(8).toString('hex')}`,
             target_node,
             advisory_type,
@@ -561,21 +547,35 @@ export function adminMonitoringRouter(
 
         // Store as memory for persistence and querying
         const systemGaii = `system@${config.nodeId}`;
-        await storage.setMemory({
+        const store = async (version: number) => storage.setMemory({
             key: `trust_advisory:${advisoryRecord.id}`,
             ownerGaii: systemGaii,
             value: advisoryRecord,
             visibility: 'private',
             tags: ['trust_advisory', `target:${target_node}`, `type:${advisory_type}`],
             ttlHours: null,
-            version: 1,
-            createdAt: advisoryRecord.created_at,
-            updatedAt: advisoryRecord.created_at,
+            version,
+            createdAt: advisoryRecord.created_at as string,
+            updatedAt: new Date().toISOString(),
         });
+        await store(1);
+
+        const notices = peers
+            ? await sendTrustNotice({ config, storage, peers }, {
+                target_node, advisory_type: advisory_type as TrustAdvisoryType, reason, evidence_hash: evidence_hash ?? null,
+            })
+            : [];
+        const accepted = notices.filter(n => n.accepted).map(n => n.node);
+        advisoryRecord.sent_to = accepted;
+        await store(2);
 
         res.status(201).json(success(config.nodeId, {
             advisory: advisoryRecord,
-            note: 'Advisory stored. It will be broadcast to peers during next sync cycle or can be manually triggered.',
+            notices,
+            network_notified: notices.length > 0 && accepted.length === notices.length,
+            note: notices.length === 0
+                ? 'Advisory stored. No active peer to send it to.'
+                : `Advisory stored and sent: ${accepted.length} of ${notices.length} peers accepted it.`,
         }));
         emitChange('config');
     });

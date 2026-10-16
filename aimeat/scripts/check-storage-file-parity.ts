@@ -33,6 +33,7 @@
  * @structure PROVIDER_SPECIFIC · readMethodFiles() · readInterface() · main()
  * @usage pnpm check:storage-file-parity
  * @version-history
+ *   v1.0.1 — 2026-10-16 — The Postgres internals reason names _writeMemoryRow (QA audit D4-10).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M8).
  */
 import { readFileSync, readdirSync } from 'node:fs';
@@ -61,7 +62,9 @@ const PROVIDER_SPECIFIC: { provider: Provider; file: string; iface: string; reas
     {
         provider: 'postgres-kysely', file: 'src/storage/providers/postgres-kysely/index.ts', iface: 'PgKyselyInternals',
         reason: '_rawMemory reads a memory row without the TTL and archive filters for the memory methods; '
-            + 'SQLite reads the row inline in each method.',
+            + 'SQLite reads the row inline in each method. _writeMemoryRow is the body of setMemory once the '
+            + 'row is known, so a trackable key can be read FOR UPDATE first; SQLite runs one statement at a '
+            + 'time and has no lost update to prevent.',
     },
 ];
 

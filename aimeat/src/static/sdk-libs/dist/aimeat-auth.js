@@ -2743,7 +2743,10 @@
       scheduleAutoRefresh(session);
       emit("login", session, { restored: true });
       return session;
-    } catch {
+    } catch (e) {
+      if (!(e && /** @type {any} */
+      e.code)) console.warn("[aimeat-auth] Restoring the session from the cookie failed:", e && /** @type {Error} */
+      e.message);
       return null;
     }
   }
@@ -2797,23 +2800,20 @@
   function scheduleAutoRefresh(session) {
     if (refreshTimer) clearTimeout(refreshTimer);
     if (!session?.jwt) return;
-    try {
-      const payload = JSON.parse(atob(session.jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-      if (!payload.exp) return;
-      const msUntilExpiry = payload.exp * 1e3 - Date.now();
-      const refreshIn = Math.max(msUntilExpiry - 5 * 60 * 1e3, 1e4);
-      refreshTimer = setTimeout(async () => {
-        try {
-          await session.refresh();
-          emit("refreshed", session);
-          scheduleAutoRefresh(session);
-        } catch (e) {
-          console.warn("[aimeat-auth] Auto-refresh failed:", e.message);
-          emit("expired", { reason: "refresh_failed", error: e.message });
-        }
-      }, refreshIn);
-    } catch {
-    }
+    const payload = parseJwt(session.jwt);
+    if (!payload || !payload.exp) return;
+    const msUntilExpiry = payload.exp * 1e3 - Date.now();
+    const refreshIn = Math.max(msUntilExpiry - 5 * 60 * 1e3, 1e4);
+    refreshTimer = setTimeout(async () => {
+      try {
+        await session.refresh();
+        emit("refreshed", session);
+        scheduleAutoRefresh(session);
+      } catch (e) {
+        console.warn("[aimeat-auth] Auto-refresh failed:", e.message);
+        emit("expired", { reason: "refresh_failed", error: e.message });
+      }
+    }, refreshIn);
   }
   function createSession(data) {
     const jwtPayload = data.jwt ? parseJwt(data.jwt) : null;
@@ -2842,8 +2842,11 @@
         federated: data.federated || false,
         homeNode: data.homeNode || "",
         homeUrl: data.homeUrl || "",
-        // Authenticated fetch wrapper — returns parsed JSON without throwing on error so callers
-        // (e.g. AIMEAT.data.get) can inspect res.ok / res.error themselves.
+        // Authenticated fetch wrapper — returns the parsed envelope for every answer, ok or not, without
+        // throwing, so a caller can branch on res.ok / res.error.code itself. A caller MUST branch: an
+        // envelope with ok:false is a refused call (401, 403, 429, 5xx), never an empty result, and a read
+        // that was refused is never the basis of a write (AIMEAT.data.get() resolves null only for
+        // NOT_FOUND and throws for the rest). An answer that is not JSON rejects from resp.json().
         async fetch(path, opts = {}) {
           if (isExpired(session.jwt)) {
             await session.refresh();
@@ -2915,12 +2918,17 @@
               headers: { "Content-Type": "application/json", "X-AIMEAT-Refresh": "1" }
             });
             let data2 = null;
+            let unreadable = null;
             try {
               data2 = await resp.json();
-            } catch {
+            } catch (e) {
+              unreadable = e;
             }
             if (!resp.ok || !data2 || data2.ok === false) {
-              throw new Error(data2?.error?.message || "Session refresh failed");
+              throw new Error(
+                data2?.error?.message || "Session refresh failed" + (unreadable ? " (HTTP " + resp.status + ", the answer was not JSON)" : ""),
+                unreadable ? { cause: unreadable } : void 0
+              );
             }
             session.jwt = data2.data.token;
             session.roles = (parseJwt(session.jwt) || {}).roles || session.roles || [];
@@ -3013,9 +3021,10 @@
     if (isOwnerLocal || isExpired(session.jwt)) {
       try {
         await session.refresh();
-      } catch {
+      } catch (e) {
         remove("session");
-        emit("expired");
+        emit("expired", { reason: "refresh_failed", error: e && /** @type {Error} */
+        e.message });
         return null;
       }
     }
@@ -3200,12 +3209,16 @@
           credentials: "include",
           headers: { "Content-Type": "application/json", ...jwt ? { "Authorization": "Bearer " + jwt } : {} }
         });
-      } catch {
+      } catch (e) {
+        console.warn("[aimeat-auth] Sign-out could not reach the node; the server session may still be open:", e && /** @type {Error} */
+        e.message);
       }
       if (onAppOrigin) {
         try {
           await apexLogout();
-        } catch {
+        } catch (e) {
+          console.warn("[aimeat-auth] Sign-out on the node address failed:", e && /** @type {Error} */
+          e.message);
         }
       }
     },

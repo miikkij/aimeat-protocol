@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Admin endpoints for capability management: list all, override, logs.
  * @version-history
+ *   v1.2.0 - 2026-10-16 - The manual aggregation trigger's answer carries `failedScans`, the source types whose scan did not complete and whose rows were left as they were (QA audit F2-01).
  *   v1.1.0 - 2026-10-05 - The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 - 2026-05-02 - Initial admin capability endpoints
  */
@@ -49,7 +50,8 @@ export function adminCapabilitiesRouter(config: AimeatConfig, storage: Storage):
     res.json(success(config.nodeId, { ...result, stats: cap?.stats }));
   });
 
-  // Trigger aggregation manually (operator only)
+  // Trigger aggregation manually (operator only). The answer names every scan that failed
+  // (`failedScans`); the rows of a failed scan's source type are left unchanged.
   router.post('/v1/admin/capabilities/aggregate', ...auth, async (_req, res) => {
     const { runCapabilityAggregation } = await import('../services/capability-aggregator.js');
     const result = await runCapabilityAggregation(config, storage);

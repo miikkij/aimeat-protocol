@@ -39,6 +39,9 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   2026-10-16 — PUT /:id/grants stores a grant on a node-wide server under the caller's owner, where
+ *     the access check now reads it; 409 GRANT_NOT_APPLICABLE is for somebody else's personal server
+ *     only. An end date that is not a date answers 400 INVALID_INPUT (QA audit F01b-02).
  *   2026-10-15 — PUT /:id/grants answers 409 GRANT_NOT_APPLICABLE on a server whose grants nobody
  *     reads (a node-wide one) instead of storing it with 200 (feature-list audit #12).
  *   2026-10-15 — Comment: the node-wide door admits the operator in person and the operator's own agent holding operator:admin (feature-list audit 18).
@@ -90,7 +93,7 @@ import { callRemoteTool, listRemoteTools, statusForRemoteRefusal } from '../serv
 import { startMcpOAuth, finishMcpOAuth } from '../services/mcp-client/oauth.js';
 import { requireEncryptionKey } from '../services/mcp-client/credential.js';
 import {
-  listMcpGrants, putMcpGrant, removeMcpGrant, grantCannotNarrow, type McpGrant,
+  listMcpGrants, putMcpGrant, removeMcpGrant, grantCannotNarrow, invalidGrantExpiry, type McpGrant,
 } from '../services/mcp-client/grants.js';
 import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
@@ -405,7 +408,8 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const server = await requireUsableServer(storage, ownerOf(req), req.params.id as string);
       if (!server) return notFound(res);
-      // A grant on a server whose grants nobody reads (a node-wide one) is refused, not stored.
+      // A grant on somebody else's personal server is refused, not stored. On a node-wide server the
+      // grant is stored under this owner and narrows this owner's own agents and apps (QA audit F01b-02).
       const cannot = grantCannotNarrow(server, ownerOf(req));
       if (cannot) {
         return res.status(409).json(error(config.nodeId, 'GRANT_NOT_APPLICABLE', cannot, 409, { server: server.slug }));
@@ -430,13 +434,11 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         ));
       }
 
-      // An end date that is not a date was stored as given and never ran out (feature-list audit 13).
-      if (b.expires !== undefined && b.expires !== null
-        && (typeof b.expires !== 'string' || !Number.isFinite(Date.parse(b.expires)))) {
-        return res.status(400).json(error(
-          config.nodeId, 'BAD_REQUEST',
-          'The end date is not a date. Give it as a date such as 2026-12-31, or leave it out for a permission that does not end.',
-        ));
+      // An end date that is not a date was stored as given and never ran out (feature-list audit 13;
+      // the same check as aimeat_mcp_grant_set, QA audit F01b-02).
+      const badExpiry = invalidGrantExpiry(b.expires);
+      if (badExpiry) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', badExpiry));
       }
 
       const grant: McpGrant = {

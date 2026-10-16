@@ -11,6 +11,9 @@
  *   - NotebookTab (default export) — capture box, trust toggles, librarian search, inbox list → NoteCard
  * @usage html`<${NotebookTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.18.0 -- 2026-10-16 -- A failed inbox load shows the could-not-load note with Retry instead of
+ *     "no notes"; a trust switch is not saved until the stored settings have loaded, because the save
+ *     replaces all three switches (QA audit F6-04, F6-05).
  *   v1.17.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt saves a note through the person's own AI; the capture box under it is this page's way) and the title's question mark, concept.knowledge (guidance part B).
  *   v1.16.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a search hit's title, snippet or organism name with a quote or an ampersand showed
@@ -76,7 +79,8 @@ import { TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
 import * as memoryService from '/js/services/memory.js';
-import { getNotebookSettings, saveNotebookSettings } from '/js/services/notebook.js';
+import { getNotebookSettingsStrict, saveNotebookSettings } from '/js/services/notebook.js';
+import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { listOrganisms } from '/js/services/organisms.js';
 import { apiGet } from '/js/api.js';
 import { useConfirm } from '/components/Modal.js';
@@ -99,6 +103,9 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const [searchScope, setSearchScope] = useState('own');   // 'own' | 'public'
 
   const [settings, setSettings] = useState({ autoDetectIntent: false, autoRunPlan: false, autoDistribute: false });
+  // The save replaces the whole record, so a switch is saved only once the stored record has loaded.
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const inboxLoad = useLoadState();
   const [autoEnrichKey, setAutoEnrichKey] = useState(null); // the just-captured note to auto-enrich (trust mode)
 
   // Mount: ONE composite (GET /v1/notebook) seeds the inbox + settings + organism names. Interactive
@@ -108,12 +115,14 @@ export default function NotebookTab({ session, showToast, onStats }) {
     const ov = await apiGet('/v1/notebook').then(r => r?.data).catch(err => { swallowed('notebook-tab: loadTab', err); return null; });
     if (!ov) { loadInbox(); loadOrgNames(); loadSettings(); return; }
     setInbox(ov.inbox || []);
+    inboxLoad.ok();
     onStats?.({ notebook: (ov.inbox || []).length });
     const map = {};
     for (const o of (ov.organisms?.organisms || [])) map[o.id] = o.name;
     setOrgNames(map);
     const s = ov.settings || {};
     setSettings({ autoDetectIntent: !!s.autoDetectIntent, autoRunPlan: !!s.autoRunPlan, autoDistribute: !!s.autoDistribute });
+    setSettingsLoaded(true);
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Initial load once the session is available; the loaders close over session/onStats/setters and are intentionally keyed to session.
@@ -121,11 +130,14 @@ export default function NotebookTab({ session, showToast, onStats }) {
 
   async function loadSettings() {
     try {
-      const s = await getNotebookSettings();
+      const s = await getNotebookSettingsStrict();
       setSettings({ autoDetectIntent: !!s.autoDetectIntent, autoRunPlan: !!s.autoRunPlan, autoDistribute: !!s.autoDistribute });
+      setSettingsLoaded(true);
     } catch (err) { swallowed('notebook-tab: loadSettings', err); }
   }
   async function toggleSetting(key) {
+    // Built from defaults, `next` would reset the other two switches the owner had set.
+    if (!settingsLoaded) { showToast(t('common.settingsNotLoaded'), true); loadSettings(); return; }
     const next = { ...settings, [key]: !settings[key] };
     setSettings(next);
     try { await saveNotebookSettings(next); } catch (err) { swallowed('notebook-tab', err); showToast(t('profile.error'), true); }
@@ -147,8 +159,9 @@ export default function NotebookTab({ session, showToast, onStats }) {
         .filter(m => typeof m.key === 'string' && m.key.startsWith(INBOX_PREFIX))
         .sort((a, b) => +new Date(b.updated_at || b.created_at || 0) - +new Date(a.updated_at || a.created_at || 0));
       setInbox(notes);
+      inboxLoad.ok();
       onStats?.({ notebook: notes.length });
-    } catch (err) { swallowed('notebook-tab', err); setInbox([]); }
+    } catch (err) { swallowed('notebook-tab', err); inboxLoad.fail(err); }
   }
 
   async function loadOrgNames() {
@@ -323,7 +336,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
 
     <${Section} band title=${t('profile.notebook.inboxTitle')}>
     ${inbox === null
-      ? html`<${Note} kind="loading">${t('profile.notebook.inboxLoading')}<//>`
+      ? (inboxLoad.failed ? html`<${LoadFailed} onRetry=${loadInbox} />` : html`<${Note} kind="loading">${t('profile.notebook.inboxLoading')}<//>`)
       : inbox.length === 0
         ? html`<${Note} kind="quiet">${t('profile.notebook.inboxEmpty')}<//>`
         : html`

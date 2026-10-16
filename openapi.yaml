@@ -18,7 +18,10 @@ info:
       record, named by `{name}`, without the word.
 
     ## Authentication
-    Every authenticated call sends `Authorization: Bearer <token>`. The ways to get a token:
+    Every authenticated call sends `Authorization: Bearer <token>`. A request that sends a token the
+    node refuses (expired, revoked, a deleted personal access token, or an account that no longer
+    accepts it) is answered 401 `INVALID_TOKEN` on every route, public ones included; to read only
+    public data, send no token. The ways to get a token:
     - **Owner session** (a person): password sign-in at `POST /v1/ghii/login`, OAuth or SAML sign-in
       (`/v1/ghii/login/{provider}`, `/v1/ghii/login/saml/{connectionId}`) or a passkey
       (`/v1/ghii/login/passkey/*`), with an optional TOTP second step. It returns a short-lived JWT and a
@@ -305,6 +308,36 @@ components:
       description: Ed25519 signature of the challenge for token acquisition
 
   schemas:
+    RestoreCounts:
+      type: object
+      description: Rows per kind, as POST /v1/admin/restore counts them.
+      properties:
+        owners: { type: integer }
+        agents: { type: integer }
+        actions: { type: integer }
+        boards: { type: integer }
+        memories: { type: integer }
+        transactions: { type: integer }
+    SetupSettingOutcome:
+      type: object
+      description: >-
+        What POST /v1/setup/init did with one node setting the wizard sent. `unchanged`: the value is
+        the one the node runs with. `written`: it was written to the new .env file and takes effect
+        when the node is restarted. `not_written`: it differs from the running value but was not
+        written, because a configuration file already exists (`reason` says which) or the write failed;
+        the node keeps running with `running`.
+      required: [setting, status, running]
+      properties:
+        setting: { type: string, enum: [node_id, node_type, port, genesis_url] }
+        status: { type: string, enum: [unchanged, written, not_written] }
+        requested:
+          description: The value the wizard sent, or null when it sent none.
+          nullable: true
+        running:
+          description: The value the running node uses.
+          nullable: true
+        restart_required: { type: boolean }
+        reason: { type: string }
     AdminMemoryRow:
       type: object
       description: >-
@@ -1486,7 +1519,7 @@ components:
           description: |
             Machine-readable error code. Common codes:
             - AUTH_REQUIRED: Missing authentication
-            - INVALID_TOKEN: The token verified but is not for this route (from 4.0.0, an MCP OAuth access token on a REST route)
+            - INVALID_TOKEN: The token was refused (expired, revoked, a deleted personal access token, an account that no longer accepts it), on any route; or it verified but is not for this route (from 4.0.0, an MCP OAuth access token on a REST route)
             - ACCESS_DENIED: Insufficient permissions
             - NOT_FOUND: Resource not found
             - INSUFFICIENT_MORSELS: Wallet balance too low
@@ -15451,10 +15484,12 @@ paths:
         Open and unauthenticated by design: the caller has no identity yet. Three things fence it:
 
         1. The response is IDENTICAL whether the address is new, already has an account, or already
-           has a live invitation — it always answers `sent`. Anything else would make this an
+           has a live invitation — it answers `sent`. Anything else would make this an
            address-checking machine open to the internet. A node whose email service is disabled
-           answers `not_sent` with the portal link for every address, which is a fact about the
-           node and not about the address.
+           answers `not_sent` (reason `mail_disabled`) with the portal link for every address, which
+           is a fact about the node and not about the address. When the node has mail and the send
+           fails, it answers `not_sent` (reason `send_failed`) and cancels the invitation it wrote,
+           so the person is not told to wait for a message and a later call can send again.
         2. One LIVE invitation per address at a time, so an inbox cannot be buried by repeating the
            call. This holds even against a caller rotating IPs.
         3. A per-IP limit (`AIMEAT_RL_REGISTRATION_INVITES`, default 5 per HOUR).
@@ -15488,8 +15523,9 @@ paths:
       responses:
         '202':
           description: >-
-            Accepted, on a node that sends email. Says `sent` whether or not a message actually
-            went out to this address — see the non-enumeration property above.
+            Accepted, on a node that sends email. Says `sent` when the message went out, and also
+            when a live invitation to the address suppressed a second message — see the
+            non-enumeration property above. A send that failed answers 200 `not_sent` instead.
           content:
             application/json:
               schema:
@@ -15512,10 +15548,11 @@ paths:
                           next: { type: string }
         '200':
           description: >-
-            Not sent. This node's email service is disabled, so no message goes to any address and
-            no invitation is stored. The answer is the same for every address, so it reveals
-            nothing about one. `register_url` is the portal, where the person registers themselves;
-            the AI hands that link to the person.
+            Not sent, and no invitation is left pending. `reason` says why: `mail_disabled` (this
+            node's email service is disabled, so no message goes to any address; the same answer
+            for every address) or `send_failed` (the node has mail and this send failed; the
+            invitation it wrote is cancelled, so a retry can send again). `register_url` is the
+            portal, where the person registers themselves; the AI hands that link to the person.
           content:
             application/json:
               schema:
@@ -15527,6 +15564,7 @@ paths:
                         type: object
                         properties:
                           status: { type: string, enum: [not_sent] }
+                          reason: { type: string, enum: [mail_disabled, send_failed] }
                           email_sent: { type: boolean, enum: [false] }
                           register_url: { type: string, format: uri }
                           tell_the_person:
@@ -28432,9 +28470,15 @@ paths:
         '422':
           description: PAYMENT_HANDLER_REQUIRED (a money session without payment.handler, or with io.aimeat.morsels; the message lists the handlers that settle its currency) / UNKNOWN_PAYMENT_HANDLER / CURRENCY_MISMATCH / seller has no x402 payout address
         '429':
-          description: PACING_PACK_CAP. A pacing pack would take the node past its daily mint ceiling; the money and the pacing went back and the session stays open, so the buyer can try again the next day. Any limit a fulfilment refuses on with 429 keeps its own code here.
+          description: PACING_PACK_CAP. A pacing pack would take the node past its daily mint ceiling; the pacing went back, the money was refunded when the payment handler could refund it (the message says which), and the session stays open, so the buyer can try again the next day. Any limit a fulfilment refuses on with 429 keeps its own code here.
         '502':
-          description: FULFILLMENT_FAILED. A line could not be fulfilled; the money and the pacing went back and the session stays open.
+          description: >-
+            FULFILLMENT_FAILED. A line could not be fulfilled; the pacing went back and the session
+            stays open. The message says what happened to the money, from what the payment handler
+            answered: refunded, no payment taken (a manual invoice), or taken and NOT returned (an
+            x402 settlement, which cannot be reversed, or a refund the payment service refused). A
+            payment taken and not returned names the checkout reference, is stored for the seller as
+            `commerce.undelivered.{session id}`, and is told to the operator.
 
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:
@@ -28820,7 +28864,11 @@ paths:
         Remove a peered node. Use ?emergency=true for immediate de-peering (no grace period): the peer
         and its recorded origin go at once, so the node id is free for a registration under another
         key. A node id that is only a waiting package registration (no peer yet) is deleted as that,
-        answering `pending_deleted: true`.
+        answering `pending_deleted: true`. With an emergency removal, `notify_network` (body or query)
+        sends a signed trust notice (type suspend, with the reason) to every other active peer, which
+        stores it for its operator; the answer lists each peer's outcome in `network_notices`
+        (`accepted` only on a 2xx answer) and `network_notified` is true only when every peer
+        accepted. The peer's stored template listings are deleted with it.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -28836,6 +28884,17 @@ paths:
             type: boolean
             default: false
           description: Emergency de-peering (immediate, no grace period)
+        - name: notify_network
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Emergency only. Send the signed notice to the other peers (the body field of the same name does the same).
+        - name: reason
+          in: query
+          schema:
+            type: string
+          description: Why; kept with the removal and sent with the notice. The body field of the same name wins.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -29449,14 +29508,30 @@ paths:
   /v1/federation/trust-advisory:
     post:
       operationId: federationTrustAdvisory
-      summary: Issue trust advisory
+      summary: Issue or receive a trust advisory
       description: |
-        Issue a trust warning, suspension, or ban against a target node.
-        Operator auth required. A `ban` advisory automatically de-peers the
-        target node.
+        Two callers, told apart by the body.
+
+        **This node's operator** (Bearer session, operator role; a body without `signature`): a
+        warning, suspension or ban against a target node, acted on here. A `ban` removes the target
+        peer, a `suspend` demotes it to the visiting tier, a `warning` changes nothing. Every
+        advisory is stored (`acted` says what was done) and listed in
+        GET /v1/admin/federation/trust-advisories.
+
+        **A peer node** (no session; the body carries `source_node`, `timestamp`, `signature`,
+        `audience` and `audience_signature`): a trust notice, sent by the other node's emergency peer
+        removal or its operator's advisory. The peer must be active with a key on file. `signature`
+        is the peer's Ed25519 signature over the JSON
+        `{ source_node, target_node, advisory_type, reason, evidence_hash, timestamp }` in that order
+        (`evidence_hash` as an empty string when absent); `audience` must be this node, proven by
+        `audience_signature`; the timestamp must be within five minutes, and each notice is taken
+        once. The notice is STORED for this node's operator (direction `received`, `acted: false`)
+        and acts on nothing. One stored notice per sending peer, target and type; a peer holds at
+        most 50 here (429 beyond that).
       tags: [Federation]
       security:
         - BearerAuth: []
+        - {}
       requestBody:
         required: true
         content:
@@ -29467,20 +29542,24 @@ paths:
               properties:
                 target_node:
                   type: string
+                  description: A node id (letters, digits, dot, dash, underscore).
                 advisory_type:
                   type: string
                   enum: [warning, suspend, ban]
                 reason:
                   type: string
+                  maxLength: 1000
                 evidence_hash:
                   type: string
                   description: SHA-256 hash of supporting evidence
-                issued_by:
-                  type: string
-                  description: Issuing node (defaults to this node)
+                source_node: { type: string, description: 'Peer notice only: the sending node.' }
+                timestamp: { type: string, format: date-time, description: 'Peer notice only.' }
+                signature: { type: string, description: 'Peer notice only: see the description.' }
+                audience: { type: string, description: 'Peer notice only: this node id.' }
+                audience_signature: { type: string, description: 'Peer notice only.' }
       responses:
         '201':
-          description: Advisory recorded
+          description: Advisory stored (and, for this node's operator, acted on)
           content:
             application/json:
               schema:
@@ -29504,11 +29583,24 @@ paths:
                             type: string
                           issued_by:
                             type: string
+                          direction: { type: string, enum: [local, received] }
+                          acted:
+                            description: What this node did. false for a warning and for every notice from a peer.
+                            oneOf:
+                              - { type: string, enum: [removed, demoted] }
+                              - { type: boolean, enum: [false] }
+                          stored: { type: boolean }
                           created_at:
                             type: string
                             format: date-time
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          description: The sending peer already has 50 notices stored here.
 
   # ── Administration ─────────────────────────────────────────
   /v1/admin/dashboard:
@@ -30479,6 +30571,16 @@ paths:
     post:
       operationId: restoreBackup
       summary: Import data from backup
+      description: |
+        Operator only (the operator in person, or an agent of the operator holding `operator:admin`).
+        Imports the `data` part of what GET /v1/admin/backup answers: owners, agents, actions and
+        boards are created, agents' memory records are written (an existing key is replaced) and
+        wallet transactions are appended.
+
+        A row whose key already exists on this node is counted in `skipped_duplicates`. A row that
+        failed for any other reason is counted in `failed`, logged at error level, and its key and
+        error are in `failures` (the first 20). `restored` is `true` only when nothing failed, so a
+        200 with `restored: false` is a partial import that needs attention.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -30488,9 +30590,51 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                owners: { type: array, items: { type: object } }
+                agents: { type: array, items: { type: object } }
+                actions: { type: array, items: { type: object } }
+                boards: { type: array, items: { type: object } }
+                agent_data:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      memories: { type: array, items: { type: object } }
+                      transactions: { type: array, items: { type: object } }
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: The import ran. Read `restored` to know whether every row was imported or already there.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    required: [restored, imported, skipped_duplicates, failed, failures]
+                    properties:
+                      restored:
+                        type: boolean
+                        description: True only when no row failed for a reason other than already existing.
+                      imported: { $ref: '#/components/schemas/RestoreCounts' }
+                      skipped_duplicates: { $ref: '#/components/schemas/RestoreCounts' }
+                      failed: { $ref: '#/components/schemas/RestoreCounts' }
+                      failures:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            kind: { type: string, enum: [owners, agents, actions, boards, memories, transactions] }
+                            key: { type: string, description: The row's key (account name, GAII, provider/id, board id, gaii/memory key) }
+                            error: { type: string }
+        '400':
+          description: INVALID_INPUT. owners, agents, actions or boards is not a list, or agent_data is not an object.
+        '401':
+          description: AUTH_REQUIRED. No credential, or one the node does not accept.
+        '403':
+          description: ACCESS_DENIED. The caller is not the node operator.
 
   /v1/admin/hooks:
     get:
@@ -38402,6 +38546,12 @@ paths:
                           nodeId:
                             type: string
                             description: Current node identifier
+                          nodeType:
+                            type: string
+                            description: The node type the node runs as; the wizard uses it as the default.
+                          port:
+                            type: integer
+                            description: The port the node runs on; the wizard uses it as the default.
 
   /v1/setup/wizard:
     get:
@@ -38434,6 +38584,11 @@ paths:
         created: a value with a double quote, a carriage return, a line feed or a NUL, a node id
         outside the node-id grammar, an unknown node type, a genesis URL that is not http(s) or
         carries credentials, or a locale that is not a language tag answers 400 INVALID_INPUT.
+
+        The running node never changes its node id, node type, port or genesis URL: the account is
+        created under the node id it runs as. A setting that differs from the running value is
+        written to a new .env file and takes effect at the next start, or, when a .env file already
+        exists, is not written at all. `settings` reports each one, and `message` says so.
       tags: [Setup]
       security: []
       requestBody:
@@ -38522,6 +38677,20 @@ paths:
                             format: date-time
                           message:
                             type: string
+                            description: |
+                              What happened, in plain words. It says setup is complete only when every
+                              node setting already matched the running node; otherwise it names the
+                              settings that need a restart or were not saved.
+                          settings:
+                            type: array
+                            description: |
+                              One entry per node setting the wizard can send (node_id, node_type, port,
+                              genesis_url): unchanged, written to .env for the next start, or not written.
+                            items:
+                              $ref: '#/components/schemas/SetupSettingOutcome'
+                          restart_required:
+                            type: boolean
+                            description: True when at least one setting was written and takes effect only after a restart.
         '400':
           description: Invalid input (missing username, short password, etc.)
         '403':
@@ -52398,7 +52567,8 @@ paths:
         `{"source_node","timestamp"}` as JSON, and x-audience naming this node with
         x-audience-signature. Each signed request is answered once (401 REPLAYED the second time),
         one signed for another node is 401 WRONG_AUDIENCE, and one without the audience is 401
-        AUDIENCE_REQUIRED.
+        AUDIENCE_REQUIRED. A browser session cannot call it; owners read the listings this node
+        fetched in GET /v1/packages/tab (`remote`).
       tags: [Federation]
       parameters:
         - name: limit
@@ -52420,13 +52590,40 @@ paths:
     post:
       operationId: syncFederationTemplates
       summary: Sync templates from federation
-      description: Pull template listings from all active peer nodes. Operator only.
+      description: |
+        Operator only, and only with package federation on (403 otherwise). Fetches the template
+        listing of every active peer this node shares its catalogue with, over the peer-signed
+        GET /v1/federation/templates, and stores each one on this node, one record per peer, with
+        the fetch time. A peer that cannot be asked or does not answer is reported with its error,
+        and its last stored listing is kept. Owners read the stored listings in GET /v1/packages/tab
+        (`remote`).
       tags: [Federation]
       security:
         - BearerAuth: []
       responses:
         '200':
-          $ref: '#/components/responses/AimeatSuccess'
+          description: One result per peer
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          syncResults:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                node: { type: string }
+                                templates: { type: integer, description: Listings fetched and stored now; 0 on an error. }
+                                stored: { type: boolean }
+                                error: { type: string }
+                          stored: { type: integer, description: Peers whose listing was stored. }
+                          failed: { type: integer, description: Peers that could not be asked or did not answer. }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -60056,17 +60253,21 @@ paths:
                 expires:
                   type: string
                   nullable: true
+                  description: An ISO date after which the grant refuses every call. A value that is not a date is refused.
       responses:
         '200':
-          description: The grant as stored
+          description: >
+            The grant as stored. On a node-wide server it is stored under the caller's owner and
+            narrows only that owner's own agents and apps; another owner's grant on the same server
+            never applies to them.
         '400':
-          description: No grantee, or no tools list.
+          description: No grantee, or no tools list (BAD_REQUEST); an `expires` that is not a date (INVALID_INPUT).
         '404':
           description: No such server.
         '409':
           description: >
-            GRANT_NOT_APPLICABLE. The server is not the caller's own (a node-wide server the node
-            offers to every owner it admits), so a grant on it would limit nobody and is not stored.
+            GRANT_NOT_APPLICABLE. The server is another owner's personal server, so a grant on it
+            would limit nobody and is not stored.
   /v1/mcp-servers/{id}/grants/{grantee}:
     delete:
       operationId: removeMcpGrant
@@ -67170,8 +67371,13 @@ paths:
       tags: [Federation, Admin]
       summary: Issue a trust advisory about a peer node
       description: |
-        Operator-only (requireRole('operator')). Records a trust advisory (warning/suspend/ban)
-        about a target node; it is broadcast to peers on the next sync cycle.
+        Operator-only (requireRole('operator')). Stores a trust advisory (warning/suspend/ban)
+        about a target node and sends it at once to every active peer except the target, as a
+        signed notice to that peer's POST /v1/federation/trust-advisory. `notices` gives each peer's
+        outcome (`accepted` only on a 2xx answer); `network_notified` is true only when every peer
+        accepted. A receiving node stores the notice for its operator and acts on nothing. This
+        node itself acts on nothing either: POST /v1/federation/trust-advisory is the route that
+        bans or suspends a peer here.
       security:
         - BearerAuth: []
       requestBody:
@@ -67201,7 +67407,18 @@ paths:
                       data:
                         type: object
                         properties:
-                          advisory: { type: object }
+                          advisory: { type: object, description: 'The stored advisory; `sent_to` lists the peers that accepted it.' }
+                          notices:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                node: { type: string }
+                                accepted: { type: boolean }
+                                status: { type: integer }
+                                code: { type: string }
+                                error: { type: string }
+                          network_notified: { type: boolean }
                           note: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -70492,7 +70709,11 @@ paths:
       operationId: aggregateAdminCapabilities
       tags: [Capabilities, Admin]
       summary: Trigger capability aggregation
-      description: Operator only. Manually runs the capability usage aggregation job.
+      description: |
+        Operator only. Manually runs the capability scan (extensions, actions, cortexes, app tools,
+        agent offers). A row whose source is gone is disabled, and deleted on a later scan. A
+        source type whose scan did not complete is listed in `failedScans`, and none of its rows
+        is disabled or deleted on that run.
       security:
         - BearerAuth: []
       responses:
@@ -70500,7 +70721,21 @@ paths:
           description: Aggregation result
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          created: { type: integer }
+                          updated: { type: integer }
+                          disabled: { type: integer, description: Rows disabled or deleted because their source is gone. }
+                          failedScans:
+                            type: array
+                            items: { type: string, enum: [extension, action, cortex, app-tool, offering] }
+                            description: Source types whose scan failed this run; their rows were left unchanged.
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /v1/admin/mint:
@@ -73459,9 +73694,9 @@ paths:
       operationId: getPackagesTab
       summary: The Packages tab in one read
       description: >-
-        The owner's installed instances, their own live packages, the newest template listings and
-        the publicly available packages, in one read scope. The cross-node federation templates call
-        stays separate. Owner role only.
+        The owner's installed instances, their own live packages, the newest template listings, the
+        publicly available packages, and the other nodes' template listings this node stored at its
+        last federation template sync (`remote`), in one read. Owner role only.
       tags: [Packages]
       security:
         - BearerAuth: []
@@ -73498,6 +73733,31 @@ paths:
                             properties:
                               packages: { type: array, items: { type: object, additionalProperties: true } }
                               total: { type: integer }
+                          remote:
+                            type: object
+                            description: >-
+                              The other nodes' template listings this node stored at its last
+                              POST /v1/federation/templates/sync, for the peers that are active and
+                              share the catalogue now. `enabled` is false, with empty lists, when
+                              package federation is off on this node.
+                            properties:
+                              enabled: { type: boolean }
+                              templates:
+                                type: array
+                                items:
+                                  type: object
+                                  additionalProperties: true
+                                  description: One listing; `sourceNode` is the peer it was fetched from and `fetchedAt` when.
+                              peers:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    node: { type: string }
+                                    fetchedAt: { type: string, format: date-time, nullable: true, description: The last successful fetch. }
+                                    lastAttemptAt: { type: string, format: date-time, nullable: true }
+                                    error: { type: string, nullable: true, description: The last attempt's error, or null when it succeeded. }
+                                    templates: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

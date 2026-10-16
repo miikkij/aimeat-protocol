@@ -8,6 +8,8 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  *   Every part is a component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.2.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry instead of a
+ *     loading line that never ends (QA audit F6-05).
  *   v2.1.0 -- 2026-10-02 -- The question mark that explains a share pattern: memory.key_pattern (components/HelpTip.js).
  *   v2.0.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a key, a share pattern or an organism group name with an ampersand or a quote showed
@@ -91,6 +93,7 @@ import { openTab } from '/components/Rail.js';
 import { formatBytes, formatRelativeTime, shortTok, groupOfKey, displayRemainder, VIS_OPTIONS } from './helpers.js';
 import { MemoryForm } from './components.js';
 import { swallowed } from '/js/swallowed.js';
+import { LoadFailed } from '/js/load-state.js';
 import { dateTime as fmtDateTime } from '/js/format.js';
 
 export function sortEntries(entries, sortBy) {
@@ -130,7 +133,11 @@ export function renderEntries(ctx) {
     sharePattern, setSharePattern, shareGroupId, setShareGroupId, submitShare,
   } = ctx;
 
-  if (!memories) return html`<${Note} kind="loading">${t('profile.memory.loading')}<//>`;
+  if (!memories) {
+    return ctx.memFailed
+      ? html`<${LoadFailed} onRetry=${ctx.loadMemories} />`
+      : html`<${Note} kind="loading">${t('profile.memory.loading')}<//>`;
+  }
 
   // Tag counts across memories — the cloud shows the most-used first, capped at 10.
   const tagCounts = new Map();

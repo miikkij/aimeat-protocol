@@ -16,8 +16,14 @@
  *   - parkMessageToNotebook(msg) — park ONE inbox message for later processing
  *   - parkConversationToNotebook({conv,thread,peerName,summary,images}) — park a WHOLE thread (transcript +
  *     inline image embeds, optional AI/pasted summary) as one entry, ready for classify/distribute
- *   - getNotebookSettings/saveNotebookSettings — the per-owner trust toggles (notebook.settings)
+ *   - getNotebookSettings/getNotebookSettingsStrict/saveNotebookSettings — the per-owner trust toggles
+ *     (notebook.settings). The forgiving read is for drawing; a save reads with the strict one or
+ *     refuses (docs/pitfalls.md section 84).
  * @version-history
+ *   v1.6.0 — 2026-10-16 — A new workspace reads the registry strictly before anything is written, so a
+ *     failed read stops the filing instead of replacing the registry; getNotebookSettingsStrict beside
+ *     the forgiving read; readManifest throws on a failed read instead of answering "no manifest"
+ *     (QA audit F6-01, F6-04).
  *   v1.0.0 — 2026-06-19 — Initial: classify + materialize-document orchestration (slice B).
  *   v1.1.0 — 2026-06-21 — Phase 3: distribute (split → many homes) + notebook.settings trust toggles.
  *   v1.2.0 — 2026-06-21 — (reverted) materializeRecord/patchRecord removed — the Tracked Response flow
@@ -38,11 +44,12 @@
 import { api, apiPost } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
 import {
-  createOrganism, saveManifest, listWorkspaces, saveWorkspaceRegistry, wsRoot, writeDraft, publishDraft,
+  createOrganism, saveManifest, listWorkspacesStrict, saveWorkspaceRegistry, wsRoot, writeDraft, publishDraft,
   getWorkspace, addWorkspaceSpaces, changeOutcome,
 } from '/js/services/organisms.js';
 import { handleOf } from '/js/services/messages-ai-prompts.js';
 import { swallowed } from '/js/swallowed.js';
+import { readForWrite } from '/js/load-state.js';
 
 const DOC_SPACE = 'pages';
 
@@ -170,9 +177,15 @@ export async function parkConversationToNotebook({ conv, thread, peerName, summa
   return { key };
 }
 
-/** The per-owner notebook trust toggles ({ autoDetectIntent, autoRunPlan, autoDistribute }). */
+/** The per-owner notebook trust toggles ({ autoDetectIntent, autoRunPlan, autoDistribute }); {} when
+ *  none are stored. Throws when the read fails: a page that saves the record reads it with this. */
+export async function getNotebookSettingsStrict() {
+  const r = await getMemory('notebook.settings', { soft: true });
+  return (r?.data?.value) || {};
+}
+/** The trust toggles, {} when the read fails. For drawing only: saving it would reset the others. */
 export async function getNotebookSettings() {
-  try { const r = await getMemory('notebook.settings'); return (r?.data?.value) || {}; }
+  try { return await getNotebookSettingsStrict(); }
   catch (err) { swallowed('notebook', err); return { }; }
 }
 export async function saveNotebookSettings(settings) {
@@ -189,12 +202,12 @@ function newWorkspaceManifest(orgId, name) {
 }
 
 /** Read a workspace's manifest through the workspace read (the copy that counts, for any member who
- *  can read it), or null if it has none / is unreadable. A memory read saw only the caller's own copy,
- *  so in somebody else's workspace it found no manifest at all. */
+ *  can read it), or null if it has none. A memory read saw only the caller's own copy, so in somebody
+ *  else's workspace it found no manifest at all. A failed read throws: the filing that follows writes
+ *  into the space this read names, and a failure read as "no manifest" filed into a space the
+ *  workspace does not have. */
 async function readManifest(orgId, wsId) {
-  try {
-    return (await getWorkspace(orgId, wsId))?.manifest || null;
-  } catch (err) { swallowed('notebook: readManifest', err); return null; }
+  return (await getWorkspace(orgId, wsId))?.manifest || null;
 }
 
 /**
@@ -229,13 +242,15 @@ export async function materializeDocument(plan) {
     if (!organismId) throw new Error('Organism creation returned no id');
   }
 
-  // 2. Workspace — create if needed (registry + manifest with a document space).
+  // 2. Workspace — create if needed (registry + manifest with a document space). The registry is a
+  //    whole record: it is read strictly FIRST, so a failed read stops here with nothing written (a
+  //    read that answered [] replaced the registry with this one workspace).
   if (!workspaceId) {
+    const existing = await readForWrite(() => listWorkspacesStrict(organismId));
     workspaceId = rid('ws-');
     const manifest = newWorkspaceManifest(organismId, plan.workspaceName);
     await saveManifest(organismId, workspaceId, manifest);
     await apiPost('/v1/memory', { key: `${wsRoot(organismId, workspaceId)}.meta.readme`, value: `# ${manifest.name}\n\nCreated from the notebook.`, visibility: 'private' });
-    const existing = await listWorkspaces(organismId);
     await saveWorkspaceRegistry(organismId, [...existing, { id: workspaceId, name: manifest.name, createdAt: new Date().toISOString() }]);
     space = DOC_SPACE;
   }

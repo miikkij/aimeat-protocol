@@ -14,6 +14,8 @@
  *   setPromotion(ref, text)
  * @usage loaded by the detail view: import('./sections/promote.js')
  * @version-history
+ *   v1.1.1 — 2026-10-16 — A promotion is not saved when the stored promotions could not be read (the
+ *     save writes the whole public record): the status line says nothing was changed (QA audit F6-04).
  *   v1.1.0 — 2026-09-27 — Parity with the old page (appcat sections-d): the "Promoted" mark stands on
  *     the headline's slab (meta.doors), as the old h3's badge did; the chapter's lead, form, door rows
  *     and the two status lines that keep their room while empty (Note lead/report `chapter`, Fields
@@ -32,6 +34,7 @@ import { Note } from '/components/Note.js';
 import { Fields } from '/components/Field.js';
 import { TextArea } from '/components/TextField.js';
 import { x } from '/views/appcat/i18n.js';
+import { t } from '/js/i18n.js';
 import { translateText } from '/views/appcat/ai-calls.js';
 
 const html = htm.bind(h);
@@ -69,8 +72,14 @@ export function loadPromoted() {
  * Resolves to whether the app is promoted now.
  */
 export async function setPromotion(ref, text) {
-  // The record is written whole, so the other apps' promotions must be in hand first.
+  // The record is written whole, so the other apps' promotions must be in hand first. When neither
+  // read worked, nothing is changed: a record built from {} removed every other app's promotion.
   if (promoted === null) await loadPromoted();
+  if (promoted === null) {
+    const e = /** @type {Error & { code?: string }} */ (new Error(t('common.notLoadedNotSaved')));
+    e.code = 'NOT_LOADED';
+    throw e;
+  }
   const en = text && text.en ? String(text.en).trim() : '';
   const fi = text && text.fi ? String(text.fi).trim() : '';
   const next = { ...(promoted || {}) };
@@ -148,7 +157,9 @@ export default function PromoteSection({ d }) {
 
   const save = async (next) => {
     setStatus({ text: x('promote.saving') });
-    const nowOn = await setPromotion(d.ref, next);
+    let nowOn;
+    try { nowOn = await setPromotion(d.ref, next); }
+    catch (e) { setStatus({ text: '✘ ' + ((e && e.message) || t('common.notLoadedNotSaved')), tone: 'err' }); return; }
     setMap(promoted);
     setText({ en: promoted?.[d.ref]?.en || '', fi: promoted?.[d.ref]?.fi || '' });
     // The old page drew the whole detail again after a save, which emptied the translate line.

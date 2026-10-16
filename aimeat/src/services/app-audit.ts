@@ -38,6 +38,10 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.8.0 — 2026-10-16 — recordAppAudit writes with compare-and-swap and retries on a version miss, so
+ *     two overlapping audited changes both keep their entry; a write that still fails is logged at error
+ *     level; the owner's archive and limit actions refuse instead of overwriting a concurrent entry
+ *     (QA audit F10b-02).
  *   v1.7.0 — 2026-10-13 — scope_allowance.kept and scope_allowance.removed: the permissions the app kept
  *     when the node moved to 4.0, and each one its owner took away (services/app-scope-allowance.ts).
  *   v1.6.0 — 2026-10-12 — `community`: the owner listed the app to signed-in members only.
@@ -204,38 +208,75 @@ export async function recordAppAudit(
 ): Promise<void> {
   const key = appAuditKey(args.filename);
   const now = new Date().toISOString();
+  const entry: AppAuditEntry = { at: now, by: args.by, action: args.action, ...(args.detail ? { detail: args.detail } : {}) };
   try {
-    const existing = await storage.getMemory(args.ownerGhii, key);
-    const rec = existing ? asRecord(existing.value, args.filename) : emptyRecord(args.filename);
-    const entry: AppAuditEntry = { at: now, by: args.by, action: args.action, ...(args.detail ? { detail: args.detail } : {}) };
-    let entries = [...rec.entries, entry];
-    // Nothing is deleted unless the owner (or the node default) set a limit; a long log rolls its
-    // oldest entries into the archive for their year (services/app-audit-archive.ts).
-    const { keep } = await effectiveKeep(storage, args.ownerGhii);
-    if (keep > 0 && entries.length > keep) {
-      entries = entries.slice(entries.length - keep);
-    } else if (entries.length > ACTIVE_ROLL_AT) {
-      const old = entries.slice(0, entries.length - ACTIVE_KEEP);
-      await moveToArchive(storage, args.ownerGhii, args.filename, old);
-      entries = entries.slice(entries.length - ACTIVE_KEEP);
-      if (keep > 0) entries = (await applyKeep(storage, args.ownerGhii, args.filename, entries, keep)).active;
+    // Compare-and-swap with retry, as the roadmap does: two audited changes to one app that overlap
+    // each read the same record, and with a plain write the later one removed the earlier entry with
+    // no error, which is a way around the rule that an agent cannot erase the record of its own
+    // changes (QA audit F10b-02). A version miss re-reads and appends again.
+    for (let attempt = 0; attempt < AUDIT_CAS_ATTEMPTS; attempt++) {
+      const existing = await storage.getMemory(args.ownerGhii, key);
+      if (await appendAuditEntry(storage, args, existing, entry)) return;
     }
-    await writeActive(storage, args.ownerGhii, args.filename, entries, existing);
+    throw new Error(`the audit record changed ${AUDIT_CAS_ATTEMPTS} times in a row while this entry was being added`);
   } catch (err) {
-    logger.warn('app-audit: write failed, the change it describes still stands', { filename: args.filename, action: args.action, error: String(err) });
+    // The change it describes has already been made and stays; the missing entry is an operator
+    // matter, so it is logged at error level with what was not recorded.
+    logger.error('app-audit: an audit entry could not be written; the change it describes still stands', { filename: args.filename, action: args.action, by: args.by, error: String(err) });
   }
 }
 
-/** Store the active record of one app. */
+/** How many times recordAppAudit re-reads after another writer changed the record first. */
+const AUDIT_CAS_ATTEMPTS = 40;
+
+/** What the owner's archive or limit action answers when an audited change landed at the same moment. */
+const AUDIT_CHANGED_MESSAGE = 'The audit log changed while this was being applied. Nothing was removed from it; try again.';
+
+/** One attempt: build the new entries from `existing` and write them only if nobody wrote in between. */
+async function appendAuditEntry(
+  storage: Storage,
+  args: { ownerGhii: string; filename: string },
+  existing: MemoryRecord | null,
+  entry: AppAuditEntry,
+): Promise<boolean> {
+  const rec = existing ? asRecord(existing.value, args.filename) : emptyRecord(args.filename);
+  let entries = [...rec.entries, entry];
+  // Nothing is deleted unless the owner (or the node default) set a limit; a long log rolls its
+  // oldest entries into the archive for their year (services/app-audit-archive.ts).
+  const { keep } = await effectiveKeep(storage, args.ownerGhii);
+  if (keep > 0 && entries.length > keep) {
+    entries = entries.slice(entries.length - keep);
+  } else if (entries.length > ACTIVE_ROLL_AT) {
+    const old = entries.slice(0, entries.length - ACTIVE_KEEP);
+    await moveToArchive(storage, args.ownerGhii, args.filename, old);
+    entries = entries.slice(entries.length - ACTIVE_KEEP);
+    if (keep > 0) entries = (await applyKeep(storage, args.ownerGhii, args.filename, entries, keep)).active;
+  }
+  return writeActive(storage, args.ownerGhii, args.filename, entries, existing);
+}
+
+/**
+ * Store the active record of one app. With `existing` given it is a compare-and-swap: false when
+ * another writer changed the record since it was read (the caller re-reads and tries again). A
+ * storage without the atomic pair (a unit-test double) gets the plain write.
+ */
 async function writeActive(
   storage: Storage, ownerGhii: string, filename: string, entries: AppAuditEntry[], existing: MemoryRecord | null,
-): Promise<void> {
+): Promise<boolean> {
   const now = new Date().toISOString();
   const value: AppAuditRecord = { spec: APP_AUDIT_SPEC, filename, entries };
-  await storage.setMemory({
+  const record: MemoryRecord = {
     key: appAuditKey(filename), ownerGaii: ownerGhii, value, visibility: 'owner', tags: ['app-audit', 'system'], ttlHours: null,
     version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-  });
+  };
+  if (!storage.setMemoryIfVersion || !storage.createMemoryIfAbsent) {
+    await storage.setMemory(record);
+    return true;
+  }
+  const saved = existing
+    ? await storage.setMemoryIfVersion(record, existing.version)
+    : await storage.createMemoryIfAbsent(record);
+  return saved !== null;
 }
 
 /**
@@ -248,7 +289,9 @@ export async function archiveAppAuditBefore(storage: Storage, ownerGhii: string,
   const old = entries.filter(e => e.at < before);
   if (!old.length) return 0;
   await moveToArchive(storage, ownerGhii, filename, old);
-  await writeActive(storage, ownerGhii, filename, entries.filter(e => !(e.at < before)), existing);
+  if (!await writeActive(storage, ownerGhii, filename, entries.filter(e => !(e.at < before)), existing)) {
+    throw new Error(AUDIT_CHANGED_MESSAGE);
+  }
   return old.length;
 }
 
@@ -258,6 +301,8 @@ export async function applyAppAuditKeep(storage: Storage, ownerGhii: string, fil
   const existing = await storage.getMemory(ownerGhii, appAuditKey(filename));
   const entries = existing ? asRecord(existing.value, filename).entries : [];
   const out = await applyKeep(storage, ownerGhii, filename, entries, keep);
-  if (out.active.length !== entries.length) await writeActive(storage, ownerGhii, filename, out.active, existing);
+  if (out.active.length !== entries.length && !await writeActive(storage, ownerGhii, filename, out.active, existing)) {
+    throw new Error(AUDIT_CHANGED_MESSAGE);
+  }
   return out.deleted;
 }

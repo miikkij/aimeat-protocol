@@ -10,6 +10,9 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.18.0 -- 2026-10-16 -- A failed read of the list shows the could-not-load note with Retry instead
+ *     of "No workspaces yet", and does not report 0 to the tab badge; the order prefs are saved only
+ *     after they loaded (QA audit F6-04, F6-05).
  *   v1.17.1 -- 2026-09-26 -- A workspace's creator tag is green again, as main drew it
  *     (.badge-success: Mark tone="fine"; fix pass).
  *   v1.17.0 -- 2026-09-26 -- Every part is a library component that takes data: the workspaces are the
@@ -83,6 +86,7 @@ import * as memoryService from '/js/services/memory.js';
 import { fmtDate, relTime } from '/views/profile/organisms/helpers.js';
 import { OrgSearch } from '/views/profile/organisms/panels.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { authHeaders } from '/js/services/auth.js';
 
 /* Workspace list — an organism contains many workspaces (each an independent manifest + data set,
@@ -93,7 +97,9 @@ import { authHeaders } from '/js/services/auth.js';
 export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   const orgId = org.id;
   const { confirm, ConfirmUI } = useConfirm();
-  const [list, setList] = useState(null);   // null = loading
+  const [list, setList] = useState(null);   // null = loading, or the first load failed (wsLoad.failed)
+  const wsLoad = useLoadState();
+  const { ok: wsLoadOk, fail: wsLoadFail } = wsLoad;
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -116,9 +122,12 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   const [dragOverId, setDragOverId] = useState(null);
   const dragIdRef = useRef(null);
   // Load saved order/sort for THIS organism; reset first so switching organisms never carries prefs over.
+  // The prefs are saved whole ({ order, sort }), so a sort or drag is saved only after they loaded.
+  const prefsLoaded = useRef(false);
   useEffect(() => {
     let alive = true;
     setCustomOrder([]); setSortMode('custom');
+    prefsLoaded.current = false;
     (async () => {
       try {
         const r = await memoryService.getMemory(UI_PREFS_KEY, { soft: true });
@@ -127,13 +136,15 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
           if (Array.isArray(v.order)) setCustomOrder(v.order.filter(x => typeof x === 'string'));
           if (['custom', 'name', 'newest'].includes(v.sort)) setSortMode(v.sort);
         }
+        if (alive) prefsLoaded.current = true;
       } catch (err) { swallowed('workspace-list: WorkspaceList', err); }
     })();
     return () => { alive = false; };
   }, [UI_PREFS_KEY]);
   const savePrefs = useCallback((order, sort) => {
+    if (!prefsLoaded.current) { showToast(t('common.settingsNotLoaded'), true); return; }
     memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(err => { swallowed('workspace-list: WorkspaceList', err); });
-  }, [UI_PREFS_KEY]);
+  }, [UI_PREFS_KEY, showToast]);
 
   // Active workspaces sorted for display; archived ones stay in server order in their own section.
   // Stable sort keeps server order for ids missing from the saved manual order (appended at the end).
@@ -172,8 +183,16 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   // fan-out (1 + 3N requests, each re-scanning the same workspace memory). The server computes the
   // same recs/docs/lastEvent/participants + pending-review counts and returns them inline.
   const load = useCallback(async () => {
-    const l = await orgService.discoverWorkspaces(orgId, { include: 'enrichment' });
+    let l;
+    try { l = await orgService.discoverWorkspacesStrict(orgId, { include: 'enrichment' }); }
+    catch (err) {
+      // A failed read is drawn as one: the list stays as it was, and the tab badge is not told 0.
+      swallowed('workspace-list: load', err);
+      wsLoadFail(err);
+      return;
+    }
     setList(l);
+    wsLoadOk();
     onCount?.(Array.isArray(l) ? l.length : 0);
     const stats = {};
     const reviews = {};
@@ -195,7 +214,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     }
     setWsStats(stats);
     setApprByWs(reviews);
-  }, [orgId, onCount]);
+  }, [orgId, onCount, wsLoadOk, wsLoadFail]);
   useEffect(() => { load(); }, [load]);
 
   const requestAccess = async (w) => {
@@ -401,7 +420,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
 
       <${OrgSearch} orgId=${orgId} onOpenWorkspace=${(ws) => onOpen(ws)} />
 
-      ${list === null ? html`<${Note} kind="loading" />`
+      ${list === null ? (wsLoad.failed ? html`<${LoadFailed} onRetry=${load} />` : html`<${Note} kind="loading" />`)
         : list.length === 0 ? html`<${Note} kind="quiet">${t('organisms.noWorkspaces') || 'No workspaces yet — create one to get started.'}<//>`
         : html`
           <${List} cols="mark-name-tags-stats-doors" keepCols>${activeSorted.map(w => renderWsRow(w, true))}<//>

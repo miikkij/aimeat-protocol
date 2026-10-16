@@ -24,9 +24,14 @@
  *   THE CAP IS COUNTED FROM THE USAGE STREAM, not from a counter on the grant. A counter would be a
  *   read-modify-write race on every call, and the per-call record already exists under the
  *   `mcp-remote` surface. What the grant holds is the ceiling, not the tally.
- * @structure McpGrant · putMcpGrant · listMcpGrants · removeMcpGrant · resolveMcpAccess
+ * @structure grantCannotNarrow · grantOwnerFor · invalidGrantExpiry · McpGrant · putMcpGrant ·
+ *   listMcpGrants · removeMcpGrant · resolveMcpAccess
  * @usage const verdict = await resolveMcpAccess({ storage, owner, server, grantee, tool, scopes });
  * @version-history
+ *   2026-10-16 — A node-wide server reads the grants of the caller's own owner (grantOwnerFor), so an
+ *     owner's grant for their agent on a server the node offers is enforced and another owner's is
+ *     never read; grantCannotNarrow refuses only somebody else's personal server; invalidGrantExpiry
+ *     for both grant-writing endpoints (QA audit F01b-02).
  *   2026-10-15 — A grant written as `app:{owner}/{file}` matches the app's GEAI; grantCannotNarrow
  *     names a server whose grants nobody reads, for the grant-writing endpoints (feature-list audit #12).
  *   2026-10-15 — The call cap counts with countUsageCalls plus the unflushed usage buffer, and an end date
@@ -42,21 +47,40 @@ import type { McpServerRecord } from '../../models/mcp-server-schemas.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { logger } from '../../utils/logger.js';
 import { pendingUsageCalls } from '../usage/usage-buffer.js';
-import { appGranteeAsGeai } from '../../utils/gaii.js';
+import { appGranteeAsGeai, ownerGhiiOf } from '../../utils/gaii.js';
 
 /**
  * Why a grant on this server would narrow nobody, or null when it would.
  *
- * resolveMcpAccess reads the grants stored under the server's own owner, so a grant written by
- * anybody else (every owner a node-wide server admits, whose `ownerGhii` is null) is stored and
- * never read. Both grant-writing endpoints (PUT /v1/mcp-servers/:id/grants, aimeat_mcp_grant_set)
- * refuse it instead of answering 200 (feature-list audit #12).
+ * A grant is stored under its writer's owner GHII. resolveMcpAccess reads, for a personal server,
+ * the grants under the server's own owner, and for a node-wide server (`ownerGhii` null) the grants
+ * under the CALLER's owner: an owner narrows their own agents and apps on a server the node offers,
+ * and one owner's grant there never touches another owner's agents (QA audit F01b-02). So only a
+ * personal server of somebody else is refused here; both grant-writing endpoints
+ * (PUT /v1/mcp-servers/:id/grants, aimeat_mcp_grant_set) answer GRANT_NOT_APPLICABLE for it.
  */
 export function grantCannotNarrow(server: McpServerRecord, writerGhii: string): string | null {
-  if (server.ownerGhii === writerGhii) return null;
-  return server.ownerGhii === null
-    ? `"${server.slug}" is offered by this node to every owner it admits, so a permission written here would limit nobody. To limit what your agents and apps do, attach a server of your own, or ask the node operator.`
-    : `"${server.slug}" belongs to someone else, so a permission written here would limit nobody. Its owner sets who may use it.`;
+  if (server.ownerGhii === writerGhii || server.ownerGhii === null) return null;
+  return `"${server.slug}" belongs to someone else, so a permission written here would limit nobody. Its owner sets who may use it.`;
+}
+
+/**
+ * The owner GHII whose grants decide for this caller on this server: the server's owner on a
+ * personal server, the caller's own owner on a node-wide one.
+ */
+export function grantOwnerFor(server: McpServerRecord, grantee: string): string {
+  return server.ownerGhii ?? ownerGhiiOf(grantee);
+}
+
+/**
+ * A plain sentence when `expires` is given and is not a date, or null when it is absent or a date.
+ * Both grant-writing endpoints refuse such a value with 400 INVALID_INPUT: stored as given it never
+ * ran out, because a comparison with an invalid date is false (QA audit F01b-02).
+ */
+export function invalidGrantExpiry(expires: unknown): string | null {
+  if (expires === undefined || expires === null) return null;
+  if (typeof expires === 'string' && Number.isFinite(Date.parse(expires))) return null;
+  return 'The end date is not a date. Give it as a date such as 2026-12-31, or leave it out for a permission that does not end.';
 }
 
 /**
@@ -195,8 +219,17 @@ export async function resolveMcpAccess(input: AccessInput): Promise<McpAccess> {
     };
   }
   if (isOwnerThemselves) return { allowed: true };
+  // The account holder in person on a node-wide server: their own grants narrow what acts FOR them,
+  // never the person, the same rule as on their own server.
+  if (server.ownerGhii === null && input.ownerInPerson === true && grantee === ownerGhiiOf(grantee)) {
+    return { allowed: true };
+  }
 
-  const grants = await listMcpGrants(storage, server.ownerGhii ?? '', server.slug);
+  // A personal server reads its owner's grants. A node-wide server has no owner, so it reads the
+  // grants of the caller's own owner: the grant an owner wrote there for their agent is enforced,
+  // and another owner's grant on the same server is never read for this caller. Until 2026-10-16
+  // this read the empty owner and found nothing (QA audit F01b-02).
+  const grants = await listMcpGrants(storage, grantOwnerFor(server, grantee), server.slug);
   // No grant for this pair at all: the scope already said yes, and that is the phase-1 default the
   // first grant replaces.
   // A grant written in the documented app form `app:{owner}/{file}` names the GEAI the app calls

@@ -7,6 +7,8 @@
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /
  *   join-requests / reputation / board rows / all `organism.{id}.*` memory + versions + schema locks.
  * @version-history
+ *   v1.7.0 — 2026-10-16 — deleteOrganism runs in one transaction, lets every statement's error fail
+ *     the call, and answers whether the organism row went, as the SQLite twin does (QA audit D4-10, E6-05).
  *   v1.6.0 — 2026-09-29 — deleteOrganism removes the classification audit log of the organism's content.
  *   v1.5.0 — 2026-09-29 — deleteOrganism removes the classification labels of the organism's content.
  *   v1.4.0 — 2026-09-09 — getOrganismReputation deleted: no caller.
@@ -24,7 +26,6 @@ import type {
 } from '../../../interface.js';
 import type { JoinRequest, Organism, OrganismMembership, PendingApproval } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { logger } from '../../../../utils/logger.js';
 import { jsonb, dbError } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
@@ -119,27 +120,39 @@ export const organismMethods = {
       return rows[0] ? toOrg(rows[0]) : null;
     } catch (err) { throw dbError('updateOrganism', err); }
   },
+  /**
+   * The whole cascade in ONE transaction, with no step allowed to fail on its own, and true only when
+   * the organism row went: the same outcome as the SQLite twin. It was a read and twelve separate
+   * statements, four of which only warned when they failed, and it answered true whatever happened,
+   * so a failure in the middle left an organism without members, or a board and its posts behind an
+   * organism reported deleted (QA audit D4-10, E6-05).
+   */
   async deleteOrganism(this: PostgresKyselyStorage, id: string): Promise<boolean> {
-    const org = await this.db.selectFrom('Organism').select('boardId').where('id', '=', id).executeTakeFirst();
-    await this.db.deleteFrom('OrganismMembership').where('organismId', '=', id).execute();
-    await this.db.deleteFrom('JoinRequest').where('organismId', '=', id).execute();
-    await this.db.deleteFrom('OrganismReputation').where('organismId', '=', id).execute().catch(err => logger.warn('deleteOrganism: side-effect update failed', { error: String(err) }));
-    if (org?.boardId) {
-      await this.db.deleteFrom('BoardPost').where('boardId', '=', org.boardId).execute().catch(err => logger.warn('deleteOrganism: side-effect update failed', { error: String(err) }));
-      await this.db.deleteFrom('BoardSubscription').where('boardId', '=', org.boardId).execute().catch(err => logger.warn('deleteOrganism: side-effect update failed', { error: String(err) }));
-      await this.db.deleteFrom('Board').where('boardId', '=', org.boardId).execute().catch(err => logger.warn('deleteOrganism: side-effect update failed', { error: String(err) }));
-    }
-    const orgKey = `organism.${id}`;
-    for (const tbl of ['Memory', 'MemoryVersion'] as const) {
-      await this.db.deleteFrom(tbl).where(eb => eb.or([eb('key', '=', orgKey), eb('key', 'like', `${orgKey}.%`)])).execute();
-    }
-    await this.db.deleteFrom('SchemaLock').where(eb => eb.or([eb('keyPattern', '=', orgKey), eb('keyPattern', 'like', `${orgKey}.%`)])).execute();
-    // The classification labels on the organism's content go with it (TARGET-082).
-    await this.db.deleteFrom('ContentLabel').where('scope', '=', `organism:${id}`).execute();
-    // So does the classification audit log of that content (TARGET-082 V4).
-    await this.db.deleteFrom('ClassificationAudit').where('scope', '=', `organism:${id}`).execute();
-    await this.db.deleteFrom('Organism').where('id', '=', id).execute();
-    return true;
+    return this.transaction(async () => {
+      const org = await this.db.selectFrom('Organism').select('boardId').where('id', '=', id).executeTakeFirst();
+      await this.db.deleteFrom('OrganismMembership').where('organismId', '=', id).execute();
+      await this.db.deleteFrom('JoinRequest').where('organismId', '=', id).execute();
+      await this.db.deleteFrom('OrganismReputation').where('organismId', '=', id).execute();
+      if (org) {
+        if (org.boardId) {
+          await this.db.deleteFrom('BoardPost').where('boardId', '=', org.boardId).execute();
+          await this.db.deleteFrom('BoardSubscription').where('boardId', '=', org.boardId).execute();
+          await this.db.deleteFrom('Board').where('boardId', '=', org.boardId).execute();
+        }
+        // The organism's content under its key namespace, across every owner (as the SQLite twin).
+        const orgKey = `organism.${id}`;
+        for (const tbl of ['Memory', 'MemoryVersion'] as const) {
+          await this.db.deleteFrom(tbl).where(eb => eb.or([eb('key', '=', orgKey), eb('key', 'like', `${orgKey}.%`)])).execute();
+        }
+        await this.db.deleteFrom('SchemaLock').where(eb => eb.or([eb('keyPattern', '=', orgKey), eb('keyPattern', 'like', `${orgKey}.%`)])).execute();
+      }
+      // The classification labels on the organism's content go with it (TARGET-082).
+      await this.db.deleteFrom('ContentLabel').where('scope', '=', `organism:${id}`).execute();
+      // So does the classification audit log of that content (TARGET-082 V4).
+      await this.db.deleteFrom('ClassificationAudit').where('scope', '=', `organism:${id}`).execute();
+      const res = await this.db.deleteFrom('Organism').where('id', '=', id).executeTakeFirst();
+      return Number(res.numDeletedRows ?? 0) > 0;
+    });
   },
 
   async createMembership(this: PostgresKyselyStorage, r: OrganismMembershipRecord): Promise<OrganismMembershipRecord> {

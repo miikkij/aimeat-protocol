@@ -12,6 +12,8 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   v2.3.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry where the loading
+ *     line stood (ctx.appsFailed) (QA audit F6-05).
  *   v2.2.0 -- 2026-10-04 -- A permission row names the app as the catalogue does (grantName): a grant made
  *     through the app's own address stored its file name, so the rows read ansapolku.html where the
  *     catalogue reads Ansapolku. The name now comes from the app itself when the app is the person's own.
@@ -75,6 +77,7 @@ import { a, day, rel, kb, nameOf, appRef, appUrl, catalogUrl, noteFor, initials,
 import { secAgents, secBuild } from './build.js';
 import { PublishDialog } from './collaboration.js';
 import { secBuilders } from './builders.js';
+import { LoadFailed } from '/js/load-state.js';
 
 export function renderPage(ctx) {
   const apps = ctx.apps || [];
@@ -122,14 +125,14 @@ export function renderPage(ctx) {
     : [{ id: 'ap-waiting', num: '01', label: a('secWaiting'), count: waiting }, { id: 'ap-kunto', num: '02', label: a('secKunto'), count: '' }, { id: 'ap-newest', num: '03', label: a('secNewest'), count: Math.min(apps.length, 6) }, { id: 'ap-agents', num: '04', label: a('secAgents'), count: '' }, { id: 'ap-build', num: '05', label: a('secBuild'), count: '' }, { id: 'ap-builders', num: '06', label: a('secBuilders'), count: '' }];
 
   return html`
-    <${SettingsPage} name="apps" crumb=${crumb()} title=${t('profile.tabs.apps')} sub=${a('titleSub')} help="concept.app" marks=${marks}
-      desc=${none ? a('descEmpty') : a('desc')} actions=${actions} strip=${strip}
+    <${SettingsPage} name="apps" crumb=${crumb()} title=${t('profile.tabs.apps')} sub=${a('titleSub')} help="concept.app" marks=${loading ? [] : marks}
+      desc=${none ? a('descEmpty') : a('desc')} actions=${actions} strip=${loading ? null : strip}
       start=${html`<${PageStart} id="apps" done=${loading ? null : !none} action=${ctx.buildPrompt ? { copy: ctx.buildPrompt } : null} />`}
       railTitle=${a('railTitle')} sections=${sections} pagesLabel=${a('pages')} pages=${pageLinks()}
       after=${html`<${ctx.ConfirmUI} />
         ${ctx.publishApp ? html`<${PublishDialog} key=${appRef(ctx.publishApp)} app=${ctx.publishApp} busy=${!!ctx.busy} onPublish=${ctx.submitPublish} onClose=${ctx.closePublish} />` : null}`}>
       ${none ? html`${secFirst(ctx)}${secWaiting(ctx, drafts, sharedDrafts, grants, '02')}${secKunto(ctx, '03')}${secBuild(ctx, { formOnly: true, num: '04' })}`
-        : loading ? html`<${Note} kind="loading">${t('common.loading')}<//>`
+        : loading ? (ctx.appsFailed ? html`<${LoadFailed} onRetry=${ctx.reload} />` : html`<${Note} kind="loading">${t('common.loading')}<//>`)
         : html`${secWaiting(ctx, drafts, sharedDrafts, grants, '01')}${secKunto(ctx, '02')}${secNewest(ctx, apps)}${secAgents(ctx)}${secBuild(ctx, { formOnly: false, num: '05' })}${secBuilders(ctx)}`}
     <//>`;
 }

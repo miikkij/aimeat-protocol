@@ -26,6 +26,10 @@
  *     headers: { Authorization: 'Bearer {{secret:EXAMPLE_TOKEN}}' } });
  *   if (r.refusal) show(AIMEAT.webhook.words(r.refusal)); else show(r.status);
  * @version-history
+ *   v1.1.0 — 2026-10-16 — The allowlist read is strict (QA audit F6-04): only a missing record reads
+ *     as empty, and a refused read throws with the node's code, so allowHost() writes nothing instead
+ *     of storing a list that holds only the new host, and hosts() no longer shows a refusal as "no
+ *     hosts allowed". langs() checks for a document instead of catching its absence.
  *   v1.0.2 — 2026-10-13 — The usage example declares ext:invoke: send and read call the living-hooks
  *     extension action, which node 4.0 refuses without it. Comment only.
  *   v1.0.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
@@ -43,10 +47,9 @@ const SETTINGS_KEY = 'living-hooks.settings';
 /** The page's reading language first, then the person's saved choice, for the refusal words. */
 function langs() {
   const out = [];
-  try {
-    const attr = document.documentElement.getAttribute('lang');
-    if (attr) out.push(attr.slice(0, 2).toLowerCase());
-  } catch { /* no document */ }
+  const root = typeof document !== 'undefined' ? document.documentElement : null;
+  const attr = root ? root.getAttribute('lang') : null;
+  if (attr) out.push(attr.slice(0, 2).toLowerCase());
   const saved = storedLang();
   if (saved) out.push(saved.slice(0, 2).toLowerCase());
   return out;
@@ -68,11 +71,20 @@ function normaliseHost(value) {
   return (dot ? '.' : '') + h;
 }
 
-/** The current allowlist record, or an empty one. */
+/**
+ * The current allowlist record; an empty one ONLY when the record does not exist. A read the node
+ * refused throws with the node's code, because allowHost() writes the whole record back: answering a
+ * refusal with {} would store a list holding only the new host and drop every other one.
+ */
 async function readSettings() {
   // ?soft=1: a missing record is a clean 200 with a null value, not a 404 in the console.
   const res = await authFetch('/v1/memory/' + encodeURIComponent(SETTINGS_KEY) + '?soft=1');
-  if (!res.ok) return {};
+  if (!res.ok) {
+    if (res.error && res.error.code === 'NOT_FOUND') return {};
+    throw Object.assign(new Error((res.error && res.error.message)
+      || 'The allowlist could not be read, so nothing was changed. Try again.'),
+    { code: (res.error && res.error.code) || 'READ_FAILED' });
+  }
   const value = res.data && res.data.value;
   return value && typeof value === 'object' ? value : {};
 }
@@ -97,7 +109,10 @@ const webhook = {
   /** A refusal as a person reads it: the node's sentence first, then a fallback per code. */
   words(refusal) { return hooks.words(refusal); },
 
-  /** The hosts this person allows. The operator's hosts apply as well and are not listed here. */
+  /**
+   * The hosts this person allows. The operator's hosts apply as well and are not listed here.
+   * Throws (with the node's `code`) when the read was refused: an empty list means none are allowed.
+   */
   async hosts() {
     const settings = await readSettings();
     return Array.isArray(settings.allow_hosts) ? settings.allow_hosts.slice() : [];
@@ -105,7 +120,8 @@ const webhook = {
 
   /**
    * Add one host to the person's allowlist. Returns the new list. Call it only from a control the
-   * person presses: every app and agent of this person may send to a host on this list.
+   * person presses: every app and agent of this person may send to a host on this list. When the
+   * current list cannot be read it throws and writes nothing.
    * @param {string} host  "api.example.com", "https://api.example.com/x" or ".example.com"
    */
   async allowHost(host) {

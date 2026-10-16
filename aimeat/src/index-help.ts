@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — backup and restore say the export is partial and name the operator token they need
+ *     (--token or AIMEAT_OP_TOKEN) and --url (QA audit P6-07, F19b-01).
  *   2026-10-15 — The client help says --surface is used by claude-desktop only (feature-list audit #6).
  *   v1.1.11 — 2026-10-12 — The serve help names AIMEAT_RUNTIME_FEATURES.
  *   v1.1.10 — 2026-10-11 — The task-runner paragraph names the runner block's fields instead of
@@ -71,8 +73,16 @@ USAGE
   aimeat connect logout          Remove stored credentials
   aimeat seed                    Seed example packages (digital signage, etc.)
   aimeat screenshot-worker [opts] Backfill missing app screenshots (operator; uses system Edge/Chrome)
-  aimeat backup  [FILE]          Export all data to JSON
-  aimeat restore <FILE>          Import data from JSON backup
+  aimeat backup  [FILE]          Export accounts, agents, actions, boards and the agents' memory
+                                 to JSON. A PARTIAL export: it leaves out the records people keep
+                                 under their own accounts, organisms, apps, files and every
+                                 credential. A node backup is the database plus .env.
+  aimeat restore <FILE>          Import a file written by aimeat backup; exits 1 when any record
+                                 failed for a reason other than already being on the node.
+                                 Both need an operator's personal access token:
+                                 --token <token> or AIMEAT_OP_TOKEN. --url <node> reaches a
+                                 running node; without it a node starts in-process on the
+                                 configured database.
 
 START OPTIONS
   --db <type>              Storage type: postgres-kysely, sqlite, memory

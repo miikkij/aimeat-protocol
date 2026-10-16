@@ -37,6 +37,9 @@
  *   const out = await acceptWork({ storage, config }, providerGaii, trackingCode);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-16 — deliverWork() settles and marks the item delivered in one transaction, after reading
+ *     its status again, so a failed status write cannot leave a settled item deliverable a second
+ *     time (QA audit E6-03).
  *   2026-10-15 — deliverWork() stores the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   v1.1.0 — 2026-10-08 — deliverWork() stamps the delivered output with its provenance record and
  *     stores the id on the work item (migration 0098, aiprov D8).
@@ -201,15 +204,6 @@ export async function deliverWork(
     if (!loaded.ok) return loaded;
     const work = loaded.work;
 
-    // Settle: pay provider, network fee, burn
-    await settlePayment(storage, config, work);
-
-    // Extension hook: post_settlement (fire-and-forget)
-    fireHook(config, storage, 'post_settlement', {
-        tracking_code: trackingCode, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
-        cost: work.cost,
-    });
-
     // How the delivered output was made (aiprov D8). The requester acts on this output, and the
     // node stamped nothing, so a work item answered by a model read the same as one a person wrote.
     // The provider is the resolved caller; an agent that delivers is recorded as model-written, a
@@ -225,11 +219,30 @@ export async function deliverWork(
         enabled: config.aiProvenance,
     });
 
-    const updated = await storage.updateWork(trackingCode, {
-        status: 'delivered',
-        output,
-        updatedAt: new Date().toISOString(),
-        ...(aiProvenanceId ? { aiProvenanceId } : {}),
+    // Settle (pay provider, network fee, burn) and the status that stops a second settlement, in ONE
+    // transaction. Written apart, a failed status write after the credit left the item deliverable,
+    // and a retry credited the provider again (QA audit E6-03). The status is read again inside the
+    // transaction, so a retry after a delivery that did land settles nothing.
+    const settled = await storage.transaction(async () => {
+        const current = await storage.getWork(trackingCode);
+        if (!current || !['accepted', 'in_progress'].includes(current.status)) return null;
+        await settlePayment(storage, config, work);
+        return storage.updateWork(trackingCode, {
+            status: 'delivered',
+            output,
+            updatedAt: new Date().toISOString(),
+            ...(aiProvenanceId ? { aiProvenanceId } : {}),
+        });
+    });
+    if (!settled) {
+        return { ok: false, status: 409, code: 'INVALID_STATE', message: 'This work item is no longer waiting for delivery; it was delivered, cancelled or expired in the meantime.' };
+    }
+    const updated = settled;
+
+    // Extension hook: post_settlement (fire-and-forget), after the settlement committed.
+    fireHook(config, storage, 'post_settlement', {
+        tracking_code: trackingCode, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
+        cost: work.cost,
     });
 
     // Fire callback webhook if provided (fire-and-forget)

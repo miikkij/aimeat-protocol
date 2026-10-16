@@ -23,6 +23,8 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.11.0 — 2026-10-16 — Each tolerant step runs in a savepoint, so on PostgreSQL a step the
+ *     database rejects no longer aborts the transaction and blocks the erasure (QA audit E6-01).
  *   v1.10.0 — 2026-10-09 — The provider_clients step also deletes the app clients each agent brought
  *     under its own GAII (secrets audit 2026-10-09, F3).
  *   v1.9.0 — 2026-10-09 — Two steps: the account's passkeys, and the extensions the person or their
@@ -59,6 +61,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { inSavepoint } from './tolerant-step.js';
 import { evictAgentTelemetry } from './telemetry-buffer.js';
 import { purgeClassificationAudit, flushClassificationAudit } from './classification/audit.js';
 import { purgeExceptions } from './classification/exceptions.js';
@@ -74,9 +77,12 @@ export interface OwnerErasureResult {
 /** Run one clean-up step, recording what it cleared and never letting a broken subsystem block the
  *  erasure. A step that throws is logged and skipped; the label stays out of the log so the caller
  *  can see what did NOT happen. */
-async function step(label: string, fn: () => Promise<string | null>, log: string[]): Promise<void> {
+async function step(label: string, fn: () => Promise<string | null>, log: string[], storage: Storage): Promise<void> {
   try {
-    const entry = await fn();
+    // A savepoint per step: on PostgreSQL a statement the database rejects would otherwise mark the
+    // whole transaction failed, and deleteOwner at the end would throw, so one broken step blocked
+    // the whole erasure, the opposite of what the header promises (QA audit E6-01).
+    const entry = await inSavepoint(storage, fn);
     if (entry) log.push(entry);
   } catch (err) {
     logger.warn('eraseOwner: step failed, continuing', { step: label, error: String(err) });
@@ -107,48 +113,48 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     for (const agent of agents) evictAgentTelemetry(agent.gaii);
 
     // 2. GHII-level data the per-identity cascade does not reach.
-    await step('ghii_memory', async () => { await storage.deleteAllMemory(ghii); return 'ghii_memory'; }, deletionLog);
+    await step('ghii_memory', async () => { await storage.deleteAllMemory(ghii); return 'ghii_memory'; }, deletionLog, storage);
     // The person's classification exceptions are records of system@<node>, keyed by their GHII.
     await step('classification_exceptions', async () => {
       await purgeExceptions(storage, nodeId, { owner: ghii });
       return 'classification_exceptions';
-    }, deletionLog);
+    }, deletionLog, storage);
 
     await step('consents', async () => {
       const consents = await storage.listConsents(ghii, {});
       for (const c of consents) await storage.deleteConsent(c.id);
       return consents.length ? `consents:${consents.length}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     await step('memberships', async () => {
       const memberships = await storage.listMembershipsByGhii(ghii);
       for (const m of memberships) await storage.deleteMembership(m.id);
       return memberships.length ? `memberships:${memberships.length}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
-    await step('sessions', async () => { await storage.revokeAllSessions(name); return 'sessions'; }, deletionLog);
+    await step('sessions', async () => { await storage.revokeAllSessions(name); return 'sessions'; }, deletionLog, storage);
 
     await step('capabilities', async () => {
       const caps = await storage.listCapabilitiesByOwner(ghii);
       for (const c of caps) await storage.deleteCapability(c.id);
       return caps.length ? `capabilities:${caps.length}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     await step('scheduled_jobs', async () => {
       const jobs = await storage.listScheduledJobs({});
       const ownerJobs = jobs.filter(j => j.createdBy === ghii || j.createdBy === name);
       for (const j of ownerJobs) await storage.deleteScheduledJob(j.id);
       return ownerJobs.length ? `scheduled_jobs:${ownerJobs.length}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
-    await step('device_auth', async () => { await storage.deleteDeviceAuthByOwner(name); return 'device_auth'; }, deletionLog);
+    await step('device_auth', async () => { await storage.deleteDeviceAuthByOwner(name); return 'device_auth'; }, deletionLog, storage);
 
     // Agent v2 enrolment grants: an unspent grant names agents under a username that is released for
     // reuse, so a surviving row would let a daemon enrol into the NEXT person to register that name.
     await step('agent_enrolment_grants', async () => {
       const n = await storage.deleteAgentEnrolmentGrantsByOwner(name);
       return n ? `agent_enrolment_grants:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // Agent v2 messaging. The turns are this person's own content, and a delivery target is worse
     // than stale: it holds a URL and a secret this node would keep POSTing to, addressed by a
@@ -156,15 +162,15 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     await step('agent_v2_messages', async () => {
       const n = await storage.deleteAgentV2MessagesByOwner(name);
       return n ? `agent_v2_messages:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
     await step('agent_v2_push_configs', async () => {
       const n = await storage.deleteAgentV2PushConfigsByOwner(name);
       return n ? `agent_v2_push_configs:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
     await step('agent_v2_tasks', async () => {
       const n = await storage.deleteAgentV2TasksByOwner(name);
       return n ? `agent_v2_tasks:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // Outside accounts. Each row holds a SEALED credential to somebody's own Gmail, Outlook or
     // publishing account, addressed by the GHII string, and a deleted username is released for
@@ -175,7 +181,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       let n = await storage.deleteConnectionsByPrincipal(ghii);
       for (const agent of agents) n += await storage.deleteConnectionsByPrincipal(agent.gaii);
       return n ? `connections:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // Remote MCP servers. Same argument as connections, and it has to be made separately because
     // check-storage-parity cannot see this table: its owner column is `ownerGhii`, which is
@@ -187,7 +193,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     await step('mcp_servers', async () => {
       const n = await storage.deleteMcpServersByOwner(ghii);
       return n ? `mcp_servers:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // The client registrations a person brought themselves (their own Entra app, their own X app),
     // and those each of their agents brought under its own GAII. They carry a client secret, so the
@@ -200,13 +206,13 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
         n += clients.length;
       }
       return n ? `provider_clients:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     await step('apps', async () => {
       const { apps } = await storage.listApps({ ownerGaii: ghii });
       for (const a of apps) await storage.deleteApp(ghii, a.filename);
       return apps.length ? `apps:${apps.length}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // App rosters, right after the apps: the roster of an app goes with the app. The records live in
     // platform namespaces keyed by the bare account name, which the cascade never sees and which is
@@ -217,7 +223,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const c = await eraseAppMembership(storage, name);
       const n = c.members + c.requests + c.visits + c.plans + c.blanketGrants + c.invites;
       return n ? `app_membership:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // Exchange contracts and grants (services/entitlement-erasure.ts). Keyed by a hash of the
     // consumer's owner GHII, which a new holder of the name gets back unchanged, so an active record
@@ -227,7 +233,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const c = await revokeEntitlementsOfAccount(storage, name, nodeId);
       const n = c.asConsumer + c.asProvider;
       return n ? `entitlements:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // Passkeys. The row is found by credential id and names the account by its bare name, which is
     // released for reuse, so a surviving row signed the previous holder's device in to the next
@@ -235,7 +241,7 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     await step('passkeys', async () => {
       const n = await storage.deletePasskeysByOwner(name);
       return n ? `passkeys:${n}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // Extensions this person or their agents installed. The installer is who may upload new code to
     // an extension, and its stored secrets are carried across an update, so a surviving row made the
@@ -246,24 +252,24 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const mine = (await storage.listExtensions({ lean: true })).filter(e => installers.has(e.installedBy));
       for (const e of mine) await uninstallExtension({ storage }, e.name);
       return mine.length ? `extensions:${mine.length}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     await step('ext_instances', async () => {
       // Some instances record the bare owner name as createdBy rather than the GHII.
       const count = await storage.deleteExtensionInstancesByOwner(ghii);
       const count2 = await storage.deleteExtensionInstancesByOwner(name);
       return count + count2 ? `ext_instances:${count + count2}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     await step('knowledge_links', async () => {
       const count = await storage.deleteLinksByContributor(ghii);
       return count ? `knowledge_links:${count}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     await step('knowledge_reviews', async () => {
       const count = await storage.deleteReviewsByOperator(ghii);
       return count ? `knowledge_reviews:${count}` : null;
-    }, deletionLog);
+    }, deletionLog, storage);
 
     // 3. The per-identity cascade, agents, GHIIs and the owner record.
     await storage.deleteOwner(name);

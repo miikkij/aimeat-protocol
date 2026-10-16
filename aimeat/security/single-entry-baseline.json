@@ -56,8 +56,8 @@
         "why": "UNREVIEWED"
       },
       "src/index.ts": {
-        "count": 3,
-        "why": "The command line's backup, restore and seed commands read this node's own admin answers over localhost."
+        "count": 1,
+        "why": "The command line's seed command reads this node's own admin answer over localhost. Backup and restore moved to cli/backup-restore.ts, which reads under a ceiling (2026-10-16)."
       },
       "src/routes/admin-seo.ts": {
         "count": 1,
@@ -76,10 +76,6 @@
         "why": "UNREVIEWED"
       },
       "src/routes/federation-peer/introduce.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/federation-sync/templates.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },

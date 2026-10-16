@@ -17,6 +17,9 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.28.0 -- 2026-10-16 -- Until the records have loaded the cover says so: a failed load shows the
+ *     could-not-load note with Retry in "Mine" and the other parts stay blank, a failed file load the
+ *     same in Files; "Nothing here yet" is only said of a list that loaded (QA audit F6-05).
  *   v1.27.0 -- 2026-10-03 -- The page's start (components/PageStart.js: what memory is for, the first prompt with the New entry form as its button, what happens next) and the title's question mark, concept.memory (guidance part B).
  *   v1.26.0 -- 2026-10-02 -- The question marks that explain a share pattern and a record's visibility: memory.key_pattern, memory.visibility (components/HelpTip.js).
  *   v1.25.0 -- 2026-09-26 -- Every part is a component call with data (the page kit, the List, the
@@ -94,6 +97,7 @@ import { fileCategory, fileBytesUrl } from './file-helpers.js';
 import { MemoryForm, FileUploadForm, CartTray } from './components.js';
 import { renderEntries } from './entries-view.js';
 import { renderBrowsePanel } from './browse-view.js';
+import { LoadFailed } from '/js/load-state.js';
 
 /* Key spaces the node and the agents write for their own use. Theirs to own, rarely theirs to read. */
 export const SYSTEM_SPACES = new Set(['notif', 'ai-usage', 'commerce', 'agents', 'generator', 'org', 'gate', 'usage']);
@@ -231,6 +235,11 @@ function renderCover(ctx) {
   } = ctx;
   const cls = classify(memories, orgNames);
   const all = memories || [];
+  // "Nothing here yet" is said only of a list that loaded. Before that, "Mine" carries the loading
+  // line or, after a failed load, the could-not-load note with Retry; the other parts stay blank.
+  const memReady = memories !== null && memories !== undefined;
+  const memPending = ctx.memFailed ? html`<${LoadFailed} onRetry=${ctx.loadMemories} />` : html`<${Note} kind="loading" />`;
+  const none = () => (memReady ? html`<${Note} kind="quiet">${nothingYet()}<//>` : null);
   const bytes = all.reduce((n, m) => n + (Number(m.bytes) || 0), 0);
   const today = new Date().toDateString();
   const changedToday = all.filter(m => new Date(m.updated_at || m.created_at || 0).toDateString() === today).length;
@@ -323,36 +332,36 @@ function renderCover(ctx) {
       ${resultRows}
       <${Section} id="mp-own" num=${nOwn} first=${searchResults === null} title=${c('own', 'Mine')} count=${cls.own.reduce((n, s) => n + s.items.length, 0)}
         doors=${html`<${Action} small soft onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')}<//>`}>
-        ${cls.own.length ? spaceTable(ctx, cls.own, { id: 'own' }) : html`<${Note} kind="quiet">${nothingYet()}<//>`}
+        ${!memReady ? memPending : cls.own.length ? spaceTable(ctx, cls.own, { id: 'own' }) : none()}
         <${Note} kind="hint">${c('spaceHint', 'A key space is the first part of a key: document/pitch-2026 belongs to document. It is the unit that is shared, exported and cleaned.')}<//>
       <//>
 
       <${Section} id="mp-org" num=${nOrg} title=${c('orgs', 'Organisms’')} count=${cls.org.reduce((n, s) => n + s.items.length, 0)}
         doors=${html`<${Action} small soft onClick=${() => openTab('organisms')}>${t('organisms.title') || 'Organisms'} →<//>`}>
-        ${cls.org.length ? spaceTable(ctx, cls.org, { id: 'org' }) : html`<${Note} kind="quiet">${nothingYet()}<//>`}
+        ${cls.org.length ? spaceTable(ctx, cls.org, { id: 'org' }) : none()}
         <${Note} kind="hint">${c('orgHint', 'An organism’s content lives in your memory when you or your agents wrote it. It is managed on the organism’s page; here it shows so you know what you own and how much it takes.')}<//>
       <//>
 
       <${Section} fold id="mp-sys" num=${nSys} title=${c('sys', 'The machine’s bookkeeping')} sub=${`${sysCount} ${c('figKeys', 'keys')} · ${formatBytes(sysBytes)}`} open=${sysOpen} onToggle=${() => setSysOpen(o => !o)}>
         <${Note} kind="hint">${c('sysHint', 'What your environment and your agents write for their own use: notices, meters, receipts. Yours as well, but rarely for you to read.')}<//>
-        ${cls.sys.length ? spaceTable(ctx, cls.sys, { head: false, id: 'sys' }) : html`<${Note} kind="quiet">${nothingYet()}<//>`}
+        ${cls.sys.length ? spaceTable(ctx, cls.sys, { head: false, id: 'sys' }) : none()}
       <//>
 
       <${Section} id="mp-files" num=${nFiles} title=${c('files', 'Files')} count=${(files || []).length}
         doors=${html`<${Action} small onClick=${() => { setShowMemForm(false); setShowFileForm(s => !s); setTimeout(() => scrollToSection('mp-files'), 30); }}>${c('upload', 'Upload a file')}<//>`}>
-        ${fileRows(ctx, files || [])}
+        ${files ? fileRows(ctx, files) : (ctx.filesFailed ? html`<${LoadFailed} onRetry=${ctx.loadFiles} />` : html`<${Note} kind="loading" />`)}
       <//>
 
       <${Section} id="mp-history" num=${nHist} title=${c('happened', 'What has happened')}
         doors=${html`<${Action} small soft onClick=${() => pickView({ kind: 'page', id: 'all' })}>${c('allKeys', 'All as keys')} →<//>`}>
         ${recent.length ? html`<${Folds}>${recent.map(m => html`
           <${FoldRow} key=${m.key} num=${formatRelativeTime(m.updated_at || m.created_at)} who=${agentOf(m.owner_gaii) || c('you', 'you')} verb=${c('wrote', 'wrote')}
-            name=${m.key} isKey onClick=${() => pickView({ kind: 'record', key: m.key })} />`)}<//>` : html`<${Note} kind="quiet">${nothingYet()}<//>`}
+            name=${m.key} isKey onClick=${() => pickView({ kind: 'record', key: m.key })} />`)}<//>` : none()}
       <//>
 
       <${Section} id="mp-stale" num=${nStale} title=${c('stale', 'Stale')} count=${stale.length}>
         <${Note} kind="hint">${c('staleHint', 'Keys nobody has changed in 90 days. Open one to decide; delete what no longer matters.')}<//>
-        <${List} cols="key-doors" keepCols empty=${c('noStale', 'Nothing has gone stale.')}>${shownStale.map(m => html`
+        <${List} cols="key-doors" keepCols empty=${memReady ? c('noStale', 'Nothing has gone stale.') : null}>${shownStale.map(m => html`
           <${ListRow} key=${m.key}>
             <${Name} asKey meta=${`${formatBytes(m.bytes)} · ${formatRelativeTime(m.updated_at || m.created_at)}`}>${m.key}<//>
             <${Doors}>

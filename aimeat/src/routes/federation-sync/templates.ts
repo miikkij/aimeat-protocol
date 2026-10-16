@@ -5,6 +5,9 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-16 — POST /v1/federation/templates/sync stores what it fetched, one memory record
+ *     per peer (services/federation-remote-templates.ts), and answers per peer whether it was stored;
+ *     it had counted each listing and dropped it (QA audit F1-04).
  *   2026-10-16 — The template listing names this node as its audience in headers (x-audience,
  *     x-audience-signature) and passes once inside five minutes (signedGetRefusal); the sync sends the
  *     headers (QA audit S6-09).
@@ -30,11 +33,11 @@ import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
-import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
-import { sign, verify } from '../../auth/keypair.js';
+import { verify } from '../../auth/keypair.js';
+import { syncRemoteTemplates } from '../../services/federation-remote-templates.js';
 import {
-    signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal, audienceHeaders,
+    signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal,
 } from '../../services/signed-node-request.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 
@@ -155,66 +158,18 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
 
         // Only peers this node shares its catalogue with. A template listing is catalogue, and asking
         // a peer we would refuse in the other direction is the asymmetry that makes a promise a lie.
-        const activePeers = [...peers.values()].filter(p => p.status === 'active' && p.shareCatalogue);
-        const results: { node: string; templates: number; error?: string }[] = [];
-        const nodeKey = await storage.getNodeKey();
-
-        for (const peer of activePeers) {
-            try {
-                const peerUrl = `${peer.url}/v1/federation/templates?limit=100`;
-                // Kept for the message it produces: safeFetch below throws a generic "Fetch blocked",
-                // and a peer whose URL has become unroutable reads better named per peer in the
-                // result list than as an exception.
-                const urlCheck = await validateOutboundUrl(peerUrl);
-                if (!urlCheck.valid) {
-                    results.push({ node: peer.nodeId, templates: 0, error: urlCheck.reason ?? 'URL validation failed' });
-                    continue;
-                }
-                if (!nodeKey) {
-                    results.push({ node: peer.nodeId, templates: 0, error: 'This node has no signing key' });
-                    continue;
-                }
-
-                // Prove we are the node the header names — the receiving half requires it now.
-                const timestamp = new Date().toISOString();
-                const listSigned = JSON.stringify({ source_node: config.nodeId, timestamp });
-                const listSignature = await sign(nodeKey.privateKey, listSigned);
-                // The node this listing request is for; a peer on an older version ignores the headers.
-                const listAudience = await audienceHeaders(nodeKey.privateKey, listSigned, peer.nodeId);
-
-                // safeFetch, not fetch. The check above looks at the URL we are about to request and
-                // nothing else, so a peer answering 302 sent this node wherever it liked — including
-                // at the cloud metadata address the check exists to keep it away from. safeFetch
-                // re-validates every redirect hop. Invariant 3.
-                const response = await safeFetch(peerUrl, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-source-node': config.nodeId,
-                        'x-timestamp': timestamp,
-                        'x-signature': listSignature,
-                        ...listAudience,
-                    },
-                    signal: AbortSignal.timeout(30_000),
-                });
-
-                if (response.ok) {
-                    const data = await response.json() as { data?: { templates?: unknown[] } };
-                    const templateCount = Array.isArray(data?.data?.templates) ? data.data.templates.length : 0;
-                    results.push({ node: peer.nodeId, templates: templateCount });
-                } else {
-                    results.push({ node: peer.nodeId, templates: 0, error: `HTTP ${response.status}` });
-                }
-            } catch (err) {
-                results.push({
-                    node: peer.nodeId,
-                    templates: 0,
-                    error: err instanceof Error ? err.message : 'unknown error',
-                });
-            }
-        }
+        // The service fetches each listing over the peer-signed GET and STORES it, one record per
+        // peer, which the Packages page reads through GET /v1/packages/tab. Until 2026-10-16 this
+        // handler counted each listing and dropped it, and answered 200 (QA audit F1-04).
+        const results = await syncRemoteTemplates(config, storage, peers);
 
         emitChange('templates');
-        res.json(success(config.nodeId, { syncResults: results }));
+        emitChange('packages');
+        res.json(success(config.nodeId, {
+            syncResults: results,
+            stored: results.filter(r => r.stored).length,
+            failed: results.filter(r => !r.stored).length,
+        }, [{ description: 'Read the stored listings', method: 'GET', url: '/v1/packages/tab' }]));
     });
 
     // POST /v1/federation/memory/list — List memory entries for a user (peer-to-peer)

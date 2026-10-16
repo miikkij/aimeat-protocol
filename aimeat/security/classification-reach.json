@@ -400,6 +400,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
+    "src/routes/federation-sync/catalogue-trust.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Written 2026-10-16 (QA audit S6-06), the node's own read: a signed trust notice from a peer is looked up under system@<node> to take it once, and the peer's stored notices are counted to cap them at 50. No owner content."
+    },
     "src/routes/federation-sync/messaging.ts": {
       "reads": {
         "getMemory": 1,
@@ -1498,6 +1505,12 @@
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Rewrites replica records to expiring when a peer is removed (read-to-rewrite). Moved here from routes/federation-peer/lifecycle.ts on 2026-10-01 unchanged."
+    },
+    "src/services/federation-remote-templates.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Written 2026-10-16 (QA audit F1-04), the node's own read: the template listings a peer already published to the federation, stored per peer under the node's own federation-templates owner, read to keep the last good listing on a failed fetch and to serve the operator's Packages page. Public listings, no owner content."
     },
     "src/services/file-refs.ts": {
       "reads": {

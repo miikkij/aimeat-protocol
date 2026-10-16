@@ -44,6 +44,13 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   2026-10-16 — QA audit F3-01, F1-04, S6-06. The memory-queue test asserted only that the drain took
+ *     the job off the pending list, which the drain did by marking it sent without a request; it now
+ *     asserts the replicate request at the fake peer, one pending job per key and peer, a failed send
+ *     marked failed, and a person's own public record sent by the scheduled round. The template sync
+ *     asserted a count; B's listing is now read on A through GET /v1/packages/tab. New: the emergency
+ *     notice reaches B and is stored there without being acted on, each peer's outcome is reported,
+ *     and B refuses a forged, misaddressed or repeated notice.
  *   2026-10-16 — B's template listing is read with the audience headers for B; the same request again
  *     is refused (401 REPLAYED) and one signed for another node too (401 WRONG_AUDIENCE). A settlement
  *     whose signed time is more than five minutes off is refused (400 STALE_TIMESTAMP) and credits
@@ -777,6 +784,24 @@ async function run(): Promise<void> {
         assert(!!fromSsrf?.error, `a peer the URL check refuses is named too: ${JSON.stringify(fromSsrf)}`);
         const fromDead = results.find(r => r.node === DEAD_ID);
         assert(!!fromDead?.error, `an unreachable peer is named: ${JSON.stringify(fromDead)}`);
+        assert(fromB?.stored === true && fromFake?.stored === false, `stored is said per peer: ${JSON.stringify(results)}`);
+    });
+
+    await test('after the sync, B\'s listing is readable on A through the owner\'s Packages read', async () => {
+        // The sync STORES what it fetched (QA audit F1-04): until 2026-10-16 it counted the listing and
+        // dropped it, and the page read the peer-signed GET, which an owner session cannot open.
+        const { status, body } = await A.json('/v1/packages/tab', { headers: auth(A.ownerToken) });
+        assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+        const remote = body.data?.remote;
+        assert(remote?.enabled === true, `package federation is on for A: ${JSON.stringify(remote)}`);
+        const mine = (remote.templates ?? []).find((t: any) => t.title === listingTitle);
+        assert(mine?.sourceNode === B_ID && typeof mine?.fetchedAt === 'string',
+            `B's listing must be on A, named with its source and fetch time: ${JSON.stringify((remote.templates ?? []).map((t: any) => [t.title, t.sourceNode]))}`);
+        const fakeRow = (remote.peers ?? []).find((p: any) => p.node === FAKE_ID);
+        assert(fakeRow?.error === 'HTTP 404', `a peer that refused carries its error: ${JSON.stringify(remote.peers)}`);
+        const plain = await A.json('/v1/packages/tab', { headers: auth(plainOwnerToken) });
+        assert(plain.status === 200 && (plain.body.data?.remote?.templates ?? []).some((t: any) => t.title === listingTitle),
+            'any owner of A reads the stored listings, not only the operator who synced');
     });
 
     await test('a plain owner may not start a template sync', async () => {
@@ -1086,9 +1111,60 @@ async function run(): Promise<void> {
         await enqueueMemoryReplication(agentGaii, REP_KEY, instant, A.storage, new Map());
         assert((await A.storage.dequeueReplication(FAKE_ID, 10)).length === queued.length, 'no active peers means no job');
 
+        // A second write of the same key while its job is pending adds no second row (QA audit F3-01).
+        await enqueueMemoryReplication(agentGaii, REP_KEY, instant, A.storage, peers);
+        assert((await A.storage.dequeueReplication(FAKE_ID, 10)).filter(e => e.type === 'memory_replicate' && (e.payload as any)?.key === REP_KEY).length === 1,
+            'one pending job per key and peer');
+
+        // The drain SENDS the job: the fake peer must see the replicate request. Until 2026-10-16 this
+        // test asserted only that the job left the pending list, which the drain did by marking it
+        // 'sent' without any request (QA audit F3-01).
+        modes.replicate = 'ok';
+        const sentBefore = seen.length;
         await drainSyncQueue(A.config, A.storage, peers);
+        const arrived = seen.slice(sentBefore).filter(s => s.path === '/v1/federation/replicate');
+        assert(arrived.some(s => s.body?.key === REP_KEY && s.body?.gaii === agentGaii),
+            `the drain must send the queued record to the peer: ${JSON.stringify(arrived.map(s => s.body?.key))}`);
         assert(!(await A.storage.dequeueReplication(FAKE_ID, 10)).some(e => e.type === 'memory_replicate'),
-            'the drain marks memory jobs sent as well as catalogue ones');
+            'a sent memory job leaves the pending list');
+    });
+
+    await test('a queued memory job whose send fails is marked failed, not sent', async () => {
+        const peers = new Map([[FAKE_ID, fakePeer()]]);
+        const instant = { ...A.config, syncMode: 'instant' as const };
+        await enqueueMemoryReplication(agentGaii, REP_KEY, instant, A.storage, peers);
+        const [job] = (await A.storage.dequeueReplication(FAKE_ID, 10)).filter(e => e.type === 'memory_replicate');
+        assert(!!job, 'a job must be pending before the drain');
+        modes.replicate = 'fail';
+        await drainSyncQueue(A.config, A.storage, peers);
+        modes.replicate = 'ok';
+        assert(!(await A.storage.dequeueReplication(FAKE_ID, 10)).some(e => e.id === job.id), 'the failed job leaves the pending list');
+        // The drain picks the next job on the next call; a fresh job is queued for the same key, which
+        // proves the failed row is not the pending one blocking it.
+        await enqueueMemoryReplication(agentGaii, REP_KEY, instant, A.storage, peers);
+        assert((await A.storage.dequeueReplication(FAKE_ID, 10)).some(e => e.type === 'memory_replicate' && e.id !== job.id),
+            'a failed job does not block a new one for the same key');
+        await drainSyncQueue(A.config, A.storage, peers);
+    });
+
+    await test('a public record a person owns, under a federation consent, is sent by the scheduled round', async () => {
+        const now = new Date().toISOString();
+        const key = `setperson.${stamp}`;
+        await A.storage.setMemory({
+            key, ownerGaii: A.ownerGhii, value: { person: true }, visibility: 'public',
+            tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+        });
+        await A.storage.createConsent({
+            id: randomUUID(), ownerGaii: A.ownerGhii, dataPattern: 'setperson.*', recipient: '*',
+            purpose: 'federation replication', scope: 'federation', expires: null, status: 'active',
+            grantedAt: now, revokedAt: null,
+        });
+        modes.replicate = 'ok';
+        const sentBefore = seen.length;
+        await replicateMemoryToAllPeers(A.config, A.storage, new Map([[FAKE_ID, fakePeer()]]));
+        const arrived = seen.slice(sentBefore).filter(s => s.path === '/v1/federation/replicate');
+        assert(arrived.some(s => s.body?.key === key && s.body?.gaii === A.ownerGhii),
+            `the person's record must reach the peer: ${JSON.stringify(arrived.map(s => [s.body?.gaii, s.body?.key]))}`);
     });
 
     await test('a catalogue change debounces into a queued, drained sync — and does nothing in bulk mode', async () => {
@@ -1109,6 +1185,67 @@ async function run(): Promise<void> {
         // it, and the job sat pending until the next drain, measured on every run of this suite.
         assert(!(await A.storage.dequeueReplication(FAKE_ID, 10)).some(e => e.type === 'catalogue_sync'),
             'the flush itself drained what the debounce queued; nothing is left pending for the next drain');
+    });
+
+    // ─── The emergency notice to the network (QA audit S6-06) ───
+    // Until 2026-10-16 the notice was an unsigned POST to the other node's operator-only route, its
+    // answer was not read, and the removal answered network_notified: true.
+    const TRUST_ID = `aimeat-trust-set-${stamp}`;
+
+    await test('an emergency removal with notify_network reaches B, which stores the notice and acts on nothing; a refusal is reported per peer', async () => {
+        const trustKey = await generateKeyPair();
+        await addPeer(A, TRUST_ID, DEAD_URL, trustKey.publicKey);
+        await addPeer(B, TRUST_ID, DEAD_URL, trustKey.publicKey);
+        modes.trust = 'refuse';
+        const del = await A.json(`/v1/federation/peers/${TRUST_ID}?emergency=true`, {
+            method: 'DELETE', headers: auth(A.ownerToken),
+            body: JSON.stringify({ notify_network: true, reason: `compromised key ${stamp}` }),
+        });
+        modes.trust = 'ok';
+        assert(del.status === 200, `delete: ${del.status} ${JSON.stringify(del.body)}`);
+        const notices: any[] = del.body.data.network_notices ?? [];
+        const byNode = (id: string) => notices.find(n => n.node === id);
+        assert(byNode(B_ID)?.accepted === true, `B must accept the signed notice: ${JSON.stringify(notices)}`);
+        assert(byNode(FAKE_ID)?.accepted === false && byNode(FAKE_ID)?.status === 403,
+            `a peer that refuses is reported with its status: ${JSON.stringify(byNode(FAKE_ID))}`);
+        assert(byNode(DEAD_ID)?.accepted === false && !!byNode(DEAD_ID)?.error, `an unreachable peer is reported: ${JSON.stringify(byNode(DEAD_ID))}`);
+        assert(del.body.data.network_notified === false, 'network_notified is true only when every peer accepted');
+        assert(del.body.data.network_notified_peers === notices.filter(n => n.accepted).length, 'the count of accepting peers is given');
+
+        const onB = await B.json('/v1/admin/federation/trust-advisories', { headers: auth(B.ownerToken) });
+        assert(onB.status === 200, `list on B: ${onB.status}`);
+        const stored = (onB.body.data.advisories as any[]).find(a => a.target_node === TRUST_ID);
+        assert(stored?.received_from === A_ID && stored?.direction === 'received' && stored?.acted === false
+            && stored?.reason === `compromised key ${stamp}`, `B stores the notice for its operator: ${JSON.stringify(stored)}`);
+
+        const peersOnB = await B.json('/v1/federation/peers', { headers: auth(B.ownerToken) });
+        const still = (peersOnB.body.data.peers as any[]).find(p => p.node_id === TRUST_ID);
+        assert(still?.status === 'active', `B acts on nothing on A's word: the target is still B's active peer: ${JSON.stringify(still)}`);
+        const gone = await B.json(`/v1/federation/peers/${TRUST_ID}?emergency=true`, { method: 'DELETE', headers: auth(B.ownerToken), body: '{}' });
+        assert(gone.status === 200, `cleanup on B: ${gone.status}`);
+    });
+
+    await test('B refuses a trust notice that is unsigned by A\'s key, names another audience, or comes again', async () => {
+        const ts = new Date().toISOString();
+        const fields = { source_node: A_ID, target_node: 'aimeat-anyone-001', advisory_type: 'ban', reason: 'forged', evidence_hash: '', timestamp: ts };
+        const signedStr = JSON.stringify(fields);
+        const wrong = await generateKeyPair();
+        const forged = await B.json('/v1/federation/trust-advisory', {
+            method: 'POST', body: JSON.stringify({ ...fields, signature: await sign(wrong.privateKey, signedStr), audience: B_ID, audience_signature: 'x' }),
+        });
+        assert(forged.status === 401, `a wrong key: ${forged.status} ${JSON.stringify(forged.body)}`);
+
+        const sig = await sign(A.nodeKey.privateKey, signedStr);
+        const elsewhere = await B.json('/v1/federation/trust-advisory', {
+            method: 'POST', body: JSON.stringify({ ...fields, signature: sig, ...(await audienceProof(A.nodeKey.privateKey, signedStr, 'aimeat-other-node')) }),
+        });
+        assert(elsewhere.status === 401 && elsewhere.body.error?.code === 'WRONG_AUDIENCE', `another audience: ${elsewhere.status} ${JSON.stringify(elsewhere.body)}`);
+
+        const good = { ...fields, signature: sig, ...(await audienceProof(A.nodeKey.privateKey, signedStr, B_ID)) };
+        const first = await B.json('/v1/federation/trust-advisory', { method: 'POST', body: JSON.stringify(good) });
+        assert(first.status === 201 && first.body.data.acted === false, `a good notice is stored and not acted on: ${first.status} ${JSON.stringify(first.body)}`);
+        const again = await B.json('/v1/federation/trust-advisory', { method: 'POST', body: JSON.stringify(good) });
+        assert(again.status === 401 && again.body.error?.code === 'REPLAYED', `the same notice again: ${again.status} ${JSON.stringify(again.body)}`);
     });
 
     await test('the scheduler starts and stops without leaving a timer behind', async () => {

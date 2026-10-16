@@ -82,7 +82,8 @@ The one place the two meet: an **MCP parameter name** is snake_case like every s
 
 - Use typed error codes from the envelope system, not raw strings.
 - Always return proper HTTP status codes with error responses.
-- Don't catch errors silently: log with `logger.error()` or propagate. `pnpm check:silent-catch` and the `aimeat/no-silent-catch` lint rule refuse a silent handler.
+- Don't catch errors silently: log with `logger.error()` or propagate. `pnpm check:silent-catch` and the `aimeat/no-silent-catch` lint rule refuse a silent handler, under `src/static` too, where each file is held at its count in `security/silent-catch-static-baseline.json`. When a swallow is right, the exemption is `// eslint-disable-next-line aimeat/no-silent-catch -- <why nothing is lost>`: the reason is required, and every exemption is counted per file in `security/silent-catch-exemptions.json`, so a new one raises that count in the same change.
+- A failed read is an error, never an empty result. Answer "not found" only for a thing that does not exist, and never build a write from a read that failed.
 
 ### File Size
 

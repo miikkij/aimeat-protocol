@@ -9,6 +9,9 @@
  *   arguments a caller can steer out of. Those are the failures that would not look like failures —
  *   the feature would appear to work and would be handing out more than the owner wrote.
  * @version-history
+ *   2026-10-16 — A grant on a node-wide server narrows the writer's own agents and nobody else's;
+ *     grantCannotNarrow no longer refuses a node-wide server (the old assertion pinned the refusal);
+ *     invalidGrantExpiry (QA audit F01b-02).
  *   2026-10-15 — A grant for app:{owner}/{file} narrows the app's GEAI; grantCannotNarrow (feature-list audit #12).
  *   v1.1.0 — 2026-09-24 — The owner's pass is for the owner IN PERSON, as the door states it: a name
  *     that resolves to the owner's account is not enough (an app under a grant).
@@ -20,7 +23,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import {
   putMcpGrant, listMcpGrants, removeMcpGrant, resolveMcpAccess, applyLockedInput, grantCannotNarrow,
-  type McpGrant,
+  invalidGrantExpiry, type McpGrant,
 } from '../../src/services/mcp-client/grants.js';
 
 const OWNER = 'alice@test-node-001';
@@ -304,8 +307,53 @@ describe('an app named in the documented form app:{owner}/{file} (feature-list a
     expect(r.allowed).toBe(true);
   });
 
-  it('grantCannotNarrow names a node-wide server and passes the writer\'s own', () => {
+  it('grantCannotNarrow passes the writer\'s own server and a node-wide one, and names another owner\'s', () => {
+    // A node-wide server was refused here until 2026-10-16; its grants are now read for the
+    // caller's own owner (QA audit F01b-02).
     expect(grantCannotNarrow(makeServer(), OWNER)).toBeNull();
-    expect(grantCannotNarrow(makeServer({ ownership: 'node', ownerGhii: null }), OWNER)).toMatch(/limit nobody/);
+    expect(grantCannotNarrow(makeServer({ ownership: 'node', ownerGhii: null }), OWNER)).toBeNull();
+    expect(grantCannotNarrow(makeServer({ ownerGhii: 'mallory@test-node-001' }), OWNER)).toMatch(/limit nobody/);
+  });
+});
+
+// QA audit F01b-02: a grant on a node-wide server was stored under its writer and read under the
+// empty owner, so it narrowed nobody.
+describe('a grant on a node-wide server', () => {
+  const nodeWide = () => makeServer({ ownership: 'node', ownerGhii: null });
+
+  it('narrows the agent of the owner who wrote it', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await putMcpGrant(storage, grant({ ownerGhii: OWNER, grantee: AGENT, tools: ['read_issue'] }));
+    const refused = await resolveMcpAccess({ storage, server: nodeWide(), grantee: AGENT, tool: 'delete_project', scopes: ['mcp:use'] });
+    expect(refused.allowed).toBe(false);
+    if (!refused.allowed) expect(refused.code).toBe('TOOL_NOT_GRANTED');
+    const allowed = await resolveMcpAccess({ storage, server: nodeWide(), grantee: AGENT, tool: 'read_issue', scopes: ['mcp:use'] });
+    expect(allowed.allowed).toBe(true);
+  });
+
+  it('another owner\'s grant, even a catch-all, never reaches this owner\'s agent', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await putMcpGrant(storage, grant({ ownerGhii: 'mallory@test-node-001', grantee: '*', tools: [] }));
+    const r = await resolveMcpAccess({ storage, server: nodeWide(), grantee: AGENT, tool: 'delete_project', scopes: ['mcp:use'] });
+    expect(r.allowed).toBe(true);
+  });
+
+  it('does not narrow the owner in person, and does narrow an app that resolves to the owner', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await putMcpGrant(storage, grant({ ownerGhii: OWNER, grantee: '*', tools: [] }));
+    const person = await resolveMcpAccess({ storage, server: nodeWide(), grantee: OWNER, tool: 'x', scopes: ['mcp:use'], ownerInPerson: true });
+    expect(person.allowed).toBe(true);
+    const app = await resolveMcpAccess({ storage, server: nodeWide(), grantee: OWNER, tool: 'x', scopes: ['mcp:use'] });
+    expect(app.allowed).toBe(false);
+  });
+});
+
+describe('invalidGrantExpiry', () => {
+  it('passes a date and an absent value, and refuses anything else', () => {
+    expect(invalidGrantExpiry(undefined)).toBeNull();
+    expect(invalidGrantExpiry(null)).toBeNull();
+    expect(invalidGrantExpiry('2026-12-31')).toBeNull();
+    expect(invalidGrantExpiry('tomorrow')).toMatch(/not a date/);
+    expect(invalidGrantExpiry(42)).toMatch(/not a date/);
   });
 });

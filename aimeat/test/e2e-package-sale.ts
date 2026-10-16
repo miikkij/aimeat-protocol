@@ -16,7 +16,8 @@
  *   - Phase 4: a purchase for a named node grants it with the author's terms and keeps the card
  *   - Phase 5: a price change reaches new sales only; a renewal at the accepted price moves the date
  *   - Phase 6: automatic renewal: charged and moved once; a declined card is told once
- *   - Phase 7: a grant the repository refuses refunds the payment
+ *   - Phase 7: a grant the repository refuses refunds the payment; when the refund fails, the buyer is
+ *     told the money was not returned and the seller gets an undelivered-payment record
  *   - Phase 8: an offer granted on approval: refused, then approved, the buyer told each time
  *   - Phase 8b: a version R withdraws reaches B's copy at B's check (phase 5, T6)
  *   - Phase 8c: a new version that can do more waits for S's review; renewals go on (phase 5)
@@ -25,6 +26,11 @@
  *   - Phase 10: an unused packages-only peer is removed after 30 days; a seller is kept (finding F)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-sale
  * @version-history
+ *   2026-10-16 — Phase 7: the refused-sale assertion matched only the word "refunded", which the old
+ *     fixed text "Payment refunded" carried whatever the rail did; it now asserts the sentence for a
+ *     confirmed refund and that no undelivered record is written. New case: the instrument
+ *     "refund-fails" makes the test rail's refund fail, and the buyer is told the money was NOT
+ *     returned, the seller reads the record and is notified (QA audit F5-01, F7e-01, S8-05).
  *   v1.1.0 — 2026-10-02 — Phase 5: S reviews before it sells, a withdrawn version on B, a new version
  *     that waits for review, discovery, the peer cap and the cleanup.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 3).
@@ -460,10 +466,38 @@ console.log('\nPhase 7 — A refusal on the repository refunds');
 await test('A sale the repository refuses (a known node under another key) answers FULFILLMENT_FAILED and grants nothing', async () => {
     const before = (await grantsOn(kit)).find(x => x.nodeId === B.nodeId);
     const wrongKey = { node_id: B.nodeId, url: B.baseUrl, public_key: (await generateKeyPair()).publicKey };
-    const { done } = await buy({ app: kit, input: { node: wrongKey } });
-    assert(done.status === 502 && done.body.error?.code === 'FULFILLMENT_FAILED' && /refunded/i.test(done.body.error?.message), `refused: ${done.status} ${JSON.stringify(done.body)}`);
+    const { create, done } = await buy({ app: kit, input: { node: wrongKey } });
+    // The refund the test rail confirmed is the only case that may say "refunded" (QA audit F5-01).
+    assert(done.status === 502 && done.body.error?.code === 'FULFILLMENT_FAILED' && /The payment was refunded\./.test(done.body.error?.message), `refused: ${done.status} ${JSON.stringify(done.body)}`);
     const after = (await grantsOn(kit)).find(x => x.nodeId === B.nodeId);
     assert(JSON.stringify(after) === JSON.stringify(before), `B's grant is unchanged: ${JSON.stringify(after)}`);
+    const rec = await S.json(`/v1/memory/${encodeURIComponent(`commerce.undelivered.${create.body.data.session.id}`)}`, { headers: auth(opsToken) });
+    assert(rec.status === 404, `a refunded payment leaves no undelivered record: ${rec.status} ${JSON.stringify(rec.body)}`);
+});
+
+// QA audit F5-01, F7e-01, S8-05: the checkout said "Payment refunded" whatever the rail did. A refund
+// the rail refuses must say the money was NOT returned and leave a record the seller can read.
+await test('A refused sale whose refund fails says the payment was not returned, and the seller and the operator get the record', async () => {
+    const wrongKey = { node_id: B.nodeId, url: B.baseUrl, public_key: (await generateKeyPair()).publicKey };
+    const { create, done } = await buy({ app: kit, input: { node: wrongKey } }, 'refund-fails');
+    const id = create.body.data.session.id as string;
+    const msg = String(done.body.error?.message ?? '');
+    assert(done.status === 502 && done.body.error?.code === 'FULFILLMENT_FAILED', `refused: ${done.status} ${JSON.stringify(done.body)}`);
+    assert(!/was refunded/i.test(msg) && /NOT returned/.test(msg) && msg.includes(id) && /Contact the seller/.test(msg), `the message says the money was not returned: ${msg}`);
+    const rec = await S.json(`/v1/memory/${encodeURIComponent(`commerce.undelivered.${id}`)}`, { headers: auth(opsToken) });
+    const v = rec.body.data?.value ?? rec.body.data?.memory?.value;
+    assert(rec.status === 200 && v?.type === 'aimeat:UndeliveredPayment' && v.sessionId === id && v.rail === 'test.money'
+        && v.refund?.outcome === 'failed' && v.amount === create.body.data.session.total && v.amount > 0 && v.currency === 'EUR' && v.buyer === `${buyer}@${S.nodeId}`
+        && v.seller === `${ops}@${S.nodeId}` && /^testmoney_refundfails_/.test(v.trackingCode) && v.status === 'open',
+        `the seller reads the record: ${rec.status} ${JSON.stringify(rec.body)}`);
+    const notes = ((await S.json('/v1/notifications?limit=200', { headers: auth(opsToken) })).body.data.notifications as any[])
+        .filter(n => n.type === 'payment_not_delivered');
+    assert(notes.some(n => String(n.body ?? '').includes(id)), `the seller is notified: ${JSON.stringify(notes)}`);
+    // S's operator (here also the seller of record) gets the node's own message naming the checkout.
+    const inbox = await S.json('/v1/messages/inbox?per_page=100', { headers: auth(opsToken) });
+    assert(JSON.stringify(inbox.body.data?.messages ?? []).includes(id), `the operator is told: ${inbox.status} ${JSON.stringify(inbox.body).slice(0, 400)}`);
+    const back = await S.json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyerToken) });
+    assert(back.body.data?.session?.status === 'open', `the session stays open: ${JSON.stringify(back.body.data?.session?.status)}`);
 });
 
 console.log('\nPhase 8 — An offer granted on approval');

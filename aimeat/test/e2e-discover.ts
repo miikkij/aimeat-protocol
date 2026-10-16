@@ -7,6 +7,8 @@
  *   → 401, scope=shared → 501); and the ratified agent read-scope rule (§11.3) — an agent WITHOUT
  *   `memory:read` does NOT see the owner's private content, an agent WITH it does.
  * @version-history
+ *   v0.2.2 — 2026-10-16 — A refused token is answered 401 INVALID_TOKEN on this public route; a request
+ *     with no token stays public (QA audit F1-01).
  *   v0.2.1 — 2026-10-11 — The priced tool has a money price; its morsel price asserted the old model, where a morsel amount was a price.
  *   v0.2.0 — 2026-09-13 — Setup no longer matched production: the workspace document was written
  *     before the manifest declaring its space, which UNDECLARED_SPACE now refuses. The manifest is written first.
@@ -299,6 +301,18 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
             assert(!hasId(r.body.data.entries, K_PRIV), 'anon own-scope must not leak A\'s private');
             assert(!hasId(r.body.data.entries, K_RES), 'anon own-scope must not leak A\'s private research');
         }
+    });
+
+    // QA audit F1-01: a token the node refuses is answered 401 on this public route too, whether the
+    // node runs anonymous mode or not. It used to be served as no credential: scope 'own' for the
+    // shared anonymous owner, or the public view, with nothing to say the token was dead.
+    await test('a refused token → 401 INVALID_TOKEN, not the public or anonymous view', async () => {
+        for (const bad of ['garbage.not.ajwt', 'aimeat_pat_0000000000000000000000000000000000000000']) {
+            const r = await discover('scope=public', bad);
+            assert(r.status === 401 && r.body.error?.code === 'INVALID_TOKEN', `${bad.slice(0, 12)}…: expected 401 INVALID_TOKEN, got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.scope)}`);
+        }
+        const none = await discover('scope=public');
+        assert(none.status === 200, `no token stays public: ${none.status}`);
     });
 
     await test('invalid scope → 400', async () => {

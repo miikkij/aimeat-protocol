@@ -10,6 +10,8 @@
  *   live-updates on its own (profile.js, which normally bridges SSE, is not mounted here).
  * @structure DocSolo (default export)
  * @version-history
+ *   2026-10-16 — A failed read says the document could not be loaded, with Retry, instead of
+ *     "Document not found." (QA audit F6-02).
  *   2026-09-27 — The window is the SoloWindow component, its sentences the quiet line, its toast
  *     the ToastBox; it writes no class (page group G9).
  *   2026-09-14 — The window's toast is the site's shared one (theme.css .toast).
@@ -29,6 +31,7 @@ import { DocumentView, DocumentEditor } from './profile/organisms/document.js';
 import { SoloWindow } from '/components/SoloWindow.js';
 import { ToastBox } from '/components/Toast.js';
 import { swallowed } from '/js/swallowed.js';
+import { LoadFailed } from '/js/load-state.js';
 
 const html = htm.bind(h);
 
@@ -43,7 +46,7 @@ export default function DocSolo() {
   useViewCSS('/css/views/profile.css');
   const session = getSession();
   const { org, ws, type, id } = parseDoc();
-  const [doc, setDoc] = useState(undefined);   // undefined=loading, null=not found, object=the page
+  const [doc, setDoc] = useState(undefined);   // undefined=loading, null=not found, 'failed'=the read failed, object=the page
   const [ot, setOt] = useState(null);
   const [mode, setMode] = useState('view');
   const [busy, setBusy] = useState(false);
@@ -63,7 +66,12 @@ export default function DocSolo() {
       for (const d of (w.objects?.[type] || [])) byId.set(d.id, { ...d, _draft: false, _published: true });
       for (const d of (w.drafts?.[type] || [])) { const pub = byId.get(d.id); byId.set(d.id, { ...d, _draft: true, _published: !!pub, _pub: pub || null }); }
       setDoc(byId.get(id) || null);
-    } catch (err) { swallowed('doc-solo', err); setDoc(null); }
+    } catch (err) {
+      // A failed read is not "Document not found.": it says it could not load and offers Retry. A
+      // document already on screen stays when a reload fails.
+      swallowed('doc-solo', err);
+      setDoc(prev => (prev && typeof prev === 'object' ? prev : 'failed'));
+    }
   }, [session, org, ws, type, id]);
 
   useEffect(() => { load(); }, [load]);
@@ -101,6 +109,7 @@ export default function DocSolo() {
 
   if (!session) return html`<${SoloWindow} message=${t('organisms.loginToView') || 'Sign in to view this document.'} />`;
   if (doc === undefined) return html`<${SoloWindow} message=${t('profile.loading') || 'Loading…'} />`;
+  if (doc === 'failed') return html`<${SoloWindow}><${LoadFailed} onRetry=${load} /><//>`;
   if (doc === null || !ot) return html`<${SoloWindow} message=${t('organisms.docNotFound2') || 'Document not found.'} />`;
 
   return html`

@@ -12,6 +12,9 @@
  *
  *   FIRST FAIL: before 2026-09-28 the module did not exist and this file could not import it.
  * @version-history
+ *   v1.1.0 — 2026-10-16 — A refused allowlist read: allowHost throws and writes nothing, hosts()
+ *     throws, and NOT_FOUND still reads as an empty list (QA audit F6-04). FIRST FAIL: against v1.0.2
+ *     of the lib allowHost stored a list holding only the new host.
  *   v1.0.0 — 2026-09-28 — Initial.
  */
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
@@ -20,11 +23,13 @@ interface Call { path: string; opts: { method?: string; body?: string } }
 const calls: Call[] = [];
 let signedIn = true;
 let stored: unknown = null;
+/** When set, the allowlist read answers this envelope instead of the stored record. */
+let readRefusal: { ok: false; error: { code: string; message: string } } | null = null;
 
 const session = {
   async fetch(path: string, opts: { method?: string; body?: string } = {}) {
     calls.push({ path, opts });
-    if (path.startsWith('/v1/memory/living-hooks.settings')) return { ok: true, data: { value: stored } };
+    if (path.startsWith('/v1/memory/living-hooks.settings')) return readRefusal ?? { ok: true, data: { value: stored } };
     if (path === '/v1/memory' && opts.method === 'POST') {
       stored = JSON.parse(String(opts.body)).value;
       return { ok: true, data: {} };
@@ -45,7 +50,7 @@ beforeAll(async () => {
   webhook = g.window.AIMEAT.webhook;
 });
 
-beforeEach(() => { calls.length = 0; signedIn = true; stored = null; });
+beforeEach(() => { calls.length = 0; signedIn = true; stored = null; readRefusal = null; });
 
 describe('AIMEAT.webhook.send', () => {
   it('goes to the living-hooks extension with the url, method, headers and body, never to the url', async () => {
@@ -98,5 +103,20 @@ describe('AIMEAT.webhook allowlist', () => {
 
   it('reads an empty list when the record does not exist', async () => {
     expect(await webhook.hosts()).toEqual([]);
+    readRefusal = { ok: false, error: { code: 'NOT_FOUND', message: 'no such key' } };
+    expect(await webhook.hosts()).toEqual([]);
+  });
+
+  it('a refused allowlist read stops allowHost: it throws with the node\'s code and writes nothing', async () => {
+    stored = { allow_hosts: ['.example.org', 'api.example.com'] };
+    readRefusal = { ok: false, error: { code: 'INTERNAL_ERROR', message: 'Something failed on the node.' } };
+    await expect(webhook.allowHost('new.example.net')).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(calls.find(c => c.path === '/v1/memory')).toBeUndefined();
+    expect(stored).toEqual({ allow_hosts: ['.example.org', 'api.example.com'] });
+  });
+
+  it('a refused allowlist read is an error in hosts(), never an empty list', async () => {
+    readRefusal = { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many requests.' } };
+    await expect(webhook.hosts()).rejects.toMatchObject({ code: 'RATE_LIMITED' });
   });
 });

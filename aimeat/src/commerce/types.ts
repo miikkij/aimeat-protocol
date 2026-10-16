@@ -9,9 +9,11 @@
  *   registries). Protocol adapters (native REST, UCP, ACP, x402) are thin shells over
  *   these — see doc-t033-commerce-spec in the dev organism's design space.
  * @structure Sellable · FulfillArgs · FulfillOutcome · CheckoutLineItem · CheckoutReceipt ·
- *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
+ *   CheckoutSessionRecord · PaymentContext · PaymentResult · RefundOutcome · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   2026-10-16 — PaymentHandler.refund answers a RefundOutcome (refunded, not_possible, failed,
+ *     nothing_captured) instead of nothing, so the buyer's message can say what the rail did (QA audit F5-01).
  *   2026-10-16 — CheckoutSessionRecord: status `completing` and collectedTrackingCode (QA audit S8-04);
  *     Sellable.fulfillsAsTask (QA audit S8-03).
  *   v1.6.0 — 2026-10-11 — A morsel is pacing, never a price: Sellable.priceMorsels is unitPrice (it
@@ -255,6 +257,19 @@ export interface PaymentResult {
  * `collect` takes the gross from the buyer, `payout` pays one recipient, `refund` reverses a
  * collect. The session service orchestrates: collect → fulfill → payouts/distribute → fee leg.
  */
+/**
+ * What a handler's refund did, so no message says a payment came back when it did not.
+ * - `refunded`: the rail reversed the charge.
+ * - `not_possible`: the rail cannot reverse a charge (an onchain stablecoin transfer is final).
+ * - `failed`: the rail can reverse, and the reversal did not go through.
+ * - `nothing_captured`: nothing was taken online (a manual invoice), so nothing is owed.
+ * `detail` is for the log and the stored record, never for the buyer's message.
+ */
+export interface RefundOutcome {
+  outcome: 'refunded' | 'not_possible' | 'failed' | 'nothing_captured';
+  detail?: string;
+}
+
 export interface PaymentHandler {
   /** Reverse-DNS handler id advertised in the UCP profile (e.g. `io.aimeat.invoice`). */
   id: string;
@@ -318,13 +333,16 @@ export interface PaymentHandler {
     trackingCode: string;
     reference: string;
   }): Promise<void>;
-  /** Reverse a collect when fulfillment fails after payment (best effort, must not throw). */
+  /**
+   * Reverse a collect when fulfillment fails after payment. Must not throw: it answers what it did,
+   * and the session service words the buyer's message from that answer (RefundOutcome).
+   */
   refund(ctx: PaymentContext, args: {
     buyerGhii: string;
     amount: number;
     trackingCode: string;
     seller?: { ghii: string; owner: string; psp?: unknown };
-  }): Promise<void>;
+  }): Promise<RefundOutcome>;
   /**
    * OPTIONAL hold rail (the covered-bid / escrow-by-deferred-capture primitives). `authorize`
    * places a hold on the buyer's instrument WITHOUT moving money; `capture` settles up to the

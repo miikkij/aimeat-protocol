@@ -15,8 +15,10 @@
  *
  *   This endpoint is OPEN and it sends email, which is a shape that has to be handled rather than
  *   hoped about:
- *     - the response NEVER reveals whether an address already has an account, or even whether a
- *       message was sent, so it cannot be used to test addresses;
+ *     - the response NEVER reveals whether an address already has an account or a live invitation,
+ *       so it cannot be used to test addresses. It does say `not_sent` when nothing could be sent
+ *       (the node has no mail, or the send failed), because a person told to check their email
+ *       for a message that is not coming is the worse failure, and neither fact is about an account;
  *     - one live invitation per address at a time, so an address cannot be buried in mail;
  *     - a per-IP limit, so one machine cannot mail a thousand strangers;
  *     - and the message itself carries the request's origin, which is what turns an open door into
@@ -24,6 +26,7 @@
  * @structure registrationInvitesRouter(config, storage): POST /v1/registration-invites
  * @usage app.use(registrationInvitesRouter(config, storage));
  * @version-history
+ *   2026-10-16 — A send that failed on a node with mail answers 200 not_sent with reason send_failed and the portal link, instead of 202 "sent"; the no-mail answer carries reason mail_disabled (QA audit F02a-04).
  *   2026-10-15 — A node whose email service is disabled answers 200 status not_sent with the portal link to register, instead of 202 "sent" and "Check your email" when nothing was sent (feature-list audit #23).
  *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): the self-service door is direct, refused in invite AND closed modes.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4b).
@@ -113,11 +116,35 @@ export function registrationInvitesRouter(config: AimeatConfig, storage: Storage
                 const registerUrl = `${config.baseUrl}/v1/portal`;
                 res.status(200).json(success(config.nodeId, {
                     status: 'not_sent',
+                    reason: 'mail_disabled',
                     email_sent: false,
                     register_url: registerUrl,
                     tell_the_person: `This service does not send email, so no message is on its way. `
                         + `Open ${registerUrl} and create your account there. Tell me when it is done.`,
                     next: 'After they have the account, connect yourself as their agent with device authorization.',
+                }, [
+                    { description: 'Where the person registers', method: 'GET', url: '/v1/portal' },
+                    { description: 'How to connect yourself as an agent afterwards', method: 'GET', url: '/auth.md' },
+                ]));
+                return;
+            }
+
+            // The node has mail and the send failed. Nothing is on its way, and the invitation the
+            // service wrote is cancelled, so a later retry can send again. Answering "sent" here
+            // left the person waiting for a message that never came, and suppressed every retry for
+            // a day (QA audit F02a-04). This says nothing about the address's account: the answer
+            // is the same whether one exists or not.
+            if (result.sendFailed) {
+                logger.warn('registration invite: the email could not be sent', { ip: observed.ip, model: agent.model });
+                const registerUrl = `${config.baseUrl}/v1/portal`;
+                res.status(200).json(success(config.nodeId, {
+                    status: 'not_sent',
+                    reason: 'send_failed',
+                    email_sent: false,
+                    register_url: registerUrl,
+                    tell_the_person: 'The email could not be sent just now, so no message is on its way. '
+                        + `I can try again in a few minutes, or you can open ${registerUrl} and create your account there. Tell me which you prefer.`,
+                    next: 'Retry this call later, or, after they have the account, connect yourself as their agent with device authorization.',
                 }, [
                     { description: 'Where the person registers', method: 'GET', url: '/v1/portal' },
                     { description: 'How to connect yourself as an agent afterwards', method: 'GET', url: '/auth.md' },

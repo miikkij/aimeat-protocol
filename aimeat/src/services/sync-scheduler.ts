@@ -9,8 +9,14 @@
  * @structure
  *   - notifyCatalogueChange(): debounces CSM/action changes into a batched peer sync (instant/hybrid)
  *   - batchTimer / batchedPeerIds: module-level debounce state for the batch window
+ *   - scheduleMemoryDrain(): the debounced drain after a memory enqueue (instant/hybrid)
+ *   - drainSyncQueue(): catalogue and memory jobs per peer, each marked by its result
  *
  * @version-history
+ *   v1.2.0 — 2026-10-16 — The drain sends memory_replicate entries (sendQueuedMemoryEntries) and marks
+ *     each by its result; it had marked them 'sent' with no request to a peer. A memory enqueue now
+ *     triggers a debounced drain in instant and hybrid mode. The trust_advisory branch is gone:
+ *     nothing enqueues that type (QA audit F3-01, S6-06).
  *   v1.1.0 — 2026-09-08 — The debounced flush waits for its enqueues before it drains.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -19,7 +25,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { syncCatalogueToPeer, enqueueCatalogueSync } from './catalogue-sync.js';
-import { replicateMemoryToAllPeers } from './memory-replication.js';
+import { replicateMemoryToAllPeers, sendQueuedMemoryEntries, onMemoryReplicationEnqueued } from './memory-replication.js';
 import {
   computePeerPriorities,
   getSyncHealthMetrics,
@@ -84,6 +90,28 @@ export function notifyCatalogueChange(
   }, config.syncBatchDelayMs);
 }
 
+/** Debounce timers for the drain that follows a memory enqueue, per storage instance. */
+const memoryDrainTimers = new Map<Storage, ReturnType<typeof setTimeout>>();
+
+/**
+ * Drain the queue once the batch window after a memory enqueue has passed: in instant and hybrid
+ * mode a change leaves at once, not at the next scheduled round. Registered with the memory
+ * replication service by startSyncScheduler.
+ */
+function scheduleMemoryDrain(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
+  if (config.syncMode === 'bulk') return;
+  const existing = memoryDrainTimers.get(storage);
+  if (existing) clearTimeout(existing);
+  memoryDrainTimers.set(storage, setTimeout(() => {
+    memoryDrainTimers.delete(storage);
+    drainSyncQueue(config, storage, peers).catch(err => {
+      logger.error('Failed to drain sync queue after a memory change', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }, config.syncBatchDelayMs));
+}
+
 /**
  * Drain the replication queue: dequeue entries and execute syncs.
  * Respects concurrent sync limit and peer priority.
@@ -129,17 +157,14 @@ export async function drainSyncQueue(
         }
       }
 
-      // Process memory_replicate entries
+      // Process memory_replicate entries: one single-record send per entry, each marked by its own
+      // result. Until 2026-10-16 this branch marked every entry 'sent' and sent nothing.
       const memoryEntries = entries.filter(e => e.type === 'memory_replicate');
       if (memoryEntries.length > 0) {
-        // These are handled by the memory replication service
-        await storage.markReplicationSent(memoryEntries.map(e => e.id));
-      }
-
-      // Process trust_advisory entries
-      const trustEntries = entries.filter(e => e.type === 'trust_advisory');
-      if (trustEntries.length > 0) {
-        await storage.markReplicationSent(trustEntries.map(e => e.id));
+        const { sent, failed } = await sendQueuedMemoryEntries(peer, memoryEntries, config, storage);
+        recordSyncAttempt(failed.length === 0);
+        await storage.markReplicationSent(sent);
+        await storage.markReplicationFailed(failed);
       }
 
       recordSyncDuration(Date.now() - startTime);
@@ -194,11 +219,16 @@ export function startSyncScheduler(
   let recurringTimer: ReturnType<typeof setTimeout>;
   scheduleNext();
 
+  const unregisterMemoryDrain = onMemoryReplicationEnqueued(storage, () => scheduleMemoryDrain(config, storage, peers));
+
   return {
     stop() {
       clearTimeout(initialTimer);
       clearTimeout(recurringTimer);
       if (batchTimer) clearTimeout(batchTimer);
+      unregisterMemoryDrain();
+      const memoryTimer = memoryDrainTimers.get(storage);
+      if (memoryTimer) { clearTimeout(memoryTimer); memoryDrainTimers.delete(storage); }
       logger.info('Sync scheduler stopped');
     },
   };

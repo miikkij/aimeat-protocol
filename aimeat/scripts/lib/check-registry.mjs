@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 1.19.1 (2026-10-16): check:silent-catch's label names what it now holds: src/static per file and per shape, and every exemption counted with its reason (W25).
  *  - 1.19.0 (2026-10-11): check:doc-links, a served string never sends its reader to a repository docs/ file.
  *  - 1.18.0 (2026-10-11): lint, the pre-commit hook's cached ESLint, so the 800-line file limit refuses the gate and not only the commit after it.
  *  - 1.17.0 (2026-10-11): check:package-scripts, every package.json script points at a tracked file and an existing script.
@@ -111,7 +112,7 @@ export const FAST_CHECKS = [
     // The whole-tree silent-exception pass, which until 2026-09-13 ran nowhere: the hook sees only
     // staged files and nothing else called it, so the three cleaned shapes were held at zero by
     // eslint alone and the fourth had no keeper at all.
-    { script: 'check:silent-catch -- --strict', label: 'A caught error leaves a trace, and no file answers with more substitutes than before' },
+    { script: 'check:silent-catch -- --strict', label: 'A caught error leaves a trace: no file holds more silent handlers or exemptions than before, src/static included, and every exemption gives its reason' },
 ];
 
 // The five compiler invariants share one program and run together, outside the fast pool.

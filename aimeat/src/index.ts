@@ -18,10 +18,11 @@
  * @version-history v1.26.0 — 2026-07-10 — Emit securityPostureWarnings() at startup so a public-profile node flags risky settings.
  * @version-history v1.27.0 — 2026-07-13 — Extract help text, `connect` dispatch, and `start`/`serve` runtime into index-help/index-connect/index-start (max-file-lines).
  * @version-history v1.28.0 — 2026-09-28 — `aimeat init --install-set <file> [--install-set-secrets <file>]`: the install set the node applies at start-up.
+ * @version-history v1.30.0 — 2026-10-16 — `aimeat backup` and `aimeat restore` send an operator's personal access token (--token or AIMEAT_OP_TOKEN, cli/backup-restore.ts), read the answer and exit 1 on a refusal without writing a file; `--url` reaches a running node; the `Bearer operator:<password>` form, which no auth path read, is gone (QA audit P6-07, F19b-01). `aimeat join` exits 1 when it did not join (QA audit F5-06).
  * @version-history v1.29.0 — 2026-10-09 — `aimeat config export --format consul --include-secrets`: the Consul export leaves the secret rows out without the flag (secrets audit 2026-10-09, S3).
  */
 import { parseArgs } from 'node:util';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from './server.js';
@@ -65,6 +66,7 @@ const { values, positionals } = parseArgs({
     'install-set': { type: 'string' },
     'install-set-secrets': { type: 'string' },
     'include-secrets': { type: 'boolean' },
+    token: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
   },
@@ -234,8 +236,9 @@ if (subcommand === 'config') {
   process.exit(0);
 } else if (subcommand === 'join') {
   const { runFederationJoin } = await import('./cli/federation-join.js');
-  await runFederationJoin(config, positionals[1] ?? config.genesisUrl ?? undefined);
-  process.exit(0);
+  // runFederationJoin returns false on every path that did not join (QA audit F5-06).
+  const joined = await runFederationJoin(config, positionals[1] ?? config.genesisUrl ?? undefined);
+  process.exit(joined ? 0 : 1);
 } else if (subcommand === 'maintenance') {
   const action = positionals[1]; // on | off | undefined (show status)
   const { createStorage } = await import('./storage/storage-factory.js');
@@ -274,59 +277,35 @@ if (subcommand === 'config') {
     }
   }
   process.exit(0);
-} else if (subcommand === 'backup') {
-  const outArg = positionals[1] ?? 'aimeat-backup.json';
-  const { app } = await createServer(config);
-  // Start server temporarily to access storage
-  const server = app.listen(0, async () => {
-    try {
-      const addr = server.address();
-      const port = typeof addr === 'object' && addr ? addr.port : 0;
-      const resp = await fetch(`http://localhost:${port}/v1/admin/backup`, {
-        headers: config.adminPassword
-          ? { Authorization: `Bearer operator:${config.adminPassword}` }
-          : {},
-      });
-      const data = await resp.json();
-      writeFileSync(outArg, JSON.stringify(data, null, 2));
-      logger.info(`Backup written to ${outArg}`);
-    } catch (err) {
-      logger.error('Backup failed', errorFields(err));
-    } finally {
-      server.close();
-    }
-  });
-} else if (subcommand === 'restore') {
-  const fromArg = positionals[1];
-  if (!fromArg) {
-    console.error('Usage: aimeat restore <file.json>');
+} else if (subcommand === 'backup' || subcommand === 'restore') {
+  // Both send an operator's personal access token (--token or AIMEAT_OP_TOKEN) and read the answer;
+  // a refusal writes no file and exits 1 (QA audit P6-07, F19b-01). --url talks to a running node;
+  // without it a node is started in this process on the configured database, on a free port.
+  const { runBackup, runRestore, operatorTokenFrom } = await import('./cli/backup-restore.js');
+  const token = operatorTokenFrom(stringFlag(values.token));
+  const file = positionals[1] ?? (subcommand === 'backup' ? 'aimeat-backup.json' : undefined);
+  if (!file) {
+    console.error('Usage: aimeat restore <file.json> [--token <operator token>] [--url <node url>]');
     process.exit(1);
   }
+  const run = (baseUrl: string) => subcommand === 'backup'
+    ? runBackup({ baseUrl, token, outFile: file })
+    : runRestore({ baseUrl, token, inFile: file });
+  const urlFlag = stringFlag(values.url);
+  if (!token) {
+    // Refused before a node is started: the run would only end in a 401.
+    process.exit(await run(urlFlag ?? 'http://localhost'));
+  }
+  if (urlFlag) {
+    process.exit(await run(urlFlag.replace(/\/+$/, '')));
+  }
   const { app } = await createServer(config);
-  const server = app.listen(0, async () => {
-    try {
-      const addr = server.address();
-      const port = typeof addr === 'object' && addr ? addr.port : 0;
-      const body = readFileSync(fromArg, 'utf-8');
-      const parsed = JSON.parse(body);
-      const payload = parsed.data ?? parsed; // handle envelope or raw
-      const resp = await fetch(`http://localhost:${port}/v1/admin/restore`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(config.adminPassword
-            ? { Authorization: `Bearer operator:${config.adminPassword}` }
-            : {}),
-        },
-        body: JSON.stringify(payload),
-      });
-      const result = await resp.json();
-      logger.info('Restore complete', result);
-    } catch (err) {
-      logger.error('Restore failed', errorFields(err));
-    } finally {
-      server.close();
-    }
+  const server = app.listen(0, () => {
+    const addr = server.address();
+    const port = typeof addr === 'object' && addr ? addr.port : 0;
+    run(`http://localhost:${port}`)
+      .catch((err) => { console.error(`${subcommand} failed: ${String(err)}`); return 1; })
+      .then((code) => { server.close(); process.exit(code); });
   });
 } else if (subcommand === 'connect') {
   await runConnectCli(positionals);

@@ -75,13 +75,32 @@
     const prov = res.meta?.provenance;
     return prov ? { ...res.data, provenance: prov } : res.data;
   }
+  function refusal(res, fallback, fallbackCode) {
+    const e = res && res.error;
+    const err = (
+      /** @type {Error & { code: string, details?: unknown }} */
+      new Error(e && e.message || fallback)
+    );
+    err.code = e && e.code || fallbackCode || "REQUEST_FAILED";
+    if (e && e.details !== void 0) err.details = e.details;
+    return err;
+  }
+  async function appConfigView() {
+    const ref = appRef();
+    if (!ref) return null;
+    const r = await fetch((APEX_URL || "") + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/config");
+    const body = await r.json();
+    if (body && body.ok) return body.data || {};
+    if (body && body.error && body.error.code === "NOT_FOUND") return null;
+    throw refusal(body, "The app config could not be read (HTTP " + r.status + "). Try again.", "APP_CONFIG_UNREADABLE");
+  }
   async function publicEntryResponse(gaii, key) {
     const url = NODE_URL + "/v1/memory/" + encodeURIComponent(gaii) + "/" + encodeURIComponent(key) + "?soft=1";
     const r = await fetch(url);
     const res = await r.json();
     if (!res.ok) {
       if (res.error?.code === "NOT_FOUND") return null;
-      throw new Error(res.error?.message || "Failed to read public memory");
+      throw refusal(res, "Failed to read public memory");
     }
     return res;
   }
@@ -128,19 +147,31 @@
     async set(key, value, opts) {
       const body = { key, value, visibility: "private", ...opts };
       const res = await authFetch2("/v1/memory", { method: "POST", body: JSON.stringify(body) });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to set memory");
+      if (!res.ok) throw refusal(res, "Failed to set memory");
       return res.data;
     },
-    // Read a single entry (falls back to public read from app creator if not found or empty).
-    // Uses ?soft=1 so a missing key is a clean 200 (value null) — no browser-console 404 noise;
-    // the contract is unchanged: resolves null when the key does not exist.
-    // opts: { agent, ownerScope } — read from one of the owner's agents' namespaces, or
-    // across the owner's whole set (GHII + agents). Omitted → unchanged behaviour.
+    /**
+     * Read a single entry's value. Resolves null ONLY when the key does not exist; a read the node
+     * refused (401, 403, 429, 5xx) throws an Error whose `code` is the node's (RATE_LIMITED,
+     * ACCESS_DENIED, INTERNAL_ERROR, …). That is what makes "read, change, write the whole value" safe:
+     * the write after a refused read never runs, so it cannot replace the stored record with a default.
+     * Uses ?soft=1 so a missing key is a clean 200 (value null), with no 404 in the browser console.
+     *
+     * When the caller's own key is missing or empty, the app creator's public value of the same key is
+     * read instead (the seed an app ships with). That fallback runs only after "does not exist", never
+     * after a refusal, and only on an unscoped read. If the creator read itself fails it is logged and
+     * get() resolves null, because the caller's own key is still absent.
+     *
+     * @param {string} key
+     * @param {{ agent?: string, ownerScope?: boolean }} [opts] read from one of the owner's agents'
+     *   namespaces, or across the owner's whole set (GHII + agents).
+     */
     async get(key, opts) {
       const res = await authFetch2(withParams(
         "/v1/memory/" + encodeURIComponent(key) + "?soft=1",
         scopeParams(opts)
       ));
+      if (!res.ok && res.error?.code !== "NOT_FOUND") throw refusal(res, 'The key "' + key + '" could not be read. Nothing was changed; try again.', "READ_FAILED");
       var val = res.ok ? res.data.value : null;
       var isEmpty = val == null || typeof val === "object" && Object.keys(val).length === 0;
       if (!isEmpty) return val;
@@ -157,7 +188,9 @@
         try {
           var pub = await data.getPublic(creator, key);
           if (pub != null) return pub;
-        } catch {
+        } catch (e) {
+          console.warn('[aimeat-data] get("' + key + `"): the app creator's public value could not be read:`, e && /** @type {Error} */
+          e.message);
         }
       }
       return val;
@@ -171,7 +204,7 @@
       ));
       if (!res.ok) {
         if (res.error?.code === "NOT_FOUND") return null;
-        throw new Error(res.error?.message || "Failed to get memory");
+        throw refusal(res, "Failed to get memory");
       }
       return withProvenance(res);
     },
@@ -182,7 +215,7 @@
         method: "PUT",
         body: JSON.stringify(body)
       });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to update memory");
+      if (!res.ok) throw refusal(res, "Failed to update memory");
       return res.data;
     },
     /**
@@ -200,7 +233,7 @@
         "/v1/memory/" + encodeURIComponent(key),
         scopeParams(opts)
       ), { method: "DELETE" });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to delete memory");
+      if (!res.ok) throw refusal(res, "Failed to delete memory");
       return res.data;
     },
     /**
@@ -226,7 +259,7 @@
       if (opts?.count) params.set("count", "true");
       const qs = params.toString();
       const res = await authFetch2("/v1/memory" + (qs ? "?" + qs : ""));
-      if (!res.ok) throw new Error(res.error?.message || "Failed to list memory");
+      if (!res.ok) throw refusal(res, "Failed to list memory");
       return res.data;
     },
     /** Cheap change probe: the number of keys under a prefix, no values transferred. */
@@ -271,7 +304,7 @@
       if (o.offset) params.set("offset", String(o.offset));
       if (o.owner) params.set("owner", o.owner);
       const res = await authFetch2("/v1/memory/discover?" + params.toString());
-      if (!res.ok) throw new Error(res.error?.message || "Failed to discover public memory");
+      if (!res.ok) throw refusal(res, "Failed to discover public memory");
       const found = (res.data?.items || []).filter(function(i) {
         return i && i.key && i.owner_gaii;
       });
@@ -284,7 +317,7 @@
         own.set("limit", String(limit));
         if (!withValues) own.set("include", "meta");
         const mineRes = await authFetch2("/v1/memory?" + own.toString());
-        if (!mineRes.ok) throw new Error(mineRes.error?.message || "Failed to list your own public memory");
+        if (!mineRes.ok) throw refusal(mineRes, "Failed to list your own public memory");
         (mineRes.data?.items || []).forEach(function(item) {
           const row = discoverRow(item, true);
           if (withValues) row.value = item.value;
@@ -328,7 +361,7 @@
       params.set("q", query);
       if (opts?.visibility) params.set("visibility", opts.visibility);
       const res = await authFetch2("/v1/memory/search?" + params.toString());
-      if (!res.ok) throw new Error(res.error?.message || "Failed to search memory");
+      if (!res.ok) throw refusal(res, "Failed to search memory");
       return res.data;
     },
     // Read another agent's public memory (no auth needed). ?soft=1: missing (or hidden)
@@ -363,41 +396,31 @@
      * This app's config: the values its owner set for the fields the app declares in its
      * `<script type="application/json" id="aimeat-config">` block, with the declared defaults filled
      * in. The OWNER's values, whoever opened the app, signed in or not, which is why a config field
-     * is never a secret. Resolves null on a page that is not a served app, or when the read fails.
+     * is never a secret. Resolves null on a page that is not a served app, or when the node says the
+     * app is not found. A read that fails in any other way (a refusal, the network, an answer that is
+     * not JSON) throws, with the node's `code` when it sent one: a config the app could not read is
+     * not a config the app does not have.
      * @returns {Promise<Record<string, string|number|boolean>|null>}
      */
     async appConfig() {
-      const ref = appRef();
-      if (!ref) return null;
-      try {
-        const res = await fetch((APEX_URL || "") + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/config");
-        if (!res.ok) return null;
-        const body = await res.json();
-        return body && body.data && body.data.values || null;
-      } catch {
-        return null;
-      }
+      const view = await appConfigView();
+      return view && view.values || null;
     },
     /**
      * Where this installed copy's workspace for a contract the app declares in its
      * `<script type="application/json" id="aimeat-workspace">` block is: `{ organism_id, workspace_id,
      * name }`, made when a set was installed. Resolves null when no install made one (the app was not
      * installed from a set, or the page is not a served app); the app then finds or creates its own.
+     * A read that fails throws, as appConfig() does, so a refused read never leads the app to create a
+     * second workspace beside the one the install made.
      * @param {string} contract e.g. "aimeat.backoffice/1"
      * @returns {Promise<{ organism_id: string, workspace_id: string, name?: string }|null>}
      */
     async appWorkspace(contract) {
-      const ref = appRef();
-      if (!ref || typeof contract !== "string" || !contract) return null;
-      try {
-        const res = await fetch((APEX_URL || "") + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/config");
-        if (!res.ok) return null;
-        const body = await res.json();
-        const links = body && body.data && body.data.workspaces;
-        return links && links[contract] || null;
-      } catch {
-        return null;
-      }
+      if (typeof contract !== "string" || !contract) return null;
+      const view = await appConfigView();
+      const links = view && view.workspaces;
+      return links && links[contract] || null;
     }
   };
   attach("data", data);

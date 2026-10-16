@@ -8,6 +8,8 @@
  *   if either side moves without the other.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-monthly-job-link.test.ts
  * @version-history
+ *   2026-10-16 — The register mock answers listStoredReports (no month stored yet): the job now reads
+ *     the stored months to decide what it owes (QA audit E4-07).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -27,6 +29,7 @@ vi.mock('../../src/services/compliance-report.js', () => ({
 vi.mock('../../src/services/compliance-register.js', () => ({
   writeStoredReport: vi.fn(async () => {}),
   snapshotIdFor: vi.fn(() => 'x'),
+  listStoredReports: vi.fn(async () => []),
 }));
 
 const { runComplianceMonthlyReport } = await import('../../src/services/compliance-monthly-job.js');

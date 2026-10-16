@@ -44,6 +44,8 @@
  * @usage
  *   import { buildFederationOverview } from '../services/federation-overview.js';
  * @version-history
+ *   v1.2.1 — 2026-10-16 — getActiveBook now throws on a failed read; the overview logs it and shows
+ *     the page without the book instead of failing whole (QA audit F2-06).
  *   v1.2.0 — 2026-10-01 — Each roster row says how the peer arrived (`origin`), and the overview lists
  *     the package registrations still waiting for their node (`pending_registrations`). The
  *     peer-registration incident, finding F; aimeat_admin_federation reads this.
@@ -347,7 +349,11 @@ export async function buildFederationOverview(
   }
 
   // ── The federation book ──
-  const book = await getActiveBook(storage);
+  // Display only, nothing is written on this answer: a failed read shows the page without the book.
+  const book = await getActiveBook(storage).catch(err => {
+    logger.warn('buildFederationOverview: the federation book could not be read', { error: String(err) });
+    return null;
+  });
   const isPrimary = !config.genesisUrl;
 
   // THE BASELINE IS THE WHOLE FEDERATION. Peers, the book, and this node's own version — the page

@@ -15,6 +15,7 @@
  *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
+ *   v1.15.0 — 2026-10-16 — savepoint(): a tolerant step inside a transaction (QA audit E6-01).
  *   v1.14.0 — 2026-10-05 — The method groups are wired from files named after their
  *     postgres-kysely/methods twins; consentMethods is bound directly now that governance.ts, which
  *     spread it, is gone (secaudit 2026-10, M8).
@@ -195,6 +196,30 @@ export class SqliteStorage {
     this.txQueue = mine.then(() => undefined, () => undefined);
     return mine;
   }
+
+  /**
+   * A tolerant step inside the open transaction (see `Storage.savepoint`). SQLite does not abort a
+   * transaction on a failed statement the way PostgreSQL does, but a step that failed half-way would
+   * otherwise keep its first writes; the savepoint gives both providers the same outcome: the failed
+   * step leaves nothing, the steps around it commit.
+   */
+  async savepoint<T>(fn: () => Promise<T>): Promise<T> {
+    if (!this.insideTransaction) return fn();
+    const name = `aimeat_sp_${++this.savepointSeq}`;
+    this.db.exec(`SAVEPOINT ${name}`);
+    try {
+      const out = await fn();
+      this.db.exec(`RELEASE SAVEPOINT ${name}`);
+      return out;
+    } catch (err) {
+      this.db.exec(`ROLLBACK TO SAVEPOINT ${name}`);
+      this.db.exec(`RELEASE SAVEPOINT ${name}`);
+      throw err;
+    }
+  }
+
+  /** Counter for savepoint names; a name only has to be unique within one open transaction. */
+  private savepointSeq = 0;
 
   /** Close the database connection */
   close(): void {

@@ -15,6 +15,9 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   v1.11.0 — 2026-10-16 — The pool has time limits (connection wait, statement, lock, idle in
+ *     transaction) and logs a connection wait that hit its limit (QA audit E6-07); savepoint() for
+ *     a tolerant step inside a transaction (QA audit E6-01).
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
  *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
  *     bound transaction, so every existing `this.db` call joins an open one without being changed.
@@ -31,8 +34,9 @@
  *   v1.2.0 — 2026-09-03 — dependencyMethods and componentVersionMethods bound.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { Kysely, PostgresDialect } from 'kysely';
+import { Kysely, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
+import { POOL_LIMITS, logPoolWaitTimeouts, type PoolLimits } from './pool-limits.js';
 import type { ChunkedUploadRecord, MemoryRecord, Storage } from '../../interface.js';
 import type { DB } from './db-types.js';
 import { runMigrations } from './migrate.js';
@@ -103,6 +107,7 @@ import { heldNameMethods } from './methods/held-names.js';
 /** Internal helpers the method groups call on `this` but that are NOT part of the public Storage API. */
 interface PgKyselyInternals {
   _rawMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
+  _writeMemoryRow(record: MemoryRecord, existing: MemoryRecord | null): Promise<MemoryRecord>;
 }
 
 /**
@@ -123,8 +128,22 @@ export class PostgresKyselyStorage {
   /** Transient chunked-upload buffer (never persisted), same as the other backends. */
   readonly chunkedUploads = new Map<string, ChunkedUploadRecord>();
 
-  constructor(connectionString: string) {
-    this.pool = new pg.Pool({ connectionString, max: 20 });
+  constructor(connectionString: string, limits: PoolLimits = POOL_LIMITS) {
+    // TIME LIMITS (QA audit E6-07). Without them a database that stops answering, or twenty
+    // connections held by slow statements, made every request, the health probe and the operator's
+    // fault report wait with no end and no log line. A refused connection already failed fast; a
+    // STALLED one did not. connectionTimeoutMillis bounds the wait for a pooled connection, and the
+    // three server settings bound one statement, one lock wait and a transaction left open while
+    // idle. The values are generous on purpose: they end a stall, not a heavy export.
+    this.pool = new pg.Pool({
+      connectionString,
+      max: limits.maxConnections,
+      connectionTimeoutMillis: limits.connectionWaitMs,
+      statement_timeout: limits.statementMs,
+      lock_timeout: limits.lockMs,
+      idle_in_transaction_session_timeout: limits.idleInTransactionMs,
+    });
+    logPoolWaitTimeouts(this.pool, limits.connectionWaitMs);
     // A CONNECTION THAT ENDS MUST NOT END THE PROCESS. node-postgres emits `error` on a client
     // whose socket ends, and an EventEmitter `error` with no listener is thrown as an uncaught
     // exception. The pool only listens while a client is idle, and it re-emits what it hears on
@@ -159,6 +178,31 @@ export class PostgresKyselyStorage {
     if (trxStore.getStore()) return fn();
     return this.rootDb.transaction().execute(trx => trxStore.run(trx, fn));
   }
+
+  /**
+   * A tolerant step: SAVEPOINT before `fn`, RELEASE after it, ROLLBACK TO SAVEPOINT when it throws,
+   * so a statement the database rejects inside `fn` does not mark the whole transaction failed. See
+   * the contract on `Storage.savepoint`. Outside a transaction every statement commits on its own,
+   * so there is nothing to isolate and `fn` runs as it is.
+   */
+  async savepoint<T>(fn: () => Promise<T>): Promise<T> {
+    const trx = trxStore.getStore();
+    if (!trx) return fn();
+    const name = `aimeat_sp_${++this.savepointSeq}`;
+    await sql.raw(`SAVEPOINT ${name}`).execute(trx);
+    try {
+      const out = await fn();
+      await sql.raw(`RELEASE SAVEPOINT ${name}`).execute(trx);
+      return out;
+    } catch (err) {
+      await sql.raw(`ROLLBACK TO SAVEPOINT ${name}`).execute(trx);
+      await sql.raw(`RELEASE SAVEPOINT ${name}`).execute(trx);
+      throw err;
+    }
+  }
+
+  /** Counter for savepoint names; a name only has to be unique within one open transaction. */
+  private savepointSeq = 0;
 
   async close(): Promise<void> {
     await this.rootDb.destroy();   // ends the pool too

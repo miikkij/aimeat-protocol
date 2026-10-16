@@ -24,6 +24,7 @@
  * @structure MCP_SERVERS_SKILL_ENTRY
  * @usage import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
  * @version-history
+ *   2026-10-16 — Section 3: a grant on a server the operator offers narrows the person's own agents and apps, and another person's grant there never touches them (QA audit F01b-02).
  *   2026-10-15 — Section 3: an app with mcp:use calls tools, a grant for app:{owner}/{file} narrows it, an
  *     agent's grantee is its full name, and a grant on an operator's server answers GRANT_NOT_APPLICABLE
  *     (feature-list audit #12).
@@ -114,9 +115,10 @@ servers that are active are flattened, and a session takes a limited number of f
 
 With no grant, the permission alone decides: an agent with \`mcp:use\` may call every tool on the
 person's servers, and so may an app the person gave \`mcp:use\` on its consent screen. A **grant
-narrows that for one agent or app, never widens it.** Only the person's own servers take a grant: a
-grant on a server the operator offers answers \`GRANT_NOT_APPLICABLE\`, because it would limit nobody.
-\`aimeat_mcp_grant_set\` with:
+narrows that for one agent or app, never widens it.** A grant works on the person's own servers and
+on a server the operator offers: there it narrows only this person's own agents and apps, and
+another person's grant on the same server never touches them. A server another person attached
+answers \`GRANT_NOT_APPLICABLE\`. \`aimeat_mcp_grant_set\` with:
 
 - \`server\` and \`grantee\`: an agent's full name (\`agent#owner@node\`), \`app:{owner}/{file}\` for an app, or \`*\` for everyone
   without their own grant. An agent's own grant wins over \`*\`.

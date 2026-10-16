@@ -8,14 +8,16 @@
  *   morsels → collect the money total from the buyer through a money handler (none when free) →
  *   fulfill each line item as an agent TASK on the offer-ask path → pay out per item (default
  *   seller payout, or the sellable's custom distribute e.g. EE commission split) → record the
- *   operator's money fee → close. A fulfillment failure after collect refunds and rethrows,
- *   leaving the session open for retry. Sessions are memory records — `commerce.session.{id}`
+ *   operator's money fee → close. A fulfillment failure after collect asks the handler to refund
+ *   and rethrows with a message that says what the refund did, leaving the session open for retry;
+ *   a payment taken and not returned is recorded for the seller (undelivered-payment.ts). Sessions are memory records — `commerce.session.{id}`
  *   under the buyer owner's GHII, `commerce.order.{id}` under the seller owner's GHII — no
  *   storage-schema changes.
  * @structure CommerceError (re-export) · createSession · getSession · listSessions · listOrders ·
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-16 — A failed fulfilment after the collect words the buyer's message from the refund's outcome: only a refund the rail confirmed says "refunded"; a payment taken and not returned (x402, a failed Stripe refund) says so, names the checkout reference, and is stored as `commerce.undelivered.{id}` under the seller, logged and told to the operator (QA audit F5-01, F7e-01, S8-05).
  *   2026-10-16 — completeSession claims the session (open → completing, compare-and-swap) before the
  *     pacing and the collect, puts it back on a refusal, and records the collected tracking code
  *     before fulfilment (QA audit S8-04); the invoice rail is refused for a line delivered at once
@@ -65,7 +67,8 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext, PaymentHandler, CheckoutAttribution } from './types.js';
+import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext, PaymentHandler, CheckoutAttribution, RefundOutcome } from './types.js';
+import { refundCollected, refundSentence, recordUndeliveredPayment } from './undelivered-payment.js';
 import { getPaymentHandler, listPaymentHandlers, LEGACY_MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { chargePacing, pacingReceipt } from '../services/metered-settlement.js';
 import { insufficientMorselsMessage } from './pacing-pack.js';
@@ -668,20 +671,30 @@ async function completeSessionInner(
       }
     }
   } catch (err) {
-    if (handler && session.total > 0) {
-      await handler.refund(ctx, { buyerGhii: session.buyerGhii, amount: session.total, trackingCode: collected.trackingCode, seller });
-    }
+    // The message about the money is built from what the rail answered: only `refunded` may say the
+    // payment came back. A payment taken and not returned is stored for the seller, logged and told
+    // to the operator (commerce/undelivered-payment.ts; QA audit F5-01).
+    const refund: RefundOutcome = handler && session.total > 0
+      ? await refundCollected(ctx, handler, { buyerGhii: session.buyerGhii, amount: session.total, trackingCode: collected.trackingCode, seller })
+      : { outcome: 'nothing_captured' };
     await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
     await releaseSessionClaim(storage, session, key);
+    const e = err as { message?: string };
+    if (handler && (refund.outcome === 'failed' || refund.outcome === 'not_possible')) {
+      await recordUndeliveredPayment(ctx, {
+        session, trackingCode: collected.trackingCode, rail: handler.id, refund, reason: e.message ?? 'unknown error',
+      });
+    }
+    const said = refundSentence(refund, session.id);
     // A limit the fulfilment refuses on (429, e.g. the pacing pack's daily PACING_PACK_CAP) keeps its
     // own code and status, so the buyer learns which limit it was and that a later try can succeed.
     // Any other failure stays FULFILLMENT_FAILED 502.
     if (err instanceof CommerceError && err.statusCode === 429) {
-      throw new CommerceError(err.code, err.statusCode, `${err.message} The payment was refunded.`);
+      throw new CommerceError(err.code, err.statusCode, `${err.message} ${said}`);
     }
-    const e = err as { message?: string };
-    throw new CommerceError('FULFILLMENT_FAILED', 502, `Payment refunded — fulfillment task creation failed: ${e.message ?? 'unknown error'}`);
+    const why = (e.message ?? 'unknown error').trim();
+    throw new CommerceError('FULFILLMENT_FAILED', 502, `The order could not be delivered: ${why}${/[.!?]$/.test(why) ? '' : '.'} ${said}`);
   }
 
   // 3) Payouts: the sellable's custom distribution (EE commission splits) or the default

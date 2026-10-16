@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-16 — The work timeout and the dispute timeout write the refund and the status that stops a
+ *     repeat in one transaction, after reading the status again (QA audit E6-03).
  *   2026-10-15 — The work timeout and the dispute timeout store the provider's recomputed trust score (refreshTrustScore) (feature-list audit #144).
  *   2026-10-15 — gate-expiry: overdue gate approvals expired on a clock; startGateExpiryJob was
  *     written and never started (feature-list audit #59). intake-thread-retention: visitor
@@ -251,11 +253,20 @@ async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage): Promis
     if (['pending', 'accepted', 'in_progress'].includes(work.status)) {
       if (new Date(work.ttlExpiresAt).getTime() < now) {
         const { returnEscrow } = await import('./morsel.js');
-        await returnEscrow(storage, work);
-        await storage.updateWork(work.trackingCode, {
-          status: 'expired',
-          updatedAt: new Date().toISOString(),
+        // The refund and the status that stops a second refund in ONE transaction, with the status
+        // read again inside it: written apart, a failing status write refunded the requester again
+        // on every round of this job (QA audit E6-03).
+        const expired = await storage.transaction(async () => {
+          const current = await storage.getWork(work.trackingCode);
+          if (!current || !['pending', 'accepted', 'in_progress'].includes(current.status)) return false;
+          await returnEscrow(storage, current);
+          await storage.updateWork(work.trackingCode, {
+            status: 'expired',
+            updatedAt: new Date().toISOString(),
+          });
+          return true;
         });
+        if (!expired) continue;
         // An expiry counts against the provider's score (feature-list audit #144).
         await refreshTrustScore(storage, work.providerGaii);
 
@@ -351,22 +362,31 @@ async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Storage): Pr
 
     if (dispute.status === 'escalated' && disputeAge > THIRTY_DAYS) {
       const { returnEscrow } = await import('./morsel.js');
-      await returnEscrow(storage, work);
+      // The refund, the dispute's resolution and the work's status in ONE transaction, with the
+      // dispute read again inside it: written apart, a failing status write refunded the requester
+      // again on the next round (QA audit E6-03).
+      const resolved = await storage.transaction(async () => {
+        const current = await storage.getDispute(dispute.id);
+        if (!current || current.status !== 'escalated') return false;
+        await returnEscrow(storage, work);
 
-      await storage.updateDispute(dispute.id, {
-        status: 'resolved',
-        ruling: {
-          ruling: 'timeout',
-          distribution: { toRequester: work.cost.total, toProvider: 0, burned: 0 },
-          reason: 'Auto-resolved: dispute timed out after 30 days',
-        },
-        updatedAt: new Date().toISOString(),
-      });
+        await storage.updateDispute(dispute.id, {
+          status: 'resolved',
+          ruling: {
+            ruling: 'timeout',
+            distribution: { toRequester: work.cost.total, toProvider: 0, burned: 0 },
+            reason: 'Auto-resolved: dispute timed out after 30 days',
+          },
+          updatedAt: new Date().toISOString(),
+        });
 
-      await storage.updateWork(work.trackingCode, {
-        status: 'settled',
-        updatedAt: new Date().toISOString(),
+        await storage.updateWork(work.trackingCode, {
+          status: 'settled',
+          updatedAt: new Date().toISOString(),
+        });
+        return true;
       });
+      if (!resolved) continue;
       // A timed-out dispute is a lost one (services/trust.ts LOST_DISPUTE_VERDICTS).
       await refreshTrustScore(storage, work.providerGaii);
 

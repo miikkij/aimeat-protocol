@@ -5,6 +5,8 @@
  * @description Profile tab for CORS origin management (GHII + per-agent): which web addresses may
  *   reach the account's API. Operator-only in the menu (the Infrastructure group).
  * @version-history
+ *   v1.23.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of an empty
+ *     CORS list and no sessions, a posture that was not the real one (QA audit F6-05, E7-04).
  *   v1.22.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so an agent name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.22.0 -- 2026-09-26 -- Every part is a component that takes data (SettingsPage, Card section,
@@ -66,6 +68,7 @@ import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Card } from '/components/Card.js';
 import { Note } from '/components/Note.js';
@@ -79,6 +82,8 @@ import { List, Row, Name, Desc, Cell, Doors } from '/components/List.js';
 export default function SecurityTab({ session, showToast }) {
   const { ConfirmUI } = useConfirm();
   const [securityData, setSecurityData] = useState(null);
+  const secLoad = useLoadState();
+  const { ok: secLoadOk, fail: secLoadFail } = secLoad;
   const [loading, setLoading] = useState(false);
   const [corsEditGhii, setCorsEditGhii] = useState(null);
   const [corsEditAgent, setCorsEditAgent] = useState(null);
@@ -100,9 +105,15 @@ export default function SecurityTab({ session, showToast }) {
         const result = await securityService.loadAll(agents);
         setSecurityData(result);
       }
-    } catch (err) { swallowed('security-tab', err); setSecurityData({ ghii: { }, agents: [] }); }
+      secLoadOk();
+    } catch (err) {
+      // Never a made-up posture: an empty CORS list and no sessions over settings that only failed
+      // to load. The page keeps what it showed; the first load shows the could-not-load note.
+      swallowed('security-tab', err);
+      secLoadFail(err);
+    }
     setLoading(false);
-  }, [session]);
+  }, [session, secLoadOk, secLoadFail]);
 
   useEffect(() => {
     if (session) loadData();
@@ -142,6 +153,7 @@ export default function SecurityTab({ session, showToast }) {
     } catch(e) { showToast(e.message || t('profile.error'), true); }
   }
 
+  if (!securityData && secLoad.failed) return html`<${LoadFailed} onRetry=${loadData} />`;
   if (loading || !securityData) return html`<${Note} kind="loading">${t('profile.security.loading')}<//>`;
 
   const ghii = securityData.ghii || {};

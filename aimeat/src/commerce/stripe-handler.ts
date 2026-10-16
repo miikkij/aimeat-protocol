@@ -20,6 +20,8 @@
  * @structure STRIPE_HANDLER_ID · stripeIdempotencyKey · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   2026-10-16 — refund answers `refunded` or `failed` instead of nothing, so a failed reversal is no
+ *     longer reported to the buyer as a refund (QA audit F5-01).
  *   2026-10-16 — Every charge Stripe could make twice carries an Idempotency-Key (stripeIdempotencyKey):
  *     the checkout and its customer, the renewal of a period, the hold (QA audit S8-04).
  *   v1.5.0 — 2026-10-09 — Stripe's error text goes to the log, redacted, and the buyer gets a plain
@@ -229,10 +231,13 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
           payment_intent: trackingCode,
           amount: String(microsToStripeMinor(amount)),
         });
+        return { outcome: 'refunded' };
       } catch (err) {
-        // Contract: refund must not throw. A failed reversal is an operator problem, not a second
-        // failure on top of the fulfillment one that triggered it.
-        logger.error(`[stripe] refund failed for ${trackingCode}: ${err instanceof Error ? err.message : String(err)}`);
+        // Contract: refund must not throw. It answers `failed`, and the session service stores the
+        // undelivered payment, tells the operator and tells the buyer the money was not returned.
+        const reason = err instanceof Error ? err.message : String(err);
+        logger.error(`[stripe] refund failed for ${trackingCode}: ${reason}`);
+        return { outcome: 'failed', detail: `Stripe refused or did not answer the refund: ${reason}`.slice(0, 300) };
       }
     },
 

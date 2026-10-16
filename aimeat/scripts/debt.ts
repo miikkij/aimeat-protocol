@@ -31,6 +31,8 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   v1.5.0 — 2026-10-16 — The src/static silent catches (per file and per shape) and the silent-catch
+ *     exemptions join the report (W25: check:silent-catch gates src/static and counts exemptions).
  *   v1.4.0 — 2026-10-12 — The node MCP tools that `aimeat connect serve` does not offer join the report.
  *   v1.3.0 — 2026-10-05 — The single-entry ceilings join the report (secaudit 2026-10, C1, C2, C7).
  *   v1.2.0 — 2026-09-13 — The substitute-answering catches join the report. Their file is keyed by
@@ -87,6 +89,21 @@ const RATCHETS: Ratchet[] = [
         // Keyed by FILE with a per-file ceiling, not one key per site: a catch handler has no stable
         // name. The backlog is the sum of the ceilings, so it falls when a handler is fixed AND the
         // count is lowered.
+        count: raw => Object.values((JSON.parse(raw) as { files?: Record<string, { count: number }> }).files ?? {})
+            .reduce((n, e) => n + e.count, 0),
+    },
+    {
+        file: 'aimeat/security/silent-catch-static-baseline.json',
+        label: 'Silent catches in src/static',
+        check: 'check:silent-catch',
+        // Per file, per shape, a ceiling: the backlog is the sum of every shape's ceiling.
+        count: raw => Object.values((JSON.parse(raw) as { files?: Record<string, { counts: Record<string, number> }> }).files ?? {})
+            .reduce((n, e) => n + Object.values(e.counts ?? {}).reduce((m, c) => m + c, 0), 0),
+    },
+    {
+        file: 'aimeat/security/silent-catch-exemptions.json',
+        label: 'Silent-catch exemptions',
+        check: 'check:silent-catch',
         count: raw => Object.values((JSON.parse(raw) as { files?: Record<string, { count: number }> }).files ?? {})
             .reduce((n, e) => n + e.count, 0),
     },

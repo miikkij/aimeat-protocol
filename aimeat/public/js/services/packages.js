@@ -15,6 +15,8 @@
  *   import * as pkgService from '/js/services/packages.js';
  *   const res = await pkgService.listPackages({ status: 'published' });
  * @version-history
+ *   v1.6.0 — 2026-10-16 — listFederationTemplates removed: it called the peer-signed GET, which an owner
+ *     session cannot open; the page reads the stored listings from GET /v1/packages/tab (QA audit F1-04).
  *   v1.5.0 — 2026-09-30 — refreshFromSources: the page's update check asks the package's source first.
  *   v1.4.0 — 2026-09-30 — setInstance: PATCH /v1/instances/:id (label, auto_update) for the page's switch.
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
@@ -106,8 +108,9 @@ export async function importPackageZip(file) {
 export const proposeAsTemplate = (groupId) => apiPost(`/v1/packages/${enc(groupId)}/propose`, {});
 
 // ── Federation Templates ──
+// The stored listings come with GET /v1/packages/tab (`remote`); the peer-facing GET
+// /v1/federation/templates needs a peer signature, so a browser session cannot read it.
 export const syncFederationTemplates = () => apiPost('/v1/federation/templates/sync', {});
-export const listFederationTemplates = (params) => apiGet('/v1/federation/templates' + buildQuery(params));
 /** Bring a package in from another node. `data` is { group_id, node_id } or { group_id, source_url, trust }. */
 export const pullPackage = (data) => apiPost('/v1/federation/packages/pull', data);
 

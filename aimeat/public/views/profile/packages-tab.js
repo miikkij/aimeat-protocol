@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab: ready-made wholes that install as the owner's own. One read
  *   (GET /v1/packages/tab: installed instances, the owner's own packages, the template listings
- *   and every public package) plus the best-effort federation listings; the page joins listings and
+ *   every public package, and the other nodes' listings the last federation sync stored); the page joins listings and
  *   packages into one offer per group. This file is the state and the handlers (open a row, install
  *   with a name given on the row, check and apply an update, remove an instance, import and export
  *   a zip, propose to the gallery, change a publication's visibility, archive it, copy the
@@ -13,6 +13,9 @@
  * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.6.0 — 2026-10-16 — The other nodes' listings come from GET /v1/packages/tab (`remote`, what the
+ *     last sync stored), not from the peer-signed GET a browser session cannot open; the sync toast
+ *     names each server that did not answer (QA audit F1-04).
  *   v2.5.0 — 2026-10-04 — The owner's choice to approve the apps of someone else's package at install
  *     (`grant_apps`), ticked on the opened offer.
  *   v2.4.0 — 2026-10-01 — An opened offer reads the package's "what you get" sheet (GET
@@ -58,6 +61,7 @@ export default function PackagesTab({ session, showToast }) {
   const fileRef = useRef(null);
   const [data, setData] = useState(null);
   const [remote, setRemote] = useState([]);
+  const [remoteEnabled, setRemoteEnabled] = useState(false);
   const [expanded, setExpanded] = useState(null);
   const [versions, setVersions] = useState({});
   const [updates, setUpdates] = useState({});
@@ -81,12 +85,10 @@ export default function PackagesTab({ session, showToast }) {
     try {
       const r = await apiGet('/v1/packages/tab');
       setData(r?.data || { instances: { instances: [] }, packages: { packages: [] }, templates: { templates: [] }, available: { packages: [] } });
+      // The other nodes' listings, as this node stored them at its last sync (`remote` on the same read).
+      setRemote(r?.data?.remote?.templates ?? []);
+      setRemoteEnabled(!!r?.data?.remote?.enabled);
     } catch (e) { swallowed('packages: tab', e); setData({ instances: { instances: [] }, packages: { packages: [] }, templates: { templates: [] }, available: { packages: [] } }); }
-    // The federation listings are another node's answer: best effort, never on the page's critical path.
-    try {
-      const fed = await pkgService.listFederationTemplates({ limit: 50 });
-      setRemote(fed?.ok ? (fed.data?.templates ?? []) : []);
-    } catch (e) { swallowed('packages: federation', e); }
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => onLiveUpdate(['packages'], load), [load]);
@@ -323,13 +325,18 @@ export default function PackagesTab({ session, showToast }) {
     try {
       const r = await pkgService.syncFederationTemplates();
       if (!r?.ok) { fail(r); return; }
-      showToast?.(x('syncedToast'));
+      // Per peer: a server that did not answer is named, so "fetched" is said only of what was stored.
+      const results = r.data?.syncResults ?? [];
+      const missed = results.filter((s) => !s.stored).map((s) => s.node);
+      if (!results.length) showToast?.(x('syncedNone'));
+      else if (missed.length) showToast?.(x('syncedPartialToast', { ok: results.length - missed.length, failed: missed.length, names: missed.join(', ') }), true);
+      else showToast?.(x('syncedToast'));
       load();
     } catch (e) { fail(e); } finally { setBusy(false); }
   };
 
   const ctx = {
-    nodeUrl: getNodeUrl(), ownerName, isOperator, showToast, ConfirmUI, fileRef,
+    nodeUrl: getNodeUrl(), ownerName, isOperator, remoteEnabled, showToast, ConfirmUI, fileRef,
     data, instances, own, offers, offerByGroup, ownByGroup, listingByGroup,
     expanded, versions, updates, installForm, filter, query, shown, busy,
     compose, myApps, sheets, installConfig, grantApps,

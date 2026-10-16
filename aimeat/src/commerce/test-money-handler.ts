@@ -13,6 +13,8 @@
  *   page then say any buyer can complete a money checkout without paying. The Stripe handler
  *   (`com.stripe.spt`) is the real money rail.
  * @version-history
+ *   2026-10-16 — refund answers a RefundOutcome; the instruments "refund-fails" and "refund-impossible"
+ *     make it answer `failed` / `not_possible`, so a test can drive an unreturned payment (QA audit F7e-01).
  *   v1.3.1 — 2026-10-13 — Registered on any node while the flag is on (ruling
  *     decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s).
  *   v1.3.0 — 2026-10-11 — Registered only when testMoneyHandlerActive() says so: the flag AND a
@@ -29,6 +31,9 @@ import { PaymentError } from './payment-handlers.js';
 export { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 
 export const TEST_MONEY_HANDLER_ID = 'test.money';
+/** Instrument values that make a later refund answer `failed` / `not_possible`, so a test can drive both. */
+export const REFUND_FAILS = 'refund-fails';
+export const REFUND_IMPOSSIBLE = 'refund-impossible';
 
 /** Module-local hold ledger: mirrors the semantics a real PSP enforces server-side. */
 const holds = new Map<string, { amount: number; state: 'held' | 'captured' | 'released' }>();
@@ -42,14 +47,22 @@ export function testMoneyPaymentHandler(): PaymentHandler {
     async collect(_ctx, { reference, instrument, saveForLater }) {
       // A saved method is named after the instrument, so a test can save one that will be declined.
       const saved = saveForLater ? { customer: `testcus_${randomUUID()}`, payment_method: typeof instrument === 'string' && instrument ? instrument : 'testpm' } : undefined;
-      return { trackingCode: `testmoney_${randomUUID()}:${reference}`, ...(saved ? { saved } : {}) };
+      // The refund only sees the tracking code, so an instrument that asks for a refund outcome
+      // other than `refunded` is carried in it.
+      const mark = instrument === REFUND_FAILS ? 'refundfails_' : instrument === REFUND_IMPOSSIBLE ? 'refundimpossible_' : '';
+      return { trackingCode: `testmoney_${mark}${randomUUID()}:${reference}`, ...(saved ? { saved } : {}) };
     },
     async chargeSaved(_ctx, { reference, saved }) {
       if (saved.payment_method === 'decline') throw new PaymentError('CARD_DECLINED', 402, 'The saved card was declined (test).');
       return { trackingCode: `testmoney_saved_${randomUUID()}:${reference}` };
     },
     async payout() { /* simulate paying the seller's connected account — off-ledger */ },
-    async refund() { /* simulate reversing the charge — off-ledger */ },
+    async refund(_ctx, { trackingCode }) {
+      // Simulates reversing the charge, off-ledger, unless the instrument asked for another outcome.
+      if (trackingCode.startsWith('testmoney_refundfails_')) return { outcome: 'failed', detail: 'The test payment method refused the refund (instrument "refund-fails").' };
+      if (trackingCode.startsWith('testmoney_refundimpossible_')) return { outcome: 'not_possible', detail: 'The test payment method cannot refund (instrument "refund-impossible").' };
+      return { outcome: 'refunded' };
+    },
 
     async authorize(_ctx, { amount, instrument }) {
       if (typeof instrument !== 'string' || !instrument) {

@@ -10,6 +10,8 @@
  * @structure WorkflowsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
+ *   v2.2.0 -- 2026-10-16 -- A failed load is drawn as one (itemsFailed: the could-not-load note with
+ *     Retry), never as "no workflows" (QA audit F6-05).
  *   v2.1.0 -- 2026-09-25 -- The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v2.0.0 -- 2026-08-30 -- The poster face (design canvas "AIMEAT Työnkulkujen sivu", direction A).
  *     Check now answers on the page and starts nothing; Run opens a confirmation that says what will
@@ -30,6 +32,7 @@ import { useConfirm } from '/components/Modal.js';
 import { listAgents } from '/js/services/agents.js';
 import * as wf from '/js/services/workflows.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState } from '/js/load-state.js';
 import { c, loc, observedWords } from './workflows/frame.js';
 import { renderWorkflowsView } from './workflows/cover.js';
 import { formOf, defOf, blankStep } from './workflows/form.js';
@@ -37,6 +40,9 @@ import { formOf, defOf, blankStep } from './workflows/form.js';
 export default function WorkflowsTab({ showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [items, setItems] = useState([]);          // [{ def, health, lastRun, waiting }]
+  // A failed first load is drawn as one, never as "no workflows" (items stays [] until a load works).
+  const itemsLoad = useLoadState();
+  const { ok: itemsLoadOk, fail: itemsLoadFail } = itemsLoad;
   const [pending, setPending] = useState([]);      // questions waiting for the person
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState({ kind: 'cover' });
@@ -82,9 +88,10 @@ export default function WorkflowsTab({ showToast }) {
         return { def, health, lastRun: last?.data?.runs?.[0] || null, waiting: inputs.some(p => p.workflowId === def.id) };
       }));
       setItems(withLast);
-    } catch (err) { swallowed('workflows-tab', err); }
+      itemsLoadOk();
+    } catch (err) { swallowed('workflows-tab', err); itemsLoadFail(err); }
     finally { setLoading(false); }
-  }, []);
+  }, [itemsLoadOk, itemsLoadFail]);
 
   const loadDetail = useCallback(async (id) => {
     setDetailLoading(true);
@@ -258,7 +265,7 @@ export default function WorkflowsTab({ showToast }) {
   }
 
   const ctx = {
-    items, pending, loading, view, pickView, itemById, detail, detailLoading, run, folds, setFold,
+    items, itemsFailed: itemsLoad.failed, reload: () => loadAll(), pending, loading, view, pickView, itemById, detail, detailLoading, run, folds, setFold,
     checks, checking, checkNote, setCheckNote, dismissCheck, handleCheck, confirm: confirmState, openConfirm, closeConfirm, handleRun, running,
     answers, setAnswer, answering, handleAnswer, handleCancel, cancelling, onlyProblems, setOnlyProblems, runsTab, setRunsTab, showKeys, setShowKeys,
     road, setRoad, pasteOpen, setPasteOpen, pasteText, setPasteText, pasteError, handlePaste, copyPrompt,

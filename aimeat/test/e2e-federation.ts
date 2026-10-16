@@ -4,6 +4,8 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   2026-10-16 — Test 18 asserts the warning advisory is stored, and 18a that a signed notice from a node
+ *     that is not a peer is refused and stored nowhere (QA audit S6-06).
  *   2026-10-15 — Phase 7 reads the genesis memory door as an approved genesis peer, signed for this node, and an unsigned read is refused (feature-list audit 166).
  *   v1.5.0 -- 2026-10-12 -- Node 4.0.0 refuses a federation message without the audience or delivery
  *     proof (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN). The direct peer's heartbeat (11),
@@ -832,6 +834,23 @@ await test('18. Trust advisory (warning)', async () => {
     assert(body.data.advisory_type === 'warning', `type: ${body.data.advisory_type}`);
     assert(body.data.target_node === 'aimeat-bad-node-001', 'target matches');
     assert(typeof body.data.id === 'string', 'has advisory id');
+    // The warning is STORED: it answered 201 with an id and stored nothing until 2026-10-16 (QA audit S6-06).
+    const list = await json('/v1/admin/federation/trust-advisories', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const mine = (list.body.data?.advisories ?? []).find((a: any) => a.id === body.data.id);
+    assert(mine?.advisory_type === 'warning' && mine?.acted === false, `the warning must be in the operator's list: ${JSON.stringify(mine)}`);
+});
+
+await test('18a. A signed trust notice from a node that is not a peer is refused and stored nowhere', async () => {
+    const { status, body } = await json('/v1/federation/trust-advisory', {
+        method: 'POST',
+        body: JSON.stringify({
+            source_node: `aimeat-stranger-${Date.now()}`, target_node: 'aimeat-bad-node-002', advisory_type: 'ban',
+            reason: 'not a peer', timestamp: new Date().toISOString(), signature: 'AAAA', audience: 'x', audience_signature: 'AAAA',
+        }),
+    });
+    assert(status === 403, `status ${status}: ${JSON.stringify(body)}`);
+    const list = await json('/v1/admin/federation/trust-advisories', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(!(list.body.data?.advisories ?? []).some((a: any) => a.target_node === 'aimeat-bad-node-002'), 'nothing was stored');
 });
 
 await test('18b. Trust advisory (ban — auto de-peers)', async () => {

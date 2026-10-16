@@ -31,6 +31,10 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-10-16 — Phase 5d: a grant on the node-wide server narrows the writer's own agent (403
+ *     NOT_GRANTED on the tool left out, read_only over MCP), another owner's catch-all there does not
+ *     reach it, and an end date that is not a date is 400 INVALID_INPUT on REST and MCP. Replaces the
+ *     arm that asserted 409 GRANT_NOT_APPLICABLE, which pinned the grant as unenforceable (QA audit F01b-02).
  *   2026-10-15 — Phase 4b2: an app granted mcp:use calls a tool, a grant for app:{owner}/{file}
  *     narrows it, an app without the word gets 403 and another owner's server 404; a grant on the
  *     node-wide server answers 409 GRANT_NOT_APPLICABLE on REST and MCP (feature-list audit #12).
@@ -1533,23 +1537,88 @@ await test('…and its agent holding mcp:manage is refused the same three acts o
     `the house server was changed over MCP: ${JSON.stringify(row)}`);
 });
 
-await test('a grant on the node-wide server is refused on REST and MCP, because nobody reads it', async () => {
-  // Grants are read under the server's own owner, and a node-wide server has none, so this answered
-  // 200 and limited nobody until 2026-10-15 (feature-list audit #12).
+// QA audit F01b-02. A grant on the node-wide server was stored under its writer and read under the
+// empty owner, so it limited nobody; feature-list audit #12 then refused it (409). The access check
+// now reads the caller's own owner's grants on a node-wide server, so an owner narrows their own
+// agent there and another owner's grant never reaches it.
+let plainUser = { gaii: '', token: '' };
+let otherUser = { gaii: '', token: '' };
+let other = { name: '', token: '' };
+const callHouse = (token: string, tool: string) => json('/v1/mcp-servers/housewide/call', {
+  method: 'POST', headers: { Authorization: `Bearer ${token}` },
+  body: JSON.stringify({ tool, arguments: tool === 'echo' ? { text: 'house' } : {} }),
+});
+
+await test('a grant an owner writes on the node-wide server narrows their own agent', async () => {
+  plainUser = await agentWithScopes(plain, 'mcpplainuser', ['mcp:read', 'mcp:use']);
+  const before = await callHouse(plainUser.token, 'refuses');
+  assert(before.status === 200, `with no grant the agent reaches every tool: ${before.status} ${JSON.stringify(before.body)}`);
+
   const put = await json('/v1/mcp-servers/housewide/grants', {
-    method: 'PUT', headers: plainAuth(), body: JSON.stringify({ grantee: '*', tools: ['echo'] }),
+    method: 'PUT', headers: plainAuth(), body: JSON.stringify({ grantee: plainUser.gaii, tools: ['echo'] }),
   });
-  assert(put.status === 409 && put.body.error?.code === 'GRANT_NOT_APPLICABLE',
+  assert(put.status === 200 && put.body.data?.grant?.grantee === plainUser.gaii,
     `REST: ${put.status} ${JSON.stringify(put.body.error ?? put.body.data)}`);
 
-  const agent = await agentWithScopes(plain, 'mcpplaingrant', ['mcp:read', 'mcp:use', 'mcp:manage']);
-  const session = await openMcpSession(agent.token);
-  const viaMcp = await mcpTool(session, 'aimeat_mcp_grant_set', { server: 'housewide', grantee: '*', tools: ['echo'] });
-  assert(viaMcp.isError && viaMcp.text.includes('GRANT_NOT_APPLICABLE'), `MCP: ${viaMcp.text}`);
-
+  const refused = await callHouse(plainUser.token, 'refuses');
+  assert(refused.status === 403 && JSON.stringify(refused.body).includes('NOT_GRANTED'),
+    `the tool the grant leaves out is refused: ${refused.status} ${JSON.stringify(refused.body)}`);
+  const allowed = await callHouse(plainUser.token, 'echo');
+  assert(allowed.status === 200, `the granted tool still answers: ${allowed.status} ${JSON.stringify(allowed.body)}`);
   const listed = await json('/v1/mcp-servers/grants?server=housewide', { headers: plainAuth() });
-  assert(listed.status === 200 && (listed.body.data.grants as unknown[]).length === 0,
-    `a grant was stored: ${JSON.stringify(listed.body.data)}`);
+  assert((listed.body.data.grants as any[]).some(g => g.grantee === plainUser.gaii), `the grant is listed: ${JSON.stringify(listed.body.data)}`);
+});
+
+await test("another owner's catch-all grant on the node-wide server does not reach this owner's agent", async () => {
+  other = await plainOwner('mcpother');
+  otherUser = await agentWithScopes(other, 'mcpotheruser', ['mcp:read', 'mcp:use']);
+  const put = await json('/v1/mcp-servers/housewide/grants', {
+    method: 'PUT', headers: { Authorization: `Bearer ${other.token}` }, body: JSON.stringify({ grantee: '*', tools: [] }),
+  });
+  assert(put.status === 200, `the other owner writes their own grant: ${put.status} ${JSON.stringify(put.body)}`);
+  // The other owner's agent is narrowed by its own owner's catch-all...
+  const theirs = await callHouse(otherUser.token, 'echo');
+  assert(theirs.status === 403, `the other owner's agent is narrowed by its own owner: ${theirs.status}`);
+  // ...and the first owner's agent is not: it keeps exactly what its own owner granted.
+  const mine = await callHouse(plainUser.token, 'echo');
+  assert(mine.status === 200, `another owner's grant must not reach this agent: ${mine.status} ${JSON.stringify(mine.body)}`);
+  // The owner in person is not narrowed by their own catch-all.
+  const person = await callHouse(other.token, 'echo');
+  assert(person.status === 200, `the owner in person is not narrowed: ${person.status} ${JSON.stringify(person.body)}`);
+});
+
+await test('read_only set through aimeat_mcp_grant_set holds on the node-wide server', async () => {
+  const setter = await agentWithScopes(plain, 'mcpplaingrant', ['mcp:read', 'mcp:use', 'mcp:manage']);
+  const session = await openMcpSession(setter.token);
+  const set = await mcpTool(session, 'aimeat_mcp_grant_set', { server: 'housewide', grantee: plainUser.gaii, tools: '*', read_only: true });
+  assert(!set.isError, `grant_set over MCP: ${set.text}`);
+  const refused = await callHouse(plainUser.token, 'refuses');
+  assert(refused.status === 403 && /read-only/i.test(JSON.stringify(refused.body)), `read-only refusal: ${refused.status} ${JSON.stringify(refused.body)}`);
+  const ok = await callHouse(plainUser.token, 'echo');
+  assert(ok.status === 200, `the read-only tool answers: ${ok.status}`);
+});
+
+await test('an end date that is not a date is refused on REST and MCP, and nothing is stored', async () => {
+  const put = await json('/v1/mcp-servers/housewide/grants', {
+    method: 'PUT', headers: plainAuth(), body: JSON.stringify({ grantee: plainUser.gaii, tools: ['echo'], expires: 'tomorrow' }),
+  });
+  assert(put.status === 400 && put.body.error?.code === 'INVALID_INPUT', `REST: ${put.status} ${JSON.stringify(put.body.error)}`);
+  const setter = await agentWithScopes(plain, 'mcpplaindate', ['mcp:read', 'mcp:use', 'mcp:manage']);
+  const session = await openMcpSession(setter.token);
+  const viaMcp = await mcpTool(session, 'aimeat_mcp_grant_set', { server: 'housewide', grantee: plainUser.gaii, tools: ['echo'], expires: 'tomorrow' });
+  assert(viaMcp.isError && viaMcp.text.includes('INVALID_INPUT'), `MCP: ${viaMcp.text}`);
+  // The read-only grant from the previous arm is still the one in force.
+  const listed = await json('/v1/mcp-servers/grants?server=housewide', { headers: plainAuth() });
+  const g = (listed.body.data.grants as any[]).find(x => x.grantee === plainUser.gaii);
+  assert(g?.readOnly === true && g.expires === null, `the stored grant is unchanged: ${JSON.stringify(g)}`);
+});
+
+await test('removing the grants on the node-wide server widens both agents again', async () => {
+  const a = await json(`/v1/mcp-servers/housewide/grants/${encodeURIComponent(plainUser.gaii)}`, { method: 'DELETE', headers: plainAuth() });
+  const b = await json('/v1/mcp-servers/housewide/grants/*', { method: 'DELETE', headers: { Authorization: `Bearer ${other.token}` } });
+  assert(a.status === 200 && b.status === 200, `remove: ${a.status} ${b.status}`);
+  assert((await callHouse(plainUser.token, 'refuses')).status === 200, 'the first agent reaches every tool again');
+  assert((await callHouse(otherUser.token, 'echo')).status === 200, 'the second agent reaches every tool again');
 });
 
 await test('a capability over the node server answers an owner in person, who holds every word by the role', async () => {

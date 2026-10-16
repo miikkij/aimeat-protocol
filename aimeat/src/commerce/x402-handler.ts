@@ -18,13 +18,17 @@
  *   With a proof, collect asks the facilitator to verify it and then settle it onchain (buyer → the
  *   seller's own USDC address, loaded from the seller's commerce.psp) and returns the settlement tx
  *   hash as the tracking code. AIMEAT never holds funds — replay is rejected by the facilitator's
- *   single-use EIP-3009 nonce (and, on the same session, by the completed-session gate). payout and
- *   refund are no-ops: the facilitator already moved money directly to the seller, and an onchain
- *   onchain transfer cannot be reversed (a post-settlement fulfillment failure is recorded, not clawed
- *   back).
+ *   single-use EIP-3009 nonce (and, on the same session, by the completed-session gate). payout is a
+ *   no-op: the facilitator already moved money directly to the seller. refund answers `not_possible`:
+ *   an onchain transfer cannot be reversed by the node. When a fulfilment fails after settlement,
+ *   the session service tells the buyer the payment was NOT returned, stores an undelivered-payment
+ *   record under the seller's account with the settlement reference, and tells the operator
+ *   (commerce/undelivered-payment.ts).
  * @structure X402_HANDLER_ID · x402PaymentHandler
  * @usage registerPaymentHandler(x402PaymentHandler(config, facilitator));
  * @version-history
+ *   2026-10-16 — refund answers `not_possible` instead of returning nothing, and the header says what
+ *     the session service really does after a failed fulfilment (QA audit F5-01, S8-05).
  *   Comment only — 2026-10-11 — The removed io.aimeat.morsels handler is no longer named: a morsel is
  *     pacing, never a payment (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.2.0 — 2026-09-01 — collect() takes an optional resource + description, so a caller that
@@ -111,8 +115,12 @@ export function x402PaymentHandler(config: AimeatConfig, facilitator: X402Facili
     // Non-custodial: the facilitator settled buyer → seller directly, so there is nothing to pay out.
     async payout() { /* funds already moved to the seller's address at collect time */ },
 
-    // An onchain stablecoin transfer is irreversible; a post-settlement fulfillment failure is recorded by
-    // the session service, not reversed. Best-effort no-op (refund must never throw).
-    async refund() { /* onchain transfers cannot be clawed back */ },
+    // An onchain stablecoin transfer is final and the node never held the funds, so it cannot be
+    // reversed from here. The answer says so; the session service then stores the undelivered
+    // payment for the seller, tells the operator and words the buyer's message from this outcome
+    // (commerce/undelivered-payment.ts).
+    async refund() {
+      return { outcome: 'not_possible', detail: 'An onchain stablecoin transfer cannot be reversed by the node; only the seller can send it back.' };
+    },
   };
 }

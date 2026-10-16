@@ -29,6 +29,8 @@
  *   const fake = await startFakePeer();
  *   await addPeer(A, 'aimeat-fake-001', fake.url, peerPublicKey);
  * @version-history
+ *   2026-10-16 — `modes.trust`: the fake peer answers POST /v1/federation/trust-advisory with 201, or
+ *     403 when set to 'refuse', so a suite can see a peer refuse a trust notice (QA audit S6-06).
  *   2026-10-15 — The fake peer refuses /v1/work/request without a credential, as a real node does (feature-list audit 165).
  *   v1.3.0 — 2026-09-26 — `modes.work` makes the fake peer answer POST /v1/work/request with a 500, so
  *     a suite can route a call to a far end that answers with an error.
@@ -171,6 +173,7 @@ export const modes = {
     catalogue: 'ok' as 'ok' | 'resync' | 'fail',
     replicate: 'ok' as 'ok' | 'fail',
     work: 'ok' as 'ok' | 'fail',
+    trust: 'ok' as 'ok' | 'refuse',
 };
 
 /** Every request the fake peer received, so an outbound body can be held to what was claimed. */
@@ -228,6 +231,11 @@ export function startFakePeer(): Promise<{ server: Server; url: string }> {
                 return;
             }
             if (path === '/v1/federation/templates') { send(res, 404, { ok: false, error: { code: 'NOT_FOUND' } }); return; }
+            if (path === '/v1/federation/trust-advisory') {
+                if (modes.trust === 'refuse') { send(res, 403, { ok: false, error: { code: 'FORBIDDEN', message: 'Not taking notices' } }); return; }
+                send(res, 201, { ok: true, data: { stored: true } });
+                return;
+            }
             if (path === '/v1/work/request') {
                 if (modes.work === 'fail') { send(res, 500, { ok: false, error: { code: 'PEER_BROKEN' } }); return; }
                 // A real node answers this route only to a signed-in caller (requireAuth), and a node

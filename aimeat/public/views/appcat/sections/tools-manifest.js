@@ -18,6 +18,8 @@
  *   blockedReason(tool) · priceLabel(tool) · ownerGhiiOf(m) · MONEY_UNIT · CURRENCIES
  * @usage const m = useToolsManifest(d); m.state === 'ready' && m.doc.tools.map(…)
  * @version-history
+ *   v1.1.2 — 2026-10-16 — A manifest read that failed (not a 404) is marked readFailed, and writeManifest
+ *     refuses to save on top of it: the save replaces the whole public record (QA audit F6-04).
  *   v1.1.1 — 2026-10-12 — A money price shows two decimals ("0.50 EUR").
  *   v1.1.0 — 2026-10-11 — priceLabel says the money price (or Free) and the pacing amount; a tool
  *     with a pacing amount and no money price can be listed (ruling "morseli on tahdistus, ei hinta").
@@ -43,7 +45,7 @@ export const CURRENCIES = ['EUR', 'USD'];
  */
 function blank() {
   return { ref: '', owner: '', filename: '', state: 'off', doc: null, offerings: {}, timing: {}, nodeId: '',
-    editing: -1, busy: false, defaultsOpen: false, toolOpen: false };
+    editing: -1, busy: false, defaultsOpen: false, toolOpen: false, readFailed: false };
 }
 
 let cur = blank();
@@ -83,17 +85,19 @@ async function loadOfferings(ref, owner, filename) {
 
 async function load(ref, owner, filename) {
   let doc = { tools: [] };
+  let readFailed = false;
   try {
     const res = await apiGet('/v1/memory/' + encodeURIComponent(keyOf(filename)));
     const value = res?.data && (res.data.value || (res.data.record && res.data.record.value));
     if (value && Array.isArray(value.tools)) doc = value;
   } catch (e) {
     // A missing record (404) is the normal "no tools yet"; anything else is said in the console and
-    // shown as no tools, as the old page did.
-    if (e && e.status !== 404) console.warn('appcat: the tool manifest could not be read', e);
+    // shown as no tools, as the old page did, but marked: writeManifest refuses to save a manifest
+    // built on a read that failed, because the save replaces the whole public record.
+    if (e && e.status !== 404) { console.warn('appcat: the tool manifest could not be read', e); readFailed = true; }
   }
   if (cur.ref !== ref) return;
-  patchManifest({ doc, state: 'ready' });
+  patchManifest({ doc, state: 'ready', readFailed });
   loadOfferings(ref, owner, filename);
 }
 
@@ -137,6 +141,12 @@ export function useToolsManifest(d) {
  */
 export async function writeManifest(doc) {
   if (!getSession()?.jwt) throw new Error(x('monetize.needLogin'));
+  if (cur.readFailed) {
+    // Built on "no tools" after a failed read, the save would replace the app's whole manifest.
+    const e = /** @type {Error & { code?: string }} */ (new Error(t('common.notLoadedNotSaved')));
+    e.code = 'NOT_LOADED';
+    throw e;
+  }
   doc.version = (doc.version || 0) + 1;
   doc.updatedAt = new Date().toISOString();
   return apiPost('/v1/memory', { key: keyOf(cur.filename), value: doc, visibility: 'public' });

@@ -4961,7 +4961,10 @@
     "error": "Error",
     "copyPrompt": "Copy prompt",
     "copyLink": "Copy link",
-    "copyUrl": "Copy URL"
+    "copyUrl": "Copy URL",
+    "loadFailed": "This could not be loaded just now. Nothing was deleted. Try again in a moment.",
+    "notLoadedNotSaved": "The current version did not load, so nothing was changed. Try again in a moment.",
+    "settingsNotLoaded": "Your saved settings did not load, so nothing was saved. Reload the page and try again."
   },
   "compat": {
     "title": "Which AIs can read your memories automatically?",
@@ -5983,6 +5986,8 @@
   "pkpage.syncRemote": "Fetch from other servers",
   "pkpage.syncing": "Fetching…",
   "pkpage.syncedToast": "The listings from other servers are fetched.",
+  "pkpage.syncedPartialToast": "The listings of {ok} servers are fetched. {failed} did not answer: {names}.",
+  "pkpage.syncedNone": "No other server shares its listings with this server yet.",
   "pkpage.open": "Open",
   "pkpage.close": "Close",
   "pkpage.openApp": "Open the app",
@@ -8778,6 +8783,10 @@
   "notiftext.workflow_failed.body": "Did not produce: {failed} · about {minutes} min · {steps}",
   "notiftext.workflow_cancelled.title": "Workflow \"{name}\" was cancelled",
   "notiftext.workflow_cancelled.body": "about {minutes} min · {steps}",
+  "notiftext.schedule_failed.title": "Schedule \"{name}\" failed",
+  "notiftext.schedule_failed.body": "{detail}",
+  "notiftext.schedule_paused.title": "Schedule \"{name}\" was paused",
+  "notiftext.schedule_paused.body": "{detail}",
   "notiftext.workflow_stopped.title": "Workflow \"{name}\" stopped at its spending limit",
   "notiftext.workflow_stopped.body": "{spent} had been spent on AI, and the limit is {cap} per run · about {minutes} min · {steps}",
   "notiftext.workflow_stopped_estimate.title": "Workflow \"{name}\" stopped to stay within its spending limit",
@@ -8839,6 +8848,8 @@
   "notiftext.package_renewal_agent_limit.body": "Your agent turned automatic renewal on, and this renewal would go over the most it may spend in a day, or it has no limit. Your card was not charged. The update service ends on {date} unless you renew it yourself or raise the agent's limit. The renewal is tried again each day until then.",
   "notiftext.package_renewed.title": "The update service for {name} was renewed",
   "notiftext.package_renewed.body": "Your card was charged {amount}, and new versions come for another {days} days.",
+  "notiftext.payment_not_delivered.title": "A payment of {amount} was taken and the order was not delivered",
+  "notiftext.payment_not_delivered.body": "The order could not be delivered and the payment did not go back to the buyer, so you hold it. Return the payment to the buyer or deliver the order. Checkout reference: {session}.",
   "notiftext.package_sale_request_approved.title": "Your request for {name} was approved",
   "notiftext.package_sale_request_approved.body": "The seller approved it. Open your Packages page to see what comes next.",
   "notiftext.package_sale_request_refused.title": "Your request for {name} was not approved",
@@ -14134,7 +14145,9 @@
     "resumeFound": "Found pending join request ({{requestId}}). Resume polling?",
     "resumeYes": "Yes, check status",
     "resumeNo": "No, start fresh",
-    "alreadyPeer": "This node is already a peer of the target"
+    "alreadyPeer": "This node is already a peer of the target",
+    "cancelled": "Join cancelled. The federation settings in .env were not changed.",
+    "notJoined": "Not joined. The network you tried to join did not accept the key, so the federation settings in .env were not changed. Run \"aimeat join\" again when it accepts the key."
   },
   "knowledge": {
     "tabLabel": "Knowledge",

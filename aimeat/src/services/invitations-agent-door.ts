@@ -20,6 +20,7 @@
  *   createRegistrationInvitation
  * @usage const result = await createRegistrationInvitation(storage, config, { email, agent, observed });
  * @version-history
+ *   2026-10-16 — A send that fails on a node with mail cancels the invitation it wrote and returns sendFailed, so the route can say nothing was sent and the address is not locked out of a retry for 24 hours (QA audit F02a-04).
  *   2026-10-15 — A node whose email service is disabled writes no invitation and returns mailUnavailable, so the route can say nothing was sent (feature-list audit #23).
  *   v1.0.0 — 2026-09-12 — Extracted from invitations.ts (max-file-lines), unchanged.
  */
@@ -32,6 +33,7 @@ import { hashInviteToken, inviteEmailHash, InvitationError } from './invitations
 import { getActiveEmailService } from './email.js';
 import { registrationInviteEmail } from './email-templates.js';
 import { isValidEmail } from '../utils/email-validator.js';
+import { logger } from '../utils/logger.js';
 
 /** The one identity string in `invitedBy` for a node-level invite. A colon cannot appear in an
  *  owner name (OWNER_RE), so this can never collide with a real inviter. */
@@ -71,6 +73,9 @@ export interface RegistrationInviteResult {
     /** True when the node's email service is disabled. This is a property of the NODE, the same
      *  for every address, so the caller may learn it without learning anything about an address. */
     mailUnavailable: boolean;
+    /** True when the node has mail and the send to this address failed. The invitation was
+     *  cancelled, so it holds no slot and a retry can send again. */
+    sendFailed: boolean;
 }
 
 /**
@@ -101,7 +106,7 @@ export async function createRegistrationInvitation(
     // answer is the same for every address, so it reveals nothing about any of them.
     const emailSvc = getActiveEmailService();
     if (!emailSvc?.enabled) {
-        return { invitation: null, acceptUrl: null, emailSent: false, suppressed: null, mailUnavailable: true };
+        return { invitation: null, acceptUrl: null, emailSent: false, suppressed: null, mailUnavailable: true, sendFailed: false };
     }
 
     const emailHash = inviteEmailHash(cleanEmail);
@@ -111,7 +116,7 @@ export async function createRegistrationInvitation(
     const existing = await storage.listInvitationsByEmailHash(emailHash, { status: 'pending', type: 'registration' });
     const live = existing.filter(i => new Date(i.expiresAt) > new Date());
     if (live.length > 0) {
-        return { invitation: null, acceptUrl: null, emailSent: false, suppressed: 'already-pending', mailUnavailable: false };
+        return { invitation: null, acceptUrl: null, emailSent: false, suppressed: 'already-pending', mailUnavailable: false, sendFailed: false };
     }
 
     const now = Date.now();
@@ -159,7 +164,21 @@ export async function createRegistrationInvitation(
         expiresLabel: invitation.expiresAt.slice(0, 16).replace('T', ' ') + ' UTC',
         reportUrl: `${config.baseUrl}/v1/transparency`,
     }, input.locale);
-    const emailSent = await emailSvc.sendRaw(cleanEmail, subject, html, text);
+    let emailSent = false;
+    try {
+        emailSent = await emailSvc.sendRaw(cleanEmail, subject, html, text);
+    } catch (err) {
+        // emailSent stays false: the branch below cancels the invitation and answers not sent.
+        logger.warn('registration invite: the mail service refused the send', { error: String(err) });
+    }
+    if (!emailSent) {
+        // Nothing reached the address, and the raw token exists nowhere else, so this invitation can
+        // never be accepted. Left pending it would also hold the one-live-invitation slot and
+        // suppress every retry for the address for a day, each answered as if it had been sent.
+        // Cancelled, it is out of the cap and out of the accept path (QA audit F02a-04).
+        await storage.updateInvitation(invitation.id, { status: 'cancelled' });
+        return { invitation: null, acceptUrl: null, emailSent: false, suppressed: null, mailUnavailable: false, sendFailed: true };
+    }
 
-    return { invitation, acceptUrl, emailSent, suppressed: null, mailUnavailable: false };
+    return { invitation, acceptUrl, emailSent, suppressed: null, mailUnavailable: false, sendFailed: false };
 }

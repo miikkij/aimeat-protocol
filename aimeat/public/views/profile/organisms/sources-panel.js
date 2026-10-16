@@ -9,6 +9,9 @@
  * @structure SRC_ICON (internal), SourcesPanel
  * @usage import { SourcesPanel } from '/views/profile/organisms/sources-panel.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-16 -- A failed read shows the could-not-load note with Retry instead of "No
+ *     sources yet"; an add or a remove is saved on top of a strict read (addWorkspaceSources,
+ *     removeWorkspaceSource), so a failed read saves nothing (QA audit F6-04).
  *   v1.12.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the description is the section description, the picker the Box with the Tabs (the source kind a view tab row) and the Search line, the results and the sources the List (an external source's tag dim again, as main's grey badge; the remove mark the Icon). The panel's own title and count are not drawn: the Sources page's head says both, and main hid them there. The Add source toggle, which stood in that hidden head, now stands under the description, so the picker opens.
  *   v1.11.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v1.10.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -48,6 +51,7 @@ import { Tabs, TabPanel } from '/components/Tabs.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { fmtBytes } from '/js/format.js';
 import { swallowed } from '/js/swallowed.js';
+import { useLoadState, LoadFailed } from '/js/load-state.js';
 
 const SRC_ICON = { memory: '🧠', storage: '📎', knowledge: '📚' };
 
@@ -65,15 +69,18 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => { setSources(await orgService.getWorkspaceSources(orgId, wsId)); }, [orgId, wsId]);
+  const srcLoad = useLoadState();
+  const { ok: srcLoadOk, fail: srcLoadFail } = srcLoad;
+  const load = useCallback(async () => {
+    try { setSources(await orgService.getWorkspaceSourcesStrict(orgId, wsId)); srcLoadOk(); }
+    catch (err) { swallowed('sources-panel: load', err); srcLoadFail(err); }
+  }, [orgId, wsId, srcLoadOk, srcLoadFail]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => onLiveUpdate(['organisms'], () => load()), [load]);
 
-  const persist = async (next) => {
-    setSources(next);
-    const r = await orgService.saveWorkspaceSources(orgId, wsId, next).catch(() => ({ ok: false }));
-    if (r?.ok === false) showToast(t('organisms.sourcesSaveError') || 'Failed to save sources');
-  };
+  // The sources record is saved whole: an add or a remove goes on top of a strict read made just
+  // before the write (addWorkspaceSources / removeWorkspaceSource), so a failed read saves nothing.
+  const saveError = (e) => showToast((e && e.message) || t('organisms.sourcesSaveError') || 'Failed to save sources');
 
   const doSearch = async () => {
     setLoading(true);
@@ -123,11 +130,15 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
         src = { ...base, type: 'knowledge', packageId: pid, label: name, external: scope === 'discover' };
       }
       if (sources.some(s => keyOf(s) === keyOf(src))) { showToast(t('organisms.sourceExists') || 'Already added'); return; }
-      await persist([...sources, src]);
-      showToast(t('organisms.sourceAdded') || 'Source added');
-    } finally { setBusy(false); }
+      const { sources: stored, added } = await orgService.addWorkspaceSources(orgId, wsId, [src], keyOf);
+      setSources(stored); srcLoadOk();
+      showToast(added ? (t('organisms.sourceAdded') || 'Source added') : (t('organisms.sourceExists') || 'Already added'));
+    } catch (e) { saveError(e); }
+    finally { setBusy(false); }
   };
-  const removeSource = (id) => persist(sources.filter(s => s.id !== id));
+  const removeSource = (id) => orgService.removeWorkspaceSource(orgId, wsId, id)
+    .then(stored => { setSources(stored); srcLoadOk(); })
+    .catch(saveError);
 
   const resultRow = (item, i) => {
     let label, meta;
@@ -171,7 +182,7 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
         <//><//>
       <//>` : null}
 
-    <${List} cols="mark-name-tags-doors" keepCols empty=${t('organisms.noSources') || 'No sources yet'}>
+    ${srcLoad.failed ? html`<${LoadFailed} onRetry=${load} />` : html`<${List} cols="mark-name-tags-doors" keepCols empty=${t('organisms.noSources') || 'No sources yet'}>
       ${sources.map(s => html`
         <${ListRow} key=${s.id}>
           <${Cell}>${SRC_ICON[s.type] || '•'}<//>
@@ -182,5 +193,5 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
           <//>
           <${Doors}><${Icon} small label=${t('organisms.remove') || 'Remove'} onClick=${() => removeSource(s.id)}>✕<//><//>
         <//>`)}
-    <//>`;
+    <//>`}`;
 }

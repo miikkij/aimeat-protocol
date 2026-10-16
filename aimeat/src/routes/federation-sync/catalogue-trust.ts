@@ -5,6 +5,10 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-16 — POST /v1/federation/trust-advisory takes a signed notice from a peer (gatePeer,
+ *     the peer's signature, the audience proof, once) and stores it for the operator without acting on
+ *     it; the operator's own advisory is stored too (a warning answered 201 and stored nothing), and its
+ *     ban and suspend writes are awaited instead of fire-and-forget (QA audit S6-06).
  *   v1.4.0 — 2026-10-11 — A synced action's pricing is its pacing amount: toll_morsels from a 4.x peer, base_morsels from a 3.x peer (actionPricingFromPeer). A morsel is pacing, not a price.
  *   v1.3.0 — 2026-10-10 — A peer that has once sent a verified delivery proof is held to it: a catalogue-sync without one is refused from it whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal; secaudit 2026-10-10 I21).
  *   v1.2.0 — 2026-10-06 — catalogue-sync checks a delivery proof: this node named, sent inside five minutes, heard once (deliveryRefusal; secaudit 2026-10 last items, D3).
@@ -21,7 +25,16 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { deliveryRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
+import {
+    deliveryRefusal, pinnedRefusal, federationPeerProofPin, audienceRefusal, signedMessageRefusal,
+} from '../../services/signed-node-request.js';
+import { TRUST_ADVISORY_TYPES, trustNoticeSignString } from '../../services/federation-trust-notice.js';
+
+/** A node id as nodes write them: letters, digits, dot, dash and underscore. */
+const NODE_ID_SHAPE = /^[A-Za-z0-9._-]{1,128}$/;
+const MAX_REASON_CHARS = 1000;
+/** How many trust notices one peer may have stored here at a time. */
+const MAX_RECEIVED_PER_PEER = 50;
 import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation-tiers.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -128,39 +141,110 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
         emitChange('federation');
     });
 
-    // POST /v1/federation/trust-advisory — Receive trust advisory about a node
+    // POST /v1/federation/trust-advisory, first handler: a signed trust notice from a PEER (the
+    // emergency removal of a peer with notify_network, or the other operator's advisory; sender in
+    // services/federation-trust-notice.ts). It is taken when the body carries a signature; any other
+    // request goes on to the operator's handler below (next('route')).
+    //
+    // A peer's notice is STORED for this node's operator to read (GET /v1/admin/federation/trust-
+    // advisories) and acts on nothing: a peer's word does not ban or demote a third node here. Until
+    // 2026-10-16 the sender posted unsigned to the operator-only handler, which refused it (QA audit S6-06).
+    router.post('/v1/federation/trust-advisory', async (req, res, next) => {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        if (typeof body.signature !== 'string') { next('route'); return; }
+        const { source_node, target_node, advisory_type, reason, evidence_hash, timestamp, signature } = body;
+
+        if (typeof source_node !== 'string' || typeof target_node !== 'string' || typeof advisory_type !== 'string'
+            || typeof reason !== 'string' || !reason || typeof timestamp !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A signed trust notice needs source_node, target_node, advisory_type, reason and timestamp as text.'));
+            return;
+        }
+        if (!(TRUST_ADVISORY_TYPES as readonly string[]).includes(advisory_type)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `advisory_type must be one of: ${TRUST_ADVISORY_TYPES.join(', ')}`));
+            return;
+        }
+        if (!NODE_ID_SHAPE.test(target_node) || reason.length > MAX_REASON_CHARS
+            || (evidence_hash !== undefined && evidence_hash !== null && (typeof evidence_hash !== 'string' || evidence_hash.length > 200))) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `target_node must be a node id, the reason at most ${MAX_REASON_CHARS} characters and evidence_hash at most 200.`));
+            return;
+        }
+
+        const gate = gatePeer(peers, source_node, null);
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
+            return;
+        }
+        const signed = trustNoticeSignString({
+            source_node, target_node, advisory_type, reason, evidence_hash: (evidence_hash as string | null | undefined) ?? '', timestamp,
+        });
+        if (!await verify(gate.peer.publicKey, signed, signature)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'The signature on this trust notice does not verify against the sending peer\'s key.'));
+            return;
+        }
+        // A new message kind, so no peer sends it in an older format: the audience is always required.
+        const refusal = await audienceRefusal({
+            signed, audience: body.audience, audienceSignature: body.audience_signature,
+            publicKey: gate.peer.publicKey, thisNodeId: config.nodeId, required: true,
+        }) ?? signedMessageRefusal(source_node, timestamp, signature);
+        if (refusal) { res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message)); return; }
+
+        // One stored notice per sending peer, target and kind: a repeat replaces it, and one peer holds at
+        // most MAX_RECEIVED_PER_PEER, so a peer cannot fill this node's system namespace.
+        const systemGaii = `system@${config.nodeId}`;
+        const key = `trust_advisory:recv:${source_node}:${target_node}:${advisory_type}`;
+        const existing = await storage.getMemory(systemGaii, key);
+        if (!existing) {
+            const held = await storage.listMemory(systemGaii, { prefix: `trust_advisory:recv:${source_node}:` });
+            if (held.length >= MAX_RECEIVED_PER_PEER) {
+                res.status(429).json(error(config.nodeId, 'RATE_LIMITED', `This node already holds ${MAX_RECEIVED_PER_PEER} trust notices from your node. Its operator reads them before more are stored.`));
+                return;
+            }
+        }
+        const now = new Date().toISOString();
+        const record = {
+            id: (existing?.value as { id?: string } | undefined)?.id ?? `adv-${randomBytes(8).toString('hex')}`,
+            target_node, advisory_type, reason, evidence_hash: evidence_hash ?? null,
+            issued_by: source_node, received_from: source_node, direction: 'received', status: 'received',
+            acted: false, created_at: now,
+        };
+        await storage.setMemory({
+            key, ownerGaii: systemGaii, value: record, visibility: 'private',
+            tags: ['trust_advisory', 'received', `target:${target_node}`, `type:${advisory_type}`, `from:${source_node}`],
+            ttlHours: null, version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+        });
+        logger.warn('Trust notice received from a peer and stored for the operator', { from: source_node, target: target_node, type: advisory_type });
+
+        res.status(201).json(success(config.nodeId, { '@type': 'aimeat:TrustAdvisory', ...record, stored: true }));
+        emitChange('federation');
+    });
+
+    // POST /v1/federation/trust-advisory, second handler: this node's operator acts on a node here
+    // (ban removes the peer, suspend demotes it, warning records it). Every advisory is stored; a
+    // warning answered 201 with an id and stored nothing until 2026-10-16 (QA audit S6-06).
     router.post('/v1/federation/trust-advisory', requireAuth(), requireOperator(storage), async (req, res) => {
-        const { target_node, advisory_type, reason, evidence_hash, issued_by } = req.body ?? {};
+        const { target_node, advisory_type, reason, evidence_hash } = req.body ?? {};
 
         if (!target_node || !advisory_type || !reason) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_node, advisory_type, and reason are required'));
             return;
         }
 
-        const validTypes = ['warning', 'suspend', 'ban'];
-        if (!validTypes.includes(advisory_type)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `advisory_type must be one of: ${validTypes.join(', ')}`));
+        if (!(TRUST_ADVISORY_TYPES as readonly string[]).includes(advisory_type)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `advisory_type must be one of: ${TRUST_ADVISORY_TYPES.join(', ')}`));
             return;
         }
 
         // Store advisory and optionally de-peer
         const advisoryId = `adv-${randomBytes(8).toString('hex')}`;
-        const advisory = {
-            id: advisoryId,
-            target_node,
-            advisory_type,
-            reason,
-            evidence_hash,
-            issued_by: issued_by ?? config.nodeId,
-            created_at: new Date().toISOString(),
-        };
+        let acted: 'removed' | 'demoted' | false = false;
 
         // If ban advisory, auto-de-peer the target (and purge from storage).
         if (advisory_type === 'ban') {
             const targetPeer = [...peers.entries()].find(([, p]) => p.nodeId === target_node);
             if (targetPeer) {
                 peers.delete(targetPeer[0]);
-                storage.deleteFederationPeer(targetPeer[1].nodeId).catch(err => { logger.warn('POST /v1/federation/trust-advisory: continuing after a suppressed failure', { error: String(err) }); });
+                await storage.deleteFederationPeer(targetPeer[1].nodeId);
+                acted = 'removed';
             }
         }
 
@@ -178,15 +262,35 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
                 if (tierRank(coerceTier(peer.tier)) > tierRank('visiting')) {
                     peer.tier = 'visiting';
                     Object.assign(peer, deriveTierFlags('visiting'));
-                    storage.saveFederationPeer(peer).catch(err => { logger.warn('POST /v1/federation/trust-advisory: continuing after a suppressed failure', { error: String(err) }); });
+                    await storage.saveFederationPeer(peer);
+                    acted = 'demoted';
                     logger.warn(`Peer ${target_node} demoted to visiting after suspend advisory`, { reason });
                 }
             }
         }
 
+        const advisory = {
+            id: advisoryId,
+            target_node,
+            advisory_type,
+            reason,
+            evidence_hash: evidence_hash ?? null,
+            issued_by: config.nodeId,
+            direction: 'local',
+            status: 'applied',
+            acted,
+            created_at: new Date().toISOString(),
+        };
+        await storage.setMemory({
+            key: `trust_advisory:${advisoryId}`, ownerGaii: `system@${config.nodeId}`, value: advisory, visibility: 'private',
+            tags: ['trust_advisory', 'local', `target:${target_node}`, `type:${advisory_type}`],
+            ttlHours: null, version: 1, createdAt: advisory.created_at, updatedAt: advisory.created_at,
+        });
+
         res.status(201).json(success(config.nodeId, {
             '@type': 'aimeat:TrustAdvisory',
             ...advisory,
+            stored: true,
         }));
         emitChange('federation');
     });

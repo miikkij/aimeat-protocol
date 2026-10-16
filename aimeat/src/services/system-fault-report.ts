@@ -27,10 +27,14 @@
  * @structure
  *   - FAULT_CODES — the error codes that mean "we broke", as opposed to a caller's mistake
  *   - reportSystemFault() — send one, deduplicated, fire-and-forget
+ *   - reportJobFault() — the same message and the same deduplication for a failed core scheduled job
  *   - SYSTEM_FAULT_REPLY — the shape an operator's answer takes when they send one
  * @usage
  *   void reportSystemFault({ storage, config }, { code, route, method, requestId });
+ *   void reportJobFault({ storage, config }, { jobId, jobName, error });
  * @version-history
+ *   2026-10-16 — reportJobFault: a core scheduled job that ends in error sends the operator this
+ *     message, one per job per hour, through the same deduplication (QA audit E4-03).
  *   v1.2.0 — 2026-10-09 — The forwarded caller message is redacted of credential-shaped text; for a
  *     500 it is already the sentence that replaced the exception text (secrets audit 2026-10-09, d4).
  *   v1.1.0 — 2026-09-24 — The report is the node's own message, so it does not count against the
@@ -59,6 +63,9 @@ export const FAULT_CODES = new Set([
     'IMPORT_FAILED',
     'ZIP_ERROR',
     'ENCRYPTION_NOT_CONFIGURED',
+    // A core scheduled job (the node's own maintenance work) ended in error. No caller exists, so
+    // nobody else could have caused it (reportJobFault).
+    'JOB_FAILED',
 ]);
 
 /** What an operator's reply says, when they choose to send one. Three things, always these three. */
@@ -97,34 +104,72 @@ export async function reportSystemFault(
     input: SystemFaultInput,
 ): Promise<void> {
     if (!FAULT_CODES.has(input.code)) return;
+    if (!firstInWindow(`${input.code} ${input.method} ${input.route}`)) return;
 
-    const key = `${input.code} ${input.method} ${input.route}`;
+    const body = [
+        `The node answered **${input.code}** on \`${input.method} ${input.route}\`.`,
+        '',
+        // What the caller saw: for a 500 that is the sentence middleware/internal-error-text.ts put
+        // in place of the exception text. Redacted again, for a code answered on another status.
+        input.shown ? `The caller was shown: "${redactCredentialText(input.shown)}"` : '',
+        input.requestId ? `Request id: \`${input.requestId}\`` : '',
+        '',
+        'Reported by the node itself. Nobody was asked to write this, and no user content is in it.',
+    ].filter(Boolean).join('\n');
+    await sendToOperator(deps, input.code, `Fault: ${input.code} on ${input.route}`, body);
+}
+
+export interface JobFaultInput {
+    jobId: string;
+    jobName: string;
+    /** The error the run ended with. Redacted of credential-shaped text before it is sent. */
+    error: string;
+}
+
+/**
+ * Report a failed core scheduled job to whoever runs this node: the same message kind and the same
+ * one-per-hour window as a failed request, keyed by the job id. A job that fails every five minutes
+ * sends one message an hour, and a second failing job still gets its own. Never throws.
+ */
+export async function reportJobFault(
+    deps: { storage: Storage; config: AimeatConfig },
+    input: JobFaultInput,
+): Promise<void> {
+    if (!firstInWindow(`JOB_FAILED ${input.jobId}`)) return;
+    const body = [
+        `The scheduled job **${input.jobName}** (\`${input.jobId}\`) ended in error.`,
+        '',
+        `Error: "${redactCredentialText(input.error)}"`,
+        '',
+        'The job keeps its schedule and runs again at its next time. The Scheduler tab of the admin page lists its runs.',
+        '',
+        'Reported by the node itself. Nobody was asked to write this, and no user content is in it.',
+    ].join('\n');
+    await sendToOperator(deps, 'JOB_FAILED', `Fault: scheduled job ${input.jobId} failed`, body);
+}
+
+/** True for the first report of this key in the window; records it. */
+function firstInWindow(key: string): boolean {
     const now = Date.now();
     const last = seen.get(key);
-    if (last !== undefined && now - last < WINDOW_MS) return;
+    if (last !== undefined && now - last < WINDOW_MS) return false;
     seen.set(key, now);
+    return true;
+}
 
+async function sendToOperator(
+    deps: { storage: Storage; config: AimeatConfig }, code: string, subject: string, body: string,
+): Promise<void> {
     try {
         const operator = await findOperatorGhii(deps.storage, deps.config);
         if (!operator) return;   // a node with no operator has nobody to tell.
-
-        const body = [
-            `The node answered **${input.code}** on \`${input.method} ${input.route}\`.`,
-            '',
-            // What the caller saw: for a 500 that is the sentence middleware/internal-error-text.ts put
-            // in place of the exception text. Redacted again, for a code answered on another status.
-            input.shown ? `The caller was shown: "${redactCredentialText(input.shown)}"` : '',
-            input.requestId ? `Request id: \`${input.requestId}\`` : '',
-            '',
-            'Reported by the node itself. Nobody was asked to write this, and no user content is in it.',
-        ].filter(Boolean).join('\n');
 
         // Local delivery only: sender and recipient are the same operator on this node, so the
         // federation peer map is never consulted.
         await sendDirectMessage({ storage: deps.storage, config: deps.config, peers: new Map() }, {
             senderGhii: operator,
             recipientGhii: operator,
-            subject: `Fault: ${input.code} on ${input.route}`,
+            subject,
             body,
             kind: 'system-fault',
             skipContactGate: true,
@@ -136,6 +181,7 @@ export async function reportSystemFault(
         // The report is best-effort by design. If it cannot be sent the user is unaffected, and a
         // silent catch here is the one place it is correct: the alternative is a failure to report a
         // failure surfacing as a third failure.
-        logger.warn('system-fault report could not be sent', { code: input.code, error: String(err) });
+        logger.warn('system-fault report could not be sent', { code, error: String(err) });
     }
 }
+

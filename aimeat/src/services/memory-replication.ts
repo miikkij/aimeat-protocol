@@ -11,8 +11,15 @@
  *   - ReplicationResult: per-peer replication outcome shape
  *   - isEligibleForReplication(storage, ownerGaii, key): public + federation-consent gate
  *   - (module) replicationState + tracking-key helpers for per-peer/per-key sync state
+ *   - replicateMemoryToPeer / replicateMemoryToAllPeers: the single send and the scheduled round
+ *   - enqueueMemoryReplication / sendQueuedMemoryEntries / onMemoryReplicationEnqueued: the queue
  *
  * @version-history
+ *   v1.5.0 — 2026-10-16 — The queued path sends (QA audit F3-01): sendQueuedMemoryEntries is the
+ *     single-record send per queued job, which the scheduler's drain calls and marks by result;
+ *     enqueueMemoryReplication writes one row per replicating peer, skips a peer that already has
+ *     the same key pending, and runs the drain the scheduler registered. The scheduled round also
+ *     reads the records of each person of this node who holds a federation consent, not agents only.
  *   v1.4.0 — 2026-10-06 — A replicate carries a delivery proof: the peer it is for and the send time,
  *     since its signed timestamp is the record's (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.3.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -223,8 +230,18 @@ export async function replicateMemoryToAllPeers(
   const activePeers = [...peers.values()].filter(p => p.status === 'active');
   if (activePeers.length === 0) return [];
 
-  // Gather all agents and their memory entries
-  const agents = await storage.listAgents();
+  // The identities whose records may federate: every agent, and every person of this node who holds
+  // an active federation consent. The person half was missing until 2026-10-16, so a public record a
+  // person owned directly, under a federation consent, was sent by neither this round nor the queue.
+  // A person with no federation consent has nothing eligible, and their memory is not read at all.
+  const owners: Array<{ gaii: string; listOpts: { visibility?: string } }> =
+    (await storage.listAgents()).map(a => ({ gaii: a.gaii, listOpts: {} }));
+  for (const g of await storage.listGHIIs()) {
+    if (!g.ghii.endsWith(`@${config.nodeId}`)) continue;
+    const consents = await storage.listConsents(g.ghii);
+    if (!consents.some(c => c.status === 'active' && c.scope === 'federation')) continue;
+    owners.push({ gaii: g.ghii, listOpts: { visibility: 'public' } });
+  }
   const results: ReplicationResult[] = [];
 
   for (const peer of activePeers) {
@@ -233,9 +250,9 @@ export async function replicateMemoryToAllPeers(
     let consentDenied = 0;
     let classifiedWithheld = 0;
 
-    for (const agent of agents) {
+    for (const agent of owners) {
       try {
-        const memories = await storage.listMemory(agent.gaii, {});
+        const memories = await storage.listMemory(agent.gaii, agent.listOpts);
         // Memory leaving for a peer asks the classification component first (TARGET-082), and what
         // stays is counted in the peer's result (keys in the log only).
         const { kept: publicMemories, withheld } = await leaveMemoriesToPeer({ storage, config },
@@ -300,8 +317,32 @@ export async function replicateMemoryToAllPeers(
 }
 
 /**
+ * The function that drains the queue soon after a memory job is enqueued, per storage instance.
+ * The sync scheduler registers it when it starts (onMemoryReplicationEnqueued). It is a registration
+ * rather than an import because the scheduler imports this module; keyed by storage because more
+ * than one node can run in one process (the two-node test suites).
+ */
+const enqueueListeners = new Map<Storage, () => void>();
+
+/** Register what runs after a memory job is enqueued on this storage. Returns the unregister call. */
+export function onMemoryReplicationEnqueued(storage: Storage, listener: () => void): () => void {
+  enqueueListeners.set(storage, listener);
+  return () => { if (enqueueListeners.get(storage) === listener) enqueueListeners.delete(storage); };
+}
+
+/** How far the duplicate check reads into a peer's pending jobs. The scheduler throttles at 1000. */
+const PENDING_SCAN_LIMIT = 1000;
+
+interface MemoryJobPayload { gaii?: string; key?: string; consent_ref?: string }
+
+/**
  * Enqueue a memory entry for replication via the replication queue.
  * Called from memory write handlers when an eligible entry is created/updated.
+ *
+ * One row per peer, so each peer's send is marked by its own result. A peer that already has a
+ * pending job for the same identity and key gets no second row: the job reads the record when it is
+ * sent, so one pending job carries the latest value. After enqueueing, the registered drain runs
+ * (instant and hybrid send each change at once; the scheduled round is the fallback).
  */
 export async function enqueueMemoryReplication(
   ownerGaii: string,
@@ -316,16 +357,51 @@ export async function enqueueMemoryReplication(
   const eligibility = await isEligibleForReplication(storage, ownerGaii, key);
   if (!eligibility.eligible) return;
 
-  const activePeerIds = [...peers.values()]
-    .filter(p => p.status === 'active')
-    .map(p => p.nodeId);
+  const targets = [...peers.values()].filter(p => p.status === 'active' && p.replicateMemory !== false);
+  if (targets.length === 0) return;
 
-  if (activePeerIds.length === 0) return;
+  let enqueued = 0;
+  for (const peer of targets) {
+    const pending = await storage.dequeueReplication(peer.nodeId, PENDING_SCAN_LIMIT);
+    const already = pending.some(e => e.type === 'memory_replicate'
+      && (e.payload as MemoryJobPayload)?.gaii === ownerGaii && (e.payload as MemoryJobPayload)?.key === key);
+    if (already) continue;
+    await storage.enqueueReplication({
+      type: 'memory_replicate',
+      targetPeers: [peer.nodeId],
+      payload: { gaii: ownerGaii, key, consent_ref: eligibility.consentId },
+      createdAt: new Date().toISOString(),
+    });
+    enqueued++;
+  }
+  if (enqueued > 0) enqueueListeners.get(storage)?.();
+}
 
-  await storage.enqueueReplication({
-    type: 'memory_replicate',
-    targetPeers: activePeerIds,
-    payload: { gaii: ownerGaii, key, consent_ref: eligibility.consentId },
-    createdAt: new Date().toISOString(),
-  });
+/**
+ * Send queued memory jobs to one peer: each job is the single-record send (replicateMemoryToPeer),
+ * which re-reads the record and re-checks visibility, consent and classification at send time.
+ * Answers the ids that were sent and the ids that were not; the caller marks them. A job whose
+ * record is gone, private, no longer consented or kept by the classification is NOT sent, and is
+ * reported with the failures, because 'sent' means a peer received it.
+ */
+export async function sendQueuedMemoryEntries(
+  peer: PeerInfo,
+  entries: ReadonlyArray<{ id: string; payload: unknown }>,
+  config: AimeatConfig,
+  storage: Storage,
+): Promise<{ sent: string[]; failed: string[] }> {
+  const sent: string[] = [];
+  const failed: string[] = [];
+  for (const entry of entries) {
+    const p = entry.payload as MemoryJobPayload;
+    if (!p?.gaii || !p?.key) { failed.push(entry.id); continue; }
+    const result = await replicateMemoryToPeer(peer, p.gaii, p.key, config, storage);
+    if (result.success) {
+      sent.push(entry.id);
+    } else {
+      failed.push(entry.id);
+      logger.warn('Queued memory replication was not sent', { peer: peer.nodeId, gaii: p.gaii, key: p.key, error: result.error });
+    }
+  }
+  return { sent, failed };
 }

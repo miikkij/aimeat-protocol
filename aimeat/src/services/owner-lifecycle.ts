@@ -32,6 +32,9 @@
  *   - resolveOperatorAgentName / OPERATOR_AGENT_REFUSAL: re-exported from operator-principal.ts
  * @usage const result = await deactivateOwner(storage, 'alice', 'operator-bob');
  * @version-history
+ *   v1.3.0 — 2026-10-16 — Each tolerant step runs in a savepoint, and the flag is read back after the
+ *     commit: on PostgreSQL one rejected statement had turned the COMMIT into a silent rollback of the
+ *     flag and every revocation while the caller was told the account was disabled (QA audit E6-01).
  *   2026-10-16 — The operator's disable and enable acts take the actor and write the operator trail
  *     (recordOperatorAction): a usage row, a log line and a line on the person's feed, so a disabled and
  *     re-enabled account keeps a record of both and of who did them (QA audit E2-04).
@@ -48,6 +51,7 @@ import { logger } from '../utils/logger.js';
 import type { AimeatConfig } from '../config.js';
 import { recordOperatorAction } from './operator-access-audit.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
+import { inSavepoint } from './tolerant-step.js';
 
 // The operator tools import the question from here; its one home is operator-principal.ts.
 export { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from './operator-principal.js';
@@ -60,10 +64,13 @@ export interface OwnerLifecycleResult {
   incomplete: string[];
 }
 
-/** Run one revocation step, recording a failure instead of letting it block the deactivation. */
-async function step(label: string, fn: () => Promise<void>, incomplete: string[]): Promise<void> {
+/** Run one revocation step, recording a failure instead of letting it block the deactivation. The
+ *  savepoint is what makes "continuing" true on PostgreSQL: without it the first statement the
+ *  database rejected marked the transaction failed, and the COMMIT undid the flag and every
+ *  revocation while this function returned normally (QA audit E6-01). */
+async function step(storage: Storage, label: string, fn: () => Promise<void>, incomplete: string[]): Promise<void> {
   try {
-    await fn();
+    await inSavepoint(storage, fn);
   } catch (err) {
     incomplete.push(label);
     logger.warn('deactivateOwner: step failed, continuing', { step: label, error: String(err) });
@@ -93,17 +100,17 @@ export async function deactivateOwner(storage: Storage, name: string, by: string
     }
 
     // 2. Session rows: owner logins, agent device-auth JWTs, ecosystem apps, /v1/auth/token.
-    await step('sessions', async () => { sessionsRevoked = await storage.revokeAllSessions(name); }, incomplete);
+    await step(storage, 'sessions', async () => { sessionsRevoked = await storage.revokeAllSessions(name); }, incomplete);
 
     // 3. PATs — resolved from storage per request, so revoked means now.
-    await step('pats', async () => {
+    await step(storage, 'pats', async () => {
       for (const pat of await storage.listPats(name)) {
         if (await storage.revokePat(pat.id, name)) patsRevoked++;
       }
     }, incomplete);
 
     // 4. App grants — their access tokens are asked per request via appGrantRevoked().
-    await step('app_grants', async () => {
+    await step(storage, 'app_grants', async () => {
       for (const grant of await storage.listAppGrantsByOwner(name)) {
         if (grant.revoked) continue;
         await storage.updateAppGrant(grant.grantId, { revoked: true });
@@ -113,19 +120,27 @@ export async function deactivateOwner(storage: Storage, name: string, by: string
 
     // 5. In-flight device authorizations: an approval mid-flight must not mint a fresh 90-day JWT
     //    for a deactivated account.
-    await step('device_auth', async () => { await storage.deleteDeviceAuthByOwner(name); }, incomplete);
+    await step(storage, 'device_auth', async () => { await storage.deleteDeviceAuthByOwner(name); }, incomplete);
 
     //    Same reasoning for an unspent Agent v2 enrolment grant: it is a live permission to hand a
     //    daemon credentials in this account's name, and deactivation has to end it too.
-    await step('agent_enrolment_grants', async () => { await storage.deleteAgentEnrolmentGrantsByOwner(name); }, incomplete);
+    await step(storage, 'agent_enrolment_grants', async () => { await storage.deleteAgentEnrolmentGrantsByOwner(name); }, incomplete);
 
     // 6. MCP OAuth refresh tokens are keyed by agent GAII and have no by-owner delete.
-    await step('mcp_oauth_refresh', async () => {
+    await step(storage, 'mcp_oauth_refresh', async () => {
       for (const agent of await storage.getAgentsByOwner(name)) {
         await storage.deleteOAuthRefreshTokensByGaii(agent.gaii);
       }
     }, incomplete);
   });
+
+  // The flag is what every auth chokepoint asks, so the caller may say "disabled" only when it is
+  // stored. Read it back after the commit: a COMMIT the database executed as a rollback returns no
+  // error, and this read is what turns that into one instead of a false success (QA audit E6-01).
+  const after = await storage.getOwner(name);
+  if (!after?.disabledAt) {
+    throw new Error(`The account ${name} could not be deactivated: the change did not reach the database. Nothing was revoked; try again, and if it repeats, check the database log.`);
+  }
 
   // 7. Live connect-tunnel sockets verified their bearer only at upgrade — close them now.
   //    Outside the transaction: a socket close is not a storage write and cannot roll back.

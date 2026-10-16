@@ -17,6 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.19.1 — 2026-10-16 — A pin toggle is refused with a toast until the stored pins have loaded: the
+ *     toggle saves the whole list, and built on the defaults it replaced the person's pins (QA audit F6-04).
  *   v3.19.0 — 2026-10-14 — The menu find at the top of the side menu (components/MenuFind.js): typing
  *     narrows the menu to the places, the sections inside a page and, for an operator, the admin pages
  *     that match; ?section= in a link scrolls to that section (wish-pikahaku-settings-controls-ja-admin-sivuille).
@@ -321,13 +323,16 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   /* ── Pinned items: 3–5 favourites under Home, persisted per user (memory key
      `sidebar.pins`, same pattern as organisms.ui). Defaults for new users. ── */
   const [pins, setPins] = useState(DEFAULT_PINS);
-  useEffect(() => {
-    getMemory('sidebar.pins', { soft: true })
-      .then(r => { const v = r?.data?.value; if (Array.isArray(v) && v.length) setPins(v.filter(id => SIDEBAR_ITEM_BY_ID[id])); })
-      // eslint-disable-next-line aimeat/no-silent-catch -- defaults stand
-      .catch(() => { /* defaults stand */ });
-  }, []);
+  // A toggle saves the whole list, so it waits for the stored list: built on the defaults after a
+  // failed read, it would replace the person's own pins.
+  const [pinsLoaded, setPinsLoaded] = useState(false);
+  const loadPins = useCallback(() => getMemory('sidebar.pins', { soft: true })
+    .then(r => { const v = r?.data?.value; if (Array.isArray(v) && v.length) setPins(v.filter(id => SIDEBAR_ITEM_BY_ID[id])); setPinsLoaded(true); })
+    // The defaults stay on screen; a toggle is refused until a read works.
+    .catch(err => { swallowed('landing-page: pins', err); }), []);
+  useEffect(() => { loadPins(); }, [loadPins]);
   const togglePin = (id) => {
+    if (!pinsLoaded) { showToast?.(t('common.settingsNotLoaded'), true); loadPins(); return; }
     setPins(prev => {
       let next;
       if (prev.includes(id)) next = prev.filter(x => x !== id);

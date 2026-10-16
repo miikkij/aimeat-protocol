@@ -11,6 +11,8 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-10-16 — The owner row, the profile row and the welcome bonus are written in one transaction
+ *     (QA audit E6-02).
  *   2026-10-15 — POST /v1/owners/:name/recover is removed: it replaced the Ed25519 owner key, whose sign-in was removed in 4.0.0, and nothing called it (feature-list audit 171).
  *   2026-10-15 — The registration hooks go through ownerRegistrationRefusal / announceOwnerRegistered, the
  *     helpers every account-creating route uses (feature-list audit 89).
@@ -97,43 +99,48 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     const roles = ['owner'];
     if (await createdAccountIsOperator(storage)) roles.push('operator');
 
-    const owner = await storage.createOwner({
-      name,
-      displayName: display_name,
-      publicKey: keyPair.publicKey,
-      roles,
-      createdAt: new Date().toISOString(),
-    });
-
-    // Auto-create GHII record for single-balance economy (welcome bonus on GHII)
+    // The owner row, the GHII profile and the welcome bonus commit together or not at all: a failure
+    // between them had left a taken name with no profile (QA audit E6-02).
     const ghii = `${name}@${config.nodeId}`;
-    const existingGhii = await storage.getGHIIByOwner(name);
-    if (!existingGhii) {
-      const now = new Date().toISOString();
-      await storage.createGHII({
-        ghii,
-        username: name,
-        nodeId: config.nodeId,
-        displayName: display_name ?? name,
-        ownerName: name,
-        bio: '',
-        avatar: '',
-        locale: 'en',
-        verificationLevel: 0,
-        totpEnabled: false,
-        morselBalance: config.welcomeBonus,
-        createdAt: now,
-        updatedAt: now,
+    const owner = await storage.transaction(async () => {
+      const created = await storage.createOwner({
+        name,
+        displayName: display_name,
+        publicKey: keyPair.publicKey,
+        roles,
+        createdAt: new Date().toISOString(),
       });
-      // Record welcome bonus transaction
-      await storage.addTransaction({
-        id: `tx-${randomUUID()}`,
-        gaii: ghii,
-        type: 'welcome_bonus',
-        amount: config.welcomeBonus,
-        timestamp: now,
-      });
-    }
+
+      // Auto-create GHII record for single-balance economy (welcome bonus on GHII)
+      const existingGhii = await storage.getGHIIByOwner(name);
+      if (!existingGhii) {
+        const now = new Date().toISOString();
+        await storage.createGHII({
+          ghii,
+          username: name,
+          nodeId: config.nodeId,
+          displayName: display_name ?? name,
+          ownerName: name,
+          bio: '',
+          avatar: '',
+          locale: 'en',
+          verificationLevel: 0,
+          totpEnabled: false,
+          morselBalance: config.welcomeBonus,
+          createdAt: now,
+          updatedAt: now,
+        });
+        // Record welcome bonus transaction
+        await storage.addTransaction({
+          id: `tx-${randomUUID()}`,
+          gaii: ghii,
+          type: 'welcome_bonus',
+          amount: config.welcomeBonus,
+          timestamp: now,
+        });
+      }
+      return created;
+    });
 
     // Which onboarding path this account was created on (05-mittaus.md). BOTH creation doors write
     // it — an account created through this programmatic one and left untracked would be missing

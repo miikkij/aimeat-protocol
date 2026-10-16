@@ -5,6 +5,11 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.8.0 - 2026-10-16 - The cleanup step runs for a source type only when that type's scan
+ *     completed: a scan that throws (or an owner's app manifests that cannot be read) changes no
+ *     row of its type, and the result lists `failedScans`. An action row switches on again like
+ *     the other kinds, and an insert of an id that already exists is taken as the existing row
+ *     (its source ref restored) instead of stopping the scan (QA audit F2-01).
  *   v1.7.0 - 2026-10-13 - The pacing amount is written as `cost.toll_morsels`, its 4.0.0 name
  *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.6.0 - 2026-10-13 - aggregateExtensionCapabilities and aggregateExtensionNow: the extension
@@ -74,6 +79,28 @@ function ownerGhiiOf(installedBy: string | null | undefined, nodeId: string): st
   return installedBy.includes('@') ? installedBy : `${installedBy}@${nodeId}`;
 }
 
+/**
+ * Insert a capability row, or take the row that already holds its id. Two runs of the scan at
+ * once (the boot run, an install, the operator's trigger) can both see a ref as new, and a row
+ * whose source ref was patched away from its id is not found by ref; in both cases the plain
+ * INSERT failed on the primary key and stopped the scan part-way, which then disabled every row
+ * the scan had not reached. An auto-generated row's id IS its source ref, so the existing row's
+ * ref is set back to it. Answers true when a row was created. Any other error propagates.
+ */
+async function createOrAdopt(storage: Storage, cap: CapabilityRecord): Promise<boolean> {
+  try {
+    await storage.createCapability(cap);
+    return true;
+  } catch (err) {
+    const existing = await storage.getCapability(cap.id);
+    if (!existing) throw err;
+    if (existing.source.ref !== cap.source.ref || existing.source.type !== cap.source.type) {
+      await storage.updateCapability(existing.id, { source: cap.source, updatedAt: cap.updatedAt });
+    }
+    return false;
+  }
+}
+
 /** What the aggregator reads of one extension: its name, its actions' shapes and who installed it. */
 type AggregatedExtension = Awaited<ReturnType<Storage['listExtensions']>>[number];
 
@@ -120,8 +147,7 @@ export async function aggregateExtensionCapabilities(
         operatorOverride: null, stats: makeDefaultStats(),
         tags: [], createdAt: now, updatedAt: now,
       };
-      await storage.createCapability(cap);
-      created++;
+      if (await createOrAdopt(storage, cap)) created++;
     } else if (existing.status === 'disabled') {
       // Re-enable: source is active again (extension was reinstalled)
       await storage.updateCapability(existing.id, {
@@ -163,10 +189,26 @@ export async function aggregateExtensionNow(config: AimeatConfig, storage: Stora
   }
 }
 
-export async function runCapabilityAggregation(config: AimeatConfig, storage: Storage): Promise<{ created: number; updated: number; disabled: number }> {
+/** The five source types the scan reads, in the order it reads them. */
+const SCANNED_SOURCE_TYPES = ['extension', 'action', 'cortex', 'app-tool', 'offering'] as const;
+
+export interface CapabilityAggregationResult {
+  created: number;
+  updated: number;
+  disabled: number;
+  /** Source types whose scan did not complete this run; their rows were left exactly as they were. */
+  failedScans: string[];
+}
+
+export async function runCapabilityAggregation(config: AimeatConfig, storage: Storage): Promise<CapabilityAggregationResult> {
   let created = 0, updated = 0, disabled = 0;
   const seenRefs = new Set<string>();
   const now = new Date().toISOString();
+  // A source type enters this set only when its scan ran to the end. The cleanup step (6) reads
+  // "not seen" as "source gone", which is true only for a complete scan: a scan that stopped
+  // part-way has not seen the rows after the failure, and would disable them on one run and
+  // delete them on the next.
+  const completed = new Set<string>();
 
   // 1. Scan active extensions. `lean`: schemas and metadata only — this scan never executes code,
   // and loading every action's full source cost +203 MB of native churn per cron run on production
@@ -178,7 +220,8 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
       created += made.created;
       updated += made.updated;
     }
-  } catch (err) { logger.error('Capability aggregator: extension scan failed', { error: String(err) }); }
+    completed.add('extension');
+  } catch (err) { logger.error('Capability aggregator: extension scan failed; its rows stay as they were this run', { error: String(err) }); }
 
   // 2. Scan published actions (discovery only, callable: false)
   try {
@@ -212,11 +255,16 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           operatorOverride: null, stats: makeDefaultStats(),
           tags: action.tags || [], createdAt: now, updatedAt: now,
         };
-        await storage.createCapability(cap);
-        created++;
+        if (await createOrAdopt(storage, cap)) created++;
+      } else if (existing.status === 'disabled') {
+        // Re-enable: the action is published again. Without this branch an action row stayed
+        // disabled after one missed scan until the next one deleted it.
+        await storage.updateCapability(existing.id, { status: 'active', source: { type: 'action', ref, version: action.updatedAt }, updatedAt: now });
+        updated++;
       }
     }
-  } catch (err) { logger.error('Capability aggregator: action scan failed', { error: String(err) }); }
+    completed.add('action');
+  } catch (err) { logger.error('Capability aggregator: action scan failed; its rows stay as they were this run', { error: String(err) }); }
 
   // 3. Scan active cortex modules (callable in browser). `lean`: no raw manifest YAML, no seed-data
   // entries — this scan reads lib exports/api_surface and prompt content only.
@@ -278,8 +326,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
           operatorOverride: null, stats: makeDefaultStats(),
           tags: cortex.tags || [], createdAt: now, updatedAt: now,
         };
-        await storage.createCapability(cap);
-        created++;
+        if (await createOrAdopt(storage, cap)) created++;
       } else if (existing.status === 'disabled') {
         // Re-enable: cortex is active again (was reinstalled)
         await storage.updateCapability(existing.id, {
@@ -318,7 +365,8 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         updated++;
       }
     }
-  } catch (err) { logger.error('Capability aggregator: cortex scan failed', { error: String(err) }); }
+    completed.add('cortex');
+  } catch (err) { logger.error('Capability aggregator: cortex scan failed; its rows stay as they were this run', { error: String(err) }); }
 
   // 4. Scan every owner's app tool manifests (`apps.{appId}.tools`): each tool is a discovery entry.
   // The call itself goes through the contract door (EXCHANGE offering → aimeat_app_tool_invoke), so
@@ -326,6 +374,9 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
   // record, read the same way the EXCHANGE projection reads it.
   try {
     const owners = await storage.listOwners();
+    // One unreadable owner does not stop the other owners' tools from being refreshed, but it
+    // makes the scan incomplete: the cleanup cannot tell that owner's tools from removed ones.
+    let everyOwnerRead = true;
     for (const owner of owners) {
       const ownerGhii = `${owner.name}@${config.nodeId}`;
       let records: Array<{ key: string; value: unknown }> = [];
@@ -333,6 +384,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         records = (await storage.listMemory(ownerGhii, { prefix: 'apps.' })).filter(r => /^apps\..+\.tools$/.test(r.key));
       } catch (err) {
         logger.warn('Capability aggregator: an owner\'s app manifests could not be read; their tools stay as they were', { owner: owner.name, error: String(err) });
+        everyOwnerRead = false;
         records = [];
       }
       for (const rec of records) {
@@ -367,8 +419,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
               trust: makeDefaultTrust(), redactedFields: [], operatorOverride: null, stats: makeDefaultStats(),
               tags: [], createdAt: now, updatedAt: now,
             };
-            await storage.createCapability(cap);
-            created++;
+            if (await createOrAdopt(storage, cap)) created++;
           } else if (existing.status === 'disabled' || existing.schemaHash !== schemaHash || existing.summary !== fields.summary || existing.usage !== fields.usage || existing.source.version !== version) {
             await storage.updateCapability(existing.id, { ...fields, status: 'active', source: { type: 'app-tool', ref, version }, updatedAt: now });
             updated++;
@@ -376,7 +427,8 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         }
       }
     }
-  } catch (err) { logger.error('Capability aggregator: app-tool scan failed', { error: String(err) }); }
+    if (everyOwnerRead) completed.add('app-tool');
+  } catch (err) { logger.error('Capability aggregator: app-tool scan failed; its rows stay as they were this run', { error: String(err) }); }
 
   // 5. Scan every agent's published offers (`agents.{agent}.offers`): a PUBLIC offer is a discovery
   // entry, priced or not. The work is commissioned through the offer's own door (a work request, or
@@ -421,18 +473,21 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
             trust: makeDefaultTrust(), redactedFields: [], operatorOverride: null, stats: makeDefaultStats(),
             createdAt: now, updatedAt: now,
           };
-          await storage.createCapability(cap);
-          created++;
+          if (await createOrAdopt(storage, cap)) created++;
         } else if (existing.status === 'disabled' || existing.schemaHash !== schemaHash || existing.summary !== fields.summary || existing.usage !== fields.usage || existing.source.version !== version) {
           await storage.updateCapability(existing.id, { ...fields, status: 'active', source: { type: 'offering', ref, version }, updatedAt: now });
           updated++;
         }
       }
     }
-  } catch (err) { logger.error('Capability aggregator: offering scan failed', { error: String(err) }); }
+    completed.add('offering');
+  } catch (err) { logger.error('Capability aggregator: offering scan failed; its rows stay as they were this run', { error: String(err) }); }
 
-  // 6. Disable or delete capabilities whose sources are gone
-  for (const sourceType of ['extension', 'action', 'cortex', 'app-tool', 'offering']) {
+  // 6. Disable or delete capabilities whose sources are gone, for the source types whose scan
+  // completed. A failed scan changes no row of its type.
+  const failedScans = SCANNED_SOURCE_TYPES.filter(t => !completed.has(t));
+  for (const sourceType of SCANNED_SOURCE_TYPES) {
+    if (!completed.has(sourceType)) continue;
     try {
       const existing = await storage.listCapabilitiesBySourceType(sourceType);
       for (const cap of existing) {
@@ -450,9 +505,9 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
     } catch (err) { logger.error('Capability aggregator: cleanup scan failed', { error: String(err) }); }
   }
 
-  if (created || updated || disabled) {
-    logger.info(`Capability aggregation: ${created} created, ${updated} updated, ${disabled} disabled`);
+  if (created || updated || disabled || failedScans.length) {
+    logger.info(`Capability aggregation: ${created} created, ${updated} updated, ${disabled} disabled`, { failedScans });
   }
 
-  return { created, updated, disabled };
+  return { created, updated, disabled, failedScans };
 }
