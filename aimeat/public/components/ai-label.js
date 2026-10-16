@@ -35,10 +35,13 @@
  *   import { AiLabel } from '/components/index.js';
  *   html`<${AiLabel} record=${prov.record} recordUrl=${prov.recordUrl} />`
  * @version-history
+ *   v1.1.0 — 2026-10-16 — `variant="chip"`: the app's corner mark (the EU icon in a pill, the
+ *     statement above it on hover, focus or a tap), for an HTML page in full screen (Jouni, 2026-10-16).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 3. Copy from docs/internal/EUAct/09 §2 + §5, icon rules
  *     from 15-eu-label-icons.md and public/assets/eu-ai-icons/README.md.
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { euIconFor } from './ai-label-icons.js';
@@ -74,8 +77,9 @@ function localized(block, field, fallbackKey) {
  * @param {any} props.record        the `aimeat.provenance/v1` document (from `meta.provenance.record`)
  * @param {string} [props.recordUrl] absolute URL of the addressable record — the "How this was made"
  *                                   link, which is the interactive second layer the Code encourages
- * @param {'inline'|'block'} [props.variant] `inline` chip beside a title (default), `block` banner
- *                                   above a body of text
+ * @param {'inline'|'block'|'chip'} [props.variant] `inline` chip beside a title (default), `block`
+ *                                   banner above a body of text, `chip` the app's corner mark for
+ *                                   content that fills the screen (placed by the caller)
  * @param {string} [props.class]     extra classes for the wrapper
  */
 export function AiLabel({ record, recordUrl, variant = 'inline', class: extraClass = '' }) {
@@ -84,6 +88,7 @@ export function AiLabel({ record, recordUrl, variant = 'inline', class: extraCla
 
   const icon = euIconFor(record);
   if (!icon) return null;
+  if (variant === 'chip') return html`<${AiLabelChip} record=${record} recordUrl=${recordUrl} icon=${icon} extraClass=${extraClass} />`;
 
   // `strength` is optional on the record (added in Phase 3; a Phase 1/2 record has none). Absent
   // means "show the label" — the obligation lives in `required`, and defaulting to the quieter form
@@ -112,6 +117,33 @@ export function AiLabel({ record, recordUrl, variant = 'inline', class: extraCla
         : null}
     </div>
   `;
+}
+
+/** Distinct ids for the corner chips' tap toggles on one page. */
+let chipSeq = 0;
+
+/**
+ * The corner chip: the same mark a served app carries (services/ai-provenance-marks.ts
+ * visibleLabelMarkup), for content that fills the screen. The EU icon alone in a pill; the
+ * statement and the details link open above it on hover, focus or a tap. AiLabel has already
+ * decided a label is owed; the caller places the chip (bottom-left, as on an app).
+ */
+function AiLabelChip({ record, recordUrl, icon, extraClass }) {
+  const [id] = useState(() => `ai-label-chip-${++chipSeq}`);
+  const disclosure = record.disclosure;
+  const short = localized(disclosure, 'short', 'aiLabel.short');
+  const alt = t(icon.alt);
+  const url = recordUrl || record?.attestation?.recordUrl;
+  return html`
+    <div class="ai-label ai-label--chip ${extraClass}" role="group" aria-label=${t('aiLabel.regionLabel')}>
+      <input type="checkbox" class="ai-label__toggle" id=${id} />
+      <label class="ai-label__tap" for=${id} aria-label=${t('aiLabel.expand')}></label>
+      <span class="ai-label__icon ai-label__icon--${icon.file}" role="img" aria-label=${alt} title=${alt}></span>
+      <span class="ai-label__panel">
+        <b>${short}</b>
+        ${url ? html`<a class="ai-label__link" href=${url} target="_blank" rel="noopener noreferrer">${t('aiLabel.detailsLink')}</a>` : null}
+      </span>
+    </div>`;
 }
 
 /**

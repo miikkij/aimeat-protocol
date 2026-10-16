@@ -15,7 +15,8 @@
  * @usage import { HTML_PAGE_SKILL_ENTRY } from './builtin-skills.html-page.js';
  * @version-history
  *   v1.1.0 — 2026-10-16 — "Say how the page was made": ai_provenance on the write, and when the
- *     shared page shows the AI label. A file its classification keeps back does not load.
+ *     shared page shows the AI label. A file its classification keeps back does not load. Full
+ *     screen shows only the page, with the AI label at the bottom-left corner.
  *   v1.0.0 — 2026-10-16 — Initial.
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -99,8 +100,9 @@ less than the person expected. So write it this way:
 ## What the reader sees
 
 The page in its frame, under a strip the page cannot draw over: a line that a user made the page,
-Full screen, and Report. That strip is why a page cannot pass itself off as the node's own sign-in.
-On a node without a page host the reader sees the page's text instead; tell the person that the
+the AI label when one is owed, Full screen, and Report. That strip is why a page cannot pass itself
+off as the node's own sign-in. Full screen shows only the page, with the AI label at the bottom-left
+corner as on an app; the reader leaves it with Esc. On a node without a page host the reader sees the page's text instead; tell the person that the
 node's operator can turn the page host on.
 
 ## Keeping it current

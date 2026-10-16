@@ -10,6 +10,7 @@
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
  *   v1.8.1 — 2026-10-16 — HtmlPageFrame takes `provenance` (the AI label in its strip) and `author`.
+ *     AiLabel's chip cut, the app's corner mark.
  *   v1.8.0 — 2026-10-16 — HtmlPageFrame (components/HtmlPageFrame.js): a workspace's HTML page in its
  *     frame from the page host, with the strip the page cannot reach.
  *   v1.7.0 — 2026-10-06 — StoreDoor's discount code (code, StoreSoonCode, .store-soon-ask, .store-soon-code);
@@ -72,10 +73,10 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         module: '/components/ai-label.js', sheet: '/css/components/ai-label.css',
         data: {
             shape: 'AiLabel({ record, recordUrl, variant, class }) · AiInteractionNotice({ titleKey, bodyKey, recordUrl, class })',
-            fields: { record: 'the provenance record', recordUrl: 'where the full record is', variant: "'inline' (default) or another cut", titleKey: 'the notice title key', bodyKey: 'the notice body key' },
+            fields: { record: 'the provenance record', recordUrl: 'where the full record is', variant: "'inline' (default), 'block', or 'chip' (the app's corner mark)", titleKey: 'the notice title key', bodyKey: 'the notice body key' },
         },
         useFor: ['Content made with AI that carries a record (EU AI Act, Article 50), and the start of a conversation with an AI.'],
-        variants: [],
+        variants: [{ name: 'chip', class: 'ai-label--chip', prop: "variant='chip'", when: 'content that fills the screen, an HTML page in full screen: the EU icon in a pill at the bottom-left, the statement above it on hover, focus or a tap, as on a served app' }],
         example: { variant: 'inline', recordUrl: '/v1/provenance/abc' },
     },
     {

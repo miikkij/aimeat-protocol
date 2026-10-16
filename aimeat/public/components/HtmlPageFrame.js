@@ -13,12 +13,16 @@
  *   name it, while the page inside runs in an opaque origin by its own sandbox.
  *   The strip carries the AI label the page's record says it owes (components/ai-label.js, which
  *   draws nothing when none is owed), and for the workspace's members the name of who made it.
+ *   In full screen only the page shows: the strip goes, and the label is the app's corner chip at
+ *   the bottom-left, drawn by this page over the frame, so the page cannot cover it (Jouni,
+ *   2026-10-16). A link the page asks to open still asks above it; Esc leaves full screen.
  *   A page passes the parts; it never writes a class. The look is css/components/html-page-frame.css.
  * @structure HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author })
  * @usage html`<${HtmlPageFrame} src=${doc.frame_url} title=${doc.title} text=${doc.markdown} onReport=${report} provenance=${{ record, recordUrl }} />`
  * @version-history
- *   v1.1.0 — 2026-10-16 — `provenance`: the AI label in the strip and above the text fallback.
- *     `author`: a member reads who made the page (Jouni, 2026-10-16: members only).
+ *   v1.1.0 — 2026-10-16 — `provenance`: the AI label in the strip and above the text fallback, and in
+ *     full screen the app's corner chip with the strip gone. `author`: a member reads who made the
+ *     page (Jouni, 2026-10-16: members only).
  *   v1.0.0 — 2026-10-16 — Initial (HTML pages in workspaces).
  */
 import { h } from 'preact';
@@ -83,7 +87,7 @@ export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading,
   const madeBy = author ? (t('pageFrame.madeBy') || '{name} made this page. It runs apart and cannot reach your account.').replace('{name}', author) : t('pageFrame.madeByUser');
   return html`
     <div class="html-page-frame" ref=${wrap}>
-      <div class="html-page-frame-strip">
+      <div class="html-page-frame-strip html-page-frame-bar">
         <span class="html-page-frame-note">${madeBy}</span>
         ${label}
         <${Action} small onClick=${fullScreen}>${t('pageFrame.fullScreen')}<//>
@@ -101,6 +105,9 @@ export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading,
       <iframe class="html-page-frame-frame" ref=${frame} src=${src}
         sandbox="allow-scripts allow-same-origin allow-forms allow-modals" referrerpolicy="no-referrer"
         title=${(t('pageFrame.frameTitle') || '{title}').replace('{title}', title || '')}></iframe>
+      ${provenance ? html`<div class="html-page-frame-chip">
+        <${AiLabel} variant="chip" record=${provenance.record} recordUrl=${provenance.recordUrl} />
+      </div>` : null}
     </div>`;
 }
 
