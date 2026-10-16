@@ -12,6 +12,9 @@
  *   carrying `memory:read`; otherwise it is scoped to the caller's own identity.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
+ *   2026-10-16 — GET /v1/librarian/search refuses an app grant without memory:read on the `own`
+ *     scope (403 SCOPE_DENIED): its own identity is its owner's GHII, so the narrowing an agent gets
+ *     handed it the owner's personal memory (QA audit F05b-01).
  *   v1.3.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
  *     secaudit 2026-10, C4).
  *   v1.3.1 — 2026-10-05 — ai:use and memory:read are asked with scopeIsCovered, so `ai:*` and
@@ -39,6 +42,8 @@ import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { callerOf } from '../middleware/caller.js';
+import { denyScope403 } from '../auth/deny.js';
 import { librarianSearch } from '../services/librarian.js';
 import { readerFor } from '../services/classification/reader.js';
 import { classifyNote, distributeNote } from '../services/notebook-classify.js';
@@ -95,6 +100,15 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
     const fanOutOwner = isOwnerSession || scopeIsCovered(scopes, 'memory:read');
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+    // An app grant's own identity IS its owner's GHII, so "the caller's own records" are the owner's
+    // whole personal memory: the narrowing that keeps an agent without memory:read inside its own
+    // namespace keeps an app inside nothing. An app searches its owner's memory with memory:read,
+    // as GET /v1/memory/search asks (QA audit F05b-01). A public search needs no word.
+    if (scope === 'own' && !fanOutOwner && callerOf(req, config.nodeId, storage).kind === 'app') {
+      denyScope403(req, res, ['memory:read'],
+        'Searching the owner\'s memory needs the "memory:read" scope. Ask the owner to grant it, or search public content with scope=public.');
+      return;
+    }
 
     const { hits, ownersSearched } = await librarianSearch(storage, config, {
       ownerName: req.auth!.owner as string,

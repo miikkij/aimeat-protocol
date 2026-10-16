@@ -5,6 +5,8 @@
  *   the words no wildcard carries, which is the half this file used to leave out.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
  * @version-history
+ *   2026-10-16 — The node registry's POST, PATCH and DELETE refuse a plain owner and the operator's
+ *     agent without operator:admin, and admit the one holding it (QA audit F01c-01).
  *   v1.6.0 — 2026-10-05 — The HTTP admin routes admit the agent holding operator:admin and refuse the
  *     one without it, as the tools do (secaudit 2026-10, C2).
  *   v1.5.0 — 2026-10-02 — aimeat_agent_runtime_report: an agent's own report (with `llm`) without
@@ -570,6 +572,40 @@ await test("The node's own MCP server registry over HTTP takes operator:admin, n
     assert(refused.status === 403, `an agent holding mcp:manage read the node's registry: ${refused.status}`);
     const done = await json('/v1/mcp-servers/node', { headers: { Authorization: `Bearer ${await agentToken(reachAdmin)}` } });
     assert(done.status === 200, `the operator's ticked agent was refused: ${done.status} ${JSON.stringify(done.body.error)}`);
+});
+
+// QA audit F01c-01: the three write routes of the node registry stand behind the same gate as the
+// read, and no test sent them a refused principal. A plain owner and the operator's agent without
+// operator:admin are refused before anything is read; the operator's agent holding it gets past the
+// gate (an unknown id answers 404, an attach whose address does not answer 502 or 400, never 403).
+await test("The node registry's POST, PATCH and DELETE refuse a plain owner and the operator's agent without operator:admin", async () => {
+    const reachTok = await agentToken(reach);
+    const adminTok = await agentToken(reachAdmin);
+    const attach = (token: string) => json('/v1/mcp-servers/node', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: `reachattach${reachStamp}`, url: 'http://127.0.0.1:9/mcp' }),
+    });
+    const patch = (token: string) => json('/v1/mcp-servers/node/no-such-server', {
+        method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ enabled: false }),
+    });
+    const remove = (token: string) => json('/v1/mcp-servers/node/no-such-server', {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+    });
+    for (const [who, token] of [['plain owner', plainToken], ['operator agent without operator:admin', reachTok]] as const) {
+        for (const [what, call] of [['POST', attach], ['PATCH', patch], ['DELETE', remove]] as const) {
+            const r = await call(token);
+            assert(r.status === 403, `${what} by the ${who}: expected 403, got ${r.status} ${JSON.stringify(r.body.error)}`);
+        }
+    }
+    const p = await patch(adminTok);
+    assert(p.status === 404, `PATCH by the operator's ticked agent: expected 404 past the gate, got ${p.status} ${JSON.stringify(p.body.error)}`);
+    const d = await remove(adminTok);
+    assert(d.status === 404, `DELETE by the operator's ticked agent: expected 404 past the gate, got ${d.status} ${JSON.stringify(d.body.error)}`);
+    const a = await attach(adminTok);
+    assert(a.status !== 403 && a.status !== 401, `POST by the operator's ticked agent was refused at the gate: ${a.status} ${JSON.stringify(a.body.error)}`);
+    if (a.status === 201 && a.body.data?.server?.id) {
+        await json(`/v1/mcp-servers/node/${a.body.data.server.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${adminTok}` } });
+    }
 });
 
 console.log(`\n────────────────────────────────────────`);

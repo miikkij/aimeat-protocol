@@ -10,6 +10,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  * @version-history
+ *   2026-10-16 -- e2e-schema-lock-rule.ts joins the list (not the guard tier): who may lock which key
+ *     pattern, one-row deletes, and a cortex activation asking the same rule (QA audit S2-04, F05a-01, S7-01).
  *   2026-10-16 -- e2e-recorded-events.ts joins the list (not the guard tier): the traces of refusals answered
  *     inside a route, a password change, a setting change and operator acts on an account (QA audit W23).
  *   2026-10-16 -- e2e-federation-peer-limits.ts joins the list and GUARD_SUITES (140 → 141), measured
@@ -1094,6 +1096,8 @@ const ALL_SUITES = [
     // The semantic layer: the core ontology served at the namespace our own responses cite, and the
     // two doors that used to store an annotation naming a vocabulary nobody defined.
     'test/e2e-ontology.ts',
+    // Who may set a schema lock on which pattern; a delete or a cortex deactivation removes only its own row.
+    'test/e2e-schema-lock-rule.ts',
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
     'test/e2e-header-nav.ts',

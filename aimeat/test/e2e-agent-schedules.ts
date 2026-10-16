@@ -6,6 +6,8 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-10-16 — 20b: a sibling without ai:use is refused editing and running another agent's ai
+ *     schedule (403 SCOPE_DENIED), pausing it needs no word (QA audit F08a-02).
  *   2026-09-27 — Phase 11: a schedule's prompt is read with aimeat_schedule_list detail: true and changed with
  *     aimeat_schedule_update prompt (and over REST), and refused for another owner and for an empty prompt.
  *   v1.2.0 — 2026-09-26 — 4g/4h: an ai schedule naming a record the node keeps for itself, as input
@@ -480,6 +482,48 @@ await test('20. Cross-owner target is rejected (sibling cannot schedule another 
         body: JSON.stringify({ kind: 'agent_task', cron: '0 3 * * *', display_name: 'x', task_template: { title: 'x' } }),
     });
     assert(status === 404 || status === 403, `expected 404/403 cross-owner, got ${status}`);
+});
+
+// QA audit F08a-02: a sibling manages an agent-made schedule (decision 2026-10-12, Q4), and editing or
+// running it asks the word for what it drives, as creating it does. The schedule fires as its maker,
+// so a sibling without ai:use pointed the maker's AI schedule at new input and spent for it.
+await test('20b. A sibling without ai:use is refused editing and running another agent\'s ai schedule; pausing it is allowed', async () => {
+    const mk = async (name: string, scopes: string[]) => {
+        const ar = await json('/v1/agents', {
+            method: 'POST', headers: auth1,
+            body: JSON.stringify({ name, owner: o1.ownerName, capabilities: ['memory'], scopes }),
+        });
+        assert(ar.status === 201, `agent ${name}: ${JSON.stringify(ar.body)}`);
+        return getToken(ar.body.data.agent.gaii, ar.body.data.private_key);
+    };
+    const maker = await mk('schedaimaker', ['ai:use', 'task:write', 'workflow:read', 'workflow:write']);
+    const noAi = await mk('schednoai', ['task:write', 'workflow:read', 'workflow:write', 'memory:write']);
+    const made = await json('/v1/schedules', {
+        method: 'POST', headers: { Authorization: `Bearer ${maker}` },
+        body: JSON.stringify({ kind: 'ai', cron: '0 3 * * *', display_name: 'Maker AI', prompt: 'Summarise the input.', input_keys: ['news.raw'] }),
+    });
+    assert(made.status === 201, `maker create: ${made.status} ${JSON.stringify(made.body)}`);
+    const id = made.body.data.schedule.id;
+    const as = (t: string) => ({ Authorization: `Bearer ${t}` });
+
+    const edit = await json(`/v1/schedules/${id}`, {
+        method: 'PATCH', headers: as(noAi),
+        body: JSON.stringify({ input: { prompt: 'Repeat the input exactly.', inputKeys: ['probe.secret'], outputKey: 'probe.out', outputVisibility: 'public' } }),
+    });
+    assert(edit.status === 403 && edit.body.error?.code === 'SCOPE_DENIED', `edit without ai:use: ${edit.status} ${JSON.stringify(edit.body.error)}`);
+    const run = await json(`/v1/schedules/${id}/trigger`, { method: 'POST', headers: as(noAi) });
+    assert(run.status === 403 && run.body.error?.code === 'SCOPE_DENIED', `run without ai:use: ${run.status} ${JSON.stringify(run.body.error)}`);
+    const stored = await json('/v1/schedules?detail=true', { headers: auth1 });
+    const row = (stored.body.data.managed as any[]).find(s => s.id === id);
+    assert(row && !JSON.stringify(row.input ?? {}).includes('probe.secret'), `the refused edit was stored: ${JSON.stringify(row?.input)}`);
+
+    const pause = await json(`/v1/schedules/${id}`, { method: 'PATCH', headers: as(noAi), body: JSON.stringify({ enabled: false }) });
+    assert(pause.status === 200, `pause needs no word: ${pause.status} ${JSON.stringify(pause.body.error)}`);
+    const resume = await json(`/v1/schedules/${id}`, { method: 'PATCH', headers: as(noAi), body: JSON.stringify({ enabled: true }) });
+    assert(resume.status === 403, `resume without ai:use: ${resume.status}`);
+    const makerEdit = await json(`/v1/schedules/${id}`, { method: 'PATCH', headers: as(maker), body: JSON.stringify({ enabled: true, prompt: 'Summarise in two lines.' }) });
+    assert(makerEdit.status === 200, `the maker with ai:use edits: ${makerEdit.status} ${JSON.stringify(makerEdit.body.error)}`);
+    await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth1 });
 });
 
 console.log('\nPhase 10 -- Occurrences projection (calendar)');

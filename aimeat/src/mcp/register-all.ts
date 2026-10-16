@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-16 — registerAppsTools receives the session caller, for aimeat_app_get's visibility rule (QA audit W15).
  *   2026-10-09 — registerDocsignTools: aimeat_docsign_validate, _lookup, _request_create, _requests,
  *     _request_get, _sign and _cancel.
  *   2026-10-08 — registerAgentMessageTools receives the session's scopes: declaring how a message was
@@ -233,7 +234,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // on every other surface everything registered is already on.
     if (deps.role === 'chat') registerToolLoader(mcp);
     registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-    registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
+    registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
     registerVisibilityTools(mcp, storage, config, caller);

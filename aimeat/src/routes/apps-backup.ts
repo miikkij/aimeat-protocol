@@ -15,6 +15,8 @@
  *   account regardless of the backup's source owner.
  * @structure appsBackupRouter(config, storage) — mount BEFORE appsRouter.
  * @version-history
+ *   2026-10-16 — POST /v1/apps/backup/restore passes the node config and the operator answer, so the
+ *     restore applies the app quota, the cortex checks and the carried moderation state (QA audit F10b-01).
  *   v1.1.0 — 2026-09-27 — GET /v1/apps/backup takes requireScope('app:write') instead of the owner
  *     role, so an agent the owner trusts with apps may export (developer decision 2026-09-27), and
  *     ?to=storage writes the ZIP as backups/apps-<owner>-<date>.zip (exportAppsBackupToStorage).
@@ -34,6 +36,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { callerOf } from '../middleware/caller.js';
 import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
@@ -214,7 +217,10 @@ export function appsBackupRouter(config: AimeatConfig, storage: Storage): Router
       }
     }
 
-    const summary = await restoreAppsBackup(storage, { owner, ownerGhii, parsed, selections, extensions: extSelections });
+    // The app quota, the cortex ceiling and the namespace rule apply as on a publish and an install
+    // (QA audit F10b-01); the operator may restore an extension into any namespace, as they may install one.
+    const isOperator = await callerOf(req, config.nodeId, storage).operator();
+    const summary = await restoreAppsBackup(storage, { owner, ownerGhii, parsed, selections, extensions: extSelections, config, isOperator });
     res.json(success(config.nodeId, summary));
   });
 

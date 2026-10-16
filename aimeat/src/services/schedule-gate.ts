@@ -23,11 +23,14 @@
  *   One capability, one implementation, whatever the interface — CLAUDE.md, Backend.
  * @structure
  *   - SCHEDULE_KIND_SCOPE — which scope each kind of schedule requires
+ *   - scheduleKindScopeRefusal() — the per-kind scope alone, for create, edit and run
  *   - checkScheduleGate() — scope + cron, in that order, returning a refusal or null
  * @usage
  *   const bad = checkScheduleGate({ kind, cron, timezone }, caller);
  *   if (bad) return renderRefusal(bad);   // each door renders its own way
  * @version-history
+ *   2026-10-16 — scheduleKindScopeRefusal(): the per-kind scope as its own check, so editing and
+ *     running a schedule ask it as creating does (QA audit F08a-02).
  *   v1.1.1 — 2026-10-05 — hasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.1.0 — 2026-09-29 — The `refinery` kind, which needs all four words a refinery batch spends; a
  *     kind's entry may name several words, and the caller holds every one.
@@ -93,6 +96,29 @@ export function isValidCron(cron: string, timezone?: string): boolean {
 /** Does this session carry the scope? scopeIsCovered, the rule requireScope applies (C3). */
 const hasScope = (scopes: string[], needed: string): boolean => scopeIsCovered(scopes, needed);
 
+/** What the caller is doing to a schedule, for the sentence a refusal says. */
+export type ScheduleAct = 'create' | 'edit' | 'run';
+const ACT_WORD: Record<ScheduleAct, string> = { create: 'Creating', edit: 'Editing', run: 'Running' };
+
+/**
+ * The per-kind scope, asked of the caller for any act that makes the schedule drive its capability:
+ * creating it, editing it (a new input, prompt or cron is a new instruction) and running it now. The
+ * schedule fires as its maker, so a caller without the word would otherwise spend the maker's
+ * (QA audit F08a-02). The owner in person is never refused, as requireScope never refuses them.
+ */
+export function scheduleKindScopeRefusal(kind: string, caller: ScheduleCaller, act: ScheduleAct): ScheduleRefusal | null {
+    const entry = SCHEDULE_KIND_SCOPE[kind as ScheduleKind];
+    const needed = entry === undefined ? [] : typeof entry === 'string' ? [entry] : [...entry];
+    const missing = caller.isOwnerSession ? [] : needed.filter(s => !hasScope(caller.scopes, s));
+    if (!missing.length) return null;
+    return {
+        status: 403, code: 'SCOPE_DENIED',
+        message: needed.length === 1
+            ? `${ACT_WORD[act]} a "${kind}" schedule requires the "${needed[0]}" scope.`
+            : `${ACT_WORD[act]} a "${kind}" schedule requires the ${needed.map(s => `"${s}"`).join(', ')} scopes; missing ${missing.map(s => `"${s}"`).join(', ')}.`,
+    };
+}
+
 /**
  * The three refusals, in the order the route has always applied them. Returns null when the caller
  * may proceed; the caller then builds and stores the record its own way.
@@ -102,17 +128,8 @@ export function checkScheduleGate(input: ScheduleGateInput, caller: ScheduleCall
         return { status: 400, code: 'INVALID_KIND', message: `kind must be one of: ${VALID_KINDS.join(', ')}` };
     }
 
-    const entry = SCHEDULE_KIND_SCOPE[input.kind as ScheduleKind];
-    const needed = entry === undefined ? [] : typeof entry === 'string' ? [entry] : [...entry];
-    const missing = caller.isOwnerSession ? [] : needed.filter(s => !hasScope(caller.scopes, s));
-    if (missing.length) {
-        return {
-            status: 403, code: 'SCOPE_DENIED',
-            message: needed.length === 1
-                ? `Creating a "${input.kind}" schedule requires the "${needed[0]}" scope.`
-                : `Creating a "${input.kind}" schedule requires the ${needed.map(s => `"${s}"`).join(', ')} scopes; missing ${missing.map(s => `"${s}"`).join(', ')}.`,
-        };
-    }
+    const scopeRefusal = scheduleKindScopeRefusal(input.kind, caller, 'create');
+    if (scopeRefusal) return scopeRefusal;
 
     if (!input.cron || !isValidCron(input.cron, input.timezone)) {
         return { status: 400, code: 'INVALID_CRON', message: 'cron is missing or invalid' };

@@ -6,6 +6,10 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-16 — activationRefusal asks the schema lock rule for every schema component
+ *     (services/schema-lock-rule.ts) and refuses a lock another account holds on the same pattern;
+ *     deactivation deletes only the rows of its recorded patterns that the installing account still
+ *     holds, one (key, apply_to) at a time (QA audit S7-01).
  *   v1.6.1 — 2026-10-11 — A cortex action declares `pricing.tollMorsels: 0` (the field was
  *     `baseMorsels`; a morsel is pacing, not a price).
  *   v1.6.0 — 2026-09-26 — A record stored without `actionProvider` has each action deleted under
@@ -41,6 +45,9 @@ import { logger } from '../../utils/logger.js';
 import { publicBoardCeiling, type BoardWriteRefusal } from '../../services/board-write.js';
 import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
 import { accountPrincipals } from '../../services/db/owner-identity.js';
+import { schemaLockRefusal } from '../../services/schema-lock-rule.js';
+import { isOwnersLock } from '../../services/packages/compose/package-component-collisions.js';
+import { localAccountName } from '../../utils/gaii.js';
 
 // ── Activation Logic ──
 
@@ -79,6 +86,13 @@ export async function activationRefusal(
   isOperator = false,
   replacing?: Pick<CortexExtensionRecord, 'activationArtifacts'>,
 ): Promise<BoardWriteRefusal | null> {
+  // The schema locks first: who may lock each pattern, and the locks of another account it would
+  // replace, shadow or sit under (services/schema-lock-rule.ts, the rule PUT /v1/memory/:key/schema
+  // asks). The activation set locks with no check, so a cortex replaced another account's lock and
+  // its deactivation deleted it (QA audit S7-01).
+  const schemaRefusal = await activationSchemaRefusal(ext, config, storage, gaii, isOperator);
+  if (schemaRefusal) return schemaRefusal;
+
   const leaving = new Set(replacing?.activationArtifacts.boardIds ?? []);
   let wanted = 0;
   for (const comp of ext.components) {
@@ -89,6 +103,62 @@ export async function activationRefusal(
   }
   if (wanted === 0) return null;
   return publicBoardCeiling({ storage, config }, { gaii, roles: isOperator ? ['operator'] : [] }, 'public', wanted, leaving);
+}
+
+/**
+ * The schema components' refusal, or null. `gaii` is the acting principal as the activation records
+ * it: a person's bare account name or an agent's GAII. The same pattern under the same apply_to may
+ * be replaced only when its holder is a principal of the activating account (isOwnersLock, the rule
+ * the package path applies), or by the operator.
+ */
+async function activationSchemaRefusal(
+  ext: Pick<CortexExtensionRecord, 'components'>,
+  config: AimeatConfig,
+  storage: Storage,
+  gaii: string,
+  isOperator: boolean,
+): Promise<BoardWriteRefusal | null> {
+  const schemas = ext.components.filter((c): c is Extract<typeof c, { type: 'schema' }> => c.type === 'schema');
+  if (schemas.length === 0) return null;
+  const owner = localAccountName(gaii);
+  const ownerGhii = `${owner}@${config.nodeId}`;
+  const isAgent = gaii.includes('#');
+  const caller = {
+    principal: isAgent ? gaii : ownerGhii, owner, roles: isAgent ? ['agent'] : ['owner'], isOperator,
+  };
+  for (const comp of schemas) {
+    const ruled = await schemaLockRefusal({ storage, config }, caller, comp.key_pattern, comp.apply_to, async () => isOperator);
+    if (ruled) return { ok: false, status: ruled.status, code: ruled.code, message: ruled.message };
+    const held = await storage.getSchema(comp.key_pattern, comp.apply_to);
+    if (held && !isOperator && !isOwnersLock(held.lockedBy, owner, ownerGhii)) {
+      return {
+        ok: false, status: 403, code: 'SCHEMA_LOCKED_BY_OTHER',
+        message: `This cortex would replace a structure lock that ${held.lockedBy} holds. Ask them to unlock it, or change the cortex to lock keys of your own.`,
+      };
+    }
+  }
+  return null;
+}
+
+/** The pattern recorded in `schemaKeys`, and the rows of it this deactivation may remove. */
+async function ownSchemaRows(
+  ext: CortexExtensionRecord,
+  storage: Storage,
+  key: string,
+  holders: ReadonlySet<string>,
+): Promise<Array<'exact' | 'prefix'>> {
+  // The apply_to the cortex declared for this pattern, when its components still say; both rows
+  // otherwise (a record from before the components were kept beside the artifacts).
+  const declared = new Set(ext.components
+    .filter((c): c is Extract<typeof c, { type: 'schema' }> => c.type === 'schema' && c.key_pattern === key)
+    .map(c => c.apply_to));
+  const rows: Array<'exact' | 'prefix'> = [];
+  for (const applyTo of ['exact', 'prefix'] as const) {
+    if (declared.size > 0 && !declared.has(applyTo)) continue;
+    const row = await storage.getSchema(key, applyTo);
+    if (row && holders.has(row.lockedBy)) rows.push(applyTo);
+  }
+  return rows;
 }
 
 export async function activateExtension(
@@ -332,10 +402,17 @@ export async function deactivateExtension(
   let installer: Promise<string[]> | undefined;
   const installerPrincipals = (): Promise<string[]> => (installer ??= accountPrincipals(storage, ext.installedBy));
 
-  // Remove schemas
-  for (const key of artifacts.schemaKeys) {
-    await storage.deleteSchema(key);
-    logger.info(`Cortex deactivated schema: ${key}`, { extension: ext.name });
+  // Remove the schema locks this activation recorded, one row at a time, and only a row that a
+  // principal of the installing account (or the deactivator) still holds. deleteSchema(key) removed
+  // every row of the pattern, so a deactivation took another account's lock with it (QA audit S7-01).
+  if (artifacts.schemaKeys.length > 0) {
+    const holders = new Set([gaii, ...await installerPrincipals()]);
+    for (const key of artifacts.schemaKeys) {
+      for (const applyTo of await ownSchemaRows(ext, storage, key, holders)) {
+        await storage.deleteSchema(key, applyTo);
+        logger.info(`Cortex deactivated schema: ${key}`, { extension: ext.name, apply_to: applyTo });
+      }
+    }
   }
 
   // Remove prompts and ontologies (stored as memory, under the principal that activated the cortex),

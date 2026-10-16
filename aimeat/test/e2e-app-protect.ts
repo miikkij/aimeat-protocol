@@ -13,6 +13,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-protect
  * @version-history
+ *   2026-10-16 — Phase 6: an older version is gated by the latest version's access code and pacing
+ *     amount, on read and on fork (QA audit F10a-01).
  *   2026-10-15 — Phase 5: an older version is served with the app's current protection
  *     (feature-list audit #103).
  *   v1.0.0 — 2026-07-07 — initial: obfuscate, watermark + operator decode, noRawDownload.
@@ -184,6 +186,42 @@ await test('An older version answers with the protection set after it was publis
     if (html.length > 0) assert(!html.includes('secretToken'), 'version 1 inline HTML is obfuscated too');
     const ownerDl = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE2}?version=1`, aAuth());
     assert(ownerDl.status === 200, `the owner still downloads version 1, got ${ownerDl.status}`);
+});
+
+// ── Phase 6: an older version is gated by the access code and the pacing amount of the latest ──
+// QA audit F10a-01: a publish writes an access code and a pacing amount on its new row only, so an
+// outsider's ?version=1 answered without the code, and read a version from before the pacing amount
+// without a licence.
+console.log('\nPhase 6: older versions, access code and pacing');
+const FILE3 = 'protect-code-versions.html';
+const FILE4 = 'protect-paced-versions.html';
+const publishV = (file: string, extra: Record<string, unknown> = {}) => json('/v1/apps', aAuth({
+    method: 'POST',
+    body: JSON.stringify({ filename: file, content: b64(APP_HTML), name: 'Gate Versions', description: 'gates on older versions', category: 'utility', tags: [], ...extra }),
+}));
+
+await test('An access code set in the publish of version 2 also gates version 1', async () => {
+    assert((await publishV(FILE3)).status === 201, 'publish 1');
+    const v2 = await publishV(FILE3, { access_code: 'gate-code-1234' });
+    assert(v2.status === 201, `publish 2: ${v2.status} ${JSON.stringify(v2.body.error)}`);
+    const v1 = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE3}?version=1`, bAuth());
+    assert(v1.status === 403, `an outsider's read of version 1 without the code must 403, got ${v1.status}`);
+    const withCode = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE3}?version=1&code=gate-code-1234`, bAuth());
+    assert(withCode.status === 200, `with the current code version 1 opens, got ${withCode.status}`);
+});
+
+await test('A pacing amount set in the publish of version 2 also gates version 1 (read and fork)', async () => {
+    assert((await publishV(FILE4)).status === 201, 'publish 1');
+    const v2 = await publishV(FILE4, { toll_morsels: 40, license_type: 'lifetime' });
+    assert(v2.status === 201, `publish 2: ${v2.status} ${JSON.stringify(v2.body.error)}`);
+    const latest = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE4}`, bAuth());
+    if (latest.status === 200) { console.log('    (pacing is off on this node: the app store is disabled; skipped)'); return; }
+    assert(latest.status === 402, `the latest version asks for a licence, got ${latest.status}`);
+    const v1 = await fetch(`${BASE}/v1/apps/${ownerAName}/${FILE4}?version=1`, bAuth());
+    assert(v1.status === 402, `an outsider's read of version 1 without a licence must 402, got ${v1.status}`);
+    await json(`/v1/apps/${FILE4}`, aAuth({ method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
+    const fork = await json(`/v1/apps/${ownerAName}/${FILE4}/fork`, bAuth({ method: 'POST', body: JSON.stringify({ version: 1, new_filename: `fork-${Date.now() % 100000}.html` }) }));
+    assert(fork.status === 402, `a fork of version 1 without a licence must 402, got ${fork.status} ${JSON.stringify(fork.body.error)}`);
 });
 
 // ── Summary ──

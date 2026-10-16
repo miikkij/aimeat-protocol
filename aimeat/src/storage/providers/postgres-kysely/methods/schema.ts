@@ -7,6 +7,7 @@
  *   (schema-lock-cache) + wildcard matcher (pattern-utils) so the resolution logic + 0-DB-after-warmup
  *   behaviour match the other backends exactly.
  * @version-history
+ *   2026-10-16 — deleteSchema(keyPattern, applyTo?): with applyTo it deletes that one row (QA audit S2-04).
  *   v1.0.0 — 2026-07-15 — Phase 5: schema locks on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -54,8 +55,10 @@ export const schemaMethods = {
     return prefix ? toSchema(prefix) : null;
   },
 
-  async deleteSchema(this: PostgresKyselyStorage, keyPattern: string): Promise<boolean> {
-    const r = await this.db.deleteFrom('SchemaLock').where('keyPattern', '=', keyPattern).executeTakeFirst();
+  async deleteSchema(this: PostgresKyselyStorage, keyPattern: string, applyTo?: 'exact' | 'prefix'): Promise<boolean> {
+    let q = this.db.deleteFrom('SchemaLock').where('keyPattern', '=', keyPattern);
+    if (applyTo) q = q.where('applyTo', '=', applyTo);
+    const r = await q.executeTakeFirst();
     const deleted = Number(r.numDeletedRows ?? 0) > 0;
     if (deleted) invalidateSchemaLockCache();
     return deleted;

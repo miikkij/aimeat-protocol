@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-16 — aimeat_storage_download asks storage:read, as its REST twins do (QA audit S3-03).
  *   2026-10-11 — A catalogue action, an action hire and a public board post are described as pacing in
  *     morsels, never a price; action_execute says what to do when the balance is short.
  *   2026-10-08 — aimeat_storage_upload takes ai_provenance and ai_provenance_id: a stored file carries
@@ -302,10 +303,13 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_storage_download',
-        description: 'Get a stored file by key, or by REFERENCE for a file you do not own. Storage holds binaries (images, video, large blobs), so by default this returns a HANDLE — a resource_link plus a presigned, TTL-limited download_url and metadata (mime_type, size) — NOT the bytes. Fetch the download_url out-of-band (or hand it to a human/tool); never read large binary into the conversation. Set inline=true only for small text files (<= 32 KB) to get the content directly. To open a file your OWNER uploaded, or one that arrived as a DM or task attachment, pass owner="<owner@node>" (the `ref` field on those attachments already carries it). The read is authorized as YOU: it works when the file is visibility:"owner"/"members"/"public", shared into a group or workspace you belong to, or covered by a consent grant.',
+        description: 'Get a stored file by key, or by REFERENCE for a file you do not own. Storage holds binaries (images, video, large blobs), so by default this returns a HANDLE — a resource_link plus a presigned, TTL-limited download_url and metadata (mime_type, size) — NOT the bytes. Fetch the download_url out-of-band (or hand it to a human/tool); never read large binary into the conversation. Set inline=true only for small text files (<= 32 KB) to get the content directly. To open a file your OWNER uploaded, or one that arrived as a DM or task attachment, pass owner="<owner@node>" (the `ref` field on those attachments already carries it). The read is authorized as YOU: it works when the file is visibility:"owner"/"members"/"public", shared into a group or workspace you belong to, or covered by a consent grant. Requires the storage:read scope.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Download Storage File', readOnlyHint: true },
+        // The word its REST twins ask (GET /v1/storage/{key}, and GET /v1/pub for a file that is not
+        // public), so a session without it reads a file on neither surface (QA audit S3-03).
+        scope: 'storage:read',
         surfaces: ['appdev', 'agent', 'service', 'commerce', 'primitives'],
         input: {
             key: { type: 'string', required: true, description: 'Storage key in your own namespace, or a full "owner@node/path/file.pdf" reference.' },

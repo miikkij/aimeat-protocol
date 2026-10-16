@@ -8,6 +8,7 @@
  * @structure schemaMethods
  * @usage Object.assign(SqliteStorage.prototype, schemaMethods) in ../index.ts
  * @version-history
+ *   2026-10-16 — deleteSchema(keyPattern, applyTo?): with applyTo it deletes that one row (QA audit S2-04).
  *   v1.0.0 — 2026-10-05 — setSchema, getSchema, deleteSchema, listSchemas, findApplicableSchema,
  *     deserializeSchema moved here from governance.ts so the file mirrors postgres-kysely/methods/schema.ts
  *     (secaudit 2026-10, M8).
@@ -52,8 +53,10 @@ export const schemaMethods = {
     return prefixRow ? this.deserializeSchema(prefixRow) : null;
   },
 
-  async deleteSchema(this: SqliteStorage, keyPattern: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM schemas WHERE keyPattern = ?').run(keyPattern);
+  async deleteSchema(this: SqliteStorage, keyPattern: string, applyTo?: 'exact' | 'prefix'): Promise<boolean> {
+    const result = applyTo
+      ? this.db.prepare('DELETE FROM schemas WHERE keyPattern = ? AND applyTo = ?').run(keyPattern, applyTo)
+      : this.db.prepare('DELETE FROM schemas WHERE keyPattern = ?').run(keyPattern);
     if (result.changes > 0) invalidateSchemaLockCache();
     return result.changes > 0;
   },

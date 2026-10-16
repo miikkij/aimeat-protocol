@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-10-16 — Section 5: editing and running a schedule need the word for its kind, as creating
+ *     it does; a pause, rename or delete needs none (QA audit F08a-02).
  *   2026-10-15 — Section 4: the approval's llm_choice.warning when the person's model policy leaves
  *     the picked model out (feature-list audit #82).
  *   2026-10-15 — Says whose schedules update, trigger and delete reach: any agent-made one of the owner,
@@ -216,7 +218,9 @@ each one's prompt), \`aimeat_schedule_update\` pauses (\`enabled: false\`), resu
 cron, the timezone, the name or the prompt, \`aimeat_schedule_trigger\` runs one now, and
 \`aimeat_schedule_delete\` removes it. These three reach any schedule an agent of your owner made, a
 sibling's included; a schedule the owner made is theirs, and an app reaches only the ones it made
-itself. A clock you run yourself, outside the node, can still be shown
+itself. Changing what a schedule does (its prompt, input, cron or timezone, or resuming it) and
+running it now need the same word as creating it, the last column above; pausing, renaming and
+deleting need none. A clock you run yourself, outside the node, can still be shown
 to the owner: \`aimeat_schedule_report_internal\` lists it beside theirs, and the node does not run it.
 
 **Over REST, for an agent with no model in the loop.** \`POST /v1/agents/{name}/schedules\` puts a

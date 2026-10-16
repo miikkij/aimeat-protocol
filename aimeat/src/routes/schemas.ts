@@ -11,6 +11,10 @@
  *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
  *
  * @version-history
+ *   2026-10-16 — PUT asks services/schema-lock-rule.ts who may lock which pattern (a node-wide or
+ *     another organism's pattern, a lock beside or under another account's lock are refused), and
+ *     DELETE removes one row, (key, apply_to), with ?apply_to= to name it; it removed every row of
+ *     the pattern, another principal's included. Both write a log line (QA audit S2-04, F05a-01).
  *   v1.2.1 — 2026-10-10 — semantic_context is checked before the lock check, so an operator's refused schema write leaves no operator trail (secaudit 2026-10-10 I8).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-08 — semantic_context is checked before the write: its prefixes must resolve,
@@ -29,6 +33,9 @@ import { SchemaSetSchema } from '../models/schemas.js';
 import { semanticContextErrors } from '../utils/onto-context.js';
 import { emitChange } from '../services/event-bus.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { schemaLockRefusal } from '../services/schema-lock-rule.js';
+import { callerOf } from '../middleware/caller.js';
+import { logger } from '../utils/logger.js';
 
 export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -74,6 +81,18 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Who may lock this pattern at all, and whether another account's lock is beside it or already
+    // governs its key (services/schema-lock-rule.ts). The same pattern under the same apply_to is
+    // the DATA-15 check below, which compares the exact principal that set it.
+    const caller = callerOf(req, config.nodeId, storage);
+    const ruled = await schemaLockRefusal({ storage, config },
+      { ...caller.principalView, isOperator: await caller.operator() }, key, apply_to,
+      (ownerOf) => operatorOverride(storage, config, req.auth, { ownerOf, area: 'schema', action: 'update', subject: key }));
+    if (ruled) {
+      res.status(ruled.status).json(error(config.nodeId, ruled.code, ruled.message, ruled.status, ruled.details));
+      return;
+    }
+
     const existing = await storage.getSchema(key, apply_to);
 
     if (existing && existing.lockedBy !== req.auth!.sub && !(await operatorOverride(storage, config, req.auth,
@@ -99,6 +118,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
         ? semantic_context as Record<string, unknown>
         : undefined,
     });
+    logger.info('schema lock set', { key, apply_to, locked_by: record.lockedBy, replaced: existing?.lockedBy ?? null });
 
     res.status(200).json(success(config.nodeId, {
       status: 'schema_set',
@@ -143,8 +163,18 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   // DELETE /v1/memory/:key/schema — delete schema for a memory key
   router.delete('/v1/memory/:key/schema', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const key = decodeURIComponent(req.params.key as string);
+    const asked = req.query.apply_to;
+    if (asked !== undefined && asked !== 'exact' && asked !== 'prefix') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'apply_to must be "exact" or "prefix". Leave it out to remove the exact lock, or the prefix lock when there is no exact one.'));
+      return;
+    }
 
-    const record = await storage.getSchema(key, 'exact') ?? await storage.getSchema(key, 'prefix');
+    // One row: the table key is (key pattern, apply_to), and an exact lock and a prefix lock on the
+    // same pattern can belong to two different principals. Without ?apply_to= the exact row is the
+    // one, else the prefix row, as before; only that row is checked and removed (DATA-15).
+    const record = asked
+      ? await storage.getSchema(key, asked)
+      : await storage.getSchema(key, 'exact') ?? await storage.getSchema(key, 'prefix');
 
     if (!record) {
       res.status(404).json(error(config.nodeId, 'NO_SCHEMA', `Nothing has a set structure under "${key}" yet. Create one first if you want to lock its shape.`));
@@ -157,11 +187,14 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    await storage.deleteSchema(key);
+    await storage.deleteSchema(key, record.applyTo);
+    removeFromCache(record.schemaJson);
+    logger.info('schema lock removed', { key, apply_to: record.applyTo, locked_by: record.lockedBy, removed_by: req.auth!.sub });
 
     res.status(200).json(success(config.nodeId, {
       status: 'schema_removed',
       key,
+      apply_to: record.applyTo,
     }, [
       { description: 'List all schemas', method: 'GET', url: '/v1/schemas' },
     ]));

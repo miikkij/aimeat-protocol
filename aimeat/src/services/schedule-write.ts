@@ -40,6 +40,9 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-16 — updateScheduleRecord and triggerScheduleRecord ask the per-kind scope of a caller
+ *     who is not the owner in person, as create does (scheduleKindScopeRefusal); a pause or a rename
+ *     asks none (QA audit F08a-02).
  *   2026-10-15 — canManageSchedule: an app manages only the schedule it made under its own grant, never
  *     an agent's; the comment says agents of the same owner manage each other's (feature-list audit #85).
  *   2026-10-05 — An app's schedule records its grant (`createdByApp`), so it fires as that app and
@@ -65,10 +68,13 @@ import { buildGAII, isSameOwner } from '../utils/gaii.js';
 import { aiJobKeyRefusal } from './ai-job-keys.js';
 import { emitChange } from './event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
-import { checkScheduleGate, isValidCron, type ScheduleKind } from './schedule-gate.js';
+import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './schedule-gate.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
 import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
+
+/** Fields an edit may change without changing what the schedule does: no word is asked for these. */
+const QUIET_EDIT_FIELDS: ReadonlySet<string> = new Set(['enabled', 'display_name', 'description', 'purpose']);
 
 export interface ScheduleWriteDeps {
     storage: Storage;
@@ -446,6 +452,15 @@ export async function updateScheduleRecord(
     if (!canManageSchedule(caller, ownerScope, job)) {
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Not allowed to edit this schedule' };
     }
+    // The word for what the schedule drives, as on create: it fires as its maker, so a sibling
+    // without ai:use would otherwise point the maker's AI schedule at new input and spend for it
+    // (QA audit F08a-02). Pausing it, or renaming it, changes nothing it does and needs no word.
+    const quietOnly = Object.entries(patch).every(([k, v]) => v === undefined || QUIET_EDIT_FIELDS.has(k))
+        && patch.enabled !== true;
+    if (!quietOnly) {
+        const scopeRefusal = scheduleKindScopeRefusal(job.type, caller, 'edit');
+        if (scopeRefusal) return { ok: false, ...scopeRefusal };
+    }
 
     const updates: Partial<ScheduledJobRecord> = { updatedAt: new Date().toISOString() };
     if (typeof patch.enabled === 'boolean') updates.enabled = patch.enabled;
@@ -553,6 +568,9 @@ export async function triggerScheduleRecord(
     if (!canManageSchedule(caller, ownerScope, job)) {
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Not allowed to trigger this schedule' };
     }
+    // Running it now spends what the schedule drives, so the caller holds that word (F08a-02).
+    const scopeRefusal = scheduleKindScopeRefusal(job.type, caller, 'run');
+    if (scopeRefusal) return { ok: false, ...scopeRefusal };
     const scheduler = deps.scheduler ?? getActiveScheduler();
     if (!scheduler) {
         return {
