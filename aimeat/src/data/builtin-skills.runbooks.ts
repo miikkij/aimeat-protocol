@@ -244,9 +244,10 @@ flowchart LR
   needs the owner's private records for its job asks the owner for that permission by name.
   Making something public to anyone takes publish:public when this node asks the owner first: that
   permission is outside "Full access" and no agent has it unless the owner ticked it. Without it a
-  write that makes a record or a stored file public answers with \`publish_request\` (a bulk write or
-  an import lists one per record under \`publish_requests\`): it is stored as it was (a new one
-  private), and the owner approves on their Notifications page. Tell the owner in one
+  change that makes something public (a record, a file, an app, a page, an organism, a board, a
+  skill, a package, a knowledge package or a data package) answers with \`publish_request\` (a bulk
+  write or an import lists one per record under \`publish_requests\`): it is stored as it was (a new
+  one private), and the owner approves on their Notifications page. Tell the owner in one
   sentence what you asked to make public and give them the \`approve_url\` from the answer;
   \`aimeat_publish_requests\` lists the requests and their state.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.

@@ -24621,8 +24621,6 @@ paths:
               type: string
               format: binary
       responses:
-        '202':
-          $ref: '#/components/responses/PublishRequested'
         '200':
           description: >-
             Upload processed successfully. A storage upload answers with key, owner_gaii, size,
@@ -24653,8 +24651,9 @@ paths:
           description: |
             Asked to be public by a caller the node's publish gate asks the owner about (an agent
             without `publish:public`, read from its grant as it is now): a storage upload, a user skill,
-            or a new cortex whose manifest asks for public. It is stored at the level it had (a new
-            file: private, a skill: owner, a cortex: private), and the answer carries `publish_request`
+            a new cortex whose manifest asks for public, or a new app the node's first-publish defaults
+            would make public. It is stored at the level it had (a new file: private, a skill: owner, a
+            cortex: private, an app: unlisted), and the answer carries `publish_request`
             as components/responses/PublishRequested describes it, at the top level beside the fields
             of the 200 answer.
           content:
