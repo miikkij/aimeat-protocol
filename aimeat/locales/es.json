@@ -22961,6 +22961,8 @@
     "madeByUser": "Una página hecha por un usuario. Funciona aparte y no puede acceder a tu cuenta.",
     "madeBy": "{name} hizo esta página. Funciona aparte y no puede acceder a tu cuenta.",
     "fullScreen": "Pantalla completa",
+    "windowLink": "Copiar el enlace a la página sola",
+    "windowLinkCopied": "Enlace copiado",
     "report": "Denunciar",
     "reported": "Gracias. Quienes gestionan este servicio revisarán la página.",
     "reportFailed": "La denuncia no se envió. Inténtalo de nuevo.",

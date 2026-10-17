@@ -25156,6 +25156,8 @@
     "madeByUser": "Käyttäjän tekemä sivu. Se toimii erillään eikä pääse tiliisi.",
     "madeBy": "Sivun teki {name}. Se toimii erillään eikä pääse tiliisi.",
     "fullScreen": "Koko näyttö",
+    "windowLink": "Kopioi linkki pelkkään sivuun",
+    "windowLinkCopied": "Linkki kopioitu",
     "report": "Ilmoita",
     "reported": "Kiitos. Palvelun ylläpitäjät tarkistavat sivun.",
     "reportFailed": "Ilmoitus ei mennyt perille. Yritä uudelleen.",

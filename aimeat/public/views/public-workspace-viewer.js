@@ -12,8 +12,11 @@
  *   "Copy AI link" copies the no-auth Markdown-bundle API URL (?format=md) so an agent can read the
  *   raw content directly; drop &format=md for the JSON form.
  * @structure PublicWorkspaceViewer (default export)
- * @usage route /v1/publicworkspaceviewer?org=<id>&ws=<ws>[&type=<space>&id=<docId>]
+ * @usage route /v1/publicworkspaceviewer?org=<id>&ws=<ws>[&type=<space>&id=<docId>[&view=page]]
  * @version-history
+ *   v1.6.0 — 2026-10-17 — `&view=page` shows one HTML page alone in the whole browser window, with only
+ *     its AI label at the bottom-left, as full screen does; the frame's strip copies that address
+ *     (Jouni, 2026-10-17: a link to share that opens only the page).
  *   v1.5.0 — 2026-10-16 — Each page shows the AI label its record says it owes (components/ai-label.js):
  *     above a Markdown page, and in the strip of an HTML page's frame. The read carried the record
  *     and nothing drew it.
@@ -92,15 +95,18 @@ const anchorId = (d) => `pwv-doc-${docKey(d).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
 function parseParams() {
   const p = new URLSearchParams(window.location.search);
-  return { org: p.get('org') || '', ws: p.get('ws') || '', type: p.get('type') || '', id: p.get('id') || '' };
+  return { org: p.get('org') || '', ws: p.get('ws') || '', type: p.get('type') || '', id: p.get('id') || '', alone: p.get('view') === 'page' };
 }
+
+/** The viewer's address for one page; `alone` shows an HTML page by itself in the whole window. */
+const pageAddress = (org, ws, d, alone) => `${window.location.origin}/v1/publicworkspaceviewer?org=${encodeURIComponent(org)}&ws=${encodeURIComponent(ws)}&type=${encodeURIComponent(d.type)}&id=${encodeURIComponent(d.id)}${alone ? '&view=page' : ''}`;
 
 // sessionStorage key for the share token of one workspace (password access mode).
 const shareTokenKey = (org, ws) => `aimeat.pwv.st.${org}.${ws}`;
 
 export default function PublicWorkspaceViewer() {
   useViewCSS('/css/views/public-workspace-viewer.css');
-  const { org, ws, type, id } = parseParams();
+  const { org, ws, type, id, alone } = parseParams();
   const [docs, setDocs] = useState(undefined); // undefined = loading, [] = none/unavailable, array = loaded
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
@@ -129,7 +135,7 @@ export default function PublicWorkspaceViewer() {
         method: 'POST', headers: { ...auth, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           targetType: 'memory', targetId: `workspace-page:${org}/${ws}/${d.type}/${d.id}`, reason: 'inappropriate',
-          description: `Shared HTML page "${d.title || d.id}" at ${window.location.origin}/v1/publicworkspaceviewer?org=${encodeURIComponent(org)}&ws=${encodeURIComponent(ws)}&type=${encodeURIComponent(d.type)}&id=${encodeURIComponent(d.id)}`,
+          description: `Shared HTML page "${d.title || d.id}" at ${pageAddress(org, ws, d, false)}`,
         }),
       });
       return res.ok || res.status === 409;
@@ -313,6 +319,13 @@ export default function PublicWorkspaceViewer() {
     `;
   }
 
+  // The page alone (view=page): an HTML page fills the whole window, as full screen shows it, with
+  // only its AI label at the bottom-left. Any other page opens in the usual view.
+  if (alone && isSingle && current && current.kind === 'html' && current.frame_url) {
+    return html`<${HtmlPageFrame} fill src=${current.frame_url} title=${current.title || ''} text=${current.markdown || ''}
+      provenance=${current.ai_provenance ? { record: current.ai_provenance.record, recordUrl: current.ai_provenance.record_url } : null} />`;
+  }
+
   return html`
     <div class="pwv-container">
       <aside class="pwv-toc">
@@ -342,7 +355,7 @@ export default function PublicWorkspaceViewer() {
           ? visibleDocs.map(d => html`
               <article class="pwv-doc" id=${anchorId(d)} data-pwv-key=${docKey(d)}>
                 ${d.kind === 'html'
-                  ? html`<${HtmlPageFrame} src=${d.frame_url || null} title=${d.title || ''} text=${d.markdown || ''} onReport=${() => reportPage(d)}
+                  ? html`<${HtmlPageFrame} src=${d.frame_url || null} title=${d.title || ''} text=${d.markdown || ''} onReport=${() => reportPage(d)} windowUrl=${pageAddress(org, ws, d, true)}
                       provenance=${d.ai_provenance ? { record: d.ai_provenance.record, recordUrl: d.ai_provenance.record_url } : null} />`
                   : html`
                     <${AiLabel} variant="block" record=${d.ai_provenance?.record} recordUrl=${d.ai_provenance?.record_url} />

@@ -16,10 +16,14 @@
  *   In full screen only the page shows: the strip goes, and the label is the app's corner chip at
  *   the bottom-left, drawn by this page over the frame, so the page cannot cover it (Jouni,
  *   2026-10-16). A link the page asks to open still asks above it; Esc leaves full screen.
+ *   `fill` shows the page alone in the whole browser window, the way full screen shows it (the public
+ *   viewer's view=page); `windowUrl` is that address, and the strip copies it.
  *   A page passes the parts; it never writes a class. The look is css/components/html-page-frame.css.
- * @structure HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author })
+ * @structure HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author, windowUrl, fill })
  * @usage html`<${HtmlPageFrame} src=${doc.frame_url} title=${doc.title} text=${doc.markdown} onReport=${report} provenance=${{ record, recordUrl }} />`
  * @version-history
+ *   v1.2.0 — 2026-10-17 — `fill`: the page alone in the whole browser window, with the AI chip at the
+ *     bottom-left as in full screen; `windowUrl`: the strip copies that address (Jouni, 2026-10-17).
  *   v1.1.0 — 2026-10-16 — `provenance`: the AI label in the strip and above the text fallback, and in
  *     full screen the app's corner chip with the strip gone. `author`: a member reads who made the
  *     page (Jouni, 2026-10-16: members only).
@@ -40,7 +44,7 @@ const html = htm.bind(h);
 /** Only web and mail addresses are ever opened, whatever the page sent. */
 const openable = (u) => typeof u === 'string' && u.length <= 4096 && /^(https?:|mailto:)/i.test(u);
 
-export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author }) {
+export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author, windowUrl, fill }) {
   const wrap = useRef(null);
   const frame = useRef(null);
   const [asked, setAsked] = useState(null);       // the address the page asked to open
@@ -86,11 +90,12 @@ export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading,
   // Who made the page is shown to the workspace's members only (Jouni, 2026-10-16); a visitor reads that a user made it.
   const madeBy = author ? (t('pageFrame.madeBy') || '{name} made this page. It runs apart and cannot reach your account.').replace('{name}', author) : t('pageFrame.madeByUser');
   return html`
-    <div class="html-page-frame" ref=${wrap}>
+    <div class=${fill ? 'html-page-frame html-page-frame--fill' : 'html-page-frame'} ref=${wrap}>
       <div class="html-page-frame-strip html-page-frame-bar">
         <span class="html-page-frame-note">${madeBy}</span>
         ${label}
         <${Action} small onClick=${fullScreen}>${t('pageFrame.fullScreen')}<//>
+        ${windowUrl ? html`<${Action} small copy=${windowUrl} copiedLabel=${t('pageFrame.windowLinkCopied')}>${t('pageFrame.windowLink')}<//>` : null}
         ${onReport ? html`<${Action} small tone="text" onClick=${report}>${t('pageFrame.report')}<//>` : null}
       </div>
       ${reported ? html`<div class="html-page-frame-strip">
