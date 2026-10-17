@@ -400,11 +400,11 @@
       "digest": "sha256:d69beca32c17c758bd59892c"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-10-16",
+      "reviewedOn": "2026-10-17",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:67ead2b7d0fa3b8a3ba49e01"
+      "digest": "sha256:7b592ea3baea097202bb06e2"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-09-19",
@@ -626,7 +626,7 @@
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "f1792d9f4df59235"
+      "aimeat/src/routes/skills.ts": "e0096aa4af3c4702"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
