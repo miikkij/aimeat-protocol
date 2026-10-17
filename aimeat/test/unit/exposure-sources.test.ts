@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { KINDS, EXPOSURE_ITEM_CAP, levelOfVisibility, createExposureContext } from '../../src/services/exposure/exposure-types.js';
 import { EXPOSURE_SOURCES, sourceFor } from '../../src/services/exposure/exposure-sources.js';
-import { buildExposureReport } from '../../src/services/exposure/exposure-report.js';
+import { buildExposureReport, NODE_SIGNED_IN_NOTE } from '../../src/services/exposure/exposure-report.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { ContentReader } from '../../src/services/classification/reader.js';
@@ -103,6 +103,13 @@ describe('buildExposureReport', () => {
     const report = await buildExposureReport(createExposureContext(stubStorage(1, ['listBoards']), config), 'alice', SEES_ALL);
     expect(report.failed).toEqual(['board']);
     expect(report.counts.by_kind.memory?.public).toBe(1);
+  });
+
+  it('lists public as signed-in on a node that shows its content to its own accounts only, and says why', async () => {
+    const closedNode = { ...config, contentAccess: 'signed-in' } as unknown as AimeatConfig;
+    const report = await buildExposureReport(createExposureContext(stubStorage(2), closedNode), 'alice', SEES_ALL);
+    expect(report.counts.by_level).toEqual({ public: 0, link: 0, 'signed-in': 2, organism: 1 });
+    expect(report.notes[0]).toBe(NODE_SIGNED_IN_NOTE);
   });
 
   it('counts a record the reader hides and does not list it, nor hand out its content address', async () => {

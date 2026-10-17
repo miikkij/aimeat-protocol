@@ -73011,6 +73011,9 @@ paths:
         code or hidden by an operator, a workspace share behind a password, sharing groups and
         workspace rosters. `counts` are of everything found; the item list of a kind stops at 500
         and the kind is named in `capped`. A kind that could not be read is named in `failed`.
+        On a node set to show its content to its own accounts only, every public and link item is
+        listed as `signed-in`, and the first note says why. A record or file whose classification
+        hides it from the caller is counted and not listed (`hidden_by_classification`).
 
         The person in person, or their own agent holding `memory:read`. An app grant and an
         ecosystem app are refused (403), and so is a session from another node. The MCP tool
