@@ -25,6 +25,7 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.3.0 — 2026-10-17 — access 'organism': only the members of the workspace's own organism (plan doc-mvcn6c7e4e5q V3.4).
  *   v1.2.0 — 2026-10-17 — Sharing one HTML page answers `window_url` beside `viewer_url`: the page alone
  *     in the whole browser window (Jouni, 2026-10-17: a link to share that opens only the page).
  *   v1.1.0 — 2026-10-16 — shareIsOpen and shareServedVisibility: the one rule for whether a share's
@@ -49,7 +50,7 @@ import { logger } from '../utils/logger.js';
 /** The share as the node decides with it: every field present. */
 export function resolveShare(v: ShareMeta | null | undefined): ResolvedShare {
     const s = v ?? {};
-    const access: ShareAccess = s.access === 'password' || s.access === 'account' ? s.access : 'open';
+    const access: ShareAccess = s.access === 'password' || s.access === 'account' || s.access === 'organism' ? s.access : 'open';
     const until: Record<string, string> = {};
     for (const [k, d] of Object.entries(s.until ?? {})) if (typeof d === 'string' && d) until[k] = d;
     return {
@@ -176,8 +177,8 @@ export async function setWorkspaceShareOp(
     }
     if (body.spaces !== undefined && !isBoolMap(body.spaces)) return refuse(400, 'INVALID_INPUT', 'spaces must be a map of name → boolean');
     if (body.docs !== undefined && !isBoolMap(body.docs)) return refuse(400, 'INVALID_INPUT', 'docs must be a map of key → boolean');
-    if (body.access !== undefined && body.access !== 'open' && body.access !== 'password' && body.access !== 'account') {
-        return refuse(400, 'INVALID_INPUT', "access must be 'open', 'password' or 'account'");
+    if (body.access !== undefined && body.access !== 'open' && body.access !== 'password' && body.access !== 'account' && body.access !== 'organism') {
+        return refuse(400, 'INVALID_INPUT', "access must be 'open', 'password', 'account' or 'organism'");
     }
     if (body.password !== undefined && body.password !== null && typeof body.password !== 'string') {
         return refuse(400, 'INVALID_INPUT', 'password must be a string (set) or null (clear)');

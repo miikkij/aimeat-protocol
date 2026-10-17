@@ -6,6 +6,8 @@
  *   PUBLISHED docs the share meta marks public are served, that drafts never leak, that per-doc
  *   overrides win over the space flag, and that the share write is creator/admin-gated.
  * @version-history
+ *   v1.5.0 — 2026-10-17 — 21b: a share for the organism's members: anonymous 401, a signed-in
+ *     outsider 403 SHARE_MEMBERS_ONLY, a member 200 (plan doc-mvcn6c7e4e5q V3.4).
  *   v1.4.0 — 2026-10-09 — 19b: a password change ends the share tokens minted under the old
  *     password (secrets audit 2026-10-09, S-6).
  *   v1.3.0 — 2026-10-09 — 14b: the generic memory routes show has_password, never the share
@@ -303,6 +305,20 @@ await test('21. account mode: anonymous → 401 SHARE_ACCOUNT_REQUIRED; any sign
     assert(anon.status === 401 && anon.body.error.code === 'SHARE_ACCOUNT_REQUIRED', `anon: ${anon.status} ${JSON.stringify(anon.body.error)}`);
     const b = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { Authorization: `Bearer ${B.ownerToken}` } });
     assert(b.status === 200, `signed-in non-member: ${b.status}`);
+});
+
+await test('21b. organism mode: anonymous → 401, a signed-in outsider → 403 SHARE_MEMBERS_ONLY, a member → 200', async () => {
+    // Only the members of the workspace's own organism (plan doc-mvcn6c7e4e5q V3.4). B joined in 3b.
+    const put = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: AH(), body: JSON.stringify({ access: 'organism' }) });
+    assert(put.status === 200 && put.body.data.share.access === 'organism', `put ${put.status} ${JSON.stringify(put.body.error)}`);
+    const anon = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`);
+    assert(anon.status === 401, `anon: ${anon.status}`);
+    const outsider = await setupOwner('c');
+    const out = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { Authorization: `Bearer ${outsider.ownerToken}` } });
+    assert(out.status === 403 && out.body.error.code === 'SHARE_MEMBERS_ONLY', `outsider: ${out.status} ${JSON.stringify(out.body.error)}`);
+    const member = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, { headers: { Authorization: `Bearer ${B.ownerToken}` } });
+    assert(member.status === 200, `member: ${member.status}`);
+    await json(`/v1/owners/${outsider.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${outsider.ownerToken}` } });
 });
 
 await test('22. back to open + password cleared: anonymous reads work again, has_password=false', async () => {

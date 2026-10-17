@@ -41994,8 +41994,11 @@ paths:
                   description: Per-doc override, key is `${typeName}/${id}`
                 access:
                   type: string
-                  enum: [open, password, account]
-                  description: How the no-auth public read path is gated (default open)
+                  enum: [open, password, account, organism]
+                  description: >-
+                    How the no-auth public read path is gated (default open). `account`: any account
+                    of this node (never a visitor from another node). `organism`: the members of the
+                    workspace's own organism; a signed-in outsider gets 403 SHARE_MEMBERS_ONLY.
                 password:
                   type: string
                   nullable: true
