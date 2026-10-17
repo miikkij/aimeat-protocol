@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-17 — The exposure of a version (listing, forking, code, who may open it) comes from publishExposure: carried from the live version, or the node's new-app defaults on a first publish (V2.4).
  *   2026-10-11 — requested.priceMorsels is tollMorsels, the app's pacing amount, carried forward the same way.
  *   2026-10-10 — nextSteps is told how the data map and the design spec stand (app-publish-next-steps.ts).
  *   2026-10-08 — The board announcement post carries a provenance record of its own text (aiprov D13).
@@ -147,6 +148,7 @@ import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { parseAppConfigSchema } from './app-config.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
 import { parseFormatMdMeta, formatMdRefusal } from './app-format-md.js';
+import { publishExposure } from './app-publish-exposure.js';
 
 /**
  * The manifest fields a caller may state. **`undefined` means "not mentioned"** and is filled from
@@ -544,9 +546,7 @@ export async function publishApp(
 
   // Carry the moderation and exposure state forward, so an update never silently re-exposes a
   // parked app, opens forking, or escapes an operator hide by re-uploading.
-  const parked = !!live?.parked;
-  const forkable = !!live?.forkable;
-  const accessCode = input.accessCode.mode === 'explicit' ? input.accessCode.value : live?.accessCode;
+  const { parked, community, forkable, accessCode, access } = publishExposure(config, live, input.accessCode);
 
   // The bytes changed → drop any cached obfuscated/locked base.
   invalidateProtectionCache(ownerName, filename);
@@ -566,7 +566,7 @@ export async function publishApp(
     declared: input.declaredProvenance,
     pipeline: 'app.publish',
     surface: {
-      visibility: accessCode || parked ? 'private' : 'public',
+      visibility: accessCode || parked || access ? 'private' : 'public',
       humanAudience: true,
       // THE APP'S OWN ANSWER, finally asked. `<meta name="aimeat-ai" content="… public-interest=yes">`
       // was parsed into the posture and then never reached the disclosure decision, so no publish on
@@ -604,7 +604,7 @@ export async function publishApp(
       size: data.length,
       data,
       accessCode,
-      parked, community: parked && !!live?.community,
+      parked, community, access,
       forkable,
       operatorHidden: !!live?.operatorHidden,
       operatorHiddenBy: live?.operatorHiddenBy,

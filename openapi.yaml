@@ -32522,6 +32522,16 @@ paths:
                   description: >-
                     Where the app is listed: `listed` (everywhere), `community` (only to people signed
                     in to this node, in the catalogue's community list) or `unlisted` (only you).
+                open_to:
+                  type: string
+                  description: >-
+                    Who may OPEN the app, beside its access code: `anyone` (the default), `signed-in`
+                    (accounts of this node and their agents and apps) or `organism:<organism id>` (that
+                    organism's active members; the owner must be one, or the whole request is refused
+                    before anything is written). A browser without a session is sent to /v1/app-open,
+                    which asks POST /v1/apps/{owner}/{filename}/open with the session. A node set to
+                    signed-in content access treats every app as at least `signed-in`. The answer
+                    carries `open_to`.
                 parked:
                   type: boolean
                   description: >-
@@ -32711,6 +32721,41 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/apps/{owner}/{filename}/open:
+    post:
+      operationId: openGatedApp
+      summary: The address that opens an app needing a sign-in
+      description: >-
+        For an app whose `open_to` is `signed-in` or an organism, or any app on a node set to
+        signed-in content access. Checks that the caller may open it (and its access code when it has
+        one, sent as `code`), then answers the address to open: the app's own origin, or the apex
+        inline address on a node without app origins, carrying `access`, a grant valid for an hour
+        that names this app only. The owner and an operator always pass. The SPA page /v1/app-open
+        calls this with the session a page load cannot carry. Refusals: 401 without an account, 403
+        ACCESS_DENIED for an account the app does not open for, 403 ACCESS_CODE_REQUIRED when the
+        code is missing or wrong, 404 for an unknown or hidden app, 409 PACED_APP for an app taken
+        through the store.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string, description: The app's access code, when it has one. }
+      responses:
+        '200':
+          description: '{ url, expires_in } — open `url` in the browser.'
+        '401': { description: No account. }
+        '403': { description: ACCESS_DENIED or ACCESS_CODE_REQUIRED. }
+        '404': { description: No such app, or an operator hid it. }
+        '409': { description: PACED_APP. }
   /v1/apps/{owner}/{filename}:
     get:
       operationId: getAppFile

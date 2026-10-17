@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.5.0 — 2026-10-17 — A fork is listed and opened by the node's new-app defaults (apps.default_listing,
+ *     apps.default_access) instead of always listed; it still gets no code (plan doc-mvcn6c7e4e5q V2.4).
  *   v1.4.1 — 2026-10-11 — A fork drops the source's pacing amount `tollMorsels` (was `priceMorsels`;
  *     a morsel is pacing, not a price).
  *   v1.4.0 — 2026-10-08 — A fork of another owner's app that nobody else can read carries a copy of
@@ -99,6 +101,7 @@ export function appFilenameRefusal(filename: string): PublishAppRefusal | null {
 // The owner scope and its resolver live in app-owner-scope.ts, below this file and the publish,
 // so the services that only need them do not depend on publishing. Re-exported for every importer.
 import type { AppOwnerScope } from './app-owner-scope.js';
+import { publishExposure } from './app-publish-exposure.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 
 /**
@@ -440,6 +443,10 @@ export async function forkApp(
 
   const forkProvenanceId = await forkProvenance(storage, config, source, callerGhii);
 
+  // A fork is a new app of the forker's, so it is listed and opened the way a first publish is: the
+  // node's new-app defaults (services/app-publish-exposure.ts). No code: the fork answer has no place
+  // to tell the forker one, and the source's code is never copied.
+  const exposure = publishExposure(config, null, { mode: 'explicit', value: undefined });
   await storage.createApp({
     ownerGaii: callerGhii,
     ownerName: callerOwner,
@@ -449,7 +456,9 @@ export async function forkApp(
     mimeType: source.mimeType,
     size: source.size,
     data: source.data,
-    parked: false,
+    parked: exposure.parked,
+    community: exposure.community,
+    access: exposure.access,
     forkable: false,   // the forker decides their own copy's forkability later
     createdAt: now,
     // The record describes how these BYTES were made, and a fork copies the bytes exactly, so the

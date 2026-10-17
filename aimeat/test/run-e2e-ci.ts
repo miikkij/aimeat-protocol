@@ -458,6 +458,10 @@ const ALL_SUITES = [
     'test/e2e-app-origin.ts',
     // Self-spawns its own server with the portfolio-origin flag ON (same pattern).
     'test/e2e-portfolio-origin.ts',
+    // Self-spawns its own node set to signed-in content access, with both origins provisioned.
+    'test/e2e-content-access-gate.ts',
+    // Self-spawns its own node with the app origin and strict new-app defaults.
+    'test/e2e-app-access.ts',
     'test/e2e-app-grants.ts',
     'test/e2e-app-grants-tasks.ts',
     'test/e2e-app-members.ts',

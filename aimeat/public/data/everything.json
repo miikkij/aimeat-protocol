@@ -623,6 +623,15 @@
      "plain": "Consent Grant, list and revoke access to a data pattern for anyone, an agent, an organism, a person, a domain or a node, with an audit log and a receipt. Each consent has a reach: local (read on this node), federation (as local, and matching public records may go to peers) or auth (another node may sign you in). A consent made without a reach is local from 4.0.0 (federation before it); private and dmz are older names for local. /v1/consent*, aimeat_consent_*"
     },
     {
+     "slug": "g-4-a-node-for-its-own-people-only",
+     "cells": [
+      "<strong>A node for its own people only</strong>",
+      "The operator can set the node to show its content to its own signed-in accounts only. Then nobody who is not signed in sees anything: every address outside sign-in, registration and the machine connections asks for a sign-in, pages load without content until the person signs in, apps open only after a sign-in, portfolio and company addresses do not answer, search engines are told to stay out, and a visitor signed in on another node is treated as a stranger. Nothing stored changes, so switching back restores what was public. With a sign-in limited to your company (registration mode and the Microsoft tenant list) it is a company node.",
+      "<code>visibility.content_access</code> (<code>AIMEAT_CONTENT_ACCESS=signed-in</code>), admin Config, <code>content_access</code> in <code>GET /?format=json</code>, <code>docs/organisation-node-sign-in.md</code> section 6a"
+     ],
+     "plain": "A node for its own people only The operator can set the node to show its content to its own signed-in accounts only. Then nobody who is not signed in sees anything: every address outside sign-in, registration and the machine connections asks for a sign-in, pages load without content until the person signs in, apps open only after a sign-in, portfolio and company addresses do not answer, search engines are told to stay out, and a visitor signed in on another node is treated as a stranger. Nothing stored changes, so switching back restores what was public. With a sign-in limited to your company (registration mode and the Microsoft tenant list) it is a company node. visibility.content_access (AIMEAT_CONTENT_ACCESS=signed-in), admin Config, content_access in GET /?format=json, docs/organisation-node-sign-in.md section 6a"
+    },
+    {
      "slug": "g-4-app-grants",
      "cells": [
       "<strong>App grants</strong>",
@@ -2009,10 +2018,19 @@
      "slug": "g-10-listing-and-access-codes",
      "cells": [
       "<strong>Listing and access codes</strong>",
-      "Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. The link opens the app in all three. Set, change or remove an access code for opening the app. The code, the pacing amount and the copy protection you set now apply to every earlier version too. An AI asking for an app's details (<code>aimeat_app_get</code>) gets them only for an app it may see; any other app is answered as not found.",
+      "Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. Set, change or remove an access code for opening the app. The code, the pacing amount and the copy protection you set now apply to every earlier version too. An AI asking for an app's details (<code>aimeat_app_get</code>) gets them only for an app it may see; any other app is answered as not found.",
       "<code>PATCH /v1/apps/:filename</code> (<code>listing</code>), <code>aimeat_app_manage</code> action <code>settings</code>, App Catalog &gt; Manage on server"
      ],
-     "plain": "Listing and access codes Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. The link opens the app in all three. Set, change or remove an access code for opening the app. The code, the pacing amount and the copy protection you set now apply to every earlier version too. An AI asking for an app's details (aimeat_app_get) gets them only for an app it may see; any other app is answered as not found. PATCH /v1/apps/:filename (listing), aimeat_app_manage action settings, App Catalog > Manage on server"
+     "plain": "Listing and access codes Choose who sees an app in a list. Listed: everyone, including search engines. Community: only people signed in to this node, in the catalogue's Community list, and their agents; the public catalogue, search engines and other nodes do not show it. Unlisted: only you. Set, change or remove an access code for opening the app. The code, the pacing amount and the copy protection you set now apply to every earlier version too. An AI asking for an app's details (aimeat_app_get) gets them only for an app it may see; any other app is answered as not found. PATCH /v1/apps/:filename (listing), aimeat_app_manage action settings, App Catalog > Manage on server"
+    },
+    {
+     "slug": "g-10-who-may-open-an-app",
+     "cells": [
+      "<strong>Who may open an app</strong>",
+      "Listing says who sees an app in a list; this says who may open it. Anyone (the default), signed-in (people with an account on this node, and their agents and apps), or the members of one organism you belong to. Someone who opens the link without a session is asked to sign in and comes back to the app; someone outside the organism is told the app is not open to them. You and an operator always open it, an access code still applies on top, and a new version keeps the setting. The operator sets how a NEW app starts: its listing, who may open it, and whether it gets a generated access code, which the publish answer tells you; a fork starts the same way, without a code.",
+      "<code>open_to</code> on <code>PATCH /v1/apps/:filename</code> and <code>aimeat_app_manage</code> action <code>settings</code>, <code>POST /v1/apps/:owner/:filename/open</code>, <code>/v1/app-open</code>, <code>apps.default_listing</code>, <code>apps.default_access</code>, <code>apps.default_access_code</code>"
+     ],
+     "plain": "Who may open an app Listing says who sees an app in a list; this says who may open it. Anyone (the default), signed-in (people with an account on this node, and their agents and apps), or the members of one organism you belong to. Someone who opens the link without a session is asked to sign in and comes back to the app; someone outside the organism is told the app is not open to them. You and an operator always open it, an access code still applies on top, and a new version keeps the setting. The operator sets how a NEW app starts: its listing, who may open it, and whether it gets a generated access code, which the publish answer tells you; a fork starts the same way, without a code. open_to on PATCH /v1/apps/:filename and aimeat_app_manage action settings, POST /v1/apps/:owner/:filename/open, /v1/app-open, apps.default_listing, apps.default_access, apps.default_access_code"
     },
     {
      "slug": "g-10-screenshots-icons-and-promotion",
@@ -4078,6 +4096,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 410
+  "rows": 412
  }
 }

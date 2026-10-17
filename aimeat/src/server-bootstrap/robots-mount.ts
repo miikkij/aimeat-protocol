@@ -16,6 +16,7 @@
  */
 import type { Express } from 'express';
 import type { AimeatConfig } from '../config.js';
+import { signedInOnly } from '../config-visibility.js';
 
 /**
  * The node's robots.txt, registered AFTER the subdomain router so an app origin has already
@@ -38,6 +39,13 @@ export function mountNodeRobots(app: Express, config: AimeatConfig, robots: stri
     if (config.seoIndexing === 'off') {
       res.type('text/plain; charset=utf-8').send(
         '# Search-engine discovery is turned off for this node.\nUser-agent: *\nDisallow: /\n',
+      );
+      return;
+    }
+    // A node that shows its content to its own accounts only has nothing to index.
+    if (signedInOnly(config)) {
+      res.type('text/plain; charset=utf-8').send(
+        '# This node shows its content to its own signed-in accounts only.\nUser-agent: *\nDisallow: /\n',
       );
       return;
     }

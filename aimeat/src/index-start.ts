@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-17 — A node set to signed-in content access refuses an anonymous realtime or echat
+ *     upgrade, whatever the anonymous mode says (plan doc-mvcn6c7e4e5q V1).
  *   2026-10-16 — The setup code is issued while the node has no OPERATOR, not only no owner, because the
  *     no-operator self-heal grants the role too; the line says where to use it in each case (Jouni, 2026-10-16).
  *   2026-10-16 — A node whose base URL is not loopback and that has no owner issues the one-time setup
@@ -69,6 +71,7 @@ import { runAsNode } from './utils/gaii.js';
 import { turnDeprecationWarning } from './services/turn-credentials.js';
 import { adminSetupSecretDir, syncAdminSetupSecretFile } from './services/admin-setup-secret.js';
 import { setupCodeGateFor, setupCodeRequired } from './services/setup-code.js';
+import { signedInOnly } from './config-visibility.js';
 
 /** How long shutdown waits for scheduled runs in progress; the process exits 5 s after server.close. */
 const SCHEDULER_SHUTDOWN_GRACE_MS = 4000;
@@ -399,7 +402,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
             socket.destroy();
             return;
           }
-          if (!config.echatAnonymous) {
+          // A node that shows its content to its own accounts only lets no anonymous visitor in.
+          if (!config.echatAnonymous || signedInOnly(config)) {
             socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
             socket.destroy();
             return;
@@ -448,7 +452,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           // to anonymous mode.
           const auth = await authenticateUpgrade(request, url, 'realtime', config.wsQueryToken);
           if (auth.outcome === 'refused') { refuseUpgrade(socket, auth.status, auth.code, auth.message); return; }
-          if (auth.outcome === 'none' && !isAnonymousMode()) {
+          if (auth.outcome === 'none' && (!isAnonymousMode() || signedInOnly(config))) {
             refuseUpgrade(socket, 401, 'AUTH_REQUIRED', 'Authentication required');
             return;
           }
