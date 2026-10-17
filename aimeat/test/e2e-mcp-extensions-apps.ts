@@ -36,6 +36,9 @@
  *   - Phase 8: aimeat_app_delete, both refusal arms and the real delete
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-extensions-apps
  * @version-history
+ *   2026-10-17 — 3: the ext and app tools miss only one-press words, so a memory:read agent is listed
+ *     them (permission ask, mcp/permission-ask-gate.ts) and each call is refused SCOPE_DENIED with the
+ *     allow address.
  *   2026-10-16 — Test 17 asserts INSTANCE_INACTIVE and the REST route's sentence: the tool runs the
  *     route's sequence now (services/extension-invoke.ts), so a paused instance is answered the same
  *     way on both surfaces. The old assertion pinned the tool's own wording (QA audit D2-05).
@@ -322,12 +325,15 @@ await test('2. Three MCP sessions open on /v1/mcp', async () => {
 
 console.log('\nPhase 2 — the scope fence, and the same door to an anonymous caller');
 
-await test('3. An agent with no ext or app word is handed none of those tools', async () => {
+await test('3. An agent with no ext or app word is refused every one of those tools with the allow address', async () => {
     const names = await toolNames(muteSession);
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
     for (const gated of ['aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_activate',
         'aimeat_extension_delete', 'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish',
         'aimeat_app_draft_discard', 'aimeat_app_delete']) {
-        assert(!names.includes(gated), `${gated} was offered to an agent holding only memory:read`);
+        assert(names.includes(gated), `${gated} is listed to ask for (its word is one-press)`);
+        const r = await callTool(muteSession, gated, {});
+        assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?'), `${gated} answered an agent holding only memory:read: ${r.text.slice(0, 200)}`);
     }
     // aimeat_extension_get and aimeat_app_versions are deliberately ungated — they read what a
     // published extension and a published app already say in public.

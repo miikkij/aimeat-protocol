@@ -10,6 +10,9 @@
  *   declares a split against somebody else's revenue.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-beneficiary
  * @version-history
+ *   2026-10-17 — The narrow agent is listed the three selling tools (permission ask,
+ *     mcp/permission-ask-gate.ts: exchange:beneficiary is one-press), and each call is refused
+ *     SCOPE_DENIED with the allow address.
  *   2026-10-16 — The two split refusals assert INVALID_INPUT, the code POST /v1/commerce/beneficiary-splits
  *     answers: the tool validates with the route's code now (commerce/beneficiary-split-declare.ts). The
  *     old assertions pinned the tool's own codes, EMPTY_SPLIT and INVALID_GHII (QA audit D2-08).
@@ -196,13 +199,17 @@ await test('Setup: operator, provider, beneficiary and consumer, each with an MC
     assert(act.status === 200, `activate ${act.status}`);
 });
 
-// ── Scope gating: a narrow agent is never even offered the selling tools ──────
+// ── Scope gating: a narrow agent is refused the selling tools ──────
+// Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the
+// call is refused with the allow address. exchange:beneficiary is one-press.
 
-await test('A narrow agent does not see the beneficiary selling tools at all', async () => {
+await test('A narrow agent is refused the beneficiary selling tools with the allow address', async () => {
     const names = await narrowAgent.session.tools();
     assert(names.length > 0, 'the narrow agent sees some tools');
     for (const t of ['aimeat_commerce_beneficiary_split_set', 'aimeat_commerce_beneficiary_splits', 'aimeat_commerce_beneficiary_release']) {
-        assert(!names.includes(t), `memory-only agent must not be offered ${t}`);
+        assert(names.includes(t), `${t} is listed to ask for`);
+        const r = await narrowAgent.session.call(t, {});
+        assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?'), `memory-only agent must be refused ${t}: ${r.text.slice(0, 200)}`);
     }
 });
 

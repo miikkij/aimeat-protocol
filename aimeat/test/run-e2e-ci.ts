@@ -714,6 +714,8 @@ const ALL_SUITES = [
     // A refusal of an agent is kept: on the owner's agent list, on its open tasks, for the agent
     // itself, closed by the grant and removed with the agent.
     'test/e2e-agent-refusals.ts',
+    // An agent's refusal hands its person one address; Allow there works in the same conversation.
+    'test/e2e-agent-permission-ask.ts',
     'test/e2e-agent-health.ts',
     'test/e2e-open-items.ts',
     'test/e2e-app-access-code.ts',

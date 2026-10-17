@@ -11,6 +11,11 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-17 — An agent's tool whose missing permissions its person can allow with one press stays
+ *     on the list, and a call answers with the address (mcp/permission-ask-gate.ts). An MCP OAuth
+ *     token older than a permission its agent now holds answers 401 invalid_token, so the client
+ *     refreshes and the allowed tool works in the same conversation. The agent's instructions say
+ *     so (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  *   2026-10-16 — The session's platform label moves to mcp/session-platform.ts unchanged, so a unit
  *     test runs it (QA audit F01a-01).
  *   2026-10-16 — Tools are registered through mcp/tool-registrar.ts, which adds the fault wrapper
@@ -150,6 +155,7 @@ import { scopeAllowsTool, enforcedScopesForTool } from '../tool-catalog/scopes.j
 import { withResourceGate } from './resource-gate.js';
 import { toolRegistrar } from './tool-registrar.js';
 import { answerScopeDeniedTools } from './scope-denied-answer.js';
+import { askableTool, staleGrantRefusal } from './permission-ask-gate.js';
 import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
 import { instructionsFor } from './instructions.js';
@@ -164,6 +170,7 @@ import { verifyJWT, type VerifiedToken } from '../auth/jwt.js';
 import { credentialRevoked } from '../auth/middleware.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { mcpRequestAuthority, sameMcpPrincipal, withRequestPermission } from './request-authority.js';
 
@@ -206,6 +213,16 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             res.status(401)
                 .setHeader('WWW-Authenticate', `Bearer error="invalid_token", resource_metadata="${resourceMetadataUrl}"`)
                 .json({ jsonrpc: '2.0', error: { code: -32001, message: audienceRefusal }, id: req.body?.id ?? null });
+            return null;
+        }
+        // A permission the person allowed after this token was issued: the client refreshes and goes
+        // on in the same conversation (mcp/permission-ask-gate.ts).
+        const stale = await staleGrantRefusal(verified, storage, config);
+        if (stale) {
+            const resourceMetadataUrl = `${config.baseUrl.replace(/\/+$/, '')}${MCP_RESOURCE_METADATA_PATH}`;
+            res.status(401)
+                .setHeader('WWW-Authenticate', `Bearer error="invalid_token", error_description="permissions changed", resource_metadata="${resourceMetadataUrl}"`)
+                .json({ jsonrpc: '2.0', error: { code: -32001, message: stale }, id: req.body?.id ?? null });
             return null;
         }
         return withCurrentScopes(storage, verified);
@@ -282,6 +299,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 return route.kind === 'upstream' ? route.nodeId : null;
             })
             .catch(err => { logger.warn('mcp: support routing unread, instructions unchanged', { error: String(err) }); return null; });
+        // An agent's person can allow a missing permission with one press; an owner, an app and an
+        // ecosystem app have no such page (services/permission-ask.ts).
+        const mayAsk = config.mcpEnforceScopes && !agentGaii.startsWith('eco:') && parseGaiiLoose(agentGaii).agent !== '';
         const mcp = new McpServer(
             // serverInfo.version is the node's software version (Core 2026-11 ruling Q2), not a number of its own.
             { name: `AIMEAT Node ${config.nodeId}`, version: getSoftwareVersion() },
@@ -293,7 +313,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 // The orientation an agent reads before it has called anything. Without it a client
                 // meets a few hundred tool descriptions and no indication of where to start, so the
                 // handbook this text points at was reachable only by guessing it existed.
-                instructions: instructionsFor(role, { proactiveGuidance: guidance, supportAnsweredBy }),
+                instructions: instructionsFor(role, { proactiveGuidance: guidance, supportAnsweredBy, permissionAsk: mayAsk }),
             },
         );
         // A client that sends null for an optional field it left out is read as leaving it out
@@ -312,13 +332,17 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const filteredTools: string[] = [];
         type ToolFn = (...args: unknown[]) => unknown;
         const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn; registerResource: ToolFn };
+        // A tool the agent may not use yet, but whose person can allow it with one press, stays on
+        // the list: a call answers SCOPE_DENIED with the address (mcp/permission-ask-gate.ts).
+        const askable = (name: string) => mayAsk && askableTool(scopes, name);
         const gate = (name: string): boolean => {
             // v2 surface filter: a tool not in this surface's purpose is simply not part of it
             // (hard skip, silent — not a scope denial). role='all' (v1) applies no surface filter.
             if (surfaceTools && !surfaceTools.has(name)) return false;
             if (scopeAllowsTool(scopes, name)) return true;
             filteredTools.push(name);
-            return !enforce; // warn-only: still register (true); enforce: skip (false)
+            // warn-only: still register (true); enforce: skip (false) unless the person can allow it
+            return !enforce || askable(name);
         };
         const originalTool = patchable.tool.bind(mcp) as ToolFn;
         const originalRegisterTool = patchable.registerTool.bind(mcp) as ToolFn;
@@ -339,10 +363,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const measuredRegisterTool = toolRegistrar(originalRegisterTool, registrarDeps);
         // Keep the initial surface ceiling and its memory footprint. The SDK reads enabled at
         // list/call time, so a removed permission affects discovery without rebuilding a session.
-        // Newly granted tools outside that initial surface still require re-initialization.
+        // A tool the person can allow with one press stays listed either way, so allowing it works
+        // in the same session; any other newly granted tool still requires re-initialization.
         const liveGate = (name: string) => !enforce || scopeAllowsTool(scopes, name);
-        const liveTool = withRequestPermission(measuredTool, liveGate);
-        const liveRegisterTool = withRequestPermission(measuredRegisterTool, liveGate);
+        const listedGate = (name: string) => liveGate(name) || askable(name);
+        const liveTool = withRequestPermission(measuredTool, listedGate);
+        const liveRegisterTool = withRequestPermission(measuredRegisterTool, listedGate);
         patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? liveTool(...args) : undefined;
         patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? liveRegisterTool(...args) : undefined;
         // Resources answer under the tools' rules: the scope of the tool that reads the same thing,
@@ -374,6 +400,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             missingWords: (name) => (!enforce || (surfaceTools && !surfaceTools.has(name)))
                 ? [] : enforcedScopesForTool(name).filter((word) => !scopeIsCovered(scopes, word)),
             principal: () => agentGaii,
+            baseUrl: config.baseUrl,
         });
         // THE CHAT STARTS SMALL. Everything permitted is registered above; what the chat's own list
         // does not name is switched off here, before the client first lists the tools, and comes

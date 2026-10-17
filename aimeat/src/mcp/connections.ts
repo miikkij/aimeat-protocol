@@ -26,6 +26,8 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-17 — aimeat_mail_send has no guard of its own: the registration gate decides from its
+ *     catalog words, so a person can allow it with one press (mcp/permission-ask-gate.ts).
  *   2026-10-16 — The READ_AS_OWNER_REQUIRED refusal is readAsOwnerRefusal (services/connections/access.ts),
  *     the decision and sentence the REST read route answers too (Jouni, 2026-10-16).
  *   2026-10-16 — aimeat_mail_send takes locale, image_url and image_alt, as POST /v1/outbound/send does.
@@ -303,12 +305,13 @@ export function registerConnectionTools(
 
     // ── Sending ─────────────────────────────────────────────────────────────────────────────────
     //
-    // TWO WORDS, AND THE TOOL IS ABSENT WITHOUT BOTH. `outbound:send` is permission to send in the
-    // owner's name; using their connected MAILBOX is the separate thing `connections:use` governs.
-    // Registering it for a session holding only one would put a control on the surface whose only
-    // possible answer is a refusal — the same "advertised but unusable" mistake LinkedIn's absent
-    // read-metrics capability exists to avoid.
-    if (scopeIsCovered(scopes, 'outbound:send') && scopeIsCovered(scopes, 'connections:use')) {
+    // TWO WORDS. `outbound:send` is permission to send in the owner's name; using their connected
+    // MAILBOX is the separate thing `connections:use` governs. Both are on the tool's catalog entry,
+    // so the registration gate in mcp/index.ts decides as it does for every tool: allowed, listed for
+    // the person to allow with one press (the call answers with the allow address,
+    // mcp/permission-ask-gate.ts), or absent. Until 2026-10-17 this tool had its own guard here and
+    // stayed absent while the person could have allowed it with one press.
+    {
         mcp.tool('aimeat_mail_send', descriptionFor('aimeat_mail_send'),
             zodShapeFor('aimeat_mail_send'),
             annotationsFor('aimeat_mail_send'),

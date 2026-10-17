@@ -2,6 +2,9 @@
  * @file e2e-mcp-wallet-extended.ts
  * @description E2E tests for MCP wallet-extended module — 1 tool: transaction history.
  * @version-history
+ *   v1.1.0 — 2026-10-17 — 12: an agent without wallet:read is listed aimeat_wallet_transactions
+ *     (permission ask, mcp/permission-ask-gate.ts), and its call is refused SCOPE_DENIED with the
+ *     allow address, with no ledger in the answer.
  *   v1.0.0 — 2026-03-21 — Initial creation
  */
 
@@ -278,7 +281,10 @@ await test('5. aimeat_wallet_transactions transaction shape has required fields'
 // the ENTIRE gate. Delete the `aimeat_wallet_transactions: 'wallet:read'` entry from
 // tool-catalog/scopes.ts and every agent the owner ever connected reads the whole morsel ledger:
 // counterparties, tracking codes, amounts. All eleven tests stay green.
-await test('12. An agent WITHOUT wallet:read neither sees the tool nor can call it', async () => {
+// Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the
+// call is refused with the allow address. wallet:read is one-press, so the gate that matters is the
+// SCOPE_DENIED answer in front of the handler (mcp/scope-denied-answer.ts), and the call must meet it.
+await test('12. An agent WITHOUT wallet:read sees the tool but its call is refused with the allow address', async () => {
     const reg = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -327,14 +333,15 @@ await test('12. An agent WITHOUT wallet:read neither sees the tool nor can call 
     const list = await rpc('tools/list', {}, 201);
     const names = (list.result?.tools ?? []).map((t: any) => t.name);
     assert(names.length > 0, 'the narrow agent was served a tool surface at all');
-    assert(!names.includes('aimeat_wallet_transactions'),
-        'an agent without wallet:read was handed the owner\'s ledger tool');
+    assert(names.includes('aimeat_wallet_transactions'),
+        'an agent without wallet:read is listed the ledger tool to ask for (wallet:read is one-press)');
 
-    // Absence from the list is the registration filter. A client that already knows the name does not
-    // read the list, so the call has to fail too — and this handler has no check of its own.
+    // The tool is listed, so the call is the whole gate — and this handler has no check of its own.
     const call = await rpc('tools/call', { name: 'aimeat_wallet_transactions', arguments: {} }, 202);
-    assert(call.error !== undefined || call.result?.isError === true,
-        `the narrow agent CALLED the ledger tool: ${JSON.stringify(call).slice(0, 200)}`);
+    const text = String(call.result?.content?.[0]?.text ?? '');
+    assert(call.result?.isError === true && text.startsWith('SCOPE_DENIED') && text.includes('/v1/allow?'),
+        `the narrow agent CALLED the ledger tool, or was refused without the allow address: ${JSON.stringify(call).slice(0, 200)}`);
+    assert(!text.includes('"transactions"'), `the refusal carried the ledger: ${text.slice(0, 200)}`);
 });
 
 // ─── Summary ───

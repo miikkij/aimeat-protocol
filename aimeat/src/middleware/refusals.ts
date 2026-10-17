@@ -32,6 +32,8 @@
  * @usage
  *   res.status(403).json(refuseNotYours(config, { thing: 'app', action: 'change' }));
  * @version-history
+ *   v1.1.1 — 2026-10-17 — refuseNeedsPermission's default address is /v1/profile?tab=agents: the
+ *     /profile/agents it named was a JSON 404 on every node.
  *   v1.1.0 — 2026-09-29 — refuseClassified(), for content whose classification does not let it leave
  *     its organism (TARGET-082).
  *   v1.0.0 — 2026-08-16 — Initial, from the measurement of what our refusals say.
@@ -80,7 +82,7 @@ export function refuseNeedsPermission(
     const next: HintAction[] = [{
         description: `Give permission to ${opts.want}`,
         method: 'GET',
-        url: opts.grantUrl ?? '/profile/agents',
+        url: opts.grantUrl ?? '/v1/profile?tab=agents',
         note: 'The owner turns this on per agent, and can turn it off again at any time.',
     }];
     if (opts.alternative) next.push(opts.alternative);

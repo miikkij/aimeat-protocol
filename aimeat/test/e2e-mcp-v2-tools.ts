@@ -20,6 +20,9 @@
  *   - Phase 2: turns · Phase 3: delivery targets · Phase 4: task handles
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-v2-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — 2c, 3c: messages:read is one-press, so the tools stay listed for the bare
+ *     agent (permission ask, mcp/permission-ask-gate.ts) and each call is refused SCOPE_DENIED with
+ *     the allow address. 4b keeps "not offered": task:write is a powerful word.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27).
  */
 
@@ -109,13 +112,18 @@ await test('2b. message send: a turn to another account\'s agent and a turn with
     assert(bobs.status === 200 && !JSON.stringify(bobs.body.data).includes('across accounts'), 'the refused turn reached bob\'s account');
 });
 
-await test('2c. message list: the worker reads the exchange; bob\'s agent reads nothing of it; not offered without messages:read', async () => {
+// Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+// messages:read is one-press (2c, 3c); task:write is powerful, so 4b keeps "not offered".
+const refusedWithAllow = (r: { isError: boolean; offered: boolean; text: string }) =>
+    r.isError && r.offered && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?');
+
+await test('2c. message list: the worker reads the exchange; bob\'s agent reads nothing of it; refused with the allow address without messages:read', async () => {
     const r = await callTool(workerMcp, 'aimeat_v2_message_list', { context_id: contextId });
     assert(!r.isError && r.text.includes(messageId), `worker's list: ${r.text.slice(0, 300)}`);
     const theirs = await callTool(bobMcp, 'aimeat_v2_message_list', { context_id: contextId });
     assert(!theirs.isError && !theirs.text.includes(messageId), `bob's agent read alice's turn: ${theirs.text.slice(0, 300)}`);
     const plain = await callTool(bareMcp, 'aimeat_v2_message_list', {});
-    assert(plain.isError && !plain.offered, `offered without messages:read: ${plain.text.slice(0, 200)}`);
+    assert(refusedWithAllow(plain), `answered without messages:read: ${plain.text.slice(0, 200)}`);
 });
 
 // ── Phase 3: delivery targets ─────────────────────────────────────────────────────────────────────
@@ -134,13 +142,13 @@ await test('3b. push set: an agent registering a target for another principal is
     assert(r.isError && r.text.includes('ACCESS_DENIED'), `for the worker: ${r.text.slice(0, 200)}`);
 });
 
-await test('3c. push list: the lead sees its target, the worker does not; not offered without messages:read', async () => {
+await test('3c. push list: the lead sees its target, the worker does not; refused with the allow address without messages:read', async () => {
     const own = await callTool(leadMcp, 'aimeat_v2_push_list', {});
     assert(!own.isError && own.text.includes(pushId), `lead's list: ${own.text.slice(0, 300)}`);
     const other = await callTool(workerMcp, 'aimeat_v2_push_list', { principal: lead.gaii });
     assert(!other.isError && !other.text.includes(pushId), `the worker read the lead's target: ${other.text.slice(0, 300)}`);
     const plain = await callTool(bareMcp, 'aimeat_v2_push_list', {});
-    assert(plain.isError && !plain.offered, `offered without messages:read: ${plain.text.slice(0, 200)}`);
+    assert(refusedWithAllow(plain), `answered without messages:read: ${plain.text.slice(0, 200)}`);
 });
 
 await test('3d. push delete: the worker may not delete the lead\'s target; the lead may, once', async () => {

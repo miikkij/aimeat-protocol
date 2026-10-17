@@ -28,6 +28,10 @@
  *   - Phase 5: clean-up (detach through REST)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-proxy-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — 2b, 3b, 4b: aimeat_mcp_list, aimeat_mcp_call and aimeat_mcp_grant_list miss
+ *     only a one-press word (mcp:read, mcp:use), so they are listed (permission ask) and a call is
+ *     refused SCOPE_DENIED with the allow address. 1b and 4d keep "not offered": mcp:manage is outside
+ *     every wildcard.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27: the MCP proxy tools called and refused).
  */
 
@@ -154,9 +158,10 @@ const SERVER = `ptools${Date.now().toString(36).slice(-5)}`;
         assert(!r.isError, `list refused: ${r.text}`);
         assert((r.data.servers ?? []).some((s: any) => s.slug === SERVER), `not listed: ${r.text.slice(0, 300)}`);
     });
-    await test('2b. aimeat_mcp_list is not offered without mcp:read, and another owner\'s agent does not see the server', async () => {
+    await test('2b. aimeat_mcp_list is refused with the allow address without mcp:read, and another owner\'s agent does not see the server', async () => {
+        // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
         const r = await callTool(sBare, 'aimeat_mcp_list', {});
-        assert(r.isError && r.offered === false, `the bare agent was answered: ${r.text}`);
+        assert(r.isError && r.offered && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?'), `the bare agent was answered: ${r.text}`);
         const other = await callTool(sStranger, 'aimeat_mcp_list', {});
         assert(!other.isError, `the stranger's own list was refused: ${other.text}`);
         assert(!(other.data.servers ?? []).some((s: any) => s.slug === SERVER), 'another owner\'s agent sees alice\'s server');
@@ -182,9 +187,10 @@ const SERVER = `ptools${Date.now().toString(36).slice(-5)}`;
         assert(!r.isError, `call refused: ${r.text}`);
         assert(r.text.includes('echo:hello-proxy'), `the far side's answer did not come back: ${r.text}`);
     });
-    await test('3b. aimeat_mcp_call is not offered without mcp:use, and another owner\'s agent is refused the server', async () => {
+    await test('3b. aimeat_mcp_call is refused with the allow address without mcp:use, and another owner\'s agent is refused the server', async () => {
+        // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
         const r = await callTool(sReader, 'aimeat_mcp_call', { server: SERVER, tool: 'echo', arguments: { text: 'x' } });
-        assert(r.isError && r.offered === false, `the reader called a tool: ${r.text}`);
+        assert(r.isError && r.offered && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?') && !r.text.includes('echo:x'), `the reader called a tool: ${r.text}`);
         const other = await callTool(sStranger, 'aimeat_mcp_call', { server: SERVER, tool: 'echo', arguments: { text: 'stolen' } });
         assert(other.isError && other.offered, `the stranger called alice's server: ${other.text}`);
         assert(!other.text.includes('echo:stolen'), 'the far side answered the stranger');
@@ -205,9 +211,10 @@ const SERVER = `ptools${Date.now().toString(36).slice(-5)}`;
         const restGrants = rest.body.data?.grants ?? [];
         assert(restGrants.some((x: any) => x.grantee === reader.gaii), `REST disagrees: ${JSON.stringify(rest.body).slice(0, 300)}`);
     });
-    await test('4b. aimeat_mcp_grant_list is not offered without mcp:read, and another owner sees none of alice\'s grants', async () => {
+    await test('4b. aimeat_mcp_grant_list is refused with the allow address without mcp:read, and another owner sees none of alice\'s grants', async () => {
+        // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
         const r = await callTool(sBare, 'aimeat_mcp_grant_list', { server: SERVER });
-        assert(r.isError && r.offered === false, `the bare agent read grants: ${r.text}`);
+        assert(r.isError && r.offered && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?'), `the bare agent read grants: ${r.text}`);
         const other = await callTool(sStranger, 'aimeat_mcp_grant_list', { server: SERVER });
         assert(!other.isError, `the stranger's own list was refused: ${other.text}`);
         assert((other.data.grants ?? []).length === 0, `alice's grant reached bob's agent: ${other.text}`);

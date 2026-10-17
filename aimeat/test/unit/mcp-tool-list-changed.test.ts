@@ -51,15 +51,20 @@ describe('tools/list_changed', () => {
     it('every door that changes an agent\'s scopes emits it', () => {
         // The half-working failure this prevents: one door notifies, the other leaves the client
         // holding a list that no longer matches what the agent may do.
+        // announceScopes() (routes/agents/announce-scopes.ts, moved out of management.ts on
+        // 2026-10-17) emits it for the route files that call it.
+        const announce = readFileSync(resolve(SRC, 'routes/agents/announce-scopes.ts'), 'utf-8');
+        expect(announce).toContain('emitToolListChanged(gaii)');
         const doors = [
-            ['routes/agents/management.ts', 'the owner edits the scopes'],
-            ['routes/agents/device-auth.ts', 're-approval'],
-            ['services/agent-profile-write.ts', 'the shared profile write (operator configure)'],
-            ['services/chat-agent.ts', 'the chat agent widening'],
+            ['routes/agents/management.ts', 'the owner edits the scopes', 'announceScopes('],
+            ['routes/agents/permission-allow.ts', 'the owner allows with one press', 'announceScopes('],
+            ['routes/agents/device-auth.ts', 're-approval', 'emitToolListChanged('],
+            ['services/agent-profile-write.ts', 'the shared profile write (operator configure)', 'emitToolListChanged('],
+            ['services/chat-agent.ts', 'the chat agent widening', 'emitToolListChanged('],
         ] as const;
-        for (const [file, what] of doors) {
+        for (const [file, what, call] of doors) {
             const src = readFileSync(resolve(SRC, file), 'utf-8');
-            expect({ what, emits: src.includes('emitToolListChanged(') })
+            expect({ what, emits: src.includes(call) })
                 .toEqual({ what, emits: true });
         }
     });

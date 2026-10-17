@@ -5,6 +5,10 @@
  *   the words no wildcard carries, which is the half this file used to leave out.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
  * @version-history
+ *   2026-10-17 — Permission ask (mcp/permission-ask-gate.ts): the narrow agent and the default agent
+ *     are offered a tool whose missing words are all one-press, and each call is refused SCOPE_DENIED
+ *     with the allow address; a tool missing a powerful word (task:write), an operator word or a word
+ *     outside every wildcard stays off the list as before.
  *   2026-10-16 — The node registry's POST, PATCH and DELETE refuse a plain owner and the operator's
  *     agent without operator:admin, and admit the one holding it (QA audit F01c-01).
  *   v1.7.0 — 2026-10-16 — An agent registered with no scopes named: it holds the node default, and on
@@ -189,7 +193,7 @@ await test('Setup: register owner + narrow and broad agents', async () => {
     broad = await mkAgent('broadagent', ['*']);
 });
 
-await test('Narrow agent (memory:read) sees only scope-allowed + ungated tools', async () => {
+await test('Narrow agent (memory:read) is answered only by scope-allowed + ungated tools; one-press tools are listed and refused', async () => {
     const client = await connectMcp(narrow.gaii, narrow.key);
     const tools = await client.list();
     // Allowed: memory:read tool + ungated tools
@@ -197,18 +201,24 @@ await test('Narrow agent (memory:read) sees only scope-allowed + ungated tools',
     assert(tools.includes('aimeat_catalogue_search'), 'has aimeat_catalogue_search (ungated)');
     assert(tools.includes('aimeat_board_read'), 'has aimeat_board_read (ungated public)');
     assert(tools.includes('aimeat_task_list'), 'has aimeat_task_list (ungated)');
-    // Filtered: requires scopes the narrow agent lacks
-    assert(!tools.includes('aimeat_memory_write'), 'memory_write FILTERED (needs memory:write)');
-    assert(!tools.includes('aimeat_wallet_balance'), 'wallet_balance FILTERED (needs wallet:read)');
-    assert(!tools.includes('aimeat_board_post'), 'board_post FILTERED (needs social:write)');
-    assert(!tools.includes('aimeat_work_inbox'), 'work_inbox FILTERED (needs work:read)');
-    assert(!tools.includes('aimeat_consent_grant'), 'consent_grant FILTERED (needs consent:manage)');
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    for (const [tool, word] of [
+        ['aimeat_memory_write', 'memory:write'], ['aimeat_wallet_balance', 'wallet:read'], ['aimeat_board_post', 'social:write'],
+        ['aimeat_work_inbox', 'work:read'], ['aimeat_consent_grant', 'consent:manage'],
+    ] as const) {
+        assert(tools.includes(tool), `${tool} is listed (${word} is one-press)`);
+        const { ok, body } = await client.call(tool, {});
+        const text = String(body.result?.content?.[0]?.text ?? '');
+        assert(!ok && text.startsWith('SCOPE_DENIED') && text.includes('/v1/allow?'), `${tool} must be refused with the allow address: ${text.slice(0, 200)}`);
+    }
+    // Still filtered: a powerful word (task:write) is not one-press.
+    assert(!tools.includes('aimeat_task_create'), 'task_create FILTERED (needs task:write, a powerful word)');
 });
 
-await test('Narrow agent cannot call a filtered tool (memory_write)', async () => {
+await test('Narrow agent cannot call a tool its scopes do not cover (memory_write)', async () => {
     const client = await connectMcp(narrow.gaii, narrow.key);
     const { ok } = await client.call('aimeat_memory_write', { key: 'x', value: 'y' });
-    assert(!ok, 'calling filtered aimeat_memory_write must not succeed');
+    assert(!ok, 'calling aimeat_memory_write without memory:write must not succeed');
     // And the write must not have happened (read it back via an allowed tool)
     const back = await client.call('aimeat_memory_read', { key: 'x' });
     const text = back.body.result?.content?.[0]?.text ?? '';
@@ -624,7 +634,11 @@ const NODE_DEFAULT = (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*').split(',')
 const PROMISED = ['aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_delete',
     'aimeat_catalogue_search', 'aimeat_workspace_read', 'aimeat_workspace_list', 'aimeat_workspace_overview', 'aimeat_organism_search',
     'aimeat_agents_list'];
-const NOT_PROMISED = ['aimeat_workspace_publish', 'aimeat_wallet_balance', 'aimeat_board_post', 'aimeat_task_create'];
+// Outside the default. Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool
+// on the list and the call is refused with the allow address. So the one-press ones are listed and
+// refused, and only a tool missing a powerful word (task:write) stays off the list.
+const NOT_PROMISED_ASKABLE = ['aimeat_workspace_publish', 'aimeat_wallet_balance', 'aimeat_board_post'];
+const NOT_PROMISED = ['aimeat_task_create'];
 let defaultAgent: { gaii: string; key: string } = { gaii: '', key: '' };
 
 await test(`Setup: an agent registered with no scopes named gets the node default (${NODE_DEFAULT.join(',')})`, async () => {
@@ -640,19 +654,23 @@ await test(`Setup: an agent registered with no scopes named gets the node defaul
 });
 
 if (!NODE_DEFAULT.includes('*')) {
-    await test('…and over MCP it is offered every tool the product promises a default agent, and none it does not', async () => {
+    await test('…and over MCP it is offered every tool the product promises a default agent, the one-press ones to ask for, and no powerful one', async () => {
         const tools = await (await connectMcp(defaultAgent.gaii, defaultAgent.key)).list();
         const missing = PROMISED.filter(t => !tools.includes(t));
         assert(missing.length === 0, `a default agent lost promised tools: ${missing.join(', ')}`);
         const extra = NOT_PROMISED.filter(t => tools.includes(t));
-        assert(extra.length === 0, `a default agent was offered tools outside its default: ${extra.join(', ')}`);
+        const unlisted = NOT_PROMISED_ASKABLE.filter(t => !tools.includes(t));
+        assert(extra.length === 0 && unlisted.length === 0,
+            `a default agent was offered a powerful tool outside its default (${extra.join(', ')}) or not listed a one-press one (${unlisted.join(', ')})`);
     });
     await test('…and a promised write works while an unpromised one is refused by name', async () => {
         const client = await connectMcp(defaultAgent.gaii, defaultAgent.key);
         const wrote = await client.call('aimeat_memory_write', { key: 'default-agent.probe', value: { ok: true } });
         assert(wrote.ok, `memory_write refused for a default agent: ${JSON.stringify(wrote.body).slice(0, 300)}`);
         const paid = await client.call('aimeat_wallet_balance', {});
-        assert(!paid.ok, 'a default agent read the wallet, which its default list does not hold');
+        const paidText = String(paid.body.result?.content?.[0]?.text ?? '');
+        assert(!paid.ok && paidText.startsWith('SCOPE_DENIED') && paidText.includes('/v1/allow?'),
+            `a default agent read the wallet, which its default list does not hold, or was refused without the allow address: ${paidText.slice(0, 200)}`);
     });
 }
 

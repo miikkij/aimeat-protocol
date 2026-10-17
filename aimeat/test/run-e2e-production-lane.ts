@@ -45,7 +45,7 @@ export const PRODUCTION_LANE_ENV = 'AIMEAT_E2E_PRODUCTION_SETTINGS';
  * SHIPPED_DEFAULT_AGENT_SCOPES in src/config.ts, written out because this file must not load the
  * node's config module. test/unit/production-lane.test.ts holds the two equal.
  */
-export const SHIPPED_DEFAULT_AGENT_SCOPES_COPY = 'memory:read,memory:write,memory:delete,catalogue:read,organism:read,agent:read';
+export const SHIPPED_DEFAULT_AGENT_SCOPES_COPY = 'memory:read,memory:write,memory:delete,catalogue:read,organism:read,agent:read,messages:send,storage:write';
 
 export type SettingGroup = 'testMode' | 'devMode' | 'anonymous' | 'agentScopes' | 'adminSetup' | 'rateLimits';
 

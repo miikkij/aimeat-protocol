@@ -5,6 +5,8 @@
  *   schema) via REST, then drives the tools as the owner's agent over MCP, and checks the
  *   membership gate with a second owner's organism.
  * @version-history
+ *   2026-10-17 — Test 48: the MCP OAuth token older than the widened grant may be answered 401
+ *     invalid_token (mcp/permission-ask-gate.ts); refused either way, and nothing is written.
  *   v1.0.0 — 2026-06-08 — Initial creation (5 workspace tools).
  *   v1.1.0 — 2026-06-09 — Add test 15b: a member who didn't create a workspace can DISCOVER it via the
  *     MCP list (cross-member registry aggregation regression).
@@ -1084,8 +1086,15 @@ await test('48. a provenance declaration without provenance:write → 403 SCOPE_
     assert((await setScopes(['memory:read', 'memory:write', 'provenance:write'])).status === 200, 'widen the grant');
     const r2 = await restWrite(token, 'prov-3');
     assert(r2.status === 403 && r2.body.error?.code === 'SCOPE_DENIED', `narrowed session, route answered ${r2.status} ${r2.body.error?.code}`);
-    const t2 = await toolWrite('prov-4', 484);
-    assert(t2?.isError === true && /^SCOPE_DENIED/.test(t2.content?.[0]?.text ?? ''), `narrowed session, tool answered ${JSON.stringify(t2).slice(0, 300)}`);
+    // On MCP the OAuth token older than the widened grant is answered 401 invalid_token since 2026-10-17
+    // (mcp/permission-ask-gate.ts), so its client refreshes; either way this token declares nothing.
+    const t2 = await client.call('aimeat_workspace_write',
+        { organism_id: orgId, ws: WS, space: 'note', id: 'prov-4', value: { title: 'Declared' }, ai_provenance: declared }, 484);
+    const t2refused = t2?.result
+        ? t2.result.isError === true && /^SCOPE_DENIED/.test(t2.result.content?.[0]?.text ?? '')
+        : /Refresh the token/.test(JSON.stringify(t2 ?? {}));
+    assert(t2refused, `narrowed session, tool answered ${JSON.stringify(t2 ?? null).slice(0, 300)}`);
+    assert(await missing('prov-4', 485), 'the old token wrote a draft');
 
     // A token minted after the grant carries the word, and declares.
     const r3 = await restWrite((await mint()).rest, 'prov-5');

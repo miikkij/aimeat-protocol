@@ -19,6 +19,8 @@
  *     6. the same over MCP, as the person's chat AI.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-stop
  * @version-history
+ *   v1.3.0 — 2026-10-17 — 6c: an agent without agent:write is offered stop and start (permission
+ *     ask, mcp/permission-ask-gate.ts), and a call is refused SCOPE_DENIED with the allow address.
  *   v1.2.0 — 2026-10-11 — 4b and 5a hold what a live fleet found the day this shipped: a direct
  *     message that arrives during the stop is delivered at the start (once, and one from before the
  *     stop is not), and the released tasks arrive in the one backlog with no frame of their own.
@@ -475,14 +477,15 @@ await test('6b. Over MCP it cannot stop itself, and a task for the stopped worke
   assert(/"waits_because":\s*"stopped"/.test(made.text), `the answer names the reason: ${made.text.slice(0, 400)}`);
 });
 
-await test('6c. An agent without agent:write is not offered the two tools', async () => {
+await test('6c. An agent without agent:write is offered the two tools, and a call is refused with the allow address', async () => {
   const plainMcp = await mcpSessionFor(plain);
   const list = await rpc(plainMcp, 'tools/list');
   const names = (list?.result?.tools ?? []).map((t: any) => t.name);
   assert(names.length > 0, 'the plain agent has tools');
-  assert(!names.includes('aimeat_agent_stop') && !names.includes('aimeat_agent_start'), 'stop and start are not on its list');
+  // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+  assert(names.includes('aimeat_agent_stop') && names.includes('aimeat_agent_start'), 'stop and start are on its list');
   const r = await callTool(plainMcp, 'aimeat_agent_start', { target_agent_name: 'worker' });
-  assert(r.isError, `a call anyway is refused: ${r.text.slice(0, 200)}`);
+  assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?'), `a call is refused with the allow address: ${r.text.slice(0, 200)}`);
   assert((await listed(owner.token, 'worker')).stopped === true, 'still stopped');
 });
 

@@ -35,6 +35,9 @@
  *   - Phase 9: the account's send limit on the tool door
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-dm-datapackage
  * @version-history
+ *   v1.3.0 — 2026-10-17 — 3: the DM and data package tools miss only one-press words, so a
+ *     memory:read agent is listed them (permission ask, mcp/permission-ask-gate.ts) and each call is
+ *     refused SCOPE_DENIED with the allow address.
  *   v1.2.1 — 2026-10-06 — The sending agent holds memory:write, which aimeat_datapackage_publish asks
  *     since the secaudit 2026-10 follow-up (A4).
  *   v1.2.0 — 2026-09-24 — Test 29 (security audit A5-3): the 31st send in a minute through
@@ -232,11 +235,14 @@ await test('2. Two MCP sessions open on /v1/mcp', async () => {
 
 console.log('\nPhase 2 — the scope fence, and the same door to an anonymous caller');
 
-await test('3. An agent with no message word is handed none of the DM tools', async () => {
+await test('3. An agent with no message word is refused every DM tool with the allow address', async () => {
     const names = await toolNames(muteSession);
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
     for (const gated of ['aimeat_dm_send', 'aimeat_dm_broadcast', 'aimeat_dm_ask', 'aimeat_dm_inbox',
         'aimeat_dm_thread', 'aimeat_dm_send_as_owner', 'aimeat_datapackage_publish', 'aimeat_datapackage_export']) {
-        assert(!names.includes(gated), `${gated} was offered to an agent holding only memory:read`);
+        assert(names.includes(gated), `${gated} is listed to ask for (its words are one-press)`);
+        const r = await callTool(muteSession, gated, {});
+        assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?'), `${gated} answered an agent holding only memory:read: ${r.text.slice(0, 200)}`);
     }
 });
 

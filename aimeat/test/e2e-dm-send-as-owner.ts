@@ -2,7 +2,9 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dm-send-as-owner
 //
 // Verifies the consent-gated delegation behind Inbox "Reply with AI":
-//  - the tool is only on the surface for an agent holding messages:send-as-owner (and for a '*' agent);
+//  - the tool is on the surface for an agent holding messages:send-as-owner (and for a '*' agent), and
+//    since 2026-10-17 (permission ask) also for an agent without it, whose call is refused SCOPE_DENIED
+//    with the allow address (tests 1 and 5);
 //  - calling it sends the DM AS THE AGENT'S OWNER (server-derived), landing in the OWNER's thread, so the
 //    recipient sees it from the human — NOT from the agent;
 //  - an agent may only ever send as its OWN owner (no cross-owner impersonation — there is no owner param);
@@ -150,13 +152,14 @@ await test('Setup: owners Alice + Bob; agents (with / without / *) the delegatio
     assert(sendbot.gaii.startsWith('sendbot#'), `sendbot gaii ${sendbot.gaii}`);
 });
 
-await test('1. Tool is on the surface ONLY with messages:send-as-owner (and for a * agent)', async () => {
+await test('1. Tool is on the surface with messages:send-as-owner, for a * agent, and to ask for without the word', async () => {
     const withScope = await (await connectMcp(sendbot.gaii, sendbot.key)).list();
     const without = await (await connectMcp(plainbot.gaii, plainbot.key)).list();
     const broad = await (await connectMcp(broadbot.gaii, broadbot.key)).list();
     assert(withScope.includes('aimeat_dm_send_as_owner'), 'sendbot (scope) SEES the tool');
     assert(without.includes('aimeat_dm_send'), 'plainbot still has plain aimeat_dm_send');
-    assert(!without.includes('aimeat_dm_send_as_owner'), 'plainbot (no scope) does NOT see the delegated tool');
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address (test 5).
+    assert(without.includes('aimeat_dm_send_as_owner'), 'plainbot (no scope) is listed the delegated tool to ask for (messages:send-as-owner is one-press)');
     assert(broad.includes('aimeat_dm_send_as_owner'), 'broad (*) agent has the tool');
 });
 
@@ -285,12 +288,13 @@ await test('4d. a file that is in NOBODY\'s storage refuses the send instead of 
 await test('5. plainbot (no scope) cannot use the delegated tool', async () => {
     const client = await connectMcp(plainbot.gaii, plainbot.key);
     const { ok, body } = await client.call('aimeat_dm_send_as_owner', { to: bob.ghii, body: 'should not go out as Alice' });
-    assert(!ok, 'a filtered (unregistered) tool call must not succeed');
-    // Name the SHAPE of the refusal, not just that something went wrong. Without the scope the tool
-    // is never registered on the session, so the JSON-RPC layer answers with an error rather than a
-    // tool result — an isError body would mean the tool ran and declined, which is a different story.
-    assert(body.error !== undefined || body.result?.isError === true,
-        `the refusal must be an MCP error or an isError result, got ${JSON.stringify(body).slice(0, 200)}`);
+    assert(!ok, 'a call without messages:send-as-owner must not succeed');
+    // Name the SHAPE of the refusal, not just that something went wrong. Listed since 2026-10-17
+    // (permission ask): a one-press permission keeps the tool on the list and the call is refused
+    // with the allow address, in front of the handler, so the answer is SCOPE_DENIED, never the tool's own.
+    const text = String(body.result?.content?.[0]?.text ?? '');
+    assert(body.result?.isError === true && text.startsWith('SCOPE_DENIED') && text.includes('/v1/allow?'),
+        `the refusal must be SCOPE_DENIED with the allow address, got ${JSON.stringify(body).slice(0, 200)}`);
     // …and nothing went out under Alice's name.
     const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
     assert(!(inbox.body.data.messages as any[]).some(m => m.body === 'should not go out as Alice'),

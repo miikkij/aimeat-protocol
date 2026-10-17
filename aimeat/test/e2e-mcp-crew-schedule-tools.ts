@@ -22,6 +22,9 @@
  *   - Phase 2: crew · Phase 3: schedules · Phase 4: a workflow step waiting for the owner
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-crew-schedule-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — 2d, 2f, 3d, 4b: memory:read, memory:write and workflow:read are one-press,
+ *     so the tools stay listed for the bare agent (permission ask, mcp/permission-ask-gate.ts) and
+ *     each call is refused SCOPE_DENIED with the allow address instead of "not offered".
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27).
  */
 
@@ -131,13 +134,18 @@ await test('2c. crew menu: the runtime answers for itself (source runtime, its t
     assert((r.data.tools as any[]).some((t) => t.id === 'web') && (r.data.profiles as string[]).includes('default'), `menu content: ${r.text.slice(0, 300)}`);
 });
 
-await test('2d. crew menu: an agent that does not exist and another owner\'s agent are refused; not offered without memory:read', async () => {
+// Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+// The bare agent's refusals in 2d, 2f, 3d and 4b are that answer (memory:read, memory:write, workflow:read are one-press).
+const refusedWithAllow = (r: { isError: boolean; offered: boolean; text: string }) =>
+    r.isError && r.offered && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?');
+
+await test('2d. crew menu: an agent that does not exist and another owner\'s agent are refused; refused with the allow address without memory:read', async () => {
     const none = await callTool(builderMcp, 'aimeat_crew_menu', { target_agent_name: `nobody${stamp}` });
     assert(none.isError && none.data?.error?.code === 'AGENT_NOT_FOUND', `no such agent: ${none.text.slice(0, 200)}`);
     const theirs = await callTool(builderMcp, 'aimeat_crew_menu', { target_agent_name: bobAgent.gaii });
     assert(theirs.isError && theirs.data?.error?.code === 'ACCESS_DENIED', `bob's agent: ${theirs.text.slice(0, 200)}`);
     const plain = await callTool(bareMcp, 'aimeat_crew_menu', { target_agent_name: runner.name });
-    assert(plain.isError && !plain.offered, `offered without memory:read: ${plain.text.slice(0, 200)}`);
+    assert(refusedWithAllow(plain), `answered without memory:read: ${plain.text.slice(0, 200)}`);
 });
 
 await test('2e. crew llm set: the builder chooses the node for the runtime agent; the record is the owner\'s and the menu shows it', async () => {
@@ -150,13 +158,13 @@ await test('2e. crew llm set: the builder chooses the node for the runtime agent
         `menu choice: ${short(menu.data.choice)}`);
 });
 
-await test('2f. crew llm set: a choice outside the vocabulary and another owner\'s agent are refused; not offered without memory:write', async () => {
+await test('2f. crew llm set: a choice outside the vocabulary and another owner\'s agent are refused; refused with the allow address without memory:write', async () => {
     const bad = await callTool(builderMcp, 'aimeat_crew_llm_set', { target_agent_name: runner.name, choice: { kind: 'telepathy' } });
     assert(bad.isError, `kind telepathy: ${bad.text.slice(0, 200)}`);
     const theirs = await callTool(builderMcp, 'aimeat_crew_llm_set', { target_agent_name: bobAgent.gaii, choice: { kind: 'node' } });
     assert(theirs.isError && theirs.data?.error?.code === 'ACCESS_DENIED', `bob's agent: ${theirs.text.slice(0, 200)}`);
     const plain = await callTool(bareMcp, 'aimeat_crew_llm_set', { choice: { kind: 'node' } });
-    assert(plain.isError && !plain.offered, `offered without memory:write: ${plain.text.slice(0, 200)}`);
+    assert(refusedWithAllow(plain), `answered without memory:write: ${plain.text.slice(0, 200)}`);
 });
 
 await test('2g. teardown of the runtime stand-in', async () => {
@@ -205,11 +213,11 @@ await test('3c. schedule report internal: the builder reports its own cron; the 
     assert(rec.status === 200 && JSON.stringify(rec.body.data?.value).includes(`nightly-${stamp}`), `the mirror: ${rec.status} ${short(rec.body.data ?? rec.body.error)}`);
 });
 
-await test('3d. schedule report internal: an entry without a name is refused; not offered without memory:write', async () => {
+await test('3d. schedule report internal: an entry without a name is refused; refused with the allow address without memory:write', async () => {
     const bad = await callTool(builderMcp, 'aimeat_schedule_report_internal', { entries: [{ cron: '0 3 * * *' }] });
     assert(bad.offered && bad.isError, `an entry with no name: ${bad.text.slice(0, 200)}`);
     const plain = await callTool(bareMcp, 'aimeat_schedule_report_internal', { entries: [{ name: 'x' }] });
-    assert(plain.isError && !plain.offered, `offered without memory:write: ${plain.text.slice(0, 200)}`);
+    assert(refusedWithAllow(plain), `answered without memory:write: ${plain.text.slice(0, 200)}`);
 });
 
 // ── Phase 4: a workflow step waiting for the owner ────────────────────────────────────────────────
@@ -249,7 +257,7 @@ await test('4b. pending inputs: the builder lists alice\'s parked question; bob\
     const theirs = await callTool(bobMcp, 'aimeat_workflow_pending_inputs', {});
     assert(!theirs.isError && !theirs.text.includes(runId), `bob's agent saw alice's question: ${theirs.text.slice(0, 300)}`);
     const plain = await callTool(bareMcp, 'aimeat_workflow_pending_inputs', {});
-    assert(plain.isError && !plain.offered, `offered without workflow:read: ${plain.text.slice(0, 200)}`);
+    assert(refusedWithAllow(plain), `answered without workflow:read: ${plain.text.slice(0, 200)}`);
 });
 
 await test('4c. workflow answer: a pick outside the question and bob\'s agent are refused; nothing is answered', async () => {

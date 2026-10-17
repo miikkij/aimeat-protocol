@@ -15,6 +15,10 @@
  *   import { instructionsFor } from './instructions.js';
  *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.8.0 — 2026-10-17 — PERMISSION_ASK, for an agent session: some tools need the person's yes
+ *     first, and such a call answers with the address where they give it in one press. After the
+ *     surface line and the new-agent paragraph, so no measured cut moves
+ *     (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  *   v1.7.1 — 2026-10-03 — The surface line comes before the new-agent paragraph again. Behind it,
  *     the line started at 2 154 on /v2/mcp/agent, past the measured cut at 2 052; in front, it starts
  *     at 1 922 and ends inside it. Order only; no sentence changed.
@@ -84,6 +88,9 @@ const KEEP_SENTENCE = ' When they say one turned out well, record it: aimeat_des
  */
 const AGENT_PARAGRAPH = 'When the person asks for a new agent, read the organisms and workspaces it will work on, propose it with aimeat_agent_propose, and give them the approval address from the answer. This node makes and runs the agent, so never send them to build one elsewhere.';
 const PROPOSING_ROLES: ReadonlySet<SurfaceRole | 'all'> = new Set(['all', 'full', 'agent', 'admin', 'primitives', 'chat']);
+// Some tools on the list need the person's yes before they work. The call answers SCOPE_DENIED with an
+// address and a sentence; the person never needs a permission's name, only the address.
+const PERMISSION_ASK = 'Some tools here need the person to allow them first. Such a call answers with an address where they allow it with one press: give them that address in their own words, never the name of a permission, and call the tool again when they have allowed it. Never tell them the node cannot do it.';
 
 /**
  * What an agent has to act on, in the first 1 500 characters. Several clients cut the instructions
@@ -147,6 +154,11 @@ Speak to the person in their own language, and reach for the handbook whenever a
 /** What the handshake may add to the base text for this particular account. */
 export interface InstructionsOptions {
     /**
+     * An agent session, whose person can allow a missing permission with one press. Adds
+     * PERMISSION_ASK; absent for an owner, an app and everything else that has no such page.
+     */
+    permissionAsk?: boolean;
+    /**
      * The proactive-guidance text, when this owner keeps that setting on. Null or absent leaves the
      * instructions exactly as they were, with nothing hinting that a switch exists — an agent told
      * about a capability it does not have would go looking for it.
@@ -191,6 +203,7 @@ export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOpt
     // and the tool's own description for a client that cuts it.
     if (role !== 'all') parts.push(SURFACE_INTROS[role]);
     if (PROPOSING_ROLES.has(role)) parts.push(AGENT_PARAGRAPH);
+    if (opts.permissionAsk) parts.push(PERMISSION_ASK);
     parts.push(DETAIL);
 
     const guidance = opts.proactiveGuidance?.trim();

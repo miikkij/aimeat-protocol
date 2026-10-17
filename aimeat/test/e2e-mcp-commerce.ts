@@ -7,6 +7,9 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   2026-10-17 — 2, 5d: the narrow agent is offered checkout_open and invoice_set (permission ask,
+ *     mcp/permission-ask-gate.ts), and each call is refused SCOPE_DENIED with the allow address;
+ *     psp_set needs commerce:psp, outside every wildcard, and stays off the list.
  *   2026-10-16 — 5c, 5d: aimeat_commerce_invoice_set turns invoice credit on and off for the owner and
  *     keeps the other rails; an agent without commerce:sell is not offered it and changes nothing.
  *   v1.6.0 — 2026-10-16 — psp_delete is screen-only like psp_set (decision D5; QA audit D2-02): test 5
@@ -203,11 +206,14 @@ await test('1. Commerce agent sees all 9 commerce tools', async () => {
     }
 });
 
-await test('2. Narrow agent (memory-only) is filtered: no commerce tools except the public read', async () => {
+await test('2. Narrow agent (memory-only): psp_set is filtered, checkout_open is listed and refused with the allow address', async () => {
     const { body } = await narrow.rpc('tools/list', {});
     const names = new Set(body.result.tools.map((t: any) => t.name));
-    assert(!names.has('aimeat_commerce_psp_set'), 'psp_set must be filtered (commerce:sell)');
-    assert(!names.has('aimeat_checkout_open'), 'checkout_open must be filtered (commerce:buy)');
+    assert(!names.has('aimeat_commerce_psp_set'), 'psp_set must be filtered (commerce:psp, outside every wildcard)');
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    assert(names.has('aimeat_checkout_open'), 'checkout_open is listed (commerce:buy is one-press)');
+    const r = await narrow.call('aimeat_checkout_open', {});
+    assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?'), `checkout_open is refused with the allow address: ${r.text.slice(0, 200)}`);
     assert(names.has('aimeat_app_tools_get'), 'app_tools_get is ungated (public manifests)');
 });
 
@@ -310,11 +316,12 @@ await test('5c. invoice_set turns invoice credit on and off for the owner from c
     assert(!off.isError && off.data.invoice_accept_immediate === false, `turn off: ${off.text}`);
 });
 
-await test('5d. FAILURE: invoice_set is not offered to an agent without commerce:sell, and its call changes nothing', async () => {
+await test('5d. FAILURE: invoice_set is refused to an agent without commerce:sell, and its call changes nothing', async () => {
     const { body } = await narrow.rpc('tools/list', {});
-    assert(!body.result.tools.some((t: any) => t.name === 'aimeat_commerce_invoice_set'), 'invoice_set must be filtered (commerce:sell)');
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    assert(body.result.tools.some((t: any) => t.name === 'aimeat_commerce_invoice_set'), 'invoice_set is listed (commerce:sell is one-press)');
     const r = await narrow.call('aimeat_commerce_invoice_set', { accept_immediate: true });
-    assert(r.isError && /SCOPE_DENIED/.test(r.text), `the narrow agent's call: ${r.text}`);
+    assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?'), `the narrow agent's call: ${r.text}`);
     const payout = await json('/v1/commerce/payout', { headers: auth(buyerOwner.token) });
     assert(payout.body.data.invoice?.accept_immediate === false, `the refused call changed the setting: ${JSON.stringify(payout.body.data.invoice)}`);
 });

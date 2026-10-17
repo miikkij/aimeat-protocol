@@ -556,7 +556,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', ...oneOf('open', 'oauth', 'invite', 'closed'), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
 
   // ── Scoped Agent Capabilities (mutable) ──
-  { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Default agent capability scopes, one per line (comma-separated in the environment; default memory:read, memory:write, memory:delete, catalogue:read, organism:read, agent:read)' },
+  { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Default agent capability scopes, one per line (comma-separated in the environment; default memory:read, memory:write, memory:delete, catalogue:read, organism:read, agent:read, messages:send, storage:write)' },
   { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'The most scopes an agent can be given, one per line (comma-separated in the environment; * = all)' },
 
   // ── Enterprise SSO (BR-04; mutable — an organisation node's host seals these) ──

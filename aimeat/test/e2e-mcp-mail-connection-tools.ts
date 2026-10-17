@@ -34,6 +34,10 @@
  *   - Phase 5: aimeat_connection_history and aimeat_connection_replies
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-mail-connection-tools
  * @version-history
+ *   2026-10-17 — 2b, 2c, 3b: a tool missing only one-press words is listed (permission ask,
+ *     mcp/permission-ask-gate.ts), so the plain agent's calls are asserted as SCOPE_DENIED with the
+ *     allow address instead of "not offered". 3h: the looker's aimeat_mail_send is listed and refused with
+ *     the allow address (connections.ts's own guard for it is gone).
  *   2026-10-16 — 4b-rest, 4c and 4d also read over POST /v1/connections/:id/read/:resource: the owner's
  *     mailbox without connections:read-as-owner is 403 READ_AS_OWNER_REQUIRED with the MCP sentence,
  *     another owner's agent keeps 404 (Jouni, 2026-10-16).
@@ -222,15 +226,17 @@ try {
         const ids = (rest.data?.data?.connections ?? []).map((c: any) => c.id);
         assert(ids.includes(readConn) && ids.includes(sendConn), `REST disagrees with the tool: ${JSON.stringify(rest.data?.data)}`);
     });
-    await test('2b. aimeat_connection_start refuses a provider this node does not have, and is not offered without connections:write', async () => {
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    // The plain agent's refusals below are that answer: SCOPE_DENIED with /v1/allow?, so `offered` is true.
+    await test('2b. aimeat_connection_start refuses a provider this node does not have, and is refused with the allow address without connections:write', async () => {
         const r = await callTool(sMail, 'aimeat_connection_start', { provider: 'no-such-provider' });
         assert(r.isError && r.offered, `an unknown provider was started: ${r.text}`);
         const plainStart = await callTool(sPlain, 'aimeat_connection_start', { provider: 'google-mail' });
-        assert(plainStart.isError && plainStart.offered === false, `the plain agent was offered the start: ${plainStart.text}`);
+        assert(plainStart.isError && /^SCOPE_DENIED/.test(plainStart.text) && plainStart.text.includes('/v1/allow?'), `the plain agent was not refused with the allow address: ${plainStart.text}`);
     });
-    await test('2c. aimeat_connection_list is not offered without connections:read, and another owner\'s agent sees none of alice\'s', async () => {
+    await test('2c. aimeat_connection_list is refused with the allow address without connections:read, and another owner\'s agent sees none of alice\'s', async () => {
         const r = await callTool(sPlain, 'aimeat_connection_list', {});
-        assert(r.isError && r.offered === false, `the plain agent listed: ${r.text}`);
+        assert(r.isError && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?'), `the plain agent listed: ${r.text}`);
         const other = await callTool(sBob, 'aimeat_connection_list', {});
         assert(!other.isError, `bob's own list refused: ${other.text}`);
         assert(!(other.data.connections ?? []).some((c: any) => c.id === readConn || c.id === sendConn), 'bob\'s agent sees alice\'s agent\'s mailbox');
@@ -247,13 +253,13 @@ try {
         const sent = up.since(mark).find((c) => c.host === 'gmail.googleapis.com' && c.path.endsWith('/messages'));
         assert(sent && new URL(sent.url).searchParams.get('q') === 'from:lasku@example.com', `the query did not reach Gmail: ${sent?.url}`);
     });
-    await test('3b. aimeat_mail_search refuses another owner\'s agent the mailbox as if it did not exist, and is not offered without the read word', async () => {
+    await test('3b. aimeat_mail_search refuses another owner\'s agent the mailbox as if it did not exist, and is refused with the allow address without the read word', async () => {
         const mark = up.mark();
         const r = await callTool(sBob, 'aimeat_mail_search', { connection_id: readConn, query: 'x' });
         assert(r.isError && /NOT_FOUND/.test(r.text), `bob's agent searched alice's agent's mailbox: ${r.text}`);
         assert(!up.since(mark).some((c) => c.host === 'gmail.googleapis.com'), 'the refused search reached Gmail');
         const p = await callTool(sPlain, 'aimeat_mail_search', { connection_id: readConn, query: 'x' });
-        assert(p.isError && p.offered === false, `the plain agent searched: ${p.text}`);
+        assert(p.isError && /^SCOPE_DENIED/.test(p.text) && p.text.includes('/v1/allow?'), `the plain agent searched: ${p.text}`);
     });
     await test('3c. aimeat_mail_read answers one message, and stores its attachment as a private file of the agent', async () => {
         const msg = await callTool(sMail, 'aimeat_mail_read', { connection_id: readConn, message_id: 'm1' });
@@ -300,7 +306,7 @@ try {
         assert(up.stats.gmailSends === before + 1, `Gmail sends ${before} -> ${up.stats.gmailSends}`);
         assert(up.lastGmailRaw.includes(`MCP report ${stamp}`) && up.lastGmailRaw.includes(`recipient-${stamp}@example.test`), 'the message Gmail got is not the one sent');
     });
-    await test('3h. aimeat_mail_send refuses a contact that is not in the owner\'s book, and is not offered without outbound:send', async () => {
+    await test('3h. aimeat_mail_send refuses a contact that is not in the owner\'s book, and without outbound:send it is listed and refused with the allow address', async () => {
         const before = up.stats.gmailSends;
         const bobContact = await api('/v1/outbound/contacts', { bearer: bob.token, body: { name: 'Bob\'s', email: `bobs-${stamp}@example.test` } });
         assert(bobContact.status === 201, `bob's contact: ${bobContact.status}`);
@@ -309,8 +315,13 @@ try {
         });
         assert(r.isError && r.offered && /NOT_FOUND/.test(r.text), `a contact of another owner was sent to: ${r.text}`);
         assert(up.stats.gmailSends === before, 'the refused send reached Gmail');
+        // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the
+        // call is refused with the allow address. connections.ts's own guard for this tool went the same day.
         const names = await toolNames(sLooker);
-        assert(!names.includes('aimeat_mail_send'), 'an agent without outbound:send was offered aimeat_mail_send');
+        assert(names.includes('aimeat_mail_send'), 'aimeat_mail_send is not on the looker\'s list');
+        const looked = await callTool(sLooker, 'aimeat_mail_send', { contact_id: contactId, subject: 'x', body: 'x', connection_id: sendConn });
+        assert(looked.isError && /^SCOPE_DENIED/.test(looked.text) && looked.text.includes('/v1/allow?'), `the looker's send was not refused with the allow address: ${looked.text}`);
+        assert(up.stats.gmailSends === before, 'the looker\'s refused send reached Gmail');
     });
 
     // ── Phase 4: the owner's mailbox ──

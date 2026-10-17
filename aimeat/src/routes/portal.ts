@@ -20,6 +20,8 @@
  *     and sends the operator to the Config page (it said to set environment variables and restart).
  *   2026-10-11 — The privacy page's {{ownerAnalyticsNotice}}: the paragraph about account holders'
  *     own analytics, written only while one of them uses Clarity or Google Analytics.
+ *   2026-10-17 — /v1/allow joins the SPA routes: the owner allows what their agent asked for with one
+ *     press (views/agent-allow.js, services/permission-ask.ts).
  *   2026-10-09 — /v1/oauth-round joins the SPA routes: the owner confirms a sign-in round an agent
  *     started (secrets audit 2026-10-09, chapter 2).
  *   v1.0.0 — 2026-03-03 — Initial portal with SSR removal
@@ -584,6 +586,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/app-grant',   // H-2 app-grant consent page (SPA)
     '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)
     '/v1/oauth-round', // The owner confirms a sign-in round an agent started (SPA, ?state=)
+    '/v1/allow',       // The owner allows what their agent asked for with one press (SPA, ?agent=&need=)
   ];
 
   // The short address of the whole feature list, the one the front page and the footer hand out.

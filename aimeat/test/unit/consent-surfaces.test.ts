@@ -54,6 +54,10 @@ describe('consent vocabulary over the real en.json', () => {
     // never say less than the set gives, because the set is what generates it.
     expect(std).toContain('your saved data');
     expect(std).toContain('the files you keep here');
+    // Standard sends messages (2026-10-17) and reaches no mailbox: it says so in its own sentence,
+    // and the area list does not claim "read and write your messages".
+    expect(std).toContain(dict['consent.preset.messagesSend']);
+    expect(std).not.toContain(dict['appGrant.area.messages']);
     expect(presetSummary('keep', t)).toBe(dict['consent.preset.keep']);
     expect(presetSummary('full', t)).toBe(dict['consent.preset.full']);
   });

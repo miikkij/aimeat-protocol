@@ -26,6 +26,9 @@
  *   - Phase 6: extension config (extension_config_set)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-package-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — 15, 16: packages:write and commerce:buy are one-press, so the tools stay
+ *     listed for an agent without them (permission ask, mcp/permission-ask-gate.ts) and the call is
+ *     refused SCOPE_DENIED with the allow address instead of "not offered".
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27).
  */
 
@@ -235,9 +238,13 @@ await test('14. aimeat_package_check_updates and aimeat_package_repository answe
     assert(repo.isError, `a node that is not a peer is no repository: ${repo.text.slice(0, 300)}`);
 });
 
-await test('15. The package tools are not offered to an agent without packages:write', async () => {
+// Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+const refusedWithAllow = (r: { isError: boolean; offered: boolean; text: string }) =>
+    r.isError && r.offered && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?');
+
+await test('15. The package tools are refused with the allow address to an agent without packages:write', async () => {
     const out = await callTool(authorBuy, 'aimeat_package_instance_set', { instance_id: instanceId, label: 'no word' });
-    assert(out.isError && !out.offered, `an agent without the word is not handed the tool: ${out.text.slice(0, 200)}`);
+    assert(refusedWithAllow(out), `an agent without the word is not refused with the allow address: ${out.text.slice(0, 200)}`);
 });
 
 console.log('\nPhase 4 — buying, and the operator\'s sale tools');
@@ -248,7 +255,7 @@ await test('16. aimeat_package_buy lists the owner\'s subscriptions, and refuses
     const offer = await callTool(authorBuy, 'aimeat_package_buy', { action: 'offer', repository: `no-such-repository-${STAMP}`, group_id: groupId });
     assert(offer.isError, `an offer from a node that is no peer: ${offer.text.slice(0, 300)}`);
     const noWord = await callTool(authorPkg, 'aimeat_package_buy', { action: 'subscriptions' });
-    assert(noWord.isError && !noWord.offered, `buying asks commerce:buy: ${noWord.text.slice(0, 200)}`);
+    assert(refusedWithAllow(noWord), `buying asks commerce:buy: ${noWord.text.slice(0, 200)}`);
 });
 
 await test('17. aimeat_package_sale: the operator\'s agent reads the catalogue; a non-operator holding operator:admin is refused', async () => {

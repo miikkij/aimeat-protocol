@@ -20,6 +20,9 @@
  *   that builds the wrong body cannot be hidden by an install that never needed it.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-packages
  * @version-history
+ *   v1.2.0 — 2026-10-17 — 5: an agent without packages:write is offered aimeat_package_install
+ *     (permission ask, mcp/permission-ask-gate.ts), and its call is refused SCOPE_DENIED with the
+ *     allow address.
  *   v1.1.0 — 2026-10-02 — The package carries an app, so the installing agent holds packages:install-code,
  *     and 6b proves an agent without it gets a request (package sale design, T1). Cases 7 and 8 went red
  *     because their setup no longer matched the rule, not because the source broke.
@@ -260,10 +263,16 @@ await test('4. aimeat_package_install is offered to an agent that holds packages
         `the node MCP must serve the install tool; it offered ${names.length} tools without it`);
 });
 
-await test('5. …and is not offered to an agent that does not', async () => {
-    const names = await toolNames(await openSession(narrowToken));
-    assert(!names.includes('aimeat_package_install'),
-        'an agent without packages:write must not be handed the install tool');
+await test('5. …and an agent that does not is refused it with the allow address', async () => {
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    const narrow = await openSession(narrowToken);
+    const names = await toolNames(narrow);
+    assert(names.includes('aimeat_package_install'),
+        'packages:write is one-press, so the install tool is listed for an agent without it');
+    const body = await mcpRpc(narrow, 'tools/call', { name: 'aimeat_package_install', arguments: { group_id: groupId, label: 'Refused' } });
+    const text = String(body?.result?.content?.[0]?.text ?? '');
+    assert(body?.result?.isError === true && text.startsWith('SCOPE_DENIED') && text.includes('/v1/allow?'),
+        `an agent without packages:write must be refused with the allow address: ${text.slice(0, 200)}`);
 });
 
 await test('6. a dry run reports what would be registered and registers nothing', async () => {

@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-17 — manage-my-agents: a refusal is answered with the one-press allow address
+ *     (/v1/allow?agent=&need=), a powerful permission with the agent's page.
  *   2026-10-15 — manage-my-agents: an owner_scope read of a private record takes memory:read-as-owner
  *     (feature-list audit #42).
  *   2026-10-15 — manage-my-agents: `refusals_unreadable: true` on an agent row means the refusals
@@ -217,8 +219,9 @@ flowchart LR
 - **Why an agent's tasks do not move:** in the same list, \`refusals\` names every call the node
   refused the agent for a permission it still lacks (the permission, the call, how many times,
   when last), and \`scope_request\` says what the agent asked for at its last approval. A refusal is
-  often why a task waits or a run looked fine and wrote nothing. Tell the owner which permission is
-  missing, in words, and that they give it in Profile → Agents → Manage access rights. A refusal
+  often why a task waits or a run looked fine and wrote nothing. Tell the owner what the agent could
+  not do, in words, and give them the address \`/v1/allow?agent=<name>&need=<permissions>\`, where they
+  allow it with one press; a powerful permission is given in Profile → Agents → Manage access rights. A refusal
   goes away when the permission is given. When a row says \`refusals_unreadable: true\`, the node
   could not read the refusals: \`refusals\` is then null and says nothing about whether any were
   refused, so ask again later rather than telling the owner there are none. Reading the owner's address book (\`aimeat_contact_list\`)

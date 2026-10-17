@@ -25,6 +25,9 @@
  *   - Phase 4: the task tools (list, todo, fail) and the two unreached branches
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-packages-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — 3: the four package writes miss only one-press words, so a memory:read agent
+ *     is listed them (permission ask, mcp/permission-ask-gate.ts) and each call is refused SCOPE_DENIED
+ *     with the allow address. aimeat_task_create (task:write, a powerful word) stays off the list.
  *   v1.0.0 — 2026-09-08 — Initial: the six uncalled tools of src/mcp/packages.ts and the three of
  *     src/mcp/agent-tasks.ts, plus the dedupe and isOwnTask branches.
  */
@@ -229,9 +232,15 @@ await test('2. An agent holding packages:write and app:write is handed all six p
     for (const t of [...PACKAGE_GATED, ...PACKAGE_UNGATED]) assert(names.includes(t), `${t} must be offered`);
 });
 
-await test('3. …an agent holding neither word keeps the two reads and loses the four writes', async () => {
-    const names = await toolNames(await openSession(narrow.token));
-    for (const t of PACKAGE_GATED) assert(!names.includes(t), `${t} writes and must be gone without its word`);
+await test('3. …an agent holding neither word keeps the two reads, and the four writes are refused with the allow address', async () => {
+    const narrowSession = await openSession(narrow.token);
+    const names = await toolNames(narrowSession);
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    for (const t of PACKAGE_GATED) {
+        assert(names.includes(t), `${t} is listed to ask for (packages:write and app:write are one-press)`);
+        const r = await callTool(narrowSession, t, {});
+        assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?'), `${t} writes and must be refused without its word: ${r.text.slice(0, 200)}`);
+    }
     for (const t of PACKAGE_UNGATED) {
         assert(names.includes(t), `${t} mirrors a public REST read, so gating it here would be stricter than REST`);
     }

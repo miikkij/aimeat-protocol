@@ -27,6 +27,9 @@
  *   - Phase 5: the provider side (consumers) and the refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-exchange
  * @version-history
+ *   v1.3.0 — 2026-10-17 — 6, 7: the exchange words are one-press, so an agent without them is listed
+ *     the tools (permission ask, mcp/permission-ask-gate.ts) and every call is refused SCOPE_DENIED
+ *     with the allow address; the fence is asserted on the call instead of on the list.
  *   v1.2.1 — 2026-10-13 — The provider's agent holds ext:invoke: aimeat_app_tool_invoke declares it beside
  *     exchange:write, and from 4.0.0 the tool is not offered without it (tests 28 and 29).
  *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
@@ -349,16 +352,30 @@ await test('5. An agent holding both exchange words is handed all ten tools', as
     }
 });
 
-await test('6. …an exchange:read agent gets the five reads and NONE of the five writes', async () => {
-    const names = await toolNames(await openSession(readOnlyAgent));
+// Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the
+// call is refused with the allow address. exchange:read and exchange:write are one-press, so the fence
+// is the SCOPE_DENIED answer in front of each handler rather than absence from the list.
+const refusedWithAllow = (r: { isError: boolean; text: string }) => r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?');
+
+await test('6. …an exchange:read agent gets the five reads, and every one of the five writes is refused with the allow address', async () => {
+    const session = await openSession(readOnlyAgent);
+    const names = await toolNames(session);
     for (const t of READ_TOOLS) assert(names.includes(t), `${t} is a read tool and must survive exchange:read`);
-    for (const t of WRITE_TOOLS) assert(!names.includes(t), `${t} mints or changes a contract and must be gone without exchange:write`);
+    for (const t of WRITE_TOOLS) {
+        assert(names.includes(t), `${t} is listed to ask for (exchange:write is one-press)`);
+        const r = await callTool(session, t, {});
+        assert(refusedWithAllow(r), `${t} mints or changes a contract and must be refused without exchange:write: ${r.text.slice(0, 200)}`);
+    }
 });
 
-await test('7. …and an agent with neither word is handed no exchange tool at all', async () => {
-    const names = await toolNames(await openSession(narrowAgent));
-    const found = [...READ_TOOLS, ...WRITE_TOOLS].filter((t) => names.includes(t));
-    assert(found.length === 0, `an agent without an exchange scope must see none of them, got ${JSON.stringify(found)}`);
+await test('7. …and an agent with neither word is refused every exchange tool with the allow address', async () => {
+    const session = await openSession(narrowAgent);
+    const names = await toolNames(session);
+    for (const t of [...READ_TOOLS, ...WRITE_TOOLS]) {
+        assert(names.includes(t), `${t} is listed to ask for (the exchange words are one-press)`);
+        const r = await callTool(session, t, {});
+        assert(refusedWithAllow(r), `an agent without an exchange scope must be refused ${t}: ${r.text.slice(0, 200)}`);
+    }
 });
 
 await test('8. The REST door behind them refuses an unauthenticated read with 401', async () => {

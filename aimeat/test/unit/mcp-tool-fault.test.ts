@@ -81,6 +81,7 @@ beforeAll(async () => {
   answerScopeDeniedTools(mcp, {
     missingWords: (name) => enforcedScopesForTool(name).filter((w) => !scopeIsCovered(deps.scopes(), w)),
     principal: deps.principal,
+    baseUrl: 'https://probe.example',
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   client = new Client({ name: 'probe', version: '1.0.0' }, { capabilities: {} });
@@ -164,6 +165,14 @@ describe('a tool the session may not use', () => {
     expect(r.text.startsWith('SCOPE_DENIED: ')).toBe(true);
     expect(r.text).toContain('"memory:write"');
     expect(r.text).not.toMatch(/not found/i);
+  });
+
+  it('hands the AI the one-press address and a sentence for the person, not the permission word', async () => {
+    const r = await call('aimeat_memory_write');
+    expect(r.text).toContain('https://probe.example/v1/allow?agent=probebot&need=memory%3Awrite');
+    expect(r.text).toMatch(/without naming any permission or tool/);
+    // The plain sentence comes from the agent editor's own words for memory:write.
+    expect(r.text).toMatch(/You may not do this yet for the person: /);
   });
 
   it('a tool that does not exist still answers not found', async () => {

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-17 -- announceScopes() moved unchanged to ./announce-scopes.ts, which ./permission-allow.ts
+ *     calls as well.
  *   2026-10-16 -- PATCH /v1/agents/:name/scopes admits the owner's agent holding agent:permissions and
  *     agent:write, the words aimeat_operator_agent_configure declares, and lets it only narrow a sibling's
  *     list (SCOPE_ADDITION_REFUSED otherwise), as the MCP tool does (QA audit D2-02).
@@ -81,8 +83,8 @@ import { fireHook } from '../../utils/fire-hook.js';
 import { executeHooks } from '../../services/hooks.js';
 import { emitChange } from '../../services/event-bus.js';
 import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
-import { emitToolListChanged } from '../../mcp/index.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { announceScopes } from './announce-scopes.js';
 import { logger } from '../../utils/logger.js';
 import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -92,24 +94,6 @@ import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config-p
 
 /** Why the read-through doors are the owner's in person: letting an agent read mail is consent. */
 const READ_IN_PERSON = 'Letting an agent read your mail is your own decision, so only you, signed in yourself, can make it here.';
-
-/**
- * An agent's permissions changed: tell the two places that hold the old list. Moved unchanged out of
- * PATCH /v1/agents/:name/scopes, so the read-through doors say it the same way.
- */
-function announceScopes(gaii: string): void {
-  // The agent's open MCP sessions registered the tools THESE scopes allowed, so the list they
-  // hold is now wrong. Saying so is the difference between the person reconnecting the connector
-  // by hand after every permission change and not having to think about it at all.
-  emitToolListChanged(gaii);
-  // …and the tool list is only half of it. An open MCP session re-lists its tools on that signal,
-  // but a connector holds a MINTED token whose scopes were fixed when it was minted, for up to an
-  // hour, and nothing told it otherwise: the node's own /v1/agents said the agent held the new
-  // word while every call it made was refused for lacking it. This frame asks for a fresh mint and
-  // nothing else — it must never be auth_revoked, which stops the identity, because then ADDING a
-  // permission would kill the agent.
-  getActiveConnectTunnelManager()?.notifyScopesChanged(gaii);
-}
 
 export function registerManagementRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // POST /v1/agents/:gaii/export — Export agent data for portability (owner auth)

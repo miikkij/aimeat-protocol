@@ -10,6 +10,7 @@
  * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold · chatFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.18.0 -- 2026-10-17 -- A letters row for the email an agent's permission request sends (email.agentAsks, on unless switched off).
  *   v1.17.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip with the address in its long tone; the change form as Fields; the uses, mailboxes, their delegations, the sent log and the letters as the List with Tick, Lead, When and Mark; Tabs in the fold tone; More; CardGrid; Roads; Note; Action): the page passes data and writes no class. Put back from main: no letter sent in 30 days is a dim tag (page group G8).
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.15.0 -- 2026-09-26 -- The mark of a sender that is not a person is the avatar's agent tone (.poster-box--agent, css/poster.css), a unification: the look Contacts, Notifications, Email and MCP drew alike.
@@ -227,6 +228,7 @@ function lettersFold(ctx) {
           options=${[2, 4, 8, 24, 72].map(h => [String(h), c('afterHours', { h })])} />` : null}
         <${Switch} on=${digest.enabled} label=${c('emailWord')} disabled=${off} onToggle=${() => setDigest({ enabled: !digest.enabled })} />`)}
       ${row('nudge', html`<${Switch} on=${em.nudge === true} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, nudge: em.nudge !== true } })} />`)}
+      ${row('agentAsks', html`<${Switch} on=${em.agentAsks !== false} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, agentAsks: em.agentAsks === false } })} />`)}
     <//>
     <${Hint}>${verified ? c('lettersHint') : c('lettersNeedVerified')}<//>
     ${ctx.mailLog.length ? html`

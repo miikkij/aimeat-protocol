@@ -21,6 +21,10 @@
  *   - Phase 5: narrowing a '*' agent
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-agent-self-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — 3b, 4b: agent:read, memory:write and agent:write are one-press, so the
+ *     tools stay listed for an agent without them (permission ask, mcp/permission-ask-gate.ts) and the
+ *     call is refused SCOPE_DENIED with the allow address. 5b keeps "not offered": agent:permissions
+ *     is outside every wildcard.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27).
  */
 
@@ -124,11 +128,15 @@ await test('3a. basics get: the agent holding agent:read reads what the button w
     assert(names(r.data) !== '[]' && names(r.data) === names(viaRest.body.data), `the two answers differ: ${names(r.data)} vs ${names(viaRest.body.data)}`);
 });
 
-await test('3b. basics get / request: not offered to an agent without agent:read / memory:write', async () => {
+// Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+const refusedWithAllow = (r: { isError: boolean; offered: boolean; text: string }) =>
+    r.isError && r.offered && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?');
+
+await test('3b. basics get / request: refused with the allow address to an agent without agent:read / memory:write', async () => {
     const get = await callTool(sibMcp, 'aimeat_agent_basics_get', {});
-    assert(get.isError && !get.offered, `basics get offered without agent:read: ${get.text.slice(0, 200)}`);
+    assert(refusedWithAllow(get), `basics get answered without agent:read: ${get.text.slice(0, 200)}`);
     const req = await callTool(sibMcp, 'aimeat_agent_basics_request', { note: 'should not land' });
-    assert(req.isError && !req.offered, `basics request offered without memory:write: ${req.text.slice(0, 200)}`);
+    assert(refusedWithAllow(req), `basics request answered without memory:write: ${req.text.slice(0, 200)}`);
 });
 
 await test('3c. basics request: the agent asks once, and asking again writes nothing new', async () => {
@@ -145,11 +153,11 @@ await test('4a. description set: the manager describes its sibling, and GET /v1/
     assert((await rowOf(sib))?.description === `Reads the morning mail ${stamp}`, 'the list does not show the description');
 });
 
-await test('4b. description set: refused on another owner\'s agent, and not offered without agent:write', async () => {
+await test('4b. description set: refused on another owner\'s agent, and refused with the allow address without agent:write', async () => {
     const r = await callTool(mgrMcp, 'aimeat_agent_description_set', { target_agent_name: bobAgent.gaii, description: 'rewritten by alice\'s agent' });
     assert(r.isError, `bob's agent was described by alice's agent: ${r.text.slice(0, 200)}`);
     const own = await callTool(sibMcp, 'aimeat_agent_description_set', { target_agent_name: sib.name, description: 'x' });
-    assert(own.isError && !own.offered, `offered without agent:write: ${own.text.slice(0, 200)}`);
+    assert(refusedWithAllow(own), `answered without agent:write: ${own.text.slice(0, 200)}`);
 });
 
 await test('4c. run mode set: the manager sets its sibling to spawn, and GET /v1/agents shows it', async () => {

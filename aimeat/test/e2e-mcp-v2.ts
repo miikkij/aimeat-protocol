@@ -13,6 +13,10 @@
 // 2026-10-02: the chat surface. It lists its small set, the finder adds tools to the session, a
 // switched-off tool runs by name, aimeat_invoke runs the session's own tools (one the dispatch table
 // does not carry among them), and a memory:read agent can neither find nor run memory_write.
+// 2026-10-17: permission ask (mcp/permission-ask-gate.ts). A tool whose missing words are all one-press
+// stays on an agent's list, so the narrow agent is listed memory_write on the agent and chat surfaces
+// and a call is refused SCOPE_DENIED with the allow address; a tool missing a powerful word
+// (task_create, task:write) stays absent, and the finder does not offer it.
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-v2.ts
 
 import { MCP_SURFACES } from '../src/tool-catalog/surfaces.js';
@@ -129,7 +133,7 @@ await test('Setup: a second agent holding only memory:read', async () => {
     narrow = { gaii: r.body.data.agent.gaii, key: r.body.data.private_key };
 });
 
-await test('A memory:read agent gets a STRICT SUBSET of the agent surface — no write tools', async () => {
+await test('A memory:read agent gets a STRICT SUBSET of the agent surface — no powerful tools, the one-press ones refused', async () => {
     const got = new Set(await listToolsForRole(narrow.gaii, narrow.key, 'agent'));
     const surface = new Set(MCP_SURFACES.agent);
 
@@ -138,8 +142,14 @@ await test('A memory:read agent gets a STRICT SUBSET of the agent surface — no
     assert(offSurface.length === 0, `scopes must not add tools outside the surface: ${offSurface.join(', ')}`);
     assert(got.size < surface.size, `a memory:read agent must see fewer than the ${surface.size} tools of the full surface, saw ${got.size}`);
 
-    // The write tools of this surface are exactly what memory:read does not buy.
-    assert(!got.has('aimeat_memory_write'), 'memory_write must be absent for a memory:read agent');
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    assert(got.has('aimeat_memory_write'), 'memory_write is listed for a memory:read agent (memory:write is one-press)');
+    const write = await (await openSession(narrow.gaii, narrow.key, 'agent')).call('aimeat_memory_write', { key: 'x', value: 'y' });
+    const writeText = String(write.content?.[0]?.text ?? '');
+    assert(write.isError === true && writeText.startsWith('SCOPE_DENIED') && writeText.includes('/v1/allow?'),
+        `memory_write is refused with the allow address: ${writeText.slice(0, 200)}`);
+    // A powerful word (task:write) is not one-press, so its tool stays off the surface for this agent.
+    assert(!got.has('aimeat_task_create'), 'task_create must be absent for a memory:read agent (task:write is powerful)');
     assert(got.has('aimeat_memory_read') || got.has('aimeat_memory_list'),
         `…while its reading tools remain: ${[...got].slice(0, 8).join(', ')}`);
 
@@ -236,16 +246,20 @@ await test('on chat, a switched-off tool runs by name, and aimeat_invoke runs on
     assert((viaInvoke.content?.[0]?.text ?? '').includes('contacts'), `with that tool's own answer, got ${(viaInvoke.content?.[0]?.text ?? '').slice(0, 120)}`);
 });
 
-await test('on chat, a memory:read agent can neither find nor run memory_write', async () => {
+await test('on chat, a memory:read agent is refused memory_write with the allow address, and cannot find a powerful tool', async () => {
     const s = await openSession(narrow.gaii, narrow.key, 'chat');
     const listed = await s.names();
-    assert(!listed.includes('aimeat_memory_write'), 'memory_write is not listed for a memory:read agent');
-    const found = JSON.parse((await s.call('aimeat_tools_find', { purpose: 'write memory' })).content?.[0]?.text ?? '{}');
-    assert(!(found.added ?? []).includes('aimeat_memory_write') && !(found.tools ?? []).some((t: any) => t.name === 'aimeat_memory_write'),
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    assert(listed.includes('aimeat_memory_write'), 'memory_write is listed for a memory:read agent (memory:write is one-press)');
+    // A powerful word (task:write) is not one-press: the finder does not offer what the scopes withhold.
+    const found = JSON.parse((await s.call('aimeat_tools_find', { purpose: 'create a task for an agent' })).content?.[0]?.text ?? '{}');
+    assert(!(found.added ?? []).includes('aimeat_task_create') && !(found.tools ?? []).some((t: any) => t.name === 'aimeat_task_create'),
         `the finder does not offer what the scopes withhold, got ${JSON.stringify(found.tools?.map((t: any) => t.name))}`);
     const byName = await s.call('aimeat_memory_write', { key: 'x', value: 'y' });
     const viaInvoke = await s.call('aimeat_invoke', { capability: 'aimeat_memory_write', input: { key: 'x', value: 'y' } });
-    assert(byName.isError === true, `a call by name is refused, got ${JSON.stringify(byName).slice(0, 200)}`);
+    const byNameText = String(byName.content?.[0]?.text ?? '');
+    assert(byName.isError === true && byNameText.startsWith('SCOPE_DENIED') && byNameText.includes('/v1/allow?'),
+        `a call by name is refused with the allow address, got ${JSON.stringify(byName).slice(0, 200)}`);
     assert(viaInvoke.isError === true, `invoke is refused, got ${JSON.stringify(viaInvoke).slice(0, 200)}`);
 });
 
