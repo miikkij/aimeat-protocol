@@ -582,6 +582,10 @@ await test('9. A second owner\'s agent lists NO packages and cannot read A\'s', 
     // …and A's package id, which B could compute or overhear, opens nothing.
     const get = await b.call('aimeat_knowledge_get', { package_id: packageId }, 401);
     assert(get.result?.isError === true, `B must be refused A's package, got: ${JSON.stringify(get.result?.content?.[0]?.text ?? get).slice(0, 200)}`);
+    // …nor its links: aimeat_knowledge_links answered any package's links without the read
+    // (plan doc-mvcn6c7e4e5q, found by the V3.6 work; the REST route asked the read already).
+    const links = await b.call('aimeat_knowledge_links', { package_id: packageId }, 403);
+    assert(links.result?.isError === true, `B must be refused A's package links, got: ${JSON.stringify(links.result?.content?.[0]?.text ?? links).slice(0, 200)}`);
 
     // The importer still reads their own, so the refusal is ownership and not a broken tool.
     const mine = await mcpRpc('tools/call', { name: 'aimeat_knowledge_get', arguments: { package_id: packageId } }, 402);
