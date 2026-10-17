@@ -1925,6 +1925,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Install-request state records."
     },
+    "src/services/publish-requests/store.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: publish request records under the reserved prefix publish.requests., which only the filing path writes. They hold ids, a title and the change asked for, never the content being published."
+    },
+    "src/services/publish-requests/apply-memory.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: the approved record is read only to compare its version and visibility with the request before making it public; its value goes back into the same record and is returned to nobody."
+    },
     "src/services/packages/install/package-skill-component.ts": {
       "reads": {
         "listMemory": 1,

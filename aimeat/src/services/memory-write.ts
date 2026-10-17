@@ -29,6 +29,10 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.18.0 — 2026-10-18 — `gatePublic`: a write the generic memory doors make public asks the node's
+ *     publish gate. An agent without publish:public (an app grant too, when the gate covers apps)
+ *     stores the record at the level it had and gets `publishRequest`, a request the owner approves
+ *     (services/publish-gate.ts, services/publish-requests/; plan doc-mvcn6c7e4e5q, V4.4).
  *   v1.17.0 — 2026-10-17 — visibility 'organism:<id>': refused with 400 NOT_ORGANISM_MEMBER, nothing
  *     written, when the writer's account is not an active member of that organism (plan
  *     doc-mvcn6c7e4e5q, V3.2; services/organism-visibility.ts).
@@ -124,7 +128,7 @@ import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { misdirectedCrewKey, crewSitesWriteRefusal } from './crew-def-store.js';
-import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
+import { parseGAII, isForeignPrincipal, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from './legacy-pacing-write.js';
@@ -135,6 +139,9 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { canonicalAppToolsKey } from './app-tools-key.js';
 import { classifyAfterWrite } from './classify-on-write.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
+import { isRaiseToPublic } from './publish-gate.js';
+import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from './publish-requests/ask.js';
+import { callerFromAuth } from './caller-context.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -166,6 +173,8 @@ export interface MemoryWriteCaller {
     roles: string[];
     /** A federated session: minted with the owner role and a scope list the receiving node chose. */
     federated?: boolean;
+    /** `owner/filename` of an app grant, so a publish request names the app that asked. */
+    app?: string;
 }
 
 export interface MemoryWriteInput {
@@ -208,6 +217,13 @@ export interface MemoryWriteInput {
      * granted them, and without a second implementation to keep in step.
      */
     authorisingScope?: string;
+    /**
+     * Ask the node's publish gate when this write makes the record public (services/publish-gate.ts,
+     * plan doc-mvcn6c7e4e5q V4.4). The generic memory doors set it: POST, PUT and PATCH /v1/memory and
+     * aimeat_memory_write. A door whose record is public BY DESIGN leaves it unset: an agent's offers
+     * document on the exchange market (decision 11.6), the node's own pitfall knowledge base.
+     */
+    gatePublic?: boolean;
 }
 
 /**
@@ -221,7 +237,9 @@ export type ExchangeReconcileReport =
 
 /** A warning a successful write carries: the record was stored, and something about it needs a person. */
 export interface MemoryWriteWarning {
-    code: 'SHADOWED_BY_OWNER_COPY';
+    // PUBLISH_NOT_ASKED: stored at the level it had, and the request to make it public could not be
+    // filed (too many already wait for the owner).
+    code: 'SHADOWED_BY_OWNER_COPY' | 'PUBLISH_NOT_ASKED';
     message: string;
     [detail: string]: unknown;
 }
@@ -243,6 +261,11 @@ export type MemoryWriteResult =
         warnings: MemoryWriteWarning[];
         /** The EXCHANGE projection's report, when this key is a listing source and it made one. */
         exchange?: ExchangeReconcileReport;
+        /**
+         * The write asked to make the record public and the caller may not do that alone: the record
+         * is stored at the level it had, and this is the request the owner answers. A door answers 202.
+         */
+        publishRequest?: ReturnType<typeof publishRequestedBody>;
     }
     | {
         ok: false;
@@ -272,7 +295,9 @@ export type MemoryWriteResult =
             | 'OWNER_APPROVES_SITES'
             // visibility 'organism:<id>' naming an organism the writer's account is not an active
             // member of (services/organism-visibility.ts).
-            | 'NOT_ORGANISM_MEMBER';
+            | 'NOT_ORGANISM_MEMBER'
+            // Making it public, by a caller with nobody on this node to ask (services/publish-gate.ts).
+            | 'PUBLISH_NOT_ALLOWED';
         message: string;
         details?: unknown;
     };
@@ -292,7 +317,8 @@ export async function writeMemoryRecord(
     // 0. An app's tool manifest lives under the app's filename (services/app-tools-key.ts). A manifest
     //    written as `apps.nuotta.tools` for the app nuotta.html was sold on the market and shown in no
     //    catalogue. Decided here, before anything reads the key, so every door writes the same one.
-    const input: MemoryWriteInput = {
+    // `let`: the publish gate (step 3a) may store the record at the level it had instead of public.
+    let input: MemoryWriteInput = {
         ...requested, key: await canonicalAppToolsKey(storage, caller.targetGaii, requested.key),
     };
 
@@ -424,6 +450,31 @@ export async function writeMemoryRecord(
             ok: false, status: 409, code: 'ARCHIVED',
             message: 'This record is archived (read-only). Unarchive it before writing.',
         };
+    }
+
+    // 3a. The publish gate (plan doc-mvcn6c7e4e5q, V4.4). A write that makes the record public, by a
+    //     caller the node asks the owner about (an agent without publish:public; an app grant too when
+    //     the gate covers apps), stores the record at the level it had (a new one: private) and files
+    //     a request after the write. Keeping a public record public asks nothing.
+    let publishAsk: Extract<PublishAsk, { kind: 'ask' }> | null = null;
+    const ownerGhii = ownerGhiiOf(caller.targetGaii);
+    if (input.gatePublic && isRaiseToPublic(existing?.visibility, input.visibility)) {
+        // The writer's caller object, from the facts every door hands this service.
+        const writer = callerFromAuth({
+            sub: caller.principal, owner: localAccountName(ownerGhii), roles: caller.roles, scopes: caller.scopes,
+            ...(caller.federated !== undefined ? { federated: caller.federated } : {}),
+        }, config.nodeId, storage);
+        const ask = publishAskOf({ storage, config }, writer, caller.app);
+        if (ask.kind === 'refused') return { ok: false, status: ask.status, code: 'PUBLISH_NOT_ALLOWED', message: ask.message };
+        if (ask.kind === 'ask') {
+            publishAsk = ask;
+            const kept = existing?.visibility ?? 'private';
+            input = {
+                ...input, visibility: kept,
+                groupId: kept === 'group' ? existing?.groupId : undefined,
+                workspaceRef: kept === 'workspace' ? existing?.workspaceRef : undefined,
+            };
+        }
     }
     if (input.key.startsWith('organism.')) {
         const guard = await isKeyArchived(storage, input.key);
@@ -597,9 +648,24 @@ export async function writeMemoryRecord(
     const warnings: MemoryWriteWarning[] = [];
     if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));
 
+    // 8. The request the publish gate asked for (step 3a), now that the record it names exists.
+    let publishRequest: ReturnType<typeof publishRequestedBody> | undefined;
+    if (publishAsk) {
+        const filed = await fileAsk({ storage, config }, ownerGhii, publishAsk.requester, {
+            kind: 'memory',
+            target: { namespace: caller.targetGaii, key: record.key, version: record.version },
+            title: `the record ${record.key}`,
+            name: record.key,
+            change: { field: 'visibility', from: record.visibility, to: 'public' },
+        });
+        if (filed.ok) publishRequest = publishRequestedBody({ storage, config }, filed);
+        else warnings.push({ code: 'PUBLISH_NOT_ASKED', message: `Saved as ${record.visibility}, not public: ${filed.message}` });
+    }
+
     return {
         ok: true, record, shadowedBy, warnings,
         ...(after.exchange !== undefined ? { exchange: after.exchange } : {}),
+        ...(publishRequest ? { publishRequest } : {}),
     };
 }
 

@@ -20,6 +20,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.24.0 — 2026-10-18 — `publish.requests.` joins the list: a publish request is an instruction the
+ *     decision door performs as the owner (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.23.0 — 2026-10-14 — `commerce.session.` is service-owned: no memory route writes, restores
  *     or deletes an open checkout, for the buyer in person either. Completion charged from a record
  *     the buyer could write (QA audit 2026-10-14, K4).
@@ -211,6 +213,13 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // judged against the forgery. Only the filing path writes this prefix, server-side; the owner and
   // their agents settle it through /v1/package-install-requests. New prefix, nothing wrote it before.
   'packages.install-requests.',
+  // 2026-10-18: `publish.requests.<id>` is a request to make something public that an agent or an
+  // app could not make alone (services/publish-requests/store.ts), and the decision door ACTS on it:
+  // it reads the target and the change out of the record and makes the target public as the owner.
+  // A principal that could write the key could forge a request naming any of the owner's records,
+  // and an agent of the owner approving from a chat would be judged against the forgery. Only the
+  // filing path writes this prefix, server-side (plan doc-mvcn6c7e4e5q, V4.3). New prefix.
+  'publish.requests.',
   // 2026-09-25: `workflows.def.<id>` is a workflow definition and `workflows.run.<id>.<runId>` a run's
   // record. A trigger runs the saved definition on the authority of the principal it names as its
   // saver (`savedBy`, services/workflow/trigger-authority.ts), and the engine advances a run in flight

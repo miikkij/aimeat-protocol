@@ -3410,7 +3410,8 @@
       "signals": "el alcance de tus mensajes y páginas",
       "secrets": "las claves que guardas aquí",
       "ext": "las extensiones instaladas en tu cuenta",
-      "mcp": "los servidores MCP que has conectado"
+      "mcp": "los servidores MCP que has conectado",
+      "publish": "hacer públicas las cosas"
     },
     "scopeText": {
       "push": {
@@ -7719,6 +7720,12 @@
   "notiftext.package_request_approved_by_agent.body": "La hizo {who} y {by} la aprobó en tu nombre.",
   "notiftext.package_request_declined_by_agent.title": "{by} rechazó la solicitud sobre el paquete {name}",
   "notiftext.package_request_declined_by_agent.body": "La hizo {who}. No se instaló ni se cambió nada.",
+  "notiftext.publish_request.title": "{who} pide hacer público: {what}",
+  "notiftext.publish_request.body": "Público significa que cualquiera puede leerlo, también quien no ha iniciado sesión. Si lo apruebas, es público al instante. Si lo rechazas, queda como está.",
+  "notiftext.publish_request_approved_by_agent.title": "{by} hizo público: {what}",
+  "notiftext.publish_request_approved_by_agent.body": "Lo pidió {who}, y {by} lo aprobó en tu nombre.",
+  "notiftext.publish_request_declined_by_agent.title": "{by} dejó como estaba: {what}",
+  "notiftext.publish_request_declined_by_agent.body": "{who} pidió hacerlo público, y {by} lo rechazó en tu nombre.",
   "notiftext.package_renewal_due.title": "El servicio de actualizaciones de {label} termina el {date}",
   "notiftext.package_renewal_due.body": "{label} sigue funcionando después, pero ya no recibe versiones nuevas. Renueva el servicio de actualizaciones donde lo compraste.",
   "notiftext.package_renewal_failed.title": "No se pudo renovar el servicio de actualizaciones de {name}",
@@ -10032,6 +10039,9 @@
     "cfgOpt_ai_catalog_refresh_weekly": "Semanal",
     "cfgOpt_visibility_content_access_open": "Cualquiera (lo público es público)",
     "cfgOpt_visibility_content_access_signed-in": "Solo cuentas con sesión aquí",
+    "cfgOpt_visibility_publish_gate_off": "Nadie pregunta",
+    "cfgOpt_visibility_publish_gate_agents": "Los agentes preguntan al propietario",
+    "cfgOpt_visibility_publish_gate_agents-and-apps": "Los agentes y las aplicaciones preguntan al propietario",
     "cfgOpt_apps_default_listing_listed": "En todas las listas",
     "cfgOpt_apps_default_listing_community": "Solo para quien inició sesión aquí",
     "cfgOpt_apps_default_listing_unlisted": "Solo en la lista de su dueño",
@@ -10453,6 +10463,7 @@
     "cfg_visibility_agent_experience": "Conteo de llamadas de agentes",
     "cfg_visibility_behaviour": "Conteo de clics y desplazamiento en las aplicaciones",
     "cfg_visibility_content_access": "Quién ve el contenido de aquí",
+    "cfg_visibility_publish_gate": "Quién pregunta antes de hacer algo público",
     "cfg_apps_default_listing": "Dónde se lista una aplicación nueva",
     "cfg_apps_default_access": "Quién puede abrir una aplicación nueva",
     "cfg_apps_default_access_code": "Una aplicación nueva recibe un código de acceso",
@@ -15025,6 +15036,9 @@
           "secrets": {
             "manage": "Añadir, sustituir y eliminar las claves y contraseñas con nombre que guardas aquí. Volver a leer un valor no es posible, ni para este agente ni para nadie."
           },
+          "publish": {
+            "public": "Hacer público para cualquiera un registro, un archivo, una aplicación o una página, sin preguntarte antes. Sin este permiso, el agente te lo pregunta y tú lo apruebas o lo rechazas. No forma parte del acceso completo."
+          },
           "operator": {
             "organism-repair": "Devuelve un propietario a un organismo que esta cuenta no posee. Solo funciona para el operador del nodo: en cualquier otra cuenta este permiso no hace nada. Es la vuelta atrás cuando ya no se alcanza la cuenta propietaria de un organismo, y entrega ese organismo a quien el agente nombre.",
             "admin": "Administrar esta instalación a través de este agente. Puede, por ejemplo, desactivar cuentas, quitarle a alguien la verificación en dos pasos y cambiar el inicio de sesión de organización, los orígenes permitidos, los hooks y los servidores MCP que se ofrecen a todas las cuentas. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. \"Acceso total\" no lo incluye."
@@ -15073,7 +15087,8 @@
         "domainCompliance": "Cumplimiento",
         "domainSignals": "Alcance",
         "domainSite": "Las páginas a las que se llega",
-        "domainMcp": "Servidores MCP que has conectado"
+        "domainMcp": "Servidores MCP que has conectado",
+        "domainPublish": "Publicar para todos"
       },
       "deviceAuth": {
         "title": "Autorización de dispositivo",

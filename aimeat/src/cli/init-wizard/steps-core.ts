@@ -194,6 +194,10 @@ export async function askCoreSettings(
     settings.AIMEAT_DEV_MODE = 'true';
   }
 
+  // A new node starts with agents and apps asking the owner before they make something public
+  // (plan doc-mvcn6c7e4e5q, V4). The code default stays off, so a running node does not change.
+  if (!env.AIMEAT_PUBLISH_GATE) settings.AIMEAT_PUBLISH_GATE = 'agents-and-apps';
+
   // Extended features — ask for public
   if (useCase === 'public') {
     const extDefault = env.AIMEAT_EXTENDED_FEATURES !== 'false';

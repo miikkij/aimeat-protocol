@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.33.0 -- 2026-10-18 -- Making something public may wait for the owner: publish_request and
+ *     aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.6).
  *   v1.32.0 -- 2026-10-17 -- What others can read: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   v1.31.0 -- 2026-10-16 -- Workspaces: aimeat_workspace_share, and HTML pages (skill aimeat-html-page).
  *   v1.30.0 -- 2026-10-15 -- Connected accounts: aimeat_connection_history and aimeat_connection_replies.
@@ -90,6 +92,11 @@ included) that someone else can read: open to anyone, to anyone holding the link
 account of this node, or to one organisation's members, each with how to close it. Use it when your
 owner asks what a stranger can see, or hesitates to put something in. Tell them what is open to
 everyone first, and close nothing without asking.
+
+**Making something public may wait for your owner.** When this node asks the owner first and you do
+not hold publish:public, a write that makes something public answers with \`publish_request\`: it is
+stored as it was (a new one private). Tell your owner in one sentence what you asked to make public
+and give them the \`approve_url\`. \`aimeat_publish_requests\` lists the requests and their state.
 
 **Classified content — read the warning, respect what is hidden.** Every memory record, stored file
 and workspace row has a classification (public, internal, confidential, highly confidential, or a

@@ -1,0 +1,348 @@
+/**
+ * @file src/services/publish-requests/store.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The publish request as a record: where it lives, how it is filed in front of the
+ *   owner, and how it is settled and told to the one who asked (plan doc-mvcn6c7e4e5q, V4.3). The
+ *   pattern is the package install request's (services/packages/install/package-install-request-store.ts).
+ *
+ *   ONE RECORD PER REQUEST, `publish.requests.<id>`, in the owner's namespace under a reserved prefix
+ *   (utils/reserved-keys.ts): the decision door reads the target and the change out of the record and
+ *   makes the target public as the owner, so no app and no delegated agent may write one. No new table.
+ *
+ *   FILED = ONE RECORD, ONE OPEN ITEM, ONE NOTIFICATION. The notification carries Approve and Decline
+ *   as `api` actions on the decision door, which the bell and the Notifications page run with the
+ *   owner's own session. A second ask for the same change by the same principal returns the standing
+ *   request instead of a second line on the owner's list.
+ *
+ *   HOW IT GOES STALE. A request is decidable for seven days (policy.ts); an expired one is settled
+ *   `expired` by the next filing, the next decision or the next read. The record lives thirty days
+ *   from its creation (the memory TTL), so the one who asked can read the outcome, and then it is
+ *   gone. At most twenty wait at once per owner.
+ *
+ *   SETTLED = STATE, ITEM CLOSED, REQUESTER TOLD. An agent that asked gets a turn on the Agent v2
+ *   road with the request id as its context. When one of the owner's agents decided rather than the
+ *   owner, the owner is told: a person must see when their AI acted for them.
+ * @structure PUBLISH_REQUEST_PREFIX · PublishKind · PublishRequest · PublishRequester ·
+ *   inPublishQueue · readPublishRequest · listPublishRequests · effectiveState · summarizePublishRequest ·
+ *   filePublishRequest · settlePublishRequest · requesterName · approveUrl · PublishApplyResult ·
+ *   PublishApplier
+ * @usage
+ *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
+ *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
+ * @version-history
+ *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
+ */
+import { createHash, randomUUID } from 'node:crypto';
+import type { AimeatConfig } from '../../config.js';
+import type { Storage } from '../../storage/interface.js';
+import { addItem, closeItem, getItem } from '../open-items.js';
+import { notify } from '../notify.js';
+import { sendAgentV2Message } from '../agent-v2-messaging.js';
+import { emitChange } from '../event-bus.js';
+import { stableStringify } from '../../utils/stable-json.js';
+import { serialByKey } from '../../utils/serial-by-key.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
+import { PUBLISH_REQUEST_DAYS, publishRequestExpired } from './policy.js';
+
+/** Where one request lives. The prefix is listable, so the owner's list finds them all. */
+export const PUBLISH_REQUEST_PREFIX = 'publish.requests.';
+const SPEC = 'aimeat.publish-request/v1';
+const RECORD_HOURS = 30 * 24;
+const MAX_WAITING = 20;
+const ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** What kind of content a request makes public. Each has an applier in appliers.ts. */
+export type PublishKind =
+  | 'memory' | 'file' | 'workspace-share' | 'app' | 'organism' | 'board' | 'skill'
+  | 'package' | 'knowledge' | 'datapackage' | 'portfolio' | 'company' | 'cortex';
+
+export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';
+
+/** Who asked. */
+export interface PublishRequester {
+  /** An agent's GAII, or `eco:<app>#<owner>@<node>` for an app grant. */
+  principal: string;
+  kind: 'agent' | 'app';
+  /** The token's subject. */
+  sub: string;
+}
+
+export interface PublishRequest {
+  spec: typeof SPEC;
+  id: string;
+  kind: PublishKind;
+  /**
+   * What the change is made to, as the applier of `kind` reads it: ids and names only, never content.
+   * `version` (where the kind has one) is the content's version when it was asked: an approval of a
+   * target whose content changed since is settled `outdated`, so nothing the owner did not see goes out.
+   */
+  target: Record<string, string | number>;
+  /** The English phrase a person reads for the target: "the record notes.trip", "the app quiz.html". */
+  title: string;
+  /** The target's own name, without words of any language: "notes.trip", "quiz.html". */
+  name: string;
+  /** The one field the request changes, from what to what. */
+  change: { field: string; from: unknown; to: unknown };
+  requested_by: PublishRequester;
+  state: PublishRequestState;
+  created_at: string;
+  expires_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  outcome: { reason?: string; url?: string } | null;
+  item_id: string | null;
+  fingerprint: string;
+}
+
+export type PublishRequestFail = { ok: false; status: number; code: string; message: string };
+
+/** What an applier answers: done (with the public address when there is one), or why not. */
+export type PublishApplyResult = { ok: true; url?: string } | { ok: false; reason: string };
+
+/** Makes one approved request's target public as the owner (appliers.ts, apply-<kind>.ts). */
+export type PublishApplier = (ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest) => Promise<PublishApplyResult>;
+const fail = (status: number, code: string, message: string): PublishRequestFail => ({ ok: false, status, code, message });
+
+export interface PublishStoreCtx { storage: Storage; config: AimeatConfig }
+
+const publishRequestKey = (id: string): string => `${PUBLISH_REQUEST_PREFIX}${id}`;
+const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex');
+
+/** One filing or decision at a time per owner, in this process: two taps cannot both approve. */
+export function inPublishQueue<T>(ownerGhii: string, work: () => Promise<T>): Promise<T> {
+  return serialByKey(`publish-requests ${ownerGhii}`, work);
+}
+
+/** Where the owner answers: the Notifications page, which shows Approve and Decline. */
+export function approveUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/v1/profile?tab=notifications`;
+}
+
+function asRequest(value: unknown): PublishRequest | null {
+  const v = value as PublishRequest | undefined;
+  return v && v.spec === SPEC && typeof v.id === 'string' && v.target && v.change && v.requested_by ? v : null;
+}
+
+export async function readPublishRequest(storage: Storage, ownerGhii: string, id: string): Promise<PublishRequest | null> {
+  if (!ID_SHAPE.test(id)) return null;
+  return asRequest((await storage.getMemory(ownerGhii, publishRequestKey(id)))?.value);
+}
+
+/** Every request on this account, newest first. */
+export async function listPublishRequests(storage: Storage, ownerGhii: string): Promise<PublishRequest[]> {
+  const rows = await storage.listMemory(ownerGhii, { prefix: PUBLISH_REQUEST_PREFIX });
+  return rows.map(r => asRequest(r.value)).filter((r): r is PublishRequest => !!r)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** The state a reader is told: a waiting request past its expiry is expired, written or not. */
+export function effectiveState(request: PublishRequest, now = Date.now()): PublishRequestState {
+  return request.state === 'awaiting_owner' && publishRequestExpired(request, now) ? 'expired' : request.state;
+}
+
+/** The request as a door answers it. */
+export function summarizePublishRequest(request: PublishRequest, now = Date.now()) {
+  return {
+    id: request.id,
+    kind: request.kind,
+    state: effectiveState(request, now),
+    title: request.title,
+    name: request.name,
+    target: request.target,
+    change: request.change,
+    requested_by: { principal: request.requested_by.principal, kind: request.requested_by.kind },
+    created_at: request.created_at,
+    expires_at: request.expires_at,
+    decided_at: request.decided_at,
+    decided_by: request.decided_by,
+    outcome: request.outcome,
+  };
+}
+
+async function putRequest(storage: Storage, ownerGhii: string, request: PublishRequest): Promise<void> {
+  const row = await storage.getMemory(ownerGhii, publishRequestKey(request.id));
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: publishRequestKey(request.id),
+    ownerGaii: ownerGhii,
+    value: request as unknown as Record<string, unknown>,
+    visibility: 'private',
+    tags: ['publish-request'],
+    ttlHours: RECORD_HOURS,
+    version: (row?.version ?? 0) + 1,
+    createdAt: row?.createdAt ?? request.created_at ?? now,
+    updatedAt: now,
+  });
+}
+
+/** The name a person reads for who asked: the agent's name, or the app's. */
+export function requesterName(r: PublishRequester): string {
+  const hash = r.principal.indexOf('#');
+  return hash > 0 ? r.principal.slice(0, hash).replace(/^eco:/, '') : r.principal;
+}
+
+function outcomeSentence(request: PublishRequest, state: PublishRequestState, by: string | null): string {
+  const what = `your request to make ${request.title} public`;
+  const cap = `${what.charAt(0).toUpperCase()}${what.slice(1)}`;
+  switch (state) {
+    case 'approved': {
+      const who = by && by.includes('#') ? `${by.split('#')[0]} approved ${what} in the owner's name` : `The owner approved ${what}`;
+      return `${who}, and it is public now.${request.outcome?.url ? ` Address: ${request.outcome.url}` : ''}`;
+    }
+    case 'declined': return `${cap} was declined. It stays as it is.`;
+    case 'expired': return `${cap} expired before anyone decided it. It stays as it is. Ask again if it is still needed.`;
+    case 'outdated': return `${cap} can no longer be carried out as asked: ${request.outcome?.reason ?? 'it changed after you asked'}. It stays as it is. Ask again.`;
+    default: return `${cap} is waiting for the owner.`;
+  }
+}
+
+/** The draft a door hands over: everything but the bookkeeping. */
+export type PublishRequestDraft = Pick<PublishRequest, 'kind' | 'target' | 'title' | 'name' | 'change' | 'requested_by'>;
+
+/**
+ * Put a request in front of the owner. Changes nothing about the target. Returns the standing
+ * request when the same principal already asked for the same change of the same target and it is
+ * still waiting; when the target was written again in between, the standing request now names the
+ * new version, because the one who asked has asked again for what is there now.
+ */
+export async function filePublishRequest(
+  ctx: PublishStoreCtx, ownerGhii: string, draft: PublishRequestDraft,
+): Promise<{ ok: true; request: PublishRequest; alreadyWaiting: boolean } | PublishRequestFail> {
+  const { storage } = ctx;
+  // The version is left out: a second ask about the same target is the same request.
+  const where = Object.fromEntries(Object.entries(draft.target).filter(([k]) => k !== 'version'));
+  const fingerprint = sha256(stableStringify({
+    kind: draft.kind, by: draft.requested_by.principal, target: where, to: draft.change.to,
+  }));
+  return inPublishQueue(ownerGhii, async () => {
+    const now = Date.now();
+    const all = await listPublishRequests(storage, ownerGhii);
+    for (const old of all.filter(r => r.state === 'awaiting_owner' && publishRequestExpired(r, now))) {
+      await settlePublishRequest(ctx, ownerGhii, old, 'expired', { by: null });
+    }
+    const waiting = all.filter(r => r.state === 'awaiting_owner' && !publishRequestExpired(r, now));
+    const same = waiting.find(r => r.fingerprint === fingerprint);
+    if (same) {
+      if (stableStringify(same.target) === stableStringify(draft.target)) return { ok: true as const, request: same, alreadyWaiting: true };
+      const moved: PublishRequest = { ...same, target: draft.target, change: draft.change };
+      await putRequest(storage, ownerGhii, moved);
+      return { ok: true as const, request: moved, alreadyWaiting: true };
+    }
+    if (waiting.length >= MAX_WAITING) {
+      return fail(409, 'TOO_MANY_REQUESTS',
+        `${MAX_WAITING} requests to make something public already wait for the owner. They need to decide some before another one is filed.`);
+    }
+    const request: PublishRequest = {
+      spec: SPEC, id: randomUUID(), ...draft,
+      state: 'awaiting_owner',
+      created_at: new Date(now).toISOString(),
+      expires_at: new Date(now + PUBLISH_REQUEST_DAYS * 86_400_000).toISOString(),
+      decided_at: null, decided_by: null, outcome: null, item_id: null,
+      fingerprint,
+    };
+    const who = requesterName(draft.requested_by);
+    const item = await addItem(storage, ownerGhii, {
+      title: `${who} asks to make ${draft.title} public`.slice(0, 200),
+      kind: 'decision',
+      origin: draft.requested_by.principal,
+      object: { type: 'publish-request', id: request.id },
+      by: 'ai',
+    });
+    request.item_id = item?.id ?? null;
+    await putRequest(storage, ownerGhii, request);
+
+    const door = `/v1/publish-requests/${request.id}/decision`;
+    // The English here is the fallback and what a push carries; the page says it from the i18n key.
+    await notify(storage, ownerGhii, {
+      type: 'publish_request',
+      title: `${who} asks to make ${draft.title} public`,
+      body: `Public means anyone can read it, also people who are not signed in. If you approve, it is public at once. If you decline, it stays as it is.`,
+      link: '/v1/profile?tab=notifications',
+      i18n: { key: 'publish_request', vars: { who, what: draft.name } },
+      actions: [
+        { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve' }, style: 'primary' },
+        { id: 'decline', label: 'Decline', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline' }, style: 'default' },
+      ],
+    });
+    emitChange('open-items', ownerGhii);
+    emitChange('notifications', ownerGhii);
+    logger.info('Publish request filed', {
+      event: 'publish.request_filed', owner: ownerGhii, id: request.id, kind: draft.kind,
+      by: draft.requested_by.principal, item: request.item_id,
+    });
+    return { ok: true as const, request, alreadyWaiting: false };
+  });
+}
+
+/**
+ * Record how a request ended, close the item it put on the owner's list, and tell the one who asked.
+ * `by` is who decided: the owner's GHII, an agent's GAII, or null when time decided.
+ */
+export async function settlePublishRequest(
+  ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest, state: Exclude<PublishRequestState, 'awaiting_owner'>,
+  how: { by: string | null; outcome?: PublishRequest['outcome'] },
+): Promise<PublishRequest> {
+  const { storage } = ctx;
+  const settled: PublishRequest = {
+    ...request, state,
+    decided_at: new Date().toISOString(),
+    decided_by: how.by,
+    outcome: how.outcome ?? request.outcome,
+  };
+  await putRequest(storage, ownerGhii, settled);
+
+  if (request.item_id) {
+    try {
+      if (await getItem(storage, ownerGhii, request.item_id)) {
+        await closeItem(storage, ownerGhii, request.item_id, how.by && how.by.includes('#') ? 'ai' : 'person');
+      }
+    } catch (err) {
+      logger.warn('Publish request: could not close the owner list item', { owner: ownerGhii, id: request.id, error: String(err) });
+    }
+  }
+
+  if (request.requested_by.kind === 'agent') {
+    try {
+      await sendAgentV2Message(storage, {
+        owner: localAccountName(ownerGhii),
+        from: how.by ?? ownerGhii,
+        to: request.requested_by.principal,
+        role: 'agent',
+        contextId: request.id,
+        parts: [
+          { kind: 'text', text: outcomeSentence(settled, state, how.by) },
+          { kind: 'data', data: { request_id: request.id, kind: request.kind, target: request.target, state, ...(settled.outcome ?? {}) } },
+        ],
+        metadata: { kind: 'publish-request' },
+      });
+    } catch (err) {
+      logger.warn('Publish request: the requester could not be told; the record says it', { owner: ownerGhii, id: request.id, error: String(err) });
+    }
+  }
+
+  if (how.by && how.by.includes('#') && (state === 'approved' || state === 'declined')) {
+    const agentName = how.by.split('#')[0];
+    const asker = requesterName(request.requested_by);
+    await notify(storage, ownerGhii, {
+      type: 'publish_request_decided',
+      title: `${agentName} ${state === 'approved' ? 'made' : 'kept'} ${request.title} ${state === 'approved' ? 'public' : 'as it was'}`,
+      body: state === 'approved'
+        ? `${asker} asked for it, and ${agentName} approved it in your name.`
+        : `${asker} asked for it, and ${agentName} declined it in your name.`,
+      link: '/v1/profile?tab=notifications',
+      i18n: {
+        key: state === 'approved' ? 'publish_request_approved_by_agent' : 'publish_request_declined_by_agent',
+        vars: { by: agentName, who: asker, what: request.name },
+      },
+    });
+    emitChange('notifications', ownerGhii);
+  }
+
+  emitChange('open-items', ownerGhii);
+  logger.info('Publish request settled', {
+    event: 'publish.request_settled', owner: ownerGhii, id: request.id, state, by: how.by,
+  });
+  return settled;
+}

@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-18 — The rule underneath: a write that makes a record public may wait for the owner
+ *     (publish_request; plan doc-mvcn6c7e4e5q, V4.6).
  *   2026-10-16 — Section 4: deleting an organism asks memory:purge of an agent; memory:delete is a
  *     default because what it deletes goes to the bin, and notifications an agent clears go there too
  *     (invariant 8, ruled by the developer on 2026-10-16).
@@ -222,5 +224,10 @@ let knowledge age, and you should offer them, not wait to be asked:
 
 Before anything that removes or exposes data: say what will happen, whether it can be undone and
 until when, and wait for the person's yes. After it: say what was done and how to undo it.
+
+Making something public can wait for the person even after their yes in the chat: when this node
+asks the owner first, a write of yours that makes a record public answers with \`publish_request\`
+unless they gave you publish:public. The record is stored as it was. Give them the \`approve_url\`
+from the answer; they approve on their Notifications page.
 `,
 };
