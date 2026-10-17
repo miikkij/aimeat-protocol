@@ -41831,7 +41831,9 @@ paths:
         at the level that decides. A page this call opens that is an HTML page (a document with
         `html`) and has no end named anywhere gets 90 days; a Markdown page has no default end.
         Turning a target off removes its end. The answer carries `viewer_url` (the one page this call
-        shared, else the workspace's viewer) and, for that page, `ends_at`. The MCP tool
+        shared, else the workspace's viewer) and, for that page, `ends_at`. When that page is an HTML
+        page it also carries `window_url`: the viewer with `view=page`, which shows the page alone in
+        the whole browser window, with only its AI label at the bottom-left. The MCP tool
         aimeat_workspace_share runs the same code.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
@@ -41873,7 +41875,7 @@ paths:
                   nullable: true
                   description: true makes a new feed key for the calendar format (shown once in the answer, ends the one before); null clears it; absent keeps it
       responses:
-        '200': { description: 'The merged share state (redacted: has_password and has_ics_key, never a hash). With ics_key true also `ics_key` and `ics_url`, once.' }
+        '200': { description: 'The merged share state (redacted: has_password and has_ics_key, never a hash), `viewer_url`, and for one shared page `ends_at` and, when it is an HTML page, `window_url`. With ics_key true also `ics_key` and `ics_url`, once.' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

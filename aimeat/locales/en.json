@@ -25176,6 +25176,8 @@
     "madeByUser": "A page made by a user. It runs apart and cannot reach your account.",
     "madeBy": "{name} made this page. It runs apart and cannot reach your account.",
     "fullScreen": "Full screen",
+    "windowLink": "Copy link to the page alone",
+    "windowLinkCopied": "Link copied",
     "report": "Report",
     "reported": "Thank you. The people who run this service will look at the page.",
     "reportFailed": "The report did not go through. Try again.",

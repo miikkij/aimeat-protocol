@@ -14,6 +14,8 @@
  *   form-action, the holder's frame-src against a navigation) was proven in a real browser on the
  *   sandbox and is not repeated here; this suite asserts the headers that make the browser do it.
  * @version-history
+ *   v1.3.0 — 2026-10-17 — Sharing one HTML page answers `window_url` (viewer_url + &view=page); a
+ *     Markdown page answers none.
  *   v1.2.0 — 2026-10-17 — A page file carries CORP cross-origin and ACAO *, the page CORP same-origin:
  *     the browser had refused every file of every page, which a status check from Node cannot see.
  *   v1.1.0 — 2026-10-16 — The frame and opened routes refuse an agent without organism:read (403) and
@@ -288,6 +290,9 @@ await test('aimeat_workspace_share stops sharing, and the page host stops servin
   assert(gone.status === 404, `after unshare: ${gone.status}`);
   const back = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws, space: 'pages', id: pageId, shared: true, until: '2099-12-31' });
   assert(!back.isError && back.data?.viewer_url?.includes(`id=${pageId}`) && back.data?.ends_at?.startsWith('2099-12-31'), `share again: ${back.text.slice(0, 300)}`);
+  assert(back.data?.window_url === `${back.data?.viewer_url}&view=page`, `an HTML page answers the page-alone address: ${back.data?.window_url}`);
+  const md = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws, space: 'pages', id: mdId, shared: true });
+  assert(!md.isError && md.data?.viewer_url?.includes(`id=${mdId}`) && !('window_url' in (md.data ?? {})), `a Markdown page has no page-alone address: ${md.text.slice(0, 300)}`);
   const missing = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws, id: pageId, shared: true });
   assert(missing.isError && /^INVALID_INPUT: /.test(missing.text), `id without space: ${missing.text}`);
 });

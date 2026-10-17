@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-17 — aimeat_workspace_share names `window_url`, an HTML page alone in the whole browser window.
  *   2026-10-16 — aimeat_workspace_share: share a page, a space or the workspace outside the organism
  *     and get its link (PUT /v1/organisms/:id/workspace/share, services/workspace-share.ts).
  *     aimeat_workspace_write takes an HTML page, { title, html, files? }.
@@ -497,7 +498,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_share',
-        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person. Only the workspace creator or an organism admin, or their own agent, may change sharing.',
+        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person, and for an HTML page also `window_url`, the page alone in the whole browser window. Only the workspace creator or an organism admin, or their own agent, may change sharing.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Share Workspace Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },

@@ -25,6 +25,8 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.2.0 — 2026-10-17 — Sharing one HTML page answers `window_url` beside `viewer_url`: the page alone
+ *     in the whole browser window (Jouni, 2026-10-17: a link to share that opens only the page).
  *   v1.1.0 — 2026-10-16 — shareIsOpen and shareServedVisibility: the one rule for whether a share's
  *     pages are public when a label is decided, used by the share routes, the member read, the page
  *     host, shared files and the compliance counts.
@@ -260,12 +262,17 @@ export async function setWorkspaceShareOp(
     // The address to hand out: the one page this call shared, else the workspace's viewer.
     const sharedNow = Object.entries(docsIn).filter(([, v]) => v === true).map(([k]) => k);
     const page = sharedNow.length === 1 ? sharedNow[0].split('/') : null;
+    const onePage = page && page.length === 2 ? publicViewerPath(orgId, ws, page[0], page[1]) : null;
+    // An HTML page also has an address that shows it alone in the whole browser window (the viewer's
+    // view=page): only the page and its AI label at the bottom-left, as full screen shows it.
+    const alone = onePage && isHtmlPageValue(await pageValueOf(storage, config, orgId, ws, sharedNow[0])) ? `${onePage}&view=page` : null;
     // A new feed key is in this answer and in no later one: only its hash is kept.
     return {
         ok: true,
         data: {
             organism_id: orgId, ws, share: redactShareOf(next),
-            viewer_url: `${config.baseUrl}${page && page.length === 2 ? publicViewerPath(orgId, ws, page[0], page[1]) : publicViewerPath(orgId, ws)}`,
+            viewer_url: `${config.baseUrl}${onePage ?? publicViewerPath(orgId, ws)}`,
+            ...(alone ? { window_url: `${config.baseUrl}${alone}` } : {}),
             ...(page && until[sharedNow[0]] ? { ends_at: until[sharedNow[0]] } : {}),
             ...(feedKey ? { ics_key: feedKey.key, ics_url: `/v1/organisms/${orgId}/workspace/public/records?ws=${encodeURIComponent(ws)}&space=<space>&format=ics&key=${feedKey.key}` } : {}),
         },

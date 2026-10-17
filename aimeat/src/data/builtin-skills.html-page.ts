@@ -14,6 +14,8 @@
  * @structure HTML_PAGE_SKILL_ENTRY
  * @usage import { HTML_PAGE_SKILL_ENTRY } from './builtin-skills.html-page.js';
  * @version-history
+ *   v1.2.0 — 2026-10-17 — `window_url`: the page alone in the whole browser window, and the strip's
+ *     button that copies it.
  *   v1.1.0 — 2026-10-16 — "Say how the page was made": ai_provenance on the write, and when the
  *     shared page shows the AI label. A file its classification keeps back does not load. Full
  *     screen shows only the page, with the AI label at the bottom-left corner.
@@ -63,7 +65,9 @@ chart, a page with pictures. Choose something else when:
 3. **Share it**: \`aimeat_workspace_share\` with \`space\`, \`id\` and \`shared: true\` (and \`access\` when the
    person wants a password or signed-in readers only). Give the person the \`viewer_url\` from the
    answer. A link to an HTML page ends after 90 days unless you pass \`until\` (an ISO date, or "none");
-   say so, and when it ends (\`ends_at\`).
+   say so, and when it ends (\`ends_at\`). The answer also carries \`window_url\`: the same page alone
+   in the whole browser window, with only its AI label at the bottom-left. Give that one when the
+   person wants the page to fill the screen, for a presentation or a page to post.
 
 Find a document space first with \`aimeat_workspace_read\` (the index lists the spaces and their
 pages). Only the workspace's creator or an organism admin, or their own agent, may share. To stop
@@ -100,9 +104,10 @@ less than the person expected. So write it this way:
 ## What the reader sees
 
 The page in its frame, under a strip the page cannot draw over: a line that a user made the page,
-the AI label when one is owed, Full screen, and Report. That strip is why a page cannot pass itself
-off as the node's own sign-in. Full screen shows only the page, with the AI label at the bottom-left
-corner as on an app; the reader leaves it with Esc. On a node without a page host the reader sees the page's text instead; tell the person that the
+the AI label when one is owed, Full screen, a button that copies the page-alone link
+(\`window_url\`), and Report. That strip is why a page cannot pass itself off as the node's own
+sign-in. Full screen and the page-alone link show only the page, with the AI label at the
+bottom-left corner as on an app; the reader leaves full screen with Esc. On a node without a page host the reader sees the page's text instead; tell the person that the
 node's operator can turn the page host on.
 
 ## Keeping it current
