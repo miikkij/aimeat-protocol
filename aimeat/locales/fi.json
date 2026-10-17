@@ -4467,7 +4467,8 @@
       "signals": "viestiesi ja sivujesi tavoittavuus",
       "secrets": "täällä pitämäsi avaimet",
       "ext": "tilillesi asennetut laajennukset",
-      "mcp": "liittämäsi MCP-palvelimet"
+      "mcp": "liittämäsi MCP-palvelimet",
+      "publish": "asioiden julkaiseminen kaikille"
     },
     "scopeText": {
       "push": {
@@ -8844,6 +8845,12 @@
   "notiftext.package_request_approved_by_agent.body": "Pyynnön teki {who}. {by} hyväksyi sen sinun nimissäsi.",
   "notiftext.package_request_declined_by_agent.title": "{by} hylkäsi pyynnön, joka koskee pakettia {name}",
   "notiftext.package_request_declined_by_agent.body": "Pyynnön teki {who}. Mitään ei asennettu eikä muutettu.",
+  "notiftext.publish_request.title": "{who} pyytää lupaa tehdä julkiseksi: {what}",
+  "notiftext.publish_request.body": "Julkinen tarkoittaa, että kuka tahansa voi lukea sen, myös kirjautumaton. Jos hyväksyt, se on heti julkinen. Jos hylkäät, se pysyy ennallaan.",
+  "notiftext.publish_request_approved_by_agent.title": "{by} teki julkiseksi: {what}",
+  "notiftext.publish_request_approved_by_agent.body": "Pyynnön teki {who}, ja {by} hyväksyi sen sinun nimissäsi.",
+  "notiftext.publish_request_declined_by_agent.title": "{by} piti ennallaan: {what}",
+  "notiftext.publish_request_declined_by_agent.body": "{who} pyysi tekemään sen julkiseksi, ja {by} hylkäsi pyynnön sinun nimissäsi.",
   "notiftext.package_renewal_due.title": "Asennuksen {label} päivityspalvelu päättyy {date}",
   "notiftext.package_renewal_due.body": "{label} toimii senkin jälkeen, mutta uusia versioita ei enää tule. Voit uusia päivityspalvelun siellä, mistä ostit sen.",
   "notiftext.package_renewal_failed.title": "Paketin {name} päivityspalvelua ei voitu uusia",
@@ -11488,6 +11495,9 @@
     "cfgOpt_ai_catalog_refresh_weekly": "Viikoittain",
     "cfgOpt_visibility_content_access_open": "Kuka tahansa (julkinen sisältö on julkista)",
     "cfgOpt_visibility_content_access_signed-in": "Vain täällä kirjautuneet",
+    "cfgOpt_visibility_publish_gate_off": "Kukaan ei kysy",
+    "cfgOpt_visibility_publish_gate_agents": "Agentit kysyvät omistajalta",
+    "cfgOpt_visibility_publish_gate_agents-and-apps": "Agentit ja sovellukset kysyvät omistajalta",
     "cfgOpt_apps_default_listing_listed": "Kaikilla listoilla",
     "cfgOpt_apps_default_listing_community": "Vain täällä kirjautuneille",
     "cfgOpt_apps_default_listing_unlisted": "Vain omistajan listalla",
@@ -12143,6 +12153,7 @@
     "cfg_visibility_agent_experience": "Agenttien kutsujen laskenta",
     "cfg_visibility_behaviour": "Klikkausten ja vierityksen laskenta sovelluksissa",
     "cfg_visibility_content_access": "Kuka näkee täällä olevan sisällön",
+    "cfg_visibility_publish_gate": "Kuka kysyy ennen kuin tekee jostain julkisen",
     "cfg_apps_default_listing": "Missä uusi sovellus näkyy listalla",
     "cfg_apps_default_access": "Kuka voi avata uuden sovelluksen",
     "cfg_apps_default_access_code": "Uusi sovellus saa pääsykoodin",
@@ -16794,6 +16805,9 @@
           "secrets": {
             "manage": "Lisää, vaihtaa ja poistaa nimettyjä avaimia ja salasanoja, joita pidät täällä. Arvoa ei saa luettua takaisin, ei tämä agentti eikä kukaan muu."
           },
+          "publish": {
+            "public": "Tekee tietueesta, tiedostosta, sovelluksesta tai sivusta julkisen kenelle tahansa kysymättä sinulta ensin. Ilman tätä agentti kysyy sinulta, ja sinä hyväksyt tai hylkäät. Ei kuulu täysiin oikeuksiin."
+          },
           "operator": {
             "organism-repair": "Palauta omistaja organismiin jota tämä tili ei omista. Toimii vain noden operaattorilla: muulla tilillä tämä oikeus ei tee mitään. Tällä pääsee takaisin organismiin jonka omistajatiliin ei enää saa yhteyttä, ja se antaa organismin sille jonka agentti nimeää.",
             "admin": "Ylläpidä tätä asennusta tämän agentin kautta. Se voi esimerkiksi sulkea tilejä, poistaa jonkun kaksivaiheisen kirjautumisen ja muuttaa organisaatiokirjautumista, sallittuja alkuperiä, koukkuja ja kaikille tileille tarjottuja MCP-palvelimia. Toimii vain sille, joka pyörittää tätä asennusta; millä tahansa muulla tilillä tämä lupa ei tee mitään. \"Täydet oikeudet\" ei sisällä sitä."
@@ -16842,7 +16856,8 @@
         "domainCompliance": "Vaatimustenmukaisuus",
         "domainSignals": "Tavoittavuus",
         "domainSite": "Sivut joille saavutaan",
-        "domainMcp": "Liittämäsi MCP-palvelimet"
+        "domainMcp": "Liittämäsi MCP-palvelimet",
+        "domainPublish": "Julkaiseminen kaikille"
       },
       "deviceAuth": {
         "title": "Laitehyväksyntä",

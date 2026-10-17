@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-18 — visibility 'public' asks the publish gate: an agent without publish:public patches
+ *     the record at the level it had and gets 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4.4).
  *   2026-10-17 — visibility 'organism:<id>' naming an organism the writer's account is not an active
  *     member of is refused with 400 NOT_ORGANISM_MEMBER before anything is read or written (plan
  *     doc-mvcn6c7e4e5q, V3.2).
@@ -61,8 +63,11 @@ import type { Router } from 'express';
 import type { MemoryRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal, ownerGhiiOf } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
+import { isRaiseToPublic } from '../../services/publish-gate.js';
+import { publishAskOf, fileAsk, publishRequestedBody } from '../../services/publish-requests/ask.js';
+import { callerOf } from '../../middleware/caller.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
@@ -177,6 +182,17 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
       return;
     }
+    // Making the record public asks the node's publish gate, as POST does inside writeMemoryRecord
+    // (plan doc-mvcn6c7e4e5q, V4.4). On an ask the patch lands at the level the record had, and the
+    // request is filed after it.
+    const publishAsk = visibility === 'public'
+      ? publishAskOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth!.app)
+      : { kind: 'allowed' as const };
+    if (publishAsk.kind === 'refused') {
+      res.status(publishAsk.status).json(error(config.nodeId, publishAsk.code, publishAsk.message));
+      return;
+    }
+    let askedToPublish = false;
 
     if (key.startsWith('organism.')) {
       const guard = await isKeyArchived(storage, key);
@@ -217,6 +233,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // subtree onto what the winner actually stored, not onto the stale copy it started from.
       const existing = await storage.getMemory(gaii, key);
       priorVisibility = existing?.visibility;
+      askedToPublish = publishAsk.kind === 'ask' && isRaiseToPublic(existing?.visibility, visibility);
+      const wantVisibility = askedToPublish ? undefined : visibility;
 
       if (if_version !== undefined && (existing?.version ?? 0) !== if_version) {
         res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',
@@ -294,7 +312,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         mediaKind: mediaKindOfValue(merged),
         pipeline: 'memory.patch',
         surface: {
-          visibility: (visibility ?? existing?.visibility ?? 'private') as MemoryRecord['visibility'],
+          visibility: (wantVisibility ?? existing?.visibility ?? 'private') as MemoryRecord['visibility'],
           humanAudience: true,
         },
         labelPolicy: config.aiLabelPublic,
@@ -311,7 +329,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         ownerGaii: gaii,
         value: merged,
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
-        visibility: (visibility ?? existing?.visibility ?? 'private') as MemoryRecord['visibility'],
+        visibility: (wantVisibility ?? existing?.visibility ?? 'private') as MemoryRecord['visibility'],
         tags: Array.isArray(tags) ? tags : (existing?.tags ?? []),
         ttlHours: ttl_hours ?? existing?.ttlHours ?? null,
         version: existing ? existing.version + 1 : 1,
@@ -376,7 +394,22 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     emitMemoryWritten(gaii, key, created ? 'created' : 'updated');
     await reconcileAfterSourceWrite(storage, gaii, key);
 
-    res.status(created ? 201 : 200).json(success(config.nodeId, {
+    // The request the publish gate asked for, now that the record it names is stored.
+    let publishRequest: ReturnType<typeof publishRequestedBody> | undefined;
+    let publishWarning: { code: 'PUBLISH_NOT_ASKED'; message: string } | undefined;
+    if (askedToPublish && publishAsk.kind === 'ask') {
+      const filed = await fileAsk({ storage, config }, ownerGhiiOf(gaii), publishAsk.requester, {
+        kind: 'memory', target: { namespace: gaii, key: record.key, version: record.version },
+        title: `the record ${record.key}`, name: record.key,
+        change: { field: 'visibility', from: record.visibility, to: 'public' },
+      });
+      if (filed.ok) publishRequest = publishRequestedBody({ storage, config }, filed);
+      else publishWarning = { code: 'PUBLISH_NOT_ASKED', message: `Saved as ${record.visibility}, not public: ${filed.message}` };
+    }
+
+    res.status(publishRequest ? 202 : created ? 201 : 200).json(success(config.nodeId, {
+      ...(publishRequest ? { publish_request: publishRequest } : {}),
+      ...(publishWarning ? { warnings: [publishWarning] } : {}),
       key: record.key,
       owner_gaii: record.ownerGaii,
       // Echoed through the one presentation of a memory value; null when this caller may not see it.

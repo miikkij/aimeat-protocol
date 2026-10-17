@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-18 — manage-my-agents: publish:public, and what a write that makes a record public answers
+ *     without it (plan doc-mvcn6c7e4e5q, V4.6).
  *   2026-10-17 — manage-my-agents: a refusal is answered with the one-press allow address
  *     (/v1/allow?agent=&need=), a powerful permission with the agent's page.
  *   2026-10-15 — manage-my-agents: an owner_scope read of a private record takes memory:read-as-owner
@@ -238,6 +240,12 @@ flowchart LR
   other agents keep private only with memory:read-as-owner, which "Full access" does not carry, since
   2026-10-15; without it an agent reads what they mark owner, members or public. An agent that
   needs the owner's private records for its job asks the owner for that permission by name.
+  Making something public to anyone takes publish:public when this node asks the owner first: that
+  permission is outside "Full access" and no agent has it unless the owner ticked it. Without it a
+  write that makes a record public answers with \`publish_request\`: the record is stored as it was
+  (a new one private), and the owner approves on their Notifications page. Tell the owner in one
+  sentence what you asked to make public and give them the \`approve_url\` from the answer;
+  \`aimeat_publish_requests\` lists the requests and their state.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
 - **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain. It
   reports the calling agent's own onboarding only.

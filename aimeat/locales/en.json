@@ -4468,7 +4468,8 @@
       "signals": "what your messages and pages reach",
       "secrets": "the keys you keep here",
       "ext": "the extensions installed on your account",
-      "mcp": "the MCP servers you have attached"
+      "mcp": "the MCP servers you have attached",
+      "publish": "making things public"
     },
     "scopeText": {
       "push": {
@@ -8845,6 +8846,12 @@
   "notiftext.package_request_approved_by_agent.body": "{who} asked for it, and {by} approved it in your name.",
   "notiftext.package_request_declined_by_agent.title": "{by} declined the request about the package {name}",
   "notiftext.package_request_declined_by_agent.body": "{who} asked for it. Nothing was installed or changed.",
+  "notiftext.publish_request.title": "{who} asks to make {what} public",
+  "notiftext.publish_request.body": "Public means anyone can read it, also people who are not signed in. If you approve, it is public at once. If you decline, it stays as it is.",
+  "notiftext.publish_request_approved_by_agent.title": "{by} made {what} public",
+  "notiftext.publish_request_approved_by_agent.body": "{who} asked for it, and {by} approved it in your name.",
+  "notiftext.publish_request_declined_by_agent.title": "{by} kept {what} as it was",
+  "notiftext.publish_request_declined_by_agent.body": "{who} asked to make it public, and {by} declined it in your name.",
   "notiftext.package_renewal_due.title": "The update service for {label} ends on {date}",
   "notiftext.package_renewal_due.body": "{label} keeps working after that, but gets no new versions. Renew the update service where you bought it.",
   "notiftext.package_renewal_failed.title": "The update service for {name} could not be renewed",
@@ -11489,6 +11496,9 @@
     "cfgOpt_ai_catalog_refresh_weekly": "Weekly",
     "cfgOpt_visibility_content_access_open": "Anyone (public content is public)",
     "cfgOpt_visibility_content_access_signed-in": "Only accounts signed in here",
+    "cfgOpt_visibility_publish_gate_off": "Nobody asks",
+    "cfgOpt_visibility_publish_gate_agents": "Agents ask the owner",
+    "cfgOpt_visibility_publish_gate_agents-and-apps": "Agents and apps ask the owner",
     "cfgOpt_apps_default_listing_listed": "Listed everywhere",
     "cfgOpt_apps_default_listing_community": "Only for people signed in here",
     "cfgOpt_apps_default_listing_unlisted": "In no list but the owner's",
@@ -12144,6 +12154,7 @@
     "cfg_visibility_agent_experience": "Agent call counts",
     "cfg_visibility_behaviour": "Click and scroll counts on apps",
     "cfg_visibility_content_access": "Who sees the content here",
+    "cfg_visibility_publish_gate": "Who asks before making something public",
     "cfg_apps_default_listing": "Where a new app is listed",
     "cfg_apps_default_access": "Who may open a new app",
     "cfg_apps_default_access_code": "A new app gets an access code",
@@ -16795,6 +16806,9 @@
           "secrets": {
             "manage": "Add, replace and delete the named keys and passwords you keep here. Reading a value back is not possible, for this agent or for anybody."
           },
+          "publish": {
+            "public": "Make a record, a file, an app or a page public to anyone, without asking you first. Without this, the agent asks you, and you approve or decline. Not part of full access."
+          },
           "operator": {
             "organism-repair": "Put an owner back on an organism this account does not own. Only works for a node operator: on any other account this permission does nothing. It is the way back when an organism's owner account can no longer be reached, and it hands that organism to whoever the agent names.",
             "admin": "Administer this installation through this agent. It can, for example, close accounts, remove someone's two-step sign-in, and change organisation sign-in, the allowed origins, the hooks and the MCP servers every account is offered. Only works for whoever runs this installation; on any other account this permission does nothing. \"Full access\" does not include it."
@@ -16843,7 +16857,8 @@
         "domainCompliance": "Compliance",
         "domainSignals": "Reach",
         "domainSite": "The pages people arrive on",
-        "domainMcp": "MCP servers you have attached"
+        "domainMcp": "MCP servers you have attached",
+        "domainPublish": "Publishing to everyone"
       },
       "deviceAuth": {
         "title": "Device Authorization",

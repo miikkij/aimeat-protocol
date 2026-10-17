@@ -31,6 +31,8 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-10-18 — publish:public (PUBLISH_PUBLIC_SCOPE) joins the own-tick family: making something
+ *     public without a request to the owner (plan doc-mvcn6c7e4e5q, V4.1).
  *   2026-10-15 — memory:read-as-owner (READ_AS_OWNER_SCOPE) joins the own-tick family: an agent reading
  *     the owner's and its siblings' private records with owner_scope (feature-list audit #42).
  *   v1.8.0 — 2026-10-15 — connections:read-as-owner joins the own-tick family: an agent reading what is in
@@ -253,6 +255,14 @@ export const SECRETS_MANAGE_SCOPE = 'secrets:manage';
 export const MCP_MANAGE_SCOPE = 'mcp:manage';
 
 /**
+ * Make content public without a request to the owner: a memory record, a file, a workspace share
+ * open to anyone with the link, an app anyone may open, a board, a skill, a package (plan
+ * doc-mvcn6c7e4e5q, V4). Only asked while the node's publish gate is on (services/publish-gate.ts).
+ * Its own tick, outside every wildcard.
+ */
+export const PUBLISH_PUBLIC_SCOPE = 'publish:public';
+
+/**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
  * a scope is checked, proposed, or approved.
  *
@@ -315,6 +325,12 @@ const OWN_TICK_SCOPES = [
     // its own; reading the owner's mailbox is a delegation the owner grants on its own tick, for the
     // reason messages:read-as-owner is. Not grandfathered: the capability did not exist before.
     'connections:read-as-owner',
+    // Make something public, to anyone, without the owner answering a request first
+    // (services/publish-gate.ts). Outside the wildcard because "Full access" is one click, and
+    // nobody clicking it is deciding that an agent may show their data to the whole internet.
+    // Not grandfathered (decision 11.3 of plan doc-mvcn6c7e4e5q): an agent without it files a
+    // request the owner approves, so no agent loses a capability, it only gains a question.
+    PUBLISH_PUBLIC_SCOPE,
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [

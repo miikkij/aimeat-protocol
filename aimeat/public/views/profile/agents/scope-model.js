@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-10-18 — publish:public, outside every wildcard: making something public without a request to
+ *     the owner (plan doc-mvcn6c7e4e5q, V4.1).
  *   2026-10-17 — The standard preset holds messages:send (Jouni: "otetaan oletusoikeudet käyttöön").
  *   2026-10-15 — memory:read-as-owner, outside every wildcard: reading the owner's and the sibling
  *     agents' private records with owner_scope (feature-list audit #42).
@@ -186,6 +188,11 @@ export const NOT_IN_WILDCARD = [
   // An agent's connections are its own; this is what lets the owner's AI read the mailbox the owner
   // connected, and it costs its own tick for the reason messages:read-as-owner does.
   'connections:read-as-owner',
+  // ── Added 2026-10-18 ─────────────────────────────────────────────────────────────────────────
+  // Making something public without asking: a record, a file, an app anyone may open. Without it the
+  // agent's attempt becomes a request the owner approves. Showing data to the whole internet costs
+  // its own tick (plan doc-mvcn6c7e4e5q, V4.1).
+  'publish:public',
 ];
 
 /**
@@ -307,6 +314,9 @@ export const SCOPE_DOMAINS = [
   //   name and not set it has learned nothing it can act on. Without a row here an owner could not
   //   grant it from this page at all.
   { key: 'secrets',  permissions: ['manage'] },
+  // publish:public — make something public without a request to the owner (plan doc-mvcn6c7e4e5q,
+  //   V4.1). Outside every wildcard (NOT_IN_WILDCARD above).
+  { key: 'publish',  permissions: ['public'] },
 
   // ── Added 2026-08-10 (August 2026 audit, step 3a) ────────────────────────────────────────────
   // These name things an agent could already do with no permission at all, because the MCP surface

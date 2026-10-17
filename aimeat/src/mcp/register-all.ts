@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-18 — registerPublishRequestTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   2026-10-17 — registerExposureTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   2026-10-16 — registerExtensionsTools receives getToken: aimeat_extension_invoke gives an action's
  *     ctx.buy the session's bearer, as POST /v1/ext/:extName/:actionId does (QA audit D2-05).
@@ -115,6 +116,7 @@ import { registerCortexTools } from './cortex.js';
 import { registerSeoTools } from './seo.js';
 import { registerVisibilityTools } from './visibility.js';
 import { registerExposureTools } from './exposure.js';
+import { registerPublishRequestTools } from './publish-requests.js';
 import { registerAppManageTool } from './app-manage.js';
 import { registerAppsTools } from './apps.js';
 import { registerAppDraftEditTools } from './apps-draft-edit.js';
@@ -243,6 +245,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
     registerVisibilityTools(mcp, storage, config, caller);
     registerExposureTools(mcp, storage, config, caller);
+    registerPublishRequestTools(mcp, storage, config, caller);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
     registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller);
     registerAiImageTool(mcp, storage, config, agentGaii);

@@ -11,6 +11,7 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-18 -- e2e-publish-gate.ts joins the list (not the guard tier): who may make a memory record public without the owner.
  *   2026-10-17 -- e2e-exposure-report.ts joins the list (not the guard tier): what of a person someone outside can read.
  *   2026-10-17 -- e2e-audience-packages.ts joins the list: members and organism:<id> on the three package kinds.
  *   2026-10-17 -- e2e-audience-boards-skills.ts joins the list: a board and a skill at organism:<id> (plan doc-mvcn6c7e4e5q, V3.5 and V3.9).
@@ -942,6 +943,8 @@ const ALL_SUITES = [
     'test/e2e-audience-packages.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
     'test/e2e-exposure-report.ts',
+    // Who may make something public without the owner, and the request the others file (plan doc-mvcn6c7e4e5q, V4.5).
+    'test/e2e-publish-gate.ts',
     'test/e2e-anonymous-identity-leaks.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-organism-dangling-refs.ts',

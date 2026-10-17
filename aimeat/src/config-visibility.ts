@@ -12,6 +12,7 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.7.0 — 2026-10-18 — publishGate: who asks the owner before making something public (V4).
  *   v1.6.0 — 2026-10-17 — appDefaultListing, appDefaultAccess, appDefaultAccessCode: how a new app starts.
  *   v1.5.0 — 2026-10-17 — contentAccess: 'signed-in' serves the node's content to its own accounts only.
  *   v1.4.0 — 2026-10-08 — behaviourEnabled (layer D).
@@ -67,7 +68,19 @@ export interface VisibilityConfig {
   appDefaultAccess: 'anyone' | 'signed-in';
   /** A new app gets an access code of its own (generated, returned to the publisher). Off by default. */
   appDefaultAccessCode: boolean;
+  /**
+   * Who may make something public without the owner answering a request first (plan
+   * doc-mvcn6c7e4e5q, V4; services/publish-gate.ts). 'off' (the code default, so a running node does
+   * not change under its apps): anyone who may write it. 'agents': an agent needs publish:public,
+   * otherwise its attempt becomes a request the owner approves. 'agents-and-apps': an app grant
+   * needs the word too. The owner in person is never asked.
+   */
+  publishGate: PublishGate;
 }
+
+/** Who must ask the owner before making something public. */
+export type PublishGate = 'off' | 'agents' | 'agents-and-apps';
+export const PUBLISH_GATE_VALUES: readonly PublishGate[] = ['off', 'agents', 'agents-and-apps'];
 
 /** Who a node shows its content to: anyone, or its own signed-in accounts only. */
 export type ContentAccess = 'open' | 'signed-in';
@@ -90,5 +103,7 @@ export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): Visibi
       ? env.AIMEAT_APP_DEFAULT_LISTING : 'listed',
     appDefaultAccess: env.AIMEAT_APP_DEFAULT_ACCESS === 'signed-in' ? 'signed-in' : 'anyone',
     appDefaultAccessCode: env.AIMEAT_APP_DEFAULT_ACCESS_CODE === 'true',
+    publishGate: env.AIMEAT_PUBLISH_GATE === 'agents' || env.AIMEAT_PUBLISH_GATE === 'agents-and-apps'
+      ? env.AIMEAT_PUBLISH_GATE : 'off',
   };
 }

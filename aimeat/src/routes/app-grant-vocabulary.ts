@@ -138,6 +138,10 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // handing this to memory:write would have given it to every grant already live, and deleting a
   // secret silently stops whatever was using it, which is a decision the owner makes per app.
   'secrets:manage': 'Store and remove the named keys and passwords in your vault (it can never read one back)',
+  // Making something public without a request to the owner (services/publish-gate.ts). Only asked
+  // while the node's publish gate covers apps; a community app whose visitors post public entries
+  // declares it, and the owner sees it on the consent screen (plan doc-mvcn6c7e4e5q, V4.1).
+  'publish:public': 'Make what it creates public to anyone, without asking you each time',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
   // NARROWER THAN push:manage ON PURPOSE. That word lists and removes every device the person has,
   // across every app and the node itself, and no app has any business there. This one registers and

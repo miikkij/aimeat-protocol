@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-10-18 -- definitions/publish-requests.ts: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.x -- 2026-10-17 -- definitions/exposure.ts: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   v1.x -- 2026-10-09 -- definitions/docsign.ts: aimeat_docsign_validate, _lookup, _request_create,
  *     _requests, _request_get, _sign and _cancel (document signing and signature validation).
@@ -85,6 +86,7 @@ import { mcpProxyTools } from './definitions/mcp-proxy.js';
 import { visibilityTools } from './definitions/visibility.js';
 import { docsignTools } from './definitions/docsign.js';
 import { exposureTools } from './definitions/exposure.js';
+import { publishRequestTools } from './definitions/publish-requests.js';
 
 const CATALOG = [
     ...agentMessagingTools,
@@ -122,6 +124,7 @@ const CATALOG = [
     ...visibilityTools,
     ...docsignTools,
     ...exposureTools,
+    ...publishRequestTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

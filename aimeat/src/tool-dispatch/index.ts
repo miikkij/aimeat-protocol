@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.10.0 -- 2026-10-18 -- publishCliTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.9.0 -- 2026-10-17 -- exposureCliTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   v1.8.0 -- 2026-10-12 -- contactCliTools, companyCliTools, beneficiaryCliTools, exchangeRunCliTools,
  *     organismOwnerCliTools and notifyUsageCliTools: the 30 agent tools that had a handler on the
@@ -54,6 +55,7 @@ import { exchangeRunCliTools } from './tool-call-defs-exchange-run.js';
 import { organismOwnerCliTools } from './tool-call-defs-organism-owners.js';
 import { notifyUsageCliTools } from './tool-call-defs-notify-usage.js';
 import { exposureCliTools } from './tool-call-defs-exposure.js';
+import { publishCliTools } from './tool-call-defs-publish.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -97,6 +99,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...organismOwnerCliTools,
     ...notifyUsageCliTools,
     ...exposureCliTools,
+    ...publishCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

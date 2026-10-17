@@ -88,6 +88,7 @@ export function generateEnvContent(settings: Record<string, string>): string {
       vars: [
         { key: 'AIMEAT_DEV_MODE' },
         { key: 'AIMEAT_ANONYMOUS' },
+        { key: 'AIMEAT_PUBLISH_GATE', comment: 'Who asks the owner before making something public: off | agents | agents-and-apps' },
       ],
     },
     {

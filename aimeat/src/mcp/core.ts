@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-18 — aimeat_memory_write asks the publish gate: a public write without publish:public is
+ *     stored at the level it had and answers with `publish_request` (plan doc-mvcn6c7e4e5q, V4.4).
  *   2026-10-16 — aimeat_action_execute says, on PEER_REFUSED, which node refused the work, the HTTP status it answered and its own answer (workErrorText), since the MCP result carries no details (decision 2026-10-16).
  *   2026-10-16 — aimeat_memory_list reads through listMemoryMetaFor (services/memory-query.ts), the
  *     listing GET /v1/memory uses: with owner_scope one query over the owner, every agent and every
@@ -506,6 +508,8 @@ export function registerCoreTools(
                 ...caller().principalView,
                 targetGaii: writeGaii,
             }, {
+                // Making the record public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4.4).
+                gatePublic: true,
                 key, value, visibility,
                 groupId: visibility === 'group' ? group_id : undefined,
                 tags,
@@ -556,6 +560,8 @@ export function registerCoreTools(
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                         ...(shadow ? { warning: shadow.code, warning_detail: shadow.message, shadowed_by: shadow.shadowed_by } : {}),
                         ...(warnings.length ? { warnings } : {}),
+                        // Stored, not public yet: the owner approves (its next_step says what to tell them).
+                        ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
                     }, null, 2),
                 }],
             };

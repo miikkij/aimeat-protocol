@@ -73,6 +73,7 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_ADMIN_PASSWORD: '',
   AIMEAT_DEV_MODE: 'false',
   AIMEAT_ANONYMOUS: 'false',
+  AIMEAT_PUBLISH_GATE: 'off',
   AIMEAT_EXTENDED_FEATURES: 'true',
   AIMEAT_JWT_TTL: '3600',
   AIMEAT_ACCESS_TTL: '900',

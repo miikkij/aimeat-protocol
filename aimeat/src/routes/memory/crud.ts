@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — POST /v1/memory asks the publish gate: a public write by an agent without
+ *     publish:public is stored at the level it had and answers 202 with `publish_request` (plan
+ *     doc-mvcn6c7e4e5q, V4.4).
  *   2026-10-16 — The metadata listing and the search read through services/memory-query.ts
  *     (listMemoryMetaFor, searchMemoryRecords), the queries aimeat_memory_list and aimeat_memory_search
  *     use too. No change to what either route answers (QA audit D2-06).
@@ -216,7 +219,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       scopes: req.auth!.scopes ?? [],
       roles: req.auth!.roles,
       federated: isForeignPrincipal(req.auth),
+      ...(req.auth!.app ? { app: req.auth!.app } : {}),
     }, {
+      // Making the record public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4.4).
+      gatePublic: true,
       key,
       value,
       visibility: vis as MemoryRecord['visibility'],
@@ -239,7 +245,9 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     const record = written.record;
 
-    res.status(existing ? 200 : 201).json(success(config.nodeId, {
+    // 202 when the record was stored at the level it had and making it public waits for the owner.
+    res.status(written.publishRequest ? 202 : existing ? 200 : 201).json(success(config.nodeId, {
+      ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
       key: record.key,
       // WHERE it landed. Memory is keyed by the writer, and with owner_scope a caller can now put a
       // record somewhere other than its own namespace — so the response has to say which, or the one

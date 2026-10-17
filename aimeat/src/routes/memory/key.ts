@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — PUT /:key asks the publish gate like POST: 202 with `publish_request` (plan
+ *     doc-mvcn6c7e4e5q, V4.4).
  *   2026-10-16 — PUT /:key refuses a change of an agent's live crew definition's browser site list
  *     unless the owner writes it in person (403 OWNER_APPROVES_SITES; QA audit F07b-02).
  *   2026-10-16 — PUT /:key writes through services/memory-write.ts writeMemoryRecord: the archive guard and every after-write effect (workflow trigger, Tracked Response, EXCHANGE reconcile, ecosystem push, automation recipes) now run on an update too (QA audit D2-03, F05a-03).
@@ -463,7 +465,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       scopes: [...who.scopes],
       roles: [...who.roles],
       federated: who.visitor,
+      ...(req.auth!.app ? { app: req.auth!.app } : {}),
     }, {
+      // Making the record public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4.4).
+      gatePublic: true,
       key,
       value: value !== undefined ? value : existing.value,
       visibility: visibility ?? existing.visibility,
@@ -493,7 +498,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     const record = written.record;
 
-    res.json(success(config.nodeId, {
+    // 202 when making the record public waits for the owner; the rest of the change is stored.
+    res.status(written.publishRequest ? 202 : 200).json(success(config.nodeId, {
+      ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
       key: record.key,
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),

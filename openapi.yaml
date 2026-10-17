@@ -7174,6 +7174,36 @@ components:
                       code:
                         example: INVALID_STATUS
 
+    PublishRequested:
+      description: |
+        Stored, not public yet. The change asked to make something public, and the node's publish gate
+        (AIMEAT_PUBLISH_GATE) asks the owner first: the caller is an agent without `publish:public`, or
+        an app grant without it when the gate covers apps. Everything else in the change is stored, at
+        the level the target had (a new one: private). `data.publish_request` is the request: its
+        `request_id`, `expires_at`, `approve_url` (the owner's Notifications page) and `next_step`, the
+        sentence to pass on to the owner. Read and decide it at /v1/publish-requests.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      publish_request:
+                        type: object
+                        properties:
+                          request_id: { type: string }
+                          status: { type: string, enum: [awaiting_owner] }
+                          kind: { type: string }
+                          title: { type: string }
+                          expires_at: { type: string, format: date-time }
+                          already_waiting: { type: boolean }
+                          approve_url: { type: string }
+                          next_step: { type: string }
+
     OdpsFieldTooLong:
       description: >
         ODPS_FIELD_TOO_LONG. The write would publish an EXCHANGE listing whose ODPS v4.1 document breaks a
@@ -17069,6 +17099,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/MemoryWriteResult'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -17949,6 +17981,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '409':
           description: |
             VERSION_CONFLICT (optimistic lock failure; `details.current_version`, `details.your_version`),
@@ -18095,6 +18129,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -73109,6 +73145,74 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+
+  /v1/publish-requests:
+    get:
+      operationId: listPublishRequests
+      tags: [Memory]
+      summary: The requests to make something public that wait for the owner
+      description: |
+        When the node's publish gate is on (AIMEAT_PUBLISH_GATE agents or agents-and-apps), an agent
+        without the `publish:public` permission, or an app grant without it when the gate covers
+        apps, does not make content public: the write stores it at the level it had (a new record:
+        private) and answers 202 with `publish_request`. This lists those requests, newest first,
+        each with its `state` (awaiting_owner, approved, declined, expired, outdated), `kind`, `title`,
+        `target` and `change`. `waiting` is how many still wait. The owner and the owner's agents see
+        every request of the account; an app grant sees the requests it filed. A request is decidable
+        for seven days. Requires memory:write. The MCP tool aimeat_publish_requests returns the same.
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/publish-requests/{id}:
+    get:
+      operationId: readPublishRequest
+      tags: [Memory]
+      summary: One request to make something public
+      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write.'
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/publish-requests/{id}/decision:
+    post:
+      operationId: decidePublishRequest
+      tags: [Memory]
+      summary: Approve or decline a request to make something public
+      description: |
+        `approve` makes the target public as the owner; `decline` leaves it as it is. The owner in
+        person decides any request: the notification's Approve and Decline call this route. An agent
+        of the owner may approve only a request it did not file and only holding `publish:public`
+        (403 OWN_REQUEST, 403 SCOPE_DENIED), and may decline any request it did not file. An app
+        grant, an ecosystem app and a visitor from another node decide nothing (403 ACCESS_DENIED).
+        A target that changed since the request (deleted, written again without asking, its level
+        changed) is not made public: 409 OUTDATED, and the request is settled outdated. A settled
+        request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED. Requires memory:write.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline] }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '410': { description: EXPIRED. The request expired before anyone decided it. }
 
   /v1/visibility/report:
     get:
