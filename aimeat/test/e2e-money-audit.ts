@@ -13,6 +13,10 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   v1.4.0 — 2026-10-17 — A tool with only pacing (solo, brief, cheap) is a free product on the raw and
+ *     capability routes too, as the app-tool route already served it: an uncontracted caller is served
+ *     and pays the pacing, a grant carries it, a revoked grant stops carrying it. Only a money price
+ *     (usdonly) answers 402. The five tests asserted the raw route's old 402 for a pacing-only tool.
  *   v1.3.2 — 2026-10-13 — "on a GRANT the burn comes out of the PROVIDER": the provider burns the paced
  *     tool's whole pacing amount, 6. With the 4.0.0 form the amount is one number, and the node had
  *     burned only a separate toll, which that form does not have, so a granted call was not paced
@@ -337,9 +341,11 @@ await test('RAW · with SEVERAL products behind one action, an uncontracted call
     const sb = await balance(stranger.token);
     const r = await rawInvoke(stranger.token);
     assert(r.status === 402, `expected 402, got ${r.status}: ${JSON.stringify(r.body).slice(0, 250)}`);
+    // 2026-10-17: only a MONEY price asks for a contract, so the 402 names the money-priced products.
+    // `brief` and `cheap` carry only pacing (a morsel is pacing, never a price) and are free products.
     const names = (r.body.app_tools ?? []).map((t: any) => t.tool).sort();
-    assert(names.length >= 3 && names.includes('brief') && names.includes('usdonly'),
-        `the 402 names every product sharing the capability: ${JSON.stringify(names)}`);
+    assert(names.includes('usdonly') && !names.includes('brief') && !names.includes('cheap'),
+        `the 402 names every money-priced product sharing the capability, and no free one: ${JSON.stringify(names)}`);
     assert((r.body.app_tools ?? []).every((t: any) => typeof t.invoke === 'string'), 'and where to call each one by name');
     assert(await balance(stranger.token) === sb, 'a refusal costs the caller nothing');
 });
@@ -502,12 +508,15 @@ await test('CAPABILITY · invoking the backing capability directly is charged li
     assert(await balance(consumer.token) === cb - 8, `consumer debited 8, moved ${cb - await balance(consumer.token)}`);
 });
 
-await test('CAPABILITY · and an uncontracted caller gets no result there either', async () => {
+// 2026-10-17: `solo` carries only pacing (8 morsels, no money price), so it is a free product, as the
+// app-tool route already served it: an uncontracted caller is served and pays the pacing. It asserted a
+// refusal, the raw route's old rule, which kept a person from using a free app's tools (Kehitysputki).
+await test('CAPABILITY · an uncontracted caller of a free paced product is served and pays its pacing', async () => {
     const stranger = await setupOwner('capx');
     const sb = await balance(stranger.token);
     const r = await json(`/v1/capabilities/${encodeURIComponent(SOLO)}/invoke`, { method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ input: { q: 'hi' } }) });
-    assert(r.status >= 400, `expected a refusal, got ${r.status}: ${JSON.stringify(r.body).slice(0, 250)}`);
-    assert(await balance(stranger.token) === sb, 'a refused call moves nothing');
+    assert(r.status === 200, `expected the free product to run, got ${r.status}: ${JSON.stringify(r.body).slice(0, 250)}`);
+    assert(await balance(stranger.token) === sb - 8, `the caller pays the 8 morsels of pacing, moved ${sb - await balance(stranger.token)}`);
 });
 
 // ── The scheduler door (who pays for a cron call?) ───────────────────────────────────────────────
@@ -854,11 +863,15 @@ async function grantRow(consumerGaii: string, action = 'solo') {
     return (r.body.data.grants as any[]).find(g => g.consumer_gaii === consumerGaii && g.action === action) ?? null;
 }
 
-await test('GRANT · before any approval, an uncontracted member is refused — this is the state being fixed', async () => {
+// `solo` is a free paced product since 2026-10-17 (pacing only, no money price): before approval the
+// member is served and pays the pacing; the grant is what makes the provider carry it.
+await test('GRANT · before any approval, an uncontracted member pays the pacing — this is the state being fixed', async () => {
     member = await setupOwner('mem');
     memberAgent = await setupAgent(member, 'mbot');
+    const mb = await balance(member.token);
     const r = await rawInvoke(member.token, 'solo');
-    assert(r.status === 402, `an approved-nowhere caller pays or is refused, got ${r.status}`);
+    assert(r.status === 200, `a free paced product serves an approved-nowhere caller, got ${r.status}`);
+    assert(await balance(member.token) === mb - 8, `and the caller pays its 8 morsels of pacing, moved ${mb - await balance(member.token)}`);
 });
 
 await test('GRANT · only the provider may issue one, and only over their OWN listing', async () => {
@@ -958,8 +971,10 @@ await test('GRANT · revoking it takes access away immediately', async () => {
         body: JSON.stringify({ consumer: member.name, offering_id: offeringSolo }),
     });
     assert(off.status === 200 && off.body.data.revoked === 1, `revoke ${off.status}: ${JSON.stringify(off.body?.data ?? off.body?.error)}`);
+    // A withdrawn approval is not carried any more: the member pays the pacing again (free paced product).
+    const mb = await balance(member.token);
     const r = await rawInvoke(member.token, 'solo');
-    assert(r.status === 402, `a withdrawn approval is not access, got ${r.status}`);
+    assert(r.status === 200 && await balance(member.token) === mb - 8, `a withdrawn approval is not carried, got ${r.status}, moved ${mb - await balance(member.token)}`);
 });
 
 /**
@@ -1080,8 +1095,12 @@ await test('GRANT · an approval issued for an app role is withdrawn with that r
         body: JSON.stringify({ app_id: APP, role: 'analyst' }),
     });
     assert(off.status === 200 && off.body.data.revoked === 2, `demoting the role withdraws both: ${JSON.stringify(off.body?.data)}`);
-    assert((await rawInvoke(a.token, 'solo')).status === 402, 'and neither is served after it');
-    assert((await rawInvoke(b2.token, 'solo')).status === 402, 'and neither is served after it');
+    // Neither is carried after it: each pays the 8 morsels of pacing of the free paced product.
+    for (const who of [a, b2]) {
+        const wb = await balance(who.token);
+        const r = await rawInvoke(who.token, 'solo');
+        assert(r.status === 200 && await balance(who.token) === wb - 8, `and neither is carried after it: ${r.status}, moved ${wb - await balance(who.token)}`);
+    }
 });
 
 // The tool's 6 morsels of pacing were its 3.x `price.morsels: 4` and its `tollMorsels: 2`, both pacing
