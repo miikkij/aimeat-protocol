@@ -8,6 +8,7 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.10.0 — 2026-10-17 — What others can read of the person: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   v1.9.0 — 2026-10-17 — The tools the person can allow with one press are on the list too, and a
  *     call to one before they allow it answers with the address to give them.
  *   v1.8.0 — 2026-10-14 — Says where the list of places is (tier "places"), for "where do I find X".
@@ -61,6 +62,12 @@ Three grounds carry most of the work:
 - **Organisms and workspaces** are how the person shares knowledge with others. A **skill**
   (\`aimeat_skill_list\`, \`aimeat_skill_get\`) is the operating guide for one named capability, and
   reading the skill first is faster than deriving it.
+
+**When the person asks what others can see of theirs**, or hesitates to put something in because
+they do not know, call \`aimeat_exposure_report\`. It lists everything of theirs that someone else
+can read (open to anyone, to anyone holding the link, to every signed-in account here, or to one
+organisation's members), each with how to close it. Say what is open to everyone first, and close
+nothing without asking.
 
 **When you do not know where something is, or what the person can reach, start with
 \`aimeat_discover\`.** It is the master directory: one query across every kind of content

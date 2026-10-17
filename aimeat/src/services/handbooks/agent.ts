@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.32.0 -- 2026-10-17 -- What others can read: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   v1.31.0 -- 2026-10-16 -- Workspaces: aimeat_workspace_share, and HTML pages (skill aimeat-html-page).
  *   v1.30.0 -- 2026-10-15 -- Connected accounts: aimeat_connection_history and aimeat_connection_replies.
  *   v1.29.0 -- 2026-10-13 -- Workflows: the three events, the event_* variables and coalesce.
@@ -83,6 +84,12 @@ Model your own structures by writing JSON under hierarchical keys (e.g. \`projec
 
 **Storage — files/binaries.** \`aimeat_storage_upload\` / \`aimeat_storage_download\`. Storage returns
 a handle/URL, not bytes — never read large binaries into context.
+
+**What others can read of your owner's.** \`aimeat_exposure_report\` lists everything of theirs (yours
+included) that someone else can read: open to anyone, to anyone holding the link, to every signed-in
+account of this node, or to one organisation's members, each with how to close it. Use it when your
+owner asks what a stranger can see, or hesitates to put something in. Tell them what is open to
+everyone first, and close nothing without asking.
 
 **Classified content — read the warning, respect what is hidden.** Every memory record, stored file
 and workspace row has a classification (public, internal, confidential, highly confidential, or a

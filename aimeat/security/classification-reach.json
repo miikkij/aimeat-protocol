@@ -1469,6 +1469,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The node's own exchange-work ledger namespace, which no one can label: a default label would hide an agent's own work from it. Decided and documented in the file."
     },
+    "src/services/exposure/exposure-types.ts": {
+      "reads": {
+        "listMemoryMetaForOwners": 1
+      },
+      "why": "Reviewed 2026-10-17 (plan doc-mvcn6c7e4e5q, V6.1), checked: the person's own memory META rows (key, visibility, tags; no value) for their exposure report. Every item made from a row carries its content address and passes the caller's classification reader in exposure-report.ts before it is listed; a hidden one is only counted."
+    },
+    "src/services/exposure/sources-records.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listStorageFilesForOwners": 1
+      },
+      "why": "Reviewed 2026-10-17 (plan doc-mvcn6c7e4e5q, V6.1), checked: the person's own file META rows (no bytes), and one knowledge manifest per exposed package for its name. Every item carries its content address and passes the caller's classification reader in exposure-report.ts before it is listed; a hidden one is only counted."
+    },
     "src/services/ext-pay-token.ts": {
       "reads": {
         "getMemory": 1
