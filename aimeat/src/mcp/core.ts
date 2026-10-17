@@ -751,7 +751,7 @@ export function registerCoreTools(
     registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
 
     // ── Storage Tools (upload/download) — extracted to ./core-storage.ts ──
-    registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, sessionScopes);
+    registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, sessionScopes, caller);
 
     // ── Data Package Tools (publish/export) — extracted to ./core-datapackage.ts ──
     registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);

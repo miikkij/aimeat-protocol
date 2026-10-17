@@ -5,6 +5,10 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 -- 2026-10-18 -- POST (inline and presigned) and PATCH .../visibility ask the publish gate
+ *     (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q, V4): a file made public by a caller the
+ *     node asks the owner about keeps the level it had (a new one: private) and the answer is 202 with
+ *     `publish_request`. The visibility change is the shared changeStorageFileVisibility.
  *   v1.8.0 -- 2026-10-17 -- POST and PATCH .../visibility take 'organism:<id>' and refuse one naming an
  *     organism the uploader's account is not an active member of (plan doc-mvcn6c7e4e5q, V3.3).
  *   v1.7.1 -- 2026-10-11 -- Upload and delete leave the change event to their service, which scopes
@@ -46,11 +50,15 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';
 import { versionedAddress } from '../../utils/http-range.js';
-import { emitChange, emitRecordChange } from '../../services/event-bus.js';
+import { emitRecordChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
-import { removeStorageFile, appOwnedKeyRefusal, writeStorageFile, storageProvenanceMintRefusal } from '../../services/storage-file-write.js';
+import {
+  removeStorageFile, appOwnedKeyRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
+} from '../../services/storage-file-write.js';
+import { mintPublishCarry } from '../../services/storage-file-publish.js';
+import { callerOf } from '../../middleware/caller.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-provenance-input.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
 import type { MemoryRouteCtx } from './shared.js';
@@ -104,6 +112,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE', 'The ai_provenance block does not validate.', undefined, { violations: stated.violations }));
       return;
     }
+    // Making the file public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4), inline and presigned.
+    const publishGate = { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) };
 
     // ── PRESIGNED MODE: mint a one-shot URL, the caller PUTs the raw bytes to /v1/upload/:token ──
     // The bytes then skip body parsing entirely (server.ts excludes /v1/upload/), so the only ceiling
@@ -111,6 +121,9 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (mode === 'presigned') {
       const refused = await storageProvenanceMintRefusal({ storage, config }, stated.provenance);
       if (refused) { res.status(refused.status).json(error(config.nodeId, refused.code, refused.message)); return; }
+      // The requester rides in the token, so the upload files the request when the bytes land.
+      const carry = await mintPublishCarry({ storage, config }, gaii, String(key), visibility, publishGate);
+      if (!carry.ok) { res.status(carry.status).json(error(config.nodeId, carry.code, carry.message)); return; }
       const contentType = (mime_type as string) ?? 'application/octet-stream';
       const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
       const token = await generateUploadToken({
@@ -121,6 +134,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
           key, mime_type: contentType, visibility: visibility ?? 'private',
           group_id, tags, workspace_refs: wsRefStr,
           ai_provenance: stated.provenance.wireBlock, ai_provenance_id: stated.provenance.declaredId,
+          publish_ask: carry.requester,
         }),
         maxBytes,
         contentType,
@@ -155,6 +169,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       mimeType: mime_type ?? 'application/octet-stream',
       tags: parsedTags.length > 0 ? parsedTags : undefined,
       provenance: stated.provenance,
+      publishGate,
     });
     if (!written.ok) {
       res.status(written.status).json(error(config.nodeId, written.code, written.message));
@@ -162,7 +177,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     const file = written.file;
 
-    res.status(201).json(success(config.nodeId, {
+    // 202 when the file was stored at the level it had and making it public waits for the owner.
+    res.status(written.publishRequest ? 202 : 201).json(success(config.nodeId, {
+      ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
+      ...(written.warnings?.length ? { warnings: written.warnings } : {}),
       ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
       key: file.key,
       owner_gaii: file.ownerGaii,   // so a client can build the owner-addressed /v1/pub/<owner>/<key> embed URL
@@ -203,25 +221,25 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspaceRef) as one or more "<organismId>/<workspaceId>"'));
       return;
     }
-    const audience = await organismVisibilityRefusal(storage, visibility, { identity: gaii, federated: isForeignPrincipal(req.auth) });
-    if (audience) {
-      res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
+    // The organism membership, the publish gate, the change and its event (global, because this path
+    // does not read who could read the file until now): the shared changeStorageFileVisibility, which
+    // PATCH /v1/storage/{key}/visibility and an approved publish request run too.
+    const changed = await changeStorageFileVisibility({ storage, config }, gaii, key, visibility, {
+      workspaceRef: wsRefStr, federated: isForeignPrincipal(req.auth),
+      publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
+    });
+    if (!changed.ok) {
+      res.status(changed.status).json(error(config.nodeId, changed.code, changed.message));
       return;
     }
 
-    const updated = await storage.updateFileVisibility(gaii, key, visibility, visibility === 'workspace' ? wsRefStr : undefined);
-    if (!updated) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
-      return;
-    }
-
-    res.json(success(config.nodeId, {
-      key: updated.key,
-      visibility: updated.visibility,
+    // 202 when the file keeps its level and making it public waits for the owner.
+    res.status(changed.publishRequest ? 202 : 200).json(success(config.nodeId, {
+      ...(changed.publishRequest ? { publish_request: changed.publishRequest } : {}),
+      ...(changed.warnings?.length ? { warnings: changed.warnings } : {}),
+      key: changed.file.key,
+      visibility: changed.file.visibility,
     }));
-    // Global on purpose: the file's visibility is what changed, and this route does not read what
-    // it was, so those who could read the file until now are told as well.
-    emitChange('memory');
   });
 
   // PATCH /v1/memory/files/:key — update file tags

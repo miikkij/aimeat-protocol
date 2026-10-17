@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-18 — aimeat_storage_upload says that a public upload without publish:public answers with
+ *     publish_request when the node asks the owner first (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_datapackage_publish takes `visibility`: public (default), members,
  *     organism:<id> or private (plan doc-mvcn6c7e4e5q, V3.8).
  *   2026-10-17 — aimeat_storage_upload takes visibility 'members' and 'organism:<organism id>', as
@@ -290,7 +292,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_storage_upload',
-        description: 'Upload a binary file (image, document, etc.) to the agent\'s file storage, addressed by key. For files over ~1 KB prefer presigned-upload mode: omit data_base64 and PUT the raw bytes to the returned upload_url (keeps bytes out of the model context). Small files may be sent inline as base64. Download later with aimeat_storage_download. TO EMBED AN IMAGE IN A WORKSPACE DOCUMENT: use the embed_markdown / embed_url from the response (the owner-addressed /v1/pub/<owner>/<key> form) — NEVER hand-write a /v1/storage/<key> path, which loads for nobody but you. Saving an embedded image into a document automatically scopes the file to that workspace\'s members; it is not exposed to the public internet. To store a speech clip or a picture the node made for you, pass the ai_provenance_id it returned: the file then carries that record, and anyone who can read the file can see how it was made.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Upload a binary file (image, document, etc.) to the agent\'s file storage, addressed by key. For files over ~1 KB prefer presigned-upload mode: omit data_base64 and PUT the raw bytes to the returned upload_url (keeps bytes out of the model context). Small files may be sent inline as base64. Download later with aimeat_storage_download. TO EMBED AN IMAGE IN A WORKSPACE DOCUMENT: use the embed_markdown / embed_url from the response (the owner-addressed /v1/pub/<owner>/<key> form) — NEVER hand-write a /v1/storage/<key> path, which loads for nobody but you. Saving an embedded image into a document automatically scopes the file to that workspace\'s members; it is not exposed to the public internet. To store a speech clip or a picture the node made for you, pass the ai_provenance_id it returned: the file then carries that record, and anyone who can read the file can see how it was made. When the node asks the owner before making something public, a file you upload as public without the publish:public permission is stored at the level it had (private when new) and the answer carries publish_request: tell your owner what you asked to make public and give them its approve_url.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Upload Storage File', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

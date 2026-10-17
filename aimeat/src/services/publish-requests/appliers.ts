@@ -13,12 +13,15 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Stored files (apply-file.ts; plan doc-mvcn6c7e4e5q, V4).
  *   v1.0.0 — 2026-10-18 — Initial: memory records (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import type { PublishApplier, PublishKind } from './store.js';
 import { applyMemoryPublish } from './apply-memory.js';
+import { applyFilePublish } from './apply-file.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   memory: applyMemoryPublish,
+  file: applyFilePublish,
 };

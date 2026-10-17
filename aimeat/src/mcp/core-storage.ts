@@ -16,6 +16,10 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-18 — aimeat_storage_upload asks the publish gate through the shared write and the mint
+ *     (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q, V4): a file made public without
+ *     publish:public is stored at the level it had and the answer carries `publish_request`, as
+ *     POST /v1/storage answers 202. A caller with nobody on this node to ask gets PUBLISH_NOT_ALLOWED.
  *   2026-10-08 — aimeat_storage_upload takes ai_provenance / ai_provenance_id (inline and presigned) and
  *     answers with the file's `ai_provenance` block; a provenance refusal is toolError(code).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -57,6 +61,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { toolError } from './tool-error.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 /** F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
  *  handle (resource_link + presigned download_url) instead of base64 so bytes never enter the
@@ -74,6 +79,8 @@ export function registerCoreStorageTools(
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
     sessionScopes: string[] = [],
+    /** The session's caller (services/caller-context.ts), for the publish gate on an upload made public. */
+    caller?: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -95,14 +102,17 @@ export function registerCoreStorageTools(
                 ...(ai_provenance_id ? { declaredId: ai_provenance_id } : {}),
                 ...(declared ? { declared, wireBlock: ai_provenance } : {}),
             };
+            // Making the file public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4), as POST /v1/storage does.
+            const publishGate = caller ? { caller: caller() } : undefined;
 
             // --- UPLOAD MODE ---
             if (!data_base64) {
                 const minted = await mintStorageUploadUrl(deps, agentGaii, {
                     key, mimeType: mime_type, visibility, groupId: group_id, workspaceRef, provenance,
+                    ...(publishGate ? { publishGate } : {}),
                 });
                 if (!minted.ok) {
-                    if (minted.code === 'SCOPE_DENIED' || minted.code === 'NOT_FOUND') return toolError(minted.code, minted.message);
+                    if (minted.code === 'SCOPE_DENIED' || minted.code === 'NOT_FOUND' || minted.code === 'PUBLISH_NOT_ALLOWED') return toolError(minted.code, minted.message);
                     return { content: [{ type: 'text' as const, text: minted.message }], isError: true };
                 }
                 return {
@@ -135,10 +145,12 @@ export function registerCoreStorageTools(
 
             const written = await writeStorageFile(deps, agentGaii, {
                 key, data: fileData, mimeType: mime_type, visibility, groupId: group_id, workspaceRef, provenance,
+                ...(publishGate ? { publishGate } : {}),
             });
             if (!written.ok) {
                 // A provenance refusal answers `CODE: message`, the code REST answers.
-                if (written.code === 'SCOPE_DENIED' || written.code === 'NOT_FOUND' || written.code === 'PROVENANCE_HASH_MISMATCH') {
+                if (written.code === 'SCOPE_DENIED' || written.code === 'NOT_FOUND' || written.code === 'PROVENANCE_HASH_MISMATCH'
+                    || written.code === 'PUBLISH_NOT_ALLOWED') {
                     return toolError(written.code, written.message);
                 }
                 // Only the per-file ceiling has an answer the caller can act on. Offering the
@@ -154,7 +166,10 @@ export function registerCoreStorageTools(
             const prov = await loadServedProvenance(storage, config, file.aiProvenanceId, { full: true });
             return {
                 content: [{ type: 'text' as const, text: JSON.stringify({
-                    mode: 'inline', key: file.key, owner_gaii: file.ownerGaii, size: file.size, uploaded: true,
+                    // Stored at the level it had: making it public waits for the owner (what to tell them is in next_step).
+                    ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
+                    ...(written.warnings?.length ? { warnings: written.warnings } : {}),
+                    mode: 'inline', key: file.key, owner_gaii: file.ownerGaii, size: file.size, visibility: file.visibility, uploaded: true,
                     // The record the file carries: attached, declared or stamped by the shared write.
                     ...provenanceItemBlock(prov),
                     ...(written.overageMorsels > 0 ? { overage_charged: written.overageMorsels } : {}),

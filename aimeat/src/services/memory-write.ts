@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.18.1 — 2026-10-18 — The gate's caller, the kept level and the filing moved to
+ *     services/memory-publish-gate.ts, which the batch write and the copy call too. No behaviour change.
  *   v1.18.0 — 2026-10-18 — `gatePublic`: a write the generic memory doors make public asks the node's
  *     publish gate. An agent without publish:public (an app grant too, when the gate covers apps)
  *     stores the record at the level it had and gets `publishRequest`, a request the owner approves
@@ -128,7 +130,7 @@ import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { misdirectedCrewKey, crewSitesWriteRefusal } from './crew-def-store.js';
-import { parseGAII, isForeignPrincipal, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
+import { parseGAII, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { undeclaredSpaceForKey } from './workspace-write-items.js';
 import { odpsWriteRefusal } from './exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from './legacy-pacing-write.js';
@@ -140,8 +142,8 @@ import { canonicalAppToolsKey } from './app-tools-key.js';
 import { classifyAfterWrite } from './classify-on-write.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
 import { isRaiseToPublic } from './publish-gate.js';
-import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from './publish-requests/ask.js';
-import { callerFromAuth } from './caller-context.js';
+import type { PublishAsk, publishRequestedBody } from './publish-requests/ask.js';
+import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest } from './memory-publish-gate.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -457,23 +459,13 @@ export async function writeMemoryRecord(
     //     the gate covers apps), stores the record at the level it had (a new one: private) and files
     //     a request after the write. Keeping a public record public asks nothing.
     let publishAsk: Extract<PublishAsk, { kind: 'ask' }> | null = null;
-    const ownerGhii = ownerGhiiOf(caller.targetGaii);
     if (input.gatePublic && isRaiseToPublic(existing?.visibility, input.visibility)) {
         // The writer's caller object, from the facts every door hands this service.
-        const writer = callerFromAuth({
-            sub: caller.principal, owner: localAccountName(ownerGhii), roles: caller.roles, scopes: caller.scopes,
-            ...(caller.federated !== undefined ? { federated: caller.federated } : {}),
-        }, config.nodeId, storage);
-        const ask = publishAskOf({ storage, config }, writer, caller.app);
+        const ask = memoryWriterAsk({ storage, config }, caller);
         if (ask.kind === 'refused') return { ok: false, status: ask.status, code: 'PUBLISH_NOT_ALLOWED', message: ask.message };
         if (ask.kind === 'ask') {
             publishAsk = ask;
-            const kept = existing?.visibility ?? 'private';
-            input = {
-                ...input, visibility: kept,
-                groupId: kept === 'group' ? existing?.groupId : undefined,
-                workspaceRef: kept === 'workspace' ? existing?.workspaceRef : undefined,
-            };
+            input = { ...input, ...keptMemoryLevel(existing) };
         }
     }
     if (input.key.startsWith('organism.')) {
@@ -651,15 +643,9 @@ export async function writeMemoryRecord(
     // 8. The request the publish gate asked for (step 3a), now that the record it names exists.
     let publishRequest: ReturnType<typeof publishRequestedBody> | undefined;
     if (publishAsk) {
-        const filed = await fileAsk({ storage, config }, ownerGhii, publishAsk.requester, {
-            kind: 'memory',
-            target: { namespace: caller.targetGaii, key: record.key, version: record.version },
-            title: `the record ${record.key}`,
-            name: record.key,
-            change: { field: 'visibility', from: record.visibility, to: 'public' },
-        });
-        if (filed.ok) publishRequest = publishRequestedBody({ storage, config }, filed);
-        else warnings.push({ code: 'PUBLISH_NOT_ASKED', message: `Saved as ${record.visibility}, not public: ${filed.message}` });
+        const filed = await fileMemoryPublishRequest({ storage, config }, publishAsk.requester, record);
+        if (filed.ok) publishRequest = filed.publishRequest;
+        else warnings.push(filed.warning);
     }
 
     return {

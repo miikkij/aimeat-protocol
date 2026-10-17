@@ -621,10 +621,6 @@
         "count": 2,
         "why": "UNREVIEWED"
       },
-      "src/routes/memory/bulk.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/routes/memory/crud.ts": {
         "count": 1,
         "why": "UNREVIEWED"

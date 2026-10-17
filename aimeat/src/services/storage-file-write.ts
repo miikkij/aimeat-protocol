@@ -32,10 +32,19 @@
  *   - writeStorageFile() — the inline write, in order, with the fence first
  *   - mintStorageUploadUrl() — the presigned representation of the same write
  *   - removeStorageFile() — the delete, sharing the same key fence and change events
+ *   - changeStorageFileVisibility() — the visibility change both PATCH routes and the publish
+ *     request's applier make
  * @usage
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.5.0 — 2026-10-18 — The publish gate (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q,
+ *     V4). `publishGate` on the write and the presigned mint: a file made public by a caller the node
+ *     asks the owner about is stored at the level it had (a new one: private) and the result carries
+ *     `publishRequest`; the mint carries the requester in the token as `publish_ask`. A caller with
+ *     nobody on this node to ask is refused with 403 PUBLISH_NOT_ALLOWED. changeStorageFileVisibility():
+ *     the visibility change, moved here from PATCH /v1/storage/{key}/visibility and
+ *     PATCH /v1/memory/files/{key}/visibility so those two routes and the applier make it once.
  *   v1.4.0 — 2026-10-17 — visibility 'organism:<id>': the write and the presigned mint refuse with 400
  *     NOT_ORGANISM_MEMBER, nothing stored and no URL minted, when the account owning the namespace is
  *     not an active member of that organism (plan doc-mvcn6c7e4e5q, V3.3).
@@ -71,6 +80,12 @@ import {
 } from './ai-provenance.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
+import { emitChange } from './event-bus.js';
+import type { CallerContext } from './caller-context.js';
+import {
+    fileRaiseAsk, keptFileLevel, mintPublishCarry, fileFilePublishRequest,
+    type StoragePublishGate, type FilePublishFiled,
+} from './storage-file-publish.js';
 
 /** How long a presigned storage upload URL is good for. The number the caller is told and the number
  *  the token is signed with are the same value, so they cannot drift apart. */
@@ -88,7 +103,7 @@ export interface StorageWriteDeps {
 export interface StorageWriteRefusal {
     ok: false;
     status: number;
-    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'QUOTA_EXCEEDED' | 'NOT_ORGANISM_MEMBER' | ProvenanceRefusalCode;
+    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'QUOTA_EXCEEDED' | 'NOT_ORGANISM_MEMBER' | 'PUBLISH_NOT_ALLOWED' | ProvenanceRefusalCode;
     message: string;
     /**
      * Which ceiling refused, when the code is QUOTA_EXCEEDED. The per-file one has an answer the
@@ -121,6 +136,12 @@ export interface StorageFileInput {
      * Stored as it is: the node is the one vouching for it. Ignored when `provenance` is given.
      */
     aiProvenanceId?: string;
+    /**
+     * Ask the node's publish gate when this write makes the file public (services/storage-file-publish.ts,
+     * plan doc-mvcn6c7e4e5q V4). The upload routes and aimeat_storage_upload set it; a write whose file is
+     * public by design (a data package, an app backup) leaves it unset.
+     */
+    publishGate?: StoragePublishGate;
 }
 
 /** The writer and its statement, for {@link StorageFileInput.provenance}. */
@@ -140,9 +161,22 @@ export interface StorageProvenanceInput {
 /** The refusals the provenance step of a write can produce, each before any byte is stored. */
 export type ProvenanceRefusalCode = 'SCOPE_DENIED' | 'NOT_FOUND' | 'PROVENANCE_HASH_MISMATCH';
 
+/** What the publish gate adds to a stored file: the request the owner answers, or why none was filed. */
+export type StoragePublishOutcome = {
+    /** The file was stored at the level it had and making it public waits for the owner: a door answers 202. */
+    publishRequest?: Extract<FilePublishFiled, { ok: true }>['publishRequest'];
+    warnings?: Array<Extract<FilePublishFiled, { ok: false }>['warning']>;
+};
+
 export type StorageFileWriteResult =
-    | { ok: true; file: StorageFileRecord; overageMorsels: number }
+    | ({ ok: true; file: StorageFileRecord; overageMorsels: number } & StoragePublishOutcome)
     | StorageWriteRefusal;
+
+/** The outcome fields of a filed (or unfiled) request, spread into a write's or a change's result. */
+function publishOutcome(filed: FilePublishFiled | null): StoragePublishOutcome {
+    if (!filed) return {};
+    return filed.ok ? { publishRequest: filed.publishRequest } : { warnings: [filed.warning] };
+}
 
 /**
  * The two refusals the key fence itself can produce. Narrower than either result type on purpose, so
@@ -309,6 +343,19 @@ export async function writeStorageFile(
     const audience = await organismVisibilityRefusal(storage, visibility, { identity: ownerGaii });
     if (audience) return { ok: false, ...audience };
 
+    // The publish gate (plan doc-mvcn6c7e4e5q, V4). A write that makes the file public, by a caller
+    // the node asks the owner about, stores the file at the level it had (a new one: private) and
+    // files a request after the bytes land. Keeping a public file public asks nothing.
+    const raise = await fileRaiseAsk({ storage, config }, ownerGaii, input.key, visibility, input.publishGate);
+    if (raise.kind === 'refused') return { ok: false, status: raise.status, code: raise.code, message: raise.message };
+    const level = raise.kind === 'ask'
+        ? keptFileLevel(raise.existing)
+        : {
+            visibility,
+            groupId: visibility === 'group' ? input.groupId : undefined,
+            workspaceRef: visibility === 'workspace' ? input.workspaceRef : undefined,
+        };
+
     if (input.data.length > config.storageMaxFileSizeMb * 1024 * 1024) {
         return {
             ok: false, status: 413, code: 'QUOTA_EXCEEDED', limit: 'per_file',
@@ -326,16 +373,16 @@ export async function writeStorageFile(
     // nothing. A record minted here is held and stored only once the file has landed.
     const held: AiProvenanceRecordRow[] = [];
     const decided = input.provenance
-        ? await provenanceForStoredBytes(deps, input.provenance, input.data, visibility, held)
+        ? await provenanceForStoredBytes(deps, input.provenance, input.data, level.visibility, held)
         : { ok: true as const, id: input.aiProvenanceId };
     if (!decided.ok) return decided;
 
     const file = await storage.createStorageFile({
         key: input.key,
         ownerGaii,
-        visibility,
-        groupId: visibility === 'group' ? input.groupId : undefined,
-        workspaceRef: visibility === 'workspace' ? input.workspaceRef : undefined,
+        visibility: level.visibility,
+        groupId: level.groupId,
+        workspaceRef: level.workspaceRef,
         mimeType: input.mimeType ?? 'application/octet-stream',
         size: input.data.length,
         data: input.data,
@@ -361,10 +408,12 @@ export async function writeStorageFile(
     // A file only its owner reads is told to that owner's streams (event-bus.ts emitRecordChange).
     // The write does not read what the key held before, so a file it replaced as private is not
     // announced to those who could read the earlier one.
-    emitRecordChange('files', ownerGaii, visibility);
-    emitRecordChange('memory', ownerGaii, visibility);
+    emitRecordChange('files', ownerGaii, level.visibility);
+    emitRecordChange('memory', ownerGaii, level.visibility);
 
-    return { ok: true, file, overageMorsels: quota.overageMorsels };
+    // The request the publish gate asked for, now that the file it names exists.
+    const filed = raise.kind === 'ask' ? await fileFilePublishRequest({ storage, config }, raise.requester, file) : null;
+    return { ok: true, file, overageMorsels: quota.overageMorsels, ...publishOutcome(filed) };
 }
 
 export interface StorageDeleteRefusal {
@@ -447,6 +496,12 @@ export interface StorageUploadUrlInput {
      * the token names the writer as its actor, so PUT /v1/upload/:token decides with the bytes.
      */
     provenance?: StorageProvenanceInput & { wireBlock?: unknown };
+    /**
+     * Ask the publish gate for a file asked as public (services/storage-file-publish.ts mintPublishCarry):
+     * refused when nobody on this node can be asked, and otherwise the requester rides in the token as
+     * `publish_ask`, so the upload files the request when the bytes land.
+     */
+    publishGate?: { caller: CallerContext; app?: string };
 }
 
 export type StorageUploadUrlResult =
@@ -480,6 +535,8 @@ export async function mintStorageUploadUrl(
         const refused = await storageProvenanceMintRefusal(deps, input.provenance);
         if (refused) return refused;
     }
+    const carry = await mintPublishCarry({ storage: deps.storage, config }, ownerGaii, input.key, input.visibility, input.publishGate);
+    if (!carry.ok) return carry;
 
     // The operator's own setting, not a constant: a node configured for 50 MB used to mint 10 MB
     // tokens and refuse everything above it, with nothing connecting the admin page to the tool.
@@ -498,6 +555,7 @@ export async function mintStorageUploadUrl(
             workspace_refs: input.workspaceRef || undefined,
             ai_provenance: input.provenance?.wireBlock ?? undefined,
             ai_provenance_id: input.provenance?.declaredId,
+            publish_ask: carry.requester,
         }),
         maxBytes,
         contentType,
@@ -510,4 +568,47 @@ export async function mintStorageUploadUrl(
         maxBytes,
         expiresInSeconds: STORAGE_UPLOAD_URL_TTL_SECONDS,
     };
+}
+
+export type StorageVisibilityResult =
+    | ({ ok: true; file: StorageFileRecord } & StoragePublishOutcome)
+    | { ok: false; status: number; code: 'INVALID_INPUT' | 'NOT_FOUND' | 'NOT_ORGANISM_MEMBER' | 'PUBLISH_NOT_ALLOWED'; message: string };
+
+/**
+ * Change who may read one stored file: PATCH /v1/storage/{key}/visibility,
+ * PATCH /v1/memory/files/{key}/visibility, and the approved publish request (apply-file.ts) all make the
+ * change here. The routes validate the visibility word and the workspace binding first, because their
+ * messages name their own body fields.
+ *
+ * `workspaceRef` is applied with visibility 'workspace' only; for any other visibility the stored
+ * binding is left as it is. `publishGate` asks the publish gate when the change makes the file public:
+ * on an ask the file keeps its level and the result carries `publishRequest`.
+ */
+export async function changeStorageFileVisibility(
+    deps: StorageWriteDeps,
+    ownerGaii: string,
+    key: string,
+    visibility: StorageFileRecord['visibility'],
+    opts: { workspaceRef?: string; federated?: boolean; publishGate?: StoragePublishGate } = {},
+): Promise<StorageVisibilityResult> {
+    const { storage, config } = deps;
+    // 'organism:<id>' names an organism the file owner's account is an active member of.
+    const audience = await organismVisibilityRefusal(storage, visibility, { identity: ownerGaii, ...(opts.federated !== undefined ? { federated: opts.federated } : {}) });
+    if (audience) return { ok: false, ...audience };
+
+    const raise = await fileRaiseAsk({ storage, config }, ownerGaii, key, visibility, opts.publishGate);
+    if (raise.kind === 'refused') return { ok: false, status: raise.status, code: raise.code, message: raise.message };
+    if (raise.kind === 'ask') {
+        // Nothing else changes on this route: the file keeps its level and the owner is asked.
+        if (!raise.existing) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'File not found' };
+        const filed = await fileFilePublishRequest({ storage, config }, raise.requester, raise.existing);
+        return { ok: true, file: raise.existing, ...publishOutcome(filed) };
+    }
+
+    const updated = await storage.updateFileVisibility(ownerGaii, key, visibility, visibility === 'workspace' ? opts.workspaceRef : undefined);
+    if (!updated) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'File not found' };
+    // Global on purpose: the file's visibility is what changed, and this path does not read what it
+    // was, so those who could read the file until now are told as well.
+    emitChange('memory');
+    return { ok: true, file: updated };
 }

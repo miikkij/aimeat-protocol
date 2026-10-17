@@ -11,6 +11,11 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-18 — POST /v1/storage (inline, raw body and presigned) and PATCH /v1/storage/{key}/visibility
+ *     ask the publish gate (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q, V4): a file made
+ *     public by a caller the node asks the owner about keeps the level it had (a new one: private) and
+ *     the answer is 202 with `publish_request`. The visibility change is the shared
+ *     changeStorageFileVisibility (services/storage-file-write.ts), which the approval also runs.
  *   2026-10-17 — Visibility 'organism:<id>' (plan doc-mvcn6c7e4e5q, V3.3): GET /v1/pub serves such a
  *     file to the organism's active members and admitted agents (the shared guard, independent of the
  *     consent layer; anonymous 404, a signed-in non-member 403 NOT_ORGANISM_MEMBER). PATCH
@@ -126,17 +131,18 @@ import { setAcceptRanges, serveStoredFile, needsBytesForType, storedFileEtag, ve
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { emitChange } from '../services/event-bus.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { isOrganismVisibilityWord, STORED_VISIBILITY_WORDS } from '../utils/visibility-words.js';
-import { isStoredVisibility, organismVisibilityRefusal } from '../services/organism-visibility.js';
+import { isStoredVisibility } from '../services/organism-visibility.js';
 import { callerOf } from '../middleware/caller.js';
 import { denyScope403 } from '../auth/deny.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
-import { writeStorageFile, mintStorageUploadUrl, removeStorageFile, type StorageProvenanceInput } from '../services/storage-file-write.js';
+import {
+    writeStorageFile, mintStorageUploadUrl, removeStorageFile, changeStorageFileVisibility, type StorageProvenanceInput,
+} from '../services/storage-file-write.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
 import { loadServedProvenance, setProvenanceHeaders, provenanceItemBlock, type ServedProvenance } from '../services/ai-provenance-marks.js';
 import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
@@ -282,6 +288,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                     groupId: reqGroupId as string | undefined,
                     workspaceRef: normalizeWorkspaceRefs(reqWorkspaceRefs, reqWorkspaceRef) || undefined,
                     provenance,
+                    publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
                 });
                 if (!minted.ok) {
                     res.status(minted.status).json(error(config.nodeId, minted.code, minted.message));
@@ -338,6 +345,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             workspaceRef,
             federate: federateFlag === true,
             provenance,
+            // Making the file public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
+            publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
         });
         if (!written.ok) {
             res.status(written.status).json(error(config.nodeId, written.code, written.message));
@@ -345,7 +354,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
         const { file, overageMorsels } = written;
 
-        res.status(201).json(success(config.nodeId, {
+        // 202 when the file was stored at the level it had and making it public waits for the owner.
+        res.status(written.publishRequest ? 202 : 201).json(success(config.nodeId, {
+            ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
+            ...(written.warnings?.length ? { warnings: written.warnings } : {}),
             // The record the file carries: the one attached, declared or stamped above.
             ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
             key: file.key,
@@ -414,23 +426,25 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"'));
             return;
         }
-        const audience = await organismVisibilityRefusal(storage, visibility, { identity: gaii, federated: isForeignPrincipal(req.auth) });
-        if (audience) {
-            res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
+        // The organism membership, the publish gate, the change and its event: one service function,
+        // which PATCH /v1/memory/files/{key}/visibility and an approved publish request run too.
+        const changed = await changeStorageFileVisibility({ storage, config }, gaii, key, visibility, {
+            workspaceRef: wsRefStr, federated: isForeignPrincipal(req.auth),
+            publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
+        });
+        if (!changed.ok) {
+            res.status(changed.status).json(error(config.nodeId, changed.code, changed.message));
             return;
         }
+        const updated = changed.file;
 
-        const updated = await storage.updateFileVisibility(gaii, key, visibility, visibility === 'workspace' ? wsRefStr : undefined);
-        if (!updated) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
-            return;
-        }
-
-        res.json(success(config.nodeId, {
+        // 202 when the file keeps its level and making it public waits for the owner.
+        res.status(changed.publishRequest ? 202 : 200).json(success(config.nodeId, {
+            ...(changed.publishRequest ? { publish_request: changed.publishRequest } : {}),
+            ...(changed.warnings?.length ? { warnings: changed.warnings } : {}),
             key: updated.key, visibility: updated.visibility,
             ...await uploadProvenanceBlock(storage, config, updated.aiProvenanceId),
         }));
-        emitChange('memory');
     });
 
     // -----------------------------------------------

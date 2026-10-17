@@ -7204,6 +7204,39 @@ components:
                           approve_url: { type: string }
                           next_step: { type: string }
 
+    PublishRequestedPerEntry:
+      description: |
+        Stored, and at least one entry is not public yet. An entry that asked to make its record public,
+        by a caller the node's publish gate asks the owner about (an agent without `publish:public`, or
+        an app grant without it when the gate covers apps), was stored at the level the record had (a new
+        one: private) and got its own request. `data.publish_requests` lists them, one per entry: the
+        entry's `key` plus the fields of PublishRequested's `publish_request`. The rest of the summary is
+        the 200 answer's. Read and decide the requests at /v1/publish-requests.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/AimeatEnvelope'
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      publish_requests:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            key: { type: string }
+                            request_id: { type: string }
+                            status: { type: string, enum: [awaiting_owner] }
+                            kind: { type: string }
+                            title: { type: string }
+                            expires_at: { type: string, format: date-time }
+                            already_waiting: { type: boolean }
+                            approve_url: { type: string }
+                            next_step: { type: string }
+
     OdpsFieldTooLong:
       description: >
         ODPS_FIELD_TOO_LONG. The write would publish an EXCHANGE listing whose ODPS v4.1 document breaks a
@@ -18330,11 +18363,15 @@ paths:
           description: >-
             Summary: { created, updated, skipped, failed[] }. An EXCHANGE listing source whose changed
             text would publish an ODPS document past a schema maxLength is not written and is listed
-            under failed[] with a reason starting "ODPS_FIELD_TOO_LONG:".
+            under failed[] with a reason starting "ODPS_FIELD_TOO_LONG:". An entry that would make a record
+            public, by a caller with nobody on this node to ask, is listed under failed[] with a reason
+            starting "PUBLISH_NOT_ALLOWED:".
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '202':
+          $ref: '#/components/responses/PublishRequestedPerEntry'
         '400':
           description: entries array missing or too large (>1000)
         '401':
@@ -18404,11 +18441,15 @@ paths:
             whose space the workspace manifest does not declare is not written and is listed under
             failed[] with a reason starting "UNDECLARED_SPACE:" (see components/responses/UndeclaredSpace).
             An EXCHANGE listing source whose changed text would publish an ODPS document past a schema
-            maxLength is listed the same way, with a reason starting "ODPS_FIELD_TOO_LONG:".
+            maxLength is listed the same way, with a reason starting "ODPS_FIELD_TOO_LONG:". An entry that
+            would make a record public, by a caller with nobody on this node to ask, is listed the same way,
+            with a reason starting "PUBLISH_NOT_ALLOWED:".
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '202':
+          $ref: '#/components/responses/PublishRequestedPerEntry'
         '400':
           description: entries array missing
         '401':
@@ -24046,6 +24087,8 @@ paths:
                           classification:
                             type: string
                             description: The label id the copy took from its source, when one was set.
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '403':
           $ref: '#/components/responses/AimeatError'
         '404':
@@ -24345,6 +24388,8 @@ paths:
         '201':
           description: Inline mode — the stored file record, with `ai_provenance` when the file carries a record.
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -24421,6 +24466,8 @@ paths:
                             type: string
                           visibility:
                             type: string
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -24599,6 +24646,17 @@ paths:
                   type:
                     type: string
                     enum: [app, storage, extension, cortex, skill, font]
+                additionalProperties: true
+        '202':
+          description: |
+            A storage upload asked as public, minted for a caller the node's publish gate asks the owner
+            about: the file is stored at the level it had (a new one: private), and the body carries
+            `publish_request` with the fields of components/responses/PublishRequested's
+            `data.publish_request`, beside the 200 answer's fields.
+          content:
+            application/json:
+              schema:
+                type: object
                 additionalProperties: true
         '400':
           description: |
@@ -25183,6 +25241,8 @@ paths:
                             description: >
                               The record the stored file carries (attached, declared, or stamped by
                               the node for an agent writer). Absent when the file has none.
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           description: >
             INVALID_INPUT (no key, data not base64), INVALID_PROVENANCE (the ai_provenance block does
@@ -25268,6 +25328,8 @@ paths:
                             type: string
                           ai_provenance:
                             $ref: '#/components/schemas/AiProvenanceItemBlock'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -30482,6 +30544,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '201':
           description: Assembled and stored; `data` carries key, owner_gaii, size, visibility, versioned_url and `ai_provenance`.
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           description: >
             CHUNKS_MISSING — the chunks are not exactly 0..n-1 (n is `total_chunks` when declared,

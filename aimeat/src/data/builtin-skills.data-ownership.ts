@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-18 — The same wait for a file made public, an import, a bulk write and a copy
+ *     (publish_requests per record; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — The rule underneath: a write that makes a record public may wait for the owner
  *     (publish_request; plan doc-mvcn6c7e4e5q, V4.6).
  *   2026-10-16 — Section 4: deleting an organism asks memory:purge of an agent; memory:delete is a
@@ -226,8 +228,9 @@ Before anything that removes or exposes data: say what will happen, whether it c
 until when, and wait for the person's yes. After it: say what was done and how to undo it.
 
 Making something public can wait for the person even after their yes in the chat: when this node
-asks the owner first, a write of yours that makes a record public answers with \`publish_request\`
-unless they gave you publish:public. The record is stored as it was. Give them the \`approve_url\`
-from the answer; they approve on their Notifications page.
+asks the owner first, a write of yours that makes a record or a file public answers with
+\`publish_request\` unless they gave you publish:public; an import or a bulk write lists one per record
+under \`publish_requests\`, and a copy made public answers the same way. It is stored as it was. Give
+them the \`approve_url\` from the answer; they approve on their Notifications page.
 `,
 };
