@@ -42,6 +42,8 @@
  *   // … point the node at provider.baseUrl and drive it …
  *   await provider.close();
  * @version-history
+ *   v1.5.0 — 2026-10-18 — POST …/images (OpenRouter's image endpoint) and …/images/edits (the OpenAI
+ *     images API's edit) are the `images` route too, for image calls with reference pictures.
  *   v1.4.0 — 2026-10-08 — A json or text reply sends `headers` (a Retry-After on a 429), a text body
  *     may be bytes, and speechPcm() answers raw PCM (aiprov plan, A1, A4).
  *   v1.3.0 — 2026-09-28 — Embeddings (POST …/embeddings, embeddingsJson) and speech (POST
@@ -113,7 +115,9 @@ function routeOf(pathname: string, method = 'GET'): StubRoute {
     if (pathname.endsWith('/chat/completions')) return 'chat';
     if (pathname.endsWith('/models')) return 'models';
     if (pathname.endsWith('/audio/transcriptions')) return 'transcriptions';
-    if (pathname.endsWith('/images/generations')) return 'images';
+    // OpenRouter's documented image endpoint is /images; an OpenAI-compatible edit is /images/edits.
+    if (pathname.endsWith('/images/generations') || pathname.endsWith('/images/edits')) return 'images';
+    if (method === 'POST' && pathname.endsWith('/images')) return 'images';
     if (method === 'POST' && pathname.endsWith('/messages')) return 'messages';
     if (method === 'POST' && pathname.endsWith('/embeddings')) return 'embeddings';
     if (method === 'POST' && pathname.endsWith('/audio/speech')) return 'speech';

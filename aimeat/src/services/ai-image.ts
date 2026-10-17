@@ -21,6 +21,10 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.10.0 -- 2026-10-18 -- Takes reference pictures and a mask (read by the caller with
+ *     readImageInputs), so a character keeps its look from panel to panel and part of a picture can be
+ *     redrawn; the result says how many references went and how the mask reached the model
+ *     (Comicland v3 A-1, A-2).
  *   v2.9.0 -- 2026-10-08 -- The stored picture names its provenance record (setStorageFileProvenance after
  *     settlement), so /v1/pub serves its marks and a public picture's record resolves for anyone.
  *   v2.8.0 -- 2026-10-08 -- The record states `mediaKind: image` and the picture's type, decided against the stored visibility.
@@ -57,7 +61,8 @@ import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import {
   AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
 } from './ai/completion.js';
-import { image as gatewayImage } from './ai/gateway.js';
+import { image as gatewayImage, type MaskMode } from './ai/gateway.js';
+import type { ImageInput } from './ai/call-files.js';
 import { runRoute, type AiRoute } from './ai/route-run.js';
 import { providerFailureOf } from './ai/errors.js';
 import { callCost } from './ai/catalog/price.js';
@@ -107,6 +112,11 @@ export interface GenerateForOwnerOptions {
   /** 'exempt' for node-internal work; absent, the call counts against the account's AI call limit
    *  (services/account-limits.ts). */
   limit?: AiCallLimitMark;
+  /** Pictures the model works from (a character sheet, a setting, the previous page, a style
+   *  sample), read by the caller with readImageInputs (services/ai/call-files.ts). */
+  references?: ImageInput[];
+  /** A PNG whose transparent pixels mark the area of the first reference to redraw. */
+  mask?: ImageInput;
 }
 
 export interface GenerateForOwnerResult {
@@ -133,6 +143,10 @@ export interface GenerateForOwnerResult {
   keySource: 'agent' | 'own' | 'node';
   /** Who chose the provider, who answered, and every attempt (services/ai/route-run.ts). */
   route: AiRoute;
+  /** How many reference pictures the model was given. */
+  referenceCount: number;
+  /** With a mask: whether the provider's own mask parameter carried it, or the prompt (MaskMode). */
+  maskMode?: MaskMode;
 }
 
 /** `image/png` -> `png`, defaulting to png rather than guessing something exotic. */
@@ -195,6 +209,8 @@ export async function generateForOwner(
       target: c.target, model: c.model, prompt,
       ...(opts.size ? { size: opts.size } : {}),
       ...(opts.signal ? { signal: opts.signal } : {}),
+      ...(opts.references?.length ? { references: opts.references } : {}),
+      ...(opts.references?.length && opts.mask ? { mask: opts.mask } : {}),
     }));
     result = run.result;
     answered = planFor(plan, run.candidate);
@@ -269,5 +285,7 @@ export async function generateForOwner(
     ...(settled.provenance ? { provenance: settled.provenance } : {}),
     keySource: answered.keyScope,
     route: { ...route, attempts: route.attempts.map(a => a.ok ? { ...a, costUsd } : a) },
+    referenceCount: opts.references?.length ?? 0,
+    ...(result.maskMode ? { maskMode: result.maskMode } : {}),
   };
 }

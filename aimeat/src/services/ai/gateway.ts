@@ -29,6 +29,9 @@
  *   - openAiChat() / speaksOpenAiChat — an OpenAI chat answer from a provider that does not speak it
  *   - GatewayError — the error shape callers map to their own codes
  * @version-history
+ *   v1.4.0 — 2026-10-18 — image() takes reference pictures and a mask, passed to the AI SDK as the
+ *     prompt's `images` and `mask`, and says how the mask reached the model (MaskMode). An extension
+ *     provider refuses input pictures rather than dropping them (Comicland v3 A-1, A-2).
  *   v1.3.0 — 2026-10-08 — A provider's error carries its reason by the one policy (./errors.ts
  *     providerReasonFromText: the JSON message, redacted, at most 300 characters, where it carried 500
  *     raw characters) and its Retry-After; a provider that cannot serve the operation is the node's
@@ -58,7 +61,7 @@ import type { OpenAiChatBody } from './adapters/openai-chat.js';
 import type {
   CompletionReasoning, ImageGenerationResult, TranscriptionAudio, TranscriptionResult,
 } from '../openrouter.js';
-import { sniffImage } from '../openrouter.js';
+import { sniffImage, GUIDED_MASK_SENTENCE } from '../openrouter.js';
 
 /** How long one attempt may take. The same ceiling the transport had. */
 const TIMEOUT_MS = 1_800_000;
@@ -287,17 +290,43 @@ export interface ImageRequest {
   /** Provider-specific size, e.g. '1024x1024'. Passed through untouched. */
   size?: string;
   signal?: AbortSignal;
+  /** Pictures the model works from, read by the caller (./call-files.ts readImageInputs). */
+  references?: ReadonlyArray<{ data: Buffer; mime: string }>;
+  /** A PNG whose transparent pixels mark the area of the first reference to redraw. */
+  mask?: { data: Buffer; mime: string };
 }
 
-export async function image(req: ImageRequest): Promise<ImageGenerationResult> {
+/**
+ * How a mask reached the model. `native`: the provider's own mask parameter, which redraws only the
+ * marked area. `guided`: OpenRouter has no mask parameter, so the mask went as one more reference
+ * the prompt explains, and the model redraws the picture following it.
+ */
+export type MaskMode = 'native' | 'guided';
+
+/** The provider types whose image API has no mask parameter: OpenRouter's `/images` and xAI's. */
+const GUIDED_MASK_TYPES: ReadonlySet<string> = new Set(['openrouter', 'xai']);
+
+export async function image(req: ImageRequest): Promise<ImageGenerationResult & { maskMode?: MaskMode }> {
   const adapter = adapterFor(req.target.type);
   if (!adapter.image) throw cannotServe(`A ${req.target.type} provider does not make images.`);
+  const references = req.references ?? [];
+  // An extension's `ai.image` action takes a prompt and a size; input pictures it would drop unseen.
+  if (references.length > 0 && req.target.type === 'extension') {
+    throw cannotServe('An extension image provider takes no reference images.');
+  }
   const model = assertModelInstance(adapter.image(req.target, req.model));
+  const mask = references.length > 0 ? req.mask : undefined;
+  const maskMode: MaskMode | undefined = mask ? (GUIDED_MASK_TYPES.has(req.target.type) ? 'guided' : 'native') : undefined;
   let r;
   try {
     r = await generateImage({
       model,
-      prompt: req.prompt,
+      prompt: references.length === 0 ? req.prompt
+        // xAI's package drops a mask with a warning, so it goes as a last reference, like OpenRouter's
+        // (whose transport does the same in services/openrouter.ts).
+        : maskMode === 'guided' && req.target.type === 'xai' && mask
+          ? { text: `${req.prompt}\n\n${GUIDED_MASK_SENTENCE}`, images: [...references, mask].map(p => new Uint8Array(p.data)) }
+          : { text: req.prompt, images: references.map(p => new Uint8Array(p.data)), ...(mask ? { mask: new Uint8Array(mask.data) } : {}) },
       n: 1,
       // The AI SDK types a size as WIDTHxHEIGHT; the node has always passed the caller's string on.
       ...(req.size ? { size: req.size as `${number}x${number}` } : {}),
@@ -317,6 +346,7 @@ export async function image(req: ImageRequest): Promise<ImageGenerationResult> {
     ...(sniffed.width && sniffed.height ? { width: sniffed.width, height: sniffed.height } : {}),
     model: meta?.model ?? req.model,
     costUsd: typeof meta?.costUsd === 'number' ? meta.costUsd : undefined,
+    ...(maskMode ? { maskMode } : {}),
   };
 }
 

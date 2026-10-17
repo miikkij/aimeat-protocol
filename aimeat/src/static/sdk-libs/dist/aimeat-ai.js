@@ -1384,9 +1384,22 @@
       ...typeof opts.role === "string" && opts.role ? { role: opts.role } : {}
     };
   }
+  async function pictureInput(p) {
+    if (isBlob(p)) return { data_url: await blobToDataUrl(
+      /** @type {Blob} */
+      p
+    ) };
+    if (p && typeof p === "object" && (p.storage_key || p.data_url)) {
+      return p.storage_key ? { storage_key: String(p.storage_key) } : { data_url: String(p.data_url) };
+    }
+    throw new Error("a reference image is { storage_key }, { data_url }, or a Blob");
+  }
   async function image(opts) {
     if (!opts || typeof opts !== "object") throw new Error("opts object required");
     if (!opts.prompt) throw new Error("opts.prompt required");
+    if (opts.reference_images != null && !Array.isArray(opts.reference_images)) throw new Error("opts.reference_images must be an array");
+    const refs = opts.reference_images ? await Promise.all(opts.reference_images.map(pictureInput)) : void 0;
+    const mask = opts.mask ? await pictureInput(opts.mask) : void 0;
     const body = {
       prompt: opts.prompt,
       model: opts.model,
@@ -1394,10 +1407,23 @@
       storage_key: opts.storage_key,
       public: opts.public === true ? true : void 0,
       app_id: opts.app_id,
-      ...routing(opts)
+      ...routing(opts),
+      ...refs && refs.length ? { reference_images: refs } : {},
+      ...mask ? { mask } : {}
     };
     return paid(opts, {
-      key: ["ai-image", opts.app_id, opts.model, opts.size, opts.storage_key, opts.provider, opts.role, opts.prompt],
+      key: [
+        "ai-image",
+        opts.app_id,
+        opts.model,
+        opts.size,
+        opts.storage_key,
+        opts.provider,
+        opts.role,
+        opts.prompt,
+        JSON.stringify(refs ? refs.map((r) => r.storage_key || String(r.data_url).length) : []),
+        mask ? mask.storage_key || String(mask.data_url).length : ""
+      ],
       what: "Make a picture on your own AI provider.",
       label: "The picture",
       remember: "ai-image:" + (opts.app_id || "app"),

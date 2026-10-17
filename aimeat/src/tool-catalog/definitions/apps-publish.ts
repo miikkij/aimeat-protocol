@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-10-18 — aimeat_image_generate takes reference_images and mask (Comicland v3 A-1, A-2).
  *   2026-10-18 — aimeat_app_publish, aimeat_app_draft_publish and aimeat_app_fork say they answer with
  *     publish_request when the node asks the owner first (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — aimeat_app_draft_save, _write and _seed take `notice` (what the draft changes), and
@@ -26,6 +27,12 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { AI_ROLE_PARAM } from './ai-models.js';
+
+/** One input picture of an image call: a stored file by key, or a data: URL (services/ai/call-files.ts). */
+const imageInputShape = z.object({
+    storage_key: z.string().min(1).max(512).optional().describe('A picture in your storage, or one you made with aimeat_image_generate.'),
+    data_url: z.string().max(60_000_000).optional().describe('data:<mime>;base64,<bytes>. Prefer storage_key: a data URL travels through your context.'),
+});
 
 /**
  * The build-spec pair, declared once for both publish tools. The node's MCP wrote these two out by
@@ -294,7 +301,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_image_generate',
-        description: 'Make a picture from a description, on the owner\'s AI key, and store it. Returns a storage key and a URL rather than the image itself, so the bytes never travel through your context. Pass public: true when a model or a web page has to fetch it back by URL; leave it off for anything private. Needs an IMAGE model to be configured (Profile > OpenRouter, or a node default) — it refuses by name rather than handing the request to a chat model, because a chat model answers an image request with prose. Spends the owner\'s daily AI budget and reports what it cost.',
+        description: 'Make a picture from a description, on the owner\'s AI key, and store it. Returns a storage key and a URL rather than the image itself, so the bytes never travel through your context. Pass public: true when a model or a web page has to fetch it back by URL; leave it off for anything private. To keep a character, a place or a style the same from picture to picture, pass the earlier pictures as reference_images (stored files by key: your own, or a picture you made with this tool before); the model sees them as pictures. To redraw only part of a picture, give it as the first reference and pass a mask. Needs an IMAGE model to be configured (Profile > OpenRouter, or a node default), and for references one that takes pictures as input — it refuses by name rather than handing the request to a chat model, because a chat model answers an image request with prose. Spends the owner\'s daily AI budget and reports what it cost.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Generate Image', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -310,6 +317,8 @@ export const appPublishTools = [
             provider: { type: 'string', description: 'One of the owner\'s AI providers (aimeat_ai_providers), or a type. No fallback then.' },
             fallback: { type: 'boolean', description: 'false keeps the call on its first provider; omitted, the owner\'s rules decide.' },
             role: { type: 'string', description: AI_ROLE_PARAM, zod: z.string().min(1).max(300) },
+            reference_images: { type: 'array', description: 'Up to 16 pictures the model works from, each { storage_key } (preferred) or { data_url }: a character sheet, a setting, the previous page, a style sample. PNG, JPEG, WebP or GIF, 40 MB in all.', zod: z.array(imageInputShape).max(16) },
+            mask: { type: 'object', description: 'A PNG the size of the first reference whose transparent pixels mark the area to redraw; everything else is kept. Needs reference_images. mask_mode in the answer says whether the provider applied it as a mask (native) or followed it as a picture (guided).', zod: imageInputShape },
         },
     },
     {
