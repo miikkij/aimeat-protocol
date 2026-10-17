@@ -14,6 +14,8 @@
  * @structure HTML_PAGE_SKILL_ENTRY
  * @usage import { HTML_PAGE_SKILL_ENTRY } from './builtin-skills.html-page.js';
  * @version-history
+ *   v1.4.0 — 2026-10-18 — Sharing names `publish_request`: when the node asks the person first, the link
+ *     opens on their approval and the agent hands over the `approve_url` (plan doc-mvcn6c7e4e5q, V4).
  *   v1.3.0 — 2026-10-17 — A share can be for the organisation's members only (access `organism`, plan V3.4).
  *   v1.2.0 — 2026-10-17 — `window_url`: the page alone in the whole browser window, and the strip's
  *     button that copies it.
@@ -69,7 +71,9 @@ chart, a page with pictures. Choose something else when:
    answer. A link to an HTML page ends after 90 days unless you pass \`until\` (an ISO date, or "none");
    say so, and when it ends (\`ends_at\`). The answer also carries \`window_url\`: the same page alone
    in the whole browser window, with only its AI label at the bottom-left. Give that one when the
-   person wants the page to fill the screen, for a presentation or a page to post.
+   person wants the page to fill the screen, for a presentation or a page to post. When the answer
+   also carries \`publish_request\`, the node asks the person before anything opens to anyone with the
+   link: the link works once they approve, so give them its \`approve_url\` as well.
 
 Find a document space first with \`aimeat_workspace_read\` (the index lists the spaces and their
 pages). Only the workspace's creator or an organism admin, or their own agent, may share. To stop

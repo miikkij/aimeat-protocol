@@ -12,8 +12,11 @@
  *   - registerSkillsTools() — registers the 5 aimeat_skill_* tools on an McpServer instance
  * @usage
  *   import { registerSkillsTools } from './skills.js';
- *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+ *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-18 — aimeat_skill_publish and aimeat_skill_update ask the publish gate for a user skill
+ *     made public, with the session's caller (services/skill-publish-gate.ts), and render
+ *     `publish_request` (plan doc-mvcn6c7e4e5q, V4). The register function takes the caller.
  *   2026-10-17 — aimeat_skill_publish and aimeat_skill_update take `organism:<id>` for a user skill,
  *     refused unless the agent's owner is in that organism (plan doc-mvcn6c7e4e5q, V3.9); the publish
  *     hands the accessor to the service for every scope.
@@ -58,6 +61,9 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { toolError } from './tool-error.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import type { PublishGateInput } from '../services/publish-requests/door.js';
+import { skillPublishAsk, userSkillState, fileSkillAsk } from '../services/skill-publish-gate.js';
 
 export function registerSkillsTools(
     mcp: McpServer,
@@ -68,10 +74,16 @@ export function registerSkillsTools(
     emitResourceListChanged: (agentGaii: string) => void,
     /** This session's granted scopes: the node-scope operator question is asked of them. */
     scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts): the publish gate asks about it. */
+    caller?: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
     const parsed = parseGAII(agentGaii);
     const ownerName = parsed ? localAccountName(agentGaii) : null;
+    /** The publish gate's caller: the session's, or one built from this session's facts. */
+    const publishGate = (): PublishGateInput => ({
+        caller: caller ? caller() : agentSessionCaller(agentGaii, ownerName ?? '', scopes, config.nodeId, storage),
+    });
 
     // Node scope is the operator's, asked of THIS AGENT: an operator account's agent holding
     // operator:admin (services/operator-principal.ts), never the owner record alone.
@@ -130,6 +142,11 @@ export function registerSkillsTools(
                 });
             }
 
+            // Making a user skill public asks the node's publish gate, as POST /v1/skills does.
+            const gate = publishGate();
+            const ask = skillPublishAsk({ storage, config }, gate, targetScope, visibility);
+            if (ask?.kind === 'refused') return toolError(ask.code, ask.message);
+
             try {
                 const fileMap = new Map<string, string>([['SKILL.md', skill_md]]);
                 for (const [path, content] of Object.entries(files ?? {})) fileMap.set(path, content);
@@ -138,7 +155,7 @@ export function registerSkillsTools(
                     owner: ownerName,
                     publisher: agentGaii,
                     files: fileMap,
-                    visibility: visibility as SkillVisibility | undefined,
+                    visibility: ask ? undefined : visibility as SkillVisibility | undefined,
                     // The accessor is the membership gate of a workspace and of an organisation level.
                     accessor: acc,
                     ...(targetScope === 'workspace' ? { organismId: organism_id, workspaceId: workspace_id } : {}),
@@ -154,7 +171,12 @@ export function registerSkillsTools(
                 // answer to "what does this agent know how to do".
                 emitChange('skills');
                 emitResourceListChanged(agentGaii);
-                return ok({ published: true, skill: summary, ...(await writeProvenanceEcho(storage, config, summary.aiProvenanceId)) });
+                const asked = ask ? await fileSkillAsk({ storage, config }, gate, ask, summary) : {};
+                return ok({
+                    published: true, skill: summary, ...(await writeProvenanceEcho(storage, config, summary.aiProvenanceId)),
+                    ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
+                    ...(asked.warnings ? { warnings: asked.warnings } : {}),
+                });
             } catch (e) {
                 return withCaughtError(err(`Skill publish failed: ${(e as Error).message}`), e);
             }
@@ -277,6 +299,19 @@ export function registerSkillsTools(
             const targetScope = scope === 'node' ? 'node' : 'user';
             if (targetScope === 'node' && !acc.isOperator) {
                 return err(`Node-scope skills are operator-managed. ${OPERATOR_AGENT_REFUSAL}`);
+            }
+            // Making a user skill public asks the node's publish gate, as PATCH /v1/skills/:name does.
+            const gate = publishGate();
+            const state = targetScope === 'user' ? await userSkillState({ storage, config }, ownerName, name) : null;
+            const ask = state ? skillPublishAsk({ storage, config }, gate, targetScope, visibility, state.visibility) : null;
+            if (ask?.kind === 'refused') return toolError(ask.code, ask.message);
+            if (ask && state) {
+                const asked = await fileSkillAsk({ storage, config }, gate, ask, { owner: ownerName, name, ...state });
+                return ok({
+                    updated: false, skill: { name, owner: ownerName, scope: targetScope, version: state.version, visibility: state.visibility },
+                    ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
+                    ...(asked.warnings ? { warnings: asked.warnings } : {}),
+                });
             }
             let summary;
             try {

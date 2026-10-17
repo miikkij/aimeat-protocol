@@ -24649,10 +24649,12 @@ paths:
                 additionalProperties: true
         '202':
           description: |
-            A storage upload asked as public, minted for a caller the node's publish gate asks the owner
-            about: the file is stored at the level it had (a new one: private), and the body carries
-            `publish_request` with the fields of components/responses/PublishRequested's
-            `data.publish_request`, beside the 200 answer's fields.
+            Asked to be public by a caller the node's publish gate asks the owner about (an agent
+            without `publish:public`, read from its grant as it is now): a storage upload, a user skill,
+            or a new cortex whose manifest asks for public. It is stored at the level it had (a new
+            file: private, a skill: owner, a cortex: private), and the answer carries `publish_request`
+            as components/responses/PublishRequested describes it, at the top level beside the fields
+            of the 200 answer.
           content:
             application/json:
               schema:
@@ -26382,6 +26384,8 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
 
     get:
       operationId: listBoards
@@ -39755,6 +39759,8 @@ paths:
                                 name: { type: string }
                                 index: { type: integer }
                                 reason: { type: string }
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -39987,6 +39993,8 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/OrganismRecord'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -42189,6 +42197,7 @@ paths:
                   description: true makes a new feed key for the calendar format (shown once in the answer, ends the one before); null clears it; absent keeps it
       responses:
         '200': { description: 'The merged share state (redacted: has_password and has_ics_key, never a hash), `viewer_url`, and for one shared page `ends_at` and, when it is an HTML page, `window_url`. With ics_key true also `ics_key` and `ics_url`, once.' }
+        '202': { $ref: '#/components/responses/PublishRequested' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -47673,6 +47682,8 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -47767,6 +47778,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -48652,6 +48665,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           description: INVALID_MANIFEST. The manifest does not validate (errors in error.details.errors), or a lib component's filename has no content in libs.
 
@@ -48727,6 +48742,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -48844,6 +48861,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
 
   /v1/cortex/{name}/prompts:
     get:
@@ -67696,6 +67715,8 @@ paths:
                           id: { type: string }
                           visibility: { type: string }
                           federate: { type: boolean }
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

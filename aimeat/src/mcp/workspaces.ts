@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-18 — aimeat_workspace_share asks the publish gate with the session's caller: opening the
+ *     share to anyone with the link answers `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — aimeat_workspace_share runs setWorkspaceShareOp (services/workspace-share.ts), the code
  *     PUT /v1/organisms/:id/workspace/share runs: an AI that published a page can now hand out its link.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
@@ -450,7 +452,9 @@ export function registerWorkspaceTools(
             const input = shareBodyFromToolInput({ space, id, shared, access, password, until });
             if ('error' in input) return toolError('INVALID_INPUT', input.error);
             const session = caller();
-            const r = await setWorkspaceShareOp({ storage, config }, { sub: session.principal, owner: session.owner }, { orgId: organism_id, ws, body: input.body });
+            // Opening it to anyone with the link asks the node's publish gate, as the PUT does; on an
+            // ask the answer carries publish_request and the rest of the change is stored.
+            const r = await setWorkspaceShareOp({ storage, config }, { sub: session.principal, owner: session.owner }, { orgId: organism_id, ws, body: input.body }, { caller: session });
             return r.ok ? ok(r.data) : toolError(r.code, r.message);
         });
 

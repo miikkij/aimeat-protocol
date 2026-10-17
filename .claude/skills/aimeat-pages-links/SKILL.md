@@ -78,7 +78,10 @@ Use the MCP tool `aimeat_workspace_share` (all three agent surfaces since 2026-1
 `ws`, `space` and `id` for one page (`space` alone for a whole space, neither for the workspace),
 `shared: true`, and `access`. Its answer carries `viewer_url`, the link to hand out. `until` takes an
 ISO date for the end of the share, or `"none"` to remove the end. Only the workspace creator, an
-organism admin or their own agent may change sharing, and only published pages are shown.
+organism admin or their own agent may change sharing, and only published pages are shown. When the
+node asks the owner before making something public and the agent lacks `publish:public`, opening
+anything to `open` answers 202 with `publish_request`: the rest is saved, and the link works once the
+owner approves at its `approve_url`.
 
 Without MCP, the tool runs the same route:
 

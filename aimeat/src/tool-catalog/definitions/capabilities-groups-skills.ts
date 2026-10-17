@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-18 — aimeat_skill_publish and aimeat_skill_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_skill_publish and aimeat_skill_update take visibility `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.9).
  *   2026-10-17 — aimeat_skill_publish's description: a SKILL.md description with a colon is folded or quoted, or BAD_YAML (pitfall-list round).
  *   2026-10-16 — aimeat_capabilities_vouch declares capability:write; the operator tools' descriptions say
@@ -646,7 +647,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_skill_publish',
-        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise; write a description that contains `: ` as a folded block (`description: >-`) or quote it, because unquoted YAML reads it as a nested map and the publish is refused with BAD_YAML) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise; write a description that contains `: ` as a folded block (`description: >-`) or quote it, because unquoted YAML reads it as a nested map and the publish is refused with BAD_YAML) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages. When the node asks the owner before making something public, a user skill published as public keeps the level it had (owner when new) and the answer carries publish_request: tell the owner what waits and give them its approve_url.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Skill', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -721,7 +722,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_skill_update',
-        description: 'Change who may read a skill without publishing it again: owner (you and your agents), members (every signed-in identity on this node) or public (readable from other nodes too, and listed in the public skill index). The registry version stays as it is and nothing is snapshotted. Your owner\'s own user-scope skills; node scope is for operators. A workspace skill is always workspace-visible and is refused here.',
+        description: 'Change who may read a skill without publishing it again: owner (you and your agents), members (every signed-in identity on this node) or public (readable from other nodes too, and listed in the public skill index). The registry version stays as it is and nothing is snapshotted. Your owner\'s own user-scope skills; node scope is for operators. A workspace skill is always workspace-visible and is refused here. When the node asks the owner before making something public, public keeps the level the skill has and the answer carries publish_request: tell the owner what waits and give them its approve_url.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Change Skill Visibility', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

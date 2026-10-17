@@ -29,6 +29,10 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-18 — Create and update take `publishGate`, the door's caller (plan doc-mvcn6c7e4e5q, V4):
+ *     making an organism public (a create's default included) by an agent without publish:public, or
+ *     an app grant when the gate covers apps, makes it private (create) or keeps its level (update),
+ *     and the answer carries `publishRequest`, the request the owner approves.
  *   2026-10-15 — The organism_joined, organism_member_joined and organism_left account events are stored under the full identity (accountGhii), which the account feed reads by (feature-list audit #44).
  *   2026-10-15 — createOrganismRecord with a shape answers `workspacesNotCreated` beside `workspaces`:
  *     each workspace of the shape that failed, with its reason (feature-list audit #56).
@@ -65,6 +69,9 @@ import { localAccountName } from '../utils/gaii.js';
 import { isOrganismOwner } from './organism-ownership.js';
 import { AGENT_ACCESS_VALUES, agentAccessOf, type AgentAccess } from './organism-agent-access.js';
 import { revokeDepartedMemberAccess } from './invitations.js';
+import { isRaiseToPublic } from './publish-gate.js';
+import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
+import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -120,6 +127,32 @@ export interface CreateOrganismInput {
   shape?: unknown;
   /** The language a shape's workspace names and readme are written in: en, fi or es. */
   lang?: unknown;
+  /** The door's caller: a public organism by one the node asks the owner about is made private. */
+  publishGate?: PublishGateInput;
+}
+
+/** May this caller make the organism public, asked before the first write (services/publish-gate.ts). */
+function organismPublishAsk(
+  deps: OrganismDeps, gate: PublishGateInput | undefined, from: string | undefined, to: string | undefined,
+): Extract<PublishAsk, { kind: 'ask' | 'refused' }> | null {
+  if (!gate || !isRaiseToPublic(from, to)) return null;
+  const ask = publishAskOf(deps, gate.caller, gate.app);
+  return ask.kind === 'allowed' ? null : ask;
+}
+
+/** File the request to make the organism public, once it exists at `from` (plan doc-mvcn6c7e4e5q, V4). */
+async function fileOrganismAsk(
+  deps: OrganismDeps, gate: PublishGateInput, ask: Extract<PublishAsk, { kind: 'ask' }>, id: string, from: string,
+): Promise<DoorAsk> {
+  const current = await deps.storage.getOrganism(id);
+  if (!current) return {};
+  return fileAskForDoor(deps, gate, ask.requester, {
+    kind: 'organism',
+    // updatedAt is the organism's version: an approval of an organism edited since is outdated.
+    target: { organism_id: id, updated_at: current.updatedAt },
+    title: `the organism ${current.name}`, name: current.name,
+    change: { field: 'visibility', from, to: 'public' },
+  }, from);
 }
 
 /**
@@ -131,7 +164,7 @@ export async function createOrganismRecord(
   deps: OrganismDeps,
   creatorOwner: string,
   input: CreateOrganismInput,
-): Promise<OrganismRefusal | { ok: true; organism: OrganismRecord; workspaces?: ShapedWorkspace[]; workspacesNotCreated?: ShapedWorkspaceFailure[] }> {
+): Promise<OrganismRefusal | ({ ok: true; organism: OrganismRecord; workspaces?: ShapedWorkspace[]; workspacesNotCreated?: ShapedWorkspaceFailure[] } & DoorAsk)> {
   const { storage, config } = deps;
 
   const name = typeof input.name === 'string' ? input.name.trim() : '';
@@ -145,7 +178,13 @@ export async function createOrganismRecord(
   // the shape's type, or the first preset, and anything longer than a label is cut to one.
   const type = typeof input.type === 'string' && input.type.trim() ? input.type.trim().slice(0, ORGANISM_TYPE_MAX) : (shape?.type ?? 'community');
   const joinPolicy = pickEnum(JOIN_POLICIES, input.joinPolicy, shape?.joinPolicy ?? 'open');
-  const visibility = pickEnum(VISIBILITIES, input.visibility, shape?.visibility ?? 'public');
+  let visibility = pickEnum(VISIBILITIES, input.visibility, shape?.visibility ?? 'public');
+  // The publish gate (plan doc-mvcn6c7e4e5q, V4): the default is public, so a create that names no
+  // visibility asks too. Asked by a caller the node asks the owner about, the organism and its board
+  // are made private, and the request is filed once the organism exists.
+  const ask = organismPublishAsk(deps, input.publishGate, undefined, visibility);
+  if (ask?.kind === 'refused') return refuse(ask.status, ask.code, ask.message);
+  if (ask) visibility = 'private';
   // Roster privacy tier; unset = 'authenticated' (see services/organism-privacy.ts).
   const memberVisibility = MEMBER_VISIBILITY_VALUES.includes(input.memberVisibility as OrganismRecord['memberVisibility'] & string)
     ? (input.memberVisibility as OrganismRecord['memberVisibility'])
@@ -223,13 +262,15 @@ export async function createOrganismRecord(
     }).catch(err => { logger.warn('createOrganismRecord: feed is best-effort', { error: String(err) }); });
   }
 
+  let shaped: { workspaces: ShapedWorkspace[]; workspacesNotCreated: ShapedWorkspaceFailure[] } | null = null;
   if (shape) {
     const lang = typeof input.lang === 'string' ? input.lang.slice(0, 2) : 'en';
     const { made, notCreated } = await applyOrganismShape(deps, id, creatorOwner, shape, lang);
     if (made.length) emitChange('organisms');
-    return { ok: true, organism, workspaces: made, workspacesNotCreated: notCreated };
+    shaped = { workspaces: made, workspacesNotCreated: notCreated };
   }
-  return { ok: true, organism };
+  const asked = ask && input.publishGate ? await fileOrganismAsk(deps, input.publishGate, ask, id, visibility) : {};
+  return { ok: true, organism, ...(shaped ?? {}), ...asked };
 }
 
 export interface UpdateOrganismInput {
@@ -246,6 +287,8 @@ export interface UpdateOrganismInput {
   readme?: unknown;
   /** The caller is the person in person (isOwnerPrincipal), not an agent: needed to widen agentAccess. */
   callerIsPerson?: boolean;
+  /** The door's caller: making the organism public by one the node asks the owner about keeps its level. */
+  publishGate?: PublishGateInput;
 }
 
 /**
@@ -260,7 +303,7 @@ export async function updateOrganismRecord(
   deps: OrganismDeps,
   organism: OrganismRecord,
   input: UpdateOrganismInput,
-): Promise<OrganismRefusal | { ok: true; organism: OrganismRecord; readme: string; readmeSet: boolean }> {
+): Promise<OrganismRefusal | ({ ok: true; organism: OrganismRecord; readme: string; readmeSet: boolean } & DoorAsk)> {
   const { storage, config } = deps;
   const updates: Partial<OrganismRecord> = { updatedAt: new Date().toISOString() };
 
@@ -330,6 +373,11 @@ export async function updateOrganismRecord(
   if (input.readme !== undefined && typeof input.readme !== 'string') {
     return refuse(400, 'INVALID_INPUT', 'readme must be a string');
   }
+  // The publish gate (plan doc-mvcn6c7e4e5q, V4), before the first write: asked by a caller the node
+  // asks the owner about, the rest of the change applies and the organism keeps the level it had.
+  const ask = organismPublishAsk(deps, input.publishGate, organism.visibility, updates.visibility);
+  if (ask?.kind === 'refused') return refuse(ask.status, ask.code, ask.message);
+  if (ask) delete updates.visibility;
 
   // The README stays owned by the organism's creator so it does not fork into a second copy under
   // whichever admin edited it last.
@@ -339,7 +387,8 @@ export async function updateOrganismRecord(
   const updated = await storage.updateOrganism(organism.id, updates);
   const readme = await getOrganismReadme(storage, organism.id);
   emitChange('organisms');
-  return { ok: true, organism: updated ?? { ...organism, ...updates }, readme, readmeSet };
+  const asked = ask && input.publishGate ? await fileOrganismAsk(deps, input.publishGate, ask, organism.id, organism.visibility) : {};
+  return { ok: true, organism: updated ?? { ...organism, ...updates }, readme, readmeSet, ...asked };
 }
 
 export type JoinOrganismResult =

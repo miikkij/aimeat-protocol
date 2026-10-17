@@ -45,6 +45,9 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-10-18 — installCortex takes `publishGate`, the door's caller: a manifest asking for `public`
+ *     by an agent without publish:public installs the cortex private and the answer carries `asked`,
+ *     the request the owner approves (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — activateCortex asks activationRefusal first and answers its status and code, so a
  *     schema lock another account holds refuses the activation before any write (QA audit S7-01).
  *   v1.7.0 — 2026-09-26 — removeCortex deletes the seed records under every principal of the installing
@@ -89,6 +92,8 @@ import { refreshCortexDependencies, forgetDependencies } from './dependency-map.
 import { snapshotCortexVersion, forgetVersions } from './component-versions.js';
 import { accountPrincipals } from './db/owner-identity.js';
 import { logger } from '../utils/logger.js';
+import { cortexPublishAsk, fileCortexAsk } from './cortex-visibility.js';
+import type { DoorAsk, PublishGateInput } from './publish-requests/door.js';
 
 export interface CortexDeps {
     storage: Storage;
@@ -208,6 +213,8 @@ export interface CortexInstallResult {
     record: CortexExtensionRecord;
     /** Manifest warnings: unsafe lib patterns, undiscoverable exports. Not a refusal. */
     warnings?: string[];
+    /** The publish request filed when the manifest asked for `public` and the owner decides (V4). */
+    asked?: DoorAsk;
 }
 
 export interface CortexActivationResult {
@@ -238,7 +245,9 @@ export async function installCortex(
     deps: CortexDeps,
     // Install publishes nothing, so it does not take the resolved identity.
     caller: Omit<CortexCaller, 'identity'>,
-    input: { manifest: unknown; libs?: unknown },
+    /** `publishGate`: the door's caller. A manifest asking for `public` by one the node asks the owner
+     *  about installs the cortex private (services/cortex-visibility.ts). */
+    input: { manifest: unknown; libs?: unknown; publishGate?: PublishGateInput },
 ): Promise<CortexOutcome<CortexInstallResult>> {
     const { storage, config } = deps;
     const { manifest } = input;
@@ -320,6 +329,11 @@ export async function installCortex(
         });
     }
 
+    // The publish gate (plan doc-mvcn6c7e4e5q, V4), the last question before the first write.
+    const ask = cortexPublishAsk(deps, input.publishGate, undefined, ext.visibility);
+    if (ask?.kind === 'refused') return refuse(ask.status, ask.code, ask.message);
+    if (ask) ext.visibility = 'private';
+
     // Claim the name FIRST, then write the bytes. The read above cannot settle who holds a name that
     // is being written at the same moment, and the node writes several itself: seedBundledCortexes
     // installs the thirteen bundled packs at boot without awaiting, so for a few hundred
@@ -351,7 +365,8 @@ export async function installCortex(
         .catch(err => logger.warn('installCortex: dependency map not refreshed', { name: ext.name, error: String(err) }));
 
     emitChange('cortex');
-    return { ok: true, value: { record, warnings: result.warnings } };
+    const asked = await fileCortexAsk(deps, input.publishGate, ask, record);
+    return { ok: true, value: { record, warnings: result.warnings, asked } };
 }
 
 /**

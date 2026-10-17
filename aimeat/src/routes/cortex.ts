@@ -11,6 +11,10 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   2026-10-18 — POST /v1/cortex, PUT /v1/cortex/:name (a new name) and POST /v1/cortex/:name/visibility
+ *     ask the publish gate: a cortex made public by an agent without publish:public stays private and
+ *     the answer is 202 with `publish_request` (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4).
+ *     The install answers say the cortex's `visibility`.
  *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): catalogue:read on GET /v1/cortex/:name, GET /v1/cortex/:name/prompts, GET /v1/cortex/:name/prompts/:promptName, GET /v1/cortex/:name/ontology. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   2026-10-05 — POST /v1/cortex with mode presigned answers the upload offer for a cortex ZIP
  *     (services/cortex-upload-offer.ts), as POST /v1/extensions does (secaudit 2026-10, M3).
@@ -51,12 +55,11 @@
  *     live gap (libs swapped, never deleted-then-recreated), re-runs init on an active cortex,
  *     and never consumes a quota slot when updating an existing cortex.
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { emitChange } from '../services/event-bus.js';
 import { cortexCallerOf } from './cortex/caller.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 import {
@@ -70,6 +73,9 @@ import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/depe
 import { resolveCortexLib, listVersions } from '../services/component-versions.js';
 import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
+import { callerOf as requestCaller } from '../middleware/caller.js';
+import { cortexPublishAsk, fileCortexAsk, cortexAskedFields, setCortexVisibility } from '../services/cortex-visibility.js';
+import type { PublishGateInput } from '../services/publish-requests/door.js';
 
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
 // `activateExtension` from '../routes/cortex.js' unchanged after the activation logic moved out.
@@ -103,6 +109,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
   /** Who is asking. In ./cortex/caller.ts, which says why a federated session is not the namesake. */
   const callerOf = (req: Parameters<typeof cortexCallerOf>[0]) => cortexCallerOf(req, config.nodeId, storage);
+  /** The caller the publish gate asks about (services/cortex-visibility.ts): the session, and an app grant's app. */
+  const publishGateOf = (req: Request): PublishGateInput =>
+    ({ caller: requestCaller(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) });
 
   // ── GET /v1/cortex — list installed cortex extensions ──
   router.get('/v1/cortex', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
@@ -155,23 +164,27 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const { manifest, libs } = req.body ?? {};
-    const out = await installCortex({ storage, config }, await callerOf(req), { manifest, libs });
+    // A manifest asking for `public` asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
+    const out = await installCortex({ storage, config }, await callerOf(req), { manifest, libs, publishGate: publishGateOf(req) });
     if (!out.ok) {
       res.status(out.refusal.status).json(
         error(config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
       return;
     }
 
-    const { record, warnings } = out.value;
-    res.status(201).json(success(config.nodeId, {
+    const { record, warnings, asked } = out.value;
+    // 202 when the cortex was installed private and making it public waits for the owner.
+    res.status(asked?.publishRequest ? 202 : 201).json(success(config.nodeId, {
       name: record.name,
       namespace: record.namespace,
       version: record.version,
       status: record.status,
+      visibility: record.visibility,
       installed_at: record.installedAt,
       installed_by: record.installedBy,
       component_count: record.components.length,
       warnings,
+      ...cortexAskedFields(asked, warnings),
       lib_urls: cortexLibUrls(config.baseUrl, record),
     }, [
       { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(record.name)}/activate` },
@@ -186,7 +199,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   router.put('/v1/cortex/:name', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const { manifest, libs } = req.body ?? {};
-    const out = await upsertCortex({ storage, config }, await callerOf(req), { name, manifest, libs });
+    const out = await upsertCortex({ storage, config }, await callerOf(req), { name, manifest, libs, publishGate: publishGateOf(req) });
     if (!out.ok) {
       res.status(out.refusal.status).json(
         error(config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
@@ -197,16 +210,18 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
     if (done.action === 'created') {
       const record = done.record;
-      res.status(201).json(success(config.nodeId, {
+      res.status(done.asked?.publishRequest ? 202 : 201).json(success(config.nodeId, {
         name: record.name,
         namespace: record.namespace,
         version: record.version,
         status: record.status,
+        visibility: record.visibility,
         action: 'created',
         installed_at: record.installedAt,
         installed_by: record.installedBy,
         component_count: record.components.length,
         warnings: done.warnings,
+        ...cortexAskedFields(done.asked, done.warnings),
         lib_urls,
       }, [
         { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(record.name)}/activate` },
@@ -363,9 +378,23 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "public" or "private"'));
       return;
     }
-    const updated = await storage.updateCortexExtension(name, { visibility });
+    // Making it public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4): on an ask the
+    // cortex keeps its level and the answer is 202 with the request.
+    const gate = publishGateOf(req);
+    const ask = cortexPublishAsk({ storage, config }, gate, ext.visibility, visibility);
+    if (ask?.kind === 'refused') {
+      res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
+      return;
+    }
+    if (ask) {
+      const asked = await fileCortexAsk({ storage, config }, gate, ask, ext);
+      res.status(asked.publishRequest ? 202 : 200).json(success(config.nodeId, {
+        name, visibility: ext.visibility, ...cortexAskedFields(asked, undefined),
+      }));
+      return;
+    }
+    const updated = await setCortexVisibility({ storage, config }, name, visibility);
     res.json(success(config.nodeId, { name, visibility: updated?.visibility }));
-    emitChange('cortex');
   });
 
   // ── GET /v1/cortex/:name/prompts — list prompts from extension ──

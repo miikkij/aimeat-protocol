@@ -24,6 +24,9 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.26.0 — 2026-10-18 — A cortex ZIP whose manifest asks for `public` asks the publish gate with
+ *     the uploader's grant (services/publish-requests/upload-gate.ts): on an ask it installs private
+ *     and the answer is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   v1.25.3 — 2026-10-09 — The PUT spends its token in storage (verifyUploadToken(token, storage)), so a
  *     used token is refused after a restart and on another process (secrets audit 2026-10-09, S-7).
  *   v1.25.2 — 2026-10-09 — A ZIP-installed extension's secrets are encrypted bound to its name
@@ -166,6 +169,9 @@ import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js
 import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-write.js';
 import { managedChangeRefusal } from '../services/packages/install/package-managed.js';
 import { receiveFontUpload } from '../services/themes/fonts.js';
+import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
+import { cortexAskedFields } from '../services/cortex-visibility.js';
+import type { DoorAsk } from '../services/publish-requests/door.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -589,10 +595,14 @@ async function handleCortexUpload(
     //    branch of aimeat_cortex_install run. It re-reads the manifest and applies the manifest and
     //    lib ceilings, the node's cortex ceiling, the namespace claim and the prior-owner check,
     //    every one of them before the first lib byte is written.
+    // A manifest asking for `public` asks the publish gate with the uploader's grant as it is now,
+    // since the token carries none (plan doc-mvcn6c7e4e5q, V4).
+    const publishGate = await uploadPublishGate(storage, config.nodeId, sub);
     if (!existing) {
         const out = await installCortex({ storage, config }, { ownerName, gaii: sub, isOperator }, {
             manifest: incoming.manifest,
             libs: result.libs,
+            publishGate,
         });
         if (!out.ok) {
             res.status(out.refusal.status).json({
@@ -601,7 +611,7 @@ async function handleCortexUpload(
             });
             return;
         }
-        respondCortexInstalled(res, out.value.record, false, sub);
+        respondCortexInstalled(res, out.value.record, false, sub, out.value.asked);
         return;
     }
 
@@ -623,7 +633,7 @@ async function handleCortexUpload(
     //    account name is completed to the account's GHII, as resolveIdentity completes an owner's.
     const identity = sub.includes('#') || sub.includes('@') ? sub : `${ownerName}@${config.nodeId}`;
     const out = await upsertCortex({ storage, config }, { ownerName, gaii: sub, identity, isOperator }, {
-        name: incoming.name, manifest: incoming.manifest, libs: result.libs,
+        name: incoming.name, manifest: incoming.manifest, libs: result.libs, publishGate,
     }, false);
     if (!out.ok) {
         res.status(out.refusal.status).json({
@@ -638,12 +648,13 @@ async function handleCortexUpload(
 /** The upload's answer, shared by the install branch and the replace branch above. */
 function respondCortexInstalled(
     res: Response, record: Pick<CortexExtensionRecord, 'name' | 'namespace' | 'version' | 'status' | 'components'>,
-    replaced: boolean, sub: string,
+    replaced: boolean, sub: string, asked?: DoorAsk,
 ): void {
     logger.info(`Cortex installed via upload: ${record.name}`, { version: record.version, by: sub, replaced });
     emitResourceListChanged(sub);
 
-    res.json({
+    // 202 when the cortex was installed private and making it public waits for the owner (V4).
+    res.status(asked?.publishRequest ? 202 : 200).json({
         success: true,
         type: 'cortex',
         name: record.name,
@@ -651,5 +662,6 @@ function respondCortexInstalled(
         version: record.version,
         status: record.status,
         component_count: record.components.length,
+        ...cortexAskedFields(asked, undefined),
     });
 }

@@ -15,6 +15,7 @@
  * @version-history
  *   v1.1.0 — 2026-10-18 — Stored files (apply-file.ts; plan doc-mvcn6c7e4e5q, V4).
  *   v1.1.0 — 2026-10-18 — Package groups, knowledge packages and data packages (plan doc-mvcn6c7e4e5q, V4).
+ *   v1.1.0 — 2026-10-18 — Organisms, boards, user skills, cortex libraries and workspace shares (V4).
  *   v1.0.0 — 2026-10-18 — Initial: memory records (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import type { PublishApplier, PublishKind } from './store.js';
@@ -23,6 +24,11 @@ import { applyFilePublish } from './apply-file.js';
 import { applyPackagePublish } from './apply-package.js';
 import { applyKnowledgePublish } from './apply-knowledge.js';
 import { applyDatapackagePublish } from './apply-datapackage.js';
+import { applyOrganismPublish } from './apply-organism.js';
+import { applyBoardPublish } from './apply-board.js';
+import { applySkillPublish } from './apply-skill.js';
+import { applyCortexPublish } from './apply-cortex.js';
+import { applyWorkspaceSharePublish } from './apply-workspace-share.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -31,4 +37,9 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   package: applyPackagePublish,
   knowledge: applyKnowledgePublish,
   datapackage: applyDatapackagePublish,
+  organism: applyOrganismPublish,
+  board: applyBoardPublish,
+  skill: applySkillPublish,
+  cortex: applyCortexPublish,
+  'workspace-share': applyWorkspaceSharePublish,
 };
