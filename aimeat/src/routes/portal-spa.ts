@@ -21,6 +21,10 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.9.0 — 2026-10-17 — A node set to signed-in content access gets a shell without the built
+ *     page head (a person's portfolio, an app's name) and without the live page body, and
+ *     window.__SITE says `contentAccess: 'signed-in'` so the shell offers a sign-in (plan
+ *     doc-mvcn6c7e4e5q V1).
  *   v1.8.0 — 2026-10-03 — The shell links /v1/themes/fonts.css?v=<hash> after the base faces when the
  *     operator has added a face (the font manager).
  *   v1.7.0 — 2026-10-03 — The build watchdog runs in the top window only: a framed shell (the design
@@ -51,6 +55,7 @@ import { fontsSheetHref } from '../services/themes/font-registry.js';
 import { findPublicPage, type PublicPage } from '../data/public-pages.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 import { injectPageBody } from '../utils/page-body.js';
+import { signedInOnly } from '../config-visibility.js';
 import { buildGlossaryBody } from './glossary.js';
 
 /**
@@ -111,6 +116,12 @@ export function serveSpa(
    */
   liveMarkdown?: string,
 ): void {
+  // A node that shows its content to its own accounts only: the shell is served to everybody (a page
+  // load carries no session), so it carries no person, app or live list. The page reads its content
+  // through the API, which refuses a stranger (middleware/content-access-gate.ts).
+  const closed = signedInOnly(config);
+  const ownPage = closed ? undefined : builtPage;
+  const live = closed ? undefined : liveMarkdown;
   const appOriginEnabled = config.appOriginEnabled && !!config.appHost;
   const v = `?v=${BUILD_ID}`;
   let html = readFileSync(spaPath, 'utf-8');
@@ -149,7 +160,7 @@ export function serveSpa(
     // This node's own public-page links (its academy, marketplace, proof apps, contact).
     // Injected rather than fetched so the first paint already knows which nav items and
     // sections exist. Empty on a fresh clone, and every consumer treats empty as "absent".
-    `window.__SITE=${JSON.stringify(publicSiteLinks(config))};` +
+    `window.__SITE=${JSON.stringify({ ...publicSiteLinks(config), ...(closed ? { contentAccess: 'signed-in' } : {}) })};` +
     `(function(){if(window.self!==window.top)return;var c="${BUILD_ID}";` +
     `function chk(){fetch("/v1/build",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;})` +
     `.then(function(d){if(d&&d.build&&d.build!==c){location.reload();}}).catch(function(){});}` +
@@ -177,7 +188,7 @@ export function serveSpa(
   // Per-route head metadata: one spa.html shell answers ten routes, so the canonical link, the
   // title and the description are stamped per request. Runs second, so a page that describes
   // itself wins over the node-wide fallback just written. Shared with the static info pages.
-  const page = builtPage ?? (routePath ? findPublicPage(routePath) : undefined);
+  const page = ownPage ?? (routePath ? findPublicPage(routePath) : undefined);
   if (page) html = injectPageHead(html, page, config, nonceAttr);
   // A route the registry does not name is a signed-in view or a tool, not a content page: its
   // document is the bare shell titled "AIMEAT". The X-Robots-Tag header (middleware/robots-header.ts)
@@ -202,7 +213,7 @@ export function serveSpa(
     // gave a crawler 130 words and the change log 105 (Bingbot, 2026-09-23).
     markdown: page?.path === '/v1/glossary'
       ? buildGlossaryBody()
-      : liveMarkdown ? `${page?.markdown ?? ''}\n\n${liveMarkdown}` : undefined,
+      : live ? `${page?.markdown ?? ''}\n\n${live}` : undefined,
   });
 
   // Make the running AIMEAT version visible from the page itself — a view-source comment plus a

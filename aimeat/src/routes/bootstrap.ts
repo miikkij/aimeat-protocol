@@ -8,6 +8,9 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-10-17 — A node set to signed-in content access answers GET / without the operator's
+ *     template, the front page passages and the live page body, and the JSON bootstrap says
+ *     `content_access` (plan doc-mvcn6c7e4e5q V1).
  *   2026-10-16 — The health check's storage probe has a 5 s limit and answers degraded when it is hit,
  *     instead of waiting on a stalled database (QA audit E6-07).
  *   2026-10-15 — The owner_scope note says private records need memory:read-as-owner (feature-list audit #42).
@@ -101,6 +104,7 @@ import { logger } from '../utils/logger.js';
 import { runningBuild } from '../utils/build-stamp.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { coreDiscoveryFields } from '../services/core-discovery.js';
+import { signedInOnly } from '../config-visibility.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -226,7 +230,12 @@ export function bootstrapRouter(
     // Markdown for Agents: Accept: text/markdown (or ?format=md) serves the markdown
     // landing — the operator's custom template converted when one is set, the authored
     // landing document otherwise. ?format=json still forces the JSON bootstrap.
+    // A node that shows its content to its own accounts only: the operator's template can carry
+    // board posts and memory ({{board:…}}, {{memory:…}}) and the front page's passages are content,
+    // so a stranger gets the node's own description and the plain shell (plan doc-mvcn6c7e4e5q V1).
+    const closed = signedInOnly(config);
     if (_req.query.format === 'md' || (_req.query.format === undefined && !wantsJson && prefersMarkdown(_req))) {
+      if (closed) { sendMarkdown(res, buildLandingMarkdown(config)); return; }
       if (siteService && config.siteEnabled && await siteService.hasCustomTemplate()) {
         const customHtml = await siteService.getPortalHtml(
           _req.query.lang as string | undefined,
@@ -252,7 +261,7 @@ export function bootstrapRouter(
     // served AT the root with the root's own head metadata. It used to 302 to /v1/portal, which
     // cost the front door its canonical URL and made the root a redirect in every report.
     if (!wantsJson) {
-      if (siteService && config.siteEnabled && await siteService.hasCustomTemplate()) {
+      if (!closed && siteService && config.siteEnabled && await siteService.hasCustomTemplate()) {
         const customHtml = await siteService.getPortalHtml(
           _req.query.lang as string | undefined,
           _req.headers.cookie,
@@ -310,6 +319,8 @@ export function bootstrapRouter(
         description: 'AIMEAT (AI Memory Exchange and Action Transfer): a place a person owns, where every AI they use keeps what it learns, works under permissions they grant and can withdraw, and shares with the people and AIs they choose',
         welcome: 'Welcome to AIMEAT ♥ Love what you build, share what you know. The network starts here.',
         anonymous_mode: config.anonymousMode,
+        // 'signed-in': this node shows its content to its own accounts only; sign in or connect first.
+        content_access: config.contentAccess,
         extended_features_enabled: config.extendedFeaturesEnabled,
         personal_nodes_enabled: config.personalNodesEnabled,
       },

@@ -38,6 +38,7 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.9.0 — 2026-10-17 — `access`: who may open the app changed (plan doc-mvcn6c7e4e5q V2.1).
  *   v1.8.0 — 2026-10-16 — recordAppAudit writes with compare-and-swap and retries on a version miss, so
  *     two overlapping audited changes both keep their entry; a write that still fails is logged at error
  *     level; the owner's archive and limit actions refuse instead of overwriting a concurrent entry
@@ -87,6 +88,8 @@ export type AppAuditAction =
   | 'parked' | 'unparked' | 'community'
   | 'forkable'
   | 'access_code.set' | 'access_code.cleared'
+  // Who may open the app (services/app-access.ts): anyone, signed-in, or one organism's members.
+  | 'access'
   | 'protection'
   | 'name' | 'description'
   | 'dev.granted' | 'dev.revoked'

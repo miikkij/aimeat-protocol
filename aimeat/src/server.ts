@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-17 — contentAccessGate after appOriginSignIn: a node set to signed-in content access
+ *     refuses everyone who is not one of its accounts, outside a short open list (plan doc-mvcn6c7e4e5q V1).
  *   2026-10-16 — ConfigSources carries the settings loadConfig() set aside (`settingFallbacks`), for
  *     the Security page incidents config-init.ts opens (Jouni, decision 2026-10-16).
  *   2026-10-16 — pageHostOnly() after subdomainMiddleware: the page host answers the page frame and
@@ -64,6 +66,7 @@ import { robotsHeader } from './middleware/robots-header.js';
 import { apexPageRedirect } from './middleware/apex-page-redirect.js';
 import { agentMeAliasMiddleware } from './middleware/agent-me-alias.js';
 import { appOriginSignIn } from './middleware/app-origin-sign-in.js';
+import { contentAccessGate } from './middleware/content-access-gate.js';
 import { logger } from './utils/logger.js';
 import { runAsNode } from './utils/gaii.js';
 import { TunnelManager } from './services/personal-tunnel.js';
@@ -271,6 +274,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // An app does not sign people in: the sign-in and registration routes refuse a request from an
   // app host, an app Origin or the isolated frame. After CORS, so the app can read the refusal.
   app.use(appOriginSignIn(config));
+
+  // A node set to show its content to its own signed-in accounts only refuses everybody else here,
+  // deny by default (middleware/content-access-gate.ts). After CORS, so a refused app can read why.
+  app.use(contentAccessGate(config));
 
   // Rate limiting — global (with role multipliers)
   app.use(rateLimit(config.rateLimits.global, config.rateLimits.roleMultipliers));

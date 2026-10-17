@@ -10,6 +10,9 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-17 — The app's access setting (anyone, signed-in, an organism) and the node's signed-in
+ *     content access gate the apex read beside the code: a stranger's browser goes to /v1/app-open,
+ *     an API caller gets 401 or 403, and the inline redirect carries a grant (plan doc-mvcn6c7e4e5q V2.3).
  *   2026-10-16 — The access code, the operator hide and the pacing amount are read from the latest
  *     version (currentAppRow) when an older version is asked for (QA audit F10a-01).
  *   2026-10-15 — A served version takes the app's current copy protection (servedProtection), not
@@ -132,6 +135,8 @@ import { escapeHtml } from '../../utils/html-escape.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
 import { appIsPaced, appToll } from '../../services/app-pacing.js';
+import { appNeedsSignIn } from '../../services/app-access.js';
+import { signInGateRefused } from './open.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
@@ -552,6 +557,10 @@ export function registerReadRoutes(
             }
         }
 
+        // Who may open it: the app's open_to setting, or the node's signed-in content access
+        // (routes/apps/open.ts). The owner, an operator and a grant from POST .../open pass.
+        if (await signInGateRefused(req, res, config, storage, app, current, canonicalOwner, operatorReads)) return;
+
         // Paced app check: if the app store is on and the app has a pacing amount, require a valid
         // licence (the app taken once through POST /v1/app-store/purchase).
         if (appIsPaced(config, current.manifest)) {
@@ -624,7 +633,8 @@ export function registerReadRoutes(
         if (runnable && config.appOriginEnabled && config.appHost && (!req.appOrigin || foreignOrigin)) {
             const target = await appOriginUrl(config, storage, owner, filename);
             const gated = !!current.accessCode
-                || appIsPaced(config, current.manifest);
+                || appIsPaced(config, current.manifest)
+                || appNeedsSignIn(config, current);
             if (!gated) {
                 res.redirect(301, target);
                 return;

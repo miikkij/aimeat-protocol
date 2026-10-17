@@ -21,6 +21,7 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-17 — settings takes `open_to` (anyone, signed-in, organism:<id>): who may open the app.
  *   2026-10-15 — audit_keep: a number is set by an agent holding account:security, as the route allows; the text said it was always refused (feature-list audit 105).
  *   2026-10-13 — scope_allowance and scope_allowance_remove, with the `words` field: the permissions an
  *     app kept when the node moved to 4.0, and the owner taking one away (services/app-scope-allowance.ts).
@@ -107,6 +108,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     parked: { type: 'boolean', description: 'For settings: the older two-state switch. true is listing "unlisted", false is listing "listed". Prefer listing.' },
     forkable: { type: 'boolean', description: 'For settings: true lets anyone signed in fork the app into their own catalogue.' },
     access_code: { type: 'string', description: 'For settings: a code visitors must type to open the app. An empty string removes it. Never read back.' },
+    open_to: { type: 'string', description: 'For settings: who may OPEN the app (listing is only who sees it in a list). "anyone": the link opens it. "signed-in": only people signed in to this node; others are asked to sign in first. "organism:<organism id>": only the members of that organism (you must be a member). Ask the person which one they want before setting it.' },
     protection: { type: 'object', description: 'For settings: copy protection { obfuscate, domainLock, watermark, noRawDownload }, each true or false.', zod: z.record(z.string(), z.boolean()) },
     // screenshot_upload
     screenshot: { type: 'string', description: 'For screenshot_upload: the image as base64, at most 2 MB.' },
@@ -163,7 +165,7 @@ export interface AppManageAction {
 const F = (required: string[], optional: string[] = []): Record<string, boolean> =>
     Object.fromEntries([...required.map(f => [f, true] as const), ...optional.map(f => [f, false] as const)]);
 
-const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'listing', 'parked', 'forkable', 'access_code', 'protection'];
+const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'listing', 'parked', 'forkable', 'access_code', 'open_to', 'protection'];
 
 /**
  * The member roster. Each action is one route of routes/app-members.ts and names the word that route
@@ -234,7 +236,7 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
 
 export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     settings: { fields: F(['filename'], ['owner', ...SETTINGS_FIELDS]), oneOf: SETTINGS_FIELDS, scope: 'app:write',
-        summary: 'change name, description, per-language descriptions, listing (listed, community for signed-in members only, or unlisted), forkable, access code or copy protection, without a new version' },
+        summary: 'change name, description, per-language descriptions, listing (listed, community for signed-in members only, or unlisted), who may open it (anyone, signed-in, or one organism\'s members), forkable, access code or copy protection, without a new version' },
     seo: { fields: F(['filename'], ['index', 'title', 'description', 'keywords', 'image', 'lang']), scope: 'app:write',
         summary: 'decide whether the app can be found in search engines (off until you ask) and what it says there; naming nothing reports where it stands' },
     marks: { fields: F(['filename'], ['badge', 'install', 'aiUse']), scope: 'app:write',

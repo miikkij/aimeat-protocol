@@ -3,8 +3,8 @@
 *How to run one AIMEAT node for your company and the partner companies you approve, with Microsoft
 Entra ID as the way in.*
 
-**Version:** 1.1 — SAML sign-in, SCIM provisioning and account deactivation (BR-04)
-**Date:** 2026-08-24
+**Version:** 1.2 — Section 6a: the node shows its content to signed-in accounts only
+**Date:** 2026-10-17
 **License:** MIT
 
 ---
@@ -138,6 +138,40 @@ Ungated Entra sign-in (`common` or `organizations` with no allowlist) does not v
   not only the first, so people from a removed tenant can no longer get in. Their accounts, memory
   and workspace access all remain. Removing an organisation is therefore reversible, and it is not
   the same thing as deleting anyone.
+- **What a stranger can READ.** The two gates above decide who gets in. They do not decide what the
+  node shows to someone who is not in: published apps, public files and shared pages are still
+  served to anyone. Section 6a closes that.
+
+## 6a. Show the content to signed-in accounts only
+
+`AIMEAT_CONTENT_ACCESS=signed-in` (also on the admin Config tab, visibility.content_access) makes
+the node serve nothing to anyone who is not signed in to one of its own accounts:
+
+- Every route outside a short list answers 401 `SIGN_IN_REQUIRED`. The list is what signing in,
+  registering, invitations, MCP and OAuth, device authorization and the app-grant steps need, plus
+  routes that carry a credential of their own (download tokens, unsubscribe links, signed
+  federation messages) and the node's own description for machines. It is `OPEN_ROUTES` in
+  `aimeat/src/middleware/content-access-gate.ts`, each entry with its reason, and
+  `test/e2e-content-access-gate.ts` calls every route the code declares to prove the rest refuse.
+- The pages still load (a browser keeps its session in its own storage, so a page load carries no
+  credential), but they carry no content: the shell drops the node's apps, members and portfolios,
+  and the API calls behind the page are refused until the person signs in.
+- Apps open only after a sign-in. A browser that opens an app without a session is sent to
+  `/v1/app-open`, signs in there, and comes back to the app. An owner can narrow an app further to
+  one organism's members (`open_to` on the app's settings).
+- Portfolio and company addresses answer 404, robots.txt disallows everything, the sitemaps and
+  the public feeds answer 401, and an anonymous visitor to a realtime room is refused.
+- A visitor signed in on another node is not an account here and gets the same 401.
+- Nothing stored changes. Content keeps its own setting underneath, so switching back to `open`
+  restores what was public.
+
+For a company node, use it together with `AIMEAT_REGISTRATION_MODE=oauth` (or `invite`) and the
+tenant allowlist: then the people who can sign in are your staff and the partners you approved,
+and only they see anything.
+
+Two settings shape how a new app starts on any node: `AIMEAT_APP_DEFAULT_LISTING` (listed,
+community or unlisted) and `AIMEAT_APP_DEFAULT_ACCESS` (anyone or signed-in), with
+`AIMEAT_APP_DEFAULT_ACCESS_CODE=true` giving each new app a code the publisher is told.
 
 ## 7. SAML and SCIM: the organisation's own identity provider (BR-04)
 

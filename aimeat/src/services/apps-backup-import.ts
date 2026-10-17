@@ -13,6 +13,7 @@
  * @structure parseAppsBackup; inspectAppsBackup; restoreAppsBackup; types
  * @usage import { parseAppsBackup, restoreAppsBackup } from '../services/apps-backup-import.js';
  * @version-history
+ *   2026-10-17 — A restored version keeps the app's access setting (who may open it), as it keeps the listing.
  *   v1.0.0 — 2026-06-12 — Initial: selective app-catalog restore with conflict modes
  *   v1.1.0 — 2026-09-28 — `append` onto an app a managed package install owns is refused per app
  *     (services/packages/install/package-managed.ts); `copy` still restores it beside the app.
@@ -275,6 +276,7 @@ function carriedState(live: AppRecord): Partial<AppRecord> {
     accessCode: live.accessCode,
     parked: !!live.parked,
     community: !!live.parked && !!live.community,
+    access: live.access,
     forkable: !!live.forkable,
     operatorHidden: !!live.operatorHidden,
     operatorHiddenBy: live.operatorHiddenBy,

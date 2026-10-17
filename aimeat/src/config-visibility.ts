@@ -12,6 +12,8 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.6.0 — 2026-10-17 — appDefaultListing, appDefaultAccess, appDefaultAccessCode: how a new app starts.
+ *   v1.5.0 — 2026-10-17 — contentAccess: 'signed-in' serves the node's content to its own accounts only.
  *   v1.4.0 — 2026-10-08 — behaviourEnabled (layer D).
  *   v1.3.0 — 2026-10-08 — agentExperienceEnabled (layer C).
  *   v1.2.0 — 2026-10-08 — merchantFeedEnabled (layer E).
@@ -48,6 +50,32 @@ export interface VisibilityConfig {
    * On by default: aggregates only, no identifier, keystroke, page text or recording.
    */
   behaviourEnabled: boolean;
+  /**
+   * Who this node shows its content to. 'open' (the default) serves public content to anyone.
+   * 'signed-in' serves nothing to a caller who is not an account of this node: every route outside
+   * the short list sign-in and machine connections need answers 401, the app, portfolio and company
+   * origins ask for a sign-in, and nothing can be made public (middleware/content-access-gate.ts,
+   * plan doc-mvcn6c7e4e5q V1). Stored values are untouched, so switching back restores them.
+   */
+  contentAccess: ContentAccess;
+  /**
+   * How a NEW app starts, the first time it is published (plan doc-mvcn6c7e4e5q V2.4). A later
+   * publish keeps whatever the owner chose. Listing: listed (default), community or unlisted.
+   */
+  appDefaultListing: 'listed' | 'community' | 'unlisted';
+  /** Who may open a new app: anyone (default) or signed-in (accounts of this node). */
+  appDefaultAccess: 'anyone' | 'signed-in';
+  /** A new app gets an access code of its own (generated, returned to the publisher). Off by default. */
+  appDefaultAccessCode: boolean;
+}
+
+/** Who a node shows its content to: anyone, or its own signed-in accounts only. */
+export type ContentAccess = 'open' | 'signed-in';
+export const CONTENT_ACCESS_VALUES: readonly ContentAccess[] = ['open', 'signed-in'];
+
+/** True when this node serves content to its own signed-in accounts only. */
+export function signedInOnly(config: { contentAccess?: ContentAccess }): boolean {
+  return config.contentAccess === 'signed-in';
 }
 
 export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): VisibilityConfig {
@@ -57,5 +85,10 @@ export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): Visibi
     merchantFeedEnabled: env.AIMEAT_MERCHANT_FEED !== 'false',
     agentExperienceEnabled: env.AIMEAT_AGENT_EXPERIENCE !== 'false',
     behaviourEnabled: env.AIMEAT_BEHAVIOUR !== 'false',
+    contentAccess: env.AIMEAT_CONTENT_ACCESS === 'signed-in' ? 'signed-in' : 'open',
+    appDefaultListing: env.AIMEAT_APP_DEFAULT_LISTING === 'community' || env.AIMEAT_APP_DEFAULT_LISTING === 'unlisted'
+      ? env.AIMEAT_APP_DEFAULT_LISTING : 'listed',
+    appDefaultAccess: env.AIMEAT_APP_DEFAULT_ACCESS === 'signed-in' ? 'signed-in' : 'anyone',
+    appDefaultAccessCode: env.AIMEAT_APP_DEFAULT_ACCESS_CODE === 'true',
   };
 }

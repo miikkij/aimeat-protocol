@@ -62,7 +62,7 @@ import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import {
-    applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput,
+    applyOwnerSettingsUpdate, appSettingsState, appDownloadUrl, parseOwnerSettingsInput, appAccessMembershipRefusal,
     SETTINGS_PRESENTATION_FIELDS, SETTINGS_OFFERING_FIELDS, type AppSettingsField, type AppSettingsInput,
 } from '../../services/app-settings.js';
 import { applyOwnerSeoUpdate, appSeoState, parseOwnerSeoInput } from '../../services/app-seo.js';
@@ -340,6 +340,13 @@ export function registerForkManageRoutes(
                 res.status(managed.status).json(error(config.nodeId, managed.code, managed.message, managed.status, managed.details));
                 return;
             }
+        }
+
+        // Who may open it, when it names an organism: the owner must be a member. Before the first write.
+        const accessRefusal = await appAccessMembershipRefusal(storage, owner, body.open_to);
+        if (accessRefusal) {
+            res.status(accessRefusal.status).json(error(config.nodeId, accessRefusal.code, accessRefusal.message));
+            return;
         }
 
         // Each field is independent and only touched when present in the body, so a

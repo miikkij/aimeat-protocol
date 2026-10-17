@@ -15,6 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-17 — Additive: "unlisted" is about lists; the link opens the app, and the owner chooses who may open it (V2.6).
  *   2026-10-17 — Pitfall-list round: the first declared language is a fallback, an agent's MCP upload is addressed by its embed_url, the realtime sample takes a ws ticket and names social:write, and the width check adds a per-element measure under overflow-x: clip. Additive.
  *   2026-10-13 — The scope notes name the words node 4.0 asks of an app's calls (ext:invoke, agent:read, task:write, workflow:write, organism:read, organism:invite). Additive.
  *   2026-10-11 — A comment calls a morsel amount pacing, not a price (no prompt text changed).
@@ -727,7 +728,9 @@ function composeAppPrompt(
     body += '2. Click "+" → "Add app" → the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
     body += '3. Click Save. A second dialog opens: fill in the description and click Publish. (Two dialogs, not one — Save takes the file, Publish puts it on the node.)\n';
     body += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
-    body += 'What I get: the app goes live on my own AIMEAT node at its own address, and I get a link to share. It starts UNLISTED (only I can find it) — from my catalogue I can list it publicly in the community catalogue, launch it, publish updates (older versions are always kept), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n\n';
+    body += 'What I get: the app goes live on my own AIMEAT node at its own address, and I get a link to share. It starts UNLISTED (only I can find it) — from my catalogue I can list it publicly in the community catalogue, launch it, publish updates (older versions are always kept), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n';
+    // Additive (plan doc-mvcn6c7e4e5q V2.6): "unlisted" is about lists, not about who opens the link.
+    body += 'Unlisted means no list shows it; the link itself still opens it for anyone who has it. In the app\'s settings I choose who may open it: anyone, only people signed in to this node, or only the members of one of my organisations.\n\n';
   }
 
   // ── full: language line + header (new mode) + body ──

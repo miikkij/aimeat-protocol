@@ -25,6 +25,9 @@
  *     the MCP tool aimeat_app_manage (action "settings") calls the same code as the route.
  *   v1.1.0 — 2026-10-12 — `listing` (listed, community, unlisted) sets where the app is listed;
  *     the older `parked` boolean maps onto it, and the answer carries `listing`.
+ *   v1.2.0 — 2026-10-17 — `access` (anyone, signed-in, organism:<id>) sets who may open the app; an
+ *     organism the owner is not a member of is refused. The answer carries `access` (plan
+ *     doc-mvcn6c7e4e5q V2.1).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppProtection, AppRecord, AppListing } from '../storage/interface.js';
@@ -32,12 +35,14 @@ import { appListingOf } from '../storage/interface.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../utils/app-protect.js';
 import { recordAppAudit, type AppAuditAction } from './app-audit.js';
 import { emitChange } from './event-bus.js';
+import { parseAppAccessInput, appAccessOf, type AppAccess } from './app-access.js';
+import { parseAudience } from './audience.js';
 
 /** How an app presents itself: a rung that stops at `presentation` may write these. */
 export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions'] as const;
 
 /** How an app is offered: needs the `operate` rung on a delegated app. */
-export const SETTINGS_OFFERING_FIELDS = ['access_code', 'listing', 'parked', 'forkable', 'protection'] as const;
+export const SETTINGS_OFFERING_FIELDS = ['access_code', 'open_to', 'listing', 'parked', 'forkable', 'protection'] as const;
 
 /** The three `listing` values, in the order the catalogue offers them. */
 export const APP_LISTINGS: readonly AppListing[] = ['listed', 'community', 'unlisted'];
@@ -74,6 +79,8 @@ export interface ParsedAppSettings {
     meta: { name?: string; description?: string; descriptions?: Record<string, string> };
     /** Present when `access_code` was in the body; `code` undefined clears it. */
     accessCode?: { code: string | undefined };
+    /** Present when `access` was in the body: the value to store, null for anyone. */
+    access?: { store: string | null };
     /** From `listing`, or from the older `parked` boolean (true = unlisted, false = listed). */
     listing?: AppListing;
     forkable?: boolean;
@@ -88,6 +95,8 @@ export interface AppSettingsState {
     protected: boolean;
     /** Where the app is listed: listed, community (signed-in members only) or unlisted. */
     listing: AppListing;
+    /** Who may open it: anyone, signed-in, or organism:<id> (services/app-access.ts). */
+    open_to: AppAccess;
     /** True for community and unlisted: the app is off every public surface. */
     parked: boolean;
     forkable: boolean;
@@ -148,6 +157,11 @@ export function parseOwnerSettingsInput(
         if (newCode && (newCode.length < 4 || newCode.length > 64)) return bad('access_code must be 4-64 characters');
         settings.accessCode = { code: newCode };
     }
+    if ('open_to' in body) {
+        const parsed = parseAppAccessInput(body.open_to);
+        if ('refusal' in parsed) return bad(parsed.refusal);
+        settings.access = parsed;
+    }
     if ('listing' in body) {
         if (typeof body.listing !== 'string' || !APP_LISTINGS.includes(body.listing as AppListing)) {
             return bad(`listing must be one of ${APP_LISTINGS.join(', ')}`);
@@ -178,6 +192,21 @@ export function parseOwnerSettingsInput(
 }
 
 /**
+ * An `access` naming an organism the app's owner is not an active member of would hand the app to
+ * people the owner cannot see: the refusal, or null. Asked before the first write by this service
+ * and by PATCH /v1/apps/:filename, which writes other fields before the settings part.
+ */
+export async function appAccessMembershipRefusal(
+    storage: Storage, ownerName: string, access: unknown,
+): Promise<AppSettingsRefusal | null> {
+    const audience = typeof access === 'string' ? parseAudience(access) : null;
+    if (audience?.level !== 'organism') return null;
+    const m = await storage.getMembership(audience.organismId!, ownerName);
+    if (m && m.status === 'active') return null;
+    return bad(`access names organism ${audience.organismId}, and the app's owner is not an active member of it`).refusal;
+}
+
+/**
  * Validate, write, audit and say what changed, for the settings fields present in `body`. The app
  * is looked up first, so a missing app is refused before any write. Emits 'apps' after a write.
  *
@@ -203,6 +232,9 @@ export async function applyOwnerSettingsUpdate(
     if (!await storage.getApp(ownerGaii, filename)) {
         return { refusal: { status: 404, code: 'NOT_FOUND', message: `App "${filename}" not found in your uploads` } };
     }
+
+    const accessRefusal = await appAccessMembershipRefusal(storage, ownerName, settings.access?.store ?? null);
+    if (accessRefusal) return { refusal: accessRefusal };
 
     const notes: string[] = [];
     // Every change to how this app is offered lands in its audit log (services/app-audit.ts),
@@ -236,6 +268,17 @@ export async function applyOwnerSettingsUpdate(
         notes.push(newCode
             ? 'Access code updated. Share the new code with recipients.'
             : 'Access code removed. The app is now publicly downloadable.');
+    }
+
+    if (settings.access) {
+        const store = settings.access.store;
+        await storage.setAppAccess(ownerGaii, filename, store);
+        await audit('access', { to: store ?? 'anyone' });
+        notes.push(store === null
+            ? 'Anyone with the link can open the app.'
+            : store === 'signed-in'
+                ? 'Only people signed in to this node can open the app. Others are asked to sign in first.'
+                : 'Only the members of the organism can open the app. Others are asked to sign in, and are refused if they are not members.');
     }
 
     if (settings.listing !== undefined) {
@@ -282,6 +325,7 @@ export function appSettingsState(app: AppRecord | null | undefined, filename: st
         description: app?.manifest?.description,
         protected: !!app?.accessCode,
         listing: appListingOf(app ?? {}),
+        open_to: appAccessOf(app),
         parked: !!app?.parked,
         forkable: !!app?.forkable,
         protection: app?.manifest?.protection ?? null,

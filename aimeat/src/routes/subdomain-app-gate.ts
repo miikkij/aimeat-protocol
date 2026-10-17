@@ -9,13 +9,18 @@
  * @structure resolveAppTarget · resolveServableApp · appIsRestricted · unlockRedirect
  * @usage import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain-app-gate.js';
  * @version-history
+ *   v1.1.0 — 2026-10-17 — An app that needs a sign-in (its access setting or the node's signed-in
+ *     content access) is restricted: the origin serves it only with a grant, and a browser without
+ *     one is sent to /v1/app-open, the apex page that asks for the grant with the session.
+ *     services/app-access.ts appNeedsCodeOrPayment keeps the old test for the custom-address rule
+ *     (plan doc-mvcn6c7e4e5q V2.2).
  *   v1.0.0 — 2026-10-17 — Moved unchanged from routes/subdomains.ts (v1.29.0).
  */
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
-import { appIsPaced } from '../services/app-pacing.js';
+import { appNeedsSignIn, appNeedsCodeOrPayment } from '../services/app-access.js';
 
 /** Resolve an "owner/filename" app target to its latest published record. */
 export async function resolveAppTarget(storage: Storage, target: string): Promise<AppRecord | null> {
@@ -39,11 +44,10 @@ export async function resolveServableApp(storage: Storage, target: string): Prom
   return app && !app.operatorHidden ? app : null;
 }
 
-/** True when the app must not be served openly at a subdomain root. */
+/** True when the app must not be served openly at a subdomain root: a code, a payment, or a sign-in
+ *  (the app's own access setting or the node's signed-in content access, services/app-access.ts). */
 export function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
-  if (app.accessCode) return true;
-  if (appIsPaced(config, app.manifest)) return true;
-  return false;
+  return appNeedsCodeOrPayment(config, app) || appNeedsSignIn(config, app);
 }
 
 /**
@@ -71,11 +75,17 @@ export function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
  * instead of opening a new one. Everything else on this origin keeps the uniform 404.
  */
 export function unlockRedirect(req: Request, res: Response, config: AimeatConfig, app: AppRecord): boolean {
-  if (!app.accessCode) return false;
+  const signIn = appNeedsSignIn(config, app);
+  if (!app.accessCode && !signIn) return false;
   if (!(req.headers.accept ?? '').includes('text/html')) return false;
   if (req.query.unlock === '1') return false;
-  const target = `${config.baseUrl}/v1/apps/${encodeURIComponent(app.ownerName)}`
-    + `/${encodeURIComponent(app.filename)}?mode=inline&unlock=1`;
+  // A sign-in gate goes to the apex page that knows the session (the SPA keeps it), which asks the
+  // node for a grant with it and comes back (POST /v1/apps/:owner/:filename/open). A code alone goes
+  // to the code form as before; a code AND a sign-in go to the page, which asks for both.
+  const target = signIn
+    ? `${config.baseUrl}/v1/app-open?app=${encodeURIComponent(`${app.ownerName}/${app.filename}`)}`
+    : `${config.baseUrl}/v1/apps/${encodeURIComponent(app.ownerName)}`
+      + `/${encodeURIComponent(app.filename)}?mode=inline&unlock=1`;
   // no-store for the same reason the apex grant redirect carries it: this address is a step in an
   // unlock, and a cached copy of it would send the next visit somewhere it no longer belongs.
   res.setHeader('Cache-Control', 'no-store');

@@ -22,6 +22,8 @@
  *   const out = await createSubdomainSite(storage, config, req.body ?? {}, resolveIdentity(req.auth!, config.nodeId));
  *   if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.2.0 — 2026-10-17 — An app that needs a sign-in may be mapped to an address: only a code or a
+ *     payment refuses (appNeedsCodeOrPayment), because the address serves it against a grant.
  *   v1.1.0 — 2026-10-06 — A name ending in `--draft` is refused: it is the address of an app's draft
  *     (secaudit 2026-10 follow-up, A2).
  *   v1.0.0 — 2026-09-27 — Extracted from routes/subdomain-admin.ts v1.0.0, same validation, codes,
@@ -30,8 +32,9 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SubdomainSiteRecord } from '../storage/interface.js';
 import {
-  RESERVED_SUBDOMAINS, SUBDOMAIN_RE, resolveAppTarget, appIsRestricted, draftBaseLabel, DRAFT_LABEL_SUFFIX,
+  RESERVED_SUBDOMAINS, SUBDOMAIN_RE, resolveAppTarget, draftBaseLabel, DRAFT_LABEL_SUFFIX,
 } from '../routes/subdomains.js';
+import { appNeedsCodeOrPayment } from './app-access.js';
 
 /** A refusal, in the shape each door renders as its own error envelope. */
 export interface SubdomainRefusal {
@@ -67,7 +70,8 @@ async function checkTarget(storage: Storage, config: AimeatConfig, kind: string,
   if (!app) {
     return refuse(404, 'APP_NOT_FOUND', `No published app matches target "${target}" (expected "owner/filename")`);
   }
-  if (appIsRestricted(config, app)) {
+  // A code or a payment only: an app that needs a sign-in is served at its own address against a grant.
+  if (appNeedsCodeOrPayment(config, app)) {
     return refuse(400, 'APP_RESTRICTED', 'An app that needs a code or a payment cannot sit at its own web address. Serve it from the main site instead.');
   }
   return null;
