@@ -19,6 +19,8 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-10-17 — SECURITY: a session from another node reads skills as an anonymous caller does, so a
+ *     'members' skill is this node's accounts only (plan doc-mvcn6c7e4e5q, V0.6).
  *   2026-10-16 — GET /v1/agents/:name/skills asks memory:read (requireScopeUnlessSelf: an agent's own record excepted), as GET /v1/skills does for the same data (QA audit P3-03).
  *   v1.8.0 -- 2026-10-12 -- requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/skills. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.7.0 -- 2026-10-09 -- GET /v1/skills/:name and its /zip answer a caller who is not signed in, with
@@ -47,7 +49,7 @@ import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
-import { resolveIdentity, localAccountName } from '../utils/gaii.js';
+import { resolveIdentity, localAccountName, isForeignPrincipal } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -72,7 +74,9 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
    *  the workspace membership gate (canReadWorkspace). */
   async function accessorOf(req: Express.Request): Promise<SkillAccessor> {
     const auth = req.auth as (typeof req.auth & { anonymous?: boolean }) | undefined;
-    if (!auth || auth.anonymous === true) return { ownerName: null, reader: readerFor({ storage, config }, null) };
+    // A session from another node reads what an anonymous caller reads: 'members' means this node's
+    // accounts, and a visitor holds none here (plan doc-mvcn6c7e4e5q, V0.6).
+    if (!auth || auth.anonymous === true || isForeignPrincipal(auth)) return { ownerName: null, reader: readerFor({ storage, config }, null) };
     return {
       ownerName: (auth.owner as string) ?? null,
       // The operator in person, or the operator's agent holding operator:admin (the MCP answer).
