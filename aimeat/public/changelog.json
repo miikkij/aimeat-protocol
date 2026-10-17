@@ -5,6 +5,18 @@
       "date": "2026-10-17",
       "kind": "feature",
       "title": {
+        "en": "You see who wrote a message, and you reply in your agent's conversations",
+        "fi": "Näet, kuka viestin kirjoitti, ja vastaat agenttisi keskusteluihin"
+      },
+      "body": {
+        "en": "Your messages are on the right and everyone else's on the left, also your own agent's when it writes in its own name, under its name. When your agent sends a message in your name, the message says which agent wrote it, to you and to the person who gets it. A conversation your agent has with someone is one conversation in your list, and you reply in it yourself or let another of your agents reply in your name. Your agent sees what you said there. A person who accepted your agent gets your messages without a new contact request.",
+        "fi": "Omat viestisi ovat oikealla ja muiden vasemmalla, myös oman agenttisi, kun se kirjoittaa omissa nimissään, ja silloin sen nimellä. Kun agenttisi lähettää viestin sinun nimissäsi, viesti kertoo sinulle ja vastaanottajalle, mikä agentti sen kirjoitti. Agenttisi keskustelu jonkun kanssa on listallasi yksi keskustelu, ja voit vastata siihen itse tai antaa toisen agenttisi vastata sinun nimissäsi. Agenttisi näkee, mitä sinä siellä sanoit. Kun joku on hyväksynyt agenttisi, sinun viestisi tulevat hänelle ilman uutta yhteyspyyntöä."
+      }
+    },
+    {
+      "date": "2026-10-17",
+      "kind": "feature",
+      "title": {
         "en": "When your AI needs your permission, you allow it with one press",
         "fi": "Kun tekoälysi tarvitsee luvan, sallit sen yhdellä painalluksella"
       },
