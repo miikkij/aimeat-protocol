@@ -12,6 +12,8 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.11.0 — 2026-10-18 — PRESIGNED_META_KEYS.storage carries `publish_ask`, the requester the publish
+ *     gate asked about at the mint (plan doc-mvcn6c7e4e5q, V4).
  *   v1.10.0 — 2026-10-09 — Single use is durable: verifyUploadToken takes the storage and files the
  *     spend in the revoked-token table until the token's expiry, so a used token is refused after a
  *     restart and on every process over the same database (secrets audit 2026-10-09, S-7).
@@ -176,7 +178,9 @@ export const PRESIGNED_META_KEYS = {
     // `ai_provenance` / `ai_provenance_id` for the same reason as `app` above: the presigned door is
     // the one recommended for anything over 1 KB, so a speech clip or picture uploaded that way must
     // carry its statement too (2026-10-08).
-    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id'],
+    // `publish_ask`: the requester the publish gate asked about at the mint (services/storage-file-publish.ts),
+    // set by the node, never by a client; the upload files the request when the bytes land.
+    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id', 'publish_ask'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],
     skill: ['scope', 'visibility', 'organism_id', 'workspace_id'],

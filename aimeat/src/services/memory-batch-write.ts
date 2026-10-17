@@ -3,8 +3,13 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Commit accepted batch rows with their provenance; restores retain source attribution.
- * @structure writeMemoryBatch
+ * @structure writeMemoryBatch · BatchPublishRequest
  * @version-history
+ *   1.3.0 2026-10-18 `publishRequester`: a row that raises a record to public, written by a caller the
+ *     node asks the owner about, is stored at the level the record had (a new one: private), and a
+ *     request of kind 'memory' is filed for it after the commit (services/memory-publish-gate.ts; plan
+ *     doc-mvcn6c7e4e5q, V4). The result lists the requests per key, and the warnings of a request that
+ *     could not be filed.
  *   1.2.1 2026-10-08 A row's provenance record states its medium (text or data).
  *   1.2.0 2026-10-08 The import check accepts a source record whose hash matches the value in its
  *     canonical form or in the form it was written in (utils/memory-content.ts), so a backup taken on
@@ -13,7 +18,7 @@
  *     (services/classify-on-write.ts, TARGET-082 V3).
  *   1.0.0 2026-09-27 Share the existing batch storage and provenance services.
  */
-import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { MemoryDbService, BulkWriteItem, BulkWriteOptions } from './db/memory-db-service.js';
 import { provenanceForWrite, storeHeldProvenance } from './ai-provenance.js';
@@ -21,16 +26,31 @@ import { memoryContentBytes, memoryContentHashes } from '../utils/memory-content
 import { mediaKindOfValue } from '../models/ai-provenance-schemas.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { classifyAfterWrite } from './classify-on-write.js';
+import { isRaiseToPublic } from './publish-gate.js';
+import type { PublishRequester } from './publish-requests/store.js';
+import { keptMemoryLevel, fileMemoryPublishRequest, type MemoryPublishFiled } from './memory-publish-gate.js';
+
+/** One request the batch filed: the key it is about, and the body a door answers for it. */
+export type BatchPublishRequest = { key: string } & Extract<MemoryPublishFiled, { ok: true }>['publishRequest'];
 
 export async function writeMemoryBatch(
   deps: { storage: Storage; config: AimeatConfig; memoryDb: MemoryDbService },
-  caller: { principal: string; targetGaii: string },
+  caller: {
+    principal: string; targetGaii: string;
+    /**
+     * Set when the publish gate asks the owner about this caller (memoryWriterAsk answered 'ask'). A
+     * row that raises a record to public then lands at the level the record had and gets a request.
+     */
+    publishRequester?: PublishRequester;
+  },
   items: BulkWriteItem[],
   opts: BulkWriteOptions,
   kind: 'bulk' | 'import',
 ) {
   const { storage, config, memoryDb } = deps;
   const held: AiProvenanceRecordRow[] = [];
+  // The rows the publish gate kept below public, as staged (the same objects the batch stores).
+  const keptBelowPublic: MemoryRecord[] = [];
   // The principal is constant for the request. Do not repeat its model lookup for each row.
   let agent: ReturnType<Storage['getAgent']> | undefined;
   const provenanceStorage = new Proxy(storage, {
@@ -46,6 +66,18 @@ export async function writeMemoryBatch(
     const result = await memoryDb.writeMany(caller.targetGaii, items, {
       ...opts,
       prepare: async (records, existing) => {
+        // The publish gate first, so the provenance surface below describes the level that is stored.
+        if (caller.publishRequester) {
+          for (const record of records) {
+            const before = existing.get(record.key);
+            if (!isRaiseToPublic(before?.visibility, record.visibility)) continue;
+            const kept = keptMemoryLevel(before);
+            record.visibility = kept.visibility;
+            if (kept.groupId) record.groupId = kept.groupId; else delete record.groupId;
+            if (kept.workspaceRef) record.workspaceRef = kept.workspaceRef; else delete record.workspaceRef;
+            keptBelowPublic.push(record);
+          }
+        }
         if (opts.prepare) await opts.prepare(records, existing);
         if (kind === 'import') {
           // Importing is transport, not authorship. A same-node, same-account handle must also
@@ -89,5 +121,15 @@ export async function writeMemoryBatch(
       }
     }
   }
-  return result;
+  // The requests the publish gate asked for, now that the records they name are committed.
+  const publishRequests: BatchPublishRequest[] = [];
+  const warnings: Array<{ key: string; code: 'PUBLISH_NOT_ASKED'; message: string }> = [];
+  if (caller.publishRequester) {
+    for (const record of keptBelowPublic) {
+      const filed = await fileMemoryPublishRequest({ storage, config }, caller.publishRequester, record);
+      if (filed.ok) publishRequests.push({ key: record.key, ...filed.publishRequest });
+      else warnings.push({ key: record.key, ...filed.warning });
+    }
+  }
+  return { ...result, publishRequests, warnings };
 }

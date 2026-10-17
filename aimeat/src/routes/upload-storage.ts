@@ -10,6 +10,9 @@
  *   import { handleStorageUpload, declaredFromMeta } from './upload-storage.js';
  *   await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A token carrying `publish_ask` (the mint asked the publish gate) hands that
+ *     requester to the write: a file that lands as a raise to public is stored at the level it had and
+ *     the answer is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   v1.0.0 — 2026-10-08 — Extracted from routes/upload.ts (max-file-lines). The storage upload takes
  *     the token's actor and its ai_provenance / ai_provenance_id, and answers with the file's
  *     `ai_provenance` block (AI provenance for stored files).
@@ -18,6 +21,7 @@ import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { writeStorageFile } from '../services/storage-file-write.js';
+import { requesterFromMeta } from '../services/storage-file-publish.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { DeclaredProvenance } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
@@ -57,6 +61,8 @@ export async function handleStorageUpload(
     const tags = Array.isArray(meta.tags)
         ? (meta.tags as unknown[]).filter((t): t is string => typeof t === 'string')
         : undefined;
+    // The requester the mint asked the publish gate about, from the SIGNED token (never the client).
+    const requester = requesterFromMeta(meta.publish_ask);
 
     // The key fence, the two size ceilings, the account-wide quota, the record shape, the overage
     // charge and the change events are services/storage-file-write.ts, shared with POST /v1/storage
@@ -82,6 +88,7 @@ export async function handleStorageUpload(
                 ...(typeof meta.ai_provenance_id === 'string' ? { declaredId: meta.ai_provenance_id } : {}),
                 ...(meta.ai_provenance !== undefined ? { declared: declaredFromMeta(meta) } : {}),
             },
+            ...(requester ? { publishGate: { requester } } : {}),
         },
     );
     if (!written.ok) {
@@ -90,9 +97,12 @@ export async function handleStorageUpload(
     }
     const { file, overageMorsels } = written;
 
-    res.json({
+    // 202 when the file was stored at the level it had and making it public waits for the owner.
+    res.status(written.publishRequest ? 202 : 200).json({
         success: true,
         type: 'storage',
+        ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
+        ...(written.warnings?.length ? { warnings: written.warnings } : {}),
         // The record the file carries: attached, declared or stamped by the write above.
         ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
         key: file.key,

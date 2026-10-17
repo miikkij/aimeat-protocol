@@ -17,6 +17,10 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   2026-10-18 -- Complete asks the publish gate through the shared write (services/storage-file-publish.ts;
+ *     plan doc-mvcn6c7e4e5q, V4): a file the session asked as public, completed by a caller the node
+ *     asks the owner about, lands at the level it had (a new one: private) and the answer is 202 with
+ *     `publish_request`.
  *   2026-10-17 -- Init takes visibility 'members' and 'organism:<id>' and refuses one naming an organism
  *     the uploader's account is not an active member of, before any chunk (plan doc-mvcn6c7e4e5q, V3.3).
  *   2026-10-16 -- Bounds and completeness (QA audit F05b-02). The bytes a session may hold are the
@@ -54,6 +58,7 @@ import { randomBytes } from 'node:crypto';
 import { versionedAddress } from '../utils/http-range.js';
 import { pubEmbedUrl } from '../services/doc-images.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
+import { callerOf } from '../middleware/caller.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -298,6 +303,8 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             groupId: upload.groupId,
             workspaceRef: upload.workspaceRef,
             provenance: stated.provenance,
+            // Making the file public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
+            publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
         });
         if (!written.ok) {
             // The write refused the file (a ceiling, the quota, the key), and trying the same bytes again
@@ -312,7 +319,10 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         // Clean up chunked upload
         await storage.deleteChunkedUpload(uploadId);
 
-        res.status(201).json(success(config.nodeId, {
+        // 202 when the file was stored at the level it had and making it public waits for the owner.
+        res.status(written.publishRequest ? 202 : 201).json(success(config.nodeId, {
+            ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
+            ...(written.warnings?.length ? { warnings: written.warnings } : {}),
             ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
             key: file.key,
             owner_gaii: file.ownerGaii,

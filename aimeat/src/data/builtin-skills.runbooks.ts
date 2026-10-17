@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-18 — manage-my-agents: a stored file made public, and a bulk write or an import, wait for
+ *     the owner the same way (publish_requests per record; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — manage-my-agents: publish:public, and what a write that makes a record public answers
  *     without it (plan doc-mvcn6c7e4e5q, V4.6).
  *   2026-10-17 — manage-my-agents: a refusal is answered with the one-press allow address
@@ -242,8 +244,9 @@ flowchart LR
   needs the owner's private records for its job asks the owner for that permission by name.
   Making something public to anyone takes publish:public when this node asks the owner first: that
   permission is outside "Full access" and no agent has it unless the owner ticked it. Without it a
-  write that makes a record public answers with \`publish_request\`: the record is stored as it was
-  (a new one private), and the owner approves on their Notifications page. Tell the owner in one
+  write that makes a record or a stored file public answers with \`publish_request\` (a bulk write or
+  an import lists one per record under \`publish_requests\`): it is stored as it was (a new one
+  private), and the owner approves on their Notifications page. Tell the owner in one
   sentence what you asked to make public and give them the \`approve_url\` from the answer;
   \`aimeat_publish_requests\` lists the requests and their state.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.

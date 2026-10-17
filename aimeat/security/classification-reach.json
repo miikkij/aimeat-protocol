@@ -495,6 +495,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
+    "src/routes/memory/copy.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-18 (moved from routes/memory/bulk.ts by extraction): the source record is shown to the caller only through presentMemory (the classification reader), and the caller's own record under the same key is read to set the version and the level it keeps."
+    },
     "src/routes/memory/crud.ts": {
       "reads": {
         "getStorageFile": 1,
@@ -1932,6 +1938,12 @@
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: publish request records under the reserved prefix publish.requests., which only the filing path writes. They hold ids, a title and the change asked for, never the content being published."
     },
+    "src/services/publish-requests/apply-file.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the approved file's metadata (no bytes) is read only to compare its created_at, size and visibility with the request before making it public; nothing is returned to anyone."
+    },
     "src/services/publish-requests/apply-memory.ts": {
       "reads": {
         "getMemory": 1
@@ -2158,6 +2170,12 @@
         "listMemory": 8
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Skill bodies and manifests pass the reader (skill-reader.ts) in listing, resolve and pinned reads; publish, delete, visibility, version lists and links are the node's own."
+    },
+    "src/services/storage-file-publish.ts": {
+      "reads": {
+        "getStorageFileMeta": 2
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: a file's metadata (no bytes) is read to know whether a write raises it to public and which level it keeps; nothing is returned to anyone."
     },
     "src/services/storage-file-write.ts": {
       "reads": {

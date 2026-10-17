@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — POST /v1/memory/bulk and POST /v1/memory/import ask the publish gate, the gate
+ *     POST /v1/memory asks (services/memory-publish-gate.ts; plan doc-mvcn6c7e4e5q, V4): an entry that
+ *     raises its record to public, by a caller the node asks the owner about, lands at the level the
+ *     record had (a new one: private) and gets its own request; the answer lists them under
+ *     `publish_requests` and is 202 when any was filed. A caller with nobody on this node to ask gets
+ *     such an entry under failed[] with PUBLISH_NOT_ALLOWED. POST /v1/memory/copy moved to
+ *     routes/memory/copy.ts by pure extraction (max-file-lines) and is registered from here.
  *   2026-10-17 — POST /v1/memory/bulk and POST /v1/memory/copy take visibility 'organism:<id>' and
  *     refuse one naming an organism the writer's account is not an active member of
  *     (services/organism-visibility.ts; plan doc-mvcn6c7e4e5q, V3.2).
@@ -67,26 +74,22 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  */
 
-import type { Router, Request } from 'express';
+import type { Router } from 'express';
 import { ZipArchive } from 'archiver';
 import type { MemoryRecord } from '../../storage/interface.js';
-import { requireAuth, requireRole, requireScope, requireExternalPrincipal, requireLocalSession } from '../../auth/middleware.js';
+import { requireAuth, requireScope, requireExternalPrincipal, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
-import { checkMemoryQuota } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
-import { isServerWrittenKey, isServiceOwnedKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
-import { agentKeyRefusal } from '../../utils/agent-key-address.js';
+import { isServiceOwnedKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
-import { fileTarget, memoryTarget } from '../../services/classification/labels.js';
-import { leaveMemories, carryLabelToCopy, CopyLabelError } from '../../services/classification-exits.js';
-import { ownDoorRefusal } from '../../utils/own-door-keys.js';
+import { fileTarget } from '../../services/classification/labels.js';
+import { leaveMemories } from '../../services/classification-exits.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
-import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
-import { fencedKeysRefusal, type ManifestWrite } from '../../services/fenced-space.js';
+import { fencedKeysRefusal } from '../../services/fenced-space.js';
 import { callerOf } from '../../middleware/caller.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
@@ -94,9 +97,11 @@ import { crewSitesWriteRefusal } from '../../services/crew-def-store.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
-import { batchKeyRefusal, storageReferenceRefusal, visibilityRefusal } from './batch-guards.js';
+import {
+  batchKeyRefusal, storageReferenceRefusal, visibilityRefusal, organismWriteRefusalFor, routePublishAsk, batchPublishAnswer,
+} from './batch-guards.js';
+import { registerCopyRoute } from './copy.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
-import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
@@ -108,20 +113,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Application-DB-Service (ctx.memoryDb) so each is ONE operation (batched reads + bulk upsert).
   const { config, storage, stats, resolve, memoryDb } = ctx;
 
-  /**
-   * The organism rule (services/organism-namespace-access.ts) for a key this file writes under
-   * `principal`, the identity the record lands under, as services/memory-write.ts asks it for
-   * POST /v1/memory and the MCP write. Null for a key outside `organism.`.
-   *
-   * The session's scopes and `write` ride along for the fenced-space rule (services/fenced-space.ts):
-   * a session that covers organism:direct writes a record space that names extensions directly, and
-   * a write to a workspace's manifest record is compared by value when the caller of this helper
-   * hands the value over, and read as the removal of every fence when it does not.
-   */
-  const organismWriteRefusal = (req: Request, principal: string, key: string, write?: ManifestWrite) =>
-    checkOrganismNamespaceAccess({ storage, config }, {
-      principal, owner: String(req.auth!.owner ?? ''), roles: req.auth!.roles ?? [], scopes: req.auth!.scopes ?? [],
-    }, key, 'write', write);
+  // The organism rule for a key this file writes (batch-guards.ts organismWriteRefusalFor).
+  const organismWriteRefusal = organismWriteRefusalFor(ctx);
 
   // POST /v1/memory/bulk — write MANY entries in one request (agent auth). Net-new batched write: the
   // service batches the existing-key lookup + byte-sum + key-count and commits the valid rows together,
@@ -167,6 +160,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // aborting; the survivors go to the service. organism.* keys are refused (Phase 2 workspace path).
     const items: BulkWriteItem[] = [];
     const preFailed: { key: string; status: 'failed'; reason: string }[] = [];
+    // The publish gate, asked once for the caller (batch-guards.ts routePublishAsk): which entries
+    // raise their record to public is decided by the batch write, which reads what each key holds.
+    const publishAsk = routePublishAsk({ storage, config }, req);
     for (const e of rawEntries) {
       const key = e?.key;
       if (typeof key !== 'string' || !key) { preFailed.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
@@ -195,6 +191,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // 'organism:<id>' names an organism the writer's account is an active member of (the single write's rule).
       const audience = await organismVisibilityRefusal(storage, e.visibility, { identity: resolve(req), federated: isForeignPrincipal(req.auth) });
       if (audience) { preFailed.push({ key, status: 'failed', reason: `${audience.code}: ${audience.message}` }); continue; }
+      // Making a record public, by a caller with nobody on this node to ask: that entry is refused.
+      if (publishAsk.kind === 'refused' && e.visibility === 'public' && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
+        preFailed.push({ key, status: 'failed', reason: `${publishAsk.code}: ${publishAsk.message}` }); continue;
+      }
       items.push({
         key,
         value: e.value,
@@ -207,6 +207,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const result = await writeMemoryBatch({ storage, config, memoryDb }, {
       principal: resolve(req), targetGaii: gaii,
+      ...(publishAsk.kind === 'ask' ? { publishRequester: publishAsk.requester } : {}),
     }, items, {
       mode,
       quota: {
@@ -234,7 +235,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const failed = [...preFailed.map(f => ({ key: f.key, reason: f.reason })),
                     ...result.items.filter(i => i.status === 'failed').map(i => ({ key: i.key, reason: i.reason ?? 'failed' }))];
-    res.json(success(config.nodeId, {
+    // 202 when an entry was stored below public and waits for the owner (batch-guards.ts batchPublishAnswer).
+    const published = batchPublishAnswer(result);
+    res.status(published.status).json(success(config.nodeId, {
+      ...published.fields,
       created: result.created,
       updated: result.updated,
       skipped: result.skipped,
@@ -341,6 +345,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const survivors: { key: string; entry: Record<string, unknown> }[] = [];
     // A container's archive marker is shared by its records. Resolve it once per request.
     const archiveChecks = new Map<string, ReturnType<typeof isKeyArchived>>();
+    // The publish gate, asked once for the caller, as on POST /v1/memory/bulk.
+    const publishAsk = routePublishAsk({ storage, config }, req);
     for (const entry of entries) {
       const key = entry?.key;
       if (typeof key !== 'string' || !key) { failed.push({ key: String(key), reason: 'missing key' }); continue; }
@@ -371,6 +377,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (sites) { failed.push({ key, reason: `OWNER_APPROVES_SITES: ${sites}` }); continue; }
       const refRefusal = await storageReferenceRefusal(storage, gaii, entry.value);
       if (refRefusal) { failed.push({ key, reason: refRefusal }); continue; }
+      // Making a record public, by a caller with nobody on this node to ask: that entry is refused.
+      if (publishAsk.kind === 'refused' && entry.visibility === 'public' && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
+        failed.push({ key, reason: `${publishAsk.code}: ${publishAsk.message}` }); continue;
+      }
       survivors.push({ key, entry });
     }
 
@@ -402,6 +412,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const result = await writeMemoryBatch({ storage, config, memoryDb }, {
       principal: resolve(req), targetGaii: gaii,
+      ...(publishAsk.kind === 'ask' ? { publishRequester: publishAsk.requester } : {}),
     }, items, {
       // Renamed targets are all-new, so 'overwrite' still yields 'created' for them.
       mode: mode === 'rename' ? 'overwrite' : mode,
@@ -423,7 +434,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     emitResourceListChanged(gaii);
     emitRecordChange('memory', gaii, ...items.map(i => i.visibility));
-    res.json(success(config.nodeId, {
+    // 202 when an entry was stored below public and waits for the owner (batch-guards.ts batchPublishAnswer).
+    const published = batchPublishAnswer(result);
+    res.status(published.status).json(success(config.nodeId, {
+      ...published.fields,
       created: result.created,
       updated: result.updated,
       skipped: result.skipped,
@@ -630,130 +644,6 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }));
   });
 
-  // POST /v1/memory/copy — copy a public memory entry from another user to your own memory
-  router.post('/v1/memory/copy', requireAuth(), requireRole('agent'), requireScope('memory:write'), async (req, res) => {
-    const callerGaii = resolve(req);
-    const { source_gaii, key, visibility: targetVis } = req.body as {
-      source_gaii: string; key: string; visibility?: string;
-    };
-
-    if (!source_gaii || !key) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_gaii and key are required'));
-      return;
-    }
-    // ONE CAPABILITY, ONE DOOR: a copy would hand a Design Book part over as the caller's own, past the
-    // Book's own door, which benches a component again before it hands one out (utils/own-door-keys.ts).
-    const ownDoor = ownDoorRefusal(source_gaii, key, config.nodeId);
-    if (ownDoor) {
-      res.status(403).json(error(config.nodeId, ownDoor.code, ownDoor.message, 403, { door: ownDoor.door }));
-      return;
-    }
-    // The porting path writes its pointer as a PUBLIC record, so this door could copy another
-    // identity's into the caller's own namespace under the same key. Refused like every write door.
-    if (isServerWrittenKey(key)) {
-      const refusal = serverWrittenKeyRefusal(key);
-      res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
-      return;
-    }
-    // An `agents.` key names the agent by its name, never by its identity (utils/agent-key-address.ts).
-    const misaddressed = agentKeyRefusal(key);
-    if (misaddressed) {
-      res.status(400).json(error(config.nodeId, misaddressed.code, misaddressed.message));
-      return;
-    }
-    // The copy lands under the caller's own name with the source's key, so an organism key is a
-    // write into that organism like any other, and gets the organism rule's answer.
-    const orgRefusal = await organismWriteRefusal(req, callerGaii, key);
-    if (orgRefusal) {
-      res.status(orgRefusal.status).json(error(config.nodeId, orgRefusal.code, orgRefusal.message));
-      return;
-    }
-    // A copy made visible to one organism names an organism the caller's account is a member of.
-    const audience = await organismVisibilityRefusal(storage, targetVis, { identity: callerGaii, federated: isForeignPrincipal(req.auth) });
-    if (audience) {
-      res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
-      return;
-    }
-
-    // A copy is a read first: public only, then the one presentation of a memory value (the
-    // classification reader and the credential mask), so a record this caller may not see answers
-    // 404 exactly as an absent one (TARGET-082 review).
-    const stored = await storage.getMemory(source_gaii, key);
-    const sourceRecord = stored && stored.visibility === 'public'
-      ? await presentMemory(readerFor({ storage, config }, req.auth), stored) : null;
-    if (!stored || !sourceRecord) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public memory entry not found'));
-      return;
-    }
-
-    // A schema lock holds on the copy as on every other write: the copy lands under the caller's own
-    // key, so it is validated against the schema that key falls under (feature-list audit #51).
-    const copyValidation = await validateMemoryWrite(key, sourceRecord.value, storage);
-    if (!copyValidation.valid) {
-      res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
-        'The copied value does not match the schema locked on this key. Read the schema at schema_url; the copy is stored only when the value matches it.', 422, {
-          key,
-          violations: copyValidation.errors,
-          schema_url: `/v1/memory/${encodeURIComponent(copyValidation.schemaKey!)}/schema`,
-        }));
-      return;
-    }
-
-    const sourceBytes = Buffer.byteLength(JSON.stringify(sourceRecord.value), 'utf8');
-    const quotaCheck = await checkMemoryQuota(config, storage, callerGaii, sourceBytes);
-    if (!quotaCheck.allowed) {
-      // 413, the status every other memory write answers for the same condition (DATA-26): 429 is a
-      // rate limit, which a client retries after a wait, and a full quota does not empty with time.
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const existing = await storage.getMemory(callerGaii, key);
-    const odps = odpsWriteRefusal(key, sourceRecord.value, existing?.value);
-    if (odps) { res.status(odps.status).json(error(config.nodeId, odps.code, odps.message, odps.status, odps.details)); return; }
-    const legacyPacing = legacyPacingWriteRefusal(key, sourceRecord.value);
-    if (legacyPacing) { res.status(legacyPacing.status).json(error(config.nodeId, legacyPacing.code, legacyPacing.message)); return; }
-    const sites = await crewSitesWriteRefusal(storage, key, callerGaii, sourceRecord.value, req.auth!);
-    if (sites) { res.status(403).json(error(config.nodeId, 'OWNER_APPROVES_SITES', sites)); return; }
-    const newVersion = existing ? existing.version + 1 : 1;
-
-    // The copy keeps its source's classification (never lower), set before the bytes land so the
-    // copy is never readable under a lower label. A label the copy's policy lacks refuses the copy.
-    let carried: string | null;
-    try {
-      carried = (await carryLabelToCopy({ storage, config }, memoryTarget(stored.ownerGaii, key), memoryTarget(callerGaii, key))).carried;
-    } catch (err) {
-      if (!(err instanceof CopyLabelError)) throw err;
-      res.status(403).json(error(config.nodeId, err.code, err.message));
-      return;
-    }
-
-    await storage.setMemory({
-      key,
-      ownerGaii: callerGaii,
-      value: sourceRecord.value,
-      visibility: (targetVis as MemoryRecord['visibility']) || 'private',
-      tags: sourceRecord.tags || [],
-      ttlHours: null,
-      version: newVersion,
-      createdAt: existing?.createdAt || now,
-      updatedAt: now,
-    });
-
-    recordMemoryTouch({ ownerGaii: callerGaii, key, writerPrincipal: callerGaii, kind: 'write' });
-    // Write-time classification of the copy (TARGET-082 V3): scheduled, never awaited.
-    classifyAfterWrite({ storage, config }, callerGaii, key, sourceRecord.value);
-
-    emitResourceUpdated(callerGaii, `aimeat://memory/${encodeURIComponent(key)}`);
-    emitResourceListChanged(callerGaii);
-
-    res.json(success(config.nodeId, {
-      key,
-      copied_from: source_gaii,
-      version: newVersion,
-      ...(carried ? { classification: carried } : {}),
-    }));
-    emitRecordChange('memory', callerGaii, (targetVis as string) || 'private', ...(existing ? [existing.visibility] : []));
-  });
+  // POST /v1/memory/copy, registered here so it keeps its place in the route order (routes/memory/copy.ts).
+  registerCopyRoute(router, ctx);
 }
