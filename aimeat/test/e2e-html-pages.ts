@@ -14,6 +14,8 @@
  *   form-action, the holder's frame-src against a navigation) was proven in a real browser on the
  *   sandbox and is not repeated here; this suite asserts the headers that make the browser do it.
  * @version-history
+ *   v1.2.0 — 2026-10-17 — A page file carries CORP cross-origin and ACAO *, the page CORP same-origin:
+ *     the browser had refused every file of every page, which a status check from Node cannot see.
  *   v1.1.0 — 2026-10-16 — The frame and opened routes refuse an agent without organism:read (403) and
  *     an anonymous caller (401) (check:denial-coverage).
  *   v1.0.0 — 2026-10-16 — Initial.
@@ -194,11 +196,17 @@ await test('the page is sandboxed without its own origin and has no network exit
   for (const d of ["connect-src 'none'", "form-action 'none'", "frame-src 'none'", `img-src ${PAGE_ORIGIN} data: blob:`]) assert(csp.includes(d), `missing ${d}: ${csp}`);
   assert(r.header('referrer-policy') === 'no-referrer' && /camera=\(\)/.test(r.header('permissions-policy') ?? ''), 'referrer and permissions policy');
   assert(csp.length < 1200, `the policy is one fixed string, not a list that grows: ${csp.length}`);
+  assert(r.header('cross-origin-resource-policy') === 'same-origin', `the page itself stays same-origin: ${r.header('cross-origin-resource-policy')}`);
 });
 
 await test('the page\'s mapped file is served beside it; an unmapped name is 404', async () => {
   const f = await page(`${new URL(frameUrl).pathname}kuva.png`, 'image');
   assert(f.status === 200 && f.header('content-type') === 'image/png', `file: ${f.status} ${f.header('content-type')}`);
+  // The page runs in an opaque origin, so its own file is cross-origin to it: with CORP same-origin
+  // the browser refused every picture, stylesheet and script of every page (aimeat.io, 2026-10-17).
+  assert(f.header('cross-origin-resource-policy') === 'cross-origin', `a page file loads into the page's opaque origin: CORP ${f.header('cross-origin-resource-policy')}`);
+  assert(f.header('access-control-allow-origin') === '*', `a font file loads in cors mode from the opaque origin: ACAO ${f.header('access-control-allow-origin')}`);
+  assert(/^sandbox /.test(f.header('content-security-policy') ?? ''), 'a file the frame navigates to is as sandboxed as the page');
   const none = await page(`${new URL(frameUrl).pathname}other.png`, 'image');
   assert(none.status === 404, `unmapped: ${none.status}`);
 });

@@ -32,6 +32,8 @@
  * @structure pageHostRouter(config, storage) — GET /p/_/holder.js · GET/HEAD /p/:token/{*path} (the holder, index.html, the page's files)
  * @usage app.use(pageHostRouter(config, storage)); // only answers on the page host
  * @version-history
+ *   v1.1.1 — 2026-10-17 — A page's own files carry CORP cross-origin and ACAO *: the sandboxed page has
+ *     an opaque origin, and with CORP same-origin the browser refused every file of every page.
  *   v1.1.0 — 2026-10-16 — The page and each of its files carry their provenance (the AI-Disclosure and
  *     Link headers; in the page, the machine-readable marks), decided as public while an open share
  *     serves the page. They carried none.
@@ -215,6 +217,14 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
         const ref = pageFileNameOk(path) ? files[path] : undefined;
         const file = typeof ref === 'string' ? await pageFile({ storage, config }, rec.ownerGaii, ref, claims) : null;
         if (!file || !isServablePageFileType(file.mimeType)) { sendText(res, 404, 'Not found'); return; }
+        // The page asks for its own files from an opaque origin (the sandbox), so no file can be
+        // same-origin to it: with CORP same-origin the browser refused every picture, stylesheet and
+        // script of every page, while a status check from a server saw 200 (aimeat.io, 2026-10-17).
+        // cross-origin lets the page load them; ACAO * lets a font, which loads in cors mode, and the
+        // request carries no credentials. Neither opens anything new: the address is the frame token,
+        // which only a reader who passed the page's gate was given, and it ends with that token.
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', '*');
         // A picture's own record, decided like the page: a generated image owes its label where the page is public.
         setProvenanceHeaders(res, await loadServedProvenance(storage, config, file.aiProvenanceId,
             openNow && file.aiProvenanceId ? { alsoPublic: new Set([file.aiProvenanceId]) } : undefined));
