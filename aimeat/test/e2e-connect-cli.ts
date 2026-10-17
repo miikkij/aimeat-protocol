@@ -32,6 +32,8 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-cli.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connect-cli
  * @version-history
+ *   2026-10-17 — `aimeat validate` with the removed MongoDB backend: the message now comes from the
+ *     setting-value check ("The MongoDB backend was removed"), which the nightly sweep showed red.
  *   2026-10-16 — `aimeat backup` and `aimeat restore` against this node: no token, a bad token and a
  *     non-operator token exit 1 and write no file; an operator PAT writes the accounts and agents; a
  *     restore with a failed row exits 1 and the route answers restored: false (QA audit P6-07, F19b-01).
@@ -858,7 +860,8 @@ await test('aimeat validate passes on a bare environment and fails on a bad valu
   const goneBackend = await runCli(['validate'], { home: emptyHome, env: cleanEnv({ AIMEAT_STORAGE: 'mongodb' }), timeoutMs: 45_000 });
   exited(goneBackend, 1);
   said(goneBackend, 'AIMEAT_STORAGE');
-  said(goneBackend, 'MongoDB backend has been removed');
+  // The setting-value check names the removed backend and the migration path (QA decisions, 2026-10-16).
+  said(goneBackend, 'MongoDB backend was removed');
 });
 
 await test('aimeat skill install writes the skill locally and stamps where it came from', async () => {
