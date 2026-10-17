@@ -30,6 +30,7 @@
  *     the root file, the rules, the skills and the agents name is defined in a package.json.
  *   v1.1.1 — 2026-09-27 — Ceiling 39,500 → 40,500 for the docs/internal plans rule.
  *   v1.1.2 — 2026-10-04 — Ceiling 40,500 → 40,800 for the rule that a mentioned place comes with its URL.
+ *   v1.1.3 — 2026-10-18 — Ceiling 40,800 → 41,000 for the rule that live data is an event, never a poll.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -53,8 +54,10 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * checkout's docs/internal/ and never in a worktree's, which holds in every session.
  * Raised to 40,800 on 2026-10-04, at Jouni's request, for the rule that every place a reply mentions
  * comes with its URL, which holds in every session.
+ * Raised to 41,000 on 2026-10-18, at Jouni's request, for the rule that live data arrives as an event
+ * over the existing SSE stream and never by polling, which holds in every session.
  */
-const CEILING_BYTES = 40_800;
+const CEILING_BYTES = 41_000;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
