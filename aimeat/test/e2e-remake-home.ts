@@ -19,6 +19,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-home
  * @version-history
+ *   v1.4.0 — 2026-10-17 — The stored page is read at html.url with the owner's session, and an
+ *     anonymous read is refused. The old assertion read it anonymously, which was the hole itself
+ *     (plan doc-mvcn6c7e4e5q, V0.3).
  *   v1.3.0 — 2026-10-11 — The Gemini app is region-dependent (Jouni's ruling, 2026-10-11): naming it
  *     raises the `conditions` question, "no" reaches B and is kept, "yes" reaches A. The Copilot app
  *     holds the "variant that cannot connect" case alone.
@@ -423,9 +426,14 @@ await test('The same upload as JSON { html } — the door an MCP agent can reach
     assert(before.status === 200 && before.body.data.html && typeof before.body.data.html.url === 'string',
         `config must carry html.url for a stored page, got ${JSON.stringify(before.body.data)}`);
     assert(before.body.data.html.size_kb >= 0 && typeof before.body.data.html.stored_at === 'string', 'html carries size_kb and stored_at');
-    const file = await fetch(`${BASE}${before.body.data.html.url}`);
-    assert(file.status === 200, `the stored page must be readable at html.url, got ${file.status}`);
+    // The owner previews it with their session. The file is theirs, not public: this assertion read
+    // it anonymously until 2026-10-17, which was the hole itself, a page not yet on the web readable
+    // by anyone at its file address (plan doc-mvcn6c7e4e5q, V0.3).
+    const file = await fetch(`${BASE}${before.body.data.html.url}`, auth(t));
+    assert(file.status === 200, `the owner must read the stored page at html.url, got ${file.status}`);
     assert((await file.text()).includes('<h1>json upload</h1>'), 'and it must be the page that was sent');
+    const anonFile = await fetch(`${BASE}${before.body.data.html.url}`);
+    assert(anonFile.status === 404, `a page not on the web must not be readable anonymously at its file address, got ${anonFile.status}`);
 
     const cfg = await json('/v1/portfolio/config', auth(t, { method: 'PUT', body: JSON.stringify({ enabled: true }) }));
     assert(cfg.status === 200, `enable ${cfg.status}: ${JSON.stringify(cfg.body.error)}`);

@@ -76,6 +76,8 @@
  *     migration 0012. Dedupe must precede the index or boot crashes on existing data.
  *   v1.5.0 — 2026-10-12 — apps.community: a parked app listed to signed-in members only. Mirrors
  *     Postgres migration 0102.
+ *   v1.6.0 — 2026-10-17 — Stored portfolio and company pages become the owner's files (visibility
+ *     'owner'); their origin serves them from storage. Mirrors Postgres migration 0103.
  */
 import type Database from 'better-sqlite3';
 import { applySchemaTables1 } from './schema-tables-1.js';
@@ -495,6 +497,11 @@ export function initializeSchema(db: Database.Database): void {
   // Community listing: a parked app listed to signed-in members only. Pre-existing apps are 0, so
   // a parked app stays owner-only. Mirrors Postgres 0102.
   safeAddColumn('apps', 'community', 'INTEGER NOT NULL DEFAULT 0');
+  // A portfolio or company page is served by its own origin from storage, never by its file
+  // address, so the file itself is the owner's. It was written public, and a page taken off the web
+  // stayed readable at /v1/pub. Mirrors Postgres 0103.
+  db.exec(`UPDATE storage_files SET visibility = 'owner' WHERE visibility = 'public'
+           AND (key = 'portfolio/index.html' OR (key LIKE 'company/%' AND key LIKE '%/index.html'))`);
 
   // Provisioned-code invitations — a second invitation type whose account is created at MINT time
   // and whose emailed code IS the account password. `type` discriminates it from the existing

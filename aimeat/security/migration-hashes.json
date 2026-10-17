@@ -103,6 +103,7 @@
     "0099_secret_host_binding.sql": "59e217ae0c30a203ff6aab70eeaa8d3094410da43e71279429169b4eda6970f5",
     "0100_peer_delivery_proof_pin.sql": "4f4f1401cb58f39ce8c8937e4666f5f1b694ad0a6df019463a09a11db8ac8093",
     "0101_agent_stopped.sql": "3b40a85ff4c155238cc650b473543f2f7bf1c08e56f34a16959c0a841cb4dd90",
-    "0102_app_community.sql": "9ee12e9b29134a2ec0da5ec576de00d0942eb1201fa74bee2ca526543ea2a5a9"
+    "0102_app_community.sql": "9ee12e9b29134a2ec0da5ec576de00d0942eb1201fa74bee2ca526543ea2a5a9",
+    "0103_page_files_owner_only.sql": "13ee8730eb6ee4594d2387277e49e2f237ada48a0bcba487e68073435f197780"
   }
 }

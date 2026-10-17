@@ -12,6 +12,8 @@
  * @structure PortfolioTab() — state (data, members, ai, pageHtml, previewOpen, paste, matPrompt, busy) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'portfolio'
  * @version-history
+ *   v3.0.1 — 2026-10-17 — The preview reads the stored page with the owner's session (apiGetText):
+ *     the file is the owner's now, not public (plan doc-mvcn6c7e4e5q, V0.3).
  *   v3.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Portfolio-sivu", direction A): one page
  *     that says where the page is, who can see it and who wrote it, previews it, and offers the three
  *     roads to change it, the AI first. The tab no longer forwards to the builder when nothing is
@@ -32,7 +34,7 @@ import { getNodeUrl, getSession } from '/js/services/auth.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { copyToClipboard } from '/js/utils.js';
-import { apiGet, apiPut } from '/js/api.js';
+import { apiGet, apiGetText, apiPut } from '/js/api.js';
 import { stampCspNonce } from '/views/portfolio/shared.js';
 import { renderPage } from './portfolio/page.js';
 import { x, titleOf, aiRequest, agentRule } from './portfolio/frame.js';
@@ -64,8 +66,8 @@ export default function PortfolioTab({ session, navigate, showToast }) {
       // The page's own words: the title comes from the file, and the preview shows the same bytes.
       if (d.html?.url) {
         try {
-          const res = await fetch(d.html.url, { cache: 'no-store' });
-          setPageHtml(res.ok ? await res.text() : '');
+          // The file is the owner's (not public), so it is read with the owner's session.
+          setPageHtml(await apiGetText(d.html.url));
         } catch (e) { swallowed('portfolio: page html', e); setPageHtml(''); }
       } else setPageHtml('');
     } catch (e) { swallowed('portfolio: config', e); setData({ config: null, standalone_url: null, html: null }); }

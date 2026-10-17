@@ -14,6 +14,9 @@
  *     - standalone_url is advertised on /v1/portfolio/config and data/:username.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-portfolio-origin.ts
  * @version-history
+ *   2026-10-17 — A switched-off page's file answers 404 anonymously and 403 to another owner, and
+ *     the owner still reads it (plan doc-mvcn6c7e4e5q, V0.3). Asserts the hole closed the same day:
+ *     the file was public. The suite now refuses a second principal and left the exemptions.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-07-03 — Initial (portfolio origin phases 0–5).
  *   v1.1.0 — 2026-08-12 — Every request that claims the portfolio origin now addresses one.
@@ -100,6 +103,7 @@ async function main() {
         const owner = `pforigin${Date.now() % 100000}`;
         const HTML = '<!DOCTYPE html><html><head><title>t</title></head><body><h1>PORTFOLIO ORIGIN DEMO</h1></body></html>';
         let token = '';
+        let pageFileUrl = '';
 
         console.log('\n=== Portfolio Origin E2E ===\n');
         console.log('Setup (server flag ON, portfolio host ' + PORTFOLIO_HOST + ')');
@@ -188,11 +192,28 @@ async function main() {
             assert(cfg.status === 200, `config status ${cfg.status}`);
             const r = await portfolioGet(owner);
             assert(r.status === 404, `expected 404, got ${r.status}`);
+            // The page's FILE is not a second way in (plan doc-mvcn6c7e4e5q, V0.3): the stored page
+            // was a public file, readable at /v1/pub after its owner took it off the web.
+            const meta = await json('/v1/portfolio/config', { headers: { Authorization: `Bearer ${token}` } });
+            const fileUrl = meta.body.data?.html?.url as string | undefined;
+            assert(!!fileUrl, `config names the stored page: ${JSON.stringify(meta.body.data?.html)}`);
+            const anon = await fetch(`${BASE}${fileUrl}`);
+            assert(anon.status === 404, `the switched-off page is readable anonymously at its file address: ${anon.status}`);
+            const own = await fetch(`${BASE}${fileUrl}`, { headers: { Authorization: `Bearer ${token}` } });
+            assert(own.status === 200 && (await own.text()).includes('PORTFOLIO ORIGIN DEMO'), `the owner previews the page: ${own.status}`);
+            pageFileUrl = fileUrl!;
             // Re-enable for the remaining tests.
             await json('/v1/portfolio/config', {
                 method: 'PUT', headers: { Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ enabled: true, showBadge: false, tags: ['portfolio'] }),
             });
+        });
+
+        await test('a second signed-in owner is refused the page file (403)', async () => {
+            assert(!!pageFileUrl, 'the previous test recorded the page file address');
+            const otherToken = (await registerOwner(BASE, `pfother${Date.now() % 100000}`)).token;
+            const other = await fetch(`${BASE}${pageFileUrl}`, { headers: { Authorization: `Bearer ${otherToken}` } });
+            assert(other.status === 403, `another owner read the page file: ${other.status}`);
         });
 
         await test('bare portfolio host (no label) 301s to the apex showcase', async () => {
