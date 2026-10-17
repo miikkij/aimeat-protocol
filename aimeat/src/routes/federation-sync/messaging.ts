@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-17 — A first message from a sender whose account the recipient already accepted (one of its
+ *     agents, or the person) is accepted, not held (services/contact-same-account.ts).
  *   2026-10-17 — A received message keeps sentByAgent / sentByAgentName, the agent that sent it in the
  *     sender's name, only when that agent belongs to the sender on the signing node.
  *   2026-10-16 — Replicate stores only under a principal of the signing node or an existing person or
@@ -72,6 +74,7 @@ import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { notify } from '../../services/notify.js';
 import { parseGaiiLoose, isSameOwner, localAccountName } from '../../utils/gaii.js';
+import { acceptedSameAccount } from '../../services/contact-same-account.js';
 import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
 import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
 import { listOperatorGhiis } from '../../services/operators.js';
@@ -425,7 +428,11 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             const fromOurSupport = peer.supportUpstream === true
                 && (await listOperatorGhiis(storage, config)).includes(deliveryGhii);
 
-            const autoAccept = isSameOwner(message.senderGhii, deliveryGhii) || knownThread || fromOurSupport;
+            // (4) The recipient accepted another identity of the sender's account (an agent of the
+            // sender, or the sender themself), and the sender is on the node that signed this
+            // (services/contact-same-account.ts; checked above: SENDER_NOT_OF_PEER).
+            const sameAccount = await acceptedSameAccount(storage, deliveryGhii, String(message.senderGhii));
+            const autoAccept = isSameOwner(message.senderGhii, deliveryGhii) || knownThread || fromOurSupport || sameAccount;
             state = autoAccept ? 'accepted' : 'pending';
             await storage.setContactState(deliveryGhii, message.senderGhii, state, message.id);
         }

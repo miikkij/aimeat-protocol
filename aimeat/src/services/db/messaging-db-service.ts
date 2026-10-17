@@ -92,6 +92,37 @@ export type OwnerConversation = ConversationSummary & {
   fold?: RowFold;
 };
 
+/**
+ * One row per conversation. An agent's 1:1 conversation is kept in two mailboxes (the agent's sent
+ * copies under the agent, the other party's replies and the owner's own messages under the owner), so
+ * the list had two rows for it once anyone answered: the owner's own row and the "via agent" row, with
+ * one key, both highlighted, and neither whole. The two fold into the owner's row, which keeps
+ * `viaAgent` so the page reads the conversation from both mailboxes and the owner can answer in it
+ * (decision-viestin-puoli-ja-merkint-kertovat-kuka-sen-kirjoitti-ja-omis, 2026-10-17). The newest
+ * message decides the preview; when the agent spoke last in its own name, `sentByAgent` names it.
+ */
+export function mergeAgentThreads(own: OwnerConversation[], agentConvs: OwnerConversation[]): OwnerConversation[] {
+  if (!agentConvs.length) return own;
+  const byId = new Map(own.map(c => [c.conversationId, c] as const));
+  const alone: OwnerConversation[] = [];
+  for (const a of agentConvs) {
+    const mine = byId.get(a.conversationId);
+    if (!mine) { alone.push(a); continue; }
+    const agentNewer = (a.updatedAt || '') > (mine.updatedAt || '');
+    byId.set(a.conversationId, {
+      ...mine,
+      viaAgent: a.viaAgent,
+      messageCount: mine.messageCount + a.messageCount,
+      ...(agentNewer ? {
+        lastMessage: a.lastMessage, lastDirection: a.lastDirection, lastSenderGhii: a.lastSenderGhii,
+        updatedAt: a.updatedAt, sentByAgent: a.viaAgent, sentByAgentName: undefined,
+      } : {}),
+      subject: mine.subject ?? a.subject,
+    });
+  }
+  return [...own.map(c => byId.get(c.conversationId)!), ...alone];
+}
+
 export class MessagingDbService {
   constructor(private readonly storage: Storage) {}
 
@@ -134,7 +165,7 @@ export class MessagingDbService {
           agentConvs.push({ ...c, viaAgent: a.gaii });
         }
       }
-      const named = await this.nameGroupThreads(ownerGhii, [...own, ...agentConvs], agents.map(a => a.gaii));
+      const named = await this.nameGroupThreads(ownerGhii, mergeAgentThreads(own, agentConvs), agents.map(a => a.gaii));
       // Sections, archive, rules and folds: what the owner decided about their own list. The same
       // answer for the page and for anyone reading in the owner's name.
       const organize = await readInboxOrganize(this.storage, ownerGhii);

@@ -7,6 +7,10 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.17.0 — 2026-10-17 — A message's side follows who sent it: mine (myself, or my agent in my name) on
+ *     the right, my agent's own message on the left under its name. A conversation my agent takes part
+ *     in is answerable: the head says the agent takes part, and the composer, Reply with AI, quoting and
+ *     transcribing are there (decision-viestin-puoli-ja-merkint-kertovat-kuka-sen-kirjoitti-ja-omis).
  *   v2.16.1 — 2026-09-26 — The operator's broadcast audience turns coral again while it is set, as
  *     main's .inbox-bc-audience--on drew it (Select attention; fix pass).
  *   v2.16.0 — 2026-09-26 —Written on components only: the pane, its head, the reply bar and the read-only
@@ -75,7 +79,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { getSession } from '/js/services/auth.js';
+import { getSession, getGhii } from '/js/services/auth.js';
 import { Action, Loud, Icon } from '/components/Action.js';
 import { Mark, Marks, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -107,7 +111,14 @@ export function ThreadPanel({
   // outside the page just renders without a quote). The sender label distinguishes you vs the peer.
   const msgById = {};
   for (const m of thread) msgById[m.id] = m;
-  const quoteSender = (q) => (q.direction === 'outbound' ? t('inbox.quoteYou') : peerDisplay(activeConv.peerGhii));
+  // A message is MINE (the right side, "You") when I sent it: written by me, or by one of my agents in my
+  // name (then senderGhii is still me, and the message names the agent). A message my agent sent in ITS
+  // OWN name is the agent's, on the left under its name, like anyone else's. The side used to follow
+  // the mailbox copy's direction, so my agents' own messages read "You"
+  // (decision-viestin-puoli-ja-merkint-kertovat-kuka-sen-kirjoitti-ja-omis, 2026-10-17).
+  const me = getGhii();
+  const isMine = (m) => (m.senderGhii ? m.senderGhii === me : m.direction === 'outbound');
+  const quoteSender = (q) => (isMine(q) ? t('inbox.quoteYou') : peerDisplay(q.senderGhii || activeConv.peerGhii));
   // Jump to the quoted original: scroll it into view inside the thread + flash it briefly.
   const jumpTo = (id) => flashMessage(`inbox-msg-${id}`);
   // Map each interactive QUESTION message id → the answers reply that fulfils it, so an answered
@@ -118,7 +129,8 @@ export function ThreadPanel({
   }
   // An announcement (a non-respondable broadcast) is read-only for the recipient — hide the composer.
   const isAnnouncement = thread.some(m => m.direction === 'inbound' && m.respondable === false);
-  // An aggregated "via <agent>" thread (a DM one of the owner's own agents sent) is read-only here.
+  // A conversation one of my agents takes part in. It is mine to answer too (2026-10-17): the head
+  // names the agent, and the composer stays.
   const viaAgentName = activeConv.viaAgent ? (subThreadLabel(activeConv.viaAgent) || peerName(activeConv.viaAgent)) : null;
   // Agent capabilities in chat: command chips for any agent peer (public chat.commands); the schedule
   // panel only for the human's OWN agents (the scheduler routes resolve under the caller's owner).
@@ -133,14 +145,14 @@ export function ThreadPanel({
       <${PaneHead} picture=${activeConv.peerGhii} name=${peerDisplay(activeConv.peerGhii)} nameTitle=${activeConv.peerGhii}
         presence=${activeConv.groupAlias ? null : activeConv.peerGhii}
         subject=${activeConv.subject || null}
-        via=${viaAgentName ? `${t('inbox.sentByAgent')} ${viaAgentName}` : null}
+        via=${viaAgentName ? t('inbox.agentTakesPart', { agent: viaAgentName }) : null}
         address=${address}>
         ${/* Two doors and the rest behind "…": the head used to carry six buttons, four of them for
               settings and second-order actions, on the row that names who you are talking to. */''}
         <${ThreadReadAloud} thread=${thread} peerLabelText=${peerDisplay(activeConv.peerGhii)} convId=${activeConv.conversationId} />
-        ${!viaAgentName ? html`<${PaneDoor} label=${t('inbox.ai.replyWithAi')} title=${t('inbox.ai.replyWithAi')} onClick=${openConversationAi} />` : null}
+        <${PaneDoor} label=${t('inbox.ai.replyWithAi')} title=${t('inbox.ai.replyWithAi')} onClick=${openConversationAi} />
         <${KebabMenu} label=${t('inbox.cover.more') || 'More'} trigger="…" items=${[
-          !viaAgentName ? { label: t('inbox.notebook.toNotebook'), onClick: openConversationNotebook } : null,
+          { label: t('inbox.notebook.toNotebook'), onClick: openConversationNotebook },
           { label: showLinkPreviews ? t('inbox.linkPreview.hideAll') : t('inbox.linkPreview.showAll'), onClick: toggleLinkPreviews },
           (thread.length >= 50) ? { label: threadAll ? t('inbox.thread.showRecent') : t('inbox.thread.showAll'), onClick: toggleThreadAll } : null,
           (peerIsMyAgent && !viaAgentName) ? { label: t('inbox.schedTitle'), onClick: () => setSchedOpen(o => !o) } : null,
@@ -160,14 +172,14 @@ export function ThreadPanel({
           const quoted = (m.replyToId && m.interactive?.role !== 'answers') ? msgById[m.replyToId] : null;
           return html`
             ${showDay ? html`<${ThreadDay} key=${'d' + m.id}>${dayLabel(m.createdAt)}<//>` : null}
-            <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
-              who=${m.direction === 'outbound' ? t('inbox.quoteYou') : peerDisplay(m.senderGhii || activeConv.peerGhii)}
+            <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${isMine(m)} urlMap=${urlMap}
+              who=${isMine(m) ? t('inbox.quoteYou') : peerDisplay(m.senderGhii || activeConv.peerGhii)}
               domId=${`inbox-msg-${m.id}`} quoted=${quoted} quotedName=${quoted ? quoteSender(quoted) : ''} onJumpTo=${jumpTo}
-              onQuote=${(onQuoteReply && !activeConv.viaAgent) ? onQuoteReply : null}
+              onQuote=${onQuoteReply || null}
               starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} onDelete=${onDeleteMsg} tracked=${trackedByMsg[m.id]}
               answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
               onAnswer=${submitInteractiveAnswers} submitting=${sending} showLinkPreviews=${showLinkPreviews}
-              onTranscribe=${activeConv.viaAgent ? null : onTranscribe} canTranscribe=${canTranscribe}
+              onTranscribe=${onTranscribe} canTranscribe=${canTranscribe}
               onOpenMarkdown=${(url, name) => setMdViewer({ url, name })} />`;
         })}
       <//>
@@ -184,9 +196,7 @@ export function ThreadPanel({
         : (!isAnnouncement && agentCommands
           ? html`<${CommandBar} commands=${agentCommands} onPick=${(c) =>
               (Array.isArray(c.params) && c.params.length) ? setCmdFill(c) : insertCommand(c, {})} />` : null)}
-      ${viaAgentName
-        ? html`<${PaneNote}>🤖 ${(t('inbox.viaAgentReadonly') || 'Sent by your agent {agent} — view only.').replace('{agent}', viaAgentName)}<//>`
-        : isAnnouncement
+      ${isAnnouncement
         ? html`<${PaneNote}>📢 ${t('inbox.announcementNote')}<//>`
         : html`${replyQuote ? html`<${ReplyBar} label=${`↩ ${t('inbox.replyingTo')} ${quoteSender(replyQuote)}`}
             text=${quoteSnippet(replyQuote.body)} onJump=${() => jumpTo(replyQuote.id)}

@@ -517,5 +517,70 @@ await test('30. A recipient on another node is still handed to federation, not r
     assert(body.data.message.status !== 'delivered', `a queued send must not claim delivery, got ${body.data.message.status}`);
 });
 
+// ── Phase E (2026-10-17): the agent's conversation is the owner's to answer, and it is one conversation ──
+// decision-viestin-puoli-ja-merkint-kertovat-kuka-sen-kirjoitti-ja-omis. The agent's sent copies live under
+// the agent and the other side's replies under the owner, so the owner had two rows and half a thread,
+// and could not answer ("vain katselu"). Now: one row, one thread, the owner answers in it and the
+// recipient (who accepted the agent) gets it without a new request, another of the owner's agents may
+// answer there in the owner's name, and the agent sees what its owner said.
+console.log('\nPhase E — the owner answers in their agent\'s conversation');
+const carolName = `dmcarol${stamp}`, daveName = `dmdave${stamp}`;
+let carol = { token: '', ghii: '' }, dave = { token: '', ghii: '' };
+let cbot = { gaii: '', token: '' }, chelper = { gaii: '', token: '' };
+let convX = '';
+
+await test('E1. Setup: Carol\'s agent writes to Dave in its own name; Dave accepts the agent and answers it', async () => {
+    carol = await registerOwner(carolName);
+    dave = await registerOwner(daveName);
+    cbot = await createAgent(carolName, carol.token, 'cbot', ['messages:send', 'messages:read']);
+    chelper = await createAgent(carolName, carol.token, 'chelper', ['messages:send', 'messages:send-as-owner']);
+    const sent = await json('/v1/messages', { method: 'POST', headers: { Authorization: `Bearer ${cbot.token}` }, body: JSON.stringify({ to: dave.ghii, body: 'Agentti kysyy: sopiiko torstai?' }) });
+    assert(sent.status === 201, `agent send ${sent.status}`);
+    convX = sent.body.data.message.conversationId;
+    const acc = await json(`/v1/messages/requests/${encodeURIComponent(cbot.gaii)}/accept`, { method: 'POST', headers: { Authorization: `Bearer ${dave.token}` } });
+    assert(acc.status === 200, `accept ${acc.status}`);
+    const reply = await json('/v1/messages', { method: 'POST', headers: { Authorization: `Bearer ${dave.token}` }, body: JSON.stringify({ to: cbot.gaii, body: 'Torstai sopii.', conversation_id: convX }) });
+    assert(reply.status === 201, `Dave's reply ${reply.status}`);
+});
+
+await test('E2. Carol has ONE row for the conversation, and it carries the agent', async () => {
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${carol.token}` } });
+    const rows = (convs.body.data.conversations as any[]).filter(c => c.conversationId === convX);
+    assert(rows.length === 1, `one row for one conversation, got ${rows.length}`);
+    assert(rows[0].viaAgent === cbot.gaii, `the row carries the agent, got ${rows[0].viaAgent}`);
+});
+
+await test('E3. Carol reads it whole: the agent\'s message and Dave\'s answer', async () => {
+    const thread = await json(`/v1/messages/conversations/${encodeURIComponent(convX)}?agent=${encodeURIComponent(cbot.gaii)}`, { headers: { Authorization: `Bearer ${carol.token}` } });
+    const msgs = thread.body.data.messages as any[];
+    assert(msgs.some(m => m.senderGhii === cbot.gaii) && msgs.some(m => m.senderGhii === dave.ghii), `both sides: ${JSON.stringify(msgs.map(m => m.senderGhii))}`);
+});
+
+await test('E4. Carol answers in it; Dave, who accepted only the agent, gets it in the same conversation, not as a request', async () => {
+    const r = await json('/v1/messages', { method: 'POST', headers: { Authorization: `Bearer ${carol.token}` }, body: JSON.stringify({ to: dave.ghii, body: 'Carol tässä: nähdään torstaina.', conversation_id: convX }) });
+    assert(r.status === 201 && r.body.data.message.conversationId === convX, `Carol's answer ${r.status} ${r.body.data?.message?.conversationId}`);
+    assert(r.body.data.awaiting_approval !== true, 'not held as a first-contact request');
+    const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${dave.token}` } });
+    assert(!(reqs.body.data.requests as any[]).some(q => q.contactId === carol.ghii), 'Carol is not in Dave\'s requests');
+    const thread = await json(`/v1/messages/conversations/${encodeURIComponent(convX)}`, { headers: { Authorization: `Bearer ${dave.token}` } });
+    assert((thread.body.data.messages as any[]).some(m => m.senderGhii === carol.ghii), 'Dave reads Carol\'s answer in the same conversation');
+});
+
+await test('E5. Another of Carol\'s agents answers there in Carol\'s name, and the message names it', async () => {
+    const r = await json('/v1/messages/as-owner', { method: 'POST', headers: { Authorization: `Bearer ${chelper.token}` }, body: JSON.stringify({ to: dave.ghii, body: 'Muistutus torstaista.', conversation_id: convX }) });
+    assert(r.status === 201 && r.body.data.conversation_id === convX, `as-owner ${r.status} ${JSON.stringify(r.body.data ?? r.body.error)}`);
+    const thread = await json(`/v1/messages/conversations/${encodeURIComponent(convX)}?agent=${encodeURIComponent(cbot.gaii)}`, { headers: { Authorization: `Bearer ${carol.token}` } });
+    const m = (thread.body.data.messages as any[]).find(x => x.body === 'Muistutus torstaista.');
+    assert(m?.senderGhii === carol.ghii && m?.sentByAgent === chelper.gaii, `in Carol's thread as Carol, naming the helper: ${JSON.stringify(m && { s: m.senderGhii, a: m.sentByAgent })}`);
+});
+
+await test('E6. The agent sees what its owner said in its conversation', async () => {
+    const thread = await json(`/v1/messages/agent-thread/${encodeURIComponent(convX)}`, { headers: { Authorization: `Bearer ${cbot.token}` } });
+    assert(thread.status === 200, `agent-thread ${thread.status}`);
+    assert((thread.body.data.messages as any[]).some(m => m.senderGhii === carol.ghii && /nähdään torstaina/.test(m.body)), 'the agent reads Carol\'s answer');
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${carol.token}` } });
+    assert((convs.body.data.conversations as any[]).filter(c => c.conversationId === convX).length === 1, 'still one row');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);
