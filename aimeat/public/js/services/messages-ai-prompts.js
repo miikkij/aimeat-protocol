@@ -28,6 +28,8 @@
  *   const text = buildConversationReplyPrompt({ peerGhii, subject, conversationId, thread }, MODES.COPY);
  * @version-history
  *   v1.0.0 -- 2026-07-12 -- Initial: conversation + message reply prompts, copy + mcp modes (TARGET-031).
+ *   v1.6.0 -- 2026-10-17 -- handleOf returns the agent's name for 'agent#owner@node', as its comment
+ *     always said; it returned the owner, so an agent's own message was labelled with its owner's name.
  *   v1.1.0 -- 2026-07-12 -- Fix MCP-mode identity trap: the prompt no longer tells the AI to send via
  *     aimeat_dm_send (an MCP session is the owner's AGENT, so the send went out under the agent into a
  *     separate thread). MCP mode now reads + researches + drafts and hands the reply back to the owner
@@ -49,7 +51,9 @@ export const MODES = { COPY: 'copy', MCP: 'mcp' };
 export function handleOf(id) {
   if (!id) return '';
   const beforeAt = String(id).split('@')[0];
-  return beforeAt.includes('#') ? beforeAt.split('#').pop() : beforeAt;
+  // The agent's name is the part BEFORE '#'. This took the part after it, the owner, so an agent's own
+  // message was labelled with its owner's name (2026-10-17).
+  return beforeAt.includes('#') ? beforeAt.split('#')[0] : beforeAt;
 }
 
 /** A human-friendly label for the peer. `displayName` wins when present, with the handle in parens. */

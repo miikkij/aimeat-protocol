@@ -15,6 +15,7 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.11.0 -- 2026-10-17 -- A conversation my agent takes part in is marked read like any other: it is mine to answer.
  *   v2.10.0 -- 2026-10-08 -- A suggested reply sent as it stands carries the draft's provenance record (aiprov D17).
  *   v2.9.1 -- 2026-09-26 -- The head's ways on are the action link's Settings family, as main's og-door and og-door--quiet (Jouni's decision "Action link in Settings"): Broadcast small; Tracked responses (small until one waits), Results and List rules small soft.
  *   v2.9.0 -- 2026-09-26 -- Rebuilt on the conversation components (component plan C2): the list is
@@ -388,8 +389,9 @@ export default function InboxTab({ showToast }) {
     const cache = await resolveThreadAttachmentUrls(msgs, conv.conversationId, urlCacheRef.current, messages.attachmentUrl);
     urlCacheRef.current = cache;
     setUrlMap(cache.map);
-    // Agent-owned ("via <agent>") threads are read-only for the owner — don't post a read receipt as them.
-    if (markRead && !conv.viaAgent) await messages.markConversationRead(conv.conversationId).catch(err => { swallowed('inbox-tab: msgs', err); });
+    // A conversation my agent takes part in is mine to read and answer too (2026-10-17): marking it read
+    // marks the copies in MY mailbox, which is where the other side's replies to my agent land.
+    if (markRead) await messages.markConversationRead(conv.conversationId).catch(err => { swallowed('inbox-tab: msgs', err); });
   }, []);
   // Side effects OUTSIDE the state updater — Preact may re-invoke an updater (loadThread inside it double-fetched).
   const toggleThreadAll = () => {

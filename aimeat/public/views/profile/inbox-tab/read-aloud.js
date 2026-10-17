@@ -13,6 +13,7 @@
  *   by its sender).
  * @usage import { ThreadReadAloud } from './inbox-tab/read-aloud.js';
  * @version-history
+ *   v1.5.0 — 2026-10-17 — "You" is what I sent (senderGhii), not every outbound copy: my agent's own message is read under its name.
  *   v1.4.0 — 2026-09-26 — Listen is the pane head's door (ConversationPane PaneDoor): its words hide in a narrow pane, its mark stays.
  *   v1.3.1 — 2026-09-26 — The thread head's Listen is the kit's Action (small, row), the same cut as Reply with AI beside it; its 🔊/⏸ mark, its words (Listen, Pause, Continue) and its pressed state stay; ✕ is the Icon.
  *   v1.3.0 — 2026-09-26 — useSpeechPhase and a message's Listen (BubbleSpeakButton) moved into the
@@ -28,6 +29,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { getGhii } from '/js/services/auth.js';
 import { isSpeechSupported, speak, stop, pause, resume, textToParagraphs } from '/js/services/speech-reader.js';
 // The phase hook and a message's own Listen live with the Message component now.
 import { useSpeechPhase } from '/components/Message.js';
@@ -41,7 +43,10 @@ export function threadParagraphs(thread, youLabel, peerLabelText) {
   for (const m of thread || []) {
     const body = textToParagraphs(m.body);
     if (!body.length) continue;
-    out.push(`${m.direction === 'outbound' ? youLabel : peerLabelText}:`);
+    // Mine when I sent it (myself, or my agent in my name); my agent's own message is read as its own.
+    const me = getGhii();
+    const mine = m.senderGhii && me ? m.senderGhii === me : m.direction === 'outbound';
+    out.push(`${mine ? youLabel : peerLabelText}:`);
     out.push(...body);
   }
   return out;

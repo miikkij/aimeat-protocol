@@ -26,6 +26,9 @@
  *   - readAgentDmInbox()  — messages addressed to the agent, group threads folded in
  * @usage const { messages, total } = await readAgentDmThread(storage, agentGaii, conversationId, { page, perPage });
  * @version-history
+ *   v1.1.0 — 2026-10-17 — readOneToOneWithOwner: an agent's 1:1 conversation is read from both mailboxes
+ *     as one, for the owner and for the agent, so the owner can answer in it and the agent sees the
+ *     answer (decision-viestin-puoli-ja-merkint-kertovat-kuka-sen-kirjoitti-ja-omis).
  *   v1.0.0 — 2026-08-22 — Initial: group threads become readable by the agent that is in them.
  */
 import type { Storage, DirectMessageRecord } from '../storage/interface.js';
@@ -55,7 +58,41 @@ export async function readAgentDmThread(
   if (convo && isParticipant(convo, agentGaii)) {
     return storage.listConversation(deliveryTargetFor(agentGaii), conversationId, opts);
   }
-  return storage.listAgentDmThread(agentGaii, conversationId, opts);
+  return readOneToOneWithOwner(storage, agentGaii, conversationId, opts);
+}
+
+/** How many messages of one conversation are merged from the two mailboxes before the page is cut. */
+const MERGE_CAP = 500;
+
+/**
+ * An agent's 1:1 conversation is kept in TWO mailboxes: the agent's own sent copies under the agent,
+ * and everything else (the other party's replies to the agent, and since 2026-10-17 the owner's own
+ * messages and the messages another of the owner's agents sent in the owner's name into the same
+ * conversation) under the owner. Read as one: the owner sees the agent's conversation whole and can
+ * answer in it, and the agent sees what its owner said there, so it does not lose the thread (Jouni,
+ * 2026-10-17: decision-viestin-puoli-ja-merkint-kertovat-kuka-sen-kirjoitti-ja-omis).
+ *
+ * The owner's rows are added only when the agent itself has a message in the conversation, so an agent
+ * never reads an owner's thread it was not part of. Merged by message id (an inbound reply to the agent
+ * is in both reads), newest first, then cut to the page.
+ */
+export async function readOneToOneWithOwner(
+  storage: Storage,
+  agentGaii: string,
+  conversationId: string,
+  opts?: DmPageOpts,
+): Promise<DmPage> {
+  const page = Math.max(1, opts?.page ?? 1);
+  const perPage = Math.max(1, opts?.perPage ?? 50);
+  const own = await storage.listAgentDmThread(agentGaii, conversationId, { page: 1, perPage: MERGE_CAP });
+  if (own.messages.length === 0) return storage.listAgentDmThread(agentGaii, conversationId, opts);
+  const owners = await storage.listConversation(deliveryTargetFor(agentGaii), conversationId, { page: 1, perPage: MERGE_CAP });
+  const byId = new Map<string, DirectMessageRecord>();
+  // The owner's copy first: it carries the owner's read state. The agent's sent copies exist only under the agent.
+  for (const m of owners.messages) byId.set(m.id, m);
+  for (const m of own.messages) if (!byId.has(m.id)) byId.set(m.id, m);
+  const all = [...byId.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { messages: all.slice((page - 1) * perPage, page * perPage), total: all.length };
 }
 
 /**

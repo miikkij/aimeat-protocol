@@ -54,6 +54,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage, DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
 import type { MessageAttachmentInput } from '../models/message-schemas.js';
+import { acceptedSameAccount } from './contact-same-account.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliveryTargetFor } from '../utils/messaging.js';
 import { notify } from './notify.js';
@@ -341,8 +342,11 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       if (!contact) {
         // skipContactGate (operator announcements) auto-accepts so a node/federation-wide notice lands
         // in the inbox instead of the first-contact requests bucket.
-        const autoAccept = isSameOwner(senderGhii, deliveryGhii) || !!input.skipContactGate;
+        const autoAccept = isSameOwner(senderGhii, deliveryGhii) || !!input.skipContactGate
+          || await acceptedSameAccount(storage, deliveryGhii, senderGhii);
         contact = await storage.setContactState(deliveryGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
+      } else if (contact.state === 'pending' && await acceptedSameAccount(storage, deliveryGhii, senderGhii)) {
+        contact = await storage.setContactState(deliveryGhii, senderGhii, 'accepted');
       }
       isRequest = contact.state === 'pending';
       awaitingApproval = isRequest;
