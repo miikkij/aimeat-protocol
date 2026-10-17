@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-17 — POST /v1/memory/bulk and POST /v1/memory/copy take visibility 'organism:<id>' and
+ *     refuse one naming an organism the writer's account is not an active member of
+ *     (services/organism-visibility.ts; plan doc-mvcn6c7e4e5q, V3.2).
  *   2026-10-16 — Comment only: POST /v1/memory/bulk-delete puts each key in the bin; the comment said
  *     it removed them for good (invariant 8 review, ruled by the developer on 2026-10-16).
  *   2026-10-16 — Bulk, import and copy refuse an entry that changes an agent's live crew definition's browser
@@ -95,7 +98,8 @@ import { batchKeyRefusal, storageReferenceRefusal, visibilityRefusal } from './b
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isKeyArchived } from '../../services/archive.js';
-import { isOwnerInPerson } from '../../utils/gaii.js';
+import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
+import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
 import { discoverMemory } from '../../services/memory-discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
@@ -188,6 +192,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // with no workspace on it; an unknown word was turned into private without a word.
       const visRefusal = visibilityRefusal(e.visibility);
       if (visRefusal) { preFailed.push({ key, status: 'failed', reason: visRefusal }); continue; }
+      // 'organism:<id>' names an organism the writer's account is an active member of (the single write's rule).
+      const audience = await organismVisibilityRefusal(storage, e.visibility, { identity: resolve(req), federated: isForeignPrincipal(req.auth) });
+      if (audience) { preFailed.push({ key, status: 'failed', reason: `${audience.code}: ${audience.message}` }); continue; }
       items.push({
         key,
         value: e.value,
@@ -659,6 +666,12 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const orgRefusal = await organismWriteRefusal(req, callerGaii, key);
     if (orgRefusal) {
       res.status(orgRefusal.status).json(error(config.nodeId, orgRefusal.code, orgRefusal.message));
+      return;
+    }
+    // A copy made visible to one organism names an organism the caller's account is a member of.
+    const audience = await organismVisibilityRefusal(storage, targetVis, { identity: callerGaii, federated: isForeignPrincipal(req.auth) });
+    if (audience) {
+      res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
       return;
     }
 

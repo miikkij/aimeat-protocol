@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-17 — MemoryRecord, StorageFileRecord and ChunkedUploadRecord visibility are
+ *     StoredVisibility, which takes `organism:<id>` (and 'members' for a chunked upload): the
+ *     active members of one organism (plan doc-mvcn6c7e4e5q, V3.2/V3.3; services/audience.ts decides).
  *   v1.5.0 — 2026-10-11 — ActionRecord.pricing.baseMorsels is tollMorsels and WorkRecord.cost.basePrice
  *     is toll: a morsel is pacing, not a price (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.4.0 — 2026-10-08 — StorageFileRecord.aiProvenanceId: a stored file names its AI-provenance record.
@@ -19,6 +22,11 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 import type { SemanticAnnotation } from './common.js';
+
+/** Who may read a memory record or a stored file, as the column stores it. */
+export type StoredVisibility =
+  'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public' | `organism:${string}`;
+
 export interface MemoryRecord {
   key: string;
   ownerGaii: string;    // the agent GAII that owns this memory
@@ -26,8 +34,10 @@ export interface MemoryRecord {
   // 'members'   = readable by any authenticated user of this node (NOT the shared anonymous identity).
   // 'workspace' = readable by members of the organism workspace named in `workspaceRef` (org/ws) —
   //               node-local (DMZ), never federated; the read is gated by canReadWorkspace().
-  // Ordering low→high reach: private < owner < group < workspace < members < public.
-  visibility: 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public';
+  // 'organism:<id>' = the active members of that one organism and their admitted agents; node-local,
+  //               never federated (services/audience.ts audienceAllows decides).
+  // Ordering low→high reach: private < owner < group < workspace < organism:<id> < members < public.
+  visibility: StoredVisibility;
   groupId?: string;
   /** For visibility 'workspace': a SPACE-SEPARATED list of one or more "<organismId>/<workspaceId>"
    *  bindings whose members may read this — a file/record shared into several workspaces is readable
@@ -263,7 +273,8 @@ export interface StorageFileRecord {
   // Same tiers as MemoryRecord (files were lagging): 'members' = any authenticated node user;
   // 'workspace' = members of the organism workspace in `workspaceRef`. Both gated by the SAME
   // authorizeRead() core as memory, so a file authorizes identically to a memory record.
-  visibility: 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public';
+  // 'organism:<id>' = the active members of that organism, as for a memory record.
+  visibility: StoredVisibility;
   groupId?: string;
   /** For visibility 'workspace': a SPACE-SEPARATED list of one or more "<organismId>/<workspaceId>"
    *  bindings whose members may read this file (a file shared into several workspaces is readable by
@@ -292,7 +303,7 @@ export interface ChunkedUploadRecord {
   ownerGaii: string;
   key: string;
   mimeType: string;
-  visibility: 'private' | 'owner' | 'group' | 'public' | 'workspace';
+  visibility: StoredVisibility;
   /** The group a 'group' file is for, and the "<organismId>/<workspaceId>" refs a 'workspace' file is for. */
   groupId?: string;
   workspaceRef?: string;

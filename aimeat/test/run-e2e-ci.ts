@@ -11,6 +11,8 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-17 -- e2e-audience-memory-files.ts joins the list (not the guard tier): visibility
+ *     'organism:<id>' on memory records and stored files (plan doc-mvcn6c7e4e5q, V3.2 + V3.3).
  *   2026-10-16 -- e2e-ai-label-shares.ts joins the list (not the guard tier): the AI label of what a workspace share serves.
  *   2026-10-16 -- In GitHub Actions a red run writes its red suites as check-run annotations and a job
  *     summary (scripts/lib/e2e-github-report.ts), which a reader without a GitHub sign-in can read; the
@@ -1181,6 +1183,8 @@ const ALL_SUITES = [
     'test/e2e-presigned-meta.ts',
     'test/e2e-memory-file-presigned.ts',
     'test/e2e-storage-visibility.ts',
+    // Visibility 'organism:<id>' on memory records and stored files: members read, others refused.
+    'test/e2e-audience-memory-files.ts',
     'test/e2e-subdomains.ts',
     'test/e2e-capabilities.ts',
     // The other side of the capability record: the fields the NODE writes about it. PUT merged the

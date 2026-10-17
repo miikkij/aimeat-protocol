@@ -25,6 +25,9 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-17 — visibility 'organism:<id>' naming an organism the writer's account is not an active
+ *     member of is refused with 400 NOT_ORGANISM_MEMBER before anything is read or written (plan
+ *     doc-mvcn6c7e4e5q, V3.2).
  *   2026-10-16 — PATCH refuses a merge that changes an agent's live crew definition's browser site list
  *     unless the owner writes it in person (403 OWNER_APPROVES_SITES; QA audit F07b-02).
  *   v1.5.5 — 2026-10-12 — PATCH refuses a merged app tool manifest or offers document carrying the old
@@ -58,7 +61,8 @@ import type { Router } from 'express';
 import type { MemoryRecord, AiProvenanceRecordRow } from '../../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
+import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
@@ -162,6 +166,15 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only write to keys prefixed with "anonymous."'));
+      return;
+    }
+    // 'organism:<id>' names an organism the writer's account is an active member of: the rule
+    // POST /v1/memory runs inside writeMemoryRecord (services/organism-visibility.ts).
+    const audience = await organismVisibilityRefusal(storage, visibility, {
+      identity: resolveIdentity(req.auth!, config.nodeId), federated: isForeignPrincipal(req.auth),
+    });
+    if (audience) {
+      res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
       return;
     }
 

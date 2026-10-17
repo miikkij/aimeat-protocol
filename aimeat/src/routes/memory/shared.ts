@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared context type + small pure helpers for the memory route group modules. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-17 — visibilityToZone: 'organism:<id>' is dmz (node-local), as members and workspace are.
  *   2026-10-05 — MEMORY_LIST_MAX_LIMIT moved unchanged to models/tool-input-vocabulary.ts and is
  *     re-exported: the tool catalog states it (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-01 — memoryContentBytes(): the one definition of "which bytes a memory value's
@@ -16,6 +17,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { StatsCollector } from '../../services/stats.js';
 import type { MemoryDbService } from '../../services/db/memory-db-service.js';
+import { isOrganismVisibilityWord } from '../../utils/visibility-words.js';
 
 /**
  * The most entries one listing will hand back, and the ceiling `?limit` is clamped to.
@@ -70,6 +72,7 @@ export function visibilityToZone(visibility: string): 'private' | 'dmz' | 'feder
     case 'workspace': return 'dmz'; // node-local: readable by workspace members, never federated
     case 'members': return 'dmz'; // node-local: never replicated to federation
     case 'public': return 'federation';
-    default: return 'private';
+    // 'organism:<id>': node-local like members and workspace, never replicated to federation.
+    default: return isOrganismVisibilityWord(visibility) ? 'dmz' : 'private';
   }
 }

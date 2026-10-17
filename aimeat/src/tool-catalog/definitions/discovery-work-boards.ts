@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-17 — aimeat_storage_upload takes visibility 'members' and 'organism:<organism id>', as
+ *     POST /v1/storage does (plan doc-mvcn6c7e4e5q, V3.3).
  *   2026-10-16 — aimeat_storage_download asks storage:read, as its REST twins do (QA audit S3-03).
  *   2026-10-11 — A catalogue action, an action hire and a public board post are described as pacing in
  *     morsels, never a price; action_execute says what to do when the balance is short.
@@ -56,6 +58,7 @@
  */
 
 import { z } from 'zod';
+import { storedVisibilitySchema } from '../../utils/visibility-words.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
@@ -295,7 +298,7 @@ export const discoveryWorkBoardsTools = [
             key: { type: 'string', required: true, description: 'Storage key (path-like identifier).' },
             data_base64: { type: 'string', description: 'Base64-encoded file data. Omit to get a presigned upload_url instead (recommended for files > 1 KB). Use @file:path with the CLI fallback.' },
             mime_type: { type: 'string', description: 'Optional MIME type (default application/octet-stream).' },
-            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public', 'workspace'], description: "Access control (default: private). Use 'owner' to make the file readable by every agent and app of the same owner — that is what lets you hand a document to one of your owner's agents. Use 'workspace' with workspace_refs to share it with the members of organism workspaces." },
+            visibility: { type: 'string', description: "Access control (default: private): private, owner, group, workspace, members, public, or 'organism:<organism id>'. Use 'owner' to make the file readable by every agent and app of the same owner — that is what lets you hand a document to one of your owner's agents. Use 'workspace' with workspace_refs to share it with the members of organism workspaces, and 'organism:<organism id>' to share it with every active member of one organism you belong to.", zod: storedVisibilitySchema },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
             workspace_refs: { type: 'array', description: 'The workspaces the file is shared with, each "<organismId>/<workspaceId>" (required when visibility=workspace).', zod: z.array(z.string()) },
             ...aiProvenanceCatalogInput,

@@ -36,6 +36,9 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.4.0 — 2026-10-17 — visibility 'organism:<id>': the write and the presigned mint refuse with 400
+ *     NOT_ORGANISM_MEMBER, nothing stored and no URL minted, when the account owning the namespace is
+ *     not an active member of that organism (plan doc-mvcn6c7e4e5q, V3.3).
  *   v1.1.0 — 2026-10-11 — The `files` and `memory` changes of a file only its owner reads go to
  *     that owner's streams (event-bus.ts emitRecordChange). Both were global events.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8, unit storage-files). Collapses
@@ -67,6 +70,7 @@ import {
     ProvenanceScopeError, type DeclaredProvenance,
 } from './ai-provenance.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
+import { organismVisibilityRefusal } from './organism-visibility.js';
 
 /** How long a presigned storage upload URL is good for. The number the caller is told and the number
  *  the token is signed with are the same value, so they cannot drift apart. */
@@ -84,7 +88,7 @@ export interface StorageWriteDeps {
 export interface StorageWriteRefusal {
     ok: false;
     status: number;
-    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'QUOTA_EXCEEDED' | ProvenanceRefusalCode;
+    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'QUOTA_EXCEEDED' | 'NOT_ORGANISM_MEMBER' | ProvenanceRefusalCode;
     message: string;
     /**
      * Which ceiling refused, when the code is QUOTA_EXCEEDED. The per-file one has an answer the
@@ -301,6 +305,9 @@ export async function writeStorageFile(
             message: 'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"',
         };
     }
+    // 'organism:<id>' names an organism the account owning this namespace is an active member of.
+    const audience = await organismVisibilityRefusal(storage, visibility, { identity: ownerGaii });
+    if (audience) return { ok: false, ...audience };
 
     if (input.data.length > config.storageMaxFileSizeMb * 1024 * 1024) {
         return {
@@ -466,6 +473,9 @@ export async function mintStorageUploadUrl(
 
     const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
     if (fenced) return fenced;
+    // Refused at the mint as at the write, so no URL is handed out for a file that cannot land.
+    const audience = await organismVisibilityRefusal(deps.storage, input.visibility, { identity: ownerGaii });
+    if (audience) return { ok: false, ...audience };
     if (input.provenance) {
         const refused = await storageProvenanceMintRefusal(deps, input.provenance);
         if (refused) return refused;

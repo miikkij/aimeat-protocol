@@ -17,6 +17,9 @@
  *   });
  *   if (!r.allowed) { res.status(403)...; return; }
  * @version-history
+ *   v1.6.0 -- 2026-10-17 -- The 'organism:<id>' tier: the active members of one organism and the
+ *     agents it admits (services/audience.ts audienceAllows), decided before the consent layer and
+ *     audited on denial; `accessorFederated` marks a visitor (plan doc-mvcn6c7e4e5q, V3.2/V3.3).
  *   v1.5.0 -- 2026-10-15 -- `noAudit`: GET /v1/permissions/check asks this guard as a simulation and
  *     writes no audit row (feature-list audit 43).
  *   v1.4.0 -- 2026-09-08 -- A person reads what their own agents and apps hold. The owner-self bypass
@@ -41,6 +44,8 @@ import type { AimeatConfig } from '../config.js';
 import { checkConsentForRead, auditDataAccess } from './consent.js';
 import { isKeyShared } from './group-shares.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { isOrganismVisibilityWord } from '../utils/visibility-words.js';
+import { organismVisibilityAdmits } from './organism-visibility.js';
 
 /**
  * Is `accessor` the HUMAN behind `resourceOwner`? True for `alice@n` reading something owned by
@@ -72,6 +77,8 @@ export interface AuthorizeReadArgs {
   /** The accessor's bare owner name — needed for the workspace membership check. */
   accessorOwner?: string;
   action: 'read' | 'list' | 'search';
+  /** The reader is a visitor from another node (isForeignPrincipal); refused for 'organism:<id>'. */
+  accessorFederated?: boolean;
   /** A simulation (GET /v1/permissions/check): answer as a read would, and write no audit row. */
   noAudit?: boolean;
 }
@@ -142,6 +149,18 @@ export async function authorizeRead(
   // string. Like public, allowed member reads are not audited.
   if (visibility === 'members') {
     return { allowed: true, reason: 'members_data' };
+  }
+
+  // 'organism:<id>' = the active members of one organism and the agents it admits, decided by
+  // services/audience.ts from the RESOLVED reader identity: the anonymous identity, a visitor from
+  // another node (whose identity names no account here) and a non-member are refused, and the denial
+  // is audited as a workspace denial is. Node-local; it never reaches the consent layer.
+  if (isOrganismVisibilityWord(visibility)) {
+    if (await organismVisibilityAdmits(storage, visibility, { identity: accessorGaii, federated: args.accessorFederated })) {
+      return { allowed: true, reason: 'organism_member' };
+    }
+    if (!args.noAudit) await auditDataAccess(storage, null, ownerGaii, accessorGaii, resourceKey, action, false);
+    return { allowed: false, reason: 'not_organism_member' };
   }
 
   // 'workspace' = readable by members of the organism workspace(s) in `workspaceRef`. That field is a

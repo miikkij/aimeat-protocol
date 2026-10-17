@@ -690,12 +690,36 @@ components:
       enum: [open, contested, escalated, resolved]
 
     Visibility:
-      type: string
-      enum: [private, owner, group, members, public]
       default: private
       description: >
-        Access level. `members` (any logged-in user of this node) and `group` apply to
-        memory records; storage files accept private/owner/public only.
+        Who may read a memory record. `members` is any signed-in account of this node, `group` the
+        members of a sharing group, and `organism:<organism id>` the active members of that one
+        organism and the agents it admits; the writer's account must be an active member of it, or
+        the write is refused with 400 NOT_ORGANISM_MEMBER. Neither `members` nor `organism:<id>` is
+        ever federated. Stored files take StoredFileVisibility.
+      oneOf:
+        - type: string
+          enum: [private, owner, group, members, public]
+        - $ref: '#/components/schemas/OrganismVisibility'
+
+    OrganismVisibility:
+      type: string
+      pattern: '^organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$'
+      description: >
+        `organism:<organism id>`: readable by the active members of that organism and the agents
+        it admits, never by an anonymous caller or a visitor from another node. Node-local.
+      example: organism:3f2a9c1e-7b44-4d0a-9e61-2a8c5d0f1b7e
+
+    StoredFileVisibility:
+      default: private
+      description: >
+        Who may read a stored file: the memory record levels plus `workspace` (the members of the
+        workspaces named in workspace_refs). `organism:<organism id>` needs the uploader's account to
+        be an active member of that organism (400 NOT_ORGANISM_MEMBER otherwise).
+      oneOf:
+        - type: string
+          enum: [private, owner, group, workspace, members, public]
+        - $ref: '#/components/schemas/OrganismVisibility'
 
     DisputeEventType:
       type: string
@@ -18026,8 +18050,7 @@ paths:
                     the key does not exist yet. Omit for the normal merge behaviour, which retries
                     instead of failing.
                 visibility:
-                  type: string
-                  enum: [private, owner, group, members, public]
+                  $ref: '#/components/schemas/Visibility'
                 tags:
                   type: array
                   items:
@@ -18213,12 +18236,13 @@ paths:
                       key: { type: string }
                       value: {}
                       visibility:
-                        type: string
-                        enum: [private, owner, group, members, public]
+                        allOf:
+                          - $ref: '#/components/schemas/Visibility'
                         description: >-
-                          The visibilities POST /v1/memory takes; absent means private. Any other value,
-                          `workspace` included, fails that entry under failed[]. A record a workspace
-                          reads is written through the workspace.
+                          The visibilities POST /v1/memory takes, `organism:<organism id>` included;
+                          absent means private. Any other value, `workspace` included, fails that entry
+                          under failed[], and so does an organism the writer's account is not an active
+                          member of. A record a workspace reads is written through the workspace.
                       tags:
                         type: array
                         items: { type: string }
@@ -23931,10 +23955,9 @@ paths:
                   type: string
                   description: Memory key to copy
                 visibility:
-                  type: string
-                  enum: [private, owner, group, members, public]
-                  default: private
-                  description: Visibility for the copied entry
+                  allOf:
+                    - $ref: '#/components/schemas/Visibility'
+                  description: Visibility for the copied entry (default private)
       responses:
         '200':
           description: 'Copied: { key, copied_from, version, classification? }'
@@ -24228,7 +24251,7 @@ paths:
                   items:
                     type: string
                 visibility:
-                  $ref: '#/components/schemas/Visibility'
+                  $ref: '#/components/schemas/StoredFileVisibility'
                 workspace_refs:
                   description: 'For `visibility: workspace` — one or more `<organismId>/<workspaceId>`.'
                   oneOf:
@@ -24304,7 +24327,14 @@ paths:
               required: [visibility]
               properties:
                 visibility:
-                  $ref: '#/components/schemas/Visibility'
+                  $ref: '#/components/schemas/StoredFileVisibility'
+                workspace_refs:
+                  description: 'For `visibility: workspace` — one or more `<organismId>/<workspaceId>`.'
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
       responses:
         '200':
           description: Visibility updated
@@ -24414,6 +24444,11 @@ paths:
         A record that is not public needs the `memory:read` scope from a signed-in caller that is
         not the account holder in person: an app grant (whose identity is its owner's GHII) or an
         agent without the word gets 403 SCOPE_DENIED. Public records need no scope.
+
+        A record with visibility `organism:<organism id>` is read by that organism's active
+        members and the agents it admits, whether or not the consent layer is on. A signed-in
+        reader outside it gets 403 NOT_ORGANISM_MEMBER; an anonymous reader gets the 404 a
+        `members` record gives.
       tags: [Memory]
       parameters:
         - name: gaii
@@ -24982,8 +25017,7 @@ paths:
                     `upload_url`, `upload_method`, `content_type`, `max_size_bytes` and
                     `expires_in_seconds`.
                 visibility:
-                  type: string
-                  enum: [private, owner, group, workspace, members, public]
+                  $ref: '#/components/schemas/StoredFileVisibility'
                 group_id:
                   type: string
                   description: Sharing group ID (required when visibility is 'group')
@@ -25025,8 +25059,7 @@ paths:
                 key:
                   type: string
                 visibility:
-                  type: string
-                  enum: [private, owner, group, public]
+                  $ref: '#/components/schemas/StoredFileVisibility'
                 group_id:
                   type: string
                   description: Sharing group ID (required when visibility is 'group')
@@ -25102,7 +25135,10 @@ paths:
         the node stored (`ai-speech/<uuid>.mp3`, `ai-images/...`) goes public in place. `key` may
         hold slashes (`/v1/storage/ai-speech/<uuid>.mp3/visibility`). The file keeps its
         AI-provenance record; made public, the record resolves for anyone at `/v1/provenance/{id}`
-        and by hash, and the answer carries it as `ai_provenance`.
+        and by hash, and the answer carries it as `ai_provenance`. Takes every visibility the upload
+        takes: `workspace` with workspace_refs (re)binds the file, `organism:<organism id>` shares it
+        with that organism's active members and needs the file owner's account to be one (400
+        NOT_ORGANISM_MEMBER otherwise), and `group` keeps the group the file already has.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -25121,7 +25157,14 @@ paths:
               required: [visibility]
               properties:
                 visibility:
-                  $ref: '#/components/schemas/Visibility'
+                  $ref: '#/components/schemas/StoredFileVisibility'
+                workspace_refs:
+                  description: 'For `visibility: workspace` — one or more `<organismId>/<workspaceId>`.'
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
       responses:
         '200':
           description: Visibility updated
@@ -30250,8 +30293,7 @@ paths:
                 chunk_size:
                   type: integer
                 visibility:
-                  type: string
-                  enum: [private, owner, group, public, workspace]
+                  $ref: '#/components/schemas/StoredFileVisibility'
                 total_chunks:
                   type: integer
                 group_id:
@@ -49615,8 +49657,10 @@ paths:
         memory: `visibility:'owner'` admits every agent and app of the SAME owner (this is how a
         document an owner uploads reaches that owner's own agent — upload with `visibility: owner`,
         then the agent reads it with its own token), `members` any authenticated node user,
-        `group`/`workspace` their members, and a private file only with a matching consent grant;
-        `organism.{id}` grants resolve for active organism members. Denied reads are written to the
+        `group`/`workspace` their members, `organism:<organism id>` the active members of that
+        organism and the agents it admits (decided whether or not the consent layer is on; a
+        signed-in non-member gets 403 NOT_ORGANISM_MEMBER), and a private file only with a matching
+        consent grant; `organism.{id}` grants resolve for active organism members. Denied reads are written to the
         consent audit log. An authenticated caller without access gets 403; anonymous/
         unauthenticated callers get 404 (file existence is hidden on public URLs).
         A non-public file needs the `storage:read` scope from a signed-in caller that is not the
