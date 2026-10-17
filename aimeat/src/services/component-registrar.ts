@@ -15,6 +15,7 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.15.1 — 2026-10-18 — The app component's publish names no publish gate (`publishGate: null`): the install is the owner's act.
  *   v1.15.0 — 2026-10-13 — An extension component's actions are capability rows when its install answers (capability-aggregator.ts aggregateExtensionNow).
  *   v1.14.0 — 2026-10-09 — An extension component's config always goes through mergeExtensionConfig,
  *     bound to its stored name: with no config values it was stored as built, a manifest secret
@@ -506,9 +507,7 @@ export async function registerComponent(
           const checked = validateCortexAgents(bundledCrews);
           if (!checked.ok) {
             return {
-              success: false,
-              componentId,
-              registeredAs,
+              success: false, componentId, registeredAs,
               error: `app declares crew-defs that are not valid: ${checked.errors.join('; ')}`,
             };
           }
@@ -533,6 +532,7 @@ export async function registerComponent(
           ownerName: owner,
           ownerGhii: ownerGaii,
           callerGaii: input.callerGaii ?? ownerGaii,
+          publishGate: null, // the install is the owner's act (install requests); the app keeps the new-app defaults
           filename: registeredAs,
           data: Buffer.from(rewritten, 'utf-8'),
           mimeType: 'text/html',

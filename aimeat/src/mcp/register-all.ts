@@ -26,6 +26,7 @@
  * @version-history
  *   2026-10-18 — registerSkillsTools and registerCortexTools receive the session's caller: the publish
  *     gate asks about it (plan doc-mvcn6c7e4e5q, V4).
+ *   2026-10-18 — registerCompanyTools and registerPortfolioTools receive the session caller, for the publish gate (V4).
  *   2026-10-18 — registerPublishRequestTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   2026-10-17 — registerExposureTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   2026-10-16 — registerExtensionsTools receives getToken: aimeat_extension_invoke gives an action's
@@ -272,7 +273,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerDmOrganizeTools(mcp, storage, config, agentGaii);
     registerNotifyTools(mcp, storage, config, agentGaii, caller);
     registerContactTools(mcp, storage, config, agentGaii, scopes, caller);
-    registerCompanyTools(mcp, storage, config, agentGaii, scopes);
+    registerCompanyTools(mcp, storage, config, agentGaii, scopes, caller);
     // peers: pulling a package from another node reads that node's address and key from the peer
     // record, never from the caller's arguments.
     registerPackageTools(mcp, storage, config, agentGaii, peers, scopes, caller);
@@ -280,7 +281,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes, caller);
     // The operator sets up this node from an install set: owner, packages, organisms, users, agents.
     registerAdminInstallSetTools(mcp, storage, config, peers, agentGaii, scopes);
-    registerPortfolioTools(mcp, storage, config, agentGaii);
+    registerPortfolioTools(mcp, storage, config, agentGaii, caller);
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii, scopes, caller);
     registerDesignbookTools(mcp, storage, config, agentGaii);
     registerUiLibraryTools(mcp, storage, config);

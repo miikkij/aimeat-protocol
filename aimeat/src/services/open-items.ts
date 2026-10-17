@@ -37,6 +37,7 @@
  *   const open = await listItems(storage, config, ownerGhii, owner);
  *   const shown = await showItems(storage, config, readerFor({ storage, config }, req.auth), owner);
  * @version-history
+ *   v1.2.1 — 2026-10-18 — The portfolio keys come from services/portfolio-config.ts, not from the route.
  *   v1.2.0 — 2026-09-29 — TARGET-082 V4: showItems, the list as a caller may see it: the record passes
  *     the caller's ContentReader (presentMemory) and a list the reader may not see reads as empty.
  *     readList and listItems stay for the node's own read-modify-write, counts and duplicate checks.
@@ -51,7 +52,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { getOwnerScopeMemory } from './owner-memory.js';
-import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from '../routes/portfolio.js';
+import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
 import { HELLO_MCP_KEY } from './hello-mcp.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';

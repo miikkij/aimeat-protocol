@@ -20,6 +20,8 @@
  *   readCompanyPortfolioPage · deleteCompanyPortfolio
  * @usage await publishCompanyPortfolio(config, storage, ownerGhii, companyId, html);
  * @version-history
+ *   v1.3.0 — 2026-10-18 — publishCompanyPortfolio takes `pointAddress`: false stores the page and leaves
+ *     the address as it is, which the publish gate uses while the owner is asked (plan doc-mvcn6c7e4e5q, V4).
  *   v1.2.0 — 2026-10-17 — SECURITY: the page file is stored with visibility 'owner'. The company
  *     origin serves it from storage while it is the front page; a public file stayed readable at
  *     /v1/pub after the front page moved elsewhere (plan doc-mvcn6c7e4e5q, V0.3; migration 0103).
@@ -59,6 +61,8 @@ export async function publishCompanyPortfolio(
   /** Who wrote the page (GHII, GAII or GEAI), for its AI-provenance record. An agent that says
    *  nothing is stamped model-written (Mint-3); a person writing in person is not. */
   writer?: { principal: string; pipeline: string },
+  /** false: store the page and leave the address as it is (the publish gate asks the owner first). */
+  pointAddress = true,
 ): Promise<{ company: CompanyRecord; status: CompanyPortfolioStatus }> {
   const company = await requireOwnCompany(storage, ownerGhii, companyId);
 
@@ -99,7 +103,7 @@ export async function publishCompanyPortfolio(
   await storeHeldProvenance(storage, held);
 
   let updated = company;
-  if (company.frontPage.kind !== 'portfolio') {
+  if (pointAddress && company.frontPage.kind !== 'portfolio') {
     updated = { ...company, frontPage: { kind: 'portfolio', target: '' }, updatedAt: now };
     await storage.updateCompany(updated);
   }

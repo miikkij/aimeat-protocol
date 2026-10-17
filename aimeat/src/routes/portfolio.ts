@@ -7,7 +7,13 @@
  *   portfolio-data endpoint consumed by the SPA viewer.
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
+ *   (both in services/portfolio-config.ts, re-exported here)
  * @version-history
+ *   v1.13.0 — 2026-10-18 — The publish gate (plan doc-mvcn6c7e4e5q, V4): PUT /v1/portfolio/config with
+ *     `enabled: true` and PUT /v1/portfolio/upload with `enable: true`, by a caller the owner is asked
+ *     about, store everything but the switch and answer 202 with `publish_request`
+ *     (services/portfolio-publish-gate.ts). The keys, the identities and the switch writes moved to
+ *     services/portfolio-config.ts by pure extraction; the PUT config write is mergePortfolioConfig.
  *   v1.12.0 — 2026-10-17 — SECURITY: portfolio/index.html is stored with visibility 'owner'. The
  *     origin serves the page from storage when the switch is on; the public file answered at
  *     /v1/pub for a page taken off the web (plan doc-mvcn6c7e4e5q, V0.3; migration 0103 for
@@ -71,6 +77,13 @@ import { fileTarget } from '../services/classification/labels.js';
 import { provenanceForWrite, storeHeldProvenance } from '../services/ai-provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import {
+  PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY, portfolioWriteGaii, portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff,
+  mergePortfolioConfig,
+} from '../services/portfolio-config.js';
+import { callerOf } from '../middleware/caller.js';
+import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
+import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
 
 /** Result of resolving a username to their published portfolio. */
 export type PortfolioResolution =
@@ -79,22 +92,12 @@ export type PortfolioResolution =
       aiProvenanceId?: string }
   | { ok: false; reason: 'user_not_found' | 'not_enabled' };
 
-/** Where this owner's portfolio file and config live. */
-export const PORTFOLIO_HTML_KEY = 'portfolio/index.html';
-export const PORTFOLIO_CONFIG_KEY = 'portfolio.config';
+// The keys, the identities and the switch writes live in services/portfolio-config.ts (a service
+// switches the page on too); re-exported here for every importer of this file.
+export {
+  PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY, portfolioWriteGaii, portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff,
+} from '../services/portfolio-config.js';
 
-/**
- * Which identity a NEW portfolio write is stored under.
- *
- * Historically this was always the owner's first agent, which was safe while a portfolio could
- * only ever be built by someone who already had one. The remake reverses that order: the welcome
- * mat IS the portfolio and it is made BEFORE any agent exists (03-welcome-mat.md), so an
- * agent-keyed write has no key to use.
- *
- * An owner with an agent keeps writing exactly where they always did — the old path is unchanged
- * byte for byte. An owner with none writes under their own GHII, which is an identity they have
- * from the moment the account exists.
- */
 /**
  * Store one owner's welcome page, replacing whatever was there.
  *
@@ -138,64 +141,6 @@ export async function writePortfolioHtml(
   });
   await storeHeldProvenance(storage, held);
   return target;
-}
-
-/**
- * Whether the owner's page is served after a publish, switching it on when the caller asks to.
- *
- * The page is served only when `portfolio.config` says `enabled`, and storing a page does not set
- * that: the file and the switch are two acts (e2e-remake-home holds it). Only the welcome-mat paste
- * set the switch, so a card an AI published for a person who never pasted a mat answered 404 at the
- * address the tool handed back (measured 2026-10-03, e2e-home-journey test 5). With `enable`, which
- * the AI sends when the person approved the page and wants it public, the switch is set the way the
- * paste sets it, merged onto what is stored. An owner who switched their page OFF keeps it off: that
- * is their decision, and the caller says so instead of handing out a dark address.
- */
-export async function switchPortfolioOnUnlessTurnedOff(
-  storage: Storage, nodeId: string, ownerName: string, target: string, enable: boolean,
-): Promise<boolean> {
-  let current: Record<string, unknown> | null = null;
-  for (const gaii of await portfolioReadGaiis(storage, ownerName, nodeId)) {
-    const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
-    if (mem?.value && typeof mem.value === 'object') { current = mem.value as Record<string, unknown>; break; }
-  }
-  if (current?.enabled === false) return false;
-  if (current?.enabled === true) return true;
-  if (!enable) return false;
-  const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
-  const prev = (existing?.value && typeof existing.value === 'object' ? existing.value : current ?? {}) as Record<string, unknown>;
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key: PORTFOLIO_CONFIG_KEY,
-    ownerGaii: target,
-    value: { ...prev, enabled: true, source: prev.source ?? 'ai' },
-    visibility: 'owner',
-    tags: ['portfolio'],
-    ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
-  return true;
-}
-
-export async function portfolioWriteGaii(
-  storage: Storage, ownerName: string, nodeId: string,
-): Promise<string> {
-  const agents = await storage.getAgentsByOwner(ownerName);
-  return agents.length ? agents[0].gaii : `${ownerName}@${nodeId}`;
-}
-
-/**
- * Every identity a portfolio might be stored under, newest convention first. Reads try each in
- * turn: an account that made its mat before connecting an agent has it under the GHII, and must
- * keep seeing it after the agent arrives.
- */
-export async function portfolioReadGaiis(
-  storage: Storage, ownerName: string, nodeId: string,
-): Promise<string[]> {
-  const agents = await storage.getAgentsByOwner(ownerName);
-  return [...agents.map(a => a.gaii), `${ownerName}@${nodeId}`];
 }
 
 /**
@@ -431,22 +376,21 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
   router.put('/v1/portfolio/config', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const ownerName = req.auth!.owner;
     const target = await portfolioWriteGaii(storage, ownerName, config.nodeId);
-    const body = req.body ?? {};
-    const now = new Date().toISOString();
-    const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
-    const prev = (existing?.value ?? {}) as Record<string, unknown>;
-    await storage.setMemory({
-      key: PORTFOLIO_CONFIG_KEY,
-      ownerGaii: target,
-      value: { ...prev, ...body },
-      visibility: 'owner',
-      tags: body.tags || ['portfolio'],
-      ttlHours: null,
-      version: existing ? existing.version + 1 : 1,
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
-    });
-    res.json(success(config.nodeId, { saved: true }));
+    let body = (req.body ?? {}) as Record<string, unknown>;
+    // The publish gate (plan doc-mvcn6c7e4e5q, V4): switching the page on makes it public. A caller the
+    // node asks the owner about saves the rest of the config with the switch as it was, and the
+    // request to switch it on is filed after the write.
+    const gate = body.enabled === true
+      ? await portfolioRaiseAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, ownerName, { overridesOff: true })
+      : { kind: 'go' as const };
+    if (gate.kind === 'refused') {
+      res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
+      return;
+    }
+    if (gate.kind === 'ask') body = Object.fromEntries(Object.entries(body).filter(([k]) => k !== 'enabled'));
+    await mergePortfolioConfig(storage, target, body);
+    const asked = gate.kind === 'ask' ? await filePortfolioAsk({ storage, config }, ownerName, gate) : undefined;
+    res.status(askedStatus(asked, 200)).json(success(config.nodeId, { saved: true, ...publishAskedFields(asked) }));
     emitChange('portfolio');
   });
 
@@ -497,17 +441,30 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    await writePortfolioHtml(storage, target, fileData,
-      { config, principal: resolveIdentity(req.auth!, config.nodeId), pipeline: 'rest.portfolio.upload' });
     // The JSON body is the agent's road (the connector's aimeat_portfolio_publish). `enable: true`
     // switches the page on, as the node's MCP tool does; without it the file and the switch stay two
     // acts. A browser upload keeps the Portfolio tab's own switch.
-    const enable = isJson && (req.body as { enable?: unknown } | undefined)?.enable === true;
-    const served = isJson ? await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, ownerName, target, enable) : undefined;
+    const asksOn = isJson && (req.body as { enable?: unknown } | undefined)?.enable === true;
+    // The publish gate (V4): switching a page on that was never switched makes it public. Asked before
+    // the page is written, so a refusal stores nothing; on an ask the page is stored and stays off.
+    const gate = asksOn
+      ? await portfolioRaiseAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, ownerName, { overridesOff: false })
+      : { kind: 'go' as const };
+    if (gate.kind === 'refused') {
+      res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
+      return;
+    }
+    const enable = asksOn && gate.kind === 'go';
 
-    res.json(success(config.nodeId, {
+    await writePortfolioHtml(storage, target, fileData,
+      { config, principal: resolveIdentity(req.auth!, config.nodeId), pipeline: 'rest.portfolio.upload' });
+    const served = isJson ? await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, ownerName, target, enable) : undefined;
+    const asked = gate.kind === 'ask' ? await filePortfolioAsk({ storage, config }, ownerName, gate) : undefined;
+
+    res.status(askedStatus(asked, 200)).json(success(config.nodeId, {
       uploaded: true, sizeKb: Math.round(fileData.length / 1024),
       ...(served === undefined ? {} : { served }),
+      ...publishAskedFields(asked),
     }));
     emitChange('portfolio');
   });

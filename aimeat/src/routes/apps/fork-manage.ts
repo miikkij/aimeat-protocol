@@ -6,6 +6,10 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — The publish gate (services/app-publish-gate.ts): a PATCH that makes the app public
+ *     (listed, no code, open to anyone), and a fork the node's defaults would make public, by a caller
+ *     the owner is asked about, apply everything but that one change and answer 202 with
+ *     `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — A fork of an older version reads the pacing amount of the latest version (QA audit F10a-01).
  *   2026-10-15 — Gate 2 of the fork asks the licence for the version it copies (feature-list audit #110).
  *   v1.10.0 — 2026-10-12 — PATCH takes `listing` (listed, community, unlisted) beside `parked`, and
@@ -78,6 +82,10 @@ import { appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.j
 import { operatorOverride } from '../../services/operator-override.js';
 import { appIsPaced, appToll } from '../../services/app-pacing.js';
 import { currentAppRow } from '../../services/app-served-protection.js';
+import { callerOf } from '../../middleware/caller.js';
+import { fileAppPublishAsk, appAskedNote, publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
+import { appSettingsGate } from '../../services/app-settings-gate.js';
+import { publishAskOf } from '../../services/publish-requests/ask.js';
 
 /** What PATCH /v1/apps/:filename answers when the body cannot be carried out, before it writes. */
 interface PatchRefusal { status: number; code: string; message: string; }
@@ -233,6 +241,7 @@ export function registerForkManageRoutes(
             callerGhii,
             callerGaii,
             newFilename,
+            publishGate: publishAskOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app),
         });
         if ('refusal' in out) {
             res.status(out.refusal.status).json(error(
@@ -240,7 +249,8 @@ export function registerForkManageRoutes(
             return;
         }
 
-        res.status(201).json(success(config.nodeId, {
+        res.status(askedStatus(out.publishAsked, 201)).json(success(config.nodeId, {
+            ...publishAskedFields(out.publishAsked),
             filename: out.filename,
             version_number: out.versionNumber,
             manifest: out.manifest,
@@ -296,7 +306,8 @@ export function registerForkManageRoutes(
             return;
         }
 
-        const body = req.body ?? {};
+        // `let`: the publish gate below may hold back the one field that would make the app public.
+        let body = req.body ?? {};
 
         // REFUSE BEFORE THE FIRST WRITE. Every field below is written as the walk reaches it and
         // refused where it is read, and the two are not in the same order: a delegated developer's
@@ -348,6 +359,16 @@ export function registerForkManageRoutes(
             res.status(accessRefusal.status).json(error(config.nodeId, accessRefusal.code, accessRefusal.message));
             return;
         }
+
+        // The publish gate (plan doc-mvcn6c7e4e5q, V4): a change that makes the app public (listed,
+        // no code, open to anyone), by a caller the node asks the owner about, is applied without
+        // that one field, and the request for it is filed after the writes. Before the first write.
+        const gate = appSettingsGate({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, app, body);
+        if (gate.kind === 'refused') {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
+            return;
+        }
+        body = gate.body;
 
         // Each field is independent and only touched when present in the body, so a
         // parked-only PATCH never clears the access code (and vice-versa).
@@ -468,6 +489,12 @@ export function registerForkManageRoutes(
             notes.push(out.note);
         }
 
+        // The request the publish gate asked for, now that the rest of the change is written.
+        const asked = gate.kind === 'ask'
+            ? await fileAppPublishAsk({ storage, config }, { ownerName: owner, filename, versionNumber: app.versionNumber }, gate)
+            : undefined;
+        if (gate.kind === 'ask') notes.push(appAskedNote(gate.change));
+
         if (notes.length === 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, listing, parked, forkable, protection, seo, marks, author or legal).'));
             return;
@@ -476,7 +503,9 @@ export function registerForkManageRoutes(
         // Re-read so the response reflects the app's current state after the update(s).
         const updated = await storage.getApp(effectiveGaii, filename);
 
-        res.json(success(config.nodeId, {
+        // 202 when making the app public waits for the owner; the rest of the change is applied.
+        res.status(askedStatus(asked, 200)).json(success(config.nodeId, {
+            ...publishAskedFields(asked),
             // filename, name, description, protected, listing, parked, forkable, protection: in this order.
             ...appSettingsState(updated, filename),
             // The STATE, not the switch. An owner who turned the switch on in review mode, or on a

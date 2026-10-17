@@ -10,10 +10,13 @@
  *   never a client-supplied id — an agent manages the same companies its owner does, and can
  *   reach no one else's. Absent and not-yours answer identically.
  *
- * @structure registerCompanyTools(mcp, storage, config, getAgentGaii) — registers
+ * @structure registerCompanyTools(mcp, storage, config, getAgentGaii, scopes, caller) — registers
  *   aimeat_company_list, _create, _update, _front_page, _portfolio_publish.
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
+ *   2026-10-18 — aimeat_company_front_page and aimeat_company_portfolio_publish pass the publish gate
+ *     (services/company/company-publish-gate.ts): an agent without publish:public pointing an address that serves
+ *     nothing at a page gets `publish_request`, the page stored and the address left as it was (V4).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-08 — aimeat_company_portfolio_publish passes the agent as the page's writer (AI provenance).
  *   2026-10-05 — aimeat_company_create and aimeat_company_update take ai_provenance and ai_provenance_id
@@ -34,12 +37,14 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
-    CompanyError, createCompany, updateCompany, setFrontPage, requireOwnCompany, companyAddress,
+    CompanyError, createCompany, updateCompany, requireOwnCompany, companyAddress,
     type CompanyProvenanceInput,
 } from '../services/company/company-service.js';
 import { toDeclaredProvenance, type AiProvenanceToolInput } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
-import { publishCompanyPortfolio } from '../services/company/company-portfolio.js';
+import { setCompanyFrontPageGated, publishCompanyPortfolioGated } from '../services/company/company-publish-gate.js';
+import { publishAskedFields } from '../services/app-publish-gate.js';
+import type { CallerContext } from '../services/caller-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { IDENTITY_FIELDS } from '../tool-catalog/definitions/companies.js';
 
@@ -71,7 +76,9 @@ export function registerCompanyTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     /** The session's scopes: declaring how a description was made needs provenance:write there too. */
-    scopes: readonly string[] = [],
+    scopes: readonly string[],
+    /** The session's caller, for the publish gate a front page passes (services/company/company-publish-gate.ts). */
+    caller: () => CallerContext,
 ): void {
     /** The description's provenance input, for the agent writing it. */
     const provenanceOf = (ai_provenance: AiProvenanceToolInput | undefined, ai_provenance_id: string | undefined): CompanyProvenanceInput => ({
@@ -185,8 +192,10 @@ export function registerCompanyTools(
         annotationsFor('aimeat_company_front_page'),
         async ({ company_id, kind, target }) => {
             try {
-                const company = await setFrontPage(storage, ownerGhii(), company_id, { kind, target: target ?? '' });
-                return ok({ company: wire(company) });
+                // Through the publish gate, as PUT /v1/companies/:id/front-page (services/company/company-publish-gate.ts).
+                const { company, asked } = await setCompanyFrontPageGated({ storage, config }, { caller: caller() },
+                    ownerGhii(), company_id, { kind, target: target ?? '' });
+                return ok({ company: wire(company), ...publishAskedFields(asked) });
             } catch (e) { return fail(e); }
         },
     );
@@ -199,11 +208,11 @@ export function registerCompanyTools(
         annotationsFor('aimeat_company_portfolio_publish'),
         async ({ company_id, html }) => {
             try {
-                const { company, status } = await publishCompanyPortfolio(
-                    config, storage, ownerGhii(), company_id, html,
+                const { company, status, asked } = await publishCompanyPortfolioGated({ storage, config }, { caller: caller() },
+                    ownerGhii(), company_id, html,
                     { principal: getAgentGaii(), pipeline: 'mcp.company_portfolio_publish' },
                 );
-                return ok({ company: wire(company), portfolio: status });
+                return ok({ company: wire(company), portfolio: status, ...publishAskedFields(asked) });
             } catch (e) { return fail(e); }
         },
     );
