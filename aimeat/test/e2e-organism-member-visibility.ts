@@ -9,7 +9,9 @@
  * @version-history
  *   v1.1.0 — 2026-10-17 — Test 9: a private organism is never listed to an anonymous caller or a
  *     signed-in outsider, whatever ?visibility= or ?member= they send. It asserts the hole closed in
- *     routes/organisms/crud.ts on the same day (it failed before the fix).
+ *     routes/organisms/crud.ts on the same day (it failed before the fix). Test 10: a signed-in
+ *     outsider's PUT of member_visibility or visibility is refused with 403, so the suite now
+ *     refuses a second principal and leaves the denial-coverage exemptions.
  *   v1.0.0 — 2026-07-03 — Initial (privacy fix: rosters were world-readable via detail/list/members).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-member-visibility
@@ -172,6 +174,17 @@ await test('9. A PRIVATE organism is never listed to someone who is not in it (a
     // The creator still finds it in their own list.
     const mine = await json(`/v1/organisms?member=${creator}&per_page=1000`, { headers: auth(creatorTok) });
     assert((mine.body.data.organisms || []).some((o: any) => o.id === privateOrgId), 'the creator lists their own private organism');
+});
+
+await test('10. A signed-in outsider cannot change who sees the roster or the organism (403)', async () => {
+    // The tier is the creator's and the admins' to set. An outsider who could set it to 'public'
+    // would undo every redaction above in one call.
+    const r = await json(`/v1/organisms/${orgId}`, { method: 'PUT', headers: auth(outsiderTok), body: JSON.stringify({ member_visibility: 'public' }) });
+    assert(r.status === 403, `an outsider changed member_visibility: ${r.status} ${JSON.stringify(r.body)}`);
+    const v = await json(`/v1/organisms/${privateOrgId}`, { method: 'PUT', headers: auth(outsiderTok), body: JSON.stringify({ visibility: 'public' }) });
+    assert(v.status === 403 || v.status === 404, `an outsider made the private organism public: ${v.status}`);
+    const still = await json(`/v1/organisms/${privateOrgId}`);
+    assert(still.status === 404, `the private organism became readable anonymously: ${still.status}`);
 });
 
 await test('Cleanup', async () => {
