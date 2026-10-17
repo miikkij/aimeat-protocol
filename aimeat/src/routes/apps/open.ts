@@ -24,7 +24,7 @@ import type { Router, Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { appNeedsSignIn, mayOpenApp } from '../../services/app-access.js';
 import { isNodeAccount } from '../../services/audience.js';
 import { appIsPaced } from '../../services/app-pacing.js';
@@ -68,7 +68,9 @@ export async function signInGateRefused(
 
 export function registerAppOpenRoutes(router: Router, config: AimeatConfig, storage: Storage, canonicalOwner: CanonicalOwner): void {
   /* ── POST /v1/apps/:owner/:filename/open — the address that opens a gated app, with a grant ── */
-  router.post('/v1/apps/:owner/:filename/open', requireAuth(), async (req: Request, res: Response) => {
+  // The owner role: the person in their own session (the /v1/app-open page) opens an app. An app grant
+  // or an agent token has no use for another app's opening grant.
+  router.post('/v1/apps/:owner/:filename/open', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
     const app = await resolveAppTarget(storage, `${req.params.owner as string}/${req.params.filename as string}`);
     const notFound = () => res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No app here.'));
     if (!app) { notFound(); return; }
