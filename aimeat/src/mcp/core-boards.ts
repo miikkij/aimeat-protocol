@@ -12,6 +12,8 @@
  * @structure registerCoreBoardTools(mcp, deps, caller)
  * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
  * @version-history
+ *   2026-10-17 — Both tools hand the session's auth to the board services, which decide an organism
+ *     board (`organism:<id>`) by membership (plan doc-mvcn6c7e4e5q, V3.5).
  *   2026-10-08 — aimeat_board_post hands the session's scopes to the post service, which refuses a
  *     declaration the session may not make before it debits the board's price.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -50,7 +52,7 @@ mcp.tool(
         // same board filtered on visibility, so the two doors to one board disagreed.
         const board = await storage.getBoard(board_id);
         if (!board) return { content: [{ type: 'text' as const, text: `Board not found: ${board_id}` }], isError: true };
-        const refusal = await boardReadRefusal({ storage, config }, agentGaii, board);
+        const refusal = await boardReadRefusal({ storage, config }, agentGaii, board, caller().auth);
         if (refusal) return { content: [{ type: 'text' as const, text: `${refusal.code}: ${refusal.message}` }], isError: true };
 
         // The same hiding rule GET /v1/boards/:id/posts applies: a post flags have hidden is
@@ -91,6 +93,7 @@ mcp.tool(
             gaii: session.principal,
             roles: [...session.roles],
             scopes: session.scopes,
+            auth: session.auth,
         }, {
             boardId: board_id, title, body, category,
             declaredProvenanceId: ai_provenance_id,

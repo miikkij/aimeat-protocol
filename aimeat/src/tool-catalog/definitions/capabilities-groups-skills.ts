@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-17 — aimeat_skill_publish and aimeat_skill_update take visibility `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.9).
  *   2026-10-17 — aimeat_skill_publish's description: a SKILL.md description with a colon is folded or quoted, or BAD_YAML (pitfall-list round).
  *   2026-10-16 — aimeat_capabilities_vouch declares capability:write; the operator tools' descriptions say
  *     what the connector's routes now admit (QA audit D2-02).
@@ -38,6 +39,7 @@ import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
+import { organismAudienceInput } from '../input-schemas.js';
 
 export const capabilitiesGroupsSkillsTools = [
     {
@@ -654,7 +656,7 @@ export const capabilitiesGroupsSkillsTools = [
             skill_md: { type: 'string', description: 'SKILL.md content (frontmatter + body). Omit for presigned ZIP upload mode.' },
             files: { type: 'object', description: 'Additional files as relative-path -> content (scripts/, references/, assets/).', zod: z.record(z.string(), z.string()) },
             scope: { type: 'string', enum: ['user', 'node', 'workspace'], description: 'Registry scope (default user).' },
-            visibility: { type: 'string', enum: ['owner', 'members', 'public'], description: 'Registry visibility (node/user). Defaults: user->owner, node->members. public = federated.' },
+            visibility: { type: 'string', description: 'Registry visibility (node/user): owner, members, public, or organism:<organism id> (user scope only: the active members of one organisation your owner is a member of). Defaults: user->owner, node->members. public = federated.', zod: z.union([z.enum(['owner', 'members', 'public']), organismAudienceInput]) },
             organism_id: { type: 'string', description: 'Workspace scope: the organism id.' },
             workspace_id: { type: 'string', description: 'Workspace scope: the workspace id.' },
             ...aiProvenanceCatalogInput,
@@ -727,7 +729,7 @@ export const capabilitiesGroupsSkillsTools = [
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             name: { type: 'string', required: true, description: 'The skill name (the bare name from its frontmatter).' },
-            visibility: { type: 'string', required: true, enum: ['owner', 'members', 'public'], description: 'Who may read it from now on.' },
+            visibility: { type: 'string', required: true, description: 'Who may read it from now on: owner, members, public, or organism:<organism id> (user scope only: the active members of one organisation your owner is a member of).', zod: z.union([z.enum(['owner', 'members', 'public']), organismAudienceInput]) },
             scope: { type: 'string', enum: ['user', 'node'], description: 'Which registry the skill is in (default user, your owner\'s own).' },
         },
     },

@@ -11,6 +11,7 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-17 -- e2e-audience-boards-skills.ts joins the list: a board and a skill at organism:<id> (plan doc-mvcn6c7e4e5q, V3.5 and V3.9).
  *   2026-10-17 -- e2e-audience-memory-files.ts joins the list (not the guard tier): visibility
  *     'organism:<id>' on memory records and stored files (plan doc-mvcn6c7e4e5q, V3.2 + V3.3).
  *   2026-10-16 -- e2e-ai-label-shares.ts joins the list (not the guard tier): the AI label of what a workspace share serves.
@@ -933,6 +934,8 @@ const ALL_SUITES = [
     // last-owner refusal, the shared invitation gate, direct add, and agent attach/detach.
     'test/e2e-organism-membership-doors.ts',
     'test/e2e-organism-member-visibility.ts',
+    // A board and a skill at organism:<id>: the members read, an outsider and anonymous do not.
+    'test/e2e-audience-boards-skills.ts',
     'test/e2e-anonymous-identity-leaks.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-organism-dangling-refs.ts',

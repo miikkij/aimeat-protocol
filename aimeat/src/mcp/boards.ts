@@ -11,6 +11,9 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-17 — An organism board (`organism:<id>`, plan doc-mvcn6c7e4e5q V3.5): the list, the
+ *     resource and every write hand the session's auth to the board services, which decide it by
+ *     membership (boardVisibleToCaller); its default posting rule reads 'members'.
  *   2026-10-15 — The board-posts resource refuses a board not shared with the caller with
  *     resourceRefusal (ACCESS_DENIED and a next step) instead of the bare "Access denied"
  *     (feature-list audit #186).
@@ -58,7 +61,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
 import {
-    boardVisibleTo, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules,
+    boardVisibleToCaller, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules,
     deleteBoardById, boardRulesBlock, type BoardWriteCaller,
 } from '../services/board-write.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
@@ -87,7 +90,7 @@ const DEFAULT_POST_TTL_HOURS = 168;
 function effectiveBoardRules(board: BoardRecord, config: AimeatConfig): Record<string, unknown> {
     const r = board.rules ?? {};
     const defaultPosting = board.visibility === 'public' ? 'anyone'
-        : board.visibility === 'shared' ? 'members'
+        : board.visibility === 'shared' || board.visibility.startsWith('organism:') ? 'members'
         : board.visibility === 'system' ? 'operators' : 'owner';
     const basePrice = boardPostPrice(board, config, 0);
     return {
@@ -128,9 +131,14 @@ export function registerBoardsTools(
         return (await resolveOperatorAgentName(storage, agentGaii, scopes)) !== null;
     }
 
-    /** Check if the agent can see a board (visibility rules). */
-    function canSeeBoard(board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis'>): boolean {
-        return boardVisibleTo(board, agentGaii);
+    /** Check if the agent can see a board (visibility rules; an organism board by membership). */
+    function canSeeBoard(board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis'>): Promise<boolean> {
+        return boardVisibleToCaller(storage, board, { gaii: agentGaii, auth: caller().auth });
+    }
+    /** The boards of `boards` this agent can see, in order. */
+    async function seenBoards(boards: BoardRecord[]): Promise<BoardRecord[]> {
+        const seen = await Promise.all(boards.map(b => canSeeBoard(b)));
+        return boards.filter((_, i) => seen[i]);
     }
 
     /**
@@ -140,7 +148,7 @@ export function registerBoardsTools(
      * the operator.
      */
     async function boardCaller(): Promise<BoardWriteCaller> {
-        return { gaii: agentGaii, roles: (await isOperator()) ? ['agent', 'operator'] : ['agent'] };
+        return { gaii: agentGaii, roles: (await isOperator()) ? ['agent', 'operator'] : ['agent'], auth: caller().auth };
     }
 
     // ── Resource: board posts ──
@@ -148,8 +156,7 @@ export function registerBoardsTools(
         'board-posts',
         new ResourceTemplate('aimeat://boards/{boardId}', {
             list: async () => {
-                const boards = await storage.listBoards();
-                const visible = boards.filter(b => canSeeBoard(b));
+                const visible = await seenBoards(await storage.listBoards());
                 return {
                     resources: visible.map(b => ({
                         uri: `aimeat://boards/${encodeURIComponent(b.id)}`,
@@ -165,7 +172,7 @@ export function registerBoardsTools(
             const boardId = decodeURIComponent(variables.boardId as string);
             const board = await storage.getBoard(boardId);
             if (!board) return { contents: [{ uri: uri.toString(), text: 'Board not found' }] };
-            if (!canSeeBoard(board)) {
+            if (!(await canSeeBoard(board))) {
                 return resourceRefusal(uri, 'ACCESS_DENIED', 'This board is not shared with you, so its posts cannot be read here. '
                     + 'Ask the board\'s owner to let you in, or list the boards you can read instead.');
             }
@@ -196,8 +203,7 @@ export function registerBoardsTools(
         zodShapeFor('aimeat_board_list'),
         annotationsFor('aimeat_board_list'),
         async () => {
-            const boards = await storage.listBoards();
-            const visible = boards.filter(b => canSeeBoard(b));
+            const visible = await seenBoards(await storage.listBoards());
             return {
                 content: [{
                     type: 'text' as const,
@@ -361,7 +367,7 @@ export function registerBoardsTools(
             // 'public', so one on a private board carried a public-surface label), the record, the
             // change event and the subscriber fan-out.
             const session = caller();
-            const out = await createBoardReply({ storage, config }, { gaii: session.principal, roles: [...session.roles], scopes: session.scopes }, {
+            const out = await createBoardReply({ storage, config }, { gaii: session.principal, roles: [...session.roles], scopes: session.scopes, auth: session.auth }, {
                 boardId: board_id, postId: post_id, body,
                 declaredProvenanceId: ai_provenance_id,
                 declaredProvenance: toDeclaredProvenance(ai_provenance),

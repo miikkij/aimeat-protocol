@@ -13,6 +13,11 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.11.0 — 2026-10-17 — A board at `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5): POST and PATCH
+ *     visibility take it when the caller is an active member (else 400 NOT_ORGANISM_MEMBER, nothing
+ *     written) and never federate it; GET /v1/boards lists it to members only; the posts, the single
+ *     post and the replies ask boardReadRefusal with the session's auth. The single post read had its
+ *     own copy of the read rule, and now asks the shared one.
  *   v1.10.0 — 2026-10-08 — POST /v1/boards/:boardId/posts and the replies route take ai_provenance
  *     and ai_provenance_id, as aimeat_board_post and aimeat_board_reply do, carry the session's
  *     scopes, and name the record in the answer (aiprov D5). A declaration the caller may not make
@@ -79,15 +84,14 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { BoardCreateSchema, BoardPostSchema, BoardPostUpdateSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { createBoardPost, createBoardReply, updateBoardPost } from '../services/board-post.js';
-import { boardReadRefusal } from '../services/board-read-access.js';
+import { boardReadRefusal, boardOrganismAudience, organismBoardAdmits } from '../services/board-read-access.js';
 import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
 import {
   createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
-  publicBoardCeiling,
+  publicBoardCeiling, boardVisibilityRefusal,
 } from '../services/board-write.js';
 import { operatorOverride, rolesWithOperator } from '../services/operator-override.js';
 import { resolveIdentity, isSameOwner, localAccountName, isOwnerInPerson } from '../utils/gaii.js';
@@ -115,6 +119,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const out = await createBoard({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      auth: req.auth,
     }, { name, visibility, description, allowedGaiis: allowed_gaiis, federate, rules });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -143,14 +148,18 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // fields below are never handed to the anon internet.
     const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
 
-    const visible = boards.filter(b => {
+    // An organism board is listed to whoever may read it (services/board-read-access.ts), which is a
+    // membership lookup; every other level is decided from the record alone.
+    const seen = await Promise.all(boards.map(async b => {
       if (b.visibility === 'public' || b.visibility === 'system') return true;
       if (!gaii) return false;
+      if (boardOrganismAudience(b.visibility)) return organismBoardAdmits(storage, b, gaii, req.auth);
       if (b.ownerGaii === gaii) return true;
       if (b.visibility === 'shared' && isSameOwner(b.ownerGaii, gaii)) return true;
       if (b.allowedGaiis.includes(gaii)) return true;
       return false;
-    });
+    }));
+    const visible = boards.filter((_, i) => seen[i]);
 
     // Whether anyone has ever used a board is the first thing a listing is asked, and answering it
     // per board meant one request each — 57 of them on this installation. One grouped query.
@@ -202,6 +211,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const out = await updateBoardPost({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      auth: req.auth,
     }, { boardId: req.params.boardId as string, postId: req.params.postId as string, ttlHours: ttl_hours, resolved });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -231,13 +241,29 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner can change visibility'));
       return;
     }
-    const { visibility, federate } = req.body ?? {};
-    if (visibility !== undefined && !['private', 'public', 'shared'].includes(visibility)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "public", or "shared"'));
+    const { visibility: requested, federate } = req.body ?? {};
+    if (requested !== undefined && !(['private', 'public', 'shared'].includes(requested) || boardOrganismAudience(String(requested)))) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "public", "shared" or "organism:<organism id>"'));
       return;
     }
-    if (visibility === undefined && typeof federate !== 'boolean') {
+    if (requested === undefined && typeof federate !== 'boolean') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility or federate must be provided'));
+      return;
+    }
+    // An organisation level names an organism the caller is in, checked before anything is written
+    // (services/board-write.ts boardVisibilityRefusal, the same check create makes).
+    let visibility: string | undefined = requested;
+    if (requested !== undefined) {
+      const level = await boardVisibilityRefusal(storage, requested, { auth: req.auth });
+      if (!level.ok) {
+        res.status(level.status).json(error(config.nodeId, level.code, level.message));
+        return;
+      }
+      visibility = level.visibility;
+    }
+    // An organisation's board is never federated: its readers are the organism's members here.
+    if (boardOrganismAudience(visibility ?? board.visibility) && federate === true) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A board shared with an organisation stays on this node, so it cannot be federated.'));
       return;
     }
     // Only when this flip is INTO public and the board is not already there — re-saving a board that
@@ -249,7 +275,9 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
     }
-    const updated = await storage.updateBoardVisibility(boardId, visibility || board.visibility, typeof federate === 'boolean' ? federate : undefined);
+    const toOrganism = !!visibility && boardOrganismAudience(visibility) !== null;
+    const updated = await storage.updateBoardVisibility(boardId, visibility || board.visibility,
+      toOrganism ? false : (typeof federate === 'boolean' ? federate : undefined));
     if (!updated) {
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update board visibility'));
       return;
@@ -340,6 +368,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const out = await createBoardPost({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      auth: req.auth,
       scopes: req.auth!.scopes ?? [],
     }, {
       boardId: req.params.boardId as string,
@@ -383,7 +412,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // applies: with it, a private board answered 403 instead of 401 and consent was consulted on
     // behalf of a pseudo-identity.
     const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
-    const readRefusal = await boardReadRefusal({ storage, config }, gaii, board);
+    const readRefusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
     if (readRefusal) {
       res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
       return;
@@ -438,32 +467,13 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // The same read rule as the posts listing (services/board-read-access.ts). This door wrote its
+    // own copy of it, which an organism board would have passed to anyone signed in.
     const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
-    if (board.visibility !== 'public' && board.visibility !== 'system') {
-      if (!gaii) {
-        res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
-        return;
-      }
-      // isSameOwner only grants access on shared boards — private boards are strictly owner-only
-      const sameOwnerAccessSingle = board.visibility === 'shared' && isSameOwner(board.ownerGaii, gaii);
-      if (board.ownerGaii !== gaii && !sameOwnerAccessSingle && !board.allowedGaiis.includes(gaii)) {
-        // Consent fallback: check if the caller has a consent grant for this board
-        if (config.consentEnabled) {
-          const consentResult = await checkConsentForRead(
-            storage, `board:${boardId}`, board.ownerGaii, gaii, board.visibility,
-          );
-          if (!consentResult.allowed) {
-            // Audit denials only (allowed reads are no longer logged — see consent-audit-buffer).
-            await auditDataAccess(storage, consentResult.consentId ?? null,
-              board.ownerGaii, gaii, `board:${boardId}`, 'read', false);
-            res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this board'));
-            return;
-          }
-        } else {
-          res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
-          return;
-        }
-      }
+    const readRefusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
+    if (readRefusal) {
+      res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
+      return;
     }
 
     const post = await storage.getPost(boardId, postId);
@@ -515,7 +525,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
-    const readRefusal = await boardReadRefusal({ storage, config }, gaii, board);
+    const readRefusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
     if (readRefusal) {
       res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
       return;
@@ -552,6 +562,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const out = await deleteBoardById({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      auth: req.auth,
     }, boardId);
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -599,6 +610,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const out = await reactToBoardPost({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      auth: req.auth,
     }, {
       boardId: req.params.boardId as string,
       postId: req.params.postId as string,
@@ -627,6 +639,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const out = await unreactToBoardPost({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      auth: req.auth,
     }, {
       boardId: req.params.boardId as string,
       postId: req.params.postId as string,
@@ -649,6 +662,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const out = await createBoardReply({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      auth: req.auth,
       scopes: req.auth!.scopes ?? [],
     }, {
       boardId: req.params.boardId as string,
@@ -685,6 +699,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const out = await subscribeToBoard({ storage, config }, {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
+      auth: req.auth,
     }, { boardId, callbackUrl: callback_url, filters });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));

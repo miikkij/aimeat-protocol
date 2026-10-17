@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Organisation boards — 2026-10-17 — BoardCreateSchema.visibility also takes `organism:<id>`; the
+ *     service decides membership (services/board-write.ts; plan doc-mvcn6c7e4e5q, V3.5).
  *   Organism visibility — 2026-10-17 — MemoryWriteSchema, MemoryUpdateSchema and ChunkedUploadInitSchema
  *     take 'organism:<organism id>' (utils/visibility-words.ts); the chunked init takes 'members' too,
  *     as POST /v1/storage does (plan doc-mvcn6c7e4e5q, V3.2/V3.3).
@@ -281,7 +283,11 @@ export const BoardRulesSchema = z.object({
 
 export const BoardCreateSchema = z.object({
     name: z.string().min(1).max(128),
-    visibility: z.enum(['private', 'shared', 'public', 'system']),
+    // `organism:<id>` is the form services/audience.ts parseAudience reads.
+    visibility: z.union([
+        z.enum(['private', 'shared', 'public', 'system']),
+        z.string().regex(/^organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
+    ]),
     description: z.string().max(10_000).optional(),
     allowed_gaiis: z.array(z.string()).optional(),
     federate: z.boolean().optional(),

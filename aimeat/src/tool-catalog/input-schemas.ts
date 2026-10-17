@@ -7,9 +7,11 @@
  *   tool, written there and nowhere else; the catalog is now where a field's exact schema lives, so
  *   they moved here unchanged, without the `.describe()` the catalog field now carries.
  * @structure flexibleBoolean · partsSchema · LinkSchema · itemShape · MAX_WAIT_SECONDS ·
- *   questionsSchema · boardRulesInput · wsGrantShape · tokenMap
+ *   questionsSchema · boardRulesInput · organismAudienceInput · wsGrantShape · tokenMap
  * @usage import { flexibleBoolean } from '../input-schemas.js';  owner_scope: { …, zod: flexibleBoolean }
  * @version-history
+ *   v1.2.0 — 2026-10-17 — organismAudienceInput: the `organism:<id>` level a board or a skill may take
+ *     (plan doc-mvcn6c7e4e5q, V3.5 and V3.9).
  *   v1.1.0 — 2026-10-11 — A checkout item may be of kind `pacing-pack` (pacing capacity bought with money).
  *   v1.0.0 — 2026-10-05 — Moved from src/mcp/{schema-flags,agent-v2-messaging,agent-v2-tasks,contacts,
  *     commerce,agent-crew,decide,boards,organisms-name-invites,themes}.ts (secaudit 2026-10, M3).
@@ -64,6 +66,12 @@ export const boardRulesInput = z.strictObject({
     default_ttl_hours: z.number().optional(),
     post_cost: z.number().optional(),
 });
+
+/**
+ * `organism:<id>`: the active members of one organism, in the form services/audience.ts parseAudience
+ * reads. Membership is decided by the service, not here.
+ */
+export const organismAudienceInput = z.string().regex(/^organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);
 
 /** Per-workspace grants applied when an invitee joins an organism. */
 export const wsGrantShape = z.array(z.object({
