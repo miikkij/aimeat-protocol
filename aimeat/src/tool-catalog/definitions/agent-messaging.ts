@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-17 — aimeat_dm_send_as_owner's description: the message names the sending agent to the owner
+ *     and the recipient, and a group address reaches its thread.
  *   2026-10-17 — aimeat_agent_propose's description: an -as-owner word is ticked by the owner after approval (pitfall-list round).
  *   2026-10-15 — aimeat_message_send's metadata takes `prompt` (MessagePromptSchema, the route's schema), which the description promised and the schema dropped (feature-list audit #126).
  *   2026-10-12 — aimeat_agents_list and aimeat_agent_basics_get name agent:read, the word their REST twins
@@ -489,7 +491,7 @@ export const agentMessagingTools = [
     },
     {
         name: 'aimeat_dm_send_as_owner',
-        description: 'Send a federated direct message AS THE OWNER (a consented delegation), not as your own agent identity — this is how you reply to the owner\'s "Postilaatikko" conversations on their behalf so the reply comes FROM the owner, in the owner\'s existing thread. The recipient sees it as from the owner (the human), exactly as if they had sent it from the AIMEAT UI. Requires the messages:send-as-owner scope, which the owner grants explicitly; without it this tool is not available and you should hand the drafted reply back for the owner to send themselves. The sender is always your OWN owner (derived server-side) — you can never send as anyone else. Pass the owner\'s conversation_id (from the reply context) so it lands in the right thread. Attach files via aimeat_storage_upload first. Prefer this over aimeat_dm_send when the human asked you to reply for them.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Send a federated direct message AS THE OWNER (a consented delegation), not as your own agent identity — this is how you reply to the owner\'s "Postilaatikko" conversations on their behalf so the reply comes FROM the owner, in the owner\'s existing thread. The message is the owner\'s, and it also names you: the owner sees "sent for you by your agent <your name>" and the recipient sees "sent by their agent <your name>". A group address such as support@operators reaches its thread. Requires the messages:send-as-owner scope, which the owner grants explicitly; without it the call answers with the address where the owner allows it, or hand the drafted reply back for the owner to send themselves. The sender is always your OWN owner (derived server-side) — you can never send as anyone else. Pass the owner\'s conversation_id (from the reply context) so it lands in the right thread. Attach files via aimeat_storage_upload first. Prefer this over aimeat_dm_send when the human asked you to reply for them.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Send Federated Direct Message As Owner', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

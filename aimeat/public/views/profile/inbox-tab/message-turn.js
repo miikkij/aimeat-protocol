@@ -11,6 +11,8 @@
  * @structure MessageBubble({ msg, mine, who, … })
  * @usage import { MessageBubble } from './message-turn.js'; (components.js re-exports it)
  * @version-history
+ *   2026-10-17 — A message an agent sent in its owner's name carries a mark naming the agent, for the
+ *     owner ("your agent X, for you") and for the recipient ("their agent X").
  *   2026-09-28 — No emoji in the menu item "Add to notebook for later" (frontend rule: no emoji in the interface).
  *   v1.1.0 — 2026-09-26 — The message is the Message component; this file only turns a message record
  *     into its data. AttachmentItem moved into the component (components/MessageFile.js). Who wrote
@@ -60,7 +62,13 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
     ...a, url: urls[a.id], kind: attachKind(a),
     state: a.expired ? 'expired' : (a.mode !== 'duplicate' ? 'pending' : null),
   }));
+  // An agent sent this in its owner's name (services/message-send-as-owner.ts). The owner reads "your
+  // agent X, for you"; the recipient reads "their agent X". The name is the one the owner gave the agent.
+  const agentName = msg.sentByAgent ? (msg.sentByAgentName || String(msg.sentByAgent).split('#')[0]) : '';
   const marks = [
+    agentName ? (mine
+      ? { text: t('inbox.sentForYouBy', { agent: agentName }), title: t('inbox.sentForYouByTitle'), tone: 'ai' }
+      : { text: t('inbox.sentByTheirAgent', { agent: agentName }), title: t('inbox.sentByTheirAgentTitle'), tone: 'ai' }) : null,
     trk ? { text: `🔗 ${trk.text}`, title: t('inbox.trackResponse'), tone: trackStatusTone(trk.tone) } : null,
     // That a model wrote this at all, which is a different fact from WHICH model and arrives far more
     // often: an agent's message is stamped whether or not it names one. Absence stays silent on

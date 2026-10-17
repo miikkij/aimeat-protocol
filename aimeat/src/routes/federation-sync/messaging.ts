@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-17 — A received message keeps sentByAgent / sentByAgentName, the agent that sent it in the
+ *     sender's name, only when that agent belongs to the sender on the signing node.
  *   2026-10-16 — Replicate stores only under a principal of the signing node or an existing person or
  *     agent of this node (403 NAMESPACE_NOT_ALLOWED), and keeps the conflict copy under the replica
  *     prefix (QA audit S6-02). The broadcast refuses a sender that is not on the signing node, as the
@@ -306,6 +308,19 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
+        // The agent that sent this in the sender's name. Kept only when it is an agent OF the sender, on
+        // the node that signed this: the peer speaks for its own people's agents and nobody else's. A
+        // value that fails is dropped, not refused: the message itself is valid, only the label is not.
+        const sentByRaw = typeof message.sentByAgent === 'string' ? message.sentByAgent : '';
+        const sentByParsed = parseGaiiLoose(sentByRaw);
+        const sentBy = sentByParsed.agent && !sentByRaw.startsWith('eco:')
+            && isSameOwner(sentByRaw, String(message.senderGhii)) && sentByParsed.node === source_node
+            ? {
+                sentByAgent: sentByRaw,
+                sentByAgentName: typeof message.sentByAgentName === 'string' ? message.sentByAgentName.slice(0, 120) : undefined,
+            }
+            : {};
+
         // The ACTUAL recipient (may be an agent/eco GAII) vs the mailbox owner it's delivered to.
         // `deliveryGhii` is where the copy lands (the owner of an agent/eco recipient); the human owns +
         // gates the mailbox, while the agent can still read messages addressed to it. Older senders omit
@@ -446,6 +461,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 replyToId: message.replyToId ?? undefined,
                 origin: 'federation',
                 originNodeId: source_node,
+                ...sentBy,
                 createdAt: message.createdAt ?? now,
                 deliveredAt: now,
             });

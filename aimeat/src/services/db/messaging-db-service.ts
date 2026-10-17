@@ -13,6 +13,8 @@
  * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName, { agentThreads }) → { conversations } in a read scope
  * @usage const { conversations } = await createMessagingDbService(storage).ownerConversations(ghii, owner);
  * @version-history
+ *   v1.6.0 — 2026-10-17 — The owner's row whose last message one of their agents sent in their name
+ *     carries sentByAgent and sentByAgentName, so the list says which agent instead of "You".
  *   v1.5.1 — 2026-09-26 — The owner comparisons take account names from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so a visitor never counts as the local namesake (secaudit 2026-09, F-1).
  *   v1.5.0 — 2026-09-13 — The list is organised with the owner's own record before it is returned:
  *     each row carries its section (people, own agents, a rule's heading, archive), why it is
@@ -64,6 +66,8 @@ export type OwnerConversation = ConversationSummary & {
    * agent's words, and a person cannot supervise what they are told they said themselves.
    */
   sentByAgent?: string;
+  /** The agent's name as the owner sees it, when its last message was sent in the owner's name. */
+  sentByAgentName?: string;
   /**
    * How many copies of one broadcast this row stands for, when it stands for more than itself.
    * Present only on a folded row; its absence means the row is one thread and nothing else.
@@ -113,7 +117,12 @@ export class MessagingDbService {
       ]);
 
       const hidden = new Set(contacts.filter(c => c.state === 'pending' || c.state === 'blocked').map(c => c.contactId));
-      const own = (byOwner[ownerGhii] ?? []).filter(c => !hidden.has(c.peerGhii));
+      const own = (byOwner[ownerGhii] ?? []).filter(c => !hidden.has(c.peerGhii))
+        // The owner's last message here was sent in their name by one of their agents: the row says
+        // which, where it read "You: ..." (services/message-send-as-owner.ts).
+        .map(c => (c.lastDirection === 'outbound' && c.lastSentByAgent
+          ? { ...c, sentByAgent: c.lastSentByAgent, sentByAgentName: c.lastSentByAgentName }
+          : c));
 
       // Owner-aggregation: an owner also sees conversations their OWN agents had with EXTERNAL people
       // (an agent DM'd a user from its own inbox), tagged `viaAgent`. Internal threads (peer is this same

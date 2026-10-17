@@ -8,6 +8,8 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.7.0 -- 2026-10-17 -- sentByAgent / sentByAgentName on the message, and lastSentByAgent on both
+ *     conversation summaries (migration 0105 in Postgres).
  *   v1.6.0 -- 2026-09-13 -- Both conversation summaries carry lastForeignAt (the newest message not
  *     written by the account's own agents) and the thread's opener, for the Messages list's archive
  *     and rules. One aggregate column and one window query more; nothing existing changes.
@@ -67,6 +69,8 @@ function deserializeMessage(row: Record<string, unknown>): DirectMessageRecord {
   if (row.replyToId) record.replyToId = row.replyToId as string;
   if (row.error) record.error = row.error as string;
   if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
+  if (row.sentByAgent) record.sentByAgent = row.sentByAgent as string;
+  if (row.sentByAgentName) record.sentByAgentName = row.sentByAgentName as string;
   if (row.deliveredAt) record.deliveredAt = row.deliveredAt as string;
   if (row.readAt) record.readAt = row.readAt as string;
   if (row.ownerReadAt) record.ownerReadAt = row.ownerReadAt as string;
@@ -93,8 +97,8 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     `INSERT INTO direct_messages
      (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, interactive,
       broadcastId, respondable, kind, status,
-      direction, replyToId, origin, originNodeId, error, aiProvenanceId, createdAt, deliveredAt, readAt, ownerReadAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      direction, replyToId, origin, originNodeId, error, aiProvenanceId, sentByAgent, sentByAgentName, createdAt, deliveredAt, readAt, ownerReadAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.ownerGhii,
@@ -115,6 +119,8 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     record.originNodeId,
     record.error ?? null,
     record.aiProvenanceId ?? null,
+    record.sentByAgent ?? null,
+    record.sentByAgentName ?? null,
     record.createdAt,
     record.deliveredAt ?? null,
     record.readAt ?? null,
@@ -250,8 +256,8 @@ export function listConversations(
 
   return rows.map(row => {
     const last = db.prepare(
-      'SELECT body, direction, senderGhii, recipientGhii, broadcastId FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? ORDER BY createdAt DESC LIMIT 1',
-    ).get(ownerGhii, row.conversationId) as { body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null } | undefined;
+      'SELECT body, direction, senderGhii, recipientGhii, broadcastId, sentByAgent, sentByAgentName FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? ORDER BY createdAt DESC LIMIT 1',
+    ).get(ownerGhii, row.conversationId) as { body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null; sentByAgent: string | null; sentByAgentName: string | null } | undefined;
     const unread = (db.prepare(
       'SELECT COUNT(*) as cnt FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? AND senderGhii <> ownerGhii AND ownerReadAt IS NULL',
     ).get(ownerGhii, row.conversationId) as { cnt: number }).cnt;
@@ -275,6 +281,7 @@ export function listConversations(
       lastMessage: last?.body ?? '',
       lastDirection: last?.direction ?? 'inbound',
       lastSenderGhii: last?.senderGhii ?? '',
+      ...(last?.sentByAgent ? { lastSentByAgent: last.sentByAgent, lastSentByAgentName: last.sentByAgentName ?? undefined } : {}),
       messageCount: row.messageCount,
       unread,
       updatedAt: row.updatedAt,
@@ -309,12 +316,12 @@ export function listConversationsForOwners(
 
   // Last message per (owner, conversation): newest row — the row that fixes peer + lastMessage + direction.
   const lasts = db.prepare(
-    `SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii, broadcastId FROM (
-        SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii, broadcastId,
+    `SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii, broadcastId, sentByAgent, sentByAgentName FROM (
+        SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii, broadcastId, sentByAgent, sentByAgentName,
                ROW_NUMBER() OVER (PARTITION BY ownerGhii, conversationId ORDER BY createdAt DESC, id DESC) rn
         FROM direct_messages WHERE ownerGhii IN (${ph})
      ) WHERE rn = 1`,
-  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null }>;
+  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null; sentByAgent: string | null; sentByAgentName: string | null }>;
   // Thread subject: the earliest non-null subject (the message that opened it).
   const subjects = db.prepare(
     `SELECT ownerGhii, conversationId, subject FROM (
@@ -349,6 +356,7 @@ export function listConversationsForOwners(
       lastMessage: last?.body ?? '',
       lastDirection,
       lastSenderGhii: last?.senderGhii ?? '',
+      ...(last?.sentByAgent ? { lastSentByAgent: last.sentByAgent, lastSentByAgentName: last.sentByAgentName ?? undefined } : {}),
       messageCount: g.messageCount,
       unread: g.unread,
       updatedAt: g.updatedAt,

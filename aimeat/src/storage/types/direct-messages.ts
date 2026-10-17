@@ -13,6 +13,8 @@
  *   payload → message → conversation → delivery log → contact consent.
  * @usage import type { DirectMessageRecord } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-10-17 — DirectMessageRecord.sentByAgent / sentByAgentName: the agent that sent a
+ *     message in its owner's name.
  *   v1.0.0 — 2026-08-23 — Extracted from agents-messaging.ts (max-file-lines), when
  *     ConversationRecord.remote pushed that file over the limit.
  */
@@ -162,6 +164,15 @@ export interface DirectMessageRecord {
    * peer node that strips provenance is unstated, not human-authored.
    */
   aiProvenanceId?: string;
+  /**
+   * The agent that sent this message in its owner's name (aimeat_dm_send_as_owner, POST
+   * /v1/messages/as-owner), as its GAII, and its name as the owner sees it. `senderGhii` stays the
+   * owner: the message is theirs, and a reply goes to them. Both copies carry it, and it travels to
+   * another node with the message, so the owner and the recipient both see which agent sent it.
+   * Absent means the sender wrote it themself, or the sending node did not say.
+   */
+  sentByAgent?: string;
+  sentByAgentName?: string;
   createdAt: string;
   deliveredAt?: string;
   /** When the RECIPIENT read it — on an outbound row a receipt travelling back, written by

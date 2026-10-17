@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-17 -- aimeat_dm_send_as_owner posts to POST /v1/messages/as-owner: it sends in the owner's
+ *     name, as the node MCP tool does, where it sent as the agent through POST /v1/messages.
  *   2026-10-16 -- The comments on aimeat_operator_agent_configure and aimeat_operator_ai_config say what the
  *     routes now admit: PATCH /scopes an agent holding agent:permissions + agent:write (narrowing only),
  *     POST /v1/ai/settings an agent holding memory:write-reserved + memory:write-as-owner (QA audit D2-02).
@@ -709,11 +711,11 @@ export const agentTools: ConnectCliToolDefinition[] = [
         })}`),
     },
     {
-        // Send a federated DM AS THE OWNER (consented delegation). No send-as-owner REST route exists;
-        // POST /v1/messages sends as the connector's own principal, so this shell path delegates to the
-        // standard send (the server MCP tool remains the way to speak strictly as the owner from an agent).
+        // Send a federated DM AS THE OWNER (consented delegation) through POST /v1/messages/as-owner, the
+        // route the node MCP tool's service answers too (services/message-send-as-owner.ts). Until
+        // 2026-10-17 this posted to POST /v1/messages and so sent as the agent, not the owner.
         name: 'aimeat_dm_send_as_owner',
-        description: 'Send a federated direct message on the owner\'s behalf (Reply-with-AI). Sends via the standard message route as the connected principal.',
+        description: 'Send a federated direct message in the owner\'s name (Reply-with-AI). The message says which agent sent it.',
         input: {
             to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
             body: { type: 'string', description: 'Message body (markdown). Optional if attachments are given.' },
@@ -729,7 +731,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
             const conversationId = optionalString(input, 'conversation_id'); if (conversationId) body.conversation_id = conversationId;
             const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
-            return client.post('/v1/messages', withProvenanceFields(body, input));
+            return client.post('/v1/messages/as-owner', withProvenanceFields(body, input));
         },
     },
     // NOTE: the owner contacts (aimeat_contact_*) are NOT cliFallback — they are exposed on the connector

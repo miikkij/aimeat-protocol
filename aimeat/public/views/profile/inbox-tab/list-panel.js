@@ -12,6 +12,8 @@
  * @structure ListPanel · rowIds
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.8.0 — 2026-10-17 — The preview names the agent: "Your agent X:" when one of yours sent the last
+ *     message in your name, "X (their agent):" when the other side's agent did.
  *   v1.7.0 — 2026-09-26 — The list is the ConversationList component (components/ConversationList.js):
  *     this file gives it data and writes no class. Put back what the previous branch lost from main's
  *     rows: each row's kind mark (a person's picture, or "ag", "#", "·" inside a group), its date on
@@ -80,7 +82,10 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     const via = c.viaAgent ? (subThreadLabel(c.viaAgent) || peerName(c.viaAgent)) : null;
     // The last turn in a thread of MINE that one of my agents spoke. Different from `via`: this thread is
     // still mine to answer, only the newest message is not my own words.
-    const byAgent = c.sentByAgent ? (subThreadLabel(c.sentByAgent) || peerName(c.sentByAgent)) : null;
+    const byAgent = c.sentByAgent ? (c.sentByAgentName || subThreadLabel(c.sentByAgent) || peerName(c.sentByAgent)) : null;
+    // The other side's last message was sent in their name by their agent: the preview says so.
+    const theirAgent = !byAgent && c.lastDirection === 'inbound' && c.lastSentByAgent
+      ? (c.lastSentByAgentName || String(c.lastSentByAgent).split('#')[0]) : null;
     const label = labelPeer
       ? peerDisplay(foldedWho(c))
       : via
@@ -103,7 +108,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
         c.fold ? t('inbox.org.foldCount', { count: String(c.fold.count) }) : null,
       ]}
       subject=${(!nested && c.subject) ? c.subject : null}
-      preview=${`${byAgent ? `${t('inbox.viaAgent')} ${byAgent}: ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${c.lastMessage || ''}`}
+      preview=${`${byAgent ? `${t('inbox.yourAgentPrefix', { agent: byAgent })} ` : theirAgent ? `${t('inbox.theirAgentPrefix', { agent: theirAgent })} ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${c.lastMessage || ''}`}
       why=${c.archived && !labelPeer ? whyArchived(c) : null}
       unread=${c.unread || 0}
       nested=${nested}

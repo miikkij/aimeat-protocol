@@ -1245,6 +1245,9 @@ export interface DirectMessage {
   ownerReadAt: Timestamp | null;
   recipientGhii: string;
   replyToId: string | null;
+  /** Migration 0105: the agent that sent this in its owner's name, and its name. NULL = not said. */
+  sentByAgent: string | null;
+  sentByAgentName: string | null;
   respondable: boolean | null;
   kind: string | null;
   senderGhii: string;

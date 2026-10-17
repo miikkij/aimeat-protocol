@@ -12,6 +12,9 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-10-17 — aimeat_dm_send_as_owner calls services/message-send-as-owner.ts, the implementation
+ *     POST /v1/messages/as-owner calls too: the message names the agent that sent it, and a group
+ *     address (support@operators) reaches the thread instead of being queued as a 1:1.
  *   2026-10-08 — aimeat_dm_send, aimeat_dm_send_as_owner and aimeat_dm_ask mint their record through
  *     services/message-provenance.ts: held, and stored only once the send lands, so a refused send
  *     leaves no record (aiprov D11), with the session's scopes, and with one hash rule, body plus
@@ -76,6 +79,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import { takeSendTurn } from '../services/message-send-limit.js';
+import { sendAsOwner } from '../services/message-send-as-owner.js';
 import { toolError } from './tool-error.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
@@ -346,86 +350,46 @@ export function registerDmMessageTools(
     // Gated by the explicit `messages:send-as-owner` scope (the registration filter only registers this
     // tool when the agent holds it). The sender is the agent's OWN owner, derived SERVER-SIDE from the
     // session GAII — never a client-supplied id — so an agent can only ever speak as its own owner, never
-    // another (no cross-owner impersonation). The reply lands in the OWNER's thread, attributed to the
-    // owner (as if sent from the UI); the acting agent is logged for audit. Powers Inbox "Reply with AI".
+    // another (no cross-owner impersonation). The reply lands in the OWNER's thread, sent by the owner,
+    // and since 2026-10-17 the message names the agent that sent it (sentByAgent), for the owner and the
+    // recipient alike. Powers Inbox "Reply with AI".
     mcp.tool(
         'aimeat_dm_send_as_owner',
         descriptionFor('aimeat_dm_send_as_owner'),
         zodShapeFor('aimeat_dm_send_as_owner'),
         annotationsFor('aimeat_dm_send_as_owner'),
         async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
-            const agentGaii = getAgentGaii();
-            const parsed = parseGaiiLoose(agentGaii);
-            // Server-derived: the acting agent's OWN owner GHII. Never trust a client id here.
-            const ownerGhii = `${parsed.owner}@${parsed.node}`;
-            const recipientGhii = to.trim();
-
-            if (recipientGhii === ownerGhii) {
-                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
-            }
-            if (!body?.trim() && !attachments?.length) {
-                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'A message must have a body or at least one attachment.' }) }] };
-            }
-            // The owner's account is the sender, and the agent is part of it: one allowance, counted
-            // before the provenance record below is written.
-            const turn = takeSendTurn(ownerGhii);
-            if (!turn.ok) return sendLimitRefused(turn);
-
-            const mapped = attachments?.length ? mapMessageAttachments(attachments, ownerGhii, config.nodeId) : undefined;
-            // TARGET-058, and this is the sharpest case on the whole surface. The message is SENT as
-            // the owner, so the recipient sees a person's name on it — but an AGENT wrote the words.
-            // Stamping the owner as the principal would let Mint-3 conclude "a human wrote this" and
-            // produce exactly the false attribution the whole design exists to prevent, so the
-            // principal here is the ACTING AGENT (the same identity the audit line below records).
-            // Delegation is not review: holding `messages:send-as-owner` says the owner allowed the
-            // agent to speak for them, not that anyone read this text before it went out. An owner
-            // who did read it can say so by declaring human_involvement:"editorial-control".
-            const prov = await mintMessageProvenance({ storage, config }, {
-                principal: agentGaii, scopes: caller().scopes, body,
+            // One implementation with POST /v1/messages/as-owner (services/message-send-as-owner.ts): the
+            // owner derived from this session's agent, the address resolved as POST /v1/messages does
+            // (a group thread included), the provenance naming the agent, and the agent on the message.
+            const result = await sendAsOwner(ctx, {
+                agentGaii: getAgentGaii(), scopes: caller().scopes, to, body, replyTo: reply_to, subject,
+                conversationId: conversation_id, attachments,
                 declaredId: ai_provenance_id, declared: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.dm_send_as_owner',
             });
-            const aiProvenanceId = prov.id;
-            const result = await sendDirectMessage(ctx, {
-                senderGhii: ownerGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
-                conversationId: conversation_id, subject, aiProvenanceId,
-                // The message is the owner's, the files are the agent's. aimeat_storage_upload stores
-                // under the identity that called it, so every file this agent uploaded lives under the
-                // GAII while the descriptor above names the owner. The send resolves which of the two
-                // actually holds each file, and refuses if neither does.
-                actingGaii: agentGaii,
-                sendLimit: turn,
-            });
-
             if (!result.ok) {
-                if (result.code === 'RATE_LIMITED') return sendLimitRefused({ message: result.reason });
-                const msg = result.reason ?? (result.code === 'RECIPIENT_NOT_FOUND'
-                    ? `No such recipient: ${recipientGhii}`
-                    : 'The recipient is not accepting messages (blocked or pending first-contact approval).');
-                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: msg, code: result.code }) }] };
+                if (result.code === 'RATE_LIMITED') return sendLimitRefused({ message: result.message });
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: result.message, code: result.code }) }] };
             }
-            await prov.store();
-
-            // Audit: an agent posted on the owner's behalf. The message displays as from the owner; this
-            // log is the durable record of WHICH agent acted (a persisted per-message field is a follow-up).
-            logger.info('dm sent as owner (delegated)', { agent: agentGaii, owner: ownerGhii, recipient: recipientGhii, messageId: result.message.id });
-
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        message_id: result.message.id,
-                        conversation_id: result.message.conversationId,
-                        sent_as: ownerGhii,
-                        recipient: result.message.recipientGhii,
-                        status: result.message.status,
-                        attachments: result.message.attachments?.length ?? 0,
-                        created_at: result.message.createdAt,
+                        message_id: result.messageId,
+                        conversation_id: result.conversationId,
+                        sent_as: result.sentAs,
+                        sent_by_agent: result.sentByAgent,
+                        sent_by_agent_name: result.sentByAgentName,
+                        recipient: result.recipient,
+                        status: result.status,
+                        attachments: attachments?.length ?? 0,
+                        ...(result.delivered !== undefined ? { delivered_to: result.delivered } : {}),
                         ...(result.awaitingApproval ? {
                             awaiting_approval: true,
                             delivery_note: 'This is the owner\'s first message to them, so it is in their contact requests rather than their inbox. They accept once, and this message and everything after it arrive normally.',
                         } : {}),
-                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                        ...(await writeProvenanceEcho(storage, config, result.aiProvenanceId)),
                     }, null, 2),
                 }],
             };
@@ -533,6 +497,8 @@ export function registerDmMessageTools(
                             id: m.id,
                             direction: m.direction,
                             from: m.senderGhii,
+                            // The agent that sent it in the sender's name (services/message-send-as-owner.ts).
+                            ...(m.sentByAgent ? { sent_by_agent: m.sentByAgent, sent_by_agent_name: m.sentByAgentName ?? null } : {}),
                             to: m.recipientGhii,
                             subject: m.subject ?? null,
                             body: m.body,
@@ -630,6 +596,8 @@ export function registerDmMessageTools(
                             conversation_id: m.conversationId,
                             subject: m.subject ?? null,
                             from: m.senderGhii,
+                            // The agent that sent it in the sender's name (services/message-send-as-owner.ts).
+                            ...(m.sentByAgent ? { sent_by_agent: m.sentByAgent, sent_by_agent_name: m.sentByAgentName ?? null } : {}),
                             body: m.body,
                             attachments: m.attachments?.map(a => attachmentView(a, mailboxOwnerGhii)) ?? [],
                             interactive: m.interactive ?? null,
@@ -666,6 +634,8 @@ export function registerDmMessageTools(
                             id: m.id,
                             direction: m.direction,
                             from: m.senderGhii,
+                            // The agent that sent it in the sender's name (services/message-send-as-owner.ts).
+                            ...(m.sentByAgent ? { sent_by_agent: m.sentByAgent, sent_by_agent_name: m.sentByAgentName ?? null } : {}),
                             to: m.recipientGhii,
                             subject: m.subject ?? null,
                             body: m.body,

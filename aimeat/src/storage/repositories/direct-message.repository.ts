@@ -9,6 +9,8 @@
  * @version-history
  *   v1.5.0 -- 2026-09-13 -- ConversationSummary carries lastForeignAt, unreadToOwner and the opener (openedBy /
  *     openedTo / openedAt), for the Messages list's archive and rules (services/inbox-organize/).
+ *   v1.5.0 -- 2026-10-17 -- ConversationSummary carries lastSentByAgent / lastSentByAgentName, read off
+ *     the newest message: the list says which agent sent it in its owner's name.
  *   v1.4.0 -- 2026-09-06 -- ConversationSummary carries broadcastId, read off the thread's NEWEST
  *     message. That one choice is the whole fold rule: copies of one announcement collapse into a
  *     single row, and a thread somebody answered lifts back out because a reply carries no id.
@@ -35,6 +37,10 @@ export type ConversationSummary = {
    *  "You: …" for something the person never sent. The sender travels with the summary so the caller
    *  can say who spoke instead of inferring it from the direction. */
   lastSenderGhii: string;
+  /** The agent that sent the newest message in its owner's name, and its name (migration 0105).
+   *  Absent when the sender wrote it themself. */
+  lastSentByAgent?: string;
+  lastSentByAgentName?: string;
   messageCount: number;
   unread: number;
   updatedAt: string;

@@ -1,0 +1,21 @@
+-- 0105_direct_message_sent_by_agent.sql
+--
+-- A message an agent sent in its owner's name says which agent sent it.
+--
+-- aimeat_dm_send_as_owner sent the message as the owner, and the agent was kept only in the node log
+-- and in the provenance record, which no page read. The owner's list said "You: ..." about words an
+-- agent wrote and sent, and the recipient saw only the owner's name (Jouni, 2026-10-17: "agenttina
+-- lähetetyt mitkä on lähetetty minuna pitäisi näkyä että agentti lähetti ne").
+--
+--   "DirectMessage"."sentByAgent"       the agent's GAII. The sender stays the owner: the message is
+--                                       theirs and a reply goes to them.
+--   "DirectMessage"."sentByAgentName"   the agent's name as its owner sees it, written at send time
+--                                       so a recipient on another node can show it too.
+--
+-- Both mailbox copies carry it, and the federated payload carries it to the recipient's node, which
+-- keeps it only when the agent belongs to the sender (routes/federation-sync/messaging.ts).
+-- NULL = the sender wrote it themself, or the sending node did not say: every existing row.
+--
+-- Mirrors the SQLite columns added in schema.ts.
+ALTER TABLE "DirectMessage" ADD COLUMN IF NOT EXISTS "sentByAgent" TEXT;
+ALTER TABLE "DirectMessage" ADD COLUMN IF NOT EXISTS "sentByAgentName" TEXT;
