@@ -6,6 +6,11 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-17 — PATCH /v1/knowledge/:id/sharing takes `audience` (owner, members,
+ *     organism:<id>, public; public is catalog_listed) and the entry PATCH takes members and
+ *     organism:<id>; an organism the writer is not in is 400 NOT_ORGANISM_MEMBER before anything is
+ *     written. The export finds its manifest by findReadableManifest, so a members or organism
+ *     package exports to whom services/audience.ts admits, with the entries it admits (plan V3.6).
  *   v1.4.0 — 2026-10-16 — The export carries `entry_provenance`: each exported entry's provenance block,
  *     keyed like `entry_data`, so the public knowledge viewer labels an entry an AI wrote.
  *   v1.3.0 — 2026-10-13 — The pacing amount is sharing.toll_morsels: the PATCH write-back, the clone
@@ -39,6 +44,12 @@ import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { loadServedProvenanceMany, provenanceItemBlock } from '../../services/ai-provenance-marks.js';
+import { localAccountName } from '../../utils/gaii.js';
+import { checkAudienceWrite } from '../../services/audience-write.js';
+import {
+  KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING, KNOWLEDGE_ENTRY_LEVELS,
+  packageAudienceOf, manifestRecordVisibility, entryRecordVisibility, knowledgeAudienceAllows,
+} from '../../services/knowledge-audience.js';
 
 /** The classification address of a package record (manifest or entry). */
 const targetOfRecord = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
@@ -55,12 +66,12 @@ export function registerSharingRoutes(
   storage: Storage,
   helpers: KnowledgeHelpers,
 ): void {
-  const { resolve, findOwnerScopeMemory } = helpers;
+  const { resolve, findOwnerScopeMemory, findReadableManifest } = helpers;
 
   /* ── PATCH /v1/knowledge/:id/sharing — Update package sharing settings ── */
   router.patch('/v1/knowledge/:id/sharing', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
-    const { catalog_listed, allow_clone } = req.body ?? {};
+    const { catalog_listed, allow_clone, audience } = req.body ?? {};
 
     const manifestKey = `packages/${packageId}/manifest`;
     const found = await findOwnerScopeMemory(req, manifestKey);
@@ -69,6 +80,18 @@ export function registerSharingRoutes(
       return;
     }
     const { record: existing, ownerGaii } = found;
+
+    // The audience, checked before anything is written (services/audience-write.ts): an organism the
+    // writer is not in is 400 NOT_ORGANISM_MEMBER. `public` is the catalogue, so it and
+    // catalog_listed must not disagree.
+    if (audience !== undefined) {
+      const checked = await checkAudienceWrite(storage, audience, req.auth, KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING);
+      if (!checked.ok) { res.status(checked.status).json(error(config.nodeId, checked.code, checked.message)); return; }
+      if (catalog_listed !== undefined && !!catalog_listed !== (audience === 'public')) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'catalog_listed is true exactly when the audience is public; send one of the two.'));
+        return;
+      }
+    }
 
     const manifest: KnowledgeManifest = typeof existing.value === 'string'
       ? JSON.parse(existing.value as string)
@@ -79,7 +102,15 @@ export function registerSharingRoutes(
       ? presentKnowledgeManifest(manifest).sharing
       : { catalog_listed: false, allow_clone: false, toll_morsels: 0 };
 
-    if (catalog_listed !== undefined) manifest.sharing.catalog_listed = !!catalog_listed;
+    if (audience !== undefined) {
+      manifest.sharing.catalog_listed = audience === 'public';
+      manifest.sharing.audience = audience;
+    } else if (catalog_listed !== undefined) {
+      manifest.sharing.catalog_listed = !!catalog_listed;
+      // Listing makes it public; unlisting a public package leaves it with its author.
+      if (catalog_listed) manifest.sharing.audience = 'public';
+      else if (manifest.sharing.audience === 'public') manifest.sharing.audience = 'owner';
+    }
     if (allow_clone !== undefined) manifest.sharing.allow_clone = !!allow_clone;
     // If catalog_listed enabled, ensure allow_clone is also enabled
     if (manifest.sharing.catalog_listed && !manifest.sharing.allow_clone && allow_clone === undefined) {
@@ -92,7 +123,7 @@ export function registerSharingRoutes(
       key: manifestKey,
       ownerGaii,
       value: manifest,
-      visibility: manifest.sharing.catalog_listed ? 'public' : 'owner',
+      visibility: manifestRecordVisibility(manifest),
       tags: existing.tags || ['knowledge-package'],
       ttlHours: null,
       version: (existing.version || 0) + 1,
@@ -103,6 +134,7 @@ export function registerSharingRoutes(
     res.json(success(config.nodeId, {
       package_id: packageId,
       sharing: manifest.sharing,
+      audience: packageAudienceOf(manifest),
     }));
     emitChange('knowledge');
     // Public landing feed — only on the private→public catalogue edge (don't re-announce).
@@ -123,8 +155,9 @@ export function registerSharingRoutes(
     const entryKey = req.params.entryKey as string;
     const { visibility, group_id: groupId } = req.body ?? {};
 
-    if (!['private', 'owner', 'group', 'public'].includes(visibility)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Visibility must be private, owner, group, or public'));
+    const between = typeof visibility === 'string' && (visibility === 'members' || visibility.startsWith('organism:'));
+    if (!between && !['private', 'owner', 'group', 'public'].includes(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Visibility must be private, owner, group, members, organism:<id>, or public'));
       return;
     }
 
@@ -135,6 +168,13 @@ export function registerSharingRoutes(
       return;
     }
     const { record: existing, ownerGaii } = found;
+
+    // members and organism:<id> are audience.ts levels; an organism the writer is not in is refused
+    // before anything is written (services/audience-write.ts).
+    if (between) {
+      const checked = await checkAudienceWrite(storage, visibility, req.auth, KNOWLEDGE_ENTRY_LEVELS);
+      if (!checked.ok) { res.status(checked.status).json(error(config.nodeId, checked.code, checked.message)); return; }
+    }
 
     const manifest: KnowledgeManifest = typeof existing.value === 'string'
       ? JSON.parse(existing.value as string)
@@ -156,7 +196,7 @@ export function registerSharingRoutes(
       key: manifestKey,
       ownerGaii,
       value: manifest,
-      visibility: manifest.sharing?.catalog_listed ? 'public' : 'owner',
+      visibility: manifestRecordVisibility(manifest),
       tags: existing.tags || ['knowledge-package'],
       ttlHours: null,
       version: (existing.version || 0) + 1,
@@ -172,7 +212,7 @@ export function registerSharingRoutes(
     if (entryRecord) {
       await storage.setMemory({
         ...entryRecord,
-        visibility,
+        visibility: entryRecordVisibility(visibility),
         groupId: visibility === 'group' ? groupId : undefined,
         updatedAt: now,
         version: (entryRecord.version || 0) + 1,
@@ -247,7 +287,7 @@ export function registerSharingRoutes(
         key: newKey,
         ownerGaii: requesterGaii,
         value: sourceEntry.value,
-        visibility: entry.visibility,
+        visibility: entryRecordVisibility(entry.visibility),
         tags: [...sourceEntry.tags, 'cloned'],
         ttlHours: null,
         version: 1,
@@ -322,23 +362,16 @@ export function registerSharingRoutes(
       ? (req.query.entries as string).split(',').map(e => e.trim())
       : null;
 
-    // Find public manifest — one IN query over all owner GHIIs, then (only if none) one over all
-    // agents. Owners keep priority. (Was listMemory per owner AND getMemory per agent = node-scan.)
-    const allOwners = await storage.listOwners();
-    const ownerRows = await storage.listMemoryForOwners(
-      allOwners.map(o => `${o.name}@${config.nodeId}`), { prefix: manifestKey, visibility: 'public' },
-    );
-    let found: MemoryRecord | null = ownerRows.find(r => r.key === manifestKey) ?? null;
-    if (!found) {
-      const allAgents = await storage.listAgents();
-      const agentRows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' });
-      found = agentRows.find(r => r.key === manifestKey) ?? null;
-    }
+    // The manifest this caller may read, on the rule GET /v1/knowledge/:id reads it by (helpers.ts
+    // findReadableManifest): a public one, the caller's own, or one whose audience (members,
+    // organism:<id>) admits the caller. It has passed the classification reader's show already.
+    const readable = await findReadableManifest(req, manifestKey);
+    const sourceManifest: MemoryRecord | undefined = readable?.record;
+    const own = readable?.own ?? false;
 
     // An export takes content out: what the requester may see, then what may leave (the
     // classification reader's show and leave, TARGET-082). A hidden manifest answers like a missing one.
     const reader = readerFor({ storage, config }, req.auth);
-    const [sourceManifest] = found ? await reader.show([found], targetOfRecord) : [];
     if (!sourceManifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
       return;
@@ -357,9 +390,17 @@ export function registerSharingRoutes(
     const manifest = sourceManifest.value as KnowledgeManifest;
     const nodeUrl = config.baseUrl || `http://localhost:${config.port}`;
 
-    // Collect public entry data
+    // Collect the entries this caller may read: the public ones, and those whose audience (members,
+    // organism:<id>) admits the caller; the package's author reads both of those always.
     const entryData: Record<string, unknown> = {};
-    const publicEntries = manifest.entries.filter(e => e.visibility === 'public');
+    const authorName = localAccountName(sourceOwnerGaii);
+    const publicEntries: typeof manifest.entries = [];
+    for (const e of manifest.entries) {
+      const between = e.visibility === 'members' || e.visibility.startsWith('organism:');
+      if (e.visibility === 'public' || (between && (own || await knowledgeAudienceAllows(storage, e.visibility, req.auth, authorName)))) {
+        publicEntries.push(e);
+      }
+    }
     const requested = requestedEntries
       ? publicEntries.filter(e => requestedEntries.includes(e.key.split('/').pop() ?? ''))
       : publicEntries;

@@ -23,6 +23,9 @@
  *   const out = await createPackageGroup({ storage, config }, caller, { name, components });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.5.0 — 2026-10-17 — Two more visibilities: 'members' (every account of this node) and
+ *     'organism:<id>' (that organism's active members); packageVisibilityRefusal refuses an organism
+ *     the author is not in with 400 NOT_ORGANISM_MEMBER before the write (plan doc-mvcn6c7e4e5q, V3.7).
  *   v1.4.0 — 2026-10-10 — checkCeilings is exported and checkAuthorQuota takes how many groups the
  *     caller adds, so the set composer checks every write before the first (secaudit 2026-10-10, I20).
  *   v1.3.0 — 2026-10-02 — The per-author quota counts package groups that are not archived
@@ -54,6 +57,7 @@ import type {
     PackageComponentType,
 } from '../../../storage/interface.js';
 import { resolveGhii } from '../../../utils/ghii-resolver.js';
+import { checkAudienceWrite, writerAuthOf } from '../../audience-write.js';
 import { emitChange } from '../../event-bus.js';
 
 /** The per-author ceiling when config carries none. config.packageMaxPerAuthor normally wins. */
@@ -66,10 +70,30 @@ const MAX_PACKAGES_PER_AUTHOR = 100;
  * `published`.
  */
 export const VALID_STATUSES = ['draft', 'published', 'beta', 'archived'] as const;
-export const VALID_VISIBILITIES = ['private', 'public'] as const;
+/**
+ * The visibilities spelled as words. `organism:<id>` is the fourth (services/audience.ts): the
+ * active members of one organism. 'members' is every account of this node. Both are decided by
+ * audienceAllows on every read (package-read.ts packageVisibleTo).
+ */
+export const VALID_VISIBILITIES = ['private', 'members', 'public'] as const;
+/** How a refusal names the four. */
+export const VISIBILITY_WORDS = 'private, members, organism:<id>, public';
 
 export type PackageStatus = (typeof VALID_STATUSES)[number];
-export type PackageVisibility = (typeof VALID_VISIBILITIES)[number];
+export type PackageVisibility = (typeof VALID_VISIBILITIES)[number] | `organism:${string}`;
+
+/**
+ * Why this author may not give a package this visibility, or null. A value that is none of the four
+ * is 400 INVALID_INPUT; an organism the author is not an active member of is 400 NOT_ORGANISM_MEMBER
+ * (services/audience-write.ts). Asked before anything is written.
+ */
+export async function packageVisibilityRefusal(
+    storage: Storage, value: unknown, owner: string,
+): Promise<Extract<PackageWriteResult, { ok: false }> | null> {
+    const checked = await checkAudienceWrite(storage, value, writerAuthOf(owner), ['private', 'members', 'organism', 'public']);
+    if (checked.ok) return null;
+    return { ok: false, status: checked.status, code: checked.code, message: checked.code === 'INVALID_INPUT' ? `visibility must be one of: ${VISIBILITY_WORDS}` : checked.message };
+}
 
 /** Raw, client-supplied component shape from a request body or a parsed ZIP (pre-validation). */
 export interface RawComponentInput {
@@ -263,9 +287,8 @@ export async function createPackageGroup(
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: `status must be one of: ${VALID_STATUSES.join(', ')}` };
     }
     const visibility = (input.visibility ?? 'private') as PackageVisibility;
-    if (!VALID_VISIBILITIES.includes(visibility)) {
-        return { ok: false, status: 400, code: 'INVALID_INPUT', message: `visibility must be one of: ${VALID_VISIBILITIES.join(', ')}` };
-    }
+    const refused = await packageVisibilityRefusal(storage, visibility, owner);
+    if (refused) return refused;
 
     const components = normalizeComponents(input.components);
 

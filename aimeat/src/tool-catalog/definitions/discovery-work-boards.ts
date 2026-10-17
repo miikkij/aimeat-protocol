@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-17 — aimeat_datapackage_publish takes `visibility`: public (default), members,
+ *     organism:<id> or private (plan doc-mvcn6c7e4e5q, V3.8).
  *   2026-10-17 — aimeat_storage_upload takes visibility 'members' and 'organism:<organism id>', as
  *     POST /v1/storage does (plan doc-mvcn6c7e4e5q, V3.3).
  *   2026-10-16 — aimeat_storage_download asks storage:read, as its REST twins do (QA audit S3-03).
@@ -266,6 +268,7 @@ export const discoveryWorkBoardsTools = [
                 url: z.string().optional(), title: z.string().optional(), retrievedAt: z.string().optional(),
             })) },
             legal_basis: { type: 'string', description: 'Why you may publish this — e.g. a public register, consent, a contract.' },
+            visibility: { type: 'string', description: 'Who reads it: public (the default: anyone, at the permanent address), members (every account of this node), organism:<id> (the members of one organism you are in) or private (your owner only).', zod: z.string().regex(/^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$/) },
         },
     },
     {

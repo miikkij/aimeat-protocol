@@ -28,6 +28,8 @@
  *   const datapackage = makeExtensionDataPackage({ storage, config, ownerGhii, producedBy });
  *   const ctx = buildExtensionCtx({ …, datapackage });
  * @version-history
+ *   v1.1.0 -- 2026-10-17 -- open and rows read as the owner, so a package published members,
+ *     organism:<id> or private is read on its audience (plan doc-mvcn6c7e4e5q, V3.8).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, A4).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -35,6 +37,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { PublishInput, TableSchema } from './contract.js';
 import { inferSchema, validateRows, type ValidationIssue } from './table.js';
 import { openPackage, publishPackage, readRows, recordFailure, type ProducedBy } from './store.js';
+import { ownerAuthOf } from './audience.js';
 
 /** What may cross the sandbox bridge in one call, as serialised JSON. Same number as ctx.files. */
 export const MAX_DATAPACKAGE_PAYLOAD_BYTES = 8 * 1024 * 1024;
@@ -123,12 +126,14 @@ export function makeExtensionDataPackage(deps: {
         },
 
         async open(ref) {
-            const opened = await openPackage(store, String(ref || ''), config.nodeId);
+            // An extension reads as its owner: their own packages, public ones, and those whose
+            // audience admits the owner (./audience.ts).
+            const opened = await openPackage(store, String(ref || ''), config.nodeId, ownerAuthOf(ownerGhii));
             return opened ? { ...opened.descriptor, descriptorUrl: opened.descriptorUrl } : null;
         },
 
         async rows(ref, resource, opts) {
-            return readRows(store, String(ref || ''), config.nodeId, String(resource || ''), opts ?? {});
+            return readRows(store, String(ref || ''), config.nodeId, String(resource || ''), opts ?? {}, ownerAuthOf(ownerGhii));
         },
 
         async fail(name, message) {

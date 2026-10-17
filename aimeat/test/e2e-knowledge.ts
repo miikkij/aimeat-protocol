@@ -215,10 +215,15 @@ await test('Create and list memory links', async () => {
   });
   assert(linkStatus === 201, `Expected 201 for link, got ${linkStatus}`);
 
-  // List links
-  const { status: listStatus, body: listBody } = await json(`/v1/knowledge/${linkPackageId}/links`);
+  // List links. The package is not listed, so its links are read by its owner's side only: the
+  // anonymous caller gets 404, as for the package itself (plan doc-mvcn6c7e4e5q, V3.6).
+  const { status: listStatus, body: listBody } = await json(`/v1/knowledge/${linkPackageId}/links`, {
+    headers: { Authorization: `Bearer ${agentToken}` },
+  });
   assert(listStatus === 200, `Expected 200 for list, got ${listStatus}`);
   assert(listBody.data.count >= 1, `Expected at least 1 link, got ${listBody.data.count}`);
+  const { status: anonStatus } = await json(`/v1/knowledge/${linkPackageId}/links`);
+  assert(anonStatus === 404, `Expected 404 for an anonymous read of an unlisted package's links, got ${anonStatus}`);
 });
 
 await test('Reject link with invalid relation', async () => {
@@ -243,7 +248,9 @@ await test('Delete a link', async () => {
   assert(status === 200, `Expected 200 for delete link, got ${status}`);
 
   // Verify link is gone
-  const { body: listBody } = await json(`/v1/knowledge/${linkPackageId}/links`);
+  const { body: listBody } = await json(`/v1/knowledge/${linkPackageId}/links`, {
+    headers: { Authorization: `Bearer ${agentToken}` },
+  });
   assert(listBody.data.count === 0, `Expected 0 links after delete, got ${listBody.data.count}`);
 });
 

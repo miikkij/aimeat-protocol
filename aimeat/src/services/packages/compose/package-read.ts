@@ -19,15 +19,43 @@
  *   import { getPackageFor } from './package-read.js';
  *   const pkg = await getPackageFor(storage, groupId, req.auth?.owner);
  * @version-history
+ *   v1.2.0 — 2026-10-17 — packageVisibleTo: 'members' and 'organism:<id>' are read by whom
+ *     services/audience.ts admits; the caller may be the request's auth, so a visitor from another
+ *     node is told apart from a local account (plan doc-mvcn6c7e4e5q, V3.7).
  *   v1.1.0 — 2026-09-28 — listInstancesFor: the owner's installed copies, for GET /v1/instances and
  *     the aimeat_package_instances MCP tool.
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/packages.ts (four read routes). Behaviour
  *     unchanged; the node MCP surface gains list and get through it.
  */
 import type { Storage, PackageRecord, PackageFilter, PackageInstanceRecord } from '../../../storage/interface.js';
+import { parseAudience, audienceAllows, type AudienceAuth } from '../../audience.js';
 
-/** The owner name reading, or undefined when nobody is signed in. */
-export type PackageReadCaller = string | undefined;
+/**
+ * Who is reading. A route passes the request's auth (or undefined), so a visitor from another node
+ * and the anonymous identity are told apart from this node's accounts. A bare owner name is what a
+ * service passes when it acts for a local account (an install set, a pull), and it reads as that
+ * account.
+ */
+export type PackageReadCaller = string | AudienceAuth | undefined;
+
+/** The author name a caller is compared to: the account name it carries. */
+function authorNameOf(caller: PackageReadCaller): string | undefined {
+    return typeof caller === 'string' ? caller : caller?.owner;
+}
+
+/**
+ * The one visibility rule (plan doc-mvcn6c7e4e5q, V3.7): public to anyone, everything to its author,
+ * 'members' and 'organism:<id>' to whom services/audience.ts admits, and private to nobody else.
+ */
+export async function packageVisibleTo(storage: Storage, pkg: PackageRecord, caller: PackageReadCaller): Promise<boolean> {
+    if (pkg.visibility === 'public') return true;
+    const name = authorNameOf(caller);
+    if (name !== undefined && name === pkg.author) return true;
+    const audience = parseAudience(pkg.visibility);
+    if (!audience || audience.level === 'private' || audience.level === 'public') return false;
+    const auth: AudienceAuth | undefined = typeof caller === 'string' ? { sub: caller, owner: caller } : caller;
+    return audienceAllows(storage, audience, auth);
+}
 
 export interface PackageListQuery {
     author?: string;
@@ -62,7 +90,10 @@ export async function listPackagesFor(
     query: PackageListQuery = {},
 ): Promise<{ packages: PackageRecord[]; total: number }> {
     const status = query.status ?? 'published';
-    const ownList = Boolean(caller) && query.author === caller;
+    // A list is public or your own: a members or organism package is not listed to anyone but its
+    // author (plan V3.7, "the public listing shows only public"); it is read and installed by id.
+    const name = authorNameOf(caller);
+    const ownList = Boolean(name) && query.author === name;
 
     const filter: PackageFilter = {
         author: query.author,
@@ -83,8 +114,7 @@ export async function getPackageFor(
 ): Promise<PackageRecord | null> {
     const pkg = await storage.getLatestPublished(groupId);
     if (!pkg) return null;
-    if (pkg.visibility === 'private' && caller !== pkg.author) return null;
-    return pkg;
+    return (await packageVisibleTo(storage, pkg, caller)) ? pkg : null;
 }
 
 /** One named version of a group, or null when there is none the caller may see. */
@@ -93,8 +123,7 @@ export async function getPackageVersionFor(
 ): Promise<PackageRecord | null> {
     const pkg = await storage.getPackageByGroupAndVersion(groupId, version);
     if (!pkg) return null;
-    if (pkg.visibility === 'private' && caller !== pkg.author) return null;
-    return pkg;
+    return (await packageVisibleTo(storage, pkg, caller)) ? pkg : null;
 }
 
 /**
@@ -112,10 +141,9 @@ export async function listPackageVersionsFor(
     const limit = Math.min(200, Math.max(1, paging.limit ?? 50));
     const offset = Math.max(0, paging.offset ?? 0);
     const result = await storage.listVersions(groupId, limit, offset);
-    return {
-        versions: result.versions.filter(v => v.visibility === 'public' || v.author === caller),
-        total: result.total,
-    };
+    const versions: PackageRecord[] = [];
+    for (const v of result.versions) if (await packageVisibleTo(storage, v, caller)) versions.push(v);
+    return { versions, total: result.total };
 }
 
 /**

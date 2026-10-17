@@ -10,6 +10,8 @@
  *   - ManifestSchema: JSON Schema for a package manifest (name, version, synthesis, references, entries)
  *
  * @version-history
+ *   v1.3.0 — 2026-10-17 — sharing.audience, and an entry's visibility takes 'members' and
+ *     'organism:<id>' (plan doc-mvcn6c7e4e5q, V3.6).
  *   v1.2.0 — 2026-10-13 — sharing.toll_morsels, the pacing amount; sharing.morsel_price is its
  *     deprecated name, and either one satisfies the requirement
  *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
@@ -71,7 +73,9 @@ export const ManifestSchema = {
         properties: {
           key: { type: 'string' },
           title: { type: 'string' },
-          visibility: { type: 'string', enum: ['private', 'owner', 'group', 'public'] },
+          // 'members' and 'organism:<id>' are the two audiences between owner and public
+          // (services/knowledge-audience.ts); the id pattern is audience.ts parseAudience's.
+          visibility: { type: 'string', pattern: '^(private|owner|group|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$' },
           schema: { type: 'string' },
           references: {
             type: 'array',
@@ -123,6 +127,7 @@ export const ManifestSchema = {
       properties: {
         catalog_listed: { type: 'boolean' },
         allow_clone: { type: 'boolean' },
+        audience: { type: 'string', pattern: '^(owner|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$' },
         license: { type: 'string' },
         toll_morsels: { type: 'number', minimum: 0 },
         morsel_price: { type: 'number', minimum: 0 },

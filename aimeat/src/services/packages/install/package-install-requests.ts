@@ -31,6 +31,8 @@
  *   const out = await installOrRequest({ storage, config, scheduler }, caller, { groupId, label });
  *   if (out.ok && out.kind === 'requested') res.status(202).json(success(nodeId, requestedBody(out)));
  * @version-history
+ *   v1.5.0 — 2026-10-17 — "No longer available to this account" asks package-read.ts packageVisibleTo,
+ *     so a 'members' or 'organism:<id>' package the owner may install stays available (plan V3.7).
  *   v1.4.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.4.0 — 2026-10-04 — An install records the owner's grant for the apps it registered when the
  *     installer chose `grantApps`, or did not say and the package is the owner's own; an agent grants
@@ -49,6 +51,7 @@ import type { Storage, PackageRecord, PackageInstanceRecord } from '../../../sto
 import type { Scheduler } from '../../scheduler.js';
 import { installPackage, type PackageInstallCaller, type PackageInstallInput, type PackageInstallResult } from './package-install.js';
 import { planPackageConfig } from '../compose/package-config.js';
+import { packageVisibleTo } from '../compose/package-read.js';
 import { packageCapabilities } from './package-capabilities.js';
 import {
     applyInstanceMigration, updateInstanceToLatest, MIGRATION_ACTIONS,
@@ -280,7 +283,7 @@ async function changedUnderneath(storage: Storage, owner: string, ownerGhii: str
     const pkg = await storage.getPackageByGroupAndVersion(group, version);
     if (!pkg || pkg.id !== request.package.record_id) return `Version ${version} of ${name} is no longer there`;
     if (pkg.status === 'archived' || (request.act !== 'migrate' && pkg.status !== 'published')) return `Version ${version} of ${name} was withdrawn`;
-    if (pkg.visibility === 'private' && pkg.author !== owner) return `${name} is no longer available to this account`;
+    if (!(await packageVisibleTo(storage, pkg, owner))) return `${name} is no longer available to this account`;
     if (packageDigest(pkg) !== request.package.digest) return `Version ${version} of ${name} changed after the request`;
     if (request.act === 'update') {
         const latest = await storage.getLatestPublished(group);

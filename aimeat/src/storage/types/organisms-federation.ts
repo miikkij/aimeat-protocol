@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-17 — KnowledgeSharing.audience and the entry visibilities 'members' and
+ *     'organism:<id>' (plan doc-mvcn6c7e4e5q, V3.6; services/knowledge-audience.ts).
  *   v1.11.0 — 2026-10-13 — KnowledgeSharing.toll_morsels; morsel_price is its optional deprecated name
  *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.10.0 — 2026-10-11 — Comments only: an extension action's tollMorsels is pacing (burn share plus
@@ -697,7 +699,7 @@ export interface KnowledgeEntryRelation {
 export interface KnowledgeEntryDescriptor {
   key: string;
   title: string;
-  visibility: 'private' | 'owner' | 'group' | 'public';
+  visibility: 'private' | 'owner' | 'group' | 'members' | `organism:${string}` | 'public';
   schema?: string;
   references?: KnowledgeReference[];        // Per-entry citations (independent knowledge unit)
   related_entries?: KnowledgeEntryRelation[]; // Intra-package relationships
@@ -719,6 +721,8 @@ export interface KnowledgeSynthesis {
 export interface KnowledgeSharing {
   catalog_listed: boolean;
   allow_clone: boolean;
+  /** Who reads an unlisted package: 'owner' (default), 'members' or 'organism:<id>'. Listed is public. */
+  audience?: 'owner' | 'members' | `organism:${string}` | 'public';
   license?: string;
   /**
    * The pacing amount in morsels; always 0 and never charged. A morsel is pacing, not a price

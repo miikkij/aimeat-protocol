@@ -17,6 +17,8 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.15.0 -- 2026-10-17 -- aimeat_package_publish and _compose take visibility members and organism:<id>;
+ *     the route validates it (plan doc-mvcn6c7e4e5q, V3.7).
  *   v1.14.0 -- 2026-10-04 -- aimeat_package_install forwards `grant_apps`.
  *   v1.13.0 -- 2026-10-02 -- aimeat_package_withdraw (POST /v1/packages/:groupId/versions/:version/withdraw).
  *   v1.12.0 -- 2026-10-02 -- aimeat_package_compose_set (POST /v1/packages/compose-set); aimeat_package_install
@@ -100,7 +102,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
             tags: { type: 'array', description: 'Tags for search.' },
-            visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
+            visibility: { type: 'string', description: 'Who may install it: private, members (every account of this node), organism:<id> (the members of one organism you are in) or public. Defaults to private.' },
             components: {
                 type: 'array', required: true,
                 description: 'The components, each { id, type: "app"|"extension"|"cortex"|"translation", label?, content, dependencies? }. At least one.',
@@ -136,7 +138,7 @@ export const packageTools: ConnectCliToolDefinition[] = [
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
             tags: { type: 'array', description: 'Tags for search.' },
-            visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
+            visibility: { type: 'string', description: 'Who may install it: private, members (every account of this node), organism:<id> (the members of one organism you are in) or public. Defaults to private.' },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps. Default true.' },

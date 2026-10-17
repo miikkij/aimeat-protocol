@@ -22,6 +22,8 @@
  *   problem the dry run would list, before anything is written.
  * @structure ComposeSetInput · ComposeSetResult · composeSet(deps, caller, input)
  * @version-history
+ *   v1.2.0 — 2026-10-17 — The visibility check is package-create.ts packageVisibilityRefusal: members and
+ *     organism:<id> pass, an organism the author is not in is a problem (plan doc-mvcn6c7e4e5q, V3.7).
  *   v1.1.0 — 2026-10-10 — The plan checks what the writes would refuse: the visibility, each package's
  *     and the bundle's ceilings, a group of another author, and the author quota for the new groups. A
  *     failure is a problem, so nothing is published (secaudit 2026-10-10, I20).
@@ -33,7 +35,7 @@ import {
     type PackageComposeDeps, type PackageComposeCaller, type ComposeExpectations,
 } from './package-compose.js';
 import {
-    createPackageGroup, addPackageVersion, normalizeComponents, checkCeilings, checkAuthorQuota, VALID_VISIBILITIES,
+    createPackageGroup, addPackageVersion, normalizeComponents, checkCeilings, checkAuthorQuota, packageVisibilityRefusal,
     type RawComponentInput,
 } from './package-create.js';
 import { packageCapabilities, type CapabilitySummary } from '../install/package-capabilities.js';
@@ -210,7 +212,8 @@ export async function composeSet(deps: PackageComposeDeps, caller: PackageCompos
     // packages before them were already published and a managed install on the stable channel had
     // received them (secaudit 2026-10-10, I20).
     const visibility = input.visibility ?? 'private';
-    if (!(VALID_VISIBILITIES as readonly string[]).includes(visibility)) problems.push(`visibility must be one of: ${VALID_VISIBILITIES.join(', ')}.`);
+    const visibilityRefused = await packageVisibilityRefusal(storage, visibility, caller.owner);
+    if (visibilityRefused) problems.push(`${visibilityRefused.message.replace(/\.$/, '')}.`);
     const bundleComponent: RawComponentInput = { id: 'install-bundle', type: 'memory', label: 'Install bundle', content: JSON.stringify(bundleDoc), dependencies: [] };
     const setGroupId = `${name}::${caller.owner}`;
     let newGroups = 0;

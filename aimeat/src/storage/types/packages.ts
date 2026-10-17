@@ -6,6 +6,8 @@
  *   src/storage/types/apps.ts, which had passed the 800-line limit; re-exported from
  *   src/storage/interface.ts like every other types file.
  * @version-history
+ *   v1.4.0 — 2026-10-17 — PackageRecord.visibility takes 'members' and 'organism:<id>' (plan
+ *     doc-mvcn6c7e4e5q, V3.7). The column is TEXT on both providers, so nothing migrates.
  *   v1.3.0 — 2026-10-11 — Comment only: an app's `priceMorsels` is its pacing amount, not a price.
  *   v1.2.0 — 2026-10-02 — PackageRecord status gains `withdrawn` (package sale design, phase 5: T6).
  *   v1.1.0 — 2026-09-30 — PackageComponentType gains `skill`: a package carries the skills bound to its
@@ -129,7 +131,9 @@ export interface PackageRecord {
   description: string;             // short description
   category: string;                // "signage" | "marketplace" | "iot" | "social" | "productivity" | "communication" | "other"
   tags: string[];                  // free-form tags for search
-  visibility: 'private' | 'public';
+  /** 'members' = every account of this node; 'organism:<id>' = that organism's active members
+   *  (services/audience.ts; services/packages/compose/package-read.ts packageVisibleTo). */
+  visibility: 'private' | 'members' | 'public' | `organism:${string}`;
   /**
    * `beta`: released on a repository's beta channel only (services/packages/sale/package-entitlements.ts).
    * `withdrawn`: taken back by its author or an operator, with a reason; never served again

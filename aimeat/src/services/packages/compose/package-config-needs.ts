@@ -20,6 +20,8 @@
  * @usage
  *   const out = await packageConfigNeeds(storage, config, { owner, isOperator }, groupId);
  * @version-history
+ *   v1.3.0 — 2026-10-17 — A package's questions are read by whom package-read.ts packageVisibleTo
+ *     admits, so a 'members' or 'organism:<id>' package asks them of whom it installs for (plan V3.7).
  *   v1.2.0 — 2026-10-09 — An extension host field (manifest `network.host_fields`) is a question with
  *     `host: true`, required unless the manifest marks it optional. One bundle then asks each buyer
  *     for their own host (the SOC's Wazuh address).
@@ -31,6 +33,7 @@ import type { AimeatConfig } from '../../../config.js';
 import type { Storage, PackageRecord, InstalledComponent } from '../../../storage/interface.js';
 import { bundleOfPackage } from '../../install-set-spec.js';
 import { planPackageConfig, configPreview } from './package-config.js';
+import { packageVisibleTo } from './package-read.js';
 import type { NetworkHostField } from '../../extension-network-hosts.js';
 
 /** One thing to ask. `package` and `component` place the answer in the install set's config or secrets. */
@@ -108,7 +111,9 @@ export async function packageConfigNeeds(
         // the questions are the install's own, and a person or their AI answers them before
         // pressing install rather than after a refusal (guided journey P3). A private package stays
         // with its author and the operator, as the shop's sale flow needs.
-        return pkg.author === caller.owner || caller.isOperator || pkg.visibility === 'public' ? pkg : null;
+        // A 'members' or 'organism:<id>' package asks its questions of whom it installs for
+        // (package-read.ts packageVisibleTo; plan V3.7).
+        return caller.isOperator || await packageVisibleTo(storage, pkg, caller.owner) ? pkg : null;
     };
     const root = await readable(groupId);
     if (!root) return notFound(groupId);

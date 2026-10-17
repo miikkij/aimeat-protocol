@@ -25,6 +25,10 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.1.0 -- 2026-10-17 -- POST takes `visibility` (public by default, members, organism:<id>,
+ *     private); an organism the caller is not in is 400 NOT_ORGANISM_MEMBER before any write. The
+ *     three GETs pass the caller to the store, which answers 404 to one the audience does not admit
+ *     (plan doc-mvcn6c7e4e5q, V3.8; services/datapackage/audience.ts).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, B2).
  */
 import { Router } from 'express';
@@ -87,6 +91,9 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             ...(body.parameters ? { parameters: body.parameters } : {}),
             ...(body.provenance ? { provenance: body.provenance } : {}),
             ...(body.retentionPolicy ? { retentionPolicy: body.retentionPolicy } : {}),
+            // Who reads it: public (default), members, organism:<id> or private. The service checks it
+            // before any write (services/datapackage/audience.ts).
+            ...(body.visibility !== undefined ? { visibility: body.visibility as string } : {}),
             // TARGET-058: what the caller says about how this was made. provenanceForWrite decides
             // from the PRINCIPAL whether anything is minted, so an owner publishing by hand is not
             // stamped and an app or agent is.
@@ -167,7 +174,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
      */
     router.get('/v1/datapackages/:owner/:name', optionalAuth(), async (req, res) => {
         const ref = buildRef(req.params.owner as string, req.params.name as string, req.query.version);
-        const opened = await openPackage(store, ref, config.nodeId);
+        const opened = await openPackage(store, ref, config.nodeId, req.auth);
         if (!opened) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such data package: ${ref}`));
             return;
@@ -193,7 +200,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
     router.get('/v1/datapackages/:owner/:name/versions', optionalAuth(), async (req, res) => {
         const owner = req.params.owner as string;
         const name = req.params.name as string;
-        const opened = await openPackage(store, buildRef(owner, name, undefined), config.nodeId);
+        const opened = await openPackage(store, buildRef(owner, name, undefined), config.nodeId, req.auth);
         if (!opened) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such data package: ${buildRef(owner, name, undefined)}`));
             return;
@@ -214,7 +221,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             offset: numberParam(req.query.offset),
             limit: numberParam(req.query.limit),
             ...(select?.length ? { select } : {}),
-        });
+        }, req.auth);
         if (!out) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such resource in ${ref}`));
             return;

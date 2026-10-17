@@ -15,10 +15,14 @@
  *     secaudit 2026-10, C4).
  *   v1.2.0 — 2026-10-15 — findReadableManifest: the manifest a caller may read, shared by the package
  *     read and the reputation read, and whether it is the caller's own (feature-list audit 207).
+ *   v1.3.0 — 2026-10-17 — findReadableManifest also finds a package whose sharing.audience is members
+ *     or organism:<id>, when services/audience.ts admits the caller (plan doc-mvcn6c7e4e5q, V3.6).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
-import { resolveIdentity, isOwnerInPerson, isForeignPrincipal, isSameOwner } from '../../utils/gaii.js';
+import { resolveIdentity, isOwnerInPerson, isForeignPrincipal, isSameOwner, localAccountName } from '../../utils/gaii.js';
+import { isNodeAccount } from '../../services/audience.js';
+import { packageAudienceOf, knowledgeAudienceAllows } from '../../services/knowledge-audience.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
 
@@ -82,12 +86,32 @@ export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): Kn
       const found = await findOwnerScopeMemory(req, manifestKey);
       if (found) { record = found.record; own = true; }
     }
+    // A package shared with this node's accounts or with one organism (sharing.audience, plan
+    // doc-mvcn6c7e4e5q V3.6): its record is not public, so it is found by key across every account
+    // and agent and admitted only when audience.ts admits this caller. A visitor from another node and
+    // the anonymous identity are never a node account, so they never reach the scan.
+    if (!record && isNodeAccount(req.auth)) {
+      record = await findSharedManifest(req, manifestKey);
+    }
     if (record && !own && signedIn && !isForeignPrincipal(req.auth)) {
       own = isSameOwner(record.ownerGaii, `${req.auth!.owner}@${config.nodeId}`);
     }
     if (!record) return null;
     const shown = await presentMemory(readerFor({ storage, config }, req.auth), record);
     return shown ? { record: shown, own } : null;
+  }
+
+  async function findSharedManifest(req: Express.Request, manifestKey: string): Promise<MemoryRecord | undefined> {
+    const owners = (await storage.listOwners()).map(o => `${o.name}@${config.nodeId}`);
+    const agents = (await storage.listAgents()).map(a => a.gaii);
+    const rows = (await storage.listMemoryForOwners([...owners, ...agents], { prefix: manifestKey }))
+      .filter(r => r.key === manifestKey && r.visibility !== 'public');
+    for (const r of rows) {
+      const audience = packageAudienceOf(r.value);
+      if (audience !== 'members' && !audience.startsWith('organism:')) continue;
+      if (await knowledgeAudienceAllows(storage, audience, req.auth, localAccountName(r.ownerGaii))) return r;
+    }
+    return undefined;
   }
 
   return { resolve, findOwnerScopeMemory, findReadableManifest };
