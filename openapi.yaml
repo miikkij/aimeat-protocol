@@ -39478,6 +39478,11 @@ paths:
         one of their agents) or an operator — for anyone else the member filter
         degrades to public organisms only (no private-membership disclosure).
 
+        Without `member`, `?visibility=` takes `public` (the default) or `listed`,
+        the two the directory shows. Any other value answers an empty list unless
+        the caller is an operator, so a private organism is never listed to someone
+        outside it.
+
         Roster privacy: each returned organism's `members`/`agentGaiis` arrays are
         redacted to `[]` when the caller is below that organism's `member_visibility`
         tier; `member_count` (pre-redaction) and `members_hidden` are attached per item.
@@ -39497,6 +39502,14 @@ paths:
             Filter to organisms this owner is a member of (bare owner name; a
             GHII/GAII is normalized). Includes private organisms only when the
             caller IS that owner (or an operator); otherwise public-only.
+        - name: visibility
+          in: query
+          schema:
+            type: string
+            enum: [public, listed, private]
+          description: >-
+            Which organisms to list (default public). `private` lists nothing
+            for a caller who is not the `member` asked about or an operator.
         - name: interest
           in: query
           schema:

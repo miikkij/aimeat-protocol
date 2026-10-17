@@ -6,6 +6,11 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-17 — SECURITY: GET /v1/organisms lists only 'public' and 'listed' organisms to a caller
+ *     who is not the member asked about or an operator. ?visibility=private went to storage as the
+ *     caller wrote it, and answered every private organism's name, description, creator, owners and
+ *     admins to the anonymous internet (probed on aimeat.io and innokas.aimeat.io). The shared
+ *     anonymous identity no longer counts as the member it names.
  *   2026-10-16 — DELETE /v1/organisms/:id asks memory:purge beside organism:write, as the workspace
  *     wipe does: it removes every record keyed under the organism for good, and deleting an organism
  *     is explicit and separately consented (invariant 8 as ruled by the developer on 2026-10-16).
@@ -70,6 +75,10 @@ import { purgeExceptions } from '../../services/classification/exceptions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
+/** What GET /v1/organisms lists to a caller who is neither the member asked about nor an operator:
+ *  the same two visibilities the directory indexes (services/directory.ts). */
+const BROWSABLE_VISIBILITIES = new Set(['public', 'listed']);
+
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
 
@@ -131,13 +140,19 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const memberBare = params.member ? localAccountName(params.member) : undefined;
     // The operator half asks isOperatorCaller, as the MCP tools do: the operator's agent holding
     // operator:admin passes too. A list read writes no operator trail.
-    const selfOrOperator = !!auth && (auth.owner === memberBare || await isOperatorCaller(storage, auth));
+    const operator = !!auth && await isOperatorCaller(storage, auth);
+    const selfOrOperator = operator || (!!auth && !auth.anonymous && auth.owner === memberBare);
+    // Browsing without a member filter shows what the directory shows: 'public' and 'listed'. The
+    // caller's ?visibility= went to storage unchecked before, so ?visibility=private answered every
+    // private organism of the node to an anonymous caller. Only an operator browses past that.
+    const asked = params.visibility || 'public';
+    if (!params.member && !operator && !BROWSABLE_VISIBILITIES.has(asked)) return { organisms: [], total: 0 };
     const organisms = await storage.listOrganisms({
       type: params.type,
       city: params.city,
       interest: params.interest,
       member: memberBare,
-      visibility: params.member ? (selfOrOperator ? params.visibility : 'public') : (params.visibility || 'public'),
+      visibility: params.member ? (selfOrOperator ? params.visibility : 'public') : asked,
       // Pass pagination through untouched: a member-scoped list (the owner's own organisms) must return ALL
       // of them — the storage layer only page-caps browse/discovery (no member filter). Forcing perPage here
       // silently dropped the owner's oldest organisms out of "My Organisms" once they belonged to 20+.

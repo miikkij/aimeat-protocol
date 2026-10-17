@@ -7,6 +7,9 @@
  *   GET /:id/members (accountability rows + true total), and GET /organisms list. Creator always
  *   sees the full roster; member_count never lies. Attribution is out of scope by design.
  * @version-history
+ *   v1.1.0 — 2026-10-17 — Test 9: a private organism is never listed to an anonymous caller or a
+ *     signed-in outsider, whatever ?visibility= or ?member= they send. It asserts the hole closed in
+ *     routes/organisms/crud.ts on the same day (it failed before the fix).
  *   v1.0.0 — 2026-07-03 — Initial (privacy fix: rosters were world-readable via detail/list/members).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-member-visibility
@@ -149,7 +152,30 @@ await test('8. A crafted array query param does not 500 the list (CodeQL type-co
     assert(arr.status === 200, `a duplicated member param must not 500, got ${arr.status}`);
 });
 
+let privateOrgId = '';
+await test('9. A PRIVATE organism is never listed to someone who is not in it (anon, signed-in outsider)', async () => {
+    // The list passed the caller's own ?visibility= straight to storage, so ?visibility=private
+    // answered every private organism of the node, name, description, creator, owners and admins
+    // included, to the anonymous internet. Probed on aimeat.io and innokas.aimeat.io on 2026-10-17.
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth(creatorTok), body: JSON.stringify({ name: 'Hidden Org', type: 'project', visibility: 'private' }) });
+    assert(org.status === 201, `create private ${org.status}`);
+    privateOrgId = org.body.data.organism.id;
+    for (const [who, headers] of [['anon', {}], ['outsider', auth(outsiderTok)]] as const) {
+        for (const q of ['?visibility=private&per_page=1000', `?visibility=private&member=${creator}&per_page=1000`, '?per_page=1000']) {
+            const r = await json(`/v1/organisms${q}`, { headers });
+            assert(r.status === 200, `${who} ${q}: ${r.status}`);
+            const ids = (r.body.data.organisms || []).map((o: any) => o.id);
+            assert(!ids.includes(privateOrgId), `${who} ${q} lists the private organism`);
+            assert(!(r.body.data.organisms || []).some((o: any) => o.visibility === 'private'), `${who} ${q} lists some private organism`);
+        }
+    }
+    // The creator still finds it in their own list.
+    const mine = await json(`/v1/organisms?member=${creator}&per_page=1000`, { headers: auth(creatorTok) });
+    assert((mine.body.data.organisms || []).some((o: any) => o.id === privateOrgId), 'the creator lists their own private organism');
+});
+
 await test('Cleanup', async () => {
+    if (privateOrgId) await json(`/v1/organisms/${privateOrgId}`, { method: 'DELETE', headers: auth(creatorTok) });
     await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: auth(creatorTok) });
     await json(`/v1/owners/${memberName}`, { method: 'DELETE', headers: auth(memberTok) });
     await json(`/v1/owners/${outsiderName}`, { method: 'DELETE', headers: auth(outsiderTok) });
