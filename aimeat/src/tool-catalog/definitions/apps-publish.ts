@@ -10,6 +10,8 @@
  * @version-history
  *   2026-10-18 — aimeat_app_publish, aimeat_app_draft_publish and aimeat_app_fork say they answer with
  *     publish_request when the node asks the owner first (plan doc-mvcn6c7e4e5q, V4).
+ *   2026-10-18 — aimeat_app_draft_save, _write and _seed take `notice` (what the draft changes), and
+ *     aimeat_app_draft_publish's roadmap defaults to it.
  *   2026-10-16 — aimeat_app_get says which apps it answers as not found (QA audit W15).
  *   v1.2.0 — 2026-10-12 — aimeat_app_delete says it deletes, and that only an earlier app backup brings
  *     the app back; it said archive (wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app-).
@@ -42,6 +44,16 @@ const SPEC_GATE_INPUT = {
         type: 'string',
         description: 'Send "skipped-by-owner" when the owner explicitly told you to publish without reading the build spec. '
             + 'The publish is recorded as skipped on the node\'s change log instead of passing silently.',
+    },
+} as const;
+
+/** What the draft is changing (services/app-news.ts), on the three tools that start or fill a draft. */
+const DRAFT_NOTICE_INPUT = {
+    notice: {
+        type: 'string',
+        description: 'One sentence, at most 280 characters, on what this draft changes ("The score board fits a phone"). '
+            + 'The owner and the people who build the app with you see it on the app page while the draft is under way; a visitor never does. '
+            + 'It stays with the draft until you send a new one, or an empty string to clear it, and becomes the roadmap line when aimeat_app_draft_publish is given none.',
     },
 } as const;
 
@@ -151,6 +163,7 @@ export const appPublishTools = [
             category: { type: 'string', description: 'Category (defaults to the live app\'s).' },
             tags: { type: 'array', description: 'Tags (default: the live app\'s).', zod: z.array(z.string()) },
             icon: { type: 'string', description: 'Emoji icon (defaults to the live app\'s).' },
+            ...DRAFT_NOTICE_INPUT,
         },
     },
     {
@@ -163,7 +176,7 @@ export const appPublishTools = [
         surfaces: ['appdev'],
         input: {
             owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
-            roadmap: { type: 'string', description: 'What this version changes. Required when the app is shared with another developer.' },
+            roadmap: { type: 'string', description: 'What this version changes. Required when the app is shared with another developer. Defaults to the draft\'s notice when the draft has one.' },
             ...SPEC_GATE_INPUT,
             ...aiProvenanceCatalogInput,
             filename: { type: 'string', required: true, description: 'App filename whose draft to publish.' },
@@ -201,6 +214,7 @@ export const appPublishTools = [
             expected_size_bytes: { type: 'number', description: 'Refuse unless the draft is currently this many bytes. Guards a multi-call build against a lost update.', zod: z.number().int().nonnegative() },
             name: { type: 'string', description: 'Display name (defaults to the live app\'s, or the draft\'s once set).' },
             description: { type: 'string', description: 'Description (defaults to the live app\'s, or the draft\'s once set).' },
+            ...DRAFT_NOTICE_INPUT,
         },
     },
     {
@@ -247,6 +261,7 @@ export const appPublishTools = [
             filename: { type: 'string', required: true, description: 'The draft slot to write into.' },
             from_filename: { type: 'string', description: 'The published app to copy from. Defaults to filename.' },
             version: { type: 'number', description: 'Which published version. Defaults to the newest.', zod: z.number().int().min(1) },
+            ...DRAFT_NOTICE_INPUT,
         },
     },
     {

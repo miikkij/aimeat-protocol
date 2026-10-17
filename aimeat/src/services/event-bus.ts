@@ -28,6 +28,8 @@
  *     change was global, which v1.3.0's owner scope never reached.
  *   v1.6.0 — 2026-10-13 — The `rowsAppended` channel: one event per append call to a workspace row
  *     space, which the workflow engine's `workspace.rows` triggers start from.
+ *   v1.7.0 — 2026-10-18 — The `appChange` channel: one app's new version or draft change, which the
+ *     SSE transport forwards to the streams opened for that app (the app page's update news).
  */
 import { EventEmitter } from 'node:events';
 
@@ -250,4 +252,42 @@ export function onRowsAppendedEvent(handler: (evt: RowsAppendedEvent) => void): 
 
 export function offRowsAppendedEvent(handler: (evt: RowsAppendedEvent) => void): void {
   bus.off('rowsAppended', handler);
+}
+
+// ── appChange ────────────────────────────────────────────────────────────────────────────────────
+// One app changed: a new version went live, or its draft was written, discarded or promoted. The
+// `change` channel's `apps` domain says only that SOME app changed, so an open app page could not
+// tell its own update from any other publish on the node. The SSE transport forwards this channel
+// to a stream that was opened for one app (routes/sse.ts), and only `version` to a visitor: a
+// draft is seen by the owner and the people holding a development right (Jouni, 2026-10-18).
+
+export interface AppChangeEvent {
+  /** `owner/filename` with the bare owner name (services/app-record-keys.ts canonicalAppId form). */
+  appId: string;
+  /** `version`: a new version is live. `draft`: the draft slot was written, discarded or promoted. */
+  kind: 'version' | 'draft';
+  /** For `version`: the number now live. */
+  version?: number;
+  timestamp: number;
+}
+
+export function emitAppChange(evt: Omit<AppChangeEvent, 'timestamp'>): void {
+  bus.emit('appChange', { ...evt, timestamp: Date.now() } satisfies AppChangeEvent);
+}
+
+/**
+ * A new live version of one app: the coarse `apps` domain for every stream, as before, and the
+ * app's own `version` event for the pages that have it open.
+ */
+export function emitAppVersion(ownerName: string, filename: string, version: number): void {
+  emitChange('apps');
+  emitAppChange({ appId: `${ownerName}/${filename}`, kind: 'version', version });
+}
+
+export function onAppChangeEvent(handler: (evt: AppChangeEvent) => void): void {
+  bus.on('appChange', handler);
+}
+
+export function offAppChangeEvent(handler: (evt: AppChangeEvent) => void): void {
+  bus.off('appChange', handler);
 }

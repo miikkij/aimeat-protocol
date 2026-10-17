@@ -19,6 +19,9 @@
  *     access-coded or unlisted app is the owner's and an operator's, a community-listed app also a
  *     member's of this node; anyone else gets the not-found answer (QA audit W15).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
+ *   2026-10-18 — aimeat_app_draft_save takes `notice` (what the draft changes), and
+ *     aimeat_app_draft_publish takes the draft's notice as its roadmap line when none is given.
+ *     aimeat_app_get carries `news`: the latest changes and, for a builder, the draft under way.
  *   2026-10-12 — aimeat_app_list and aimeat_app_get carry `listing` (listed, community, unlisted), and
  *     aimeat_app_list returns the apps other owners listed to the node's members.
  *   2026-10-11 — aimeat_app_get carries the deprecated `priceMorsels` mirror of the pacing amount, as the
@@ -131,6 +134,7 @@ import {
 } from '../services/app-lifecycle.js';
 import { isSharedApp, listAppsBuiltFor, levelName } from '../services/app-dev-grant.js';
 import { roadmapGate } from '../services/app-roadmap.js';
+import { draftNoticeFrom, appViewerStanding, readAppNews } from '../services/app-news.js';
 import { publicAppManifest } from '../services/app-public-manifest.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
@@ -353,10 +357,12 @@ export function registerAppsTools(
         // content_base64, the name this tool used, or as content, the name the other surfaces use.
         zodShapeFor('aimeat_app_draft_save'),
         annotationsFor('aimeat_app_draft_save'),
-        async ({ filename, owner, content, content_base64: givenBase64, name, description, category, tags, icon }) => {
+        async ({ filename, owner, content, content_base64: givenBase64, name, description, category, tags, icon, notice }) => {
             const content_base64 = givenBase64 ?? content;
             if (!content_base64) return { content: [{ type: 'text' as const, text: 'INVALID_INPUT: give the draft\'s base64-encoded HTML as content_base64 (or content).' }], isError: true };
             const agentGaii = getAgentGaii();
+            const draftNotice = draftNoticeFrom(notice, agentGaii);
+            if (draftNotice && 'refusal' in draftNotice) return { content: [{ type: 'text' as const, text: `INVALID_INPUT: ${draftNotice.refusal}` }], isError: true };
             const scope = await resolveAppTargetScope(storage, config,
                 { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
@@ -371,7 +377,7 @@ export function registerAppsTools(
                     ownerGhii: scope.ownerGhii,
                     filename,
                     data,
-                    requested: { name, description, category, tags, icon },
+                    requested: { name, description, category, tags, icon, draftNotice },
                 });
                 if ('refusal' in staged) {
                     return { content: [{ type: 'text' as const, text: refusalText(staged.refusal) }], isError: true };
@@ -417,17 +423,18 @@ export function registerAppsTools(
                 { principal: agentGaii, owner, filename, act: 'publish' });
             if (!scope) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
             if ('refusal' in scope) return { content: [{ type: 'text' as const, text: scope.refusal }], isError: true };
-            const road = roadmapGate({
-                line: roadmap,
-                shared: await isSharedApp(storage, scope.ownerName, filename),
-            });
-            if (!road.ok) return { content: [{ type: 'text' as const, text: road.message }], isError: true };
             // Loaded here rather than in the service so this door can name ITS remedy; the HTTP door
             // points at `PUT .../draft` for the same condition.
             const draft = await storage.getAppDraft(scope.ownerGhii, filename);
             if (!draft) {
                 return { content: [{ type: 'text' as const, text: `No draft to publish for "${filename}". Save one with aimeat_app_draft_save first.` }], isError: true };
             }
+            // The draft's own notice answers the roadmap question when no line is given (publishAppDraft).
+            const road = roadmapGate({
+                line: roadmap?.trim() ? roadmap : draft.manifest.draftNotice?.text,
+                shared: await isSharedApp(storage, scope.ownerName, filename),
+            });
+            if (!road.ok) return { content: [{ type: 'text' as const, text: road.message }], isError: true };
             try {
                 // The promotion, including the draft-slot clear, is services/app-lifecycle.ts — the
                 // same function POST .../publish-draft calls. Both doors used to map the draft
@@ -640,6 +647,10 @@ export function registerAppsTools(
             // in one place for every door that shows a manifest to somebody else.
             const isOwn = localAccountName(getAgentGaii()) === app.ownerName;
             const manifest = presentAppManifest(isOwn ? app.manifest : publicAppManifest(app.manifest));
+            // What changed lately and, for the people who build it, the draft under way: the same
+            // answer as GET /v1/apps/:owner/:filename/news (services/app-news.ts).
+            const standing = await appViewerStanding(storage, config, session?.auth ?? null, app);
+            const news = await readAppNews(storage, app, standing.builder);
 
             return {
                 content: [{
@@ -667,6 +678,7 @@ export function registerAppsTools(
                         ai_provenance_url: prov?.recordUrl ?? null,
                         // What the app loads and calls, read from its bytes at publish (the dependency map).
                         requires: await requirementsOf(storage, 'app', depAppRef(app.ownerName, app.filename)),
+                        news,
                     }, null, 2),
                 }],
             };

@@ -15,6 +15,7 @@
  *   silence: an app's own element that only looks like a mark is never touched.
  * @usage pnpm exec vitest run test/unit/app-serve-marks-strip.test.ts
  * @version-history
+ *   2026-10-18 -- The app-info mark round-trips too, alone and with every other mark.
  *   v1.2.0 — 2026-10-09 — The "Use with your AI" mark round-trips alone and with every other mark.
  *   v1.1.0 — 2026-10-08 — The owner's analytics tags with their banner, and the behaviour script,
  *     round-trip through the real snippet functions (AI visibility layers B and D; e2e-app-marks
@@ -62,6 +63,18 @@ const AI_USE: NonNullable<ServeMarksSpec['aiUse']> = {
   use: { tools: 2, skills: 1, guideUrl: 'https://aimeat.io/v1/use-with-ai/alice/demo.html' }, locale: 'fi',
 };
 
+/**
+ * The app-info mark as services/app-news.ts hands it over: roadmap lines with characters that must
+ * be escaped, a label and a Finnish date, so its JSON block and its words are both exercised.
+ */
+const INFO: NonNullable<ServeMarksSpec['info']> = {
+  news: {
+    app: 'alice/demo.html', version: 7, label: '1.4', updatedAt: '2026-10-18T09:00:00.000Z',
+    changes: [{ what: 'The board fits a <phone> & "tablet".', version: 7, at: '2026-10-18T09:00:00.000Z' }],
+  },
+  tucked: true, moreUrl: 'https://aimeat.io/v1/appcat?q=demo.html', locale: 'fi',
+};
+
 const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
   ['every mark', FULL,
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-ref', 'badge', 'chrome-reserve']],
@@ -76,6 +89,9 @@ const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
   ['the "Use with your AI" mark alone, in Finnish', { isDocument: true, aiUse: AI_USE }, ['ai-use', 'chrome-reserve']],
   ['every mark and the "Use with your AI" mark', { ...FULL, aiUse: AI_USE },
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'ai-use', 'app-ref', 'badge', 'chrome-reserve']],
+  ['the app-info mark alone, in Finnish', { isDocument: true, info: INFO }, ['app-info', 'chrome-reserve']],
+  ['every mark, the "Use with your AI" mark and the app-info mark', { ...FULL, aiUse: AI_USE, info: INFO },
+    ['agent-discovery', 'ai-disclosure', 'ai-label', 'ai-use', 'app-info', 'app-ref', 'badge', 'chrome-reserve']],
 ];
 
 describe('stripServedMarks: a served copy comes back as the author\'s bytes', () => {

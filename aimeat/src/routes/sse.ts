@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Server-Sent Events transport for live UI updates, and the single-use connection
  *   tickets for every connection that cannot send an Authorization header. Exposes
- *   POST /v1/events/ticket (exchange JWT for a single-use connection ticket),
+ *   POST /v1/events/ticket (exchange JWT for a single-use connection ticket, optionally for one app),
+ *   POST /v1/events/visitor-ticket (the same without an account: the build and one public app),
  *   POST /v1/ws/ticket (the same for one WebSocket endpoint, spent at the upgrade in
  *   auth/ws-upgrade.ts) and GET /v1/events?ticket=... (the event stream). Forwards event-bus
  *   changes to connected clients as a `data:` SSE message, COALESCED to at most
@@ -13,6 +14,12 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   v1.7.0 -- 2026-10-18 -- Every stream opens with `event: hello` carrying the build, so an open SPA
+ *     page reloads after a restart on new code without asking /v1/build on a timer. A ticket may
+ *     follow one app (`{ app: "owner/filename" }`): the stream then carries that app's `event: app`
+ *     (a new version to everyone who may open it, the draft to its builders) and no domain frame.
+ *     POST /v1/events/visitor-ticket gives the same to a visitor without an account, within a cap
+ *     per node and per address. Jouni's ruling of 2026-10-18: live data is an event, never a poll.
  *   v1.6.0 -- 2026-10-09 -- POST /v1/ws/ticket: a 60-second single-use ticket for one WebSocket
  *     endpoint (realtime, personal-tunnel, connect-tunnel), so a client stops putting its session
  *     token in the upgrade URL (secrets audit 2026-10-09, d3). The SSE ticket map moved to
@@ -51,8 +58,12 @@ import { verifyJWT } from '../auth/jwt.js';
 import { isSocketKind, mintSocketTicket, SOCKET_KINDS, SOCKET_TICKET_TTL_SECONDS } from '../auth/ws-upgrade.js';
 import { createSingleUseTicketStore } from '../services/single-use-tickets.js';
 import { success, error } from '../middleware/envelope.js';
-import { onChangeEvent, offChangeEvent } from '../services/event-bus.js';
-import type { ChangeEvent } from '../services/event-bus.js';
+import { onChangeEvent, offChangeEvent, onAppChangeEvent, offAppChangeEvent } from '../services/event-bus.js';
+import type { ChangeEvent, AppChangeEvent } from '../services/event-bus.js';
+import { appStreamTopic, type AppStreamTopic } from '../services/app-news.js';
+import { equalAppId } from '../services/app-record-keys.js';
+import { rateLimit } from '../middleware/rate-limit.js';
+import { BUILD_ID } from './portal-spa.js';
 import { resolveIdentity, localAccountName, runAsNode } from '../utils/gaii.js';
 import { presence } from '../services/presence.js';
 import { allowedDomains, filterDomains, isOwnerPrincipal } from '../auth/sse-domain-scopes.js';
@@ -72,22 +83,81 @@ interface Ticket {
    * otherwise any app the owner opens would hold their presence online for as long as it runs.
    */
   presenceEligible: boolean;
+  /**
+   * The one app this stream follows (services/app-news.ts appStreamTopic), decided at mint time
+   * like `allow`. A stream opened for an app carries that app's events and the build, nothing else.
+   */
+  app?: AppStreamTopic;
+  /** Opened without an account: counted against the visitor caps, carries no domain at all. */
+  visitorIp?: string;
 }
 
 const tickets = createSingleUseTicketStore<Ticket>();
 
-export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
+/**
+ * Streams opened without an account, across the node and from one address. A visitor's stream is
+ * cheap (keepalives, the build, one app's versions), and these are the ceiling on how many of them
+ * one machine, or everyone together, may hold open at once.
+ */
+const VISITOR_STREAMS_MAX = 5000;
+const VISITOR_STREAMS_PER_IP = 24;
+let visitorStreams = 0;
+const visitorStreamsByIp = new Map<string, number>();
+
+/** A draft written in many small saves is told at most once a second, like the domain frames. */
+const DRAFT_COALESCE_MS = 1000;
+
+export function sseRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // Ticket endpoint — exchange JWT for a single-use SSE connection ticket
-  router.post('/v1/events/ticket', requireAuth(), (req, res) => {
+  // With `{ app: "owner/filename" }` in the body the stream follows that one app instead (its new
+  // versions, and its draft when the caller builds it): what an open app page listens to.
+  router.post('/v1/events/ticket', requireAuth(), async (req, res) => {
     const owner = isOwnerPrincipal(req.auth!);
+    const asked = (req.body as { app?: unknown } | undefined)?.app;
+    let app: AppStreamTopic | undefined;
+    if (asked !== undefined) {
+      const topic = await appStreamTopic(storage, config, req.auth!, asked);
+      if (!topic) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No app to follow at that address.'));
+        return;
+      }
+      app = topic;
+    }
     const ticket = tickets.mint({
       sub: req.auth!.sub,
       presenceGhii: resolveIdentity(req.auth!, config.nodeId),
       allow: owner ? null : allowedDomains(req.auth!.scopes),
-      presenceEligible: owner,
+      presenceEligible: owner && !app,
+      ...(app ? { app } : {}),
     }, 30_000);
+    res.json(success(config.nodeId, { ticket, expires: 30 }));
+  });
+
+  // The same ticket for a visitor without an account: a stream that carries the build (an open page
+  // reloads after the node restarts on new code) and, with `{ app }`, one app's new versions, when
+  // anyone may open that app. Never a domain frame and never a draft.
+  router.post('/v1/events/visitor-ticket', rateLimit({ windowMs: 60_000, max: 60 }), async (req, res) => {
+    const asked = (req.body as { app?: unknown } | undefined)?.app;
+    let app: AppStreamTopic | undefined;
+    if (asked !== undefined) {
+      const topic = await appStreamTopic(storage, config, null, asked);
+      if (!topic) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No app to follow at that address.'));
+        return;
+      }
+      app = topic;
+    }
+    const ticket = tickets.mint({
+      sub: '',
+      presenceGhii: '',
+      allow: new Set<string>(),
+      presenceEligible: false,
+      visitorIp: req.ip || 'unknown',
+      ...(app ? { app } : {}),
+    }, 30_000);
+    res.set('Cache-Control', 'no-store');
     res.json(success(config.nodeId, { ticket, expires: 30 }));
   });
 
@@ -130,6 +200,17 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
       return;
     }
 
+    const visitorIp = t.visitorIp;
+    if (visitorIp !== undefined) {
+      const fromIp = visitorStreamsByIp.get(visitorIp) ?? 0;
+      if (visitorStreams >= VISITOR_STREAMS_MAX || fromIp >= VISITOR_STREAMS_PER_IP) {
+        res.status(503).json(error(config.nodeId, 'TOO_MANY_STREAMS', 'Too many open live streams; the page keeps working without one.'));
+        return;
+      }
+      visitorStreams++;
+      visitorStreamsByIp.set(visitorIp, fromIp + 1);
+    }
+
     // Presence: an open PORTAL stream means this owner is reachable. An app-grant stream
     // resolves to the same GHII but must NOT speak for the human: otherwise any app they
     // leave open would pin them "available" (see presenceEligible at mint time).
@@ -157,6 +238,9 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
     // gives the browser an explicit reconnect backoff instead of its 3s default guess.
     res.write('retry: 3000\n\n');
     res.write(':open\n\n');
+    // Which build answers. A node restarted on new code drops every stream; the reconnect reads a
+    // different build here, and an open SPA page reloads on it instead of asking /v1/build on a timer.
+    res.write(`event: hello\ndata: ${JSON.stringify({ build: BUILD_ID })}\n\n`);
     flush();
 
     // Keepalive comment. 15s keeps the connection under the read timeout of common proxies
@@ -208,14 +292,41 @@ export function sseRouter(config: AimeatConfig, _storage: Storage): Router {
         trailingTimer = setTimeout(() => { trailingTimer = null; flushChange(); }, COALESCE_MS - since);
       }
     });
-    onChangeEvent(handler);
+    // A stream opened for one app, or by a visitor, carries no domain frame: the page that holds it
+    // listens for its app and the build, and the domains are the business of the signed-in shell.
+    const domainFrames = !t.app && visitorIp === undefined;
+    if (domainFrames) onChangeEvent(handler);
+
+    // The followed app's own events, as a named `app` event so a client listening for domain frames
+    // never mistakes one for "everything changed". A new version goes at once; a draft is told only
+    // to a builder's stream and at most once a second, since an agent writes a draft in many pieces.
+    const topic = t.app;
+    let draftTimer: ReturnType<typeof setTimeout> | null = null;
+    const sendApp = (body: { kind: 'version' | 'draft'; version?: number }): void => {
+      res.write(`event: app\ndata: ${JSON.stringify(body)}\n\n`);
+      flush();
+    };
+    const appHandler = (evt: AppChangeEvent): void => {
+      if (!topic || !equalAppId(evt.appId, topic.id)) return;
+      if (evt.kind === 'version') { sendApp({ kind: 'version', version: evt.version ?? 0 }); return; }
+      if (!topic.builder || draftTimer) return;
+      draftTimer = setTimeout(() => { draftTimer = null; sendApp({ kind: 'draft' }); }, DRAFT_COALESCE_MS);
+    };
+    if (topic) onAppChangeEvent(appHandler);
 
     // Cleanup on disconnect
     req.on('close', () => {
       clearInterval(keepalive);
       if (trailingTimer) clearTimeout(trailingTimer);
-      offChangeEvent(handler);
+      if (draftTimer) clearTimeout(draftTimer);
+      if (domainFrames) offChangeEvent(handler);
+      if (topic) offAppChangeEvent(appHandler);
       if (t.presenceEligible) presence.markOffline(t.presenceGhii);
+      if (visitorIp !== undefined) {
+        visitorStreams = Math.max(0, visitorStreams - 1);
+        const left = (visitorStreamsByIp.get(visitorIp) ?? 1) - 1;
+        if (left > 0) visitorStreamsByIp.set(visitorIp, left); else visitorStreamsByIp.delete(visitorIp);
+      }
     });
   });
 

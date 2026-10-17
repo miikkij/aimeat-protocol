@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.19.0 — 2026-10-18 — AppMarks gains `info` and `tucked`; a draft's manifest may carry
+ *     `draftNotice` (AppDraftNotice), what the draft is changing. Both live in JSON, no migration.
  *   v1.18.0 — 2026-10-17 — AppRecord gains `access`: who may open the app (absent anyone,
  *     'signed-in', 'organism:<id>'), separate from the listing.
  *   v1.17.0 — 2026-10-12 — AppRecord gains `community` and AppListOptions `includeCommunity`: a
@@ -67,6 +69,27 @@ export interface AppMarks {
   install?: boolean;
   /** The "Use with your AI" mark, served when the app has public app tools or bound skills. */
   aiUse?: boolean;
+  /** The app-info mark: the version, when it was last updated and what changed (utils/app-info-badge.ts). */
+  info?: boolean;
+  /**
+   * The row's starting state for a visitor who has not chosen: true tucks the optional marks away
+   * until the pointer comes near the corner. Absent = false, the marks are in view. The AI label and
+   * the cookie mark are never tucked. A visitor's own choice wins and is kept per app in the browser.
+   */
+  tucked?: boolean;
+}
+
+/**
+ * What the app's draft is changing, in one sentence, with who wrote it and when. Kept on the DRAFT's
+ * manifest only (services/app-news.ts): the owner and the people holding a development right see it
+ * on the app page, a visitor never does (Jouni, 2026-10-18), and promoting the draft makes it the
+ * version's roadmap line when the publisher gives none.
+ */
+export interface AppDraftNotice {
+  text: string;
+  /** The account that wrote it. */
+  by: string;
+  at: string;
 }
 
 /** A natural person's declaration that they reviewed this app and answer for it. */
@@ -141,6 +164,8 @@ export function mergeLegal(
 export interface AppManifest {
   /** Summary of the roadmap committed with this app version. */
   roadmap?: { at: string; version: number; done: number; wanted: number };
+  /** A draft's manifest only: what the draft is changing (AppDraftNotice). Never on a live version. */
+  draftNotice?: AppDraftNotice;
   /**
    * The design spec's stamp (services/app-design-spec.ts): when it was last written, by whom, against
    * which app version, at which revision, and how big it is. Never the prose. Refreshed by every

@@ -14,6 +14,8 @@
  *   prompt on click
  * @usage <script src="/js/install-chip.js" defer></script> (injected at serve time)
  * @version-history
+ *   v1.4.0 — 2026-10-18 — Placed after the app-info mark too (--aimeat-mark-info-w); the tucked row
+ *     (utils/app-info-badge.ts) hides it with the other optional marks.
  *   v1.3.0 — 2026-10-11 — Placed after the cookie mark too (--aimeat-mark-cookie-w).
  *   v1.2.0 — 2026-10-09 — Placed after the "Use with your AI" mark too (--aimeat-mark-aiuse-w).
  *   v1.1.0 — 2026-09-29 — The third mark on the one row (developer decision 2026-09-29): placed
@@ -58,9 +60,10 @@
   function buildPill() {
     var wrap = document.createElement('div');
     wrap.id = 'aimeat-install-chip';
-    // The last place on the row: after the AI label, the bolt, the "Use with your AI" mark and the
-    // cookie mark when they are there, in their place when they are not (the fallbacks are 0).
-    var left = 'calc(12px + var(--aimeat-mark-ai-w, 0px) + var(--aimeat-mark-badge-w, 0px) + var(--aimeat-mark-aiuse-w, 0px) + var(--aimeat-mark-cookie-w, 0px))';
+    // The last place on the row: after the AI label, the bolt, the "Use with your AI" mark, the
+    // app-info mark and the cookie mark when they are there, in their place when they are not (the
+    // fallbacks are 0).
+    var left = 'calc(12px + var(--aimeat-mark-ai-w, 0px) + var(--aimeat-mark-badge-w, 0px) + var(--aimeat-mark-aiuse-w, 0px) + var(--aimeat-mark-info-w, 0px) + var(--aimeat-mark-cookie-w, 0px))';
     wrap.style.cssText = 'position:fixed!important;left:' + left + '!important;right:auto!important;'
       + 'bottom:12px!important;top:auto!important;z-index:2147483646!important;display:flex!important;'
       + 'align-items:center!important;height:34px!important;box-sizing:border-box!important;'

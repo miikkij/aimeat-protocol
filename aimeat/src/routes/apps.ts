@@ -97,6 +97,8 @@
  *   v1.20.0 -- 2026-07-16 -- Agent-Bundled Apps Slice 1: apps/agents-deploy.ts — deploy/undeploy/
  *     status for crew-defs declared under manifest.cortex.agents (owner-scoped pointer tasks).
  *   2026-08-29 -- registerLegalRoutes: the app's own legal pages and its audit log (apps/legal.ts).
+ *   2026-10-18 -- registerAppNewsRoutes: GET /v1/apps/:owner/:filename/news, the version, the latest
+ *     changes and, for its builders, the draft under way (apps/news.ts).
  *   2026-10-17 -- registerAppOpenRoutes: POST /v1/apps/:owner/:filename/open hands a signed-in caller
  *     the address of an app that needs a sign-in, with a grant (apps/open.ts).
  *   2026-09-28 -- registerAppConfigRoutes: the config an app declares and its owner's values (apps/app-config.ts).
@@ -129,6 +131,7 @@ import { registerDraftRoutes } from './apps/drafts.js';
 import { registerForkManageRoutes } from './apps/fork-manage.js';
 import { registerLegalRoutes } from './apps/legal.js';
 import { registerRoadmapRoutes } from './apps/roadmap.js';
+import { registerAppNewsRoutes } from './apps/news.js';
 import { registerDesignSpecRoutes } from './apps/design-spec.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
 import { registerScopeAllowanceRoutes } from './apps/scope-allowance.js';
@@ -196,6 +199,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerForkManageRoutes(router, config, storage, canonicalOwner, appTarget);
     registerLegalRoutes(router, config, storage, canonicalOwner);
     registerRoadmapRoutes(router, config, storage, appTarget);
+    registerAppNewsRoutes(router, config, storage);
     registerDesignSpecRoutes(router, config, storage);
     registerScopeAllowanceRoutes(router, config, storage);
     registerAppAgentRoutes(router, config, storage);

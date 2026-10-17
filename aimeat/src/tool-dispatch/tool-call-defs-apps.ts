@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-10-18 -- aimeat_app_draft_save forwards `notice`, what the draft changes.
  *   2026-10-16 -- aimeat_app_get answers an app behind an access code only to its owner, as the node's MCP tool does (QA audit W15).
  *   v1.12.0 -- 2026-10-12 -- aimeat_app_delete says it deletes, as the code does; it said archive.
  *   v1.11.0 -- 2026-10-09 -- aimeat_extension_config_set sends PATCH /v1/extensions/:name/config.
@@ -66,6 +67,7 @@ import type { LevelDef } from '../services/iam/model.js';
 import type { CommandDef } from '../services/iam/app-commands.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 import { appSettingsTools } from './tool-call-defs-apps-settings.js';
+import { DRAFT_NOTICE_PARAM, draftNoticeBody } from './tool-call-defs-app-draft-edit.js';
 import { installExtensionOverHttp, installCortexOverHttp, extensionDetailPath } from './extension-install.js';
 
 /** What a caller states about one run, in the connector's own wire vocabulary. */
@@ -358,7 +360,9 @@ export const appTools: ConnectCliToolDefinition[] = [
                     message: `No app "${filename}" published by "${owner}". Use aimeat_app_list to see what exists.`,
                 } };
             }
-            return { ok: true as const, data: { app } };
+            // The latest changes and, for a builder, the draft under way, as the node's MCP carries them.
+            const news = await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/news`);
+            return { ok: true as const, data: { app, ...(news.ok !== false ? { news: news.data } : {}) } };
         },
     },
     {
@@ -574,6 +578,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             category: { type: 'string', description: 'Category (defaults to the live app\'s).' },
             tags: { type: 'array', description: 'Tags (default: the live app\'s).' },
             icon: { type: 'string', description: 'Emoji icon (defaults to the live app\'s).' },
+            notice: DRAFT_NOTICE_PARAM,
         },
         handler: ({ client, config }, input) => {
             const filename = requiredString(input, 'filename');
@@ -585,6 +590,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             const category = optionalString(input, 'category'); if (category) body.category = category;
             const icon = optionalString(input, 'icon'); if (icon) body.icon = icon;
             const tags = optionalArray(input, 'tags'); if (tags) body.tags = tags;
+            draftNoticeBody(input, body);
             return client.put(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/draft`, body);
         },
     },

@@ -38,6 +38,7 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.10.0 — 2026-10-18 — `marks.info` and `marks.tucked`: the app-info mark and the row's starting state.
  *   v1.9.0 — 2026-10-17 — `access`: who may open the app changed (plan doc-mvcn6c7e4e5q V2.1).
  *   v1.8.0 — 2026-10-16 — recordAppAudit writes with compare-and-swap and retries on a version miss, so
  *     two overlapping audited changes both keep their entry; a write that still fails is logged at error
@@ -82,7 +83,7 @@ export const APP_AUDIT_MAX = 500;
 /** What can happen to a published app's settings. Kept flat so a reader can grep it. */
 export type AppAuditAction =
   | 'legal.set' | 'legal.cleared'
-  | 'marks.badge' | 'marks.install' | 'marks.aiUse'
+  | 'marks.badge' | 'marks.install' | 'marks.aiUse' | 'marks.info' | 'marks.tucked'
   | 'authorship.declared' | 'authorship.cleared'
   | 'seo'
   | 'parked' | 'unparked' | 'community'

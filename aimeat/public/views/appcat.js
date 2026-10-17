@@ -12,13 +12,17 @@
  *   address (?view=), the stars on the node. Writes no class; the parts are components.
  *
  *   Deep links (features.md F287–F291): ?lang= (the site reads it), ?view=library|community|favorites|building,
- *   ?filter=<state or condition>, ?q=<search>, ?create=1 (the generate-with-AI dialog), ?add=1 (sign
+ *   ?filter=<state or condition>, ?q=<search>, ?app=<owner>/<filename> (that app's details, in the view
+ *   it belongs to), ?create=1 (the generate-with-AI dialog), ?add=1 (sign
  *   in, then the Add dialog on its Paste tab). Keys (F170–F173): Escape closes the app viewer, else
  *   the detail view; Ctrl/Cmd+N opens Add; Ctrl/Cmd+F brings the focus to the search; while a dialog
  *   is open the page's keys stand aside.
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.2.0 — 2026-10-18 — ?app=<owner>/<filename> opens one app's details in its own view (Your apps,
+ *     Building for others or the community): the link of the app-info mark on a served app. Jouni
+ *     found the search link landing on Your apps with no match for another person's app.
  *   v1.1.0 — 2026-10-04 — The view Building for others (?view=building): the apps somebody else owns
  *     and the person may build, shown in the index only to a person who holds such a right (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.0.0 — 2026-09-27 — Initial (appcat, the shell builder).
@@ -31,7 +35,7 @@ import { ToastBox } from '/components/Toast.js';
 import { onAuthChange, authLoaded } from '/js/services/auth.js';
 import { onLocaleChange } from '/js/i18n.js';
 import { x } from '/views/appcat/i18n.js';
-import { useCatalog, reloadCatalog, closeDetail, clearNotice, appRef } from '/views/appcat/store.js';
+import { useCatalog, reloadCatalog, closeDetail, clearNotice, appRef, findApp, isOwn, openDetail, notice } from '/views/appcat/store.js';
 import { DialogHost, openDialog } from '/views/appcat/dialogs/host.js';
 import * as detailModule from '/views/appcat/detail.js';
 import { CatRail } from '/views/appcat/rail.js';
@@ -99,6 +103,37 @@ export default function AppCat() {
       wait();
     }
   }, [params]);
+
+  // ?app=<owner>/<filename> opens that app's details in the view it belongs to: Your apps when it is
+  // the person's own, Building for others when they hold a right on it, the community's otherwise.
+  // The app-info mark on a served app links here (utils/app-info-badge.ts). Once the listing is in,
+  // and once per sign-in state, because signing in moves an app from the community to Your apps.
+  const linked = useRef('');
+  // Closing the details ends the link: the address loses ?app=, so a later redraw (a sign-out, a
+  // language change) does not open them again over the page.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (cat.detail) { opened.current = true; return; }
+    if (!opened.current) return;
+    opened.current = false;
+    const url = new URL(location.href);
+    if (!url.searchParams.has('app')) return;
+    url.searchParams.delete('app');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+  }, [cat.detail]);
+  useEffect(() => {
+    const ref = (new URLSearchParams(location.search).get('app') || '').trim();
+    const slash = ref.indexOf('/');
+    if (!cat.loaded || slash <= 0 || linked.current === `${cat.me || ''}|${ref}`) return;
+    linked.current = `${cat.me || ''}|${ref}`;
+    const row = findApp(ref.slice(0, slash), ref.slice(slash + 1));
+    if (!row) { notice(x('deepLink.notFound', { app: ref }), 'error'); return; }
+    const next = isOwn(row) ? 'library'
+      : (cat.building || []).some((b) => appRef(b) === appRef(row)) ? 'building' : 'community';
+    setView(next);
+    writeView(next);
+    openDetail(row);
+  }, [cat.loaded, cat.me, cat.building, params]);
 
   // The page's keys (F170–F173).
   useEffect(() => {

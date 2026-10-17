@@ -16,6 +16,7 @@
  * @usage
  *   import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
  * @version-history
+ *   2026-10-18 -- aimeat_app_draft_write and aimeat_app_draft_seed forward `notice` (DRAFT_NOTICE_PARAM).
  *   2026-09-28 -- aimeat_image_generate takes `role`, the AI role the call runs as.
  *   2026-09-27 -- aimeat_app_screenshot moved into aimeat_app_manage (action "screenshot").
  *   v1.0.0 — 2026-08-16 — Initial.
@@ -23,6 +24,17 @@
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalNumber, optionalBoolean } from './tool-call-helpers.js';
 import { AI_ROLE_PARAM } from '../tool-catalog/definitions/ai-models.js';
+
+/** What the draft changes (services/app-news.ts). Forwarded as given: an empty string clears it. */
+export const DRAFT_NOTICE_PARAM = {
+    type: 'string',
+    description: 'One sentence, at most 280 characters, on what this draft changes. The app\'s builders see it on the app page; an empty string clears it.',
+} as const;
+
+/** The notice as the route takes it, an empty string included. */
+export function draftNoticeBody(input: JsonObject, body: JsonObject): void {
+    if (typeof input.notice === 'string') body.notice = input.notice;
+}
 
 export const appDraftEditTools: ConnectCliToolDefinition[] = [
     {
@@ -37,6 +49,7 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             expected_size_bytes: { type: 'number', description: 'Refuse unless the draft is currently this many bytes.' },
             name: { type: 'string', description: 'Display name (defaults to the live app\'s, or the draft\'s once set).' },
             description: { type: 'string', description: 'Description (defaults to the live app\'s, or the draft\'s once set).' },
+            notice: DRAFT_NOTICE_PARAM,
         },
         handler: ({ client, config }, input) => {
             const filename = requiredString(input, 'filename');
@@ -45,6 +58,7 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             const expected = optionalNumber(input, 'expected_size_bytes'); if (expected !== undefined) body.expected_size_bytes = expected;
             const name = optionalString(input, 'name'); if (name) body.name = name;
             const description = optionalString(input, 'description'); if (description !== undefined) body.description = description;
+            draftNoticeBody(input, body);
             return client.post(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/draft/write`, body);
         },
     },
@@ -97,12 +111,14 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             owner: { type: 'string', description: 'Whose catalogue the app is in. Omit for your own; naming somebody else works only when they granted you a development right on it.' },
             from_filename: { type: 'string', description: 'The published app to copy from. Defaults to filename.' },
             version: { type: 'number', description: 'Which published version. Defaults to the newest.' },
+            notice: DRAFT_NOTICE_PARAM,
         },
         handler: ({ client, config }, input) => {
             const filename = requiredString(input, 'filename');
             const body: JsonObject = {};
             const from = optionalString(input, 'from_filename'); if (from) body.from_filename = from;
             const version = optionalNumber(input, 'version'); if (version !== undefined) body.version = version;
+            draftNoticeBody(input, body);
             return client.post(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/draft/seed`, body);
         },
     },

@@ -32,6 +32,7 @@
  *   - cookieConsentMiddleware(config): adds the snippet to text/html string bodies before </body>
  *   - buildStandaloneSnippetJs(config): self-loading IIFE for GET /v1/portal/cookie-consent.js
  * @version-history
+ *   v2.2.1 — 2026-10-18 — The cookie mark sits after the app-info mark too (--aimeat-mark-info-w).
  *   v2.2.0 — 2026-10-11 — With no policy address set the banner links to the service's own privacy
  *     policy, with the service's address in front on an app's page (`assetBase`).
  *   v2.1.0 — 2026-10-11 — The service's own pages get the banner only when the operator lists a
@@ -109,7 +110,7 @@ const COOKIE_ICON = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="non
 
 /**
  * The cookie mark's style: a 34px round button on the node's row of marks, after the AI label, the
- * attribution bolt and the "Use with your AI" mark, by the widths they declare; it declares its own
+ * attribution bolt, the "Use with your AI" mark and the app-info mark, by the widths they declare; it declares its own
  * room as --aimeat-mark-cookie-w for the install button after it (public/js/install-chip.js). Drawn
  * like the others (utils/app-ai-use-badge.ts): an opaque surface and every declaration `!important`,
  * so app CSS cannot restyle it. One step under the banner's own layer, so the open dialog covers it.
@@ -117,7 +118,7 @@ const COOKIE_ICON = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="non
 const COOKIE_MARK_CSS = ':root{--aimeat-mark-cookie-w:42px}'
   + '#aimeat-cookie-mark{display:contents!important}'
   + '#aimeat-cookie-mark button{display:flex!important;position:fixed!important;'
-  + 'left:calc(12px + var(--aimeat-mark-ai-w,0px) + var(--aimeat-mark-badge-w,0px) + var(--aimeat-mark-aiuse-w,0px))!important;'
+  + 'left:calc(12px + var(--aimeat-mark-ai-w,0px) + var(--aimeat-mark-badge-w,0px) + var(--aimeat-mark-aiuse-w,0px) + var(--aimeat-mark-info-w,0px))!important;'
   + 'right:auto!important;bottom:12px!important;top:auto!important;z-index:2147483646!important;width:34px!important;'
   + 'height:34px!important;box-sizing:border-box!important;margin:0!important;padding:0!important;align-items:center!important;'
   + 'justify-content:center!important;border-radius:50%!important;color:#FFB52E!important;background:#14141c!important;'

@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-18 — The inline live version carries the app-info mark (services/app-news.ts appInfoMarkFor).
  *   2026-10-17 — The app's access setting (anyone, signed-in, an organism) and the node's signed-in
  *     content access gate the apex read beside the code: a stranger's browser goes to /v1/app-open,
  *     an API caller gets 401 or 403, and the inline redirect carries a grant (plan doc-mvcn6c7e4e5q V2.3).
@@ -112,6 +113,7 @@ import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { servedBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
 import { appAiUse } from '../../services/app-ai-use.js';
+import { appInfoMarkFor } from '../../services/app-news.js';
 import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
 import { appOfRequestOrigin } from '../../services/app-origin-target.js';
 import { appCsp } from '../../utils/app-csp.js';
@@ -701,6 +703,9 @@ export function registerReadRoutes(
         const locale = detectLocale(req.headers['accept-language']);
         // The "Use with your AI" mark rides with the visible chrome (services/app-ai-use.ts).
         const aiUse = (runnable && isHtml) ? await appAiUse(storage, config, app) : null;
+        // The app-info mark rides on the live version only: a page pinned to ?version= is not
+        // reloaded onto a newer one (services/app-news.ts, public/js/app-news.js).
+        const info = (runnable && isHtml && !version) ? await appInfoMarkFor(storage, config, app, locale) : undefined;
         let body = (runnable && isHtml)
             // The visible label rides ONLY on the inline (runnable) form. A raw download stays
             // byte-for-byte, which is what keeps the content hash in the record verifiable.
@@ -712,6 +717,7 @@ export function registerReadRoutes(
                 badge: servedBadgeOn(config, app.manifest),
                 provenance: prov,
                 aiUse: aiUse ? { use: aiUse, locale } : undefined,
+                info,
                 visibleLabel: {
                     config, locale,
                     // As the publish decides it: an access code or a park makes the app private.

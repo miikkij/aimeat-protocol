@@ -36,6 +36,8 @@
  *   const out = await applyOwnerMarksUpdate(storage, { ownerGaii, filename },
  *     { marks: body.marks, author: body.author, actor: { ghii, ownerPrincipal } });
  * @version-history
+ *   v1.5.0 — 2026-10-18 — Two more: `info`, the app-info mark (absent = on), and `tucked`, whether the
+ *     optional marks start tucked away for a visitor who has not chosen (absent = false, in view).
  *   v1.4.0 — 2026-10-09 — A third switch, `aiUse`: the "Use with your AI" mark (services/app-ai-use.ts). Absent = on.
  *   v1.3.0 — 2026-09-29 — servedBadgeOn(): the node's AIMEAT_APP_BADGE switch, then the per-app one.
  *   v1.2.0 — 2026-09-26 — `labelPolicy`: the declaration's note says the visible label stays on a
@@ -54,6 +56,7 @@ import { resolveAppOwnerScope } from './app-lifecycle.js';
 import { emitChange } from './event-bus.js';
 import { recordAppAudit, type AppAuditAction } from './app-audit.js';
 import { appAiUseOn } from '../utils/app-ai-use-badge.js';
+import { appInfoMarkOn, appMarksTucked } from '../utils/app-info-badge.js';
 
 export const AUTHOR_NAME_MAX = 120;
 
@@ -83,6 +86,12 @@ export function appInstallChipOn(m: AppManifest | undefined | null): boolean {
  */
 export { appAiUseOn };
 
+/**
+ * The app-info mark (absent = on) and the row's starting state (absent = in view). Declared beside the
+ * mark (utils/app-info-badge.ts) for the same reason as appAiUseOn.
+ */
+export { appInfoMarkOn, appMarksTucked };
+
 /** The declared reviewer's name, or undefined when nobody has declared. */
 export function appReviewedBy(m: AppManifest | undefined | null): string | undefined {
   const name = m?.authorship?.name?.trim();
@@ -91,16 +100,16 @@ export function appReviewedBy(m: AppManifest | undefined | null): string | undef
 
 // ── Request shapes ──────────────────────────────────────────────────────────────────────────────
 
-const MARK_KEYS: ReadonlyArray<keyof AppMarks> = ['badge', 'install', 'aiUse'];
+const MARK_KEYS: ReadonlyArray<keyof AppMarks> = ['badge', 'install', 'aiUse', 'info', 'tucked'];
 
-/** `{ badge?: boolean, install?: boolean, aiUse?: boolean }`; anything else is refused by name. */
+/** `{ badge?, install?, aiUse?, info?, tucked? }`, each a boolean; anything else is refused by name. */
 export function parseMarksInput(input: unknown): { marks: Partial<AppMarks> } | { error: string } {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    return { error: 'marks must be an object of booleans (badge, install, aiUse)' };
+    return { error: 'marks must be an object of booleans (badge, install, aiUse, info, tucked)' };
   }
   const marks: Partial<AppMarks> = {};
   for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-    if (!(MARK_KEYS as readonly string[]).includes(k)) return { error: `marks.${k} is not a mark (badge, install, aiUse)` };
+    if (!(MARK_KEYS as readonly string[]).includes(k)) return { error: `marks.${k} is not a mark (badge, install, aiUse, info, tucked)` };
     if (typeof v !== 'boolean') return { error: `marks.${k} must be a boolean` };
     marks[k as keyof AppMarks] = v;
   }
@@ -126,7 +135,7 @@ export function parseAuthorInput(input: unknown): { name: string | null } | { er
 // ── State and notes ─────────────────────────────────────────────────────────────────────────────
 
 export interface AppMarksState {
-  marks: { badge: boolean; install: boolean; aiUse: boolean };
+  marks: { badge: boolean; install: boolean; aiUse: boolean; info: boolean; tucked: boolean };
   authorship: AppAuthorship | null;
   authorshipLog: AppAuthorshipLogEntry[];
 }
@@ -134,7 +143,10 @@ export interface AppMarksState {
 export function appMarksState(app: Pick<AppSummaryRecord, 'manifest'>): AppMarksState {
   const m = app.manifest;
   return {
-    marks: { badge: appBadgeOn(m), install: appInstallChipOn(m), aiUse: appAiUseOn(m) },
+    marks: {
+      badge: appBadgeOn(m), install: appInstallChipOn(m), aiUse: appAiUseOn(m),
+      info: appInfoMarkOn(m), tucked: appMarksTucked(m),
+    },
     authorship: m?.authorship ?? null,
     authorshipLog: m?.authorshipLog ?? [],
   };
@@ -213,6 +225,16 @@ export async function applyOwnerMarksUpdate(
         ? 'The "Use with your AI" mark is shown on this app again whenever it has public app tools or skills.'
         : 'The "Use with your AI" mark is no longer shown on this app. Its tools and skills stay public to agents.');
     }
+    if (update.marks.info !== undefined && update.marks.info !== before.marks.info) {
+      notes.push(update.marks.info
+        ? 'The app-info mark is shown on this app again: its version, when it was last updated and what changed.'
+        : 'The app-info mark is no longer shown on this app. An open page still reloads itself when a new version is published.');
+    }
+    if (update.marks.tucked !== undefined && update.marks.tucked !== before.marks.tucked) {
+      notes.push(update.marks.tucked
+        ? 'The marks on this app now start tucked away and come into view when the pointer nears the corner. The AI label and the cookie mark stay in view. A visitor who chose otherwise keeps their choice.'
+        : 'The marks on this app now start in view. A visitor who tucked them away keeps their choice.');
+    }
   }
 
   if (author !== undefined) {
@@ -245,6 +267,8 @@ export async function applyOwnerMarksUpdate(
     if (update.marks?.badge !== undefined && update.marks.badge !== before.marks.badge) await audit('marks.badge', { on: update.marks.badge });
     if (update.marks?.install !== undefined && update.marks.install !== before.marks.install) await audit('marks.install', { on: update.marks.install });
     if (update.marks?.aiUse !== undefined && update.marks.aiUse !== before.marks.aiUse) await audit('marks.aiUse', { on: update.marks.aiUse });
+    if (update.marks?.info !== undefined && update.marks.info !== before.marks.info) await audit('marks.info', { on: update.marks.info });
+    if (update.marks?.tucked !== undefined && update.marks.tucked !== before.marks.tucked) await audit('marks.tucked', { on: update.marks.tucked });
     if (update.authorship === null) await audit('authorship.cleared', { name: before.authorship?.name ?? null });
     else if (update.authorship) await audit('authorship.declared', { name: update.authorship.name });
     // The catalogue card and the details view read these, so the views watching 'apps' have to

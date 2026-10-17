@@ -83,10 +83,6 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/routes/portal-spa.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/routes/site.ts": {
         "count": 1,
         "why": "UNREVIEWED"

@@ -236,7 +236,7 @@ The atomic primitive is an **action** (`actions.ts`, a callable unit of work). I
 
 ### Live Surface (Platform)
 
-`sse.ts` (authenticated, typed, owner-scoped live updates: one shared connection, subscribe with `onLiveUpdate`, never poll), `public-events.ts` (the unauthenticated landing feed), `notifications.ts` (the bell inbox), `push.ts` (VAPID) and `realtime.ts` (WebRTC and Yjs, behind a flag). These make the shared living surface live.
+`sse.ts` (typed, owner-scoped live updates: one shared connection, subscribe with `onLiveUpdate`, never poll; every stream opens with the build, a ticket may follow one app, and a visitor without an account gets a ticket for the build and a public app's versions), `public-events.ts` (the unauthenticated landing feed), `notifications.ts` (the bell inbox), `push.ts` (VAPID) and `realtime.ts` (WebRTC and Yjs, behind a flag). These make the shared living surface live.
 
 ### Portal Product Surfaces
 
