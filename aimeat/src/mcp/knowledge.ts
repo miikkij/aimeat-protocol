@@ -11,6 +11,8 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-17 — SECURITY: aimeat_knowledge_links asks the package read first (readPackage), as the
+ *     REST route does; it answered any package's links to any agent.
  *   2026-10-13 — aimeat_knowledge_get and the knowledge-package resource answer a manifest's pacing
  *     amount as sharing.toll_morsels, also for one stored with sharing.morsel_price
  *     (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
@@ -285,6 +287,11 @@ export function registerKnowledgeTools(
         zodShapeFor('aimeat_knowledge_links'),
         annotationsFor('aimeat_knowledge_links'),
         async ({ package_id, direction }) => {
+            // The package read first, as GET /v1/knowledge/:id/links asks it: links of a package the
+            // agent may not read answer the same as a package that does not exist.
+            if (!(await readPackage(package_id))) {
+                return { content: [{ type: 'text' as const, text: `Package not found: ${package_id}` }], isError: true };
+            }
             const manifestKey = `packages/${package_id}/manifest`;
             const links = await storage.listLinks(manifestKey, {
                 direction: direction ?? 'both',
