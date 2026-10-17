@@ -7,6 +7,7 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.21.0 -- 2026-10-17 -- A share for the organism's members refuses a signed-in outsider with 403 SHARE_MEMBERS_ONLY (V3.4).
  *   v1.20.0 -- 2026-10-16 -- The share routes decide each item's AI label for the reader the share
  *     serves (shareServedVisibility: public on an open share); it was decided as private, so an
  *     AI-made page on an open link owed no label. ?format=md carries each page's provenance note.
@@ -439,7 +440,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const found = await collectPublicDocs(id, ws, share, space ? { type: space } : undefined);
     if (found.count === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
-    if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
+    if (denied) { res.status(denied.code === 'SHARE_MEMBERS_ONLY' ? 403 : 401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const docs = await found.release(readerFor({ storage, config }, req.auth));
     if (docs.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public documents')); return; }
     void markPagesOpened(storage, config, id, ws, docs.map(d => ({ space: d.type, id: d.id })));
@@ -472,7 +473,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const found = await collectPublicDocs(id, ws, share, { type, id: docId });
     if (found.count === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
-    if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
+    if (denied) { res.status(denied.code === 'SHARE_MEMBERS_ONLY' ? 403 : 401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const [doc] = await found.release(readerFor({ storage, config }, req.auth));
     if (!doc) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Document not found or not public')); return; }
     // ONE document is one piece of content: its record rides the AI-Disclosure and Link headers in
@@ -530,7 +531,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       && ((await readWsManifestValue(id, ws))?.objectTypes as Array<Record<string, unknown>> | undefined ?? []).some(ot => ot.name === space && ot.mode === 'records');
     if (found.count === 0 && !emptyFeed) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
     const denied = asIcs && icsKeyMatches(share.icsKeyHash, req.query.key) ? null : await shareGateDenied(req, organism, id, ws, share);
-    if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
+    if (denied) { res.status(denied.code === 'SHARE_MEMBERS_ONLY' ? 403 : 401).json(error(config.nodeId, denied.code, denied.message)); return; }
     const records = await found.release(readerFor({ storage, config }, req.auth));
     if (records.length === 0 && !emptyFeed) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
     if (asIcs) {

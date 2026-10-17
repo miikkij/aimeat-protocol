@@ -9,6 +9,7 @@
  * @structure ShareAccess · ShareMeta · ResolvedShare · PublicDoc · PublicRecord
  * @usage import type { ResolvedShare } from './share-types.js';
  * @version-history
+ *   v1.4.0 — 2026-10-17 — ShareAccess 'organism': the members of the workspace's own organism (V3.4).
  *   v1.3.0 — 2026-10-16 — `until` on the share (end dates); `kind`, `namespace` and `html` on a public
  *     document that is an HTML page.
  *   v1.2.0 — 2026-10-13 — icsKeyHash on the share: the feed key of the ICS rendering.
@@ -16,7 +17,9 @@
  *   v1.0.0 — 2026-09-29 — Moved from routes/organisms/shared.ts (TARGET-082 V1).
  */
 
-export type ShareAccess = 'open' | 'password' | 'account';
+/** open: anyone with the link · password · account: any account of this node · organism: the members
+ *  of the workspace's own organism (plan doc-mvcn6c7e4e5q V3.4). */
+export type ShareAccess = 'open' | 'password' | 'account' | 'organism';
 /** `icsKeyHash`: the SHA-256 of the feed key that opens the ICS rendering of a shared records space
  *  to a calendar program, which cannot sign in or send a share token (services/calendar-feed.ts). */
 /** `until`: when a target stops being shared, keyed `*` (the workspace), `space:<name>` or

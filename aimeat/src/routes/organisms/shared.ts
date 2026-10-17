@@ -657,6 +657,12 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     if (share.access === 'account') {
       return authed ? null : { code: 'SHARE_ACCOUNT_REQUIRED', message: 'Sign in to view these shared documents' };
     }
+    // The members of this workspace's own organism (plan doc-mvcn6c7e4e5q V3.4): the same membership
+    // the workspace read asks, through memberRole.
+    if (share.access === 'organism') {
+      if (!authed) return { code: 'SHARE_ACCOUNT_REQUIRED', message: 'Sign in to view these shared documents' };
+      return await memberRole(req, organism, id) ? null : { code: 'SHARE_MEMBERS_ONLY', message: 'These documents are shared with the members of this organisation only' };
+    }
     // access === 'password': a valid share token for THIS org+ws, or an authenticated org member.
     const rawToken = req.headers['x-share-token'];
     const token = typeof rawToken === 'string' ? rawToken : undefined;

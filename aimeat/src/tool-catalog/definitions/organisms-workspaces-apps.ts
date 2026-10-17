@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-17 — aimeat_workspace_share takes access "organism": the members of the workspace's organism (V3.4).
  *   2026-10-17 — aimeat_workspace_share names `window_url`, an HTML page alone in the whole browser window.
  *   2026-10-16 — aimeat_workspace_share: share a page, a space or the workspace outside the organism
  *     and get its link (PUT /v1/organisms/:id/workspace/share, services/workspace-share.ts).
@@ -498,7 +499,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_share',
-        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person, and for an HTML page also `window_url`, the page alone in the whole browser window. Only the workspace creator or an organism admin, or their own agent, may change sharing.',
+        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node), "organism" (only the members of this workspace\'s organism) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person, and for an HTML page also `window_url`, the page alone in the whole browser window. Only the workspace creator or an organism admin, or their own agent, may change sharing.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Share Workspace Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -511,7 +512,7 @@ export const organismsWorkspacesAppsTools = [
             space: { type: 'string', description: 'The document space NAME. Alone, it shares the whole space; with `id`, one page of it.' },
             id: { type: 'string', description: 'The page id (from aimeat_workspace_read). Needs `space`.' },
             shared: { type: 'boolean', required: true, description: 'true shares it, false stops sharing it.' },
-            access: { type: 'string', enum: ['open', 'account', 'password'], description: 'Who may open the link: open (anyone with it), account (anyone signed in to this node), password (with `password`).' },
+            access: { type: 'string', enum: ['open', 'account', 'organism', 'password'], description: 'Who may open the link: open (anyone with it), account (anyone signed in to this node), organism (only the members of this workspace\'s organism), password (with `password`).' },
             password: { type: 'string', description: 'The share password, 4–128 characters, when access is "password". Tell the person; the node keeps only its hash.' },
             until: { type: 'string', description: 'When the share ends, as an ISO date such as 2027-01-31; "none" removes the end. Left out: no change, and an HTML page newly shared ends after 90 days.' },
         },
