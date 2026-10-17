@@ -21,6 +21,7 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-10-18 — `publish.requests.` makes twenty-five: a request to make something public.
  *   v1.x — 2026-10-11 — `agent-workplace.` makes twenty-four: where one agent's finished work is shared.
  *   v1.x — 2026-10-10 — `agents.connectors.` makes twenty-three: the owner's connectors and the
  *     orders that wait for one.
@@ -65,7 +66,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all twenty-four, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all twenty-five, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -106,8 +107,10 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // `agent-workplace.` (2026-10-11): which workspace one agent's finished work is shared with.
         // The node acts on it when a task completes, so an app that could write it could have the
         // owner's private results shared with a workspace the owner did not choose.
+        // `publish.requests.` (2026-10-18): a request to make something public, waiting for the owner.
+        // The decision route makes public what the record names, as the owner.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agent-workplace.', 'agents.connectors.', 'agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.roles.', 'ai.routing.', 'audit.', 'chat.', 'classification.policy.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'signals.', 'workflows.'],
+            ['agent-workplace.', 'agents.connectors.', 'agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.roles.', 'ai.routing.', 'audit.', 'chat.', 'classification.policy.', 'commerce.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'publish.requests.', 'signals.', 'workflows.'],
         );
     });
 
