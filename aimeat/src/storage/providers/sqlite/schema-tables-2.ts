@@ -6,6 +6,7 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.8.0 — 2026-10-17 — apps.access for a fresh database (schema.ts adds it to an existing one).
  *   v1.7.0 — 2026-10-12 — apps.community for a fresh database (schema.ts adds it to an existing one).
  *   v1.6.0 — 2026-10-11 — Comments only: apps.manifest's old price.morsels and app_purchases.priceMorsels
  *     hold pacing amounts, not prices. No schema change.
@@ -226,6 +227,7 @@ export function applySchemaTables2(db: Database.Database): void {
       accessCode     TEXT,
       parked         INTEGER NOT NULL DEFAULT 0,
       community      INTEGER NOT NULL DEFAULT 0,
+      access         TEXT,
       forkable       INTEGER NOT NULL DEFAULT 0,
       aiProvenanceId TEXT,
       operatorHidden INTEGER NOT NULL DEFAULT 0,

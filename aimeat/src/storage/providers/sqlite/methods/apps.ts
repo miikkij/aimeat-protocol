@@ -35,6 +35,8 @@
  *     3.26.1 record's `priceMorsels` reads as its pacing amount `tollMorsels`, as on postgres-kysely.
  *   v1.12.0 — 2026-10-12 — setAppParked becomes setAppListing (the `parked` and `community` pair in
  *     one write); createApp and both row readers carry `community`.
+ *   v1.13.0 — 2026-10-17 — `access` (who may open the app): createApp writes it, both row readers
+ *     carry it, and setAppAccess sets it on every version row.
  */
 import { mergeLegal } from '../../../types/apps.js';
 import type {
@@ -54,12 +56,13 @@ export const appMethods = {
 
   async createApp(this: SqliteStorage, record: AppRecord): Promise<AppRecord> {
     this.db.prepare(
-      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, community, forkable, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, operatorSeoBlocked, operatorSeoBlockedBy, operatorSeoBlockedAt, operatorSeoBlockReason, createdAt, aiProvenanceId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, community, access, forkable, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, operatorSeoBlocked, operatorSeoBlockedBy, operatorSeoBlockedAt, operatorSeoBlockReason, createdAt, aiProvenanceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ownerGaii, record.ownerName, record.filename, record.versionNumber,
       JSON.stringify(record.manifest), record.mimeType, record.size, record.data,
-      record.accessCode ?? null, record.parked ? 1 : 0, record.parked && record.community ? 1 : 0, record.forkable ? 1 : 0,
+      record.accessCode ?? null, record.parked ? 1 : 0, record.parked && record.community ? 1 : 0,
+      record.access ?? null, record.forkable ? 1 : 0,
       record.operatorHidden ? 1 : 0, record.operatorHiddenBy ?? null,
       record.operatorHiddenAt ?? null, record.operatorHideReason ?? null,
       record.operatorSeoBlocked ? 1 : 0, record.operatorSeoBlockedBy ?? null,
@@ -203,6 +206,13 @@ export const appMethods = {
     // The listing applies to the whole app — flag every version row, both columns in one write.
     const result = this.db.prepare('UPDATE apps SET parked = ?, community = ? WHERE ownerGaii = ? AND filename = ?')
       .run(listing === 'listed' ? 0 : 1, listing === 'community' ? 1 : 0, ownerGaii, filename);
+    return result.changes > 0;
+  },
+
+  async setAppAccess(this: SqliteStorage, ownerGaii: string, filename: string, access: string | null): Promise<boolean> {
+    // Who may open the app applies to the whole app — every version row. Stored as given.
+    const result = this.db.prepare('UPDATE apps SET access = ? WHERE ownerGaii = ? AND filename = ?')
+      .run(access, ownerGaii, filename);
     return result.changes > 0;
   },
 
@@ -431,6 +441,7 @@ export const appMethods = {
     if (row.accessCode) record.accessCode = row.accessCode as string;
     if (row.parked) record.parked = true;
     if (row.parked && row.community) record.community = true;
+    if (row.access) record.access = row.access as string;
     if (row.forkable) record.forkable = true;
     if (row.operatorHidden) {
       record.operatorHidden = true;
@@ -463,6 +474,7 @@ export const appMethods = {
     if (row.accessCode) record.accessCode = row.accessCode as string;
     if (row.parked) record.parked = true;
     if (row.parked && row.community) record.community = true;
+    if (row.access) record.access = row.access as string;
     if (row.forkable) record.forkable = true;
     if (row.operatorHidden) {
       record.operatorHidden = true;

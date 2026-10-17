@@ -14,6 +14,7 @@
  *     normalizeAppManifestPacing, and `freeOnly` means no pacing amount under either key.
  *   v1.2.0 — 2026-10-12 — Selects `community`; with includeCommunity a signed-in viewer's listing
  *     also returns other owners' parked apps marked community.
+ *   v1.3.0 — 2026-10-17 — Selects `access` (who may open the app), so a listing row carries it.
  */
 import type { AppListOptions, AppManifest } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -27,7 +28,7 @@ import { normalizeAppManifestPacing } from '../../../app-manifest-pacing.js';
  */
 export const SUMMARY_COLUMNS = [
   'a.ownerGaii', 'a.ownerName', 'a.filename', 'a.versionNumber', 'a.manifest', 'a.mimeType',
-  'a.size', 'a.accessCode', 'a.parked', 'a.community', 'a.forkable', 'a.operatorHidden', 'a.operatorHiddenBy',
+  'a.size', 'a.accessCode', 'a.parked', 'a.community', 'a.access', 'a.forkable', 'a.operatorHidden', 'a.operatorHiddenBy',
   'a.operatorHiddenAt', 'a.operatorHideReason',
   'a.operatorSeoBlocked', 'a.operatorSeoBlockedBy', 'a.operatorSeoBlockedAt', 'a.operatorSeoBlockReason',
   'a.aiProvenanceId', 'a.createdAt',

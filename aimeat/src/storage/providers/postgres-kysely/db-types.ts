@@ -881,6 +881,8 @@ export interface OutboundMessage {
 }
 
 export interface App {
+  /** Who may open the app: null anyone, 'signed-in' or 'organism:<id>'. Migration 0104. */
+  access: string | null;
   accessCode: string | null;
   aiProvenanceId: string | null;
   createdAt: Generated<Timestamp>;

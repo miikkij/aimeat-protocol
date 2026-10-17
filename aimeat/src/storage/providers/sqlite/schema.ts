@@ -78,6 +78,8 @@
  *     Postgres migration 0102.
  *   v1.6.0 — 2026-10-17 — Stored portfolio and company pages become the owner's files (visibility
  *     'owner'); their origin serves them from storage. Mirrors Postgres migration 0103.
+ *   v1.7.0 — 2026-10-17 — apps.access: who may open the app (NULL anyone, 'signed-in',
+ *     'organism:<id>'). Mirrors Postgres migration 0104.
  */
 import type Database from 'better-sqlite3';
 import { applySchemaTables1 } from './schema-tables-1.js';
@@ -497,6 +499,8 @@ export function initializeSchema(db: Database.Database): void {
   // Community listing: a parked app listed to signed-in members only. Pre-existing apps are 0, so
   // a parked app stays owner-only. Mirrors Postgres 0102.
   safeAddColumn('apps', 'community', 'INTEGER NOT NULL DEFAULT 0');
+  // Who may open the app: NULL anyone, 'signed-in' or 'organism:<id>'. Mirrors Postgres 0104.
+  safeAddColumn('apps', 'access', 'TEXT');
   // A portfolio or company page is served by its own origin from storage, never by its file
   // address, so the file itself is the owner's. It was written public, and a page taken off the web
   // stayed readable at /v1/pub. Mirrors Postgres 0103.

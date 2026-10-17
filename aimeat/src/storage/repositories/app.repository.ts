@@ -44,6 +44,8 @@
  *     design spec's stamp follows every write of the spec (services/app-design-spec.ts).
  *   v1.11.0 — 2026-10-12 — setAppParked becomes setAppListing(listing): one write sets the `parked`
  *     and `community` pair, so an app is listed, listed to signed-in members only, or unlisted.
+ *   v1.12.0 — 2026-10-17 — setAppAccess(access): who may open the app, on every version row
+ *     (null anyone, 'signed-in', 'organism:<id>'). Migration 0104.
  */
 import type { AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord, AppListing } from '../interface.js';
 
@@ -162,6 +164,14 @@ export interface AppRepository {
      * Returns true if any row was updated.
      */
     setAppListing(ownerGaii: string, filename: string, listing: AppListing): Promise<boolean>;
+    /**
+     * Set who may OPEN the app, on EVERY version row of (ownerGaii, filename). `null` means anyone;
+     * otherwise 'signed-in' (any account of this node) or 'organism:<organismId>' (the members of
+     * one organism). Separate from the listing, which says where the app is shown. The string is
+     * stored as given; the caller validates it. Mirrors setAppListing. Returns true if any row was
+     * updated.
+     */
+    setAppAccess(ownerGaii: string, filename: string, access: string | null): Promise<boolean>;
     /**
      * Set the fork-permission flag on EVERY version row of (ownerGaii, filename).
      * When true, outsiders (users other than the owner and the owner's own agents)
