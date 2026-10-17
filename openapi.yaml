@@ -33208,7 +33208,7 @@ paths:
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
         - { name: view, in: query, schema: { type: string, enum: [map, reasons] }, description: "`map` answers the whole published shelf as one page of text, every part on a line under its kind, and ignores the other filters. It is what the search tools answer when they are given nothing. `reasons` answers what builders wrote down about the Book, as what it should become next: the things made by hand because the Book had nothing for them, and the parts most often looked at and left, each with the reasons given." }
       responses:
-        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage, published_at? }], count }; with view=map { map, count, note }; with view=reasons { made: [{ name, times, kept, rows }], passed_over: [{ part, times, reasons }], note }" }
+        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage, published_at?, preview_url }], count }; with view=map { map, count, note }; with view=reasons { made: [{ name, times, kept, rows }], passed_over: [{ part, times, reasons }], note }. `preview_url` is where a frame shows the part: plain for a published part, and carrying an hour-long token `t` for a part in proposal, which only a signed-in caller's list holds." }
         '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       operationId: proposeDesignbookPart
@@ -33368,7 +33368,8 @@ paths:
         The part's body is exactly what an adopt writes into an app, so reading it IS the
         preview. Carries the record version (the part's evolution is its version history) and the
         adoption count. PUBLIC for a published part; one still in proposal needs a session and
-        answers 404 without one. `reasons` is what builders wrote about the part: `taken` counts
+        answers 404 without one. `part.preview_url` is where a frame shows it (see the list).
+        `reasons` is what builders wrote about the part: `taken` counts
         builders who reached for it, `kept` counts the apps among them whose owner said the app
         turned out well (the number that says more than "an AI favoured it"), `passed_over` those
         who looked and left, and the rows carry each one's own sentence. Accounts, not measurements.
@@ -33394,8 +33395,11 @@ paths:
         The part rendered as the real page the guarantee bench measures — the Atelier kit, the
         part's body, demo rows shaped per component; a look or motion sheet is shown worn by the
         demo arrangement, a genre as its template's own page, an illustration as its art
-        direction set in the kit's type. Sessionless for any part that exists (the part is a
-        public record already); the browsable gallery at /v1/design-book embeds this per card.
+        direction set in the kit's type. Sessionless for a published part. A part still in
+        proposal is shown to a signed-in caller, or to a frame whose address carries the token
+        `t` that the list and the detail read hand out as each part's `preview_url` (valid for an
+        hour, naming that one part); anyone else gets 404. The browsable gallery at
+        /v1/design-book embeds this per card.
         Answers text/html, not the JSON envelope. A genre that grew out of an app answers 302 to
         the app's own address instead: it is a published page with script in it, and it is never
         served from the node's origin. A component is benched again first: one that no longer
@@ -33412,6 +33416,13 @@ paths:
             The ground a COMPONENT part is shown on. A component reads the page's tokens, so it is a
             different picture in the dark. Every other kind ignores it, and so does any other value.
           schema: { type: string, enum: [light, dark] }
+        - name: t
+          in: query
+          required: false
+          description: >-
+            The preview token from a part's `preview_url`. Needed only for a part in proposal when
+            the request carries no session, which is how an iframe loads it.
+          schema: { type: string }
       responses:
         '200':
           description: The preview page

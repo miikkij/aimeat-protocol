@@ -10,7 +10,7 @@
  *   into an address every build gets.
  *
  *   A PART IS A MEMORY RECORD, NOT A TABLE ROW: `atelier.book.part.<id>` under the NODE'S OWN
- *   SYSTEM IDENTITY (`system@{nodeId}`, the compliance-register pattern), visibility public,
+ *   SYSTEM IDENTITY (`system@{nodeId}`, the compliance-register pattern), public once published,
  *   `trackable: true` — so the evolution timeline (versions, diffs, restore) is the same free
  *   machinery every stored layout already has, and the record is self-describing
  *   (`spec: 'aimeat.designbook.part/v1'`). The system identity is not an account anyone can hold
@@ -34,6 +34,7 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.11.0 — 2026-10-17 — A part in proposal is stored for signed-in members, published parts public (V0.4).
  *   v1.10.2 — 2026-10-08 — setStatus() keeps the part's provenance record when it rewrites the part
  *     with its new status. setMemory writes the column whole, so leaving it out erased the record of
  *     who wrote the part, and the gallery label went with it (aiprov E2).
@@ -301,7 +302,7 @@ export class DesignBookService {
       key: partKey(input.id),
       ownerGaii: this.bookOwner(),
       value: JSON.stringify(part),
-      visibility: 'public',
+      visibility: part.status === 'published' ? 'public' : 'members',
       tags: ['designbook', `kind:${part.kind}`, `status:${part.status}`],
       ttlHours: null,
       version: existing ? existing.version + 1 : 1,
@@ -747,7 +748,7 @@ export class DesignBookService {
       key: record.key,
       ownerGaii: this.bookOwner(),
       value: JSON.stringify(next),
-      visibility: 'public',
+      visibility: next.status === 'published' ? 'public' : 'members',
       tags: ['designbook', `kind:${part.kind}`, `status:${next.status}`],
       ttlHours: null,
       version: record.version + 1,

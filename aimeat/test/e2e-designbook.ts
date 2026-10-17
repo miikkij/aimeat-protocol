@@ -9,6 +9,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=designbook
  * @version-history
+ *   2026-10-17 — A part in proposal: its preview answers 404 anonymously and 200 to a frame holding
+ *     the read's preview_url token, a forged token opens nothing, and its record is not public
+ *     memory (plan doc-mvcn6c7e4e5q, V0.4). The genre preview of a proposal is read signed in: it
+ *     was read anonymously, which was the hole.
  *   2026-10-16 — The proposer's agent is refused the part delete on memory:delete (SCOPE_DENIED naming
  *     memory:purge) and passes with memory:purge (invariant 8 as ruled by the developer on 2026-10-16).
  *   v1.8.9 — 2026-09-26 — At propose, beside a list of the markup a counter-reset that names list-item
@@ -278,6 +282,18 @@ const GOOD_BODY = {
         assert(anon.status === 404, `an anonymous read of a proposed part is 404, got ${anon.status}`);
         const signed = await json(`/v1/designbook/${partId}`, { headers: auth(op.token) });
         assert(signed.status === 200, `the signed-in read still answers, got ${signed.status}`);
+        // The preview and the stored record were the two other ways in (plan doc-mvcn6c7e4e5q, V0.4):
+        // the preview rendered every part sessionless, and the record was public memory.
+        const anonPreview = await fetch(`${BASE}/v1/designbook/${partId}/preview`);
+        assert(anonPreview.status === 404, `an anonymous preview of a proposed part is 404, got ${anonPreview.status}`);
+        const url = signed.body.data.part.preview_url as string;
+        assert(typeof url === 'string' && url.includes('?t='), `the signed-in read hands the frame a token address, got ${url}`);
+        const framed = await fetch(`${BASE}${url}`);
+        assert(framed.status === 200, `a frame holding the token shows the proposal, got ${framed.status}`);
+        const forged = await fetch(`${BASE}/v1/designbook/${partId}/preview?t=not-a-token`);
+        assert(forged.status === 404, `a forged token opens nothing, got ${forged.status}`);
+        const record = await fetch(`${BASE}/v1/memory/${encodeURIComponent(`system@${NODE_ID}`)}/atelier.book.part.${partId}`);
+        assert(record.status === 404 || record.status === 403, `the proposal's record is not public memory, got ${record.status}`);
     });
 
     await test('re-proposing your own part updates it in place (200, version 2)', async () => {
@@ -1190,8 +1206,9 @@ const GOOD_BODY = {
             && /app-templates\/genre-departures/.test(adopt.body.error.message),
             `adopt refuses a genre with the fork address: ${JSON.stringify(adopt.body)}`);
 
-        // A genre previews as the page it IS: the template's own document, not the demo frame.
-        const prev = await fetch(`${BASE}/v1/designbook/genre-test-departures/preview`);
+        // A genre previews as the page it IS: the template's own document, not the demo frame. It is
+        // still in proposal, so the preview is read signed in (V0.4: it read it anonymously before).
+        const prev = await fetch(`${BASE}/v1/designbook/genre-test-departures/preview`, { headers: auth(other.token) });
         assert(prev.status === 200, `genre preview is 200, got ${prev.status}`);
         const page = await prev.text();
         assert(/<!DOCTYPE html>/i.test(page) && !page.includes('demoFor('), 'a genre serves its template page, not the demo frame');
