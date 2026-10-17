@@ -1164,6 +1164,44 @@ async function main() {
             assert(totals.channels.page === 3, 'the hits must be attributed to the page channel');
         });
 
+        // ── Phase 12: an app the operator hid is gone from its own origin too ─────────────────
+        // The apex answered 404 for a moderated app, while its own subdomain, the path form on the
+        // bare app host and the origin's documents kept serving it: the origin asked only about an
+        // access code and pacing (plan doc-mvcn6c7e4e5q, V0.2).
+        console.log('\nPhase 12: a moderated app is not served on its own origin');
+
+        await test('an operator-hidden app answers 404 on its subdomain, the path form and its documents', async () => {
+            const hide = await json(`/v1/admin/apps/${owner}/${filename}/moderate`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ hidden: true, reason: 'policy test' }),
+            });
+            assert(hide.status === 200 && hide.body.data.operator_hidden === true, `hide: ${hide.status} ${JSON.stringify(hide.body)}`);
+            try {
+                const root = await onAppOrigin('/', SUB);
+                assert(root.status === 404, `the subdomain still serves the hidden app: ${root.status}`);
+                assert(!root.body.includes('app origin demo'), 'the hidden app\'s HTML reached the visitor');
+                const pathForm = await onAppOrigin(`/${owner}/${filename}`, null);
+                assert(pathForm.status === 404, `the path form still answers: ${pathForm.status}`);
+                const md = await onAppOrigin('/?format=md', SUB);
+                assert(md.status === 404, `the markdown face still answers: ${md.status}`);
+                // With no app to describe, /llms.txt falls through to what served the path before;
+                // what matters is that nothing of the hidden app is in it.
+                const llms = await onAppOrigin('/llms.txt', SUB);
+                assert(!llms.body.includes('Origin Demo') && !llms.body.includes(filename),
+                    `the origin's llms.txt still describes the hidden app: ${llms.body.slice(0, 200)}`);
+                const card = await onAppOrigin('/.well-known/mcp.json', SUB);
+                assert(card.status === 404 || !card.body.includes(filename), `the WebMCP card still names the hidden app: ${card.status}`);
+            } finally {
+                const back = await json(`/v1/admin/apps/${owner}/${filename}/moderate`, {
+                    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ hidden: false }),
+                });
+                assert(back.status === 200, `restore: ${back.status}`);
+            }
+            const again = await onAppOrigin('/', SUB);
+            assert(again.status === 200, `the restored app is served again: ${again.status}`);
+        });
+
         console.log('\n─────────────────────────────────────');
         console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
         if (failed === 0) console.log('✅ All tests passed!');

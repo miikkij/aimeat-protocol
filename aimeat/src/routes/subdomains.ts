@@ -14,6 +14,10 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.29.0 — 2026-10-17 — SECURITY: an app an operator hid is not served on its own origin. The
+ *     root, the path form, the origin documents, the WebMCP card and a company front page resolve
+ *     the app through resolveServableApp, which answers null for a hidden app; the apex already
+ *     answered 404 (plan doc-mvcn6c7e4e5q, V0.2).
  *   v1.28.1 — 2026-10-11 — appIsRestricted reads the app's pacing amount (appIsPaced); a morsel is pacing, not a price.
  *   v1.28.0 — 2026-10-09 — A served app carries the "Use with your AI" mark when it has public app tools or skills.
  *   v1.27.0 — 2026-10-08 — The portfolio and the company page are served with their AI-provenance marks.
@@ -240,6 +244,13 @@ export async function resolveAppTarget(storage: Storage, target: string): Promis
     app = await storage.getAppByOwnerName(bare, filename);
   }
   return app;
+}
+
+/** The app an app origin may serve: null when there is none or an operator hid it. The origin holds
+ *  no session, so the owner and an operator look like strangers here; the apex keeps their pass. */
+export async function resolveServableApp(storage: Storage, target: string): Promise<AppRecord | null> {
+  const app = await resolveAppTarget(storage, target);
+  return app && !app.operatorHidden ? app : null;
 }
 
 /** True when the app must not be served openly at a subdomain root. */
@@ -624,7 +635,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       // page are two separate acts, and serving a placeholder would claim otherwise.
       if (company.frontPage.kind !== 'app' || !company.frontPage.target) return companyNotFound();
 
-      const companyApp = await resolveAppTarget(storage, company.frontPage.target);
+      const companyApp = await resolveServableApp(storage, company.frontPage.target);
       if (!companyApp || appIsRestricted(config, companyApp)) return companyNotFound();
       // The front page is an app, so it is served through the app path unchanged: same CSP,
       // same serve-time marks, same download accounting.
@@ -704,7 +715,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       return;
     }
 
-    const app = await resolveAppTarget(storage, site.target);
+    const app = await resolveServableApp(storage, site.target);
     if (!app) return notFound();
     // A gated app is served here only against a grant the APEX issued after it checked the access
     // code or the licence (services/app-access-token.ts). This origin holds no session, so the
@@ -733,13 +744,13 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       { config, locale: detectLocale(req.headers['accept-language']) });
   });
 
-  registerAppOriginWebmcp(router, storage, { resolveApp: t => resolveAppTarget(storage, t), isRestricted: a => appIsRestricted(config, a as AppRecord) });
+  registerAppOriginWebmcp(router, storage, { resolveApp: t => resolveServableApp(storage, t), isRestricted: a => appIsRestricted(config, a as AppRecord) });
 
   // Every document an app origin publishes about ITSELF (llms.txt, robots.txt, sitemap.xml, the
   // MCP server card, the web-app manifest + icon, AGENTS.md, the markdown mirrors) lives in
   // ./subdomain-origin-docs.ts — a pure extraction when this file hit the line ceiling.
   registerAppOriginDocs(router, config, storage, {
-    resolveApp: t => resolveAppTarget(storage, t),
+    resolveApp: t => resolveServableApp(storage, t),
     isRestricted: a => appIsRestricted(config, a),
   });
 
@@ -755,7 +766,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // segments like /v1/..., assets) falls through to normal routing.
     if (!/\.html?$/i.test(filename) || filename.includes('..')) return next();
     const bareOwner = localAccountName(owner);
-    const app = await resolveAppTarget(storage, `${bareOwner}/${filename}`);
+    const app = await resolveServableApp(storage, `${bareOwner}/${filename}`);
     if (!app) return next();
     if (appIsRestricted(config, app) && !(await appAccessGranted(req.query.access, app.ownerName, app.filename))) {
       if (unlockRedirect(req, res, config, app)) return;
