@@ -213,6 +213,21 @@ async function run() {
         await json(`/v1/organisms/${orgId}`, as(alice.token, { method: 'DELETE' }));
     });
 
+    await test('A skill for "members" is this node\'s accounts: the visitor cannot read it, a local account can', async () => {
+        // The skill read counted any session with an owner name as a member, so a visitor from
+        // another node read members-only skills (plan doc-mvcn6c7e4e5q, V0.6).
+        const md = `---\nname: ns-members-skill-${stamp}\ndescription: A members-only skill the visitor must not read. Use for nothing.\nlicense: MIT\n---\n\n# Members only\n`;
+        const pub = await json('/v1/skills', as(alice.token, { method: 'POST', body: JSON.stringify({ skill_md: md }) }));
+        assert(pub.status === 201, `publish ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+        const vis = await json(`/v1/skills/ns-members-skill-${stamp}?scope=user`, as(alice.token, { method: 'PATCH', body: JSON.stringify({ visibility: 'members' }) }));
+        assert(vis.status === 200 && vis.body.data.skill.visibility === 'members', `visibility ${vis.status}`);
+        const path = `/v1/skills/ns-members-skill-${stamp}?scope=user&owner=${namesake}`;
+        const local = await json(path, as(bob.token));
+        assert(local.status === 200, `a local account reads a members skill: ${local.status}`);
+        const visitor = await json(path, as(fedToken));
+        assert(visitor.status === 404 || visitor.status === 403, `a visitor from another node read a members skill: ${visitor.status}`);
+    });
+
     // ── The identity itself. Everything below follows from this one answer. ──
     await test('The visitor IS NOT the local namesake: their identity carries their HOME node', async () => {
         const me = await json('/v1/ghii/me', as(fedToken));
