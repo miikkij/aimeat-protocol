@@ -6,6 +6,9 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-18 — POST /v1/knowledge/import asks the publish gate for a listed package or a public
+ *     entry: an agent without publish:public stores the package unlisted and those entries private,
+ *     and gets 202 with `publish_request` (services/knowledge-publish-ask.ts; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — A package's audience (sharing.audience: owner, members, organism:<id>, public) and an
  *     entry's members or organism:<id>: POST /v1/knowledge/import stores the records at the memory tier
  *     services/knowledge-audience.ts names and refuses an organism the writer is not in (400
@@ -60,6 +63,8 @@ import { logger } from '../../utils/logger.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
+import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
+import { callerOf } from '../../middleware/caller.js';
 
 // The validator is shared with the operator's import, which used to write a manifest nothing
 // checked. → ./manifest-validator.ts
@@ -172,6 +177,22 @@ export function registerPackagesCoreRoutes(
     for (const value of named) {
       const checked = await checkAudienceWrite(storage, value, req.auth, KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING);
       if (!checked.ok) { res.status(checked.status).json(error(config.nodeId, checked.code, checked.message)); return; }
+    }
+
+    // A listed package or a public entry asks the node's publish gate before anything is stored (plan
+    // doc-mvcn6c7e4e5q, V4). On an ask the package is stored unlisted with its author and those
+    // entries private, and one request naming them is filed after the write.
+    const listed = manifest.sharing.catalog_listed === true;
+    const keptEntries = manifest.entries.filter(e => e.visibility === 'public');
+    const publishAsk = knowledgePublishAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, listed || keptEntries.length > 0);
+    if (publishAsk.kind === 'refused') {
+      res.status(publishAsk.status).json(error(config.nodeId, publishAsk.code, publishAsk.message));
+      return;
+    }
+    if (publishAsk.kind === 'ask') {
+      manifest.sharing.catalog_listed = false;
+      if (manifest.sharing.audience === 'public') manifest.sharing.audience = 'owner';
+      for (const e of keptEntries) e.visibility = 'private';
     }
 
     // Resolve entry data — can be in req.body.entry_data, pkg.entry_data,
@@ -300,12 +321,22 @@ export function registerPackagesCoreRoutes(
       });
     }
 
-    res.status(201).json(success(config.nodeId, {
+    // The request the publish gate asked for, now that the package it names exists.
+    const asked = publishAsk.kind === 'ask'
+      ? await fileKnowledgeAsk({ storage, config }, ghii, publishAsk.requester, {
+        ownerGaii, packageId, name: String(manifest.name ?? packageId),
+        field: listed ? 'audience' : 'entries', from: listed ? packageAudienceOf(manifest) : 'private',
+        entries: keptEntries.map(e => e.key),
+      })
+      : {};
+
+    res.status(asked.publish_request ? 202 : 201).json(success(config.nodeId, {
       package_id: packageId,
       manifest_key: manifestKey,
       entries_created: createdEntries.length,
       catalog_listed: manifest.sharing.catalog_listed,
       audience: packageAudienceOf(manifest),
+      ...asked,
     }, [
       { description: 'View package manifest', method: 'GET', url: `/v1/memory/${encodeURIComponent(manifestKey)}` },
       { description: 'List your packages', method: 'GET', url: '/v1/memory?prefix=packages/&tags=knowledge-package' },

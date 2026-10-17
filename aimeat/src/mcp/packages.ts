@@ -23,6 +23,9 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-18 — aimeat_package_compose and aimeat_package_compose_set ask the publish gate as their
+ *     REST routes do: a new group asked public by an agent without publish:public is created private
+ *     and the answer carries `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_package_get reads with the session's auth, so a 'members' or 'organism:<id>'
  *     package is answered by services/audience.ts (plan doc-mvcn6c7e4e5q, V3.7).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
@@ -88,7 +91,7 @@ import { listSellers, addSeller, removeSeller } from '../services/packages/sale/
 import { installSetRepositories } from '../services/install-set-trust.js';
 import { toolError } from './tool-error.js';
 import { setPackageVersionStatus } from '../services/packages/compose/package-create.js';
-import { composePackageFromApps } from '../services/packages/compose/package-compose.js';
+import { composeWithPublishGate, composeSetWithPublishGate } from '../services/packages/compose/package-publish-ask.js';
 import { pullPackage, listRepositoryPackages } from '../services/packages/peer/package-pull.js';
 import type { PeerInfo } from '../services/federation.js';
 import { getActiveScheduler } from '../services/scheduler.js';
@@ -100,7 +103,6 @@ import { buyerOfferView } from '../services/packages/sale/package-sale-checkout.
 import { subscriptionsOf, readRequests, setAutoRenew } from '../services/packages/sale/package-sale-catalogue.js';
 import { createSession } from '../commerce/session-service.js';
 import { bundleInstallOf, installSetForOwner } from '../services/install-bundle-owner.js';
-import { composeSet } from '../services/packages/compose/package-compose-set.js';
 import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
 import { INSTALL_CODE_SCOPE } from '../services/packages/install/package-approvals.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -239,7 +241,8 @@ export function registerPackageTools(
 
     mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), zodShapeFor('aimeat_package_compose'), annotationsFor('aimeat_package_compose'), async (args) => {
         const owner = ownerOf();
-        const out = await composePackageFromApps({ storage, config },
+        // Behind the publish gate, as POST /v1/packages/compose (services/packages/compose/package-publish-ask.ts).
+        const out = await composeWithPublishGate({ storage, config }, caller(), undefined,
             { owner, ownerGhii: await resolveGhii(storage, owner, config) },
             {
                 name: args.name, apps: args.apps, description: args.description, category: args.category,
@@ -261,6 +264,8 @@ export function registerPackageTools(
                     expects: out.expects,
                     notes: out.notes,
                     new_version: out.newVersion === true,
+                    // Created, not public yet: the owner approves (its next_step says what to tell them).
+                    ...out.asked,
                 }, null, 2),
             }],
         };
@@ -269,16 +274,16 @@ export function registerPackageTools(
     // A set to sell: the same service POST /v1/packages/compose-set calls.
     mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), zodShapeFor('aimeat_package_compose_set'), annotationsFor('aimeat_package_compose_set'), async (args) => {
         const owner = ownerOf();
-        const out = await composeSet({ storage, config }, { owner, ownerGhii: await resolveGhii(storage, owner, config) }, {
+        const out = await composeSetWithPublishGate({ storage, config }, caller(), undefined, { owner, ownerGhii: await resolveGhii(storage, owner, config) }, {
             name: args.name, apps: args.apps, title: args.title, organism: args.organism, defaults: args.defaults,
             description: args.description, category: args.category, tags: args.tags, visibility: args.visibility,
             includeCortex: args.include_cortex, includeSkills: args.include_skills, allowExpectations: args.allow_expectations,
             outcome: args.outcome, prompts: args.prompts, dryRun: args.dry_run === true,
         });
         if (!out.ok) return { ...toolError(out.code, out.problems ? `${out.message} ${out.problems.join(' | ')}` : out.message) };
-        const { ok, ...answer } = out;
+        const { ok, asked, ...answer } = out;
         void ok;
-        return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...answer, ...asked }, null, 2) }] };
     });
 
     mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), zodShapeFor('aimeat_package_pull'), annotationsFor('aimeat_package_pull'), async (args) => {

@@ -469,7 +469,7 @@
     },
     "src/routes/knowledge/sharing.ts": {
       "reads": {
-        "getMemory": 3,
+        "getMemory": 2,
         "listMemoryForOwners": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Clone passes reader.show and export passes show and leave; the other read is read-to-update. 2026-10-17: the export's manifest lookup now goes through helpers.ts findReadableManifest, so two reads left this file."
@@ -1230,10 +1230,9 @@
     "src/services/datapackage/store.ts": {
       "reads": {
         "getStorageFile": 8,
-        "listStorageFiles": 3,
-        "getMemory": 2
+        "listStorageFiles": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published data package: public by the owner's publish, and the publish step passes leave()."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published data package: public by the owner's publish, and the publish step passes leave(). 2026-10-18: the catalogue rows' two reads moved to ./version-audience.ts with upsertCatalogueEntry."
     },
     "src/services/db/agent-data-access-overview-db-service.ts": {
       "reads": {
@@ -1949,6 +1948,32 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: the approved record is read only to compare its version and visibility with the request before making it public; its value goes back into the same record and is returned to nobody."
+    },
+    "src/services/publish-requests/apply-knowledge.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: an approved knowledge request reads the owner's manifest and the named entries only to compare their versions and visibilities with the request before making them public, then re-reads the manifest between its own writes. Nothing read is returned to anyone."
+    },
+    "src/services/knowledge-sharing.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), checked: read-to-update. The entry's own record is read to write it back at the new visibility, as the entry PATCH route did before the write moved here; nothing read is returned."
+    },
+    "src/services/knowledge-publish-ask.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: after a knowledge write by the caller's own account, the manifest's and the named entries' versions are read to stamp the publish request. Only the version numbers leave this file."
+    },
+    "src/services/datapackage/version-audience.ts": {
+      "reads": {
+        "getStorageFile": 3,
+        "getMemory": 2,
+        "listStorageFiles": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the owner's own data package files (latest.json, the version's files rewritten at a new tier with the same bytes) and the catalogue rows read-to-update, as ./store.ts read them before writeLatest and upsertCatalogueEntry moved here. Nothing read is returned to a caller."
     },
     "src/services/packages/install/package-skill-component.ts": {
       "reads": {

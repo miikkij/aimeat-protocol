@@ -25,6 +25,10 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.2.0 -- 2026-10-18 -- POST asks the publish gate when the version would make the package public
+ *     (the default): an agent without publish:public publishes at the audience the package had (a
+ *     first version private) and gets 202 with `publish_request` (services/datapackage/publish-ask.ts;
+ *     plan doc-mvcn6c7e4e5q, V4).
  *   v1.1.0 -- 2026-10-17 -- POST takes `visibility` (public by default, members, organism:<id>,
  *     private); an organism the caller is not in is 400 NOT_ORGANISM_MEMBER before any write. The
  *     three GETs pass the caller to the store, which answers 404 to one the audience does not admit
@@ -42,6 +46,8 @@ import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { inferSchema, validateRows, type ValidationIssue } from '../services/datapackage/table.js';
 import type { PublishInput, TableSchema } from '../services/datapackage/contract.js';
 import { publishPackage, openPackage, readRows, listPackages, listVersions, parseRef } from '../services/datapackage/store.js';
+import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
+import { callerOf } from '../middleware/caller.js';
 
 /** The request body a publish takes, loosely typed here and checked by the service. `schema` is
  *  OPTIONAL on the wire — an app that hands over rows and nothing else is asking for a proposal — so
@@ -73,6 +79,16 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
+        // Publishing it public (the default) asks the node's publish gate first (plan
+        // doc-mvcn6c7e4e5q, V4): on an ask the version is published at the audience the package had,
+        // a first one private, and the request is filed after.
+        const gate = await datapackagePublishGate(store, callerOf(req, config.nodeId, storage), req.auth?.app, ownerGhii,
+            String(body.name ?? ''), body.visibility !== undefined ? String(body.visibility) : undefined);
+        if (gate.kind === 'refused') {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
+            return;
+        }
+
         const input: PublishInput = {
             name: String(body.name ?? ''),
             changes: String(body.changes ?? ''),
@@ -93,7 +109,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             ...(body.retentionPolicy ? { retentionPolicy: body.retentionPolicy } : {}),
             // Who reads it: public (default), members, organism:<id> or private. The service checks it
             // before any write (services/datapackage/audience.ts).
-            ...(body.visibility !== undefined ? { visibility: body.visibility as string } : {}),
+            ...(gate.visibility !== undefined ? { visibility: gate.visibility } : {}),
             // TARGET-058: what the caller says about how this was made. provenanceForWrite decides
             // from the PRINCIPAL whether anything is minted, so an owner publishing by hand is not
             // stamped and an app or agent is.
@@ -118,7 +134,12 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
         emitChange('files');
-        res.status(out.unchanged ? 200 : 201).json(success(config.nodeId, {
+        const asked = gate.requester
+            ? await fileDatapackageAsk(store, req.auth!.owner, gate.requester, ownerGhii, input.name, out.contentHash, gate.from)
+            : {};
+        // 202 when the version was published at the audience the package had and making it public waits for the owner.
+        res.status(asked.publish_request ? 202 : out.unchanged ? 200 : 201).json(success(config.nodeId, {
+            ...asked,
             package_id: out.descriptor.aimeat.packageId,
             content_hash: out.contentHash,
             descriptor_url: out.descriptorUrl,

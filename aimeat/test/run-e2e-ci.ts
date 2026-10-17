@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
  *   2026-10-18 -- e2e-publish-gate-files.ts joins the list (not the guard tier): the publish gate on stored files and on memory bulk, import and copy.
+ *   2026-10-18 -- e2e-publish-gate-packages.ts joins the list (not the guard tier): the publish gate on packages, knowledge packages and data packages.
  *   2026-10-18 -- e2e-publish-gate.ts joins the list (not the guard tier): who may make a memory record public without the owner.
  *   2026-10-17 -- e2e-exposure-report.ts joins the list (not the guard tier): what of a person someone outside can read.
  *   2026-10-17 -- e2e-audience-packages.ts joins the list: members and organism:<id> on the three package kinds.
@@ -948,6 +949,8 @@ const ALL_SUITES = [
     'test/e2e-publish-gate.ts',
     // The same gate on stored files and on memory bulk, import and copy (plan doc-mvcn6c7e4e5q, V4).
     'test/e2e-publish-gate-files.ts',
+    // The same gate on packages, knowledge packages and data packages (plan doc-mvcn6c7e4e5q, V4).
+    'test/e2e-publish-gate-packages.ts',
     'test/e2e-anonymous-identity-leaks.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-organism-dangling-refs.ts',

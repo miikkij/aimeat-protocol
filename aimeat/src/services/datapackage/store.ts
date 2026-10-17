@@ -28,6 +28,10 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-10-18 — writeLatest and upsertCatalogueEntry moved to ./version-audience.ts. A publish of bytes
+ *     already stored gives the version's files, the pointer and the catalogue entry the audience asked
+ *     for (setVersionAudience); it moved the pointer only, so a private version published again as
+ *     public stayed private at its file addresses (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — A publish takes `visibility` (public by default, members, organism:<id>, private;
  *     ./audience.ts): an organism the publisher is not in is refused before any write, the files, the
  *     pointer and the catalogue entry carry it, and openPackage, readRows and readAllRows take the
@@ -65,10 +69,8 @@ import { linkSourceImages } from './images.js';
 import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
 import type { AudienceAuth } from '../audience.js';
 import { checkAudienceWrite } from '../audience-write.js';
-import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge-audience.js';
-import {
-    DATAPACKAGE_LEVELS, fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf, datapackageReadable,
-} from './audience.js';
+import { DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable } from './audience.js';
+import { writeLatest, upsertCatalogueEntry, setVersionAudience } from './version-audience.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
 
@@ -284,7 +286,13 @@ export async function publishPackage(
         // this answer names; the record held above was never stored.
         if (existing.aiProvenanceId) descriptor.aimeat.aiProvenanceId = existing.aiProvenanceId;
         else delete descriptor.aimeat.aiProvenanceId;
-        await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility);
+        // The same bytes under another audience: the version's files, the pointer and (when the
+        // audience changed) the catalogue entry take the one asked for. Only the pointer moved
+        // before, so the files kept the tier they were first written at (./version-audience.ts).
+        const moved = await setVersionAudience({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, visibility, {
+            catalogue: (previous?.visibility ?? 'public') !== visibility,
+        });
+        if (!moved.ok) return { ok: false, code: 'INVALID_INPUT', message: moved.message, issues: [] };
         // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
         // out, and a re-publish of existing content pushed nothing out.
         return { ok: true, descriptor, contentHash, descriptorUrl, unchanged: true, resources: resourceUrls, pruned: [] };
@@ -335,7 +343,7 @@ export async function publishPackage(
         visibility: fileVisibility,
     });
 
-    await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility);
+    await writeLatest({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility);
     // Retention, if the owner asked for any. AFTER the new version is live and the pointer moves,
     // never before: pruning first would leave a window where the newest version is gone and the new
     // one is not yet published.
@@ -438,24 +446,6 @@ async function readLatestPointer(deps: StoreDeps, ownerGhii: string, name: strin
         throw new Error(`latest.json for "${name}" is not readable JSON, so the version chain cannot be `
             + 'continued honestly', { cause: err });
     }
-}
-
-/** The mutable pointer for a consumer following the newest version. Clears any recorded failure:
- *  a successful publish IS the answer to "the last attempt broke". */
-async function writeLatest(
-    deps: StoreDeps, ownerGhii: string, name: string, contentHash: string, descriptorUrl: string, at: string,
-    visibility: string,
-): Promise<void> {
-    const pointer: LatestPointer = {
-        packageId: packageId(localAccountName(ownerGhii), name),
-        name, contentHash, descriptorUrl, updatedAt: at, visibility,
-    };
-    await writeStorageFile({ storage: deps.storage, config: deps.config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, {
-        key: latestKey(name),
-        data: Buffer.from(JSON.stringify(pointer, null, 2) + '\n', 'utf8'),
-        mimeType: 'application/json; charset=utf-8',
-        visibility: fileVisibilityOf(visibility),
-    });
 }
 
 /**
@@ -663,80 +653,4 @@ export function parseRef(ref: string, nodeId: string): { ownerGhii: string; name
         name: m[2],
         ...(m[3] ? { contentHash: m[3] } : {}),
     };
-}
-
-/**
- * The catalogue side: a knowledge package so the data package appears where people and agents look
- * for knowledge. `content_type: 'dataset'` because the union is closed and `dataset` is already the
- * right word for this; inventing `data-package` would be a type change for no gain.
- *
- * Deterministic id from the packageId, so re-publishing a version updates the entry instead of
- * accumulating one manifest per run — which at a daily cadence is 365 manifests a year for one
- * package, and the memory-key budget is 1000.
- */
-async function upsertCatalogueEntry(
-    deps: StoreDeps, ownerGhii: string, descriptor: Descriptor, descriptorUrl: string, visibility: string,
-): Promise<void> {
-    const id = bare(bytesHash(Buffer.from(descriptor.aimeat.packageId, 'utf8'))).slice(0, 32);
-    const key = `packages/${id}/manifest`;
-    const now = new Date().toISOString();
-    const existing = await deps.storage.getMemory(ownerGhii, key);
-    const manifest = {
-        type: 'knowledge-package',
-        name: descriptor.title ?? descriptor.name,
-        version: bare(descriptor.aimeat.contentHash).slice(0, 12),
-        author: ownerGhii,
-        created: (existing?.value as { created?: string } | undefined)?.created ?? now,
-        updated: now,
-        content_type: 'dataset',
-        tags: ['data-package', 'frictionless', descriptor.name],
-        language: 'en',
-        maturity: 'stable',
-        synthesis: { level: 'original', description: descriptor.aimeat.changes },
-        references: (descriptor.aimeat.sources ?? []).map(s => ({ url: s.url ?? '', title: s.title ?? '' })),
-        entries: descriptor.resources.map(r => ({
-            key: `packages/${id}/${r.name}`,
-            title: r.title ?? r.name,
-            visibility: catalogueEntryVisibilityOf(visibility),
-        })),
-        links: [],
-        // Listed in the public catalogue only when the package is public; else the package's own
-        // audience (services/knowledge-audience.ts reads it).
-        sharing: { catalog_listed: visibility === 'public', allow_clone: false, toll_morsels: 0, audience: catalogueAudienceOf(visibility) },
-        // The pointer back to the canonical bytes. The catalogue never holds them: a knowledge
-        // package is a collection of memory entries, and memory does not carry files.
-        x_aimeat_datapackage: {
-            packageId: descriptor.aimeat.packageId,
-            contentHash: descriptor.aimeat.contentHash,
-            descriptorUrl,
-            resources: descriptor.resources.map(r => ({ name: r.name, rowCount: r.rowCount, fields: r.schema.fields.length })),
-        },
-    };
-    // The catalogue rows carry the descriptor's record: they describe the same version, publicly.
-    const aiProvenanceId = descriptor.aimeat.aiProvenanceId;
-    await deps.storage.setMemory({
-        key, ownerGaii: ownerGhii, value: manifest,
-        ...(aiProvenanceId ? { aiProvenanceId } : {}),
-        visibility: manifestRecordVisibility(manifest), tags: ['knowledge-package', 'dataset', 'data-package'], ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now, updatedAt: now,
-    });
-    // One entry per resource, holding its schema — so an agent that found the package through the
-    // catalogue learns the columns without fetching a single byte of data.
-    for (const r of descriptor.resources) {
-        const entryKey = `packages/${id}/${r.name}`;
-        const prev = await deps.storage.getMemory(ownerGhii, entryKey);
-        await deps.storage.setMemory({
-            key: entryKey, ownerGaii: ownerGhii,
-            value: {
-                resource: r.name, rowCount: r.rowCount, bytes: r.bytes, hash: r.hash,
-                schema: r.schema,
-                csvUrl: publicUrl(deps.config.baseUrl, ownerGhii, `${packageKeyRoot(descriptor.name)}/${bare(descriptor.aimeat.contentHash)}/${r.path}`),
-            },
-            ...(aiProvenanceId ? { aiProvenanceId } : {}),
-            visibility: entryRecordVisibility(catalogueEntryVisibilityOf(visibility)), tags: ['knowledge-entry', 'dataset'], ttlHours: null,
-            version: prev ? prev.version + 1 : 1,
-            createdAt: prev?.createdAt ?? now, updatedAt: now,
-        });
-    }
 }

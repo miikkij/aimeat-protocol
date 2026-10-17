@@ -6,6 +6,10 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-18 — PATCH /v1/knowledge/:id/sharing (to audience public / catalog_listed) and the
+ *     entry PATCH (to public) ask the publish gate: an agent without publish:public keeps the package's
+ *     audience or the entry's visibility and gets 202 with `publish_request`. The two writes moved to
+ *     services/knowledge-sharing.ts, which the approved request calls (plan doc-mvcn6c7e4e5q, V4).
  *   v1.5.0 — 2026-10-17 — PATCH /v1/knowledge/:id/sharing takes `audience` (owner, members,
  *     organism:<id>, public; public is catalog_listed) and the entry PATCH takes members and
  *     organism:<id>; an organism the writer is not in is 400 NOT_ORGANISM_MEMBER before anything is
@@ -36,10 +40,8 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { success, error } from '../../middleware/envelope.js';
 import { refuseClassified } from '../../middleware/refusals.js';
 import { emitChange } from '../../services/event-bus.js';
-import { recordPublicActivity } from '../../services/public-activity.js';
 import type { KnowledgeHelpers } from './helpers.js';
 import { presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
-import { logger } from '../../utils/logger.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
@@ -48,8 +50,12 @@ import { localAccountName } from '../../utils/gaii.js';
 import { checkAudienceWrite } from '../../services/audience-write.js';
 import {
   KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING, KNOWLEDGE_ENTRY_LEVELS,
-  packageAudienceOf, manifestRecordVisibility, entryRecordVisibility, knowledgeAudienceAllows,
+  packageAudienceOf, entryRecordVisibility, knowledgeAudienceAllows,
 } from '../../services/knowledge-audience.js';
+import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry } from '../../services/knowledge-sharing.js';
+import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
+import { isRaiseToPublic } from '../../services/publish-gate.js';
+import { callerOf } from '../../middleware/caller.js';
 
 /** The classification address of a package record (manifest or entry). */
 const targetOfRecord = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
@@ -93,60 +99,33 @@ export function registerSharingRoutes(
       }
     }
 
-    const manifest: KnowledgeManifest = typeof existing.value === 'string'
-      ? JSON.parse(existing.value as string)
-      : { ...(existing.value as KnowledgeManifest) };
-    // A manifest stored before 4.0.0 carries sharing.morsel_price; the write-back stores it as
-    // sharing.toll_morsels, the name the response and every later read use.
-    manifest.sharing = manifest.sharing
-      ? presentKnowledgeManifest(manifest).sharing
-      : { catalog_listed: false, allow_clone: false, toll_morsels: 0 };
-
-    if (audience !== undefined) {
-      manifest.sharing.catalog_listed = audience === 'public';
-      manifest.sharing.audience = audience;
-    } else if (catalog_listed !== undefined) {
-      manifest.sharing.catalog_listed = !!catalog_listed;
-      // Listing makes it public; unlisting a public package leaves it with its author.
-      if (catalog_listed) manifest.sharing.audience = 'public';
-      else if (manifest.sharing.audience === 'public') manifest.sharing.audience = 'owner';
+    // Listing the package (audience public) asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
+    // On an ask the package keeps its audience, the rest of the change is written, and the request
+    // is filed after the write.
+    const before = typeof existing.value === 'string' ? JSON.parse(existing.value as string) : existing.value;
+    const audienceNow = packageAudienceOf(before);
+    const wantsPublic = audience === 'public' || (audience === undefined && catalog_listed === true);
+    const ask = knowledgePublishAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, wantsPublic && audienceNow !== 'public');
+    if (ask.kind === 'refused') {
+      res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
+      return;
     }
-    if (allow_clone !== undefined) manifest.sharing.allow_clone = !!allow_clone;
-    // If catalog_listed enabled, ensure allow_clone is also enabled
-    if (manifest.sharing.catalog_listed && !manifest.sharing.allow_clone && allow_clone === undefined) {
-      manifest.sharing.allow_clone = true;
-    }
-    manifest.updated = new Date().toISOString();
 
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key: manifestKey,
-      ownerGaii,
-      value: manifest,
-      visibility: manifestRecordVisibility(manifest),
-      tags: existing.tags || ['knowledge-package'],
-      ttlHours: null,
-      version: (existing.version || 0) + 1,
-      createdAt: existing.createdAt || now,
-      updatedAt: now,
-    });
+    // The write: services/knowledge-sharing.ts, which an approved publish request calls too.
+    const { manifest } = await setKnowledgeSharing({ storage, config }, found, packageId,
+      ask.kind === 'ask' ? { allow_clone } : { audience, catalog_listed, allow_clone });
+    const asked = ask.kind === 'ask'
+      ? await fileKnowledgeAsk({ storage, config }, req.auth!.owner, ask.requester, {
+        ownerGaii, packageId, name: String(manifest.name ?? packageId), field: 'audience', from: audienceNow, entries: [],
+      })
+      : {};
 
-    res.json(success(config.nodeId, {
+    res.status(asked.publish_request ? 202 : 200).json(success(config.nodeId, {
       package_id: packageId,
       sharing: manifest.sharing,
       audience: packageAudienceOf(manifest),
+      ...asked,
     }));
-    emitChange('knowledge');
-    // Public landing feed — only on the private→public catalogue edge (don't re-announce).
-    if (manifest.sharing.catalog_listed && existing.visibility !== 'public') {
-      void recordPublicActivity(storage, config, {
-        category: 'agents',
-        actor: (manifest.author as string) || ownerGaii,
-        summary: `Knowledge package "${manifest.name}" published`,
-        detail: manifest.synthesis?.description || '',
-        link: `/v1/knowledge/${packageId}`,
-      }).catch(err => { logger.warn('actor: feed is best-effort', { error: String(err) }); });
-    }
   });
 
   /* ── PATCH /v1/knowledge/:id/entries/:entryKey/visibility — Change entry visibility ── */
@@ -179,52 +158,38 @@ export function registerSharingRoutes(
     const manifest: KnowledgeManifest = typeof existing.value === 'string'
       ? JSON.parse(existing.value as string)
       : { ...(existing.value as KnowledgeManifest) };
-
-    // Find and update the entry in the manifest
-    const entries = manifest.entries || [];
-    const entry = entries.find((e) => e.key === entryKey || e.key.endsWith('/' + entryKey));
+    const entry = findKnowledgeEntry(manifest, entryKey);
     if (!entry) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Entry not found in package'));
       return;
     }
 
-    entry.visibility = visibility;
-    manifest.updated = new Date().toISOString();
-
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key: manifestKey,
-      ownerGaii,
-      value: manifest,
-      visibility: manifestRecordVisibility(manifest),
-      tags: existing.tags || ['knowledge-package'],
-      ttlHours: null,
-      version: (existing.version || 0) + 1,
-      createdAt: existing.createdAt || now,
-      updatedAt: now,
-    });
-
-    // Also update the individual entry's memory record visibility
-    const fullEntryKey = entry.key.startsWith('packages/')
-      ? entry.key
-      : `packages/${packageId}/${entry.key}`;
-    const entryRecord = await storage.getMemory(ownerGaii, fullEntryKey);
-    if (entryRecord) {
-      await storage.setMemory({
-        ...entryRecord,
-        visibility: entryRecordVisibility(visibility),
-        groupId: visibility === 'group' ? groupId : undefined,
-        updatedAt: now,
-        version: (entryRecord.version || 0) + 1,
+    // Making the entry public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4). On an ask
+    // nothing is written (the visibility was the whole change) and the request is filed.
+    const ask = knowledgePublishAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app,
+      isRaiseToPublic(entry.visibility, visibility));
+    if (ask.kind === 'refused') {
+      res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
+      return;
+    }
+    if (ask.kind === 'ask') {
+      const from = String(entry.visibility ?? 'private');
+      const asked = await fileKnowledgeAsk({ storage, config }, req.auth!.owner, ask.requester, {
+        ownerGaii, packageId, name: String(manifest.name ?? packageId), field: 'entries', from, entries: [entry.key],
       });
+      res.status(asked.publish_request ? 202 : 200).json(success(config.nodeId, {
+        package_id: packageId, entry_key: entryKey, visibility: from, ...asked,
+      }));
+      return;
     }
 
+    // The write: services/knowledge-sharing.ts, which an approved publish request calls too.
+    await setKnowledgeEntryVisibility({ storage, config }, found, packageId, entryKey, visibility, groupId);
     res.json(success(config.nodeId, {
       package_id: packageId,
       entry_key: entryKey,
       visibility,
     }));
-    emitChange('knowledge');
   });
 
   /* ── POST /v1/knowledge/:id/clone — Clone public entries to your own namespace ── */

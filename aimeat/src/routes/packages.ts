@@ -21,6 +21,11 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-18 — POST /v1/packages, POST /v1/packages/compose, POST /v1/packages/compose-set and PATCH
+ *     /v1/packages/:groupId ask the publish gate when they would make a group public: an agent without
+ *     publish:public gets the group at the visibility it had (a new one private) and 202 with
+ *     `publish_request` (services/packages/compose/package-publish-ask.ts; plan doc-mvcn6c7e4e5q, V4).
+ *     The PATCH body moved to updatePackageGroup (package-create.ts).
  *   2026-10-17 — The read routes pass the request's auth to package-read.ts, which admits 'members' and
  *     'organism:<id>' packages by services/audience.ts; PATCH /v1/packages/:groupId takes both and
  *     refuses an organism the author is not in with 400 NOT_ORGANISM_MEMBER (plan V3.7).
@@ -62,7 +67,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import Busboy from 'busboy';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, PackageRecord, TemplateListingRecord } from '../storage/interface.js';
+import type { Storage, TemplateListingRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { createPackagesTabService } from '../services/db/packages-tab-db-service.js';
@@ -70,13 +75,15 @@ import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { buildZip, parseZip, ZipValidationError } from '../services/packages/compose/package-zip.js';
 import {
-  createPackageGroup, addPackageVersion, setPackageVersionStatus, packageVisibilityRefusal,
+  createPackageGroup, addPackageVersion, setPackageVersionStatus, updatePackageGroup,
 } from '../services/packages/compose/package-create.js';
+import {
+  packagePublishGate, filePackageAsks, composeWithPublishGate, composeSetWithPublishGate,
+} from '../services/packages/compose/package-publish-ask.js';
+import { callerOf } from '../middleware/caller.js';
 import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
 } from '../services/packages/compose/package-read.js';
-import { composePackageFromApps } from '../services/packages/compose/package-compose.js';
-import { composeSet } from '../services/packages/compose/package-compose-set.js';
 import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { packageSheet } from '../services/packages/compose/package-sheet.js';
@@ -145,17 +152,18 @@ export function packagesRouter(
     } = req.body ?? {};
 
     const ownerGhii = await resolveGhii(storage, owner, config);
-    const out = await composePackageFromApps({ storage, config }, { owner, ownerGhii }, {
-      name, apps, description, category, tags, visibility, status,
-      includeCortex, includeSkills, allowExpectations, outcome, prompts,
-    });
+    const out = await composeWithPublishGate({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app,
+      { owner, ownerGhii }, {
+        name, apps, description, category, tags, visibility, status,
+        includeCortex, includeSkills, allowExpectations, outcome, prompts,
+      });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
 
-    res.status(201).json(success(config.nodeId, {
-      ...out.package, expects: out.expects, notes: out.notes, new_version: out.newVersion === true,
+    res.status(out.asked.publish_request ? 202 : 201).json(success(config.nodeId, {
+      ...out.package, expects: out.expects, notes: out.notes, new_version: out.newVersion === true, ...out.asked,
     }, [
       { description: 'Install it', method: 'POST', url: `/v1/packages/${encodeURIComponent(out.package.packageGroupId)}/install` },
       { description: 'Make it public', method: 'PATCH', url: `/v1/packages/${encodeURIComponent(out.package.packageGroupId)}` },
@@ -172,7 +180,7 @@ export function packagesRouter(
     }
     const b = (req.body ?? {}) as Record<string, unknown>;
     const ownerGhii = await resolveGhii(storage, owner, config);
-    const out = await composeSet({ storage, config }, { owner, ownerGhii }, {
+    const out = await composeSetWithPublishGate({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, { owner, ownerGhii }, {
       name: b.name as string, apps: b.apps as string[], title: b.title as string | undefined,
       organism: b.organism as { key?: string; name?: string } | undefined,
       defaults: b.defaults as Record<string, Record<string, unknown>> | undefined,
@@ -186,9 +194,10 @@ export function packagesRouter(
       res.status(out.status).json(error(config.nodeId, out.code, out.message, out.status, out.problems ? { problems: out.problems } : undefined));
       return;
     }
-    const { ok, ...answer } = out;
+    const { ok, asked, ...answer } = out;
     void ok;
-    res.status(answer.dry_run ? 200 : 201).json(success(config.nodeId, answer, answer.dry_run ? [] : [
+    // 202 when the groups the set created kept their visibility and making them public waits for the owner.
+    res.status(answer.dry_run ? 200 : asked.publish_request ? 202 : 201).json(success(config.nodeId, { ...answer, ...asked }, answer.dry_run ? [] : [
       { description: 'Sell it: set its terms', method: 'PUT', url: `/v1/packages/${encodeURIComponent(answer.set.group_id)}/offer` },
     ]));
   });
@@ -344,8 +353,14 @@ export function packagesRouter(
 
     const { name, description, category, tags, visibility, status, components, manifest } = req.body ?? {};
 
+    // A new group asked to be public asks the publish gate first; on an ask it is created private.
+    const gate = packagePublishGate({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, visibility, undefined);
+    if (gate.kind === 'refused') {
+      res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
+      return;
+    }
     const out = await createPackageGroup({ storage, config }, { owner }, {
-      name, description, category, tags, visibility, status, components, manifest,
+      name, description, category, tags, visibility: gate.visibility as string | undefined, status, components, manifest,
     });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -353,7 +368,8 @@ export function packagesRouter(
     }
 
     const packageGroupId = out.package.packageGroupId;
-    res.status(201).json(success(config.nodeId, out.package, [
+    const asked = gate.requester ? await filePackageAsks({ storage, config }, owner, gate.requester, [packageGroupId], gate.from) : {};
+    res.status(asked.publish_request ? 202 : 201).json(success(config.nodeId, { ...out.package, ...asked }, [
       { description: 'Publish new version', method: 'POST', url: `/v1/packages/${encodeURIComponent(packageGroupId)}/versions` },
       { description: 'View package', method: 'GET', url: `/v1/packages/${encodeURIComponent(packageGroupId)}` },
     ]));
@@ -631,44 +647,28 @@ export function packagesRouter(
   router.patch('/v1/packages/:groupId', requireAuth(), requireScope('app:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
-
-    // Get all versions in the group
-    const allVersions = await storage.listVersions(groupId, 1000, 0);
-    if (allVersions.versions.length === 0) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Package group not found: ${groupId}`));
-      return;
-    }
-
-    // Verify author
-    if (allVersions.versions[0].author !== owner) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the package author can update group metadata'));
-      return;
-    }
-
     const { description, tags, visibility } = req.body ?? {};
-    // private, members, organism:<id> or public; an organism the author is not in is 400 before any write.
-    const refused = visibility ? await packageVisibilityRefusal(storage, visibility, owner) : null;
-    if (refused) {
-      res.status(refused.status).json(error(config.nodeId, refused.code, refused.message));
+
+    // Making the group public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4): on an ask the
+    // group keeps its visibility, the rest of the change is written, and the request is filed after.
+    const current = (await storage.listVersions(groupId, 1, 0)).versions[0];
+    const gate = packagePublishGate({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, visibility, current?.visibility);
+    if (gate.kind === 'refused') {
+      res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
       return;
     }
 
-    const updates: Partial<PackageRecord> = { updatedAt: new Date().toISOString() };
-    if (description !== undefined) updates.description = description;
-    if (tags !== undefined) updates.tags = tags;
-    if (visibility !== undefined) updates.visibility = visibility;
-
-    // Update ALL versions in the group
-    for (const ver of allVersions.versions) {
-      await storage.updatePackage(ver.id, updates);
+    // The author check, the visibility check and the write on every version: services/packages/compose/package-create.ts.
+    const out = await updatePackageGroup({ storage, config }, { owner }, {
+      groupId, description, tags, visibility: gate.requester ? undefined : visibility,
+    });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
     }
-
-    // Return the latest version with updates applied
-    const updated = await storage.getLatestPublished(groupId)
-      ?? (await storage.listVersions(groupId, 1, 0)).versions[0];
-
-    res.json(success(config.nodeId, updated));
-    emitChange('packages');
+    const asked = gate.requester ? await filePackageAsks({ storage, config }, owner, gate.requester, [groupId], gate.from) : {};
+    // 202 when the group kept its visibility and making it public waits for the owner.
+    res.status(asked.publish_request ? 202 : 200).json(success(config.nodeId, { ...out.package, ...asked }));
   });
 
   // DELETE /v1/packages/:groupId — archive ALL versions of a package group

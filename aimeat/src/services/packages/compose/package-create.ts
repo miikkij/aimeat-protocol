@@ -18,11 +18,14 @@
  *   response and changed none of them.
  * @structure PackageWriteResult · RawComponentInput · normalizeComponents · hashContent ·
  *   nextPackageVersion · createPackageGroup(deps, caller, input) · addPackageVersion(deps, caller, input)
+ *   · setPackageVersionStatus · updatePackageGroup(deps, caller, input)
  * @usage
  *   import { createPackageGroup } from './package-create.js';
  *   const out = await createPackageGroup({ storage, config }, caller, { name, components });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.6.0 — 2026-10-18 — updatePackageGroup: the body of PATCH /v1/packages/:groupId, moved here so an
+ *     approved publish request makes a group public through the same function (plan doc-mvcn6c7e4e5q, V4).
  *   v1.5.0 — 2026-10-17 — Two more visibilities: 'members' (every account of this node) and
  *     'organism:<id>' (that organism's active members); packageVisibilityRefusal refuses an organism
  *     the author is not in with 400 NOT_ORGANISM_MEMBER before the write (plan doc-mvcn6c7e4e5q, V3.7).
@@ -431,6 +434,51 @@ export async function setPackageVersionStatus(
     if (!updated) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `Version ${pkg.version} not found for package ${groupId}` };
     }
+    emitChange('packages');
+    return { ok: true, package: updated };
+}
+
+export interface PackageGroupUpdateInput {
+    groupId: string;
+    description?: unknown;
+    tags?: unknown;
+    /** private, members, organism:<id> or public; omitted keeps the group's. */
+    visibility?: unknown;
+}
+
+/**
+ * Change a group's description, tags or visibility on every version of it. The body of PATCH
+ * /v1/packages/:groupId, and what an approved publish request calls to make the group public
+ * (services/publish-requests/apply-package.ts), so both take the same author check and the same
+ * visibility check. Answers the newest published version, else the newest one, as the route did.
+ */
+export async function updatePackageGroup(
+    deps: PackageCreateDeps,
+    caller: PackageCreateCaller,
+    input: PackageGroupUpdateInput,
+): Promise<PackageWriteResult> {
+    const { storage } = deps;
+    const { groupId } = input;
+    const allVersions = await storage.listVersions(groupId, 1000, 0);
+    if (allVersions.versions.length === 0) {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: `Package group not found: ${groupId}` };
+    }
+    if (allVersions.versions[0].author !== caller.owner) {
+        return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Only the package author can update group metadata' };
+    }
+    // private, members, organism:<id> or public; an organism the author is not in is 400 before any write.
+    const refused = input.visibility ? await packageVisibilityRefusal(storage, input.visibility, caller.owner) : null;
+    if (refused) return refused;
+
+    const updates: Partial<PackageRecord> = { updatedAt: new Date().toISOString() };
+    if (input.description !== undefined) updates.description = input.description as string;
+    if (input.tags !== undefined) updates.tags = input.tags as string[];
+    if (input.visibility !== undefined) updates.visibility = input.visibility as PackageVisibility;
+    for (const ver of allVersions.versions) {
+        await storage.updatePackage(ver.id, updates);
+    }
+    const updated = await storage.getLatestPublished(groupId)
+        ?? (await storage.listVersions(groupId, 1, 0)).versions[0];
     emitChange('packages');
     return { ok: true, package: updated };
 }
