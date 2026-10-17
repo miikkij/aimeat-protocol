@@ -40,6 +40,9 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.6.0 — 2026-10-18 — The publish gate (services/app-publish-gate.ts): a fork the node's defaults
+ *     would make public, by a caller the owner is asked about, lands unlisted and files a request to
+ *     list it (`publishAsked`); the draft promotion passes the gate's answer to publishApp.
  *   v1.5.0 — 2026-10-17 — A fork is listed and opened by the node's new-app defaults (apps.default_listing,
  *     apps.default_access) instead of always listed; it still gets no code (plan doc-mvcn6c7e4e5q V2.4).
  *   v1.4.1 — 2026-10-11 — A fork drops the source's pacing amount `tollMorsels` (was `priceMorsels`;
@@ -102,6 +105,8 @@ export function appFilenameRefusal(filename: string): PublishAppRefusal | null {
 // so the services that only need them do not depend on publishing. Re-exported for every importer.
 import type { AppOwnerScope } from './app-owner-scope.js';
 import { publishExposure } from './app-publish-exposure.js';
+import { gateFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
+import type { PublishAsk } from './publish-requests/ask.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 
 /**
@@ -261,6 +266,8 @@ export interface PublishAppDraftInput {
   filename: string;
   /** The slot's contents, already loaded by the door so it can word its own "no draft" answer. */
   draft: AppDraftRecord;
+  /** The publish gate's answer for this caller (services/app-publish-gate.ts); see PublishAppInput. */
+  publishGate: PublishAsk | null;
   declaredProvenanceId?: string;
   declaredProvenance?: DeclaredProvenance;
   specToken?: string;
@@ -300,6 +307,7 @@ export async function publishAppDraft(
     },
     accessCode: { mode: 'carry' },
     source: 'draft',
+    publishGate: input.publishGate,
     roadmap: input.roadmap,
     declaredProvenanceId: input.declaredProvenanceId,
     declaredProvenance: input.declaredProvenance,
@@ -326,6 +334,12 @@ export interface ForkAppInput {
   /** WHO forked, resolved server-side. Recorded on the lineage event and the public feed. */
   callerGaii: string;
   newFilename: string;
+  /**
+   * The publish gate's answer for the forker (services/app-publish-gate.ts). A fork is the first
+   * publish of a new app: when the node's defaults make it public and the owner is asked, it lands
+   * unlisted and a request to list it is filed.
+   */
+  publishGate: PublishAsk | null;
 }
 
 export interface ForkedApp {
@@ -334,6 +348,8 @@ export interface ForkedApp {
   manifest: AppManifest;
   downloadUrl: string;
   forkedFrom: { owner: string; filename: string; version: number };
+  /** The publish request the gate filed, or the warning that it could not be filed. */
+  publishAsked?: AppPublishAsked;
 }
 
 /**
@@ -446,7 +462,9 @@ export async function forkApp(
   // A fork is a new app of the forker's, so it is listed and opened the way a first publish is: the
   // node's new-app defaults (services/app-publish-exposure.ts). No code: the fork answer has no place
   // to tell the forker one, and the source's code is never copied.
-  const exposure = publishExposure(config, null, { mode: 'explicit', value: undefined });
+  const gated = gateFirstPublishExposure(publishExposure(config, null, { mode: 'explicit', value: undefined }), true, input.publishGate);
+  if ('refusal' in gated) return gated;
+  const { exposure } = gated;
   await storage.createApp({
     ownerGaii: callerGhii,
     ownerName: callerOwner,
@@ -522,12 +540,17 @@ export async function forkApp(
     link: `${downloadUrl}?mode=inline`,
   }).catch(err => { logger.warn('forkApp: feed is best-effort', { error: String(err) }); });
 
+  const publishAsked = gated.asked
+    ? await fileAppPublishAsk({ storage, config }, { ownerName: callerOwner, filename: newFilename, versionNumber: 1 }, gated.asked)
+    : undefined;
+
   return {
     filename: newFilename,
     versionNumber: 1,
     manifest: forkedManifest,
     downloadUrl,
     forkedFrom: { owner: source.ownerName, filename: sourceFilename, version: source.versionNumber },
+    ...(publishAsked ? { publishAsked } : {}),
   };
 }
 

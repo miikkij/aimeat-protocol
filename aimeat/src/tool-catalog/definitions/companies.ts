@@ -15,6 +15,8 @@
  * @structure companyTools: AimeatToolDefinition[]
  * @usage import { companyTools } from './definitions/companies.js';
  * @version-history
+ *   2026-10-18 — aimeat_company_front_page, aimeat_company_portfolio_publish and aimeat_portfolio_publish
+ *     say they answer with publish_request when the node asks the owner first (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-12 — The six tools declare all three interfaces (agentEverywhere): each has a CLI dispatch
  *     definition (tool-dispatch/tool-call-defs-companies.ts) and the connector MCP registers it. They
  *     declared connectorMcp: false while the connector registered every one of them.
@@ -105,7 +107,7 @@ export const companyTools = [
     },
     {
         name: 'aimeat_company_front_page',
-        description: "Choose what the company's address serves: 'app' serves one of the OWNER'S OWN published apps (target \"owner/file.html\"; someone else's answers FRONT_PAGE_NOT_YOURS), 'portfolio' serves the page published with aimeat_company_portfolio_publish, 'redirect' sends visitors to an absolute http(s) URL, and 'none' keeps the address reserved while serving nothing. Choosing 'portfolio' before a page exists answers NO_PORTFOLIO — publish first.",
+        description: "Choose what the company's address serves: 'app' serves one of the OWNER'S OWN published apps (target \"owner/file.html\"; someone else's answers FRONT_PAGE_NOT_YOURS), 'portfolio' serves the page published with aimeat_company_portfolio_publish, 'redirect' sends visitors to an absolute http(s) URL, and 'none' keeps the address reserved while serving nothing. Choosing 'portfolio' before a page exists answers NO_PORTFOLIO — publish first. When the node asks the owner before making something public, pointing an address that serves nothing at a page leaves it as it is and answers with publish_request.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Set Company Front Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -119,7 +121,7 @@ export const companyTools = [
     },
     {
         name: 'aimeat_company_portfolio_publish',
-        description: "Publish a standalone HTML page as the company's public front page and point the address at it in one act. Send the WHOLE document (doctype through </html>) — it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode, and keep it under the node's portfolio size limit (512KB by default). Re-publishing replaces the previous page.",
+        description: "Publish a standalone HTML page as the company's public front page and point the address at it in one act. Send the WHOLE document (doctype through </html>) — it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode, and keep it under the node's portfolio size limit (512KB by default). Re-publishing replaces the previous page. When the node asks the owner before making something public and the address serves nothing yet, the page is stored, the address stays as it is, and the answer carries publish_request.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Company Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -132,7 +134,7 @@ export const companyTools = [
     },
     {
         name: 'aimeat_portfolio_publish',
-        description: "Publish this person's own welcome page — the page at their address, which is also their portfolio. Use it when they ask you to make their page, improve it, or change what it says: you write the HTML and publish it, they never copy or paste anything. Send the WHOLE document (doctype through </html>); it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode. Re-publishing replaces the previous page, so read what is there first if they asked for a change rather than a rewrite. This is the person's page; the company equivalent is aimeat_company_portfolio_publish.",
+        description: "Publish this person's own welcome page — the page at their address, which is also their portfolio. Use it when they ask you to make their page, improve it, or change what it says: you write the HTML and publish it, they never copy or paste anything. Send the WHOLE document (doctype through </html>); it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode. Re-publishing replaces the previous page, so read what is there first if they asked for a change rather than a rewrite. This is the person's page; the company equivalent is aimeat_company_portfolio_publish. When the node asks the owner before making something public, enable: true on a page never switched on stores the page, leaves it off and answers with publish_request.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Your Welcome Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

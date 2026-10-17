@@ -653,13 +653,13 @@
     },
     "src/routes/portfolio.ts": {
       "reads": {
-        "getMemory": 5,
+        "getMemory": 2,
         "getStorageFile": 1,
         "listStorageFilesForOwners": 1,
         "listMemoryForOwners": 1,
         "getStorageFileMeta": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the builder's memory previews pass presentMemories and its images pass reader.show; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings. 2026-10-03: the two reads added for `enable` on the upload read the same portfolio config record (PORTFOLIO_CONFIG_KEY), to switch the page on unless the owner switched it off."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the builder's memory previews pass presentMemories and its images pass reader.show; the published page, its enabled gate, sizes and the config merge are the owner's published page and settings. 2026-10-03: the two reads added for `enable` on the upload read the same portfolio config record (PORTFOLIO_CONFIG_KEY), to switch the page on unless the owner switched it off. 2026-10-18: the switch and the config merge moved to services/portfolio-config.ts."
     },
     "src/routes/public-stats.ts": {
       "reads": {
@@ -1974,6 +1974,25 @@
         "listStorageFiles": 1
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the owner's own data package files (latest.json, the version's files rewritten at a new tier with the same bytes) and the catalogue rows read-to-update, as ./store.ts read them before writeLatest and upsertCatalogueEntry moved here. Nothing read is returned to a caller."
+    },
+    "src/services/publish-requests/apply-company.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the metadata (when it was written) of the company's own page, compared with the request before the address is pointed at it. No content is read or returned."
+    },
+    "src/services/company/company-publish-gate.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: when the company's own page was written, stamped on the publish request as its version. No content is read or returned."
+    },
+    "src/services/portfolio-config.ts": {
+      "reads": {
+        "getMemory": 4,
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18, moved from src/routes/portfolio.ts by pure extraction: the owner's own portfolio config record (portfolio.config), read to merge a settings write and to tell whether the page is switched on, and when the stored page was written (metadata only), for the publish gate. No content is shown to anyone."
     },
     "src/services/packages/install/package-skill-component.ts": {
       "reads": {

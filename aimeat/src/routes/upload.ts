@@ -27,6 +27,9 @@
  *   v1.26.0 — 2026-10-18 — A cortex ZIP whose manifest asks for `public` asks the publish gate with
  *     the uploader's grant (services/publish-requests/upload-gate.ts): on an ask it installs private
  *     and the answer is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
+ *   v1.27.0 — 2026-10-18 — An app upload passes the publish gate's answer the mint put in the signed
+ *     token (`publish_ask`): a new app the node's defaults make public, by a caller the owner is asked
+ *     about, is stored unlisted and answers 202 with `publish_request` (services/app-publish-gate.ts).
  *   v1.25.3 — 2026-10-09 — The PUT spends its token in storage (verifyUploadToken(token, storage)), so a
  *     used token is refused after a restart and on another process (secrets audit 2026-10-09, S-7).
  *   v1.25.2 — 2026-10-09 — A ZIP-installed extension's secrets are encrypted bound to its name
@@ -156,6 +159,7 @@ import { handleSkillUpload } from './upload-skill.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { operatorName } from '../services/operator-principal.js';
 import { publishApp } from '../services/app-publish.js';
+import { publishAskFromMeta, publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
 import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { effectiveDevLevel, mayAct } from '../services/app-dev-grant.js';
@@ -344,6 +348,9 @@ async function handleAppUpload(
         },
         accessCode: { mode: 'carry' },
         source: 'presigned',
+        // The gate was asked when the URL was minted, for the session that asked for it; the signed
+        // token carries the answer (services/app-publish-gate.ts).
+        publishGate: publishAskFromMeta(meta.publish_ask),
         roadmap: typeof meta.roadmap === 'string' ? meta.roadmap : undefined,
         // The declaration the caller made when they asked for this URL, carried in the signed token.
         // Re-validated rather than trusted: the token is ours and cannot be forged, but a block that
@@ -368,9 +375,11 @@ async function handleAppUpload(
     logger.info(`App ${out.isUpdate ? 'updated' : 'published'} via upload: ${filename} v${out.versionNumber}`, { by: sub });
     emitResourceListChanged(sub);
 
-    res.json({
+    // 202 when the new app was published unlisted and listing it waits for the owner.
+    res.status(askedStatus(out.publishAsked, 200)).json({
         success: true,
         type: 'app',
+        ...publishAskedFields(out.publishAsked),
         filename,
         ...(out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
         ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),

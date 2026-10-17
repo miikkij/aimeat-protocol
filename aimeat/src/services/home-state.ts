@@ -19,6 +19,7 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   v1.4.3 — 2026-10-18 — The portfolio keys come from services/portfolio-config.ts.
  *   v1.4.2 — 2026-10-11 — needsBetterApp passes the person's answer to the conditions question
  *     (`meets_conditions`): the Gemini app connects in the United States only.
  *   v1.4.1 — 2026-09-18 — needsBetterApp passes the person's own answer to the branch decision, so
@@ -45,7 +46,8 @@ import {
     type OnboardingRoom,
 } from './onboarding-funnel.js';
 import { resolveAiClient, decideBranch } from './ai-tool-branch.js';
-import { portfolioReadGaiis, PORTFOLIO_HTML_KEY, portfolioStandaloneUrl } from '../routes/portfolio.js';
+import { portfolioStandaloneUrl } from '../routes/portfolio.js';
+import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
 import { logger } from '../utils/logger.js';
 import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent-health.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';

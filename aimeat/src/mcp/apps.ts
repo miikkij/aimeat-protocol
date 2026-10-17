@@ -11,6 +11,10 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-18 — aimeat_app_publish and aimeat_app_draft_publish pass the publish gate's answer for the
+ *     session (upload mode puts it in the signed token): a new app the node's defaults make public, by an
+ *     agent without publish:public, is published unlisted and answers with `publish_request`. `caller`
+ *     is required (services/app-publish-gate.ts; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — aimeat_app_get applies the app visibility rule (services/app-visibility.ts): a hidden,
  *     access-coded or unlisted app is the owner's and an operator's, a community-listed app also a
  *     member's of this node; anyone else gets the not-found answer (QA audit W15).
@@ -138,6 +142,8 @@ import { presentAppManifest } from '../services/app-pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { mayViewApp } from '../services/app-visibility.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { publishAskOf } from '../services/publish-requests/ask.js';
+import { publishAskedFields } from '../services/app-publish-gate.js';
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -146,8 +152,8 @@ export function registerAppsTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
-    /** The session's caller (register-all.ts): who asks, for the app visibility rule of aimeat_app_get. */
-    caller?: () => CallerContext,
+    /** The session's caller (register-all.ts): who asks, for the app visibility rule of aimeat_app_get and the publish gate. */
+    caller: () => CallerContext,
 ): void {
 
     /**
@@ -228,11 +234,16 @@ export function registerAppsTools(
                     // dropped `ai_provenance`. The carry-over list lives with the token, so a new
                     // option is covered by declaring it there once AND passing it here; the
                     // crew-defs were declared in neither place until 2026-09-13.
-                    meta: buildUploadMeta('app', {
-                        filename, name, description, category, tags, icon, version,
-                        ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
-                        cortex_agents: cortexAgents,
-                    }),
+                    meta: {
+                        ...buildUploadMeta('app', {
+                            filename, name, description, category, tags, icon, version,
+                            ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
+                            cortex_agents: cortexAgents,
+                        }),
+                        // The publish gate's answer for this session; the PUT has none to ask
+                        // (services/app-publish-gate.ts). Server-side, never from the input.
+                        publish_ask: publishAskOf({ storage, config }, caller()),
+                    },
                     maxBytes: MAX_APP_SIZE,
                     contentType: 'text/html',
                 });
@@ -283,6 +294,7 @@ export function registerAppsTools(
                     requested: { name, description, category, tags, icon, version, cortexAgents },
                     accessCode: { mode: 'carry' },
                     source: 'inline',
+                    publishGate: publishAskOf({ storage, config }, caller()),
                     declaredProvenanceId: ai_provenance_id,
                     declaredProvenance: toDeclaredProvenance(ai_provenance),
                     specToken: spec_token,
@@ -320,6 +332,8 @@ export function registerAppsTools(
                             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
                             ...servedMarksResponse(out),
                             next_steps: out.nextSteps,
+                            // Published unlisted, not public yet: the owner approves (its next_step says what to tell them).
+                            ...publishAskedFields(out.publishAsked),
                         }, null, 2),
                     }],
                 };
@@ -429,6 +443,7 @@ export function registerAppsTools(
                     specToken: spec_token,
                     specAck: spec_ack,
                     roadmap,
+                    publishGate: publishAskOf({ storage, config }, caller()),
                 });
                 if ('refusal' in out) {
                     // The draft stays: a refused promotion is work to fix, not work to lose.
@@ -454,6 +469,7 @@ export function registerAppsTools(
                             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
                             ...servedMarksResponse(out),
                             next_steps: out.nextSteps,
+                            ...publishAskedFields(out.publishAsked),
                         }, null, 2),
                     }],
                 };
@@ -605,10 +621,8 @@ export function registerAppsTools(
             // An app the caller may not see (hidden, behind an access code, unlisted, or listed to this
             // node's members for a caller who is not one) is answered as absent, as the app read routes
             // answer it (services/app-visibility.ts; QA audit W15).
-            const session = caller?.();
-            const viewer = session
-                ? { ownerName: session.owner, member: session.kind !== 'anonymous' && !session.visitor, auth: session.auth }
-                : null;
+            const session = caller();
+            const viewer = { ownerName: session.owner, member: session.kind !== 'anonymous' && !session.visitor, auth: session.auth };
             if (!app || !(await mayViewApp(storage, config, viewer, app, 'detail'))) {
                 return { content: [{ type: 'text' as const, text: `App "${filename}" not found for owner "${owner}"` }], isError: true };
             }
@@ -706,5 +720,5 @@ export function registerAppsTools(
         },
     );
 
-    registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged);
+    registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged, caller);
 }

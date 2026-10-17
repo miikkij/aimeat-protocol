@@ -8,6 +8,8 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-10-18 — aimeat_app_publish, aimeat_app_draft_publish and aimeat_app_fork say they answer with
+ *     publish_request when the node asks the owner first (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — aimeat_app_get says which apps it answers as not found (QA audit W15).
  *   v1.2.0 — 2026-10-12 — aimeat_app_delete says it deletes, and that only an earlier app backup brings
  *     the app back; it said archive (wish-data-ownership-code-defects-leave-over-mcp-keeps-access-app-).
@@ -46,7 +48,7 @@ const SPEC_GATE_INPUT = {
 export const appPublishTools = [
     {
         name: 'aimeat_app_publish',
-        description: 'Publish or update an HTML app STRAIGHT TO LIVE (versioned by group) — every call becomes the new live version users get immediately. START FROM THE SHELL: fetch `GET /v1/app-templates` and build on one, rather than writing an app from scratch. The shell carries the login pill, the language and theme controls, and the design system the node already serves; an app written from nothing typically ships without them, and the person only finds out by opening it. Two modes: UPLOAD MODE (recommended for files > 1 KB) — call with metadata only (omit content), get an upload_url, then PUT the raw HTML; the PUT response is the publish result. INLINE MODE — pass content for tiny files. Use @file:path with the CLI fallback. DECIDING LIVE vs STAGING: use this when you are confident the app works. When you want to TEST the next version first (e.g. anything using the microphone/camera, which only work on a real origin — never in an embedded preview), stage it with aimeat_app_draft_save, open its preview_url to verify, then aimeat_app_draft_publish — the live app stays untouched until you do.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Publish or update an HTML app STRAIGHT TO LIVE (versioned by group) — every call becomes the new live version users get immediately. START FROM THE SHELL: fetch `GET /v1/app-templates` and build on one, rather than writing an app from scratch. The shell carries the login pill, the language and theme controls, and the design system the node already serves; an app written from nothing typically ships without them, and the person only finds out by opening it. Two modes: UPLOAD MODE (recommended for files > 1 KB) — call with metadata only (omit content), get an upload_url, then PUT the raw HTML; the PUT response is the publish result. INLINE MODE — pass content for tiny files. Use @file:path with the CLI fallback. DECIDING LIVE vs STAGING: use this when you are confident the app works. When you want to TEST the next version first (e.g. anything using the microphone/camera, which only work on a real origin — never in an embedded preview), stage it with aimeat_app_draft_save, open its preview_url to verify, then aimeat_app_draft_publish — the live app stays untouched until you do. When the node asks the owner before making something public, a NEW app the node would list for anyone is published unlisted and the answer carries publish_request.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish App', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -116,7 +118,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_fork',
-        description: 'Fork an app into your own catalogue as a new independent app, recording its origin (manifest.forkedFrom) and a lineage event. You may fork your own apps freely; you may fork someone else\'s only when they have marked it forkable (and, for a paid app, you hold a license). This is the sanctioned, provenance-recording path — prefer it over app_get+app_publish so the fork chain stays intact.',
+        description: 'Fork an app into your own catalogue as a new independent app, recording its origin (manifest.forkedFrom) and a lineage event. You may fork your own apps freely; you may fork someone else\'s only when they have marked it forkable (and, for a paid app, you hold a license). This is the sanctioned, provenance-recording path — prefer it over app_get+app_publish so the fork chain stays intact. When the node asks the owner before making something public, a fork the node would list for anyone lands unlisted and the answer carries publish_request.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Fork App', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -153,7 +155,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_app_draft_publish',
-        description: 'Promote an app\'s saved draft to a NEW live version, then clear the draft slot — THIS is the moment the live app changes. Carries the live app\'s parked/forkable/protection state forward, exactly like a normal re-publish. Call this after you have tested the draft via the preview_url from aimeat_app_draft_save and it works. Fails if there is no saved draft.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Promote an app\'s saved draft to a NEW live version, then clear the draft slot — THIS is the moment the live app changes. Carries the live app\'s parked/forkable/protection state forward, exactly like a normal re-publish. Call this after you have tested the draft via the preview_url from aimeat_app_draft_save and it works. Fails if there is no saved draft. When the node asks the owner before making something public, a NEW app the node would list for anyone is published unlisted and the answer carries publish_request.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

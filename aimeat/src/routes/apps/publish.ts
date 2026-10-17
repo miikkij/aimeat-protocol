@@ -8,6 +8,9 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.11.0 -- 2026-10-18 -- The publish gate (services/app-publish-gate.ts): a first publish the node's
+ *     defaults make public, by a caller the owner is asked about, is stored unlisted and answers 202
+ *     with `publish_request`; presigned mode carries the gate's answer in the signed token (`publish_ask`).
  *   v2.10.0 -- 2026-10-11 -- `toll_morsels` sets the app's pacing amount (a morsel is pacing, not a
  *     price). The 3.x `price_morsels` / `priceMorsels` are read as pacing until 4.0.0, then refused with
  *     400 MORSEL_PRICE_REMOVED; a delegate is refused all three. The response manifest carries the
@@ -81,6 +84,9 @@ import { imageUploadType } from '../../utils/raster-image.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
 import { appTargetOr, type AppTargetFor } from './helpers.js';
 import { readAppTollInput, presentAppManifest } from '../../services/app-pacing.js';
+import { callerOf } from '../../middleware/caller.js';
+import { publishAskOf } from '../../services/publish-requests/ask.js';
+import { publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
 
 export function registerPublishRoutes(
     router: Router,
@@ -178,6 +184,10 @@ export function registerPublishRoutes(
             }
         }
 
+        // The publish gate's answer for this session (services/app-publish-gate.ts), asked once for
+        // both modes. The presigned PUT has no session, so the signed token carries the answer.
+        const publishGate = publishAskOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app);
+
         // --- PRESIGNED MODE: return upload URL instead of requiring content ---
         if (req.body.mode === 'presigned') {
             const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
@@ -196,13 +206,17 @@ export function registerPublishRoutes(
                 // keeps that property (it drops undefined) and adds the carry-over list's guarantee
                 // that a newly accepted option cannot be forgotten here — which is how the
                 // provenance declaration went missing on this door.
-                meta: buildUploadMeta('app', {
-                    filename, description, category, tags, icon,
-                    ...(typeof req.body.name === 'string' ? { name: req.body.name } : {}),
-                    ...(typeof semver === 'string' ? { version: semver } : {}),
-                    ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
-                    cortex_agents: cortexAgents,
-                }),
+                meta: {
+                    ...buildUploadMeta('app', {
+                        filename, description, category, tags, icon,
+                        ...(typeof req.body.name === 'string' ? { name: req.body.name } : {}),
+                        ...(typeof semver === 'string' ? { version: semver } : {}),
+                        ai_provenance, ai_provenance_id, spec_token, spec_ack, roadmap,
+                        cortex_agents: cortexAgents,
+                    }),
+                    // Server-side, never from the body: buildUploadMeta picks only the declared keys.
+                    publish_ask: publishGate,
+                },
                 maxBytes: MAX_APP_SIZE,
                 contentType: 'text/html',
             });
@@ -296,6 +310,7 @@ export function registerPublishRoutes(
             // one explicitly. The other two carry the live app's forward — they have no way to say.
             accessCode: Object.hasOwn(req.body, 'access_code') ? { mode: 'explicit', value: accessCode } : { mode: 'carry' },
             source: 'inline',
+            publishGate,
             roadmap,
             declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
             declaredProvenance: declared.declared,
@@ -324,7 +339,9 @@ export function registerPublishRoutes(
         const hasScreenshot = shot !== null;
 
 
-        res.status(201).json(success(config.nodeId, {
+        // 202 when the new app was published unlisted and listing it waits for the owner.
+        res.status(askedStatus(out.publishAsked, 201)).json(success(config.nodeId, {
+            ...publishAskedFields(out.publishAsked),
             filename,
             ...('warning' in road ? { roadmap_hint: road.warning } : {}),
             ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),

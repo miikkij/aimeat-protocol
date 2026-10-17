@@ -1,0 +1,140 @@
+/**
+ * @file src/services/portfolio-config.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Where an owner's welcome page (the portfolio) and its switch live, and the writes of
+ *   the switch. Moved out of routes/portfolio.ts by pure extraction, so a service (the publish
+ *   request applier, services/publish-requests/apply-portfolio.ts) switches the page on through the
+ *   same function PUT /v1/portfolio/config uses, without importing a route. routes/portfolio.ts
+ *   re-exports every name for its importers.
+ * @structure PORTFOLIO_HTML_KEY · PORTFOLIO_CONFIG_KEY · portfolioWriteGaii · portfolioReadGaiis ·
+ *   mergePortfolioConfig · portfolioSwitchState · switchPortfolioOnUnlessTurnedOff
+ * @usage await mergePortfolioConfig(storage, await portfolioWriteGaii(storage, owner, nodeId), { enabled: true });
+ * @version-history
+ *   v1.0.0 — 2026-10-18 — Extracted from routes/portfolio.ts (the keys, portfolioWriteGaii,
+ *     portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff, and the PUT /v1/portfolio/config write as
+ *     mergePortfolioConfig); portfolioSwitchState added for the publish gate (plan doc-mvcn6c7e4e5q, V4).
+ */
+import type { Storage } from '../storage/interface.js';
+
+/** Where this owner's portfolio file and config live. */
+export const PORTFOLIO_HTML_KEY = 'portfolio/index.html';
+export const PORTFOLIO_CONFIG_KEY = 'portfolio.config';
+
+/**
+ * Which identity a NEW portfolio write is stored under.
+ *
+ * Historically this was always the owner's first agent, which was safe while a portfolio could
+ * only ever be built by someone who already had one. The remake reverses that order: the welcome
+ * mat IS the portfolio and it is made BEFORE any agent exists (03-welcome-mat.md), so an
+ * agent-keyed write has no key to use.
+ *
+ * An owner with an agent keeps writing exactly where they always did — the old path is unchanged
+ * byte for byte. An owner with none writes under their own GHII, which is an identity they have
+ * from the moment the account exists.
+ */
+export async function portfolioWriteGaii(
+  storage: Storage, ownerName: string, nodeId: string,
+): Promise<string> {
+  const agents = await storage.getAgentsByOwner(ownerName);
+  return agents.length ? agents[0].gaii : `${ownerName}@${nodeId}`;
+}
+
+/**
+ * Every identity a portfolio might be stored under, newest convention first. Reads try each in
+ * turn: an account that made its mat before connecting an agent has it under the GHII, and must
+ * keep seeing it after the agent arrives.
+ */
+export async function portfolioReadGaiis(
+  storage: Storage, ownerName: string, nodeId: string,
+): Promise<string[]> {
+  const agents = await storage.getAgentsByOwner(ownerName);
+  return [...agents.map(a => a.gaii), `${ownerName}@${nodeId}`];
+}
+
+/**
+ * The PUT /v1/portfolio/config write: MERGES `patch` onto what is stored under `target`. A caller
+ * that wants a field gone sends it as null rather than omitting it.
+ */
+export async function mergePortfolioConfig(
+  storage: Storage, target: string, patch: Record<string, unknown>,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
+  const prev = (existing?.value ?? {}) as Record<string, unknown>;
+  await storage.setMemory({
+    key: PORTFOLIO_CONFIG_KEY,
+    ownerGaii: target,
+    value: { ...prev, ...patch },
+    visibility: 'owner',
+    tags: (patch.tags as string[] | undefined) || ['portfolio'],
+    ttlHours: null,
+    version: existing ? existing.version + 1 : 1,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  });
+}
+
+/**
+ * The switch as the reader sees it (the first identity holding a config), and when the stored page
+ * was written: `enabled` true (served), false (the owner switched it off) or null (never set).
+ */
+export async function portfolioSwitchState(
+  storage: Storage, ownerName: string, nodeId: string,
+): Promise<{ enabled: boolean | null; pageAt: string | null }> {
+  const gaiis = await portfolioReadGaiis(storage, ownerName, nodeId);
+  let enabled: boolean | null = null;
+  for (const gaii of gaiis) {
+    const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
+    if (mem?.value && typeof mem.value === 'object') {
+      const v = (mem.value as Record<string, unknown>).enabled;
+      enabled = v === true ? true : v === false ? false : null;
+      break;
+    }
+  }
+  let pageAt: string | null = null;
+  for (const gaii of gaiis) {
+    const meta = await storage.getStorageFileMeta(gaii, PORTFOLIO_HTML_KEY);
+    if (meta) { pageAt = meta.createdAt; break; }
+  }
+  return { enabled, pageAt };
+}
+
+/**
+ * Whether the owner's page is served after a publish, switching it on when the caller asks to.
+ *
+ * The page is served only when `portfolio.config` says `enabled`, and storing a page does not set
+ * that: the file and the switch are two acts (e2e-remake-home holds it). Only the welcome-mat paste
+ * set the switch, so a card an AI published for a person who never pasted a mat answered 404 at the
+ * address the tool handed back (measured 2026-10-03, e2e-home-journey test 5). With `enable`, which
+ * the AI sends when the person approved the page and wants it public, the switch is set the way the
+ * paste sets it, merged onto what is stored. An owner who switched their page OFF keeps it off: that
+ * is their decision, and the caller says so instead of handing out a dark address.
+ */
+export async function switchPortfolioOnUnlessTurnedOff(
+  storage: Storage, nodeId: string, ownerName: string, target: string, enable: boolean,
+): Promise<boolean> {
+  let current: Record<string, unknown> | null = null;
+  for (const gaii of await portfolioReadGaiis(storage, ownerName, nodeId)) {
+    const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
+    if (mem?.value && typeof mem.value === 'object') { current = mem.value as Record<string, unknown>; break; }
+  }
+  if (current?.enabled === false) return false;
+  if (current?.enabled === true) return true;
+  if (!enable) return false;
+  const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
+  const prev = (existing?.value && typeof existing.value === 'object' ? existing.value : current ?? {}) as Record<string, unknown>;
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: PORTFOLIO_CONFIG_KEY,
+    ownerGaii: target,
+    value: { ...prev, enabled: true, source: prev.source ?? 'ai' },
+    visibility: 'owner',
+    tags: ['portfolio'],
+    ttlHours: null,
+    version: existing ? existing.version + 1 : 1,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  });
+  return true;
+}

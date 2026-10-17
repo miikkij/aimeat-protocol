@@ -5,9 +5,12 @@
  * @description aimeat_app_fork, moved out of mcp/apps.ts by pure extraction when that file passed
  *   the 800-line limit. What is left here is the tool's own business: its two gates, and the answer
  *   it renders. The copy itself is services/app-lifecycle.ts.
- * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged)
+ * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged, caller)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   2026-10-18 — The fork passes the publish gate (services/app-publish-gate.ts): a fork the node's
+ *     defaults would make public, by an agent without publish:public, lands unlisted and answers with
+ *     `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — A fork of an older version reads the pacing amount of the latest version (QA audit F10a-01).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-15 — Gate 2 asks the licence for the version it copies (feature-list audit #110).
@@ -36,6 +39,9 @@ import { ownerGhiiOf } from '../utils/gaii.js';
 import { appIsPaced, appToll } from '../services/app-pacing.js';
 import { currentAppRow } from '../services/app-served-protection.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
+import { publishAskOf } from '../services/publish-requests/ask.js';
+import { publishAskedFields } from '../services/app-publish-gate.js';
 
 export function registerAppForkTool(
     mcp: McpServer,
@@ -43,6 +49,8 @@ export function registerAppForkTool(
     config: AimeatConfig,
     getAgentGaii: () => string,
     emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's caller, for the publish gate a new app passes (services/app-publish-gate.ts). */
+    caller: () => CallerContext,
 ): void {
     // ── Tool 6: aimeat_app_fork ──
     mcp.tool(
@@ -92,6 +100,7 @@ export function registerAppForkTool(
                     callerGhii,
                     callerGaii: agentGaii,
                     newFilename: new_filename,
+                    publishGate: publishAskOf({ storage, config }, caller()),
                 });
                 if ('refusal' in out) {
                     return { content: [{ type: 'text' as const, text: out.refusal.message }], isError: true };
@@ -110,6 +119,8 @@ export function registerAppForkTool(
                             download_url: out.downloadUrl,
                             inline_url: `${out.downloadUrl}?mode=inline`,
                             note: `Forked "${filename}" into your catalogue as "${new_filename}".`,
+                            // Stored unlisted, not public yet: the owner approves (its next_step says what to tell them).
+                            ...publishAskedFields(out.publishAsked),
                         }, null, 2),
                     }],
                 };

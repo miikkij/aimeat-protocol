@@ -23,11 +23,11 @@
       "digest": "sha256:5846c0714eb80fa8c0f94ddf"
     },
     "node:aimeat-open-items": {
-      "reviewedOn": "2026-09-29",
+      "reviewedOn": "2026-10-17",
       "watches": [
         "aimeat/src/services/open-items.ts"
       ],
-      "digest": "sha256:90f67577f4bed52222bc7fd5"
+      "digest": "sha256:e7d6e96dedba4f85193d1706"
     },
     "node:aimeat-recurring-work": {
       "reviewedOn": "2026-10-16",
@@ -68,11 +68,11 @@
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-17",
       "watches": [
         "aimeat/src/mcp/portfolio.ts"
       ],
-      "digest": "sha256:fc2334431d1009e278a73c47"
+      "digest": "sha256:1648d9524247680b0d9c2f9f"
     },
     "node:aimeat-activating-a-person": {
       "reviewedOn": "2026-09-19",
@@ -502,13 +502,13 @@
   },
   "fileDigests": {
     "node:aimeat-open-items": {
-      "aimeat/src/services/open-items.ts": "da99aa649ff0dbc6"
+      "aimeat/src/services/open-items.ts": "6882e2583df9b088"
     },
     "node:aimeat-first-conversation": {
       "aimeat/src/services/model-recommendation.ts": "d81eaca4a619f479"
     },
     "node:aimeat-welcome-pages": {
-      "aimeat/src/mcp/portfolio.ts": "41af2dc564ddaf06"
+      "aimeat/src/mcp/portfolio.ts": "13d7b9967f6f77ab"
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {

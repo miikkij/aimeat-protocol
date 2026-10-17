@@ -17,10 +17,12 @@
  *   - Deleting a company frees its slug. That is deliberate: an address nobody claims should
  *     be claimable again, and the registry is not an archive.
  *
- * @structure CompanyError · slugify · createCompany · updateCompany · setFrontPage ·
+ * @structure CompanyError · slugify · createCompany · updateCompany · setFrontPage · resolveFrontPage ·
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   2026-10-18 — setFrontPage's checks are resolveFrontPage (pure extraction), which the publish gate
+ *     asks before it files a request (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-10 — The description's provenance record is held and stored only after the company row
  *     is written, so a SLUG_TAKEN create leaves no orphan record (secaudit 2026-10-10 I11).
  *   2026-10-08 — The description's record is minted against the owner's surface, not a public one: no
@@ -245,6 +247,19 @@ export async function updateCompany(storage: Storage, ownerGhii: string, id: str
  */
 export async function setFrontPage(storage: Storage, ownerGhii: string, id: string, front: CompanyFrontPage): Promise<CompanyRecord> {
   const company = await requireOwnCompany(storage, ownerGhii, id);
+  const resolved = await resolveFrontPage(storage, ownerGhii, company, front);
+  const next: CompanyRecord = { ...company, frontPage: resolved, updatedAt: new Date().toISOString() };
+  await storage.updateCompany(next);
+  return next;
+}
+
+/**
+ * The front page as it would be stored, or the CompanyError that refuses it. setFrontPage's checks,
+ * also asked by the publish gate before it files a request (services/company/company-publish-gate.ts).
+ */
+export async function resolveFrontPage(
+  storage: Storage, ownerGhii: string, company: CompanyRecord, front: CompanyFrontPage,
+): Promise<CompanyFrontPage> {
   const ownerBare = localAccountName(ownerGhii);
 
   if (front.kind === 'app') {
@@ -285,10 +300,7 @@ export async function setFrontPage(storage: Storage, ownerGhii: string, id: stri
   } else {
     front = { kind: 'none', target: '' };
   }
-
-  const next: CompanyRecord = { ...company, frontPage: front, updatedAt: new Date().toISOString() };
-  await storage.updateCompany(next);
-  return next;
+  return front;
 }
 
 export async function deleteCompany(storage: Storage, ownerGhii: string, id: string): Promise<void> {

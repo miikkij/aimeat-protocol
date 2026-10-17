@@ -23,6 +23,9 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-10-18 — action "settings" asks the publish gate as PATCH /v1/apps/:filename does: a change that
+ *     makes the app public, by an agent without publish:public, is applied without that one field and
+ *     answers with `publish_request` (services/app-publish-gate.ts; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 — 2026-10-05 — The member, plan, audit_archive, audit_keep, builder and spec actions call
@@ -67,7 +70,7 @@ import { ownerAppSeo } from '../services/app-seo.js';
 import { ownerAppMarks } from '../services/app-marks.js';
 import { ownerAppLegal } from '../services/app-legal.js';
 import { ownerAppAudit } from '../services/app-audit.js';
-import { applyOwnerSettingsUpdate, ownerAppSettings, SETTINGS_FIELDS, SETTINGS_OFFERING_FIELDS } from '../services/app-settings.js';
+import { ownerAppSettings, SETTINGS_FIELDS, SETTINGS_OFFERING_FIELDS } from '../services/app-settings.js';
 import { listAppVersionsView } from '../services/app-versions.js';
 import { collectAppLineage } from '../services/app-lineage.js';
 import { captureAppScreenshot } from '../services/screenshot-capture.js';
@@ -88,6 +91,8 @@ import {
 import { appManageMemberAction } from './app-manage-members.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { publishAskedFields } from '../services/app-publish-gate.js';
+import { applyOwnerSettingsGated } from '../services/app-settings-gate.js';
 
 type Args = Record<string, unknown>;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
@@ -160,11 +165,14 @@ export function registerAppManageTool(
                 const scope = await target(touchesOffering ? 'operate' : 'presentation');
                 if ('refusal' in scope) return toolError('FORBIDDEN', scope.refusal);
                 const appTarget = { ownerGaii: scope.ownerGhii, ownerName: scope.ownerName, filename };
-                const out = await applyOwnerSettingsUpdate(storage, config, { ...appTarget, callerGaii }, fields);
+                // Through the publish gate, as PATCH /v1/apps/:filename asks it (services/app-publish-gate.ts):
+                // a change that makes the app public is applied without that one field, which the
+                // owner is asked about.
+                const out = await applyOwnerSettingsGated({ storage, config }, caller(), undefined, { ...appTarget, callerGaii }, fields);
                 if ('refusal' in out) return refusalText(out.refusal);
                 const state = await ownerAppSettings(storage, config, appTarget);
                 if ('refusal' in state) return refusalText(state.refusal);
-                return answer({ ...state, ...(out.notes.length ? { note: out.notes.join(' ') } : {}) });
+                return answer({ ...state, ...(out.notes.length ? { note: out.notes.join(' ') } : {}), ...publishAskedFields(out.asked) });
             }
             case 'seo': {
                 const out = await ownerAppSeo(storage, config, { callerGaii, filename, seo: pick(args, ['index', 'title', 'description', 'keywords', 'image', 'lang']) });

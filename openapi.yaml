@@ -24621,6 +24621,8 @@ paths:
               type: string
               format: binary
       responses:
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '200':
           description: >-
             Upload processed successfully. A storage upload answers with key, owner_gaii, size,
@@ -32084,6 +32086,8 @@ paths:
                     The owner chose to publish without the build spec. Recorded on the node's change
                     log rather than passing silently.
       responses:
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '201':
           description: |
             App published or updated. `data.ai_posture` states what the node now believes about the
@@ -32874,6 +32878,8 @@ paths:
                   type: string
                   description: A provenance record you already hold, attached instead of a new declaration
       responses:
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '200':
           description: App updated
           content:
@@ -35317,6 +35323,8 @@ paths:
                   type: string
                   description: Attach an already-minted record of the caller's own instead.
       responses:
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '201':
           description: Draft published as a new live version
           content:
@@ -35398,6 +35406,8 @@ paths:
                   type: integer
                   description: Source version to fork (defaults to latest)
       responses:
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '201':
           description: App forked
           content:
@@ -68204,6 +68214,8 @@ paths:
                 enabled: { type: boolean }
                 tags: { type: array, items: { type: string } }
       responses:
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '200':
           description: Configuration saved
           content:
@@ -68262,6 +68274,8 @@ paths:
                     page on, unless they switched it off themselves. Without it the page is stored
                     and the switch stays as it was.
       responses:
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '200':
           description: File uploaded
           content:
@@ -73859,6 +73873,7 @@ paths:
                 html: { type: string, description: 'The complete HTML document, doctype through </html>.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '202': { $ref: '#/components/responses/PublishRequested' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -73971,6 +73986,7 @@ paths:
                 target: { type: string, description: '"owner/file.html" for app, an absolute URL for redirect' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '202': { $ref: '#/components/responses/PublishRequested' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }

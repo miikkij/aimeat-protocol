@@ -13,6 +13,10 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-18 — PUT /v1/companies/:id/front-page and PUT /v1/companies/:id/portfolio pass the publish
+ *     gate (services/company/company-publish-gate.ts): pointing an address that serves nothing at a page, by a
+ *     caller the owner is asked about, stores the page, leaves the address as it is and answers 202
+ *     with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-08 — PUT /v1/companies/:id/portfolio passes the writer, so the page carries an AI-provenance record.
  *   2026-10-05 — POST and PUT /v1/companies[/:id] take ai_provenance and ai_provenance_id for the description;
  *     the service records it, and the company answers descriptionProvenanceId (secaudit 2026-10, M3
@@ -33,9 +37,12 @@ import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
 import {
-  CompanyError, createCompany, updateCompany, setFrontPage, deleteCompany,
+  CompanyError, createCompany, updateCompany, deleteCompany,
   requireOwnCompany, checkSlugAvailable, companyAddress, slugify, type CompanyProvenanceInput,
 } from '../services/company/company-service.js';
+import { setCompanyFrontPageGated, publishCompanyPortfolioGated } from '../services/company/company-publish-gate.js';
+import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
+import { callerOf } from '../middleware/caller.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { CompanyRecord } from '../models/company-schemas.js';
 import {
@@ -43,7 +50,7 @@ import {
 } from '../services/company/company-smtp.js';
 import { listSendableCompanies } from '../services/outbound/company-sender-access.js';
 import {
-  publishCompanyPortfolio, getCompanyPortfolio, deleteCompanyPortfolio,
+  getCompanyPortfolio, deleteCompanyPortfolio,
 } from '../services/company/company-portfolio.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -308,11 +315,14 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(400).json(error(config.nodeId, 'INVALID_FRONT_PAGE', parsed.error.message));
         return;
       }
-      const company = await setFrontPage(storage, resolve(req), req.params.id as string, {
-        kind: parsed.data.kind, target: parsed.data.target ?? '',
-      });
+      // Through the publish gate (services/company/company-publish-gate.ts): pointing an address that serves
+      // nothing at a page makes it public, and a caller the owner is asked about files a request.
+      const { company, asked } = await setCompanyFrontPageGated({ storage, config },
+        { caller: callerOf(req, config.nodeId, storage), app: req.auth?.app }, resolve(req), req.params.id as string, {
+          kind: parsed.data.kind, target: parsed.data.target ?? '',
+        });
       emitChange('companies', resolve(req));
-      res.json(success(config.nodeId, { company: withAddress(config, company) }));
+      res.status(askedStatus(asked, 200)).json(success(config.nodeId, { company: withAddress(config, company), ...publishAskedFields(asked) }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }
@@ -420,12 +430,12 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(400).json(error(config.nodeId, 'INVALID_PORTFOLIO', parsed.error.message));
         return;
       }
-      const { company, status } = await publishCompanyPortfolio(
-        config, storage, resolve(req), req.params.id as string, parsed.data.html,
+      const { company, status, asked } = await publishCompanyPortfolioGated({ storage, config },
+        { caller: callerOf(req, config.nodeId, storage), app: req.auth?.app }, resolve(req), req.params.id as string, parsed.data.html,
         { principal: resolveIdentity(req.auth!, config.nodeId), pipeline: 'rest.companies.portfolio' },
       );
       emitChange('companies', resolve(req));
-      res.json(success(config.nodeId, { company: withAddress(config, company), portfolio: status }, [
+      res.status(askedStatus(asked, 200)).json(success(config.nodeId, { company: withAddress(config, company), portfolio: status, ...publishAskedFields(asked) }, [
         { description: 'Open the published page', method: 'GET', url: companyAddress(config, company) ?? '/' },
       ]));
     } catch (e) {

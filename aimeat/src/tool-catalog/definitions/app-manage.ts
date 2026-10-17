@@ -21,6 +21,7 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-18 — settings says it answers with publish_request when the node asks the owner first (V4).
  *   2026-10-17 — settings takes `open_to` (anyone, signed-in, organism:<id>): who may open the app.
  *   2026-10-15 — audit_keep: a number is set by an agent holding account:security, as the route allows; the text said it was always refused (feature-list audit 105).
  *   2026-10-13 — scope_allowance and scope_allowance_remove, with the `words` field: the permissions an
@@ -236,7 +237,7 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
 
 export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     settings: { fields: F(['filename'], ['owner', ...SETTINGS_FIELDS]), oneOf: SETTINGS_FIELDS, scope: 'app:write',
-        summary: 'change name, description, per-language descriptions, listing (listed, community for signed-in members only, or unlisted), who may open it (anyone, signed-in, or one organism\'s members), forkable, access code or copy protection, without a new version' },
+        summary: 'change name, description, per-language descriptions, listing (listed, community for signed-in members only, or unlisted), who may open it (anyone, signed-in, or one organism\'s members), forkable, access code or copy protection, without a new version. When the node asks the owner before making something public, a change that would make the app public (listed, no code, open to anyone) is applied without that one field and answers with publish_request' },
     seo: { fields: F(['filename'], ['index', 'title', 'description', 'keywords', 'image', 'lang']), scope: 'app:write',
         summary: 'decide whether the app can be found in search engines (off until you ask) and what it says there; naming nothing reports where it stands' },
     marks: { fields: F(['filename'], ['badge', 'install', 'aiUse']), scope: 'app:write',

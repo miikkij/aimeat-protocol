@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-18 — `publishGate`: a first publish the node's defaults make public, by a caller the owner is asked about, is stored unlisted and files a request to list it (`publishAsked`; services/app-publish-gate.ts, plan doc-mvcn6c7e4e5q V4). provenanceModelFindings moved to app-ai-model-hints.ts.
  *   2026-10-17 — The exposure of a version (listing, forking, code, who may open it) comes from publishExposure: carried from the live version, or the node's new-app defaults on a first publish (V2.4).
  *   2026-10-11 — requested.priceMorsels is tollMorsels, the app's pacing amount, carried forward the same way.
  *   2026-10-10 — nextSteps is told how the data map and the design spec stand (app-publish-next-steps.ts).
@@ -119,10 +120,10 @@ import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
 import { recordAccountEvent } from './account-events.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, declarationLacksModel, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai-provenance.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
-import { unknownModelHints } from './app-ai-model-hints.js';
-import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
+import { unknownModelHints, provenanceModelFindings } from './app-ai-model-hints.js';
+import { lintAppArtifact, loadsAtelierKit, type AppArtifactFinding } from './app-artifact-lint.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
 import { evaluateSpecCheck, type AppSpecCheck } from './app-spec-gate.js';
 import { buildAtelierSpecToken } from './build-atelier-prompt.js';
@@ -132,7 +133,6 @@ import { genreForkFindings } from './app-genre-fork.js';
 import { handRolledFindings } from './app-hand-rolled.js';
 import { levelFindings } from './app-build-level.js';
 import { recordBookParts } from './app-book-parts.js';
-import { loadsAtelierKit } from './app-artifact-lint.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
 import { stampFor } from './data-map/data-map-check.js';
@@ -149,6 +149,8 @@ import { parseAppConfigSchema } from './app-config.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
 import { parseFormatMdMeta, formatMdRefusal } from './app-format-md.js';
 import { publishExposure } from './app-publish-exposure.js';
+import { gateFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
+import type { PublishAsk } from './publish-requests/ask.js';
 
 /**
  * The manifest fields a caller may state. **`undefined` means "not mentioned"** and is filled from
@@ -203,6 +205,8 @@ export interface PublishAppInput {
    * a feed that stops being read at that point. See `announces` below.
    */
   source: 'inline' | 'presigned' | 'draft' | 'package-install';
+  /** The publish gate's answer for the caller, asked by the door (null: a package install). Read on a first publish only (app-publish-gate.ts). */
+  publishGate: PublishAsk | null;
   /** A provenance record the caller asked to attach — checked against their own account. */
   declaredProvenanceId?: string;
   /** What the caller said about how the bytes were made. Absent + non-human principal → MINT-3. */
@@ -257,6 +261,8 @@ export interface PublishAppResult {
   servedMarksRemoved: ServedMarkRemoval[];
   /** Agent face + bound skill, and what to do about each. Best-effort, so it can be undefined. */
   nextSteps?: Record<string, unknown>;
+  /** The publish request the gate filed (or the warning that it could not be): the app is unlisted. */
+  publishAsked?: AppPublishAsked;
 }
 
 /**
@@ -546,7 +552,10 @@ export async function publishApp(
 
   // Carry the moderation and exposure state forward, so an update never silently re-exposes a
   // parked app, opens forking, or escapes an operator hide by re-uploading.
-  const { parked, community, forkable, accessCode, access } = publishExposure(config, live, input.accessCode);
+  // A first publish the node's defaults make public waits for the owner when the gate asks (V4).
+  const gated = gateFirstPublishExposure(publishExposure(config, live, input.accessCode), !live, input.publishGate);
+  if ('refusal' in gated) return gated;
+  const { parked, community, forkable, accessCode, access } = gated.exposure;
 
   // The bytes changed → drop any cached obfuscated/locked base.
   invalidateProtectionCache(ownerName, filename);
@@ -724,6 +733,9 @@ export async function publishApp(
     });
   }
 
+  // The request the gate asked for, now that the unlisted version it names is stored.
+  const publishAsked = gated.asked && await fileAppPublishAsk({ storage, config }, { ownerName, filename, versionNumber: newVersion }, gated.asked);
+
   // The two calls a builder is measured to forget once the app is live (app-book-parts.ts).
   const bookParts = isHtml
     ? await recordBookParts(storage, config, {
@@ -772,21 +784,8 @@ export async function publishApp(
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.
     nextSteps: bookParts ? { ...(steps ?? {}), design_book_parts: bookParts } : steps,
+    ...(publishAsked ? { publishAsked } : {}),
   };
-}
-
-/** The hint a declaration earns when it says a model made the app and not which model. */
-function provenanceModelFindings(declared: DeclaredProvenance | undefined): AppArtifactFinding[] {
-  if (!declarationLacksModel(declared)) return [];
-  const served = declared?.provider ? `, only who served it ("${declared.provider}")` : '';
-  return [{
-    pitfall: 'provenance-without-model',
-    severity: 'warn',
-    message: `The ai_provenance you declared says a model made this app and does not name the model. The public record shows no model${served}. `
-      + 'On the next publish, set ai_provenance.model to your own model id as your provider names it, for example "openai/gpt-6" or "anthropic/claude-opus-5". '
-      + 'Take it from your own configuration; do not ask the person.',
-    url: '/v1/appdev/pitfalls/provenance-without-model',
-  }];
 }
 
 /** Drop blank entries and cap each at 2000 characters; `undefined` when nothing survives. */

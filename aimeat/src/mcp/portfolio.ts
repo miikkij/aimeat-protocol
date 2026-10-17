@@ -18,9 +18,11 @@
  *   Measured 2026-08-09 before writing this: an agent token already reaches the REST portfolio
  *   routes (`PUT /v1/portfolio/config` answered 200 and the owner read the change back). The gap
  *   was never permission, only that MCP had no door to it.
- * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii)
- * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii);
+ * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii, caller)
+ * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-10-18 — `enable: true` asks the publish gate (services/portfolio-publish-gate.ts): an agent without
+ *     publish:public stores the page, leaves it off and answers with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-08 — The page is written with the agent as its writer, so it carries an AI-provenance record.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-10-03 — `enable: true` switches the page on, as the welcome-mat paste does, unless
@@ -46,6 +48,9 @@ import {
 } from '../routes/portfolio.js';
 import { emitChange } from '../services/event-bus.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
+import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
+import { publishAskedFields } from '../services/app-publish-gate.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -59,6 +64,8 @@ export function registerPortfolioTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    /** The session's caller, for the publish gate switching the page on passes. */
+    caller: () => CallerContext,
 ): void {
     // The operator's kill switch, honoured here too. server-bootstrap/routes-loader.ts mounts
     // the whole portfolio router only when config.portfolioEnabled is true, so on a node with the
@@ -91,8 +98,15 @@ export function registerPortfolioTools(
             // Same target the REST route writes, so the page an agent publishes is the same file the
             // browser reads. Resolving it anywhere else is how two "welcome pages" come to exist.
             const target = await portfolioWriteGaii(storage, owner, config.nodeId);
+            // The publish gate, as PUT /v1/portfolio/upload asks it (services/portfolio-publish-gate.ts):
+            // switching on a page never switched makes it public. Asked before the page is written.
+            const gate = enable === true
+                ? await portfolioRaiseAsk({ storage, config }, caller(), undefined, owner, { overridesOff: false })
+                : { kind: 'go' as const };
+            if (gate.kind === 'refused') return out({ error: gate.code, message: gate.message }, true);
             await writePortfolioHtml(storage, target, data, { config, principal: getAgentGaii(), pipeline: 'mcp.portfolio_publish' });
-            const served = await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, owner, target, enable === true);
+            const served = await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, owner, target, enable === true && gate.kind === 'go');
+            const asked = gate.kind === 'ask' ? await filePortfolioAsk({ storage, config }, owner, gate) : undefined;
             emitChange('portfolio');
             // Both addresses the node actually serves, and none it does not: the person is told
             // to look, so the link has to open.
@@ -104,9 +118,12 @@ export function registerPortfolioTools(
                 standalone_url: portfolioStandaloneUrl(config, owner),
                 note: served
                     ? 'Tell the person the address and let them look. A page they have not seen is not finished.'
-                    : enable === true
+                    : gate.kind === 'ask'
+                        ? 'The page is stored and not public yet: switching it on waits for the person\'s approval (publish_request says what to tell them).'
+                        : enable === true
                         ? 'The page is stored, and the person switched their page off, so the address shows nothing yet. Tell them they switch it on themselves on the Portfolio page (/v1/profile?tab=portfolio).'
                         : 'The page is stored and not public yet. When the person approves it and wants it public, publish again with enable: true, or they switch it on on the Portfolio page (/v1/profile?tab=portfolio).',
+                ...publishAskedFields(asked),
             });
         },
     );

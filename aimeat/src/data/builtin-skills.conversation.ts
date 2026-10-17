@@ -33,6 +33,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   2026-10-18 — aimeat-welcome-pages: an answer with `publish_request` means the node asks the person
+ *     before the page goes public; tell them and give them the approve_url (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — aimeat-mail-to-data: a read of the owner's mailbox without connections:read-as-owner
  *     answers READ_AS_OWNER_REQUIRED on MCP and REST alike (Jouni, 2026-10-16).
  *   2026-10-15 — aimeat-mail-to-data: a mailbox the owner connected appears with holder owner and is read on connections:read-as-owner (feature-list audit 128).
@@ -256,6 +258,10 @@ aimeat_portfolio_publish({ html: "<!DOCTYPE html>…", enable: true })
   out. Without it the page is stored and stays as public or private as it was. When the answer says
   \`served: false\` after \`enable: true\`, the person switched their page off earlier, and they
   switch it on themselves on the Portfolio page, /v1/profile?tab=portfolio .
+- When the answer carries \`publish_request\`, this node asks the person before anything goes public:
+  the page is stored and stays off until they approve. Tell them in one sentence and give them the
+  \`approve_url\` from the answer. A company page answers the same way when its address served
+  nothing before.
 - When the page is the person's profile, their business card, what goes on it comes from the
   interview in \`aimeat-guided-journey\`, stage 1: their words, a schema.org \`Person\` block in a
   \`<script type="application/ld+json">\` tag, and a short "For AIs" section. The page is served as it

@@ -6,6 +6,9 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.9.0 -- 2026-10-18 -- publish-draft passes the publish gate's answer (services/app-publish-gate.ts):
+ *     a first publish the node's defaults make public, by a caller the owner is asked about, is stored
+ *     unlisted and answers 202 with `publish_request`.
  *   v2.8.1 -- 2026-10-11 -- The publish-draft answer's manifest carries the deprecated `priceMorsels`
  *     mirror of the app's pacing amount `tollMorsels` (services/app-pacing.ts). The draft still carries
  *     the live pacing amount forward and accepts none of its own.
@@ -76,6 +79,9 @@ import { appOriginUrl, appTargetOr, type AppTargetFor } from './helpers.js';
 import { isSharedApp } from '../../services/app-dev-grant.js';
 import { roadmapGate } from '../../services/app-roadmap.js';
 import { presentAppManifest } from '../../services/app-pacing.js';
+import { callerOf } from '../../middleware/caller.js';
+import { publishAskOf } from '../../services/publish-requests/ask.js';
+import { publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
 
 export function registerDraftRoutes(
     router: Router,
@@ -487,6 +493,7 @@ export function registerDraftRoutes(
             declaredProvenance: declared.declared,
             specToken: typeof spec_token === 'string' ? spec_token : undefined,
             specAck: typeof spec_ack === 'string' ? spec_ack : undefined,
+            publishGate: publishAskOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app),
         });
         if ('refusal' in out) {
             // The draft SURVIVES a refusal. A broken artifact is something to fix and publish again,
@@ -496,8 +503,9 @@ export function registerDraftRoutes(
             return;
         }
 
-
-        res.status(201).json(success(config.nodeId, {
+        // 202 when a new app was published unlisted and listing it waits for the owner (app-publish-gate.ts).
+        res.status(askedStatus(out.publishAsked, 201)).json(success(config.nodeId, {
+            ...publishAskedFields(out.publishAsked),
             filename,
             ... (out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
             ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),
