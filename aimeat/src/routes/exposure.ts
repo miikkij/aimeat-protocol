@@ -15,6 +15,7 @@
  * @structure exposureRouter(config, storage): GET /v1/exposure/mine · GET /v1/admin/exposure
  * @usage app.use(exposureRouter(config, storage));
  * @version-history
+ *   v1.0.1 — 2026-10-18 — A report no source could be read for answers 503 STORAGE_UNAVAILABLE.
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.3).
  */
 import { Router } from 'express';
@@ -24,7 +25,7 @@ import { requireAuth, requireScope, requireOperator } from '../auth/middleware.j
 import { success, error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { createExposureContext } from '../services/exposure/exposure-types.js';
-import { buildExposureReport, buildNodeExposureReport } from '../services/exposure/exposure-report.js';
+import { buildExposureReport, buildNodeExposureReport, exposureUnreadable, EXPOSURE_UNREADABLE_MESSAGE } from '../services/exposure/exposure-report.js';
 import { readerFor } from '../services/classification/reader.js';
 
 export function exposureRouter(config: AimeatConfig, storage: Storage): Router {
@@ -42,6 +43,10 @@ export function exposureRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const report = await buildExposureReport(createExposureContext(storage, config), caller.owner,
       readerFor({ storage, config }, req.auth));
+    if (exposureUnreadable(report)) {
+      res.status(503).json(error(config.nodeId, 'STORAGE_UNAVAILABLE', EXPOSURE_UNREADABLE_MESSAGE));
+      return;
+    }
     res.json(success(config.nodeId, report, [
       { description: 'Share or stop sharing a workspace page', method: 'PUT', url: '/v1/organisms/{id}/workspace/share' },
       { description: 'Change who reads a memory record', method: 'PATCH', url: '/v1/memory/{key}' },

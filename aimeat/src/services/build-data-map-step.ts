@@ -24,6 +24,7 @@
  * @usage import { buildDataMapStep } from './build-data-map-step.js';
  *   full += buildDataMapStep('classic');
  * @version-history
+ *   v1.0.1 — 2026-10-18 — One sentence shorter, so part `start` stays under 24 000 characters.
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V7).
  */
 
@@ -35,7 +36,7 @@ export type DataMapTrack = 'classic' | 'atelier';
  * the interview section it follows, and the layered serving cuts the specification at headings.
  */
 export const DATA_MAP_QUESTIONS = '**Then the data map: three more questions, before any code.** '
-  + 'Ask them with the questions above, in plain words. Skipped, they are where an app goes wrong without anyone noticing: a company asked for ONE shared list of candidates and got an app where every person keeps their own.\n'
+  + 'Ask them with the questions above, in plain words. Skipped, an app goes wrong unnoticed: a company asked for ONE shared list of candidates and got an app where every person keeps their own.\n'
   + '(a) Who opens the app: just you, your organisation (which organisation?), or anyone?\n'
   + '(b) For each kind of data the app keeps (name each one from the idea): whose is it? PERSONAL (each person their own), SHARED BY THE TEAM (one common set that everybody in the organisation reads and edits), or PUBLIC (anyone may see it)?\n'
   + '(c) Who may change the shared data: everyone in the team, or only some roles?\n'

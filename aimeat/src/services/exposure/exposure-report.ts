@@ -22,10 +22,15 @@
  *   caller's classification reader before it is listed, so an AI is not handed the key of a record
  *   the person's classification hides from AI; it is counted, and `hidden_by_classification` says
  *   how many.
- * @structure ExposureReport · NodeExposureReport · buildExposureReport · buildNodeExposureReport
+ *   A report with every source failed is no report: exposureUnreadable() says so, and the doors
+ *   answer it as a failure.
+ * @structure ExposureReport · NodeExposureReport · buildExposureReport · buildNodeExposureReport ·
+ *   exposureUnreadable · EXPOSURE_UNREADABLE_MESSAGE
  * @usage
  *   const report = await buildExposureReport(createExposureContext(storage, config), 'alice', reader);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — exposureUnreadable: every source failed is answered as a failure, not as an
+ *     empty report (test/unit/node-mcp-error-flag.test.ts).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.2).
  */
 import { logger } from '../../utils/logger.js';
@@ -159,6 +164,17 @@ async function readAll(
   }
   return { found, failed };
 }
+
+/**
+ * True when no source could be read at all. Such a report would say "nothing is exposed" about an
+ * account nobody looked at, so the doors answer it as a failure instead (503, an MCP error).
+ */
+export function exposureUnreadable(report: { failed: readonly unknown[] }): boolean {
+  return report.failed.length > 0 && report.failed.length >= EXPOSURE_SOURCES.length;
+}
+
+/** The sentence both doors answer an unreadable report with. */
+export const EXPOSURE_UNREADABLE_MESSAGE = 'None of the places your content lives could be read just now, so no report was made. Try again in a moment.';
 
 /** Widest level first, then the order of KINDS, then the title. */
 function byExposure(a: ExposureItem, b: ExposureItem): number {
