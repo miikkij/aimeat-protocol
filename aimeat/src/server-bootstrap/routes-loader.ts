@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-10-17 — exposureRouter (routes/exposure.ts): GET /v1/exposure/mine and GET /v1/admin/exposure.
  *   2026-10-16 — pageHostRouter (routes/page-host.ts), the page frame of HTML pages, ahead of the subdomain router.
  *   2026-10-15 — The extended-features guard is requireExtendedFeatures (middleware/extended-features-gate.ts),
  *     which answers with the shared error() envelope (feature-list audit #186).
@@ -124,6 +125,7 @@ import { permissionsRouter } from '../routes/permissions.js';
 import { memoryRouter } from '../routes/memory.js';
 import { memoryHandsRouter } from '../routes/memory-hands.js';
 import { dataMapRouter } from '../routes/data-map.js';
+import { exposureRouter } from '../routes/exposure.js';
 import { classificationRouter } from '../routes/classification.js';
 import { librarianRouter } from '../routes/librarian.js';
 import { discoverRouter } from '../routes/discover.js';
@@ -515,6 +517,7 @@ export async function mountRoutes(
   // "Public memory not found" for it. Two segments, two meanings, and the first one mounted wins.
   app.use(memoryHandsRouter(config, storage));
   app.use(dataMapRouter(config, storage));
+  app.use(exposureRouter(config, storage));   // what of a person someone outside can read (V6.3)
   app.use(classificationRouter(config, storage)); // TARGET-082: content classification and its policy
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
   app.use(librarianRouter(config, storage));  // Tier-1 fan-across full-text retrieval

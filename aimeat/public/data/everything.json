@@ -677,6 +677,15 @@
      "plain": "Secrets vault Store an API key that can be written but never read back. The only reader is an extension's outbound request, which fills {{secret:NAME}} in place. /v1/secrets, aimeat_secret_*"
     },
     {
+     "slug": "g-4-what-others-can-read-of-yours",
+     "cells": [
+      "<strong>What others can read of yours</strong>",
+      "Ask your AI what a stranger can see of yours and get one list: every record, file, app, shared workspace page, organism, board, knowledge package, package, data package, skill, welcome page, company front page, exchange offering or need and public agent of yours (your agents' included) that someone else can read, each with who: anyone, anyone holding the link, every signed-in account of this node, or the members of one organisation. Each line says how to close it, with the tool and the route. Not counted, and the list says so: a download link made for one file, an app with an access code, a share behind a password, and sharing groups, which name their readers. A kind lists at most 500 items; the counts include everything. The operator gets the same numbers node-wide, with no item in them. No page yet: it is read from chat or over REST.",
+      "<code>GET /v1/exposure/mine</code>, <code>aimeat_exposure_report</code>; operator: <code>GET /v1/admin/exposure</code>"
+     ],
+     "plain": "What others can read of yours Ask your AI what a stranger can see of yours and get one list: every record, file, app, shared workspace page, organism, board, knowledge package, package, data package, skill, welcome page, company front page, exchange offering or need and public agent of yours (your agents' included) that someone else can read, each with who: anyone, anyone holding the link, every signed-in account of this node, or the members of one organisation. Each line says how to close it, with the tool and the route. Not counted, and the list says so: a download link made for one file, an app with an access code, a share behind a password, and sharing groups, which name their readers. A kind lists at most 500 items; the counts include everything. The operator gets the same numbers node-wide, with no item in them. No page yet: it is read from chat or over REST. GET /v1/exposure/mine, aimeat_exposure_report; operator: GET /v1/admin/exposure"
+    },
+    {
      "slug": "g-4-permission-check",
      "cells": [
       "<strong>Permission check</strong>",
@@ -4096,6 +4105,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 412
+  "rows": 413
  }
 }

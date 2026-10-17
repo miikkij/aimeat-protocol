@@ -308,6 +308,23 @@ components:
       description: Ed25519 signature of the challenge for token acquisition
 
   schemas:
+    ExposureLevelCounts:
+      type: object
+      description: How many things are readable at each level (GET /v1/exposure/mine).
+      properties:
+        public: { type: integer }
+        link: { type: integer }
+        signed-in: { type: integer }
+        organism: { type: integer }
+    ExposureCounts:
+      type: object
+      description: The exposure counts, overall, by level and by kind (only the kinds with something exposed).
+      properties:
+        total: { type: integer }
+        by_level: { $ref: '#/components/schemas/ExposureLevelCounts' }
+        by_kind:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/ExposureLevelCounts' }
     RestoreCounts:
       type: object
       description: Rows per kind, as POST /v1/admin/restore counts them.
@@ -30553,6 +30570,55 @@ paths:
                           complete:
                             type: boolean
                             description: False when the 1000-organism cap was reached and the list is partial.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/admin/exposure:
+    get:
+      operationId: adminExposureReport
+      summary: What of the node's accounts someone outside can read, in numbers (operator)
+      description: |
+        The node-wide variant of GET /v1/exposure/mine: every account read with the same sources,
+        each thing counted once however many accounts can close it, by level (public, link,
+        signed-in, organism) and by kind, and the accounts with the most exposed (numbers only).
+        No item, title or address leaves this route. At most 5000 accounts are read; `owners_capped`
+        says whether there were more. `failed` names the kinds that could not be read, with how
+        many accounts.
+
+        Reserved to the node operator. An operator's agent also needs the scope `operator:admin`.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The node-wide counts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          generated_at: { type: string, format: date-time }
+                          owners: { type: integer, description: Accounts read. }
+                          owners_capped: { type: boolean }
+                          counts: { $ref: '#/components/schemas/ExposureCounts' }
+                          top_owners:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                owner: { type: string }
+                                total: { type: integer }
+                                by_level: { $ref: '#/components/schemas/ExposureLevelCounts' }
+                          failed:
+                            type: object
+                            additionalProperties: { type: integer }
+                          notes:
+                            type: array
+                            items: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /v1/admin/organisms/{id}/ownership:
@@ -72925,6 +72991,76 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/exposure/mine:
+    get:
+      operationId: readExposureReport
+      tags: [Memory]
+      summary: What of the caller's own content someone outside can read, and how to close each
+      description: |
+        Every thing of the caller's account, their agents included, that someone who is neither
+        the person nor acting for them can read: memory records, files, apps, shared workspace
+        pages, organisms, boards, knowledge packages, packages, data packages, skills, the welcome
+        page, company front pages, exchange offerings and needs, and agents in the public agent
+        list. Each item carries its `level`: `public` (anyone), `link` (anyone holding the address:
+        an app with no access code that is not listed, an open workspace share), `signed-in` (any
+        account of this node) or `organism` (the members of the organism in `organism_id`), and
+        `how_to_close`, one sentence naming the MCP tool and the route that close it.
+
+        Not counted, and said so in `notes`: a presigned download address, an app with an access
+        code or hidden by an operator, a workspace share behind a password, sharing groups and
+        workspace rosters. `counts` are of everything found; the item list of a kind stops at 500
+        and the kind is named in `capped`. A kind that could not be read is named in `failed`.
+
+        The person in person, or their own agent holding `memory:read`. An app grant and an
+        ecosystem app are refused (403), and so is a session from another node. The MCP tool
+        aimeat_exposure_report returns the same object.
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The report
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string, description: The account as a GHII. }
+                          generated_at: { type: string, format: date-time }
+                          counts: { $ref: '#/components/schemas/ExposureCounts' }
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              required: [kind, id, title, level, how_to_close]
+                              properties:
+                                kind:
+                                  type: string
+                                  enum: [memory, file, app, workspace_share, organism, board, knowledge, package, datapackage, skill, portfolio, company, exchange, agent]
+                                id: { type: string, description: 'Unique within its kind: a memory key, an app filename, <org>/<ws>/<space>/<id> for a shared page.' }
+                                title: { type: string }
+                                level: { type: string, enum: [public, link, signed-in, organism] }
+                                organism_id: { type: string, description: Present when level is organism. }
+                                url: { type: string, description: The address it is read at, when a stranger can open one. }
+                                how_to_close: { type: string }
+                          capped:
+                            type: array
+                            items: { type: string }
+                          failed:
+                            type: array
+                            items: { type: string }
+                          hidden_by_classification:
+                            type: integer
+                            description: Items counted but not listed, because their classification hides them from this caller (an AI, when a classification hides content from AI).
+                          notes:
+                            type: array
+                            items: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /v1/visibility/report:
     get:
