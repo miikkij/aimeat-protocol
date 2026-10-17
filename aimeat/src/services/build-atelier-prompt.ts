@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.36.0 — 2026-10-17 — ADDITIVE: the data map step after the interview's five questions (unchanged) and its team branch at the end of "Data, in short" (build-data-map-step.ts, plan V7); the spec token moves with the body. To stay under 800 lines, "What the review always catches" moved verbatim to build-atelier-review.ts.
  *   v1.35.0 — 2026-10-17 — The mosaic section says block ids are a contract like source names: a renamed block needs ui_set in the same change.
  *   v1.34.0 — 2026-10-11 — EVENTS FIRST, A TIMER LAST follows LIVE BY DECLARATION in the mosaic section (build-events-first.ts): the `live` map's `domains` field, agent work as events, the domains an app may hear, and the three places a timer belongs.
  *   v1.33.0 — 2026-10-01 — The interview opens, on any model but Claude Opus or Fable, with one sentence telling the person those build the better app (cold-agent build-app 2026-10-01: Sonnet 5.5 1/3, Opus 5.5 3/3). Outside the token body, so the spec token does not move.
@@ -149,6 +150,8 @@ import { atelierEventsFirst } from './build-events-first.js';
 import { buildAtelierLibrarySection } from '../data/library-packs.js';
 import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './build-atelier-layout-rules.js';
 import { atelierMotionParts } from './build-atelier-motion-parts.js';
+import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './build-data-map-step.js';
+import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -708,6 +711,7 @@ function composeBody(config: AimeatConfig): string {
     + '`AIMEAT.data.set/get` with a `<app-name>.`-prefixed key; one key holds one record a user '
     + 'opens as a unit, never one key per field; read back after writing. Declare the scopes the '
     + 'app uses in `<meta name="aimeat-scopes">`.\n\n';
+  body += ATELIER_DATA_MAP_STEER;
 
   body += '## Finishing\n\n';
   body += 'Before you call it done: open the app at 390×844, 1280×900 and 1280×460 in BOTH '
@@ -717,28 +721,7 @@ function composeBody(config: AimeatConfig): string {
     + SPEC_TOKEN_SLOT + '` — the digest of this document — so the node can tell the app was '
     + 'built against the spec in force.\n\n';
 
-  body += '## What the review always catches\n\n';
-  body += '- A form that switches into edit mode says so: retitle it and its primary action '
-    + '("Edit entry" / "Save changes"), and the row being edited stays visibly selected. A form '
-    + 'still headed "Log an entry" while it edits reads as adding a duplicate.\n'
-    + '- Counters and the lists beside them read from the SAME data, computed in one place. A '
-    + 'screen whose numbers disagree with its rows reads as broken even when both are defensible.\n'
-    + '- Say a number ONCE. The same three counts as a stat row, as tab labels, as chips and again '
-    + 'in a heading is the most common defect the review finds — pick the one place the number '
-    + 'earns, and delete the echoes.\n'
-    + '- The content people came for comes BEFORE the form that adds to it. In a journal, reading '
-    + 'is the daily act; a full-height form above the entries buries the product under its input.\n'
-    + '- Master-detail is ALWAYS listDetail, never a hand-rolled pick panel: the component carries '
-    + 'the selection mark, the row-to-detail morph and the narrow-screen fold, and a hand-rolled '
-    + 'panel loses all three.\n'
-    + '- The shell\'s bar is the ONLY top bar. Building a second header of your own puts two bars '
-    + 'and the account pill in a fight for the same edge.\n'
-    + '- A filter applies WHEN IT CHANGES. A separate Show/Apply button beside a dropdown is a '
-    + 'second step nobody expects of a filter.\n'
-    + '- Give the shell a `tagline` (one line on what the app IS): the sign-in screen presents the '
-    + 'app with it, so a first visitor learns what they are looking at before they log in.\n'
-    + '- Storage internals never reach the person: "under keys that start with standup." is a '
-    + 'sentence for a developer, not for a screen.\n\n';
+  body += ATELIER_REVIEW_SECTION;
 
   body += '## Never\n\n';
   body += '- daisyUI/Tailwind classes outside a `section` body — the kit is the vocabulary.\n'
@@ -768,6 +751,7 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '3. How should it look and FEEL? (Map the answer to a look from the table below.)\n'
     + '4. Which languages should it speak?\n'
     + '5. Anything it must NOT do?\n\n';
+  full += buildDataMapStep('atelier');
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.
   full += ATELIER_PROPOSAL_SECTION;

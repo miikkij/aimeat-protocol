@@ -15,6 +15,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-17 — The new-app publish walkthrough moved unchanged to build-app-publish-walkthrough.ts (line ceiling).
+ *   2026-10-17 — ADDITIVE: the data map step after the interview's six questions (build-data-map-step.ts, plan V7); questions 1-6 unchanged.
  *   2026-10-17 — Additive: "unlisted" is about lists; the link opens the app, and the owner chooses who may open it (V2.6).
  *   2026-10-17 — Pitfall-list round: the first declared language is a fallback, an agent's MCP upload is addressed by its embed_url, the realtime sample takes a ws ticket and names social:write, and the width check adds a per-element measure under overflow-x: clip. Additive.
  *   2026-10-13 — The scope notes name the words node 4.0 asks of an app's calls (ext:invoke, agent:read, task:write, workflow:write, organism:read, organism:invite). Additive.
@@ -179,6 +181,8 @@ import { buildDecideSection } from './build-app-prompt-decide.js';
 import { buildRenderedContentParagraphs, buildAgentDataSection } from './build-app-prompt-content.js';
 import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
 import { classicLiveUpdatesSection } from './build-events-first.js';
+import { buildDataMapStep } from './build-data-map-step.js';
+import { publishWalkthrough } from './build-app-publish-walkthrough.js';
 
 export interface BuildAppPromptOptions {
   /** Conversation/UI language for the generated app. Only 'en' and 'fi' are localized. */
@@ -721,17 +725,7 @@ function composeAppPrompt(
   body += 'Namespace rule: data written through MCP tools is stored under the AGENT\'s identity (GAII, `name#owner@node`), NOT the human owner\'s — so a browser app reading the signed-in owner\'s keys will NOT see it. When agents seed or share data the app must read: store the author identity inside each record, write such keys with public visibility and read them with `AIMEAT.data.getPublic(<full agent GAII>, key)`, or add `?owner_scope=true` to memory reads (resolves the owner\'s agents\' keys too).\n\n';
 
   // After-build publish walkthrough (new-app mode only)
-  if (!isImprove) {
-    body += '## When the app is ready — tell me how to publish it\n';
-    body += 'After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
-    body += '1. Open ' + nodeUrl + '/v1/appcat\n';
-    body += '2. Click "+" → "Add app" → the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
-    body += '3. Click Save. A second dialog opens: fill in the description and click Publish. (Two dialogs, not one — Save takes the file, Publish puts it on the node.)\n';
-    body += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
-    body += 'What I get: the app goes live on my own AIMEAT node at its own address, and I get a link to share. It starts UNLISTED (only I can find it) — from my catalogue I can list it publicly in the community catalogue, launch it, publish updates (older versions are always kept), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n';
-    // Additive (plan doc-mvcn6c7e4e5q V2.6): "unlisted" is about lists, not about who opens the link.
-    body += 'Unlisted means no list shows it; the link itself still opens it for anyone who has it. In the app\'s settings I choose who may open it: anyone, only people signed in to this node, or only the members of one of my organisations.\n\n';
-  }
+  if (!isImprove) body += publishWalkthrough(nodeUrl);
 
   // ── full: language line + header (new mode) + body ──
   // The language line follows the UI language, but the USER's own words win: someone who writes
@@ -751,6 +745,7 @@ function composeAppPrompt(
     full += '5. Should it use AI features (summaries, suggestions, generation)? If yes I can enable them via aimeat-ai.\n';
     full += '6. Does it need any special capabilities? (charts/graphs · editable flow or mindmap diagrams · static text-defined diagrams · a game or heavy 2D animation · generative art / creative canvas · 3D · live multi-user/realtime) — each maps to a capability pack in Step 2; include only what I pick.\n';
     full += 'Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n';
+    full += buildDataMapStep('classic');
   }
   full += body;
 
