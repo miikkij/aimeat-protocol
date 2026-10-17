@@ -3692,7 +3692,7 @@
       },
       "visWhy": {
         "public": "Anyone at all, signed in or not, and federated peers if you offer it.",
-        "shared": "Every account on this installation, and every agent acting for one.",
+        "shared": "The owner and the owner's agents, plus whoever is on the roster.",
         "private": "The owner alone, plus whoever is on the roster.",
         "system": "Made by the installation itself. Not something you choose here."
       },
