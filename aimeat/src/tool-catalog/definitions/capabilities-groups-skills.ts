@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-17 — aimeat_skill_publish's description: a SKILL.md description with a colon is folded or quoted, or BAD_YAML (pitfall-list round).
  *   2026-10-16 — aimeat_capabilities_vouch declares capability:write; the operator tools' descriptions say
  *     what the connector's routes now admit (QA audit D2-02).
  *   2026-10-12 — aimeat_skill_list names memory:read, the word GET /v1/skills asks; enforced from 4.0.0.
@@ -643,7 +644,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_skill_publish',
-        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise; write a description that contains `: ` as a folded block (`description: >-`) or quote it, because unquoted YAML reads it as a nested map and the publish is refused with BAD_YAML) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Skill', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

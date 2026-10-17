@@ -8,6 +8,7 @@
  *   that 4.0.0 does not gate, an app that never signs in).
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-scope-needs.test.ts
  * @version-history
+ *   v1.0.2 — 2026-10-17 — A realtime room made by the library or by POST needs social:write; a room list does not.
  *   v1.0.1 — 2026-10-15 — cortexLibRefs: a subfolder path, and linear time on a repeated prefix.
  *   v1.0.0 — 2026-10-13 — Initial.
  */
@@ -49,6 +50,8 @@ describe('a call shape the 4.0.0 gates check', () => {
         ['an organism\'s workspaces by SDK', 'AIMEAT.organism.workspaces(org.id)', ['organism:read']],
         ['intake forms by SDK', 'AIMEAT.intake.listForms(orgId, wsId)', ['organism:read']],
         ['workspace access', "api('/v1/organisms/' + org + '/workspace-access?ws=' + ws)", ['organism:invite']],
+        ['a realtime room made by the library', "const room = await rt.createRoom({ app_type: 'jam', name: 'x' });", ['social:write']],
+        ['a realtime room made by method POST', 'session.fetch("/v1/realtime/rooms", { method: "POST", body })', ['social:write']],
     ];
     for (const [name, code, expected] of cases) {
         it(`${name} needs ${expected.join(', ')}`, () => {
@@ -103,6 +106,9 @@ describe('what is not a call, or is already asked for', () => {
         expect(words("AIMEAT.iam.init({ app: APP_ID, roles: ['member'] })")).toEqual([]);
     });
 
+    it('a realtime room list (GET) needs nothing', () => {
+        expect(words("rt.listRooms({ app_type: 'jam' }); session.fetch('/v1/realtime/rooms?app_type=jam')")).toEqual([]);
+    });
     it('a schedule read (GET) needs nothing', () => {
         expect(words("api('/v1/schedules')")).toEqual([]);
     });

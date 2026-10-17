@@ -10,6 +10,9 @@
  * @structure VENDORED_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-10-17 — realtime aiDoc: createRoom needs social:write, an empty room is removed after an
+ *     hour and the reconnect recreates it, an AI player is an agent on the same socket, and the rate
+ *     limit's default and refusal code (pitfall-list round).
  *   2026-10-09 — realtime aiDoc and changelog: connect() opens the socket with a single-use ticket
  *     (POST /v1/ws/ticket), never the session token in the URL (secrets audit 2026-10-09, d3).
  *   2026-10-09 — NEW hls pack (hls.js 1.7.3, /lib/hls@1/), in ./vendored-media.ts (800-line rule):
@@ -647,14 +650,22 @@ export const VENDORED_PACKS: LibraryPack[] = [
       'Rooms over HTTP first: await rt.createRoom({ app_type, name, is_public, max_peers, tags }) →',
       'room.id; await rt.listRooms({ app_type }) → rooms[]. Find-or-create by app_type and pick the',
       'LOWEST room id so concurrent creators converge on one room. Then rt.connect(room.id, nick).',
+      'createRoom (POST /v1/realtime/rooms) needs social:write in the app\'s aimeat-scopes.',
+      'A room with no peers is deleted after an hour idle. On close, call rt.getRoom(id); when it is',
+      'gone, create the room again with the same name and tags, connect with a new AimeatRealtime,',
+      'and wait longer between each try.',
       "Events: 'joined' (msg.peerId = you, msg.peers[] = existing {peerId, nick, state}),",
       "'peer-joined' / 'peer-left' / 'peer-presence' ({peerId, nick, state}), 'broadcast'",
       '(msg.payload = exactly what the sender passed to rt.broadcast(payload)), \'close\', \'error\'.',
       'There is NO trusted sender field on broadcast — carry an op id + author INSIDE your payload',
       'and de-dupe by id. Presence: rt.presence(state) → peers get peer-presence.',
+      'An AI player is an agent on the same socket: it creates or joins a room with its own token (an',
+      'Authorization header, or a ticket from POST /v1/ws/ticket) and sends the payloads a browser',
+      'sends. It needs no server feature of its own.',
       'For shared documents use the Yjs CRDT surface (conflict-free concurrent edits). Throttle',
       'high-frequency events (pointermove etc.) to ~30ms batches — send ONE batched message per',
-      'tick, not one per event (the WS is rate-limited).',
+      'tick, not one per event (the WS is rate-limited: 50 frames a second per peer by default, and a',
+      "refused frame arrives as an 'error' event with code RATE_LIMITED).",
       'SharedClock (window.SharedClock) — a network-synced timeline for sequencers/jams/animation:',
       "  const clock = new SharedClock({ bpm: 120, steps: 16 }); clock.onStep((s) => draw(s));",
       "  Leader: rt.broadcast(clock.start()). Joiner: rt.broadcast({type:'sync-request'}) then",

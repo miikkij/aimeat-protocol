@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.35.0 — 2026-10-17 — The mosaic section says block ids are a contract like source names: a renamed block needs ui_set in the same change.
  *   v1.34.0 — 2026-10-11 — EVENTS FIRST, A TIMER LAST follows LIVE BY DECLARATION in the mosaic section (build-events-first.ts): the `live` map's `domains` field, agent work as events, the domains an app may hear, and the three places a timer belongs.
  *   v1.33.0 — 2026-10-01 — The interview opens, on any model but Claude Opus or Fable, with one sentence telling the person those build the better app (cold-agent build-app 2026-10-01: Sonnet 5.5 1/3, Opus 5.5 3/3). Outside the token body, so the spec token does not move.
  *   v1.32.0 — 2026-09-28 — The motion parts follow the motion section, each with its call (build-atelier-motion-parts.ts); they sit in the `look` part because `start` is at its size limit.
@@ -364,7 +365,7 @@ function composeBody(config: AimeatConfig): string {
     + 'by hand. You declare WHAT the app has — one resolver per data source name, an `onPick`, a '
     + '`fallback` layout of blocks — and the ARRANGEMENT (order, look, navigation mode) is a '
     + 'stored record the owner\'s AI can change later with one `aimeat_app_manage` call (action `ui_set`), no '
-    + 'republish. Source names are the binding contract: keep them stable across edits.\n\n'
+    + 'republish. Source names are the binding contract: keep them stable across edits. Block ids are part of the same contract: the stored arrangement keeps the old ids after a publish, so a fill for a renamed block never runs. When a version renames or removes a block, replace the arrangement with `aimeat_app_manage` action `ui_set` in the same change, and read `layout: "kept-existing"` in the publish answer as that warning.\n\n'
     + '```js\n'
     + 'var m = AIMEAT.atelier.mosaic({\n'
     + '  app: a,\n'

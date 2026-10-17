@@ -5,6 +5,8 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-10-17 — A package install renames its apps: link a sibling from your own name and the app
+ *     host's path form, which keeps the query (pitfall-list round).
  *   2026-10-11 — The workspace-contracts guide is the skill aimeat-workspace-contracts; the handbook
  *     named docs/agent-workspace-contracts.md, which no route serves.
  *   2026-10-09 — aimeat_extension_config_set in the extension tools.
@@ -145,7 +147,10 @@ missing. An API key belongs in an extension's \`type: secret\` config, which a p
 An app that keeps its records in an organism workspace declares it in
 \`<script type="application/json" id="aimeat-workspace">\` ({ "workspaces": [{ contract, name, manifest,
 schemas }] }); publish refuses one that provisioning would not take. Installed from a set, the app reads
-where its workspace was made with \`AIMEAT.data.appWorkspace(contract)\`.
+where its workspace was made with \`AIMEAT.data.appWorkspace(contract)\`. A package install renames every
+app it installs to \`<package>-<owner>-<id>-<component id>.html\`: build a link to a sibling app from your
+own name in the #aimeat-app-ref block, and use the app host's path form \`apps.<node>/<owner>/<file>?<query>\`,
+which keeps the query.
 
 **Extensions (server-side sandboxed WASM; can store ext: memory + ctx.fetch external APIs).**
 \`aimeat_extension_install\` (UPLOAD mode recommended: no manifest → get an upload_url, PUT a ZIP with
