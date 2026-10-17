@@ -30,6 +30,8 @@
  * @structure WORKSPACE_CONTRACTS_SKILL_ENTRY
  * @usage import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
  * @version-history
+ *   v1.1.3 — 2026-10-17 — A document space's own strict schema lists `id`: the node writes it into every
+ *     document, and a schema without it refuses every page.
  *   v1.1.2 — 2026-10-16 — A document space holds HTML pages too ({ title, html, files? }, skill
  *     aimeat-html-page); a contract's document output stays Markdown unless it says html.
  *   v1.1.1 — 2026-10-14 — Section 3: a replacement manifest that changes the list of a space an app
@@ -105,6 +107,11 @@ A document space (a notes page the agent keeps up) has the same shape with \`mod
 schema. A document is \`{ title, markdown }\`. The same space can also hold an HTML page,
 \`{ title, html, files? }\`, which the node shows isolated in a frame (skill \`aimeat-html-page\`); write
 one only when the contract's output says so.
+
+When you lock a schema on a document space yourself, list \`id\` among its properties. The node
+writes the page's \`id\` into every document, so a schema with \`additionalProperties: false\` that
+leaves \`id\` out refuses every page with "must NOT have additional properties: id". \`html\` and
+\`files\` need no entry: a document space's schema never sees them.
 
 ## 2. Who adds the spaces
 
