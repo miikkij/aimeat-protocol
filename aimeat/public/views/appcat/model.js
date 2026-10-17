@@ -14,6 +14,7 @@
  *   fmtKb(bytes) · fmtDate(iso) · fmtNum(n) · host()
  * @usage import { filterRows, sortRows } from '/views/appcat/model.js';
  * @version-history
+ *   v1.2.0 — 2026-10-18 — The search finds an app by its file name too (?q=hello.html found nothing).
  *   v1.1.0 — 2026-10-12 — Three listings: listed, community (signed-in members of the node only) and
  *     unlisted. stateOf reads the listing's `listing`, and the state rows count and filter all three.
  *   v1.0.1 — 2026-09-27 — The own list's search reads the manifest's description, as the old one did
@@ -124,10 +125,11 @@ export function filterRows(rows, f) {
       if (f.own) {
         // The own list searched the manifest's own description, not the words in the page's
         // language (render.js: app.description).
-        return appName(sa).toLowerCase().includes(q) || String(man(sa).description || '').toLowerCase().includes(q)
+        return appName(sa).toLowerCase().includes(q) || String(sa.filename || '').toLowerCase().includes(q)
+          || String(man(sa).description || '').toLowerCase().includes(q)
           || appTags(sa).some((tg) => String(tg).toLowerCase().includes(q));
       }
-      const text = (appName(sa) + ' ' + appTags(sa).map((tg) => String(tg).toLowerCase()).join(' ') + (appDesc(sa) ? ' ' + appDesc(sa) : '')).toLowerCase();
+      const text = (appName(sa) + ' ' + String(sa.filename || '') + ' ' + appTags(sa).map((tg) => String(tg).toLowerCase()).join(' ') + (appDesc(sa) ? ' ' + appDesc(sa) : '')).toLowerCase();
       return text.includes(q);
     });
   }

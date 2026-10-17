@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.30.0 — 2026-10-18 — A served app carries the app-info mark unless its owner switched it off: the
+ *     version, the latest changes, and the live follow that reloads the open page on a new version.
  *   v1.29.1 — 2026-10-17 — resolveAppTarget, resolveServableApp, appIsRestricted and unlockRedirect
  *     moved unchanged to subdomain-app-gate.ts (line ceiling); the first three are re-exported here.
  *   v1.29.0 — 2026-10-17 — SECURITY: an app an operator hid is not served on its own origin. The
@@ -140,6 +142,7 @@ import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { appAiUse } from '../services/app-ai-use.js';
+import { appInfoMarkFor } from '../services/app-news.js';
 import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
 import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage } from '../services/app-seo.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
@@ -365,8 +368,12 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
     // authors write apps, not meta tags, and author-declared tags always win).
     // The "Use with your AI" mark rides with the visible chrome a person sees (services/app-ai-use.ts).
     const aiUse = visible ? await appAiUse(storage, protect.config, app) : null;
+    // The app-info mark: the version, the latest changes, and the live follow that reloads the page
+    // on a new version (services/app-news.ts, public/js/app-news.js).
+    const info = visible ? await appInfoMarkFor(storage, protect.config, app, visible.locale) : undefined;
     let buf = applyServeMarks(relaxed, {
       aiUse: aiUse && visible ? { use: aiUse, locale: visible.locale } : undefined,
+      info,
       // This branch is inside a `text/html` test, so the media type is already settled and the
       // marks pass does not have to guess from a closing tag the author never had to write.
       isDocument: true,

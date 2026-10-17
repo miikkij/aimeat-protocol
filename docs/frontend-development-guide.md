@@ -998,9 +998,12 @@ deployed new code.
    sheets, `theme.css`, `poster.css`, the component sheets and `/lib`.
 3. `serveSpa()` injects `window.__B = "?v=BUILD_ID"`, and the dynamic imports in `ROUTES` append it
    (`import('/views/help.js' + B)`).
-4. The same injected script polls `/v1/build` every 60 seconds and when the tab becomes visible. When
-   the server reports a different build, the page reloads itself, so an open tab picks up a restart
-   without a manual refresh.
+4. The same injected script sets `window.__BUILD_ID` and, after load, calls `watchBuild()` in
+   `public/lib/live-updates.js`. Every live stream opens with `event: hello` carrying the build
+   (`src/routes/sse.ts`), and a restart drops every stream, so the reconnect reads the new build and
+   the page reloads itself. A signed-out page holds a visitor stream for it
+   (`POST /v1/events/visitor-ticket`), which carries the build and nothing else. Nothing asks
+   `/v1/build` on a timer: live data is an event, never a poll (Jouni, 2026-10-18).
 
 **Rule: when you add a shared JS module** on an absolute path (`/js/services/foo.js`,
 `/components/Bar.js`, `/lib/baz.js`), add an identity entry to the importmap in `public/spa.html`.

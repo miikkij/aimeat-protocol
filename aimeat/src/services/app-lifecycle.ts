@@ -43,6 +43,10 @@
  *   v1.6.0 — 2026-10-18 — The publish gate (services/app-publish-gate.ts): a fork the node's defaults
  *     would make public, by a caller the owner is asked about, lands unlisted and files a request to
  *     list it (`publishAsked`); the draft promotion passes the gate's answer to publishApp.
+ *   v1.7.0 — 2026-10-18 — The draft slot carries what the draft is changing (`draftNotice`, kept until
+ *     restated or cleared), and promoting it makes that the roadmap line when none is given. Every
+ *     write, discard and promotion of the slot tells the live channel (emitDraftChange), and a delete
+ *     tells it which version is live now, so an open page of the app follows.
  *   v1.5.0 — 2026-10-17 — A fork is listed and opened by the node's new-app defaults (apps.default_listing,
  *     apps.default_access) instead of always listed; it still gets no code (plan doc-mvcn6c7e4e5q V2.4).
  *   v1.4.1 — 2026-10-11 — A fork drops the source's pacing amount `tollMorsels` (was `priceMorsels`;
@@ -68,13 +72,13 @@
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type {
-  Storage, AppManifest, AppProtection, AppRecord, AppDraftRecord,
+  Storage, AppManifest, AppProtection, AppRecord, AppDraftRecord, AppDraftNotice,
 } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { resolveAppTarget, type AppDevAct } from './app-dev-grant.js';
 import { DesignBookReasons } from './design-book/reasons.js';
 import { logger } from '../utils/logger.js';
-import { emitChange } from './event-bus.js';
+import { emitChange, emitAppChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
 import { appQuotaRefusal } from './install-quotas.js';
 import { lintAppAiDisclosure } from './app-ai-posture.js';
@@ -149,6 +153,11 @@ export interface DraftManifestRequest {
   protection?: AppProtection;
   /** Overrides the live app's mime type; the doors that cannot express one leave it undefined. */
   mimeType?: string;
+  /**
+   * What the draft is changing, already built at the door (services/app-news.ts draftNoticeFrom).
+   * `undefined` keeps the notice the slot has, `null` clears it.
+   */
+  draftNotice?: AppDraftNotice | null;
 }
 
 export interface StageAppDraftInput {
@@ -222,6 +231,11 @@ export async function stageAppDraft(
   // A draft that only changes HTML keeps the live app's bundled crew-defs; the promotion then
   // carries them into the new version unchanged.
   if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
+  // What the draft is changing stays with the slot until somebody states a new one or clears it.
+  const notice = requested.draftNotice !== undefined
+    ? requested.draftNotice
+    : (await storage.getAppDraft(ownerGhii, filename))?.manifest.draftNotice;
+  if (notice) manifest.draftNotice = notice;
 
   const mimeType = requested.mimeType ?? live?.mimeType ?? 'text/html';
   // A served copy is staged as its source, by the same function the publish uses.
@@ -233,6 +247,7 @@ export async function stageAppDraft(
     ownerGaii: ownerGhii, ownerName, filename, manifest,
     mimeType, size: data.length, data, updatedAt,
   });
+  emitDraftChange(ownerGhii, filename);
 
   return {
     filename, manifest, mimeType,
@@ -254,7 +269,18 @@ export async function stageAppDraft(
 export async function discardAppDraft(
   storage: Storage, ownerGhii: string, filename: string,
 ): Promise<boolean> {
-  return storage.deleteAppDraft(ownerGhii, filename);
+  const gone = await storage.deleteAppDraft(ownerGhii, filename);
+  if (gone) emitDraftChange(ownerGhii, filename);
+  return gone;
+}
+
+/**
+ * The draft slot of one app changed: the owner's and the builders' open pages of the app re-read
+ * its draft news (routes/sse.ts forwards `draft` only to them). The slot is keyed by the owner's
+ * GHII, and the event by the bare owner name every app id uses.
+ */
+export function emitDraftChange(ownerGhii: string, filename: string): void {
+  emitAppChange({ appId: `${localAccountName(ownerGhii)}/${filename}`, kind: 'draft' });
 }
 
 export interface PublishAppDraftInput {
@@ -308,7 +334,8 @@ export async function publishAppDraft(
     accessCode: { mode: 'carry' },
     source: 'draft',
     publishGate: input.publishGate,
-    roadmap: input.roadmap,
+    // The draft's own notice says what it changed, so it is the roadmap line when none is given.
+    roadmap: input.roadmap?.trim() ? input.roadmap : draft.manifest.draftNotice?.text,
     declaredProvenanceId: input.declaredProvenanceId,
     declaredProvenance: input.declaredProvenance,
     specToken: input.specToken,
@@ -319,6 +346,7 @@ export async function publishAppDraft(
   if ('refusal' in out) return out;
 
   await storage.deleteAppDraft(ownerGhii, filename);
+  emitDraftChange(ownerGhii, filename);
   return out;
 }
 
@@ -643,6 +671,13 @@ export async function deleteOwnedApp(
   });
 
   emitChange('apps');
+  // An open page of this app reloads onto what is live now: the version before, or nothing.
+  try {
+    const latestLeft = await storage.getAppByOwnerName(ownerName, filename);
+    emitAppChange({ appId: `${ownerName}/${filename}`, kind: 'version', version: latestLeft?.versionNumber ?? 0 });
+  } catch (err) {
+    logger.warn('deleteOwnedApp: open pages of the app were not told; they reload on their next visit', { filename, error: String(err) });
+  }
 
   // A deleted app leaves the Design Book's reasons: a part must not look favoured by apps that no
   // longer exist. Whole-app deletes only (one version gone is still an app), and best-effort:

@@ -21,6 +21,9 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.10.0 — 2026-10-18 — The build watch is an event: window.__BUILD_ID and live-updates.js
+ *     watchBuild() (the stream's `hello` names the build) replace the fetch of /v1/build every 60 s
+ *     and on every return to the tab (Jouni, 2026-10-18: live data is an event, never a poll).
  *   v1.9.0 — 2026-10-17 — A node set to signed-in content access gets a shell without the built
  *     page head (a person's portfolio, an app's name) and without the live page body, and
  *     window.__SITE says `contentAccess: 'signed-in'` so the shell offers a sign-in (plan
@@ -143,13 +146,13 @@ export function serveSpa(
     html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
   }
 
-  // Inject window.__B for dynamic import() cache-busting in spa.html scripts, PLUS a tiny
-  // auto-reload watchdog: it polls /v1/build (on tab-visible and every 60s) and, the
-  // moment the server reports a different BUILD_ID (i.e. it restarted with new code), reloads the
-  // page so fresh ES modules are fetched. This kills the recurring "restarted the server but the
-  // open tab still runs old code until a manual hard refresh" problem — no F5 ever needed.
-  // Only the top window watches: a shell inside a frame (the design lab's previews) is reloaded
-  // with the page around it, and a gallery of frames each polling would multiply the requests.
+  // Inject window.__B for dynamic import() cache-busting in spa.html scripts, PLUS the build watch:
+  // window.__BUILD_ID names this build, and live-updates.js watchBuild() keeps the page's live
+  // stream open, whose every (re)connect begins with the build that answers (routes/sse.ts). A node
+  // restarted on new code drops the stream, the reconnect reads a different build, and the page
+  // reloads so fresh ES modules are fetched. No F5, and no timer asking /v1/build (Jouni,
+  // 2026-10-18: live data is an event, never a poll). Only the top window watches: a shell inside a
+  // frame (the design lab's previews) is reloaded with the page around it.
   const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
   const bootScript =
     `window.__B="${v}";` +
@@ -161,11 +164,13 @@ export function serveSpa(
     // Injected rather than fetched so the first paint already knows which nav items and
     // sections exist. Empty on a fresh clone, and every consumer treats empty as "absent".
     `window.__SITE=${JSON.stringify({ ...publicSiteLinks(config), ...(closed ? { contentAccess: 'signed-in' } : {}) })};` +
-    `(function(){if(window.self!==window.top)return;var c="${BUILD_ID}";` +
-    `function chk(){fetch("/v1/build",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;})` +
-    `.then(function(d){if(d&&d.build&&d.build!==c){location.reload();}}).catch(function(){});}` +
-    `document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});` +
-    `setInterval(chk,60000);})();`;
+    // After load, so the importmap in the body has registered and these resolve to the same module
+    // instances the views import (one shared stream, not two).
+    `window.__BUILD_ID="${BUILD_ID}";` +
+    `(function(){if(window.self!==window.top)return;window.addEventListener("load",function(){` +
+    `Promise.all([import("/lib/live-updates.js"),import("/js/services/auth.js")])` +
+    `.then(function(m){m[0].watchBuild(function(){var s=m[1].getSession();return s&&s.jwt;});})` +
+    `.catch(function(){});},{once:true});})();`;
   html = html.replace('</head>', `<script${nonceAttr}>${bootScript}</script>\n</head>`);
 
   // Themes & Styles: which themes this node offers, their styles, the address of each theme's sheet

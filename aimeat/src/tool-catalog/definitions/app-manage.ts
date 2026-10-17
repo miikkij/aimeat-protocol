@@ -22,6 +22,7 @@
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
  *   2026-10-18 — settings says it answers with publish_request when the node asks the owner first (V4).
+ *   2026-10-18 — marks takes `info` (the app-info mark) and `tucked` (the marks start tucked away).
  *   2026-10-17 — settings takes `open_to` (anyone, signed-in, organism:<id>): who may open the app.
  *   2026-10-15 — audit_keep: a number is set by an agent holding account:security, as the route allows; the text said it was always refused (feature-list audit 105).
  *   2026-10-13 — scope_allowance and scope_allowance_remove, with the `words` field: the permissions an
@@ -85,6 +86,8 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     badge: { type: 'boolean', description: 'For marks: false takes the "publish your own app" badge off the app; true puts it back.' },
     install: { type: 'boolean', description: 'For marks: false stops offering visitors to install the app in their browser; true offers it again.' },
     aiUse: { type: 'boolean', description: 'For marks: false takes the "Use with your AI" mark off the app (shown when it has public app tools or skills); true puts it back. The tools and skills stay public either way.' },
+    info: { type: 'boolean', description: 'For marks: false takes the app-info mark off (the version, when it was last updated, what changed); true puts it back. An open page reloads itself on a new version either way.' },
+    tucked: { type: 'boolean', description: 'For marks: true starts the optional marks tucked away until the pointer nears the corner; false starts them in view (the default). The AI label and the cookie mark are never tucked; a visitor\'s own choice wins.' },
     // legal
     kind: { type: 'string', enum: ['terms', 'privacy', 'imprint', 'refunds', 'accessibility', 'cookies', 'support'], description: 'For legal: which page. Omit to read where the app stands.' },
     format: { type: 'string', enum: ['markdown', 'html', 'url'], description: 'For legal: markdown (rendered with every character escaped), html (served as written on the app\'s own origin) or url (a link to where the page lives).' },
@@ -240,8 +243,8 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'change name, description, per-language descriptions, listing (listed, community for signed-in members only, or unlisted), who may open it (anyone, signed-in, or one organism\'s members), forkable, access code or copy protection, without a new version. When the node asks the owner before making something public, a change that would make the app public (listed, no code, open to anyone) is applied without that one field and answers with publish_request' },
     seo: { fields: F(['filename'], ['index', 'title', 'description', 'keywords', 'image', 'lang']), scope: 'app:write',
         summary: 'decide whether the app can be found in search engines (off until you ask) and what it says there; naming nothing reports where it stands' },
-    marks: { fields: F(['filename'], ['badge', 'install', 'aiUse']), scope: 'app:write',
-        summary: 'switch the "publish your own app" badge, the install offer and the "Use with your AI" mark; naming nothing reports them. Naming the reviewer who lifts the AI label is the account holder\'s own act and is not here' },
+    marks: { fields: F(['filename'], ['badge', 'install', 'aiUse', 'info', 'tucked']), scope: 'app:write',
+        summary: 'switch the "publish your own app" badge, the install offer, the "Use with your AI" mark and the app-info mark, and whether the marks start tucked away; naming nothing reports them. Naming the reviewer who lifts the AI label is the account holder\'s own act and is not here' },
     legal: { fields: F(['filename'], ['kind', 'format', 'content', 'remove']), provenance: true, scope: 'app:write',
         summary: 'publish, replace or remove one of the app\'s legal pages (terms, privacy, imprint, refunds, accessibility, cookies, support), served under its address; no kind reports which pages it still ought to have' },
     audit: { fields: F(['filename'], ['limit', 'playtest', 'year']), scope: 'app:write',

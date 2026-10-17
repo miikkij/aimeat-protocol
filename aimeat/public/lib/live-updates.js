@@ -25,6 +25,11 @@
  * Reconnect after a restart (2026-08-30): the backoff starts at 2 s and caps at 60 s (was 5 s to
  * 120 s), and a tab that comes back into view while a reconnect is still waiting tries at once. A
  * run page left open across a deploy sat still for over a minute while the run advanced.
+ * Build watch (2026-10-18): every stream opens with `event: hello` carrying the build, and the shell
+ * calls watchBuild() once, so a node restarted on new code reloads the open page on the reconnect. It
+ * replaces the shell's fetch of /v1/build every 60 s (Jouni: live data is an event, never a poll). A
+ * signed-out page holds a visitor stream for it (POST /v1/events/visitor-ticket), which carries the
+ * build and nothing else, and a view that brings a session reopens the stream signed.
  */
 
 let es = null;
@@ -50,6 +55,12 @@ const DEBOUNCE_MS = 1000;             // match server COALESCE_MS
 let pendingDomains = new Set();       // null ⇒ "everything changed" (sticky for the window)
 let hadHiddenUpdate = false;
 
+// The build watch (watchBuild below): a signed-out page opens a visitor stream, which carries the
+// build and nothing else; a page that signs in later reopens it signed.
+let visitorOk = false;
+let streamSigned = false;
+let buildReloadPending = false;
+
 // Multi-tab connection sharing
 let started = false;
 let isLeader = false;
@@ -60,9 +71,36 @@ let leaderAbort = null;             // aborts a still-queued (follower) lock req
 export async function connect(getJwt) {
   refCount++;
   jwtGetter = getJwt;
-  if (started) return;
+  if (started) {
+    // The build watch may hold a visitor stream; a view that has a session needs the signed one.
+    if (isLeader && es && !streamSigned && getJwt?.()) { es.close(); es = null; _open(); }
+    return;
+  }
   started = true;
   startShared();
+}
+
+/**
+ * Reload the page when the node answering is a different build: the shell's own watch, started once
+ * in the top window (routes/portal-spa.ts). Every stream opens with `event: hello` carrying the build
+ * (routes/sse.ts), and a node restarted on new code drops every stream, so the reconnect reads the
+ * new build and the page reloads onto fresh modules. It replaces a fetch of /v1/build every 60 s
+ * (Jouni, 2026-10-18: live data is an event, never a poll). A signed-out page holds a visitor stream
+ * for it, which carries nothing but the build.
+ * @param {() => string|undefined} getJwt
+ */
+export function watchBuild(getJwt) {
+  visitorOk = true;
+  connect(getJwt);
+}
+
+/** The build a stream says it is, against the one this page was served with. */
+function checkBuild(build) {
+  if (typeof window === 'undefined' || window.self !== window.top) return;
+  const mine = window.__BUILD_ID;
+  if (!mine || !build || build === mine) return;
+  if (document.hidden) { buildReloadPending = true; return; }
+  location.reload();
 }
 
 function startShared() {
@@ -73,6 +111,7 @@ function startShared() {
   bc = new BroadcastChannel('aimeat-live');
   bc.onmessage = (ev) => {
     if (ev.data && ev.data.type === 'domains') ingestDomains(ev.data.domains);
+    if (ev.data && ev.data.type === 'hello') checkBuild(ev.data.build);
   };
   // Hold the lock for as long as this tab is connected; whoever holds it is the leader. The
   // request callback resolves only when we release (on disconnect), at which point the next
@@ -99,13 +138,17 @@ function relay(domains) {
 
 async function _open() {
   const jwt = jwtGetter?.();
-  if (!jwt) return;
+  if (!jwt && !visitorOk) return;
 
   try {
-    const resp = await fetch('/v1/events/ticket', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${jwt}` },
-    });
+    streamSigned = !!jwt;
+    const resp = jwt
+      ? await fetch('/v1/events/ticket', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${jwt}` },
+      })
+      // Signed out: the visitor stream, which carries the build and nothing else (watchBuild).
+      : await fetch('/v1/events/visitor-ticket', { method: 'POST', credentials: 'omit' });
     if (!resp.ok) {
       console.warn('[SSE] Ticket request failed:', resp.status);
       if (resp.status === 401) {
@@ -128,6 +171,14 @@ async function _open() {
     const ticket = body.data.ticket;
 
     es = new EventSource(`/v1/events?ticket=${encodeURIComponent(ticket)}`);
+
+    // Which build answers: a restart on new code reloads the page (watchBuild).
+    es.addEventListener('hello', (event) => {
+      let build = null;
+      try { build = JSON.parse(event.data).build; } catch { /* not ours to read */ }
+      if (bc) { try { bc.postMessage({ type: 'hello', build }); } catch { /* channel closed */ } }
+      checkBuild(build);
+    });
 
     es.onopen = () => {
       reconnectDelay = INITIAL_RECONNECT_DELAY;
@@ -196,6 +247,8 @@ function scheduleReconnect() {
 
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
+    // A new build arrived while the tab was hidden: the reload happens when the person comes back.
+    if (!document.hidden && buildReloadPending) { location.reload(); return; }
     if (!document.hidden && hadHiddenUpdate) {
       hadHiddenUpdate = false;
       pendingDomains = null;   // one catch-up reconcile across all domains

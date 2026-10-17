@@ -46,6 +46,9 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.7.0 — 2026-10-18 — `info`: the app-info mark (utils/app-info-badge.ts), after the "Use with your
+ *     AI" mark, in the visitor's language; it counts as visible chrome for the reserve strip and its
+ *     block loads public/js/app-news.js. A spec without it produces the same bytes.
  *   v1.6.0 — 2026-10-09 — `aiUse`: the "Use with your AI" mark (utils/app-ai-use-badge.ts), after the
  *     badge, in the visitor's language; it counts as visible chrome for the reserve strip. A spec
  *     without it produces the same bytes, so the goldens are unchanged.
@@ -82,6 +85,9 @@ import { createT, type Locale } from '../i18n.js';
 import { findOpenTag, injectBeforeClosingTag } from '../utils/html-inject.js';
 import { BADGE_MARK, badgeSnippet } from '../utils/app-badge.js';
 import { AI_USE_MARK, aiUseBadgeSnippet, type AppAiUse } from '../utils/app-ai-use-badge.js';
+import { APP_INFO_MARK, appInfoBadgeSnippet } from '../utils/app-info-badge.js';
+import { formatForPerson } from './display-prefs.js';
+import type { AppNews } from './app-news.js';
 import { RESERVE_MARK, reserveSnippet } from '../utils/app-chrome-reserve.js';
 import {
   APP_REF_MARK, DISCOVERY_MARK, agentDiscoverySnippet, appRefSnippet, type AppDiscoverySpec,
@@ -104,6 +110,43 @@ function aiUseMarkup(use: AppAiUse, locale: Locale): string {
     counts: t('aiUseBadge.counts', { tools: use.tools, skills: use.skills }),
     link: t('aiUseBadge.link'),
     open: t('aiUseBadge.open'),
+  });
+}
+
+/** A served date in the visitor's language: "18 Oct 2026", "18.10.2026", "18 oct 2026". */
+function servedDate(iso: string, locale: Locale): string {
+  return formatForPerson({ locale, region: locale, timezone: null }, iso, { dateStyle: 'medium' });
+}
+
+/** The app-info mark in the visitor's language, from the app's news (services/app-news.ts). */
+function infoMarkup(info: NonNullable<ServeMarksSpec['info']>): string {
+  const { news, locale } = info;
+  const t = createT(locale);
+  const version = news.label
+    ? t('appInfoBadge.versionLabel', { label: news.label, v: news.version })
+    : t('appInfoBadge.version', { v: news.version });
+  const updated = servedDate(news.updatedAt, locale);
+  return appInfoBadgeSnippet({
+    appId: news.app,
+    version: news.version,
+    tucked: info.tucked,
+    moreUrl: info.moreUrl,
+    open: t('appInfoBadge.open'),
+    title: t('appInfoBadge.title'),
+    versionLine: updated ? `${version} · ${t('appInfoBadge.updated', { date: updated })}` : version,
+    changesTitle: t('appInfoBadge.changes'),
+    changes: news.changes.map((c) => (c.version ? `${c.what} (${c.version})` : c.what)),
+    more: t('appInfoBadge.more'),
+    words: {
+      draft: t('appInfoBadge.draft'),
+      draftBy: t('appInfoBadge.draftBy'),
+      draftSaved: t('appInfoBadge.draftSaved'),
+      draftStale: t('appInfoBadge.draftStale'),
+      draftOpen: t('appInfoBadge.draftOpen'),
+      tuck: t('appInfoBadge.tuck'),
+      untuck: t('appInfoBadge.untuck'),
+      reloaded: t('appInfoBadge.reloaded'),
+    },
   });
 }
 
@@ -190,6 +233,12 @@ export interface ServeMarksSpec {
    * switched it off, or when the caller serves no visible chrome.
    */
   aiUse?: { use: AppAiUse; locale: Locale };
+  /**
+   * The app-info mark (utils/app-info-badge.ts): the app's public news, the owner's starting state for
+   * the row, the catalogue link and the visitor's language. Absent when the owner switched it off or
+   * the caller serves no visible chrome.
+   */
+  info?: { news: AppNews; tucked: boolean; moreUrl: string; locale: Locale };
   /** The `<head>` metadata the app almost certainly has none of. */
   headMeta?: AppHeadSpec;
   /**
@@ -232,10 +281,11 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     // The reserved-strip contract rides along whenever VISIBLE chrome does (the badge or the AI
     // label): it declares `--aimeat-chrome-bottom` so the app can lift its own bottom UI clear of
     // the marks. Declaration only — an app that ignores it renders exactly as before.
-    const visibleChrome = spec.badge || (spec.provenance && spec.visibleLabel) || spec.aiUse;
+    const visibleChrome = spec.badge || (spec.provenance && spec.visibleLabel) || spec.aiUse || spec.info;
     if (visibleChrome && !text.includes(RESERVE_MARK)) parts.push(reserveSnippet());
     if (spec.badge && !text.includes(BADGE_MARK)) parts.push(badgeSnippet());
     if (spec.aiUse && !text.includes(AI_USE_MARK)) parts.push(aiUseMarkup(spec.aiUse.use, spec.aiUse.locale));
+    if (spec.info && !text.includes(APP_INFO_MARK)) parts.push(infoMarkup(spec.info));
     if (spec.provenance && !text.includes(PROVENANCE_HTML_MARK)) {
       const { block, w3c } = aiDisclosureParts(spec.provenance,
         spec.visibleLabel ? { ...spec.visibleLabel, reviewedBy: spec.reviewedBy } : undefined);

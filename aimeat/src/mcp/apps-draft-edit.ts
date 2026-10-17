@@ -21,6 +21,7 @@
  *   import { registerAppDraftEditTools } from './apps-draft-edit.js';
  *   registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-18 — aimeat_app_draft_write and aimeat_app_draft_seed take `notice`: what the draft changes.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-13 — The write, replace and seed results render `served_marks_removed` /
@@ -37,6 +38,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveAppTargetScope } from '../services/app-lifecycle.js';
 import { writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft } from '../services/app-draft-edit.js';
+import { draftNoticeFrom } from '../services/app-news.js';
 import { servedMarksResponse } from '../services/app-serve-marks-strip.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
@@ -65,8 +67,10 @@ export function registerAppDraftEditTools(
         descriptionFor('aimeat_app_draft_write'),
         zodShapeFor('aimeat_app_draft_write'),
         annotationsFor('aimeat_app_draft_write'),
-        async ({ filename, owner, content, mode, expected_size_bytes, name, description }) => {
+        async ({ filename, owner, content, mode, expected_size_bytes, name, description, notice }) => {
             const agentGaii = getAgentGaii();
+            const draftNotice = draftNoticeFrom(notice, agentGaii);
+            if (draftNotice && 'refusal' in draftNotice) return fail(`INVALID_INPUT: ${draftNotice.refusal}`);
             const scope = await resolveAppTargetScope(storage, config,
                 { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return fail('Failed to parse agent GAII');
@@ -79,7 +83,7 @@ export function registerAppDraftEditTools(
                     content,
                     mode,
                     expectedSizeBytes: expected_size_bytes,
-                    requested: { name, description },
+                    requested: { name, description, draftNotice },
                 });
                 if ('refusal' in out) return fail(refusalMessage(out.refusal));
                 logger.info(`App draft written via MCP: ${filename}`, { by: agentGaii, mode: mode ?? 'append' });
@@ -177,8 +181,10 @@ export function registerAppDraftEditTools(
         descriptionFor('aimeat_app_draft_seed'),
         zodShapeFor('aimeat_app_draft_seed'),
         annotationsFor('aimeat_app_draft_seed'),
-        async ({ filename, owner, from_filename, version }) => {
+        async ({ filename, owner, from_filename, version, notice }) => {
             const agentGaii = getAgentGaii();
+            const draftNotice = draftNoticeFrom(notice, agentGaii);
+            if (draftNotice && 'refusal' in draftNotice) return fail(`INVALID_INPUT: ${draftNotice.refusal}`);
             const scope = await resolveAppTargetScope(storage, config,
                 { principal: agentGaii, owner, filename, act: 'draft' });
             if (!scope) return fail('Failed to parse agent GAII');
@@ -188,7 +194,7 @@ export function registerAppDraftEditTools(
                     callerGaii: agentGaii,
                     ownerName: scope.ownerName,
                     ownerGhii: scope.ownerGhii,
-                    filename, fromFilename: from_filename, version,
+                    filename, fromFilename: from_filename, version, draftNotice,
                 });
                 if ('refusal' in out) return fail(refusalMessage(out.refusal));
                 logger.info(`App draft seeded via MCP: ${filename}`, { by: agentGaii, from: out.seededFrom });

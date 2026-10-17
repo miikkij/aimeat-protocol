@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-18 -- marks forwards `info` and `tucked`.
  *   2026-10-17 -- settings forwards `open_to` (who may open the app).
  *   2026-10-13 -- scope_allowance and scope_allowance_remove over GET and DELETE .../scope-allowance.
  *   2026-10-12 -- settings forwards `listing` to PATCH /v1/apps/:filename.
@@ -74,7 +75,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         case 'seo':
             return client.patch(`/v1/apps/${file}`, { seo: pick(input, ['index', 'title', 'description', 'keywords', 'image', 'lang']) });
         case 'marks':
-            return client.patch(`/v1/apps/${file}`, { marks: pick(input, ['badge', 'install', 'aiUse']) });
+            return client.patch(`/v1/apps/${file}`, { marks: pick(input, ['badge', 'install', 'aiUse', 'info', 'tucked']) });
         case 'legal': {
             // No kind is a question: `me` in the owner slot, the node resolves the account.
             if (!input.kind) return client.get(`/v1/apps/me/${file}/legal`);

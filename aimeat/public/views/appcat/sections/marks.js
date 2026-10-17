@@ -19,6 +19,8 @@
  * @structure meta · MarksSection({ d })
  * @usage const mod = await import('./sections/marks.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.3.0 — 2026-10-18 — Two more switches drawn the same way: the app-info mark (marks.info) and
+ *     whether the marks start tucked away for a visitor (marks.tucked).
  *   v1.2.0 — 2026-10-09 — A third switch, the "Use with your AI" mark (marks.aiUse), drawn as the other two.
  *   v1.1.0 — 2026-09-27 — Parity with the old page (sections-c): the switches as .mk-row (List tone
  *     switches), the part headings as its h4, the reviewer's form as .mk-author-form (Enter no longer
@@ -64,7 +66,8 @@ function fromRow(app) {
   return {
     marks: {
       badge: !(m.marks && m.marks.badge === false), install: !(m.marks && m.marks.install === false),
-      aiUse: !(m.marks && m.marks.aiUse === false),
+      aiUse: !(m.marks && m.marks.aiUse === false), info: !(m.marks && m.marks.info === false),
+      tucked: !!(m.marks && m.marks.tucked === true),
     },
     authorship: m.authorship || null,
     log: m.authorshipLog || [],
@@ -94,7 +97,10 @@ export default function MarksSection({ d }) {
       const a = await patchApp(d.filename, body);
       setData((cur) => ({
         ...cur,
-        marks: a.marks ? { badge: a.marks.badge !== false, install: a.marks.install !== false, aiUse: a.marks.aiUse !== false } : cur.marks,
+        marks: a.marks ? {
+          badge: a.marks.badge !== false, install: a.marks.install !== false, aiUse: a.marks.aiUse !== false,
+          info: a.marks.info !== false, tucked: a.marks.tucked === true,
+        } : cur.marks,
         authorship: 'authorship' in a ? (a.authorship || null) : cur.authorship,
         log: a.authorshipLog || cur.log,
       }));
@@ -130,7 +136,7 @@ export default function MarksSection({ d }) {
   // readout (.mk-sees) and the log (.mk-log). Enter in the name field sends nothing, as there.
   return html`
     <${Note} kind="hint" chapter>${x('marks.intro')}<//>
-    <${List} tone="switches" cols="name-meaning-doors">${sw('badge')}${sw('install')}${sw('aiUse')}<//>
+    <${List} tone="switches" cols="name-meaning-doors">${sw('badge')}${sw('install')}${sw('aiUse')}${sw('info')}${sw('tucked')}<//>
 
     <${SubHeading} level=${4} part="apart">${x('marks.authorTitle')}<//>
     ${data.authorship

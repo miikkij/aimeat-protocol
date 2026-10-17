@@ -9,6 +9,9 @@
  *   v2.9.0 -- 2026-10-18 -- publish-draft passes the publish gate's answer (services/app-publish-gate.ts):
  *     a first publish the node's defaults make public, by a caller the owner is asked about, is stored
  *     unlisted and answers 202 with `publish_request`.
+ *   v2.10.0 -- 2026-10-18 -- PUT .../draft, .../draft/write and .../draft/seed take `notice`: one
+ *     sentence on what the draft changes, which the app page shows its builders and which becomes the
+ *     roadmap line when publish-draft is given none (services/app-news.ts).
  *   v2.8.1 -- 2026-10-11 -- The publish-draft answer's manifest carries the deprecated `priceMorsels`
  *     mirror of the app's pacing amount `tollMorsels` (services/app-pacing.ts). The draft still carries
  *     the live pacing amount forward and accepts none of its own.
@@ -82,6 +85,23 @@ import { presentAppManifest } from '../../services/app-pacing.js';
 import { callerOf } from '../../middleware/caller.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
 import { publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
+import { draftNoticeFrom } from '../../services/app-news.js';
+import type { AppDraftNotice } from '../../storage/interface.js';
+
+/**
+ * The body's `notice` (what the draft changes) as the record the slot keeps: undefined when not sent,
+ * null to clear it. Answers 400 and returns false on a notice the service refuses.
+ */
+function noticeFromBody(
+    config: AimeatConfig, req: import('express').Request, res: import('express').Response,
+): AppDraftNotice | null | undefined | false {
+    const out = draftNoticeFrom((req.body ?? {}).notice, resolveIdentity(req.auth!, config.nodeId));
+    if (out && 'refusal' in out) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', out.refusal));
+        return false;
+    }
+    return out;
+}
 
 export function registerDraftRoutes(
     router: Router,
@@ -114,6 +134,8 @@ export function registerDraftRoutes(
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content must be base64-encoded (Buffer.from(html).toString("base64") / btoa(html)).'));
             return;
         }
+        const draftNotice = noticeFromBody(config, req, res);
+        if (draftNotice === false) return;
 
         // The filename rule, the size cap and the manifest that inherits from the live app are
         // services/app-lifecycle.ts — the same function aimeat_app_draft_save calls. This route maps
@@ -133,6 +155,7 @@ export function registerDraftRoutes(
                     ? uses_cortex.filter((c: unknown): c is string => typeof c === 'string') : undefined,
                 protection: sanitizeProtection(protection),
                 mimeType: typeof mime_type === 'string' ? mime_type : undefined,
+                draftNotice,
             },
         });
         if ('refusal' in staged) {
@@ -186,6 +209,8 @@ export function registerDraftRoutes(
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'expected_size_bytes must be a number'));
             return;
         }
+        const draftNotice = noticeFromBody(config, req, res);
+        if (draftNotice === false) return;
 
         const out = await writeAppDraft(storage, config, {
             ownerName: owner, ownerGhii, filename, content, mode,
@@ -193,6 +218,7 @@ export function registerDraftRoutes(
             requested: {
                 name: typeof name === 'string' ? name : undefined,
                 description: typeof description === 'string' ? description : undefined,
+                draftNotice,
             },
         });
         if ('refusal' in out) {
@@ -294,12 +320,15 @@ export function registerDraftRoutes(
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'version must be a number'));
             return;
         }
+        const draftNotice = noticeFromBody(config, req, res);
+        if (draftNotice === false) return;
 
         const out = await seedAppDraft(storage, config, {
             callerGaii: resolveIdentity(req.auth!, config.nodeId),
             ownerName: owner, ownerGhii, filename,
             fromFilename: typeof from_filename === 'string' ? from_filename : undefined,
             version,
+            draftNotice,
         });
         if ('refusal' in out) {
             res.status(out.refusal.status).json(error(
@@ -458,8 +487,10 @@ export function registerDraftRoutes(
         // The same question POST /v1/apps asks: what did this change? A warning on your own app, a
         // refusal on one somebody else helps build. Asked before the promotion, so a refusal never
         // arrives after the bytes are live.
+        // The draft's own notice answers it when the publisher gives no line (publishAppDraft).
         const shared = await isSharedApp(storage, owner, filename);
-        const road = roadmapGate({ line: typeof req.body?.roadmap === 'string' ? req.body.roadmap : undefined, shared });
+        const givenLine = typeof req.body?.roadmap === 'string' && req.body.roadmap.trim() ? req.body.roadmap : undefined;
+        const road = roadmapGate({ line: givenLine ?? draft.manifest.draftNotice?.text, shared });
         if (!road.ok) {
             res.status(400).json(error(config.nodeId, 'ROADMAP_REQUIRED', road.message));
             return;

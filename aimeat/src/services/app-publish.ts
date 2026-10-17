@@ -41,6 +41,8 @@
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
  *   2026-10-18 — `publishGate`: a first publish the node's defaults make public, by a caller the owner is asked about, is stored unlisted and files a request to list it (`publishAsked`; services/app-publish-gate.ts, plan doc-mvcn6c7e4e5q V4). provenanceModelFindings moved to app-ai-model-hints.ts.
+ *   2026-10-18 — The live channel hears which app got which version (emitAppVersion), so an open page of it reloads.
+ *   2026-10-18 — sanitizeDescriptions moved to app-publish-helpers.ts unchanged (line limit).
  *   2026-10-17 — The exposure of a version (listing, forking, code, who may open it) comes from publishExposure: carried from the live version, or the node's new-app defaults on a first publish (V2.4).
  *   2026-10-11 — requested.priceMorsels is tollMorsels, the app's pacing amount, carried forward the same way.
  *   2026-10-10 — nextSteps is told how the data map and the design spec stand (app-publish-next-steps.ts).
@@ -117,10 +119,11 @@ import { readAppDesignSpec, designSpecStamp, designSpecHint } from './app-design
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../storage/interface.js';
-import { emitChange } from './event-bus.js';
+import { emitAppVersion } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
 import { recordAccountEvent } from './account-events.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai-provenance.js';
+import { sanitizeDescriptions } from './app-publish-helpers.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { unknownModelHints, provenanceModelFindings } from './app-ai-model-hints.js';
 import { lintAppArtifact, loadsAtelierKit, type AppArtifactFinding } from './app-artifact-lint.js';
@@ -697,7 +700,7 @@ export async function publishApp(
     } catch (err) { logger.warn('publishApp: board announcement is best-effort', { error: String(err) }); }
   }
 
-  emitChange('apps');
+  emitAppVersion(ownerName, filename, newVersion);
   if (announces) {
     void recordPublicActivity(storage, config, {
       category: 'apps',
@@ -786,14 +789,4 @@ export async function publishApp(
     nextSteps: bookParts ? { ...(steps ?? {}), design_book_parts: bookParts } : steps,
     ...(publishAsked ? { publishAsked } : {}),
   };
-}
-
-/** Drop blank entries and cap each at 2000 characters; `undefined` when nothing survives. */
-function sanitizeDescriptions(input: Record<string, string> | undefined): Record<string, string> | undefined {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return undefined;
-  const cleaned: Record<string, string> = {};
-  for (const [loc, val] of Object.entries(input)) {
-    if (typeof val === 'string' && val.trim().length > 0) cleaned[loc] = val.trim().slice(0, 2000);
-  }
-  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }

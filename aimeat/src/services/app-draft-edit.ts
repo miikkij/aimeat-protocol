@@ -29,6 +29,8 @@
  *   });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A write and a replace carry the draft's notice (what it is changing) forward,
+ *     and a seed may state a new one.
  *   v1.0.0 — 2026-08-16 — Initial implementation. Four operations so a hosted agent can build an app
  *     larger than one model response, and continue one it published a week ago (aimeat_app_get does
  *     not return source, and stageAppDraft only ever took bytes from its caller).
@@ -36,7 +38,7 @@
 import { bareOwner } from './app-members.js';
 import { resolveAppTarget } from './app-dev-grant.js';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppDraftRecord } from '../storage/interface.js';
+import type { Storage, AppDraftRecord, AppDraftNotice } from '../storage/interface.js';
 import type { PublishAppRefusal } from './app-publish.js';
 import {
   stageAppDraft, type DraftManifestRequest, type StagedAppDraft,
@@ -99,6 +101,8 @@ export interface SeedAppDraftInput extends AppDraftEditScope {
   fromFilename?: string;
   /** Which published version. Defaults to the newest. */
   version?: number;
+  /** What the new draft will change (services/app-news.ts draftNoticeFrom). Undefined keeps the slot's. */
+  draftNotice?: AppDraftNotice | null;
 }
 
 export interface AppDraftSlice {
@@ -167,6 +171,7 @@ function carryManifest(
     usesCortex: requested?.usesCortex ?? base?.usesCortex,
     protection: requested?.protection ?? base?.protection,
     mimeType: requested?.mimeType ?? draft?.mimeType,
+    draftNotice: requested?.draftNotice !== undefined ? requested.draftNotice : (base?.draftNotice ?? null),
   };
   return carried;
 }
@@ -366,6 +371,7 @@ export async function seedAppDraft(
       usesCortex: live.manifest.usesCortex,
       protection: live.manifest.protection,
       mimeType: live.mimeType,
+      draftNotice: input.draftNotice,
     },
   });
   if ('refusal' in staged) return staged;

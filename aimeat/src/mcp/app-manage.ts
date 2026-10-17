@@ -26,6 +26,7 @@
  *   2026-10-18 — action "settings" asks the publish gate as PATCH /v1/apps/:filename does: a change that
  *     makes the app public, by an agent without publish:public, is applied without that one field and
  *     answers with `publish_request` (services/app-publish-gate.ts; plan doc-mvcn6c7e4e5q, V4).
+ *   2026-10-18 — The marks action passes `info` and `tucked` too.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.0 — 2026-10-05 — The member, plan, audit_archive, audit_keep, builder and spec actions call
@@ -180,7 +181,7 @@ export function registerAppManageTool(
                 return answer({ filename, state: out.state, ...(out.note ? { note: out.note } : {}), seo: out.seo });
             }
             case 'marks': {
-                const out = await ownerAppMarks(storage, config, { callerGaii, filename, marks: pick(args, ['badge', 'install', 'aiUse']) });
+                const out = await ownerAppMarks(storage, config, { callerGaii, filename, marks: pick(args, ['badge', 'install', 'aiUse', 'info', 'tucked']) });
                 if ('error' in out) return plainRefusal(out.error);
                 return answer({ filename, ...(out.note ? { note: out.note } : {}), marks: out.state.marks, reviewer: out.state.authorship?.name ?? null });
             }

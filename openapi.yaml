@@ -32830,6 +32830,8 @@ paths:
                     badge: { type: boolean, description: The "publish your own app" attribution badge }
                     install: { type: boolean, description: The browser "Install this app" offer on the app's own origin }
                     aiUse: { type: boolean, description: 'The "Use with your AI" mark, served when the app has public app tools or bound skills; it links to /v1/use-with-ai/{owner}/{filename}' }
+                    info: { type: boolean, description: 'The app-info mark: the version, when it was last updated and what changed. An open page reloads itself on a new version either way.' }
+                    tucked: { type: boolean, description: 'Off unless switched on: the optional marks start tucked away and come into view near the corner. The AI label and the cookie mark are never tucked; a visitor''s own choice wins.' }
                 author:
                   type: string
                   nullable: true
@@ -34323,6 +34325,67 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/news:
+    get:
+      operationId: appNewsGet
+      tags: [Apps]
+      summary: Which version of an app runs, what changed lately, and the draft under way
+      description: >
+        The live version number, the author's version label, when the live version was published,
+        and the latest roadmap `done` lines (what the last versions changed). For the people who
+        build the app (its owner, the owner's agents, and every holder of a development right of any
+        rung) also `draft`: when the draft was last saved, what it is changing (its `notice`, with
+        who wrote it and when) and whether it has gone stale (nobody saved it for 14 days), or null
+        when there is none. Anyone else never gets `draft`. `builder` says which answer this is. An
+        app the caller may not follow (hidden, behind an access code, a sign-in gate it does not
+        pass, or a pacing amount) answers 404, the same as one that does not exist. The app-info mark
+        on a served app and `aimeat_app_get`'s `news` read the same answer.
+      security:
+        - {}
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The app's news
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          app: { type: string }
+                          version: { type: integer }
+                          label: { type: string }
+                          updatedAt: { type: string, format: date-time }
+                          changes:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                what: { type: string }
+                                version: { type: integer }
+                                at: { type: string, format: date-time }
+                          draft:
+                            type: object
+                            nullable: true
+                            properties:
+                              savedAt: { type: string, format: date-time }
+                              stale: { type: boolean }
+                              notice:
+                                type: object
+                                properties:
+                                  text: { type: string }
+                                  by: { type: string }
+                                  at: { type: string, format: date-time }
+                          builder: { type: boolean }
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/apps/{owner}/{filename}/roadmap:
     get:
       operationId: appRoadmapGet
@@ -34825,6 +34888,9 @@ paths:
                     domainLock: { type: boolean }
                     watermark: { type: boolean }
                     noRawDownload: { type: boolean }
+                notice:
+                  type: string
+                  description: One sentence, at most 280 characters, on what this draft changes. The app's builders see it on the app page and in its news; a visitor never does. Kept until restated; an empty string clears it. It becomes the roadmap line when publish-draft is given none.
       responses:
         '200':
           description: Draft saved (live app unchanged)
@@ -34981,6 +35047,9 @@ paths:
                   description: Display name; defaults from the live app, or from the draft once set.
                 description:
                   type: string
+                notice:
+                  type: string
+                  description: One sentence, at most 280 characters, on what this draft changes. The app's builders see it on the app page and in its news; a visitor never does. Kept until restated; an empty string clears it. It becomes the roadmap line when publish-draft is given none.
       responses:
         '200':
           description: The piece was written
@@ -35164,6 +35233,9 @@ paths:
                 version:
                   type: integer
                   description: Which published version. Defaults to the newest.
+                notice:
+                  type: string
+                  description: One sentence, at most 280 characters, on what this draft changes. The app's builders see it on the app page and in its news; a visitor never does. Kept until restated; an empty string clears it. It becomes the roadmap line when publish-draft is given none.
       responses:
         '200':
           description: The published source is now in the draft slot
@@ -69981,8 +70053,22 @@ paths:
       description: |
         Issue a short-lived (30s), single-use ticket that the client presents to `GET /v1/events`
         to open the change-event stream. The stream itself takes no Authorization header.
+
+        With `{ "app": "owner/filename" }` the stream follows that one app instead, which is what an
+        open app page listens to: it carries the app's `event: app` frames (a new version always, the
+        draft only when the caller builds the app: its owner, the owner's agents, or a development
+        right of any rung) and the opening `event: hello`, and no domain frames. An app the caller may
+        not follow answers 404, the same as one that does not exist.
       security:
         - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                app: { type: string, description: 'The app to follow, as "owner/filename".' }
       responses:
         '200':
           description: Connection ticket
@@ -70000,6 +70086,47 @@ paths:
                           expires: { type: integer, description: Seconds until the ticket expires. }
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/events/visitor-ticket:
+    post:
+      operationId: createVisitorEventTicket
+      tags: [Presence]
+      summary: A single-use stream ticket for a visitor without an account
+      description: |
+        The same 30-second, single-use ticket as `POST /v1/events/ticket`, for a caller with no
+        account. The stream it opens carries the opening `event: hello` (the build that answers: an
+        open page reloads after the node restarts on new code) and, with `{ "app": "owner/filename" }`,
+        that app's new versions as `event: app` frames, when anyone may open the app (no access code,
+        no sign-in gate, no pacing amount, not hidden). Never a domain frame, never a draft. Open
+        visitor streams are capped per node and per address; over the cap `GET /v1/events` answers 503.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                app: { type: string, description: 'The app to follow, as "owner/filename".' }
+      responses:
+        '200':
+          description: Connection ticket
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ticket: { type: string }
+                          expires: { type: integer, description: Seconds until the ticket expires. }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/ws/ticket:
     post:
       operationId: createSocketTicket
@@ -70064,9 +70191,12 @@ paths:
       summary: Server-Sent Events change stream
       description: |
         Open the owner-scoped, coalesced, typed change-event stream. Authenticated via a single-use
-        `ticket` (from `POST /v1/events/ticket`), not a bearer token. Emits `data: {"domains":[...]}`
-        frames listing the changed data domains, plus `:keepalive` comments every 30s. Response is
-        `text/event-stream`.
+        `ticket` (from `POST /v1/events/ticket` or `POST /v1/events/visitor-ticket`), not a bearer
+        token. Every stream opens with `event: hello` and `data: {"build":"…"}`, the build that
+        answers. A signed-in stream then emits `data: {"domains":[...]}` frames listing the changed
+        data domains; a stream opened for one app emits `event: app` with
+        `data: {"kind":"version","version":N}` or `data: {"kind":"draft"}` instead. `:keepalive`
+        comments every 15s. Response is `text/event-stream`; 503 when the visitor streams are at their cap.
       parameters:
         - name: ticket
           in: query

@@ -110,6 +110,8 @@
  *     searched for in every listed read route (secrets audit 2026-10-09).
  *   2026-10-09 -- e2e-admin-setup-closed.ts joins the list (not the guard tier): setup/register answers
  *     410 once an operator exists, on a node started with the shipped setting (secrets audit 2026-10-09, 1.4).
+ *   2026-10-18 -- e2e-app-news.ts joins the list: the app-info mark, the app's news, the draft notice
+ *     and the app's live stream (a visitor hears versions, a builder the draft).
  *   2026-10-09 -- e2e-app-ai-use.ts joins the list: the "Use with your AI" mark and its guide page.
  *   2026-10-09 -- e2e-workspace-read-scale.ts joins the list: the workspace read timed at production size.
  *   2026-10-08 -- e2e-storage-file-provenance.ts joins the list: a stored file carries its AI-provenance record.
@@ -455,6 +457,7 @@ const ALL_SUITES = [
     'test/e2e-app-fork.ts',
     'test/e2e-app-marks.ts',
     'test/e2e-app-ai-use.ts',
+    'test/e2e-app-news.ts',
     'test/e2e-app-legal.ts',
     'test/e2e-app-rows.ts',
     'test/e2e-app-store-license.ts',
