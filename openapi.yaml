@@ -67768,7 +67768,7 @@ paths:
                             properties:
                               url:
                                 type: string
-                                description: Public-file address of the stored page (`/v1/pub/{gaii}/portfolio/index.html`).
+                                description: File address of the stored page (`/v1/pub/{gaii}/portfolio/index.html`). The file is the owner's (visibility `owner`), so it is read with the owner's session; the portfolio origin serves the page to visitors while it is enabled.
                               size_kb: { type: integer }
                               stored_at: { type: string, format: date-time }
         '401':

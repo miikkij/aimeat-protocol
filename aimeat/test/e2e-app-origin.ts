@@ -10,6 +10,9 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-10-17 — Phase 12: an operator-hidden app answers 404 on its subdomain, the path form and
+ *     the markdown face, and its documents no longer describe it (plan doc-mvcn6c7e4e5q, V0.2). It
+ *     failed before the fix: the subdomain served the hidden app with 200.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.8.0 — 2026-09-24 — Phase 5: a builder holding a development right, drafter or full, cannot
  *     mint a frame grant (A6-6). The owner's own session still can.

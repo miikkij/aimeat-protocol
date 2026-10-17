@@ -7,7 +7,7 @@
  *   document the owner wrote, served on an isolated origin), different address family:
  *   a personal portfolio answers on {user}.portfolio.<apex>, a company's on {slug}.co.<apex>.
  *
- *   Stored as a PUBLIC storage file under the OWNER's GHII, keyed by company id
+ *   Stored as the OWNER's storage file (visibility 'owner') under the owner's GHII, keyed by company id
  *   (`company/{id}/index.html`). Keying on the id rather than the slug means the page
  *   survives anything that ever renames an address, and keeping it under the owner means
  *   the owner's storage quota is the one that applies — a company is not a separate tenant.
@@ -20,6 +20,9 @@
  *   readCompanyPortfolioPage · deleteCompanyPortfolio
  * @usage await publishCompanyPortfolio(config, storage, ownerGhii, companyId, html);
  * @version-history
+ *   v1.2.0 — 2026-10-17 — SECURITY: the page file is stored with visibility 'owner'. The company
+ *     origin serves it from storage while it is the front page; a public file stayed readable at
+ *     /v1/pub after the front page moved elsewhere (plan doc-mvcn6c7e4e5q, V0.3; migration 0103).
  *   v1.1.0 — 2026-10-08 — The page carries an AI-provenance record decided from its writer
  *     (provenanceForWrite); readCompanyPortfolioPage replaces readCompanyPortfolioHtml and gives the
  *     serving path the page and its record.
@@ -86,7 +89,7 @@ export async function publishCompanyPortfolio(
   await storage.createStorageFile({
     key,
     ownerGaii: ownerGhii,
-    visibility: 'public',
+    visibility: 'owner',
     mimeType: 'text/html',
     size: data.length,
     data,

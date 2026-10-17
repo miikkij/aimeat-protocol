@@ -8,6 +8,10 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.12.0 — 2026-10-17 — SECURITY: portfolio/index.html is stored with visibility 'owner'. The
+ *     origin serves the page from storage when the switch is on; the public file answered at
+ *     /v1/pub for a page taken off the web (plan doc-mvcn6c7e4e5q, V0.3; migration 0103 for
+ *     stored pages). GET /v1/portfolio/config's `html.url` is read by the owner's session.
  *   v1.11.0 — 2026-10-08 — writePortfolioHtml takes the writer and records the page's AI provenance
  *     (an agent's page is stamped model-written, a person's is not); resolvePublishedPortfolio names
  *     the record, and the portfolio origin serves its marks with the page.
@@ -120,10 +124,12 @@ export async function writePortfolioHtml(
     enabled: writer.config.aiProvenance, held,
   }) : undefined;
   await storage.deleteStorageFile(target, PORTFOLIO_HTML_KEY);
+  // The FILE is the owner's: the portfolio origin serves the page from storage while the switch is
+  // on, and a public file stayed readable at /v1/pub after its owner took the page off the web.
   await storage.createStorageFile({
     key: PORTFOLIO_HTML_KEY,
     ownerGaii: target,
-    visibility: 'public',
+    visibility: 'owner',
     mimeType: 'text/html',
     size: data.length,
     data,
