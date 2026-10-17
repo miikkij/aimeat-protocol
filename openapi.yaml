@@ -73064,6 +73064,11 @@ paths:
                             items: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '503':
+          description: STORAGE_UNAVAILABLE. No source could be read, so no report was made (an empty one would say nothing is exposed).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
 
   /v1/visibility/report:
     get:

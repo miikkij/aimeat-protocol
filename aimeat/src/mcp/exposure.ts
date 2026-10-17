@@ -11,6 +11,7 @@
  * @structure registerExposureTools(mcp, storage, config, caller)
  * @usage import { registerExposureTools } from './exposure.js';
  * @version-history
+ *   v1.0.1 — 2026-10-18 — A report no source could be read for is an error (STORAGE_UNAVAILABLE), as on REST.
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.3).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -22,7 +23,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { createExposureContext } from '../services/exposure/exposure-types.js';
-import { buildExposureReport } from '../services/exposure/exposure-report.js';
+import { buildExposureReport, exposureUnreadable, EXPOSURE_UNREADABLE_MESSAGE } from '../services/exposure/exposure-report.js';
 import { readerForAgent } from '../services/classification/reader.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
@@ -44,7 +45,9 @@ export function registerExposureTools(
       if (c.visitor) return toolError('FORBIDDEN', 'A session from another node has no account here, so it has no exposure report.');
       // The session's classification reader: a record hidden from this agent is counted, not listed.
       const reader = readerForAgent({ storage, config }, c.principal, c.scopes);
-      return text(await buildExposureReport(createExposureContext(storage, config), c.owner, reader));
+      const report = await buildExposureReport(createExposureContext(storage, config), c.owner, reader);
+      if (exposureUnreadable(report)) return toolError('STORAGE_UNAVAILABLE', EXPOSURE_UNREADABLE_MESSAGE);
+      return text(report);
     },
   );
 }
