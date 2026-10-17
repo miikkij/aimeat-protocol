@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-17 -- manage-my-profile-data: the visibility ladder names organism:<id> (one organism's members) and says members and organism never leave the node (plan V3.2).
  *   2026-10-16 -- aimeat-node-guide: the account that would become the operator of a node others can reach needs the one-time setup code while it has none (Jouni, 2026-10-16).
  *   2026-10-16 -- aimeat-node-guide: the first account of a node others can reach needs the one-time setup code (Jouni, 2026-10-16).
  *   2026-10-16 -- aimeat-html-page (builtin-skills.html-page.ts): an HTML page in a workspace in three calls, and its rules.
@@ -383,9 +384,11 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
 - **What do I have?** \`aimeat_memory_list\` (prefix filters), \`aimeat_memory_search\` for
   content search, \`aimeat_discover\` for a cross-domain map.
 - **Read/write:** \`aimeat_memory_read\` / \`aimeat_memory_write\`.
-- **Visibility ladder** (low → high reach): private < owner < group < workspace < members < public.
-  \`public\` is federated — visible beyond this node. \`workspace\` is a REST-only tier today:
-  \`aimeat_memory_write\` takes the other five. Never raise visibility without the
+- **Visibility ladder** (low → high reach): private < owner < group < workspace < organism:<id> <
+  members < public. \`organism:<id>\` is the active members of one organism the owner belongs to;
+  \`members\` is every account signed in to this node. Neither leaves the node; \`public\` is
+  federated — visible beyond this node. \`workspace\` is a REST-only tier today:
+  \`aimeat_memory_write\` takes the others. Never raise visibility without the
   owner's explicit confirmation.
 - **Sharing with people/organisms:** consents (\`aimeat_consent_grant\` / \`aimeat_consent_list\` /
   \`aimeat_consent_revoke\`) grant scoped read access without copying data.

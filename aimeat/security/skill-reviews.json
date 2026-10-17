@@ -248,11 +248,11 @@
       "digest": "sha256:e157e1c4f4353bd3e15e9461"
     },
     "node:manage-my-profile-data": {
-      "reviewedOn": "2026-10-11",
+      "reviewedOn": "2026-10-17",
       "watches": [
         "aimeat/src/routes/memory/shared.ts"
       ],
-      "digest": "sha256:e1ddf3bb411ec5a076246d93"
+      "digest": "sha256:d78eaf80767d1827ba9352b7"
     },
     "node:add-a-crew-agent": {
       "reviewedOn": "2026-10-15",
@@ -305,7 +305,7 @@
       "digest": "sha256:56e7613fffd8c15f2eae9c97"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-16",
+      "reviewedOn": "2026-10-17",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -314,7 +314,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:01a49d54d27ef517dc9507df"
+      "digest": "sha256:8f306f4316177aa62d73a4f4"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-17",
@@ -325,7 +325,7 @@
         "aimeat/src/services/workspace-opened.ts",
         "aimeat/src/routes/page-host.ts"
       ],
-      "digest": "sha256:2f4a154f0e64f8da007812da",
+      "digest": "sha256:b8bb2a6e7efd4cf7fb80393d",
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
@@ -342,7 +342,7 @@
       "digest": "sha256:8ce8eda9413556d9aaf5915b"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-10-16",
+      "reviewedOn": "2026-10-17",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -353,7 +353,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:e449c6d18b23c2dedeb3268b",
+      "digest": "sha256:150555494cbcec5ace6c43cc",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -378,14 +378,14 @@
       "digest": "sha256:30db4fa9b91cb702b8fbb38a"
     },
     "node:aimeat-bookkeeping": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-17",
       "watches": [
         "aimeat/src/routes/finance.ts",
         "aimeat/src/routes/finance-ledger.ts",
         "aimeat/src/services/finance/invoice-service.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:0f3183aec88e8f7ff94e7f55",
+      "digest": "sha256:7107f05b3945d1064f6ad7c0",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
@@ -479,11 +479,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-16",
+      "reviewedOn": "2026-10-17",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:0290575c0cc3f379081bc472"
+      "digest": "sha256:f54bc2934d4fd545f2de7ca2"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -607,7 +607,7 @@
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "f297c3b304d67ebd"
     },
     "node:manage-my-profile-data": {
-      "aimeat/src/routes/memory/shared.ts": "0aa6b56759507d92"
+      "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
     },
     "node:add-a-crew-agent": {
       "aimeat/src/routes/agents/device-auth.ts": "562ec994ef35b79c",
@@ -663,7 +663,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "f4093757d23c40ef"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "909ce570d5a14f6c"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -714,7 +714,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/cli/connect/mcp/local-server.ts": "8843e486d97c7154",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "f4093757d23c40ef",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "909ce570d5a14f6c",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "1d994833dc454b72",
       "aimeat/src/services/agent-task-rules.ts": "920bd83aa13aebf4"
@@ -729,7 +729,7 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "3d600154729ba344",
+      "aimeat/src/routes/memory/bulk.ts": "d8fe2281c17ecd8f",
       "aimeat/src/routes/memory/key.ts": "bc4ae2e72f0b7f5c",
       "aimeat/src/services/memory-bin.ts": "337c889faa2e6b75",
       "aimeat/src/routes/memory-hands.ts": "7c9bde91c26c70cc",
@@ -755,7 +755,7 @@
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
       "aimeat/src/routes/finance-ledger.ts": "0db9f1cfe9b9c080",
       "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
-      "aimeat/src/routes/odata.ts": "e3d050db841b2353"
+      "aimeat/src/routes/odata.ts": "29300210ceeea2c6"
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
@@ -769,7 +769,7 @@
     "node:aimeat-html-page": {
       "aimeat/src/services/html-page.ts": "4017c2f005e63477",
       "aimeat/src/services/page-frame.ts": "96108b74f3403752",
-      "aimeat/src/services/workspace-share.ts": "ab0628a53429570a",
+      "aimeat/src/services/workspace-share.ts": "b1adc7a1e888c254",
       "aimeat/src/services/workspace-opened.ts": "5a9837a77b3b4530",
       "aimeat/src/routes/page-host.ts": "fed8aae26b7b9e02"
     }

@@ -451,9 +451,9 @@
     "src/routes/knowledge/helpers.ts": {
       "reads": {
         "getMemory": 1,
-        "listMemoryForOwners": 3
+        "listMemoryForOwners": 4
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Read-to-update for the sharing routes; GET /:id checks its result with presentMemory in packages-core. Reviewed 2026-10-15 (feature-list audit 207): findReadableManifest reads a public manifest across owners and agents, or the caller's own, and returns it only through presentMemory; GET /v1/knowledge/:id and the reputation read both take it from there."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Read-to-update for the sharing routes; GET /:id checks its result with presentMemory in packages-core. Reviewed 2026-10-15 (feature-list audit 207): findReadableManifest reads a public manifest across owners and agents, or the caller's own, and returns it only through presentMemory; GET /v1/knowledge/:id and the reputation read both take it from there. Reviewed 2026-10-17 (plan doc-mvcn6c7e4e5q V3.6): findSharedManifest reads a members- or organism-audience manifest only for a node account that audience.ts admits, and findReadableManifest returns it through presentMemory like the others; the export moved here from sharing.ts and reads through the same function."
     },
     "src/routes/knowledge/organism.ts": {
       "reads": {
@@ -470,9 +470,9 @@
     "src/routes/knowledge/sharing.ts": {
       "reads": {
         "getMemory": 3,
-        "listMemoryForOwners": 3
+        "listMemoryForOwners": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Clone passes reader.show and export passes show and leave; the other read is read-to-update."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Clone passes reader.show and export passes show and leave; the other read is read-to-update. 2026-10-17: the export's manifest lookup now goes through helpers.ts findReadableManifest, so two reads left this file."
     },
     "src/routes/library-packs.ts": {
       "reads": {
