@@ -33,9 +33,14 @@
  *   v1.0.0 — 2026-07-27 — Initial: close the free raw door onto every priced app-tool on the node.
  *   v1.1.0 — 2026-10-11 — A tool counts when it is offered (a money price or a pacing amount), not only
  *     when it has a money price: a free tool with pacing is paced on the raw route too.
+ *   v1.2.0 — 2026-10-17 — Each binding says whether it has a money price and its pacing amount, so the
+ *     paywall asks for a contract only for a money price and paces a free tool. v1.1.0 meant that, and
+ *     the paywall answered every offered tool with 402: Heidi could not acknowledge a test in the
+ *     Kehitysputki app, whose free tools carry only a pacing amount (Jouni: "ei sen pitäisi vaatia
+ *     mitään kontrakteja. kun ne on ilmaisia apptoolseja").
  */
 import type { Storage } from '../../storage/interface.js';
-import { AppToolsDocSchema, isToolOffered } from '../../models/app-tool-schemas.js';
+import { AppToolsDocSchema, isToolOffered, isToolPriced, toolTollMorsels } from '../../models/app-tool-schemas.js';
 import { cached, TTL } from '../../services/cache.js';
 import { logger } from '../../utils/logger.js';
 
@@ -45,6 +50,10 @@ export interface PricedBinding {
   appId: string;
   /** Tool name within that app's manifest. */
   tool: string;
+  /** The tool has a money price: the raw route asks for a contract. Without one it is a free product. */
+  money: boolean;
+  /** The tool's pacing amount in morsels (0 when none): what a call to a free product is paced at. */
+  tollMorsels: number;
 }
 
 const APP_TOOLS_PREFIX = 'apps.';
@@ -77,7 +86,9 @@ export async function pricedAppToolsFor(
         for (const t of parsed.data.tools) {
           // Offered = a money price or a pacing amount: a free tool with pacing is still a product, so
           // its action is not free through the raw route either.
-          if (t.action_id === binding && isToolOffered(t)) out.push({ appId, tool: t.name });
+          if (t.action_id === binding && isToolOffered(t)) {
+            out.push({ appId, tool: t.name, money: isToolPriced(t), tollMorsels: toolTollMorsels(t) });
+          }
         }
       }
       // Stable order, so an ambiguous binding resolves the same way on every node and every call

@@ -4,6 +4,8 @@
  * @structure Authenticated fixtures; free calls and caller identity; refusal paths; cleanup.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tool-free-mcp
  * @version-history
+ *   2026-10-17 — The raw route runs an action that only a free paced tool sells (`paced-only`), where
+ *     it answered 402; an action a money-priced tool sells still answers 402.
  *   2026-10-13 — From 4.0.0 POST /v1/memory refuses a manifest with price.morsels, so the `priced` tool
  *     is written with tollMorsels there and keeps its 3.x figure on 3.x; `zero` is tollMorsels 0.
  *   2026-10-12 — Both agents hold ext:invoke, the word node 4.0.0 asks on the extension action route
@@ -107,6 +109,8 @@ try {
   const agentSession = await session(actor.token), limitedSession = await session(limited.token);
   const manifest = JSON.stringify({ metadata: { name: EXT, version: '1.0.0', description: 'Free app tool parity fixture', author: 'e2e' },
     actions: [{ id: 'echo', method: 'POST', path: '/echo', script: 'echo' },
+      // Sold only by a free tool with a pacing amount: the shape of Kehitysputki's own tools.
+      { id: 'paced', method: 'POST', path: '/paced', script: 'echo' },
       { id: 'paid', method: 'POST', path: '/paid', script: 'echo', commercial: { payMoney: { amount: 1000, currency: 'EUR' } } }],
     config: { public_access: { default: true } }, limits: { timeout_ms: 5000, max_api_calls: 1 } });
   const install = await json('/v1/extensions', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ manifest,
@@ -122,7 +126,8 @@ try {
   const tools = [{ ...baseTool, name: 'free' }, { ...baseTool, name: 'zero', tollMorsels: 0 },
     { ...baseTool, name: 'priced', ...(legacyPrice ? { price: { morsels: 5 } } : { tollMorsels: 5 }) },
     { ...baseTool, name: 'usd', pricesMoney: [{ amount: 1000, currency: 'USD' }] },
-    { ...baseTool, name: 'action-paid', action_id: 'ext:' + EXT + ':paid' }];
+    { ...baseTool, name: 'action-paid', action_id: 'ext:' + EXT + ':paid' },
+    { ...baseTool, name: 'paced-only', action_id: 'ext:' + EXT + ':paced', ...(legacyPrice ? { price: { morsels: 5 } } : { tollMorsels: 5 }) }];
   for (const [filename, visibility] of [[FILE, 'public'], [PRIVATE_FILE, 'private']]) {
     const saved = await json('/v1/memory', { method: 'POST', headers: auth(seller.token),
       body: JSON.stringify({ key: 'apps.' + filename + '.tools', visibility, value: { version: 1, tools } }) });
@@ -175,6 +180,15 @@ try {
     const http = await rest('priced', { query: 'paced' }), mcp = await invoke(agentSession, seller!, 'priced', { query: 'paced' });
     assert(http.status === 200 && http.body.data?.pacing?.morsels === 5, 'REST paced run ' + http.status + ' ' + JSON.stringify(http.body.data?.pacing ?? http.body.error));
     assert(!mcp.isError && mcp.data?.pacing?.morsels === 5, 'MCP paced run: ' + mcp.text);
+  });
+  // 2026-10-17: the raw route answered 402 "take a contract" for an action that only a FREE tool sells
+  // (a pacing amount, no money price), so a person could not acknowledge a test in Kehitysputki. It is
+  // paced at the tool's amount and runs; a money price still answers 402 (the echo action, sold by `usd`).
+  await test('the raw route runs an action sold only by a free paced tool, and paces it', async () => {
+    const raw = await json('/v1/ext/' + EXT + '/paced', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ query: 'acknowledge' }) });
+    assert(raw.status === 200, 'raw paced action ' + raw.status + ' ' + JSON.stringify(raw.body.error));
+    const echoed = await json('/v1/ext/' + EXT + '/echo', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ query: 'sold for money' }) });
+    assert(echoed.status === 402, 'an action a money-priced tool sells still asks for a contract ' + echoed.status);
   });
   await test('a free tool cannot remove the backing action money price', async () => {
     const http = await rest('action-paid', { query: 'paid' }), mcp = await invoke(agentSession, seller!, 'action-paid', { query: 'paid' });

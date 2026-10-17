@@ -15,6 +15,10 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v2.1.0 — 2026-10-17 — Step 3.6: with no contract held, an action that only free app-tools sell (a
+ *     pacing amount, no money price) is paced at the highest of their amounts and runs; only a money
+ *     price answers 402. A contract the caller holds is still settled first. Every offered tool answered
+ *     402 since v2.0.0, so a person could not use a free app's tools (Kehitysputki, 2026-10-17).
  *   v2.0.0 — 2026-10-11 — The morsel payment channel is gone: `commercial.payMorsels` joins the toll as
  *     pacing (step 3.1), so an action with only a morsel price is not commercial any more. The pacing
  *     is given back when the call is refused later for money or for the app's spend permission, and
@@ -111,7 +115,7 @@ const isPosInt = (v: unknown): v is number => typeof v === 'number' && Number.is
 export const APP_TOOL_HEADER = 'x-aimeat-app-tool';
 
 /** Split `{app_id}/{tool}`. Anything else is a malformed request, not a silent fallback to guessing. */
-function parseNamedTool(raw: string | undefined | null): PricedBinding | null {
+function parseNamedTool(raw: string | undefined | null): Pick<PricedBinding, 'appId' | 'tool'> | null {
   const v = (raw ?? '').trim();
   if (!v) return null;
   const slash = v.lastIndexOf('/');
@@ -438,20 +442,41 @@ export async function enforcePaywall(args: {
       if (viaTool) return viaTool;                          // contracted → settled once, right here
     }
 
-    const first = sold[0]!;
+    // 3.6 No contract held. When every tool that sells it is FREE (a pacing amount, no money price),
+    //     nothing is asked for: the call is paced at the highest of those tools' amounts, less what 3.1
+    //     already charged, and runs, as aimeat_app_tool_invoke runs a tool with no money price. Until
+    //     2026-10-17 such a call answered 402 "take a contract", so a person could not use a free app's
+    //     own tools (Kehitysputki). A contract a caller does hold is still settled above.
+    const moneySold = sold.filter(s => s.money);
+    if (!moneySold.length) {
+      const already = resolvePacingToll(config, toll, action.commercial?.payMorsels);
+      const extra = Math.min(Math.max(0, ...sold.map(s => s.tollMorsels)) - already, config.extensionMaxDebitPerCall);
+      if (extra <= 0) return { ok: true, ...giveBack };
+      const more = await burnPacingToll({
+        config, storage, callerGaii, providerOwner: ownerName, label: `ext:${ext.name}:${action.id}`, toll: extra, res,
+      });
+      if (!more.ok) {
+        await paced.charge?.reverse();
+        return { ok: false };
+      }
+      const both = async () => { await paced.charge?.reverse(); await more.charge?.reverse(); };
+      return { ok: true, refund: both };
+    }
+
+    const first = moneySold[0]!;
     res.status(402).json({
       ...error(config.nodeId, 'PAYMENT_REQUIRED',
-        `This capability is sold as ${sold.length === 1 ? 'the app-tool' : 'the app-tools'} `
-        + sold.map(s => `"${ownerName}/${s.appId} · ${s.tool}"`).join(', ') + '. '
+        `This capability is sold as ${moneySold.length === 1 ? 'the app-tool' : 'the app-tools'} `
+        + moneySold.map(s => `"${ownerName}/${s.appId} · ${s.tool}"`).join(', ') + '. '
         + 'Take a contract on EXCHANGE (POST /v1/exchange/entitlements with the offering id) and '
         + 'call it again — this route and the app-tool endpoint settle the same contract.'
-        + (sold.length > 1
+        + (moneySold.length > 1
           ? ` They are separate products at separate prices; hold more than one and this route settles the `
             + `cheapest unless you name it with "${APP_TOOL_HEADER}: {app_id}/{tool}".`
           : '')),
       ...paymentChallenge(config),
       app_tool: { owner: ownerName, app_id: first.appId, tool: first.tool, coordinate: `apptool:${ownerName}/${first.appId}` },
-      app_tools: sold.map(s => ({
+      app_tools: moneySold.map(s => ({
         owner: ownerName, app_id: s.appId, tool: s.tool,
         invoke: `/v1/apps/${ownerName}/${s.appId}/webmcp/tools/${s.tool}`,
       })),
