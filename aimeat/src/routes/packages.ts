@@ -21,6 +21,9 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-17 — The read routes pass the request's auth to package-read.ts, which admits 'members' and
+ *     'organism:<id>' packages by services/audience.ts; PATCH /v1/packages/:groupId takes both and
+ *     refuses an organism the author is not in with 400 NOT_ORGANISM_MEMBER (plan V3.7).
  *   2026-10-16 — GET /v1/packages/tab carries `remote`: the other nodes' template listings stored by the
  *     last federation template sync, with per-peer fetch time and error (QA audit F1-04).
  *   2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -67,7 +70,7 @@ import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { buildZip, parseZip, ZipValidationError } from '../services/packages/compose/package-zip.js';
 import {
-  createPackageGroup, addPackageVersion, setPackageVersionStatus, VALID_VISIBILITIES,
+  createPackageGroup, addPackageVersion, setPackageVersionStatus, packageVisibilityRefusal,
 } from '../services/packages/compose/package-create.js';
 import {
   listPackagesFor, getPackageFor, getPackageVersionFor, listPackageVersionsFor,
@@ -303,7 +306,7 @@ export function packagesRouter(
 
   // GET /v1/packages — list packages
   router.get('/v1/packages', async (req, res) => {
-    const result = await listPackagesFor(storage, req.auth?.owner, {
+    const result = await listPackagesFor(storage, req.auth, {
       author: req.query.author as string | undefined,
       category: req.query.category as string | undefined,
       status: req.query.status as string | undefined,
@@ -456,7 +459,7 @@ export function packagesRouter(
     const groupId = decodeURIComponent(req.params.groupId as string);
     const version = req.params.version as string;
 
-    const pkg = await getPackageVersionFor(storage, groupId, version, req.auth?.owner);
+    const pkg = await getPackageVersionFor(storage, groupId, version, req.auth);
     if (!pkg) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Version ${version} not found for package ${groupId}`));
       return;
@@ -469,7 +472,7 @@ export function packagesRouter(
   router.get('/v1/packages/:groupId/versions', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
 
-    const result = await listPackageVersionsFor(storage, groupId, req.auth?.owner, {
+    const result = await listPackageVersionsFor(storage, groupId, req.auth, {
       limit: parseInt(req.query.limit as string ?? '50', 10),
       offset: parseInt(req.query.offset as string ?? '0', 10),
     });
@@ -490,8 +493,8 @@ export function packagesRouter(
       return;
     }
     const pkg = nodeRead.kind === 'served' ? nodeRead.pkg : versionParam
-      ? await getPackageVersionFor(storage, groupId, versionParam, req.auth?.owner)
-      : await getPackageFor(storage, groupId, req.auth?.owner);
+      ? await getPackageVersionFor(storage, groupId, versionParam, req.auth)
+      : await getPackageFor(storage, groupId, req.auth);
 
     if (!pkg) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Package not found: ${groupId}`));
@@ -554,7 +557,7 @@ export function packagesRouter(
   router.get('/v1/packages/:groupId', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
 
-    const pkg = await getPackageFor(storage, groupId, req.auth?.owner);
+    const pkg = await getPackageFor(storage, groupId, req.auth);
     if (!pkg) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Package not found: ${groupId}`));
       return;
@@ -643,9 +646,10 @@ export function packagesRouter(
     }
 
     const { description, tags, visibility } = req.body ?? {};
-    if (visibility && !VALID_VISIBILITIES.includes(visibility)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        `visibility must be one of: ${VALID_VISIBILITIES.join(', ')}`));
+    // private, members, organism:<id> or public; an organism the author is not in is 400 before any write.
+    const refused = visibility ? await packageVisibilityRefusal(storage, visibility, owner) : null;
+    if (refused) {
+      res.status(refused.status).json(error(config.nodeId, refused.code, refused.message));
       return;
     }
 

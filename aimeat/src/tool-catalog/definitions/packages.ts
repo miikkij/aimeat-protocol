@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-10-17 — aimeat_package_publish, _compose and _compose_set take the visibilities members and
+ *     organism:<id> beside private and public (plan doc-mvcn6c7e4e5q, V3.7).
  *   2026-10-12 — aimeat_package_instances names packages:read, the word GET /v1/instances asks; enforced from 4.0.0.
  *   2026-10-12 — aimeat_package_versions, _delete and _publish declare connectorOnly: they are on both
  *     connector interfaces and not on the node MCP (V2_EXCLUDED), and they declared the node MCP.
@@ -54,6 +56,10 @@ import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere, connectorOnly } from './types.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
+
+/** A package's visibility on every interface: the words, or organism:<id> (services/audience.ts parseAudience). */
+const PACKAGE_VISIBILITY = z.string().regex(/^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$/);
+const PACKAGE_VISIBILITY_TEXT = 'private (you only), members (every account of this node), organism:<id> (the members of one organism you are in) or public.';
 
 /** What `config` on aimeat_package_install is, on every interface. */
 /** The `grant_apps` input of aimeat_package_install, shared by its three surfaces. */
@@ -129,7 +135,7 @@ export const packagesTools = [
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
             tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
-            visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
+            visibility: { type: 'string', description: `Who may install it: ${PACKAGE_VISIBILITY_TEXT} Defaults to private.`, zod: PACKAGE_VISIBILITY },
             components: {
                 type: 'array', required: true,
                 description: 'The components, each { id, type: "app"|"extension"|"cortex"|"translation", label?, content, dependencies? }. At least one.', zod: z.array(z.object({
@@ -162,7 +168,7 @@ export const packagesTools = [
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
             tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
-            visibility: { type: 'string', enum: ['private', 'public'], description: 'Who may install it. Defaults to private.' },
+            visibility: { type: 'string', description: `Who may install it: ${PACKAGE_VISIBILITY_TEXT} Defaults to private.`, zod: PACKAGE_VISIBILITY },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published, so you can install it at once.' },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true. Node-shipped cortexes are never packaged.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps, so the installer\'s AI has their operating guides. Default true. Installing publishes each in the installer\'s skills, bound to their copy of the app, and never overwrites a skill of theirs.' },
@@ -188,7 +194,7 @@ export const packagesTools = [
             description: { type: 'string', description: 'What the set is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
             tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
-            visibility: { type: 'string', enum: ['private', 'public'], description: 'Defaults to private: a set is made to be sold.' },
+            visibility: { type: 'string', description: `Who may install it: ${PACKAGE_VISIBILITY_TEXT} Defaults to private: a set is made to be sold.`, zod: PACKAGE_VISIBILITY },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps. Default true.' },
             allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension a package cannot carry.' },

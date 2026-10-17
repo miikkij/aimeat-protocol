@@ -4595,7 +4595,10 @@ components:
             type: string
         visibility:
           type: string
-          enum: [private, public]
+          pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$'
+          description: >
+            private (the author only), members (every account of this node), organism:<id> (the active
+            members of that organism) or public.
         status:
           type: string
           enum: [draft, published, beta, archived]
@@ -24727,13 +24730,25 @@ paths:
                   properties:
                     keep: { type: integer }
                     unit: { type: string, enum: [versions, months] }
+                visibility:
+                  type: string
+                  default: public
+                  pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$'
+                  description: >-
+                    Who reads the package: public (anyone, at the permanent address), members (every
+                    account of this node), organism:<id> (that organism's active members) or private
+                    (the owner only). The owner always reads it. The files, the latest pointer and the
+                    catalogue entry carry it; only a public package is in the public catalogue.
       responses:
         '201':
           description: A new version was written
         '200':
           description: Identical content was already published — no new version (unchanged is true)
         '400':
-          description: The request is malformed (no name, no changes, no resources, a bad resource name)
+          description: >-
+            The request is malformed (no name, no changes, no resources, a bad resource name, a
+            visibility that is none of the four), or NOT_ORGANISM_MEMBER: the visibility names an
+            organism the caller is not an active member of. Nothing is written.
         '422':
           description: The quality gate refused — issues[] carries the row and column of each problem
         '401':
@@ -24799,11 +24814,12 @@ paths:
         the package's mutable pointer, and the pointer travels back so a consumer can see whether the
         latest production run failed. With `version` the answer is pinned and can never change.
 
-        No authentication: a published package is public, and a program reading one should not need
-        an AIMEAT session. For the raw bytes use the descriptor_url this returns, which is a
-        permanent, range-readable /v1/pub address.
+        No authentication for a public package (the default): a program reading one should not need
+        an AIMEAT session. A package published members, organism:<id> or private answers 404 to a
+        caller its visibility does not admit; its owner always reads it. For the raw bytes use the
+        descriptor_url this returns, which is a permanent, range-readable /v1/pub address.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -24827,10 +24843,11 @@ paths:
         The versions are discovered from the stored keys rather than from an index, so nothing can
         be published without appearing here. How far back it goes is the owner's retention policy.
 
-        No authentication, for the same reason as the descriptor: a history nobody can see is not a
-        history a consumer can rely on.
+        No authentication for a public package, for the same reason as the descriptor: a history
+        nobody can see is not a history a consumer can rely on. A non-public package answers as the
+        descriptor does.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -24847,9 +24864,9 @@ paths:
       description: |
         A paginated read for a UI or an agent that wants to look rather than download. For anything
         larger, read the resource's CSV from its permanent address — that is what it is for, and it
-        answers byte ranges.
+        answers byte ranges. A non-public package answers 404 to a caller its visibility does not admit.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -24873,8 +24890,9 @@ paths:
   # THREE THINGS THAT DIFFER FROM EVERY OTHER ROUTE HERE, all deliberate:
   #  - the responses are NOT the node envelope. A connector reads `error.code` / `error.message` and
   #    an OData-shaped body; the envelope would surface in Excel as "something went wrong".
-  #  - there is no authentication. The package's CSV is world-readable at a permanent address, so a
-  #    feed over the same rows is world-readable too; a token here would be theatre.
+  #  - no authentication for a public package. Its CSV is world-readable at a permanent address, so a
+  #    feed over the same rows is world-readable too. A package published members, organism:<id> or
+  #    private answers 404 to a caller its visibility does not admit (a bearer token is read).
   #  - there is no meter. Metering needs an authenticated caller and an entitlement coordinate, which
   #    is a different door. A half-built meter counting anonymous reads as free would misreport.
   /v1/odata/{owner}/{name}:
@@ -47832,6 +47850,7 @@ paths:
                       properties:
                         catalog_listed: { type: boolean }
                         allow_clone: { type: boolean }
+                        audience: { type: string, pattern: '^(owner|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$', description: 'Who reads an unlisted package: owner (default), members (every account of this node) or organism:<id> (that organism''s active members; the writer must be one, else 400 NOT_ORGANISM_MEMBER and nothing is written). catalog_listed true is public. An entry''s visibility takes members and organism:<id> too.' }
                         license: { type: string }
                         toll_morsels: { type: number, minimum: 0, description: The pacing amount in morsels. Required unless the deprecated morsel_price is sent. }
                         morsel_price: { type: number, minimum: 0, deprecated: true, description: Deprecated name of toll_morsels; refused from node 5.0.0. }
@@ -47854,7 +47873,10 @@ paths:
       operationId: getKnowledgePackage
       summary: Get knowledge package
       description: >
-        Retrieve a knowledge package by ID. Public access.
+        Retrieve a knowledge package by ID. A public package to anyone; your own in any audience; one
+        whose sharing.audience is members to any account of this node, and organism:<id> to that
+        organism's active members. Anyone else, the anonymous identity and a visitor from another node
+        get 404. GET /v1/knowledge/{id}/links and /export answer on the same terms.
 
         When the package declared a `synthesis.level` other than `original` at import, the response
         carries its AI provenance record on `meta.provenance` (`{ id, record, recordUrl }`) and the
@@ -47926,6 +47948,9 @@ paths:
     get:
       operationId: getKnowledgeLinks
       summary: Get knowledge entry links
+      description: >
+        The links of a package the caller may read, on the terms of GET /v1/knowledge/{id}. A package
+        the caller may not read answers 404 like a missing one.
       tags: [Knowledge]
       parameters:
         - name: id
@@ -47936,6 +47961,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/knowledge/{id}/broken-links:
     get:
@@ -47960,6 +47987,12 @@ paths:
       x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: updatePackageSharing
       summary: Update package sharing settings
+      description: >
+        Who reads the package. `audience` is owner (the author only), members (every account of this
+        node), organism:<id> (the active members of that organism) or public (the catalogue, the same as
+        catalog_listed true). The package, its links and its export are then read by exactly that
+        audience. An organism the writer is not an active member of is 400 NOT_ORGANISM_MEMBER, and
+        nothing is written.
       tags: [Knowledge]
       security:
         - BearerAuth: []
@@ -47975,15 +48008,25 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                catalog_listed: { type: boolean, description: 'true is the public catalogue; must agree with audience when both are sent.' }
+                allow_clone: { type: boolean }
+                audience: { type: string, pattern: '^(owner|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$' }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
 
   /v1/knowledge/{id}/entries/{entryKey}/visibility:
     patch:
       x-aimeat-scope: { word: 'memory:write', enforcedIn: '4.0.0' }
       operationId: updateEntryVisibility
       summary: Update knowledge entry visibility
+      description: >
+        members (every account of this node) and organism:<id> (that organism's active members) sit
+        between owner and public; the export hands such an entry to whom it admits. An organism the
+        writer is not an active member of is 400 NOT_ORGANISM_MEMBER, and nothing is written.
       tags: [Knowledge]
       security:
         - BearerAuth: []
@@ -48004,7 +48047,13 @@ paths:
           application/json:
             schema:
               type: object
+              required: [visibility]
+              properties:
+                visibility: { type: string, pattern: '^(private|owner|group|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$' }
+                group_id: { type: string }
       responses:
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
@@ -48034,6 +48083,10 @@ paths:
         hand out (`entry_data`, keyed by entry name), and `entry_provenance` with the same keys:
         each entry's provenance block (AiProvenanceItemBlock) when it has one, so a viewer labels
         an entry an AI wrote and an importer keeps how it was made.
+
+        The package is found on the terms of GET /v1/knowledge/{id} (public, your own, or a members
+        or organism:<id> audience that admits you). The entries handed out are the public ones and
+        those whose members or organism:<id> visibility admits the caller; the author gets both.
       tags: [Knowledge]
       parameters:
         - name: id
@@ -48044,6 +48097,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/knowledge/{id}/contribute:
     post:
@@ -50234,7 +50289,7 @@ paths:
                 description: { type: string }
                 category: { type: string, enum: [signage, marketplace, iot, social, productivity, communication, other] }
                 tags: { type: array, items: { type: string } }
-                visibility: { type: string, enum: [private, public], default: private }
+                visibility: { type: string, pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$', default: private, description: 'private, members (every account of this node), organism:<id> (that organism''s active members; the author must be one, else 400 NOT_ORGANISM_MEMBER) or public.' }
                 status:
                   type: string
                   enum: [draft, published, beta, archived]
@@ -50343,7 +50398,7 @@ paths:
                 description: { type: string }
                 category: { type: string }
                 tags: { type: array, items: { type: string } }
-                visibility: { type: string, enum: [private, public], default: private }
+                visibility: { type: string, pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$', default: private, description: 'private, members (every account of this node), organism:<id> (that organism''s active members; the author must be one, else 400 NOT_ORGANISM_MEMBER) or public.' }
                 status: { type: string, enum: [draft, published, beta, archived], default: published }
                 include_cortex:
                   type: boolean
@@ -50479,7 +50534,7 @@ paths:
                 description: { type: string }
                 category: { type: string }
                 tags: { type: array, items: { type: string } }
-                visibility: { type: string, enum: [private, public], default: private }
+                visibility: { type: string, pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$', default: private, description: 'private, members (every account of this node), organism:<id> (that organism''s active members; the author must be one, else 400 NOT_ORGANISM_MEMBER) or public.' }
                 include_cortex: { type: boolean, default: true }
                 include_skills: { type: boolean, default: true }
                 allow_expectations: { type: boolean, default: false }
@@ -51727,7 +51782,7 @@ paths:
                 description: { type: string }
                 category: { type: string, enum: [signage, marketplace, iot, social, productivity, communication, other] }
                 tags: { type: array, items: { type: string } }
-                visibility: { type: string, enum: [private, public] }
+                visibility: { type: string, pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$', description: 'private, members (every account of this node), organism:<id> (that organism''s active members; the author must be one, else 400 NOT_ORGANISM_MEMBER) or public.' }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

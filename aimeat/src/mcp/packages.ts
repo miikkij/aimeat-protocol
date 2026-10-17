@@ -23,6 +23,8 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-17 — aimeat_package_get reads with the session's auth, so a 'members' or 'organism:<id>'
+ *     package is answered by services/audience.ts (plan doc-mvcn6c7e4e5q, V3.7).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-08 — aimeat_package_buy attributes the session to the agent (AI visibility).
  *   2026-10-06 — aimeat_package_buy's auto_renew names the agent on the subscription, so each renewal is
@@ -222,7 +224,9 @@ export function registerPackageTools(
     });
 
     mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), zodShapeFor('aimeat_package_get'), annotationsFor('aimeat_package_get'), async ({ group_id }) => {
-        const pkg = await getPackageFor(storage, group_id, ownerOf());
+        // The session's own auth, so audience.ts sees the agent (an organism that admits only listed
+        // agents refuses the rest) for a 'members' or 'organism:<id>' package (plan V3.7).
+        const pkg = await getPackageFor(storage, group_id, caller().auth);
         if (!pkg) {
             return {
                 content: [{ type: 'text' as const, text: `NOT_FOUND: Package not found: ${group_id}` }],

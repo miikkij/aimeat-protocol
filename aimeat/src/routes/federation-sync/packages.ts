@@ -12,6 +12,8 @@
  * @structure registerFederationPackageRoutes(router, config, storage, peers)
  * @usage import { registerFederationPackageRoutes } from './federation-sync/packages.js';
  * @version-history
+ *   v1.3.0 — 2026-10-17 — The attestation passes the request's auth to package-read.ts and serves no
+ *     'members' or 'organism:<id>' package: those stay on this node's own routes (plan V3.7).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-09-28 — The attestation serves an entitled peer node's signed read of a private
  *     package on a node in the repository role (services/packages/sale/package-entitlements.ts).
@@ -56,9 +58,12 @@ export function registerFederationPackageRoutes(
             res.status(nodeRead.status).json(error(config.nodeId, nodeRead.code, nodeRead.message));
             return;
         }
-        const pkg = nodeRead.kind === 'served' ? nodeRead.pkg : version
-            ? await getPackageVersionFor(storage, groupId, version, req.auth?.owner)
-            : await getPackageFor(storage, groupId, req.auth?.owner);
+        const read = nodeRead.kind === 'served' ? nodeRead.pkg : version
+            ? await getPackageVersionFor(storage, groupId, version, req.auth)
+            : await getPackageFor(storage, groupId, req.auth);
+        // The federation endpoints serve public packages (and a private one to its author or an
+        // entitled peer, as before). A members or organism package stays on this node's own routes.
+        const pkg = read && (nodeRead.kind === 'served' || read.visibility === 'public' || read.visibility === 'private') ? read : null;
 
         if (!pkg) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Package not found: ${groupId}`));

@@ -6,6 +6,11 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-17 — A package's audience (sharing.audience: owner, members, organism:<id>, public) and an
+ *     entry's members or organism:<id>: POST /v1/knowledge/import stores the records at the memory tier
+ *     services/knowledge-audience.ts names and refuses an organism the writer is not in (400
+ *     NOT_ORGANISM_MEMBER) before anything is written; entry overrides pass the schema too.
+ *     GET /v1/knowledge/:id/links answers only a caller who may read the package (plan V3.6).
  *   2026-10-15 — GET /v1/knowledge/:id finds its manifest with helpers.ts findReadableManifest, which the
  *     reputation read shares (feature-list audit 207).
  *   2026-10-13 — POST /v1/knowledge/import stores the pacing amount as sharing.toll_morsels; the 3.x
@@ -36,7 +41,11 @@
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, KnowledgeManifest, MemoryLinkRecord } from '../../storage/interface.js';
+import type { Storage, KnowledgeManifest, MemoryLinkRecord, MemoryRecord } from '../../storage/interface.js';
+import { checkAudienceWrite } from '../../services/audience-write.js';
+import {
+  KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING, packageAudienceOf, manifestRecordVisibility, entryRecordVisibility,
+} from '../../services/knowledge-audience.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -112,6 +121,14 @@ export function registerPackagesCoreRoutes(
       }
     }
 
+    // An entry override may name an audience too; it is applied before the checks below.
+    if (overrides?.entries && Array.isArray(pkg.entries)) {
+      for (const entry of pkg.entries) {
+        const entryOverride = overrides.entries[String(entry.key ?? '').split('/').pop() ?? ''];
+        if (entryOverride?.visibility) entry.visibility = entryOverride.visibility;
+      }
+    }
+
     // Validate manifest structure
     const manifest = pkg as KnowledgeManifest;
     if (!validateManifest(manifest)) {
@@ -129,22 +146,32 @@ export function registerPackagesCoreRoutes(
     const now = new Date().toISOString();
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Apply overrides to entries if provided
-    if (overrides?.entries) {
-      for (const entry of manifest.entries) {
-        const entryName = entry.key.split('/').pop() ?? entry.key;
-        const entryOverride = overrides.entries[entryName];
-        if (entryOverride?.visibility) {
-          entry.visibility = entryOverride.visibility;
-        }
-      }
-    }
+    // Entry overrides were applied before the validation above, so an override passes the schema too.
     if (overrides?.catalog_listed !== undefined) {
       manifest.sharing.catalog_listed = overrides.catalog_listed;
       // If catalog_listed is enabled and allow_clone wasn't explicitly set, enable cloning
       if (overrides.catalog_listed && !manifest.sharing.allow_clone) {
         manifest.sharing.allow_clone = true;
       }
+    }
+
+    // sharing.audience 'public' is the catalogue, so it lists the package; any other audience on a
+    // listed package is a contradiction, refused as PATCH /v1/knowledge/:id/sharing refuses it.
+    if (manifest.sharing.audience === 'public') manifest.sharing.catalog_listed = true;
+    else if (manifest.sharing.audience !== undefined && manifest.sharing.catalog_listed) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'catalog_listed is true exactly when the audience is public; send one of the two.'));
+      return;
+    }
+
+    // An audience that names an organism is refused before anything is written when the writer is
+    // not in it: the package's own, and each entry's (services/audience-write.ts, plan V3.6).
+    const named = [
+      ...(manifest.sharing.audience !== undefined && !manifest.sharing.catalog_listed ? [manifest.sharing.audience] : []),
+      ...manifest.entries.map(e => e.visibility).filter(v => v.startsWith('organism:')),
+    ];
+    for (const value of named) {
+      const checked = await checkAudienceWrite(storage, value, req.auth, KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING);
+      if (!checked.ok) { res.status(checked.status).json(error(config.nodeId, checked.code, checked.message)); return; }
     }
 
     // Resolve entry data — can be in req.body.entry_data, pkg.entry_data,
@@ -203,18 +230,18 @@ export function registerPackagesCoreRoutes(
       const mayNot = await provenanceDeclarationRefusal(storage, { principal, declared: fromSynthesis, enabled: config.aiProvenance, scopes: req.auth!.scopes });
       if (!mayNot) declared = fromSynthesis;
     }
-    const recordFor = (content: unknown, visibility: KnowledgeManifest['entries'][number]['visibility']) => provenanceForWrite(storage, {
+    const recordFor = (content: unknown, visibility: MemoryRecord['visibility']) => provenanceForWrite(storage, {
       principal, scopes: req.auth!.scopes, content: memoryContentBytes(content), declared,
       pipeline: 'knowledge.import', surface: { visibility, humanAudience: true },
       labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl, enabled: config.aiProvenance,
     });
-    const aiProvenanceId = await recordFor(manifest, manifest.sharing.catalog_listed ? 'public' : 'owner');
+    const aiProvenanceId = await recordFor(manifest, manifestRecordVisibility(manifest));
 
     await storage.setMemory({
       key: manifestKey,
       ownerGaii,
       value: manifest,
-      visibility: manifest.sharing.catalog_listed ? 'public' : 'owner',
+      visibility: manifestRecordVisibility(manifest),
       tags: ['knowledge-package', manifest.content_type, ...manifest.tags],
       ttlHours: null,
       version: 1,
@@ -229,12 +256,12 @@ export function registerPackagesCoreRoutes(
       const shortKey = entry.key.split('/').pop() ?? '';
       const data = entryData[entry.key] ?? entryData[shortKey] ?? {};
       // Each entry's own record: the package's declaration about these bytes, or the stamp.
-      const entryProvenanceId = await recordFor(data, entry.visibility);
+      const entryProvenanceId = await recordFor(data, entryRecordVisibility(entry.visibility));
       await storage.setMemory({
         key: entry.key,
         ownerGaii,
         value: data,
-        visibility: entry.visibility,
+        visibility: entryRecordVisibility(entry.visibility),
         tags: ['knowledge-entry', manifest.content_type, ...manifest.tags],
         ttlHours: null,
         version: 1,
@@ -278,6 +305,7 @@ export function registerPackagesCoreRoutes(
       manifest_key: manifestKey,
       entries_created: createdEntries.length,
       catalog_listed: manifest.sharing.catalog_listed,
+      audience: packageAudienceOf(manifest),
     }, [
       { description: 'View package manifest', method: 'GET', url: `/v1/memory/${encodeURIComponent(manifestKey)}` },
       { description: 'List your packages', method: 'GET', url: '/v1/memory?prefix=packages/&tags=knowledge-package' },
@@ -385,6 +413,13 @@ export function registerPackagesCoreRoutes(
     const manifestKey = `packages/${packageId}/manifest`;
     const direction = (req.query.direction as string) ?? 'both';
     const relation = req.query.relation as string | undefined;
+
+    // The links of a package are read on the terms of the package itself (helpers.ts
+    // findReadableManifest): a package this caller may not read answers like a missing one.
+    if (!(await findReadableManifest(req, manifestKey))) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
+      return;
+    }
 
     const links = await storage.listLinks(manifestKey, {
       direction: direction as 'outgoing' | 'incoming' | 'both',

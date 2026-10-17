@@ -29,6 +29,9 @@
  *   - GET /v1/odata/:owner/:name/:resource  the entity set
  * @usage app.use(odataRouter(config, storage))
  * @version-history
+ *   2026-10-17 — The feed reads with the caller's auth: a package published members, organism:<id> or
+ *     private answers 404 to whom its audience does not admit, and a public one stays open to anyone
+ *     (plan doc-mvcn6c7e4e5q, V3.8; services/datapackage/audience.ts).
  *   2026-10-15 — The entity set reads every row and pages the answer: at most 5 000 rows per response, @odata.nextLink to the rest, @odata.count over the whole table. It used to return the first 5 000 rows of a larger table as if they were all of it (feature-list audit #151, #193).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, the OData surface).
  */
@@ -74,7 +77,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
 
     /** The service document: which entity sets this feed offers. What Excel reads first. */
     router.get('/v1/odata/:owner/:name', async (req, res) => {
-        const opened = await openPackage(store, refOf(req), config.nodeId);
+        const opened = await openPackage(store, refOf(req), config.nodeId, req.auth);
         if (!opened) { odataError(res, 404, 'NotFound', `No such data package: ${refOf(req)}`); return; }
         odataHeaders(res, !!req.query.version);
         res.type('application/json;odata.metadata=minimal').send(JSON.stringify({
@@ -90,7 +93,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
      * connector parses — a JSON approximation here would fail inside Excel with no useful message.
      */
     router.get('/v1/odata/:owner/:name/\\$metadata', async (req, res) => {
-        const opened = await openPackage(store, refOf(req), config.nodeId);
+        const opened = await openPackage(store, refOf(req), config.nodeId, req.auth);
         if (!opened) { odataError(res, 404, 'NotFound', `No such data package: ${refOf(req)}`); return; }
         odataHeaders(res, !!req.query.version);
         res.type('application/xml; charset=utf-8')
@@ -100,7 +103,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
     /** One entity set: the rows, with the readable subset of the query language applied. */
     router.get('/v1/odata/:owner/:name/:resource', async (req, res) => {
         const ref = refOf(req);
-        const opened = await openPackage(store, ref, config.nodeId);
+        const opened = await openPackage(store, ref, config.nodeId, req.auth);
         if (!opened) { odataError(res, 404, 'NotFound', `No such data package: ${ref}`); return; }
 
         // The client addresses the set by the name the METADATA published, which may differ from the
@@ -131,7 +134,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
         // built for; the query is parsed into a shape a storage-side implementation could execute.
         const contentHash = opened.descriptor.aimeat.contentHash;
         const pinnedRef = `pkg:${req.params.owner}/${req.params.name}@${contentHash}`;
-        const all = await readAllRows(store, pinnedRef, config.nodeId, resource.name);
+        const all = await readAllRows(store, pinnedRef, config.nodeId, resource.name, req.auth);
         if (!all) { odataError(res, 404, 'NotFound', `Could not read ${resource.name} of ${ref}`); return; }
 
         const page = applyQueryPaged(all.rows, parsed.value, resource.schema);

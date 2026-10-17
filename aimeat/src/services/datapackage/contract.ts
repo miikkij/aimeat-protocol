@@ -34,6 +34,9 @@
  * @usage
  *   import { buildDescriptor, contentHashOf, descriptorKey } from './contract.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-17 -- PublishInput.visibility and LatestPointer.visibility: public (default),
+ *     members, organism:<id> or private (plan doc-mvcn6c7e4e5q, V3.8; ./audience.ts). Not in the
+ *     content hash: who reads a version is not what it contains.
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, A4/B1/B2).
  */
 import { createHash } from 'node:crypto';
@@ -143,6 +146,8 @@ export interface PublishInput {
     declaredProvenance?: unknown;
     /** An existing provenance record the caller asks to attach instead of minting a new one. */
     declaredProvenanceId?: string;
+    /** Who reads it: 'public' (default), 'members', 'organism:<id>' or 'private' (./audience.ts). */
+    visibility?: string;
 }
 
 /** A package name is an address segment, so it is constrained like one. */
@@ -266,4 +271,6 @@ export interface LatestPointer {
     /** The last run that FAILED, if the newest attempt did. The package stays on the version below,
      *  and this is how a consumer learns the difference between "unchanged" and "broken". */
     lastError?: { at: string; message: string };
+    /** Who reads the package (./audience.ts). Absent on a pointer written before 2026-10-17: public. */
+    visibility?: string;
 }

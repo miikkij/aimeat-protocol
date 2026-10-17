@@ -20,6 +20,9 @@
  *   import { installPackage } from './package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.13.0 — 2026-10-17 — Who may install a package is package-read.ts packageVisibleTo: a 'members'
+ *     package installs for this node's accounts and an 'organism:<id>' one for that organism's
+ *     members (plan doc-mvcn6c7e4e5q, V3.7).
  *   v1.12.0 — 2026-10-05 — "The owner's own package" is isOwnPackage (package-approvals.ts): never a
  *     pulled or signed package, whose author the other node's descriptor names. A remote descriptor
  *     naming the installer as author approved the package's apps with no consent screen (secaudit
@@ -86,6 +89,7 @@ import { registerExtensionSchedules } from '../../extension-schedules.js';
 import { planPackageConfig, missingConfigMessage, configPreview } from '../compose/package-config.js';
 import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from '../compose/package-expects.js';
 import { emitChange } from '../../event-bus.js';
+import { packageVisibleTo } from '../compose/package-read.js';
 import { skillComponentName } from './package-skill-component.js';
 import { proposeBundledAgentsOfApps, type BundledAgentProposal } from '../../app-agent-propose.js';
 import type { AppRecord } from '../../../storage/types/apps.js';
@@ -295,7 +299,9 @@ export async function installPackage(
     // who can guess or has seen an author's package name could install their private one and get
     // its app, cortex and extension source registered under their own identity, while GET, versions
     // and export all answered them 404.
-    if (pkg.visibility === 'private' && owner !== pkg.author) {
+    // 'members' and 'organism:<id>' are installed by whom services/audience.ts admits (package-read.ts
+    // packageVisibleTo, the rule the read doors use; plan doc-mvcn6c7e4e5q, V3.7).
+    if (!(await packageVisibleTo(storage, pkg, caller))) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` };
     }
 

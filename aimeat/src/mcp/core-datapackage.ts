@@ -25,6 +25,9 @@
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-17 — aimeat_datapackage_publish takes `visibility` (public by default, members,
+ *     organism:<id>, private), and aimeat_datapackage_export reads as this session, so a package's
+ *     audience decides (plan doc-mvcn6c7e4e5q, V3.8).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, B3).
@@ -32,7 +35,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
@@ -75,6 +78,8 @@ export function registerCoreDataPackageTools(
 ): void {
     const agentGaii = getAgentGaii();
     const store = { storage, config };
+    /** This session as a reader: an agent of this node, so a package's audience decides (plan V3.8). */
+    const reader = { sub: agentGaii, owner: localAccountName(agentGaii) };
 
     // ── aimeat_datapackage_publish ──
     mcp.tool(
@@ -82,7 +87,7 @@ export function registerCoreDataPackageTools(
         descriptionFor('aimeat_datapackage_publish'),
         zodShapeFor('aimeat_datapackage_publish'),
         annotationsFor('aimeat_datapackage_publish'),
-        async ({ name, changes, resources, title, description, license, sources, legal_basis, ai_provenance, ai_provenance_id }) => {
+        async ({ name, changes, resources, title, description, license, sources, legal_basis, ai_provenance, ai_provenance_id, visibility }) => {
             const bytes = Buffer.byteLength(JSON.stringify(resources ?? []), 'utf8');
             if (bytes > MAX_ROWS_BYTES) {
                 return errContent({
@@ -112,6 +117,7 @@ export function registerCoreDataPackageTools(
                 },
                 declaredProvenance: toDeclaredProvenance(ai_provenance),
                 ...(ai_provenance_id ? { declaredProvenanceId: ai_provenance_id } : {}),
+                ...(visibility !== undefined ? { visibility } : {}),
             }, { gaii: agentGaii, kind: 'agent' });
 
             if (!out.ok) {
@@ -156,7 +162,7 @@ export function registerCoreDataPackageTools(
         zodShapeFor('aimeat_datapackage_export'),
         annotationsFor('aimeat_datapackage_export'),
         async ({ ref, resource, format, limit, offset, select }) => {
-            const opened = await openPackage(store, ref, config.nodeId);
+            const opened = await openPackage(store, ref, config.nodeId, reader);
             if (!opened) return errContent({ code: 'NOT_FOUND', message: `No such data package: ${ref}` });
             const res = opened.descriptor.resources.find(r => r.name === resource);
             if (!res) {
@@ -196,7 +202,7 @@ export function registerCoreDataPackageTools(
 
             const page = await readRows(store, ref, config.nodeId, resource, {
                 offset: offset ?? 0, limit: limit ?? 500, ...(select?.length ? { select } : {}),
-            });
+            }, reader);
             if (!page) return errContent({ code: 'NOT_FOUND', message: `Could not read ${resource} of ${ref}` });
             const truncated = page.total > page.rows.length + (offset ?? 0);
             const body = format === 'csv'

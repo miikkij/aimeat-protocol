@@ -28,6 +28,10 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-10-17 — A publish takes `visibility` (public by default, members, organism:<id>, private;
+ *     ./audience.ts): an organism the publisher is not in is refused before any write, the files, the
+ *     pointer and the catalogue entry carry it, and openPackage, readRows and readAllRows take the
+ *     reader and answer null to one the audience does not admit (plan doc-mvcn6c7e4e5q, V3.8).
  *   2026-10-15 — readAllRows: every row of one resource, for the OData feed, which pages the answer itself instead of reading a 5 000-row window (feature-list audit #151, #193).
  *   v1.2.0 -- 2026-10-13 -- The catalogue manifest names its pacing amount sharing.toll_morsels, the
  *     4.0.0 name (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
@@ -59,6 +63,12 @@ import {
 import { inferSchema, toCsv, fromCsv, validateRows, type ValidationIssue } from './table.js';
 import { linkSourceImages } from './images.js';
 import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
+import type { AudienceAuth } from '../audience.js';
+import { checkAudienceWrite } from '../audience-write.js';
+import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge-audience.js';
+import {
+    DATAPACKAGE_LEVELS, fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf, datapackageReadable,
+} from './audience.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
 
@@ -93,7 +103,7 @@ export type PublishResult =
          *  set, which is the default: keep everything. Returned so the answer can SAY what was
          *  deleted — a deletion nobody can see is how a history disappears unnoticed. */
         pruned: string[] }
-    | { ok: false; code: 'INVALID_INPUT' | 'QUALITY_GATE'; message: string; issues: ValidationIssue[] };
+    | { ok: false; code: 'INVALID_INPUT' | 'QUALITY_GATE' | 'NOT_ORGANISM_MEMBER'; message: string; issues: ValidationIssue[] };
 
 /**
  * Build, check and store one version.
@@ -121,6 +131,12 @@ export async function publishPackage(
     if (!Array.isArray(input.resources) || input.resources.length === 0) {
         return { ok: false, code: 'INVALID_INPUT', message: 'a package needs at least one resource', issues: [] };
     }
+    // Who reads it, checked before anything is written: an organism the publisher is not in is
+    // refused (services/audience-write.ts). Public when not named, as every package was before.
+    const visibility = input.visibility ?? 'public';
+    const audience = await checkAudienceWrite(storage, visibility, { sub: producedBy.gaii, owner: ownerName }, DATAPACKAGE_LEVELS);
+    if (!audience.ok) return { ok: false, code: audience.code, message: audience.message, issues: [] };
+    const fileVisibility = fileVisibilityOf(visibility);
 
     // ── 0.5 Pictures. BEFORE inference and before the hash, because a rewritten reference changes
     //        the bytes, and two publishes of the same photographs must land on the same address.
@@ -244,7 +260,7 @@ export async function publishPackage(
         mediaKind: 'data',
         // A published package is world-readable at a permanent address and is read by people as well
         // as programs, which is exactly the surface the disclosure rules are written for.
-        surface: { visibility: 'public', humanAudience: true },
+        surface: { visibility: fileVisibility, humanAudience: true },
         labelPolicy: config.aiLabelPublic,
         nodeId: config.nodeId,
         baseUrl: config.baseUrl,
@@ -268,7 +284,7 @@ export async function publishPackage(
         // this answer names; the record held above was never stored.
         if (existing.aiProvenanceId) descriptor.aimeat.aiProvenanceId = existing.aiProvenanceId;
         else delete descriptor.aimeat.aiProvenanceId;
-        await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now);
+        await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility);
         // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
         // out, and a re-publish of existing content pushed nothing out.
         return { ok: true, descriptor, contentHash, descriptorUrl, unchanged: true, resources: resourceUrls, pruned: [] };
@@ -281,7 +297,7 @@ export async function publishPackage(
             key: resourceKey(input.name, contentHash, b.name),
             data: b.data,
             mimeType: 'text/csv; charset=utf-8',
-            visibility: 'public',
+            visibility: fileVisibility,
         });
         if (!written.ok) {
             return { ok: false, code: 'INVALID_INPUT', issues: [],
@@ -294,7 +310,7 @@ export async function publishPackage(
         key: dKey,
         data: descriptorBytes,
         mimeType: 'application/json; charset=utf-8',
-        visibility: 'public',
+        visibility: fileVisibility,
         // The descriptor file names its record, so GET /v1/pub serves its marks and the by-hash
         // lookup of the bytes a reader downloaded finds it.
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
@@ -316,17 +332,17 @@ export async function publishPackage(
         key: odpsYamlKey(input.name, contentHash),
         data: Buffer.from(odpsToYamlDocument(odpsDoc), 'utf8'),
         mimeType: 'text/yaml; charset=utf-8',
-        visibility: 'public',
+        visibility: fileVisibility,
     });
 
-    await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now);
+    await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility);
     // Retention, if the owner asked for any. AFTER the new version is live and the pointer moves,
     // never before: pruning first would leave a window where the newest version is gone and the new
     // one is not yet published.
     const pruned = input.retentionPolicy
         ? await pruneOldVersions(deps, ownerGhii, input.name, input.retentionPolicy, contentHash)
         : [];
-    await upsertCatalogueEntry(deps, ownerGhii, descriptor, descriptorUrl).catch(err => {
+    await upsertCatalogueEntry(deps, ownerGhii, descriptor, descriptorUrl, visibility).catch(err => {
         // The bytes ARE the package; the catalogue is where a person finds it. A catalogue failure
         // must not un-publish a version that is already at its permanent address, and it must not be
         // swallowed either — an operator seeing this knows a package is live and unlisted.
@@ -428,16 +444,17 @@ async function readLatestPointer(deps: StoreDeps, ownerGhii: string, name: strin
  *  a successful publish IS the answer to "the last attempt broke". */
 async function writeLatest(
     deps: StoreDeps, ownerGhii: string, name: string, contentHash: string, descriptorUrl: string, at: string,
+    visibility: string,
 ): Promise<void> {
     const pointer: LatestPointer = {
         packageId: packageId(localAccountName(ownerGhii), name),
-        name, contentHash, descriptorUrl, updatedAt: at,
+        name, contentHash, descriptorUrl, updatedAt: at, visibility,
     };
     await writeStorageFile({ storage: deps.storage, config: deps.config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, {
         key: latestKey(name),
         data: Buffer.from(JSON.stringify(pointer, null, 2) + '\n', 'utf8'),
         mimeType: 'application/json; charset=utf-8',
-        visibility: 'public',
+        visibility: fileVisibilityOf(visibility),
     });
 }
 
@@ -466,7 +483,8 @@ export async function recordFailure(
         key,
         data: Buffer.from(JSON.stringify(pointer, null, 2) + '\n', 'utf8'),
         mimeType: 'application/json; charset=utf-8',
-        visibility: 'public',
+        // The pointer keeps the package's audience; a pointer with none is a public package's.
+        visibility: fileVisibilityOf(pointer.visibility ?? 'public'),
     });
 }
 
@@ -477,17 +495,24 @@ export interface OpenedPackage { descriptor: Descriptor; descriptorUrl: string; 
  * `pkg:{owner}/{name}@sha256:…` to pin one. A pinned reference always answers with the same bytes,
  * which is what makes pinning worth anything.
  */
-export async function openPackage(deps: StoreDeps, ref: string, nodeId: string): Promise<OpenedPackage | null> {
+export async function openPackage(
+    deps: StoreDeps, ref: string, nodeId: string, reader?: AudienceAuth | null,
+): Promise<OpenedPackage | null> {
     const parsed = parseRef(ref, nodeId);
     if (!parsed) return null;
     const { ownerGhii, name, contentHash } = parsed;
 
+    // The pointer carries the package's audience (./audience.ts), so it is read for a pinned version
+    // too. A package this reader may not read answers like a missing one. No reader is anonymous.
+    const pointerFile = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
+    const pointer = pointerFile ? JSON.parse(pointerFile.data.toString('utf8')) as LatestPointer : undefined;
+    if (!(await datapackageReadable(deps.storage, ownerGhii, pointer?.visibility, reader))) return null;
+
     let hash = contentHash;
     let latest: LatestPointer | undefined;
     if (!hash) {
-        const pointerFile = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
-        if (!pointerFile) return null;
-        latest = JSON.parse(pointerFile.data.toString('utf8')) as LatestPointer;
+        if (!pointer) return null;
+        latest = pointer;
         if (!latest.contentHash) return null;   // only a failure has ever been recorded
         hash = latest.contentHash;
     }
@@ -504,8 +529,9 @@ export async function openPackage(deps: StoreDeps, ref: string, nodeId: string):
  *  whole table into somebody's context because it happened to fit. */
 export async function readRows(
     deps: StoreDeps, ref: string, nodeId: string, resource: string, opts: { offset?: number; limit?: number; select?: string[] } = {},
+    reader?: AudienceAuth | null,
 ): Promise<{ rows: Array<Record<string, unknown>>; total: number; schema: TableSchema } | null> {
-    const loaded = await loadResourceRows(deps, ref, nodeId, resource);
+    const loaded = await loadResourceRows(deps, ref, nodeId, resource, reader);
     if (!loaded) return null;
     const { all, res } = loaded;
     const offset = Math.max(0, opts.offset ?? 0);
@@ -527,19 +553,19 @@ export async function readRows(
  * so this reads nothing more than a windowed read does.
  */
 export async function readAllRows(
-    deps: StoreDeps, ref: string, nodeId: string, resource: string,
+    deps: StoreDeps, ref: string, nodeId: string, resource: string, reader?: AudienceAuth | null,
 ): Promise<{ rows: Array<Record<string, unknown>>; total: number; schema: TableSchema } | null> {
-    const loaded = await loadResourceRows(deps, ref, nodeId, resource);
+    const loaded = await loadResourceRows(deps, ref, nodeId, resource, reader);
     if (!loaded) return null;
     return { rows: loaded.all, total: loaded.all.length, schema: loaded.res.schema };
 }
 
 /** The parsed CSV of one resource of one package version, with the resource's descriptor entry. */
 async function loadResourceRows(
-    deps: StoreDeps, ref: string, nodeId: string, resource: string,
+    deps: StoreDeps, ref: string, nodeId: string, resource: string, reader?: AudienceAuth | null,
 ): Promise<{ all: Array<Record<string, unknown>>; res: DescriptorResource } | null> {
     const parsed = parseRef(ref, nodeId);
-    const opened = await openPackage(deps, ref, nodeId);
+    const opened = await openPackage(deps, ref, nodeId, reader);
     if (!parsed || !opened) return null;
     const res = opened.descriptor.resources.find(r => r.name === resource);
     if (!res) return null;
@@ -649,7 +675,7 @@ export function parseRef(ref: string, nodeId: string): { ownerGhii: string; name
  * package, and the memory-key budget is 1000.
  */
 async function upsertCatalogueEntry(
-    deps: StoreDeps, ownerGhii: string, descriptor: Descriptor, descriptorUrl: string,
+    deps: StoreDeps, ownerGhii: string, descriptor: Descriptor, descriptorUrl: string, visibility: string,
 ): Promise<void> {
     const id = bare(bytesHash(Buffer.from(descriptor.aimeat.packageId, 'utf8'))).slice(0, 32);
     const key = `packages/${id}/manifest`;
@@ -671,10 +697,12 @@ async function upsertCatalogueEntry(
         entries: descriptor.resources.map(r => ({
             key: `packages/${id}/${r.name}`,
             title: r.title ?? r.name,
-            visibility: 'public',
+            visibility: catalogueEntryVisibilityOf(visibility),
         })),
         links: [],
-        sharing: { catalog_listed: true, allow_clone: false, toll_morsels: 0 },
+        // Listed in the public catalogue only when the package is public; else the package's own
+        // audience (services/knowledge-audience.ts reads it).
+        sharing: { catalog_listed: visibility === 'public', allow_clone: false, toll_morsels: 0, audience: catalogueAudienceOf(visibility) },
         // The pointer back to the canonical bytes. The catalogue never holds them: a knowledge
         // package is a collection of memory entries, and memory does not carry files.
         x_aimeat_datapackage: {
@@ -689,7 +717,7 @@ async function upsertCatalogueEntry(
     await deps.storage.setMemory({
         key, ownerGaii: ownerGhii, value: manifest,
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
-        visibility: 'public', tags: ['knowledge-package', 'dataset', 'data-package'], ttlHours: null,
+        visibility: manifestRecordVisibility(manifest), tags: ['knowledge-package', 'dataset', 'data-package'], ttlHours: null,
         version: existing ? existing.version + 1 : 1,
         createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
@@ -706,7 +734,7 @@ async function upsertCatalogueEntry(
                 csvUrl: publicUrl(deps.config.baseUrl, ownerGhii, `${packageKeyRoot(descriptor.name)}/${bare(descriptor.aimeat.contentHash)}/${r.path}`),
             },
             ...(aiProvenanceId ? { aiProvenanceId } : {}),
-            visibility: 'public', tags: ['knowledge-entry', 'dataset'], ttlHours: null,
+            visibility: entryRecordVisibility(catalogueEntryVisibilityOf(visibility)), tags: ['knowledge-entry', 'dataset'], ttlHours: null,
             version: prev ? prev.version + 1 : 1,
             createdAt: prev?.createdAt ?? now, updatedAt: now,
         });
