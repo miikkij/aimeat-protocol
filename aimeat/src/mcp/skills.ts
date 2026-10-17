@@ -14,6 +14,9 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-17 — aimeat_skill_publish and aimeat_skill_update take `organism:<id>` for a user skill,
+ *     refused unless the agent's owner is in that organism (plan doc-mvcn6c7e4e5q, V3.9); the publish
+ *     hands the accessor to the service for every scope.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-08 — aimeat_skill_publish takes ai_provenance and ai_provenance_id, inline and in the ZIP
  *     upload's token, and answers with the record SKILL.md carries (aiprov E12).
@@ -48,6 +51,7 @@ import {
   getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, setSkillVisibility,
   listSkillsByBinding, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
+import type { SkillVisibility } from '../services/skill-audience.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
@@ -134,8 +138,10 @@ export function registerSkillsTools(
                     owner: ownerName,
                     publisher: agentGaii,
                     files: fileMap,
-                    visibility,
-                    ...(targetScope === 'workspace' ? { organismId: organism_id, workspaceId: workspace_id, accessor: acc } : {}),
+                    visibility: visibility as SkillVisibility | undefined,
+                    // The accessor is the membership gate of a workspace and of an organisation level.
+                    accessor: acc,
+                    ...(targetScope === 'workspace' ? { organismId: organism_id, workspaceId: workspace_id } : {}),
                     // How SKILL.md was written, recorded as on POST /v1/skills (aiprov E12).
                     provenance: {
                         principal: agentGaii, scopes,
@@ -272,7 +278,13 @@ export function registerSkillsTools(
             if (targetScope === 'node' && !acc.isOperator) {
                 return err(`Node-scope skills are operator-managed. ${OPERATOR_AGENT_REFUSAL}`);
             }
-            const summary = await setSkillVisibility(storage, config, targetScope, name, visibility, targetScope === 'user' ? ownerName : undefined);
+            let summary;
+            try {
+                summary = await setSkillVisibility(storage, config, targetScope, name, visibility as SkillVisibility, targetScope === 'user' ? ownerName : undefined, acc);
+            } catch (e) {
+                // An organisation level the agent's owner is not in, refused before any write.
+                return withCaughtError(err(`Visibility change failed: ${(e as Error).message}`), e);
+            }
             if (!summary) return err(`Skill not found: ${name}`);
             emitChange('skills');
             return ok({ updated: true, skill: summary });

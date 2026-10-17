@@ -9,6 +9,9 @@
  * @structure SKILL_ZIP_LIMITS · handleSkillUpload(res, config, storage, sub, meta, data)
  * @usage await handleSkillUpload(res, config, storage, verified.sub, verified.meta, data);
  * @version-history
+ *   v1.2.0 — 2026-10-17 — The token's visibility may be `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.9);
+ *     a SkillAccessError from the publish (a workspace or an organisation the uploader is not in) is
+ *     answered with its status instead of a 500.
  *   v1.1.0 — 2026-10-08 — The token's `ai_provenance` / `ai_provenance_id` are recorded against
  *     SKILL.md (services/skill-provenance.ts); a malformed block is 422, a declaration the uploader
  *     may not make is 403 SCOPE_DENIED before anything is stored (aiprov E12).
@@ -20,7 +23,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
-import { publishSkill, type SkillScope } from '../services/skills.js';
+import { publishSkill, SkillAccessError, type SkillScope } from '../services/skills.js';
+import { parseSkillVisibility } from '../services/skill-audience.js';
 import { ProvenanceScopeError } from '../services/ai-provenance.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -47,7 +51,8 @@ export async function handleSkillUpload(
     const ownerName = localAccountName(sub);
     const metaScope = meta.scope as SkillScope;
     const scope: SkillScope = metaScope === 'node' ? 'node' : metaScope === 'workspace' ? 'workspace' : 'user';
-    const visibility = meta.visibility as 'owner' | 'members' | 'public' | undefined;
+    // The token's visibility was checked by the tool that signed it; read it in its stored form.
+    const visibility = parseSkillVisibility(meta.visibility) ?? undefined;
 
     let entries: Map<string, Buffer>;
     try {
@@ -111,6 +116,12 @@ export async function handleSkillUpload(
         }
         if (err instanceof ProvenanceScopeError) {
             res.status(403).json({ success: false, error: err.code, message: err.message });
+            return;
+        }
+        // A workspace the uploader is not in (403), or an organisation level they may not name (400).
+        if (err instanceof SkillAccessError) {
+            const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'FORBIDDEN' ? 403 : 400;
+            res.status(status).json({ success: false, error: err.code, message: err.message });
             return;
         }
         throw err;

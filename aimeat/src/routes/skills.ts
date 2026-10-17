@@ -19,6 +19,10 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-10-17 — POST /v1/skills and PATCH /v1/skills/:name take `organism:<id>` for a user skill:
+ *     the active members of one organism read it (plan doc-mvcn6c7e4e5q, V3.9). Naming an organism the
+ *     caller is not in is 400 NOT_ORGANISM_MEMBER before anything is written; the accessor carries the
+ *     session's auth for services/audience.ts.
  *   2026-10-17 — SECURITY: a session from another node reads skills as an anonymous caller does, so a
  *     'members' skill is this node's accounts only (plan doc-mvcn6c7e4e5q, V0.6).
  *   2026-10-16 — GET /v1/agents/:name/skills asks memory:read (requireScopeUnlessSelf: an agent's own record excepted), as GET /v1/skills does for the same data (QA audit P3-03).
@@ -54,6 +58,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { SkillValidationError } from '../services/skill-md.js';
+import { parseSkillVisibility, SKILL_VISIBILITY_HINT } from '../services/skill-audience.js';
 import { ProvenanceScopeError } from '../services/ai-provenance.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { provenanceWriteEcho } from '../services/ai-provenance-echo.js';
@@ -84,6 +89,8 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       sub: auth.sub as string,
       gaii: resolveIdentity(req.auth!, config.nodeId),
       reader: readerFor({ storage, config }, req.auth),
+      // The organisation level asks services/audience.ts with the session itself.
+      auth,
     };
   }
 
@@ -169,8 +176,9 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'skill_md (the SKILL.md content) is required'));
         return;
       }
-      if (visibility !== undefined && !['owner', 'members', 'public'].includes(visibility)) {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be owner, members, or public'));
+      const level = visibility === undefined ? undefined : parseSkillVisibility(visibility);
+      if (level === null) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', SKILL_VISIBILITY_HINT));
         return;
       }
       // How SKILL.md was written: a declaration or an attached record id, validated as every REST
@@ -196,8 +204,10 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         owner: accessor.ownerName,
         publisher: req.auth!.sub as string,
         files,
-        visibility: visibility as 'owner' | 'members' | 'public' | undefined,
-        ...(scope === 'workspace' ? { organismId: organism, workspaceId: ws, accessor } : {}),
+        visibility: level,
+        // The accessor is the membership gate of a workspace and of an organisation level.
+        accessor,
+        ...(scope === 'workspace' ? { organismId: organism, workspaceId: ws } : {}),
         provenance: {
           principal: resolveIdentity(req.auth!, config.nodeId), scopes: req.auth!.scopes,
           ...(declaration.declared ? { declared: declaration.declared } : {}),
@@ -337,9 +347,9 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Authentication required'));
         return;
       }
-      const visibility = req.body?.visibility;
-      if (!['owner', 'members', 'public'].includes(visibility)) {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be owner, members, or public'));
+      const visibility = parseSkillVisibility(req.body?.visibility);
+      if (!visibility) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', SKILL_VISIBILITY_HINT));
         return;
       }
       const scopeQ = req.query.scope;
@@ -354,7 +364,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       }
       // The owner comes from the session, never from the request: a user-scope skill under
       // another name is not this principal's to change, whatever the query says.
-      const summary = await setSkillVisibility(storage, config, scope, name, visibility, scope === 'user' ? accessor.ownerName : undefined);
+      const summary = await setSkillVisibility(storage, config, scope, name, visibility, scope === 'user' ? accessor.ownerName : undefined, accessor);
       if (!summary) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Skill not found: ${name}`));
         return;

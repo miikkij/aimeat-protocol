@@ -20,12 +20,21 @@
  *   always; a shared board also to that owner's other principals and to anyone on allowedGaiis; and
  *   failing all of those, the consent layer, whose refusal is audited because a denied read is
  *   exactly the event a person asks about afterwards.
+ *
+ *   A board at `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5) is read by its keeper and by whoever
+ *   services/audience.ts audienceAllows admits: the active members of that organism and their agents.
+ *   No roster, no same-owner pass and no consent fallback reaches it, so the membership decision is
+ *   the one written there.
  * @structure
+ *   - boardOrganismAudience() — the organism audience of a board's visibility, or null
+ *   - organismBoardAdmits() — the read decision for an organism board
  *   - boardReadRefusal() — a refusal, or null when the read is allowed
  * @usage
- *   const refusal = await boardReadRefusal({ storage, config }, gaii, board);
+ *   const refusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
  *   if (refusal) return fail(refusal.message);
  * @version-history
+ *   v1.1.0 — 2026-10-17 — The organism level: boardOrganismAudience, organismBoardAdmits, and
+ *     boardReadRefusal takes the caller's auth for it (plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.0.0 — 2026-08-11 — Extracted from routes/boards.ts (August 2026 audit, the side-effect sweep's
  *     read-path half) after aimeat_board_read was found reading private boards.
  */
@@ -33,6 +42,29 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { checkConsentForRead, auditDataAccess } from './consent.js';
+import { parseAudience, audienceAllows, type Audience, type AudienceAuth } from './audience.js';
+
+/** The organism audience a board's visibility names (`organism:<id>`), or null for every other level. */
+export function boardOrganismAudience(visibility: string): Audience | null {
+    const audience = parseAudience(visibility);
+    return audience?.level === 'organism' ? audience : null;
+}
+
+/**
+ * May this caller read an organism board? The keeper (the exact identity that made it) always, and
+ * otherwise exactly what audienceAllows answers for the board's organism.
+ */
+export async function organismBoardAdmits(
+    storage: Storage,
+    board: Pick<BoardRecord, 'visibility' | 'ownerGaii'>,
+    gaii: string | undefined,
+    auth: AudienceAuth | null | undefined,
+): Promise<boolean> {
+    const audience = boardOrganismAudience(board.visibility);
+    if (!audience) return false;
+    if (gaii && board.ownerGaii === gaii) return true;
+    return audienceAllows(storage, audience, auth);
+}
 
 export interface BoardReadRefusal {
     status: number;
@@ -44,11 +76,14 @@ export interface BoardReadRefusal {
  * May `gaii` read this board's posts? Returns null when the read is allowed.
  *
  * `gaii` is undefined for an unauthenticated caller, which only a public or system board serves.
+ * `auth` is the caller's session (req.auth, or an MCP session's caller().auth); an organism board is
+ * decided on it, and a caller that passes none is refused there.
  */
 export async function boardReadRefusal(
     deps: { storage: Storage; config: AimeatConfig },
     gaii: string | undefined,
     board: Pick<BoardRecord, 'id' | 'visibility' | 'ownerGaii' | 'allowedGaiis'>,
+    auth?: AudienceAuth | null,
 ): Promise<BoardReadRefusal | null> {
     const { storage, config } = deps;
 
@@ -56,6 +91,11 @@ export async function boardReadRefusal(
 
     if (!gaii) {
         return { status: 401, code: 'AUTH_REQUIRED', message: 'Authentication required for non-public boards' };
+    }
+
+    if (boardOrganismAudience(board.visibility)) {
+        if (await organismBoardAdmits(storage, board, gaii, auth)) return null;
+        return { status: 403, code: 'ACCESS_DENIED', message: 'This board is for the members of one organisation. Ask to join it to read the board.' };
     }
 
     // isSameOwner only grants access on shared boards — a private board is strictly owner-only.

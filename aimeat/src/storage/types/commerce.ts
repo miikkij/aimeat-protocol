@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-10-17 — BoardRecord.visibility may be `organism:<id>`: the active members of one
+ *     organism (services/audience.ts; plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.6.0 — 2026-10-17 — MemoryRecord, StorageFileRecord and ChunkedUploadRecord visibility are
  *     StoredVisibility, which takes `organism:<id>` (and 'members' for a chunked upload): the
  *     active members of one organism (plan doc-mvcn6c7e4e5q, V3.2/V3.3; services/audience.ts decides).
@@ -213,7 +215,8 @@ export interface BoardRecord {
   id: string;
   name: string;
   description?: string;
-  visibility: 'private' | 'shared' | 'public' | 'system';
+  /** `organism:<id>` is read by the active members of that organism (services/audience.ts). */
+  visibility: 'private' | 'shared' | 'public' | 'system' | `organism:${string}`;
   ownerGaii: string;
   allowedGaiis: string[];
   createdAt: string;

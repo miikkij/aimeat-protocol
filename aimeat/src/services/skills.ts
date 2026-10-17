@@ -32,6 +32,11 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.9.0 -- 2026-10-17 -- A user skill may be read by `organism:<id>`, the active members of one
+ *     organism (plan doc-mvcn6c7e4e5q, V3.9): publishSkill and setSkillVisibility take it, refused
+ *     before any write unless the caller is in that organism; the read gate is mayReadSkill
+ *     (skill-audience.ts), which asks services/audience.ts. The shapes and SkillAccessError moved to
+ *     skill-types.ts (max-file-lines) and are re-exported here.
  *   v1.8.0 -- 2026-10-09 -- A user skill binds only to its publisher's own app (assertSkillBinding, skill-refs.ts); listSkillsByBinding leaves out a user skill whose owner does not own the bound app.
  *   v1.7.0 -- 2026-10-08 -- publishSkill records how SKILL.md was made (skill-provenance.ts) and sets
  *     the record on the SKILL.md file and the manifest; the summary names it (aiprov E12).
@@ -62,10 +67,10 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
 import { canReadWorkspace } from './workspace-access.js';
 import { localAccountName } from '../utils/gaii.js';
-import type { ContentReader } from './classification/reader.js';
 import { showSkillRecords } from './skill-reader.js';
 import { listAcrossOwners, freshestByKey } from './skill-records.js';
 import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenance.js';
+import { mayReadSkill, publisherMayName, skillVisibilityOf, storedSkillVisibility, type SkillVisibility } from './skill-audience.js';
 
 // The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
 import {
@@ -76,107 +81,9 @@ import {
 } from './skill-refs.js';
 export { parseSkillRef, formatSkillRef, scopeOwnerGhii, readNodeSkillBody, type SkillScope, type SkillRef } from './skill-refs.js';
 
-interface SkillVersionSnapshot {
-  manifest: SkillManifestValue;
-  files: Record<string, string>;
-}
-
-/** Which package install published a skill: the package group and the installed copy. */
-/**
- * The package install that published a skill. `author` and `originNode` say who wrote the package and
- * which node it came from (package sale design, T5): the skill is instructions the owner's AI follows,
- * and its reader is told whose. Absent on a skill a package installed before 2026-10-02.
- */
-export interface SkillPackageTag { groupId: string; instanceId: string; author?: string; originNode?: string }
-
-
-// ── Stored shapes ──
-
-export interface SkillManifestValue {
-  type: 'skill';
-  name: string;
-  description: string;
-  /** Registry semver — starts 1.0.0, patch-bumped on every republish. */
-  version: string;
-  license?: string;
-  compatibility?: string;
-  metadata?: Record<string, unknown>;
-  /** 2d: the app this skill teaches, `app:{owner}/{filename}` — copied up from
-   *  frontmatter metadata.binding for cheap filtering. */
-  binding?: string;
-  /** The skill that replaces this one — copied up from frontmatter metadata.superseded_by
-   *  (a ref such as `user:alice/new-name`, or a bare name in the same registry), so the
-   *  registry knows a skill is retired instead of the reader having to spot it in prose. */
-  supersededBy?: string;
-  /** Installed by a package (package-skill-component.ts); kept across the owner's own republish. */
-  fromPackage?: SkillPackageTag;
-  /** File index (paths + sizes) — bodies live in the per-file records, never here. */
-  files: Array<{ path: string; size: number }>;
-  /** GAII/GHII that performed the (last) publish. */
-  publishedBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface SkillSummary {
-  ref: string;
-  scope: SkillScope;
-  /** Bare owner name for user scope; null for node/workspace scope. */
-  owner: string | null;
-  /** Organism + workspace ids — workspace scope only. */
-  org?: string;
-  ws?: string;
-  name: string;
-  description: string;
-  version: string;
-  license?: string;
-  compatibility?: string;
-  metadata?: Record<string, unknown>;
-  /** 2d: app binding, when the skill teaches a specific app. */
-  binding?: string;
-  /** The skill that replaces this one, when it is retired (frontmatter metadata.superseded_by). */
-  supersededBy?: string;
-  /** The package install that published this skill; only such a skill is replaced or removed by it. */
-  fromPackage?: SkillPackageTag;
-  /** Node scope: shipped with this build and kept in step by the seeder (a stamp record exists). */
-  builtin?: boolean;
-  /** Library view with links: the accessor's own agents that link this skill, with the ref they
-   *  hold (a pinned ref keeps its `@version`). */
-  linkedBy?: Array<{ agent: string; ref: string }>;
-  visibility: MemoryRecord['visibility'];
-  files: Array<{ path: string; size: number }>;
-  updatedAt: string;
-  /** The provenance record of SKILL.md, from the manifest row; absent is UNSTATED (skill-provenance.ts). */
-  aiProvenanceId?: string;
-}
-
-export interface ResolvedSkill extends SkillSummary {
-  /** path -> content (utf-8). Present when resolve loads bodies. */
-  fileContents: Record<string, string>;
-  /** The retained version snapshots, oldest first; a `@version` pin resolves any of these. */
-  versions: Array<{ version: string; publishedAt: string }>;
-}
-
-/** Who is asking — null accessor = anonymous/unauthenticated. */
-export interface SkillAccessor {
-  /** Bare owner name of the caller (owner sessions and agent sessions both resolve to this). */
-  ownerName: string | null;
-  isOperator?: boolean;
-  /** Raw auth subject (bare owner / full GAII) — used by the workspace membership gate.
-   *  Derived from ownerName when absent. */
-  sub?: string;
-  /** Full GHII/GAII — used by the workspace read gate. Derived from ownerName when absent. */
-  gaii?: string;
-  /** The caller's classification reader; made from ownerName/gaii when absent (skill-reader.ts). */
-  reader?: ContentReader;
-}
-
-export class SkillAccessError extends Error {
-  constructor(public readonly code: 'NOT_FOUND' | 'FORBIDDEN' | 'BAD_REF', message: string) {
-    super(message);
-    this.name = 'SkillAccessError';
-  }
-}
+// The stored and returned shapes and SkillAccessError live in skill-types.ts (max-file-lines).
+import { SkillAccessError, type SkillVersionSnapshot, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill-types.js';
+export { SkillAccessError, type SkillPackageTag, type SkillManifestValue, type SkillSummary, type ResolvedSkill, type SkillAccessor } from './skill-types.js';
 
 // ── Internals ──
 
@@ -189,7 +96,7 @@ function toSummary(record: MemoryRecord, scope: SkillScope, owner: string | null
     name: v.name,
     description: v.description,
     version: v.version,
-    visibility: record.visibility,
+    visibility: skillVisibilityOf(record) as SkillSummary['visibility'],
     files: v.files ?? [],
     updatedAt: v.updatedAt ?? record.updatedAt,
   };
@@ -225,19 +132,8 @@ async function mayReadWs(
   return canReadWorkspace(storage, config, organism, a.sub, a.ownerName ?? undefined, a.gaii, ws);
 }
 
-/** Visibility gate shared by resolve/list. Owner of the skill always reads their own. */
-function mayRead(record: MemoryRecord, scope: SkillScope, skillOwner: string | null, accessor: SkillAccessor): boolean {
-  if (scope === 'node') {
-    // Node skills are the node-wide library: readable by any authenticated identity
-    // ('members' default); 'public' additionally allows anonymous/federated reads.
-    if (record.visibility === 'public') return true;
-    return accessor.ownerName !== null;
-  }
-  if (accessor.ownerName !== null && accessor.ownerName === skillOwner) return true;
-  if (record.visibility === 'public') return true;
-  if (record.visibility === 'members') return accessor.ownerName !== null;
-  return false;
-}
+// The visibility gate shared by resolve and list is mayReadSkill (skill-audience.ts), with the
+// organisation level; it was mayRead here until 2026-10-17.
 
 // ── Publish / delete ──
 
@@ -249,8 +145,9 @@ export interface PublishSkillOpts {
   publisher: string;
   /** Relative path -> content. Must contain SKILL.md; layout validated against the contract. */
   files: Map<string, string | Buffer>;
-  /** Registry visibility. Defaults: node -> 'members', user -> 'owner', workspace -> 'workspace'. */
-  visibility?: 'owner' | 'members' | 'public';
+  /** Registry visibility. Defaults: node -> 'members', user -> 'owner', workspace -> 'workspace'.
+   *  `organism:<id>` is a user skill's only, and the publisher must be in that organism. */
+  visibility?: SkillVisibility;
   /** When the files came from a wrapping directory (ZIP), its name — the frontmatter name must match. */
   expectedName?: string;
   /** Workspace scope only: target organism + workspace, and the accessor for the membership gate. */
@@ -297,6 +194,8 @@ export async function publishSkill(
     const gate = await mayReadWs(storage, config, org, ws, opts.accessor ?? { ownerName: opts.owner ?? null });
     if (!gate) throw new SkillAccessError('FORBIDDEN', `Not a member of workspace ${org}/${ws}`);
   }
+  // An organisation level names an organism the publisher is in; refused before the first write.
+  await assertSkillVisibility(storage, opts.scope, opts.visibility, opts.accessor ?? { ownerName: opts.owner ?? null, sub: opts.publisher });
 
   // Workspace records are keyed under the workspace prefix but OWNED by the publishing
   // member's GHII; multi-member republish forks collapse on read via freshest-wins.
@@ -313,9 +212,9 @@ export async function publishSkill(
   }
   const existingValue = existing?.value as SkillManifestValue | undefined;
   const version = existingValue?.version ? bumpPatch(existingValue.version) : '1.0.0';
-  const visibility: MemoryRecord['visibility'] = isWs
-    ? 'workspace'
-    : (opts.visibility ?? existing?.visibility ?? (opts.scope === 'node' ? 'members' : 'owner'));
+  const chosen = opts.visibility ?? (existing ? skillVisibilityOf(existing) as SkillVisibility : undefined) ?? (opts.scope === 'node' ? 'members' : 'owner');
+  const stored = storedSkillVisibility(chosen);
+  const visibility: MemoryRecord['visibility'] = isWs ? 'workspace' : stored.record;
   const workspaceRef = isWs ? `${org}/${ws}` : undefined;
   // How SKILL.md was made, decided before the first write so a refused declaration stores nothing.
   const aiProvenanceId = await skillProvenanceId(storage, config, opts.provenance, String(opts.files.get('SKILL.md') ?? ''), visibility);
@@ -365,6 +264,7 @@ export async function publishSkill(
   // The owner editing a package's skill keeps it the package's: the update sees the edit, the uninstall removes it.
   const fromPackage = opts.fromPackage ?? (opts.scope === 'user' ? existingValue?.fromPackage : undefined);
   if (fromPackage) manifest.fromPackage = fromPackage;
+  if (!isWs && stored.audience) manifest.audience = stored.audience;
 
   const ownExisting = await storage.getMemory(ownerGaii, mKey);
   const record = await storage.setMemory({
@@ -477,10 +377,9 @@ export async function listSkills(
   const skillOwner = scope === 'user' ? (owner ?? accessor.ownerName ?? undefined) : undefined;
   if (scope === 'user' && !skillOwner) return [];
   const ownerGaii = scopeOwnerGhii(config, scope, skillOwner);
-  const records = await storage.listMemory(ownerGaii, { prefix: 'skills.', tags: ['skill'] });
-  const summaries = (await showSkillRecords({ storage, config }, accessor, records
-    .filter(r => MANIFEST_KEY_RE.test(r.key))
-    .filter(r => mayRead(r, scope, skillOwner ?? null, accessor))))
+  const manifests = (await storage.listMemory(ownerGaii, { prefix: 'skills.', tags: ['skill'] })).filter(r => MANIFEST_KEY_RE.test(r.key));
+  const readable = await Promise.all(manifests.map(r => mayReadSkill(storage, r, scope, skillOwner ?? null, accessor)));
+  const summaries = (await showSkillRecords({ storage, config }, accessor, manifests.filter((_, i) => readable[i])))
     .map(r => toSummary(r, scope, skillOwner ?? null));
   if (scope === 'node' && summaries.length > 0) {
     // The seeder leaves a stamp beside every skill it wrote; a stamped skill came with the build.
@@ -507,7 +406,8 @@ export async function listSkillsByBinding(
   // A user skill counts only when its owner owns the app; one bound to another account's app
   // before publish refused it (2026-10-09) stays in its owner's registry and is not listed here.
   const own = records.filter(r => r.ownerGaii === systemGhii || ownerOf(r) === bindingOwner(binding));
-  const gated = own.filter(r => mayRead(r, r.ownerGaii === systemGhii ? 'node' : 'user', ownerOf(r), accessor));
+  const readable = await Promise.all(own.map(r => mayReadSkill(storage, r, r.ownerGaii === systemGhii ? 'node' : 'user', ownerOf(r), accessor)));
+  const gated = own.filter((_, i) => readable[i]);
   return (await showSkillRecords({ storage, config }, accessor, gated))
     .map(r => toSummary(r, r.ownerGaii === systemGhii ? 'node' : 'user', ownerOf(r)));
 }
@@ -608,7 +508,7 @@ export async function resolveSkillRef(
   const ownerGaii = scopeOwnerGhii(config, ref.scope, ref.owner);
   const stored = await storage.getMemory(ownerGaii, manifestKey(ref.name));
   if (!stored) throw new SkillAccessError('NOT_FOUND', `Skill not found: ${refStr}`);
-  if (!mayRead(stored, ref.scope, skillOwner, accessor)) {
+  if (!(await mayReadSkill(storage, stored, ref.scope, skillOwner, accessor))) {
     throw new SkillAccessError('FORBIDDEN', `Not allowed to read skill: ${refStr}`);
   }
   // A manifest this reader may not see reads as absent, as a missing one does.
@@ -659,8 +559,9 @@ async function resolvePinned(
       `Version ${ref.version} of ${formatSkillRef({ ...ref, version: undefined })} is not retained (the registry keeps the newest ${VERSION_SNAPSHOTS_KEPT} snapshots)`);
   }
   const { manifest, files } = snap.value as SkillVersionSnapshot;
+  // Who reads it is the live skill's answer, not the snapshot's.
   const summary = toSummary(
-    { ...liveManifest, value: manifest },
+    { ...liveManifest, value: { ...manifest, audience: (liveManifest.value as SkillManifestValue).audience } },
     ref.scope, ref.scope === 'user' ? ref.owner! : null, ref.org, ref.ws,
   );
   summary.ref = formatSkillRef(ref);
@@ -673,22 +574,38 @@ async function resolvePinned(
  * Change a skill's visibility without a republish: the manifest and its file records take the
  * new visibility, the registry version stays, no snapshot is written. Node and user scopes only;
  * a workspace skill is always workspace-visible. The caller decides who may (own user skill;
- * node scope for operators).
+ * node scope for operators). `organism:<id>` is refused here, before any write, unless the caller
+ * (`accessor`, else the owner) is in that organism.
  */
 export async function setSkillVisibility(
   storage: Storage, config: AimeatConfig, scope: 'node' | 'user', name: string,
-  visibility: 'owner' | 'members' | 'public', owner?: string,
+  visibility: SkillVisibility, owner?: string, accessor?: SkillAccessor,
 ): Promise<SkillSummary | null> {
+  await assertSkillVisibility(storage, scope, visibility, accessor ?? { ownerName: owner ?? null });
   const ownerGaii = scopeOwnerGhii(config, scope, owner);
   const manifest = await storage.getMemory(ownerGaii, manifestKey(name));
   if (!manifest) return null;
   const now = new Date().toISOString();
+  const stored = storedSkillVisibility(visibility);
   const files = await storage.listMemory(ownerGaii, { prefix: filePrefix(name) });
   for (const f of files) {
-    await storage.setMemory({ ...f, visibility, version: f.version + 1, updatedAt: now });
+    await storage.setMemory({ ...f, visibility: stored.record, version: f.version + 1, updatedAt: now });
   }
-  const record = await storage.setMemory({ ...manifest, visibility, version: manifest.version + 1, updatedAt: now });
+  const value: SkillManifestValue = { ...(manifest.value as SkillManifestValue) };
+  if (stored.audience) value.audience = stored.audience; else delete value.audience;
+  const record = await storage.setMemory({ ...manifest, value, visibility: stored.record, version: manifest.version + 1, updatedAt: now });
   return toSummary(record, scope, scope === 'user' ? (owner ?? null) : null);
+}
+
+/** Refuse the organisation level outside a user skill, or naming an organism the caller is not in. */
+async function assertSkillVisibility(
+  storage: Storage, scope: SkillScope, v: SkillVisibility | undefined, accessor: SkillAccessor,
+): Promise<void> {
+  if (!v || v === 'owner' || v === 'members' || v === 'public') return;
+  if (scope !== 'user') throw new SkillAccessError('BAD_VISIBILITY', 'Only a skill in your own registry can be shared with an organisation.');
+  if (!(await publisherMayName(storage, v, accessor))) {
+    throw new SkillAccessError('NOT_ORGANISM_MEMBER', 'You can share a skill only with an organisation you are an active member of. Join it first, or choose another visibility.');
+  }
 }
 
 // ── Agent attachment (links are refs, never copies) ──

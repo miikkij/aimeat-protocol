@@ -35,6 +35,8 @@
  * @structure
  *   - BOARD_LIMITS — the bounds the HTTP schemas apply, named here so both doors share them
  *   - boardVisibleTo() — may this identity see the board at all
+ *   - boardVisibleToCaller() — the same, with an organism board decided by membership
+ *   - boardVisibilityRefusal() — may this caller give a board this visibility
  *   - createBoard() — shape, the operator rule, the record, the event
  *   - subscribeToBoard() — visibility, the duplicate check, the subscription, the event
  *   - reactToBoardPost() — the reaction bound, the write, the event
@@ -45,6 +47,10 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.5.0 -- 2026-10-17 -- A board at `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5): create checks
+ *     it with boardVisibilityRefusal (the caller's owner an active member, else 400 before the write)
+ *     and stores it never federated; subscribe and react ask boardVisibleToCaller, which decides an
+ *     organism board with services/audience.ts. BoardWriteCaller carries the session's `auth` for it.
  *   v1.4.1 -- 2026-09-24 -- publicBoardCeiling() takes the boards the same act deletes first
  *     (`leaving`), so a cortex redeploy can ask it before it tears the old activation down.
  *   v1.4.0 -- 2026-09-14 -- publicBoardCeiling() counts under the owner GHII and takes the number of
@@ -68,6 +74,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord, BoardRules, BoardSubscriptionRecord } from '../storage/interface.js';
 import { isSameOwner, ownerGhiiOf } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
+import { parseAudience, audienceAllows, formatAudience, type AudienceAuth } from './audience.js';
+import { boardOrganismAudience, organismBoardAdmits } from './board-read-access.js';
 
 /** The bounds BoardRulesSchema applies on the HTTP door. */
 export const BOARD_RULE_LIMITS = {
@@ -150,6 +158,9 @@ export interface BoardWriteCaller {
     /** The resolved identity performing the write. */
     gaii: string;
     roles: string[];
+    /** The session's auth: an organism board is decided on it (services/audience.ts). Without it,
+     *  an organism board admits its keeper alone. */
+    auth?: AudienceAuth | null;
 }
 
 export interface BoardWriteRefusal {
@@ -159,12 +170,13 @@ export interface BoardWriteRefusal {
     message: string;
 }
 
-const VISIBILITIES: readonly BoardRecord['visibility'][] = ['private', 'shared', 'public', 'system'];
+const VISIBILITIES: readonly string[] = ['private', 'shared', 'public', 'system'];
 
 /**
  * May this identity see the board at all? Public and system boards are open; a private board is its
  * owner's alone; a shared board also serves that owner's other principals and everyone on the
- * roster.
+ * roster. An organism board is its keeper's here, because the membership answer is asynchronous:
+ * boardVisibleToCaller is the full rule.
  *
  * This is the plain visibility rule, without the consent fallback boardReadRefusal() adds for
  * reading posts. Subscribing has always asked the plain question, on both doors.
@@ -175,8 +187,56 @@ export function boardVisibleTo(
 ): boolean {
     if (board.visibility === 'public' || board.visibility === 'system') return true;
     if (board.ownerGaii === gaii) return true;
+    if (boardOrganismAudience(board.visibility)) return false;
     if (board.visibility === 'shared' && isSameOwner(board.ownerGaii, gaii)) return true;
     return board.allowedGaiis.includes(gaii);
+}
+
+/** boardVisibleTo, with an organism board decided by membership (organismBoardAdmits). */
+export async function boardVisibleToCaller(
+    storage: Storage,
+    board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis'>,
+    caller: Pick<BoardWriteCaller, 'gaii' | 'auth'>,
+): Promise<boolean> {
+    if (boardOrganismAudience(board.visibility)) return organismBoardAdmits(storage, board, caller.gaii, caller.auth);
+    return boardVisibleTo(board, caller.gaii);
+}
+
+/**
+ * May this caller react on the board? Who may see it, and on a board that is not an organism's,
+ * also the keeper's other identities (see reactToBoardPost). An organism board asks membership only.
+ */
+async function mayReactOn(storage: Storage, board: BoardRecord | null, caller: BoardWriteCaller): Promise<boolean> {
+    if (!board) return false;
+    if (boardOrganismAudience(board.visibility)) return boardVisibleToCaller(storage, board, caller);
+    return boardVisibleTo(board, caller.gaii) || isSameOwner(board.ownerGaii, caller.gaii);
+}
+
+/**
+ * Is `visibility` a level this caller may give a board? The four named levels pass here (the
+ * operator and quota rules are asked where each applies). `organism:<id>` passes only when the
+ * caller is in that organism, as services/audience.ts decides, and comes back in its stored form.
+ * Asked before anything is written, by create and by PATCH /v1/boards/:id/visibility.
+ */
+export async function boardVisibilityRefusal(
+    storage: Storage,
+    visibility: unknown,
+    caller: Pick<BoardWriteCaller, 'auth'>,
+): Promise<{ ok: true; visibility: BoardRecord['visibility'] } | BoardWriteRefusal> {
+    if (typeof visibility === 'string' && VISIBILITIES.includes(visibility)) {
+        return { ok: true, visibility: visibility as BoardRecord['visibility'] };
+    }
+    const audience = parseAudience(visibility);
+    if (audience?.level !== 'organism') {
+        return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'visibility must be "private", "shared", "public", "system" or "organism:<organism id>"' };
+    }
+    if (!(await audienceAllows(storage, audience, caller.auth))) {
+        return {
+            ok: false, status: 400, code: 'NOT_ORGANISM_MEMBER',
+            message: 'You can share a board only with an organisation you are an active member of. Join it first, or choose another visibility.',
+        };
+    }
+    return { ok: true, visibility: formatAudience(audience) as BoardRecord['visibility'] };
 }
 
 /**
@@ -243,7 +303,8 @@ export type BoardCreateResult = { ok: true; board: BoardRecord } | BoardWriteRef
 
 export interface BoardCreateInput {
     name: string;
-    visibility: BoardRecord['visibility'];
+    /** One of the four levels, or `organism:<id>` (boardVisibilityRefusal decides). */
+    visibility: string;
     description?: string;
     allowedGaiis?: string[];
     federate?: boolean;
@@ -266,9 +327,11 @@ export async function createBoard(
     if (input.description && input.description.length > BOARD_LIMITS.descriptionMax) {
         return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `description must be at most ${BOARD_LIMITS.descriptionMax} characters` };
     }
-    if (!VISIBILITIES.includes(input.visibility)) {
-        return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: 'visibility must be "private", "shared", "public" or "system"' };
-    }
+    const level = await boardVisibilityRefusal(storage, input.visibility, caller);
+    if (!level.ok) return level;
+    const visibility = level.visibility;
+    // An organisation's board stays on this node: its readers are the organism's members here.
+    const organismBoard = boardOrganismAudience(visibility) !== null;
     const rules = normalizeBoardRules(input.rules);
     if (!rules.ok) return rules;
 
@@ -277,20 +340,20 @@ export async function createBoard(
     // shape RFC §27 exists for, so any account may open one, up to a count. The price on a public
     // post keeps the flood out of the board; this keeps the flood out of the catalogue.
     const operator = caller.roles.includes('operator');
-    if (input.visibility === 'system' && !operator) {
+    if (visibility === 'system' && !operator) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only operators can create system boards' };
     }
-    const ceiling = await publicBoardCeiling(deps, caller, input.visibility);
+    const ceiling = await publicBoardCeiling(deps, caller, visibility);
     if (ceiling) return ceiling;
 
     const board = await storage.createBoard({
         id: `board-${randomBytes(8).toString('hex')}`,
         name,
         description: input.description,
-        visibility: input.visibility,
+        visibility,
         ownerGaii: caller.gaii,
         allowedGaiis: input.allowedGaiis ?? [],
-        federate: input.federate === true,
+        federate: input.federate === true && !organismBoard,
         createdAt: new Date().toISOString(),
         ...(rules.rules ? { rules: rules.rules } : {}),
     });
@@ -319,7 +382,7 @@ export async function subscribeToBoard(
     if (!board) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `Board not found: ${input.boardId}` };
     }
-    if (!boardVisibleTo(board, caller.gaii)) {
+    if (!(await boardVisibleToCaller(storage, board, caller))) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'You do not have access to this board' };
     }
 
@@ -380,7 +443,7 @@ export async function reactToBoardPost(
     // exactly the arrangement this node is built around. isSameOwner is the test the rest of the
     // codebase makes for that, so it is the test here.
     const board = await storage.getBoard(input.boardId);
-    const mayReact = !!board && (boardVisibleTo(board, caller.gaii) || isSameOwner(board.ownerGaii, caller.gaii));
+    const mayReact = await mayReactOn(storage, board, caller);
     if (!mayReact) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Post not found' };
     }
@@ -428,7 +491,7 @@ export async function unreactToBoardPost(
     }
 
     const board = await storage.getBoard(input.boardId);
-    const mayReact = !!board && (boardVisibleTo(board, caller.gaii) || isSameOwner(board.ownerGaii, caller.gaii));
+    const mayReact = await mayReactOn(storage, board, caller);
     if (!mayReact) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Post not found' };
     }

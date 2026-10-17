@@ -30,6 +30,9 @@
  *   const out = await createBoardPost({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.5.0 — 2026-10-17 — An organism board (`organism:<id>`) takes posts and replies from whoever may
+ *     read it (services/board-read-access.ts organismBoardAdmits), narrowed by posting 'owner'. The
+ *     caller carries the session's `auth` for it (plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.4.0 — 2026-10-16 — createBoardPost writes the charge, its ledger line, the provenance record and
  *     the post in one transaction (QA audit E6-03).
  *   v1.3.0 — 2026-10-08 — createBoardPost asks provenanceDeclarationRefusal before it debits the
@@ -51,6 +54,8 @@ import { provenanceForWrite, provenanceDeclarationRefusal } from './ai-provenanc
 import { isSameOwner } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { notifyBoardSubscribers } from './board-subscribers.js';
+import { boardOrganismAudience, organismBoardAdmits } from './board-read-access.js';
+import type { AudienceAuth } from './audience.js';
 
 /** The bounds BoardPostSchema applies on the HTTP door, named here so both doors share them. */
 export const BOARD_POST_LIMITS = {
@@ -68,6 +73,8 @@ export interface BoardPostCaller {
     /** The session's own scopes, when the caller has them: a provenance declaration needs
      *  provenance:write there as well as on the grant. */
     scopes?: readonly string[];
+    /** The session's auth: an organism board is decided on it (services/audience.ts). */
+    auth?: AudienceAuth | null;
 }
 
 export interface BoardPostInput {
@@ -98,11 +105,22 @@ const DEFAULT_TTL_HOURS = 168;
  * decides, and its default is what the visibility always meant: a shared board takes posts from its
  * keeper, the keeper's other principals and the roster; a public one from anyone signed in. A
  * keeper may narrow either to 'owner' (an announcements board) or a public one to 'members'.
+ * An organism board takes posts from whoever may read it; 'owner' narrows it to the keeper.
  */
-function boardPostAccessRefusal(
+async function boardPostAccessRefusal(
+    storage: Storage,
     board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis' | 'rules'>,
     caller: BoardPostCaller,
-): { ok: false; status: number; code: string; message: string } | null {
+): Promise<{ ok: false; status: number; code: string; message: string } | null> {
+    if (boardOrganismAudience(board.visibility)) {
+        if (!(await organismBoardAdmits(storage, board, caller.gaii, caller.auth))) {
+            return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'This board is for the members of one organisation. Ask to join it to post here.' };
+        }
+        if (board.rules?.posting === 'owner' && board.ownerGaii !== caller.gaii) {
+            return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the keeper of this board publishes on it. Ask the keeper if you have something for the board.' };
+        }
+        return null;
+    }
     if (board.visibility === 'system' && !caller.roles.includes('operator')) {
         return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only operators can post to system boards' };
     }
@@ -175,7 +193,7 @@ export async function createBoardPost(
     }
 
     // Who may post here — the same question a REPLY asks, which is why it is its own function.
-    const denied = boardPostAccessRefusal(board, caller);
+    const denied = await boardPostAccessRefusal(storage, board, caller);
     if (denied) return denied;
 
     // The provenance refusal, BEFORE the price is debited (invariant 14). provenanceForWrite below
@@ -340,7 +358,7 @@ export async function createBoardReply(
     if (!board) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Board not found: ${input.boardId}` };
 
     // A reply is a post. Who may post here is the same question, and neither door was asking it.
-    const denied = boardPostAccessRefusal(board, caller);
+    const denied = await boardPostAccessRefusal(storage, board, caller);
     if (denied) return denied;
 
     const body = String(input.body ?? '');
