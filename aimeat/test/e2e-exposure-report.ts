@@ -5,7 +5,7 @@
  * @description E2E for the exposure report (plan doc-mvcn6c7e4e5q, V6.1-V6.3): what of a person someone
  *   outside can read, and how to close each. Owner A makes one exposed thing of each kind it can make
  *   over REST (a public and a members memory record, a public file, a listed app, an app with no code
- *   taken off the lists, an open workspace share, a public organism, a public board, a public skill)
+ *   taken off the lists, an app open to signed-in accounts only, an open workspace share, a public organism, a public board, a public skill)
  *   and private ones beside them (a private record and file, an app behind an access code, a private
  *   board). Asserted:
  *     - GET /v1/exposure/mine lists every exposed thing at its level and none of the private ones;
@@ -59,6 +59,7 @@ const K = {
     pubMem: `exp.pub.${stamp}`, memMem: `exp.members.${stamp}`, privMem: `exp.private.${stamp}`,
     pubFile: `exp/pub-${stamp}.txt`, privFile: `exp/private-${stamp}.txt`,
     listedApp: `exp-listed-${stamp}.html`, unlistedApp: `exp-unlisted-${stamp}.html`, codedApp: `exp-coded-${stamp}.html`,
+    signedInApp: `exp-signedin-${stamp}.html`,
     skill: `exp-skill-${stamp}`,
 };
 
@@ -88,12 +89,15 @@ await test('Setup: an operator, owner A with one exposed thing of each kind and 
         assert(f.status === 201, `file ${key}: ${f.status} ${JSON.stringify(f.body.error)}`);
     }
     const html = (t: string) => b64(`<!DOCTYPE html><html><head><title>${t}</title></head><body>${t}</body></html>`);
-    for (const [filename, extra] of [[K.listedApp, {}], [K.unlistedApp, {}], [K.codedApp, { access_code: 'kood1234' }]] as const) {
+    for (const [filename, extra] of [[K.listedApp, {}], [K.unlistedApp, {}], [K.signedInApp, {}], [K.codedApp, { access_code: 'kood1234' }]] as const) {
         const a = await call('/v1/apps', { token: A.token, body: { filename, content: html(filename), mime_type: 'text/html', description: 'Exposure fixture', ...extra } });
         assert(a.status === 201, `app ${filename}: ${a.status} ${JSON.stringify(a.body.error)}`);
     }
     const park = await call(`/v1/apps/${K.unlistedApp}`, { token: A.token, method: 'PATCH', body: { parked: true } });
     assert(park.status === 200, `park: ${park.status} ${JSON.stringify(park.body.error)}`);
+    // Listed, and opened by this node's accounts only: the app's own open_to decides the level.
+    const gate = await call(`/v1/apps/${K.signedInApp}`, { token: A.token, method: 'PATCH', body: { open_to: 'signed-in' } });
+    assert(gate.status === 200, `open_to: ${gate.status} ${JSON.stringify(gate.body.error)}`);
 
     const po = await call('/v1/organisms', { token: A.token, body: { name: `Exposed ${stamp}`, description: 'x', type: 'project', join_policy: 'open', visibility: 'public' } });
     assert(po.status === 201, `public organism: ${po.status} ${JSON.stringify(po.body.error)}`);
@@ -141,6 +145,7 @@ await test('A\'s report lists every exposed thing at its level', async () => {
     listedAt('file', K.pubFile, 'public');
     listedAt('app', K.listedApp, 'public');
     listedAt('app', K.unlistedApp, 'link');
+    listedAt('app', K.signedInApp, 'signed-in');
     listedAt('workspace_share', `${privateOrg}/${ws}/pages/${docId}`, 'link');
     listedAt('organism', publicOrg, 'public');
     listedAt('board', publicBoard, 'public');

@@ -15,6 +15,8 @@
  *   stands: a report that went blank because one kind could not be read would say "nothing is
  *   exposed". The item list of a kind stops at EXPOSURE_ITEM_CAP and the kind is named in `capped`;
  *   the counts are always of everything found. `notes` says what the report does not count and why.
+ *   On a node set to show its content to its own accounts only (config contentAccess 'signed-in'),
+ *   every public and link item is listed as signed-in, and the first note says why.
  *
  *   A RECORD THE CALLER MAY NOT SEE IS NOT LISTED TO THEM. Each record or file item passes the
  *   caller's classification reader before it is listed, so an AI is not handed the key of a record
@@ -29,6 +31,7 @@
 import { logger } from '../../utils/logger.js';
 import { errorFields } from '../../utils/error-fields.js';
 import type { ContentReader } from '../classification/reader.js';
+import { signedInOnly } from '../../config-visibility.js';
 import {
   type ExposureContext, type ExposureFound, type ExposureItem, type ExposureKind, type ExposureLevel,
   KINDS, LEVELS, EXPOSURE_ITEM_CAP,
@@ -100,6 +103,20 @@ function emptyLevels(): Record<ExposureLevel, number> {
   return { public: 0, link: 0, 'signed-in': 0, organism: 0 };
 }
 
+/** An item as a node set to signed-in content access serves it: no wider than its own accounts. */
+function lowerToSignedIn(f: ExposureFound): ExposureFound {
+  return f.level === 'public' || f.level === 'link' ? { ...f, level: 'signed-in' } : f;
+}
+
+/** The notes, with the node's own setting when it narrows every level. */
+function notesFor(ctx: ExposureContext): string[] {
+  return signedInOnly(ctx.config)
+    ? [NODE_SIGNED_IN_NOTE, ...EXPOSURE_NOTES]
+    : [...EXPOSURE_NOTES];
+}
+
+export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in.';
+
 /** An item as the report hands it out: the content address a source attached stays behind. */
 function outward(f: ExposureFound): ExposureItem {
   return {
@@ -128,9 +145,13 @@ async function readAll(
   const failed: ExposureKind[] = [];
   // One source after another: on SQLite every read shares one connection, and the memo lets a later
   // source reuse what an earlier one read.
+  // A node that shows its content to its own accounts only serves nothing to a stranger or to a
+  // link holder (middleware/content-access-gate.ts), so what would be public or link is signed-in.
+  const lower = signedInOnly(ctx.config);
   for (const source of EXPOSURE_SOURCES) {
     try {
-      found.set(source.kind, await source.list(ctx, ownerName, ownerGhii));
+      const items = await source.list(ctx, ownerName, ownerGhii);
+      found.set(source.kind, lower ? items.map(lowerToSignedIn) : items);
     } catch (err) {
       logger.warn('exposure: a source could not be read', { ...errorFields(err), kind: source.kind, owner: ownerName });
       failed.push(source.kind);
@@ -174,7 +195,7 @@ export async function buildExposureReport(ctx: ExposureContext, ownerName: strin
     capped,
     failed,
     hidden_by_classification: hidden,
-    notes: [...EXPOSURE_NOTES],
+    notes: notesFor(ctx),
   };
 }
 
@@ -212,6 +233,6 @@ export async function buildNodeExposureReport(ctx: ExposureContext): Promise<Nod
     counts: countItems(unique.values()),
     top_owners: perOwner.slice(0, TOP_OWNERS),
     failed,
-    notes: [...EXPOSURE_NOTES],
+    notes: notesFor(ctx),
   };
 }

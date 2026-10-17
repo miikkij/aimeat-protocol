@@ -9,10 +9,11 @@
  *   EACH KIND IS DECIDED BY THE RULE THAT SERVES IT, not by a copy of it:
  *
  *   - An app: an access code shuts everyone out who lacks it, so such an app is not counted, and an
- *     app an operator hid is served to nobody. Otherwise `access` on the record, when another change
- *     has written one ('signed-in', 'community', 'members' or 'organism:<id>'), names who opens it;
- *     without it a listed app is public, and a community or unlisted app opens for anyone holding
- *     its address (services/app-visibility.ts: "a link opens the app in all three").
+ *     app an operator hid is served to nobody. Otherwise the app's own `open_to` (`access` on the
+ *     record, read by services/app-access.ts appAccessOf) names who opens it: signed-in or one
+ *     organism; for 'anyone' a listed app is public, and a community or unlisted app opens for anyone
+ *     holding its address (services/app-visibility.ts: "a link opens the app in all three").
+ *     The node's own signed-in setting is applied to every kind by the report.
  *   - A workspace share: what the share routes hand an anonymous visitor, asked of their own
  *     collectors (services/workspace-public-collectors.ts) with the anonymous classification reader,
  *     as services/share-provenance.ts does. An open share is 'link', an account share 'signed-in'.
@@ -28,7 +29,8 @@
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
  */
 import type { OrganismRecord } from '../../storage/interface.js';
-import { appListingOf } from '../../storage/types/apps.js';
+import { appListingOf, type AppRecord } from '../../storage/types/apps.js';
+import { appAccessOf } from '../app-access.js';
 import { resolveAppUrls } from '../app-urls.js';
 import { readShareMetaOf, publicViewerPath } from '../workspace-share.js';
 import { createPublicCollectors } from '../workspace-public-collectors.js';
@@ -36,7 +38,6 @@ import { readerFor } from '../classification/reader.js';
 import { workspaceRegistrations } from '../workspace-meta-read.js';
 import { isOrganismOwner } from '../organism-ownership.js';
 import { companyAddress } from '../company/company-service.js';
-import { parseAudience } from '../audience.js';
 import { listPublishedMembers } from '../portfolio-members.js';
 import {
   type ExposureContext, type ExposureItem, type ExposureLevel, type ExposureSource,
@@ -45,15 +46,15 @@ import {
 
 const enc = encodeURIComponent;
 
-/** The level an app's own `access` names, 'listing' when it names none, or null when it shuts everyone out. */
-function appAccessLevel(access: unknown): { level: ExposureLevel; organism_id?: string } | 'listing' | null {
-  if (access === undefined || access === null || access === '' || access === 'public') return 'listing';
-  if (access === 'signed-in' || access === 'community' || access === 'members') return { level: 'signed-in' };
-  if (access === 'private') return null;
-  const a = parseAudience(access);
-  if (a?.level === 'organism' && a.organismId) return { level: 'organism', organism_id: a.organismId };
-  // A value this report does not know is not counted as open: the serving code decides it.
-  return null;
+/**
+ * The level the app's own `open_to` names (services/app-access.ts appAccessOf), or 'listing' when it
+ * is 'anyone' and the listing decides. The node's own signed-in setting is applied by the report.
+ */
+function appAccessLevel(app: Pick<AppRecord, 'access'>): { level: ExposureLevel; organism_id?: string } | 'listing' {
+  const own = appAccessOf(app);
+  if (own === 'anyone') return 'listing';
+  if (own === 'signed-in') return { level: 'signed-in' };
+  return { level: 'organism', organism_id: own.slice('organism:'.length) };
 }
 
 export const appSource: ExposureSource = {
@@ -66,8 +67,7 @@ export const appSource: ExposureSource = {
       if (seen.has(app.filename)) continue;
       seen.add(app.filename);
       if (app.accessCode || app.operatorHidden) continue;
-      const access = appAccessLevel((app as { access?: unknown }).access);
-      if (access === null) continue;
+      const access = appAccessLevel(app);
       const lv = access === 'listing'
         ? { level: (appListingOf(app) === 'listed' ? 'public' : 'link') as ExposureLevel }
         : access;
@@ -80,8 +80,8 @@ export const appSource: ExposureSource = {
       return {
         kind: 'app', id: filename, title, ...lv, ...(url ? { url } : {}),
         how_to_close: lv.level === 'public'
-          ? `Take it off every list with aimeat_app_manage (action "settings", listing "unlisted"), and give it an access code (access_code) so only people with the code open it (PATCH /v1/apps/${enc(filename)}); aimeat_app_delete removes it.`
-          : `Give it an access code with aimeat_app_manage (action "settings", access_code) so only people with the code open it (PATCH /v1/apps/${enc(filename)} with {"access_code":"..."}); aimeat_app_delete removes it.`,
+          ? `Take it off every list with aimeat_app_manage (action "settings", listing "unlisted"), and choose who may open it there: open_to "signed-in" or "organism:<id>", or an access_code (PATCH /v1/apps/${enc(filename)}); aimeat_app_delete removes it.`
+          : `Choose who may open it with aimeat_app_manage (action "settings"): open_to "organism:<id>" for one organisation, or an access_code so only people with the code open it (PATCH /v1/apps/${enc(filename)}); aimeat_app_delete removes it.`,
       };
     });
   },
