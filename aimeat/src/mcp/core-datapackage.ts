@@ -23,8 +23,11 @@
  * @structure registerCoreDataPackageTools() — aimeat_datapackage_publish, aimeat_datapackage_export
  * @usage
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
- *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);
+ *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-10-18 — aimeat_datapackage_publish asks the publish gate as POST /v1/datapackages does: a
+ *     public publish (the default) by an agent without publish:public lands at the audience the
+ *     package had (a first version private) and answers with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_datapackage_publish takes `visibility` (public by default, members,
  *     organism:<id>, private), and aimeat_datapackage_export reads as this session, so a package's
  *     audience decides (plan doc-mvcn6c7e4e5q, V3.8).
@@ -36,6 +39,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
+import type { CallerContext } from '../services/caller-context.js';
+import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
 import { annotationsFor } from './annotations.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
@@ -75,6 +80,8 @@ export function registerCoreDataPackageTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    /** The session's caller (services/caller-context.ts), for the publish gate. */
+    caller: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
     const store = { storage, config };
@@ -99,7 +106,11 @@ export function registerCoreDataPackageTools(
                 });
             }
 
-            const out = await publishPackage(store, ownerGhiiOf(agentGaii), {
+            // Publishing it public (the default) asks the publish gate, as POST /v1/datapackages does.
+            const ownerGhii = ownerGhiiOf(agentGaii);
+            const gate = await datapackagePublishGate(store, caller(), undefined, ownerGhii, name, visibility);
+            if (gate.kind === 'refused') return errContent({ code: gate.code, message: gate.message, published: false });
+            const out = await publishPackage(store, ownerGhii, {
                 name, changes,
                 resources: (resources ?? []).map(r => ({
                     name: r.name,
@@ -117,7 +128,7 @@ export function registerCoreDataPackageTools(
                 },
                 declaredProvenance: toDeclaredProvenance(ai_provenance),
                 ...(ai_provenance_id ? { declaredProvenanceId: ai_provenance_id } : {}),
-                ...(visibility !== undefined ? { visibility } : {}),
+                ...(gate.visibility !== undefined ? { visibility: gate.visibility } : {}),
             }, { gaii: agentGaii, kind: 'agent' });
 
             if (!out.ok) {
@@ -135,8 +146,13 @@ export function registerCoreDataPackageTools(
             }
             // The open page hears about it, the same domain POST /v1/datapackages emits.
             emitChange('files');
+            const asked = gate.requester
+                ? await fileDatapackageAsk(store, caller().owner, gate.requester, ownerGhii, name, out.contentHash, gate.from)
+                : {};
             return jsonContent({
                 ...(await writeProvenanceEcho(storage, config, out.descriptor.aimeat.aiProvenanceId)),
+                // Published, not public yet: the owner approves (its next_step says what to tell them).
+                ...asked,
                 package_id: out.descriptor.aimeat.packageId,
                 content_hash: out.contentHash,
                 descriptor_url: out.descriptorUrl,

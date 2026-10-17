@@ -12,6 +12,8 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-10-18 — aimeat_package_publish, _compose and _compose_set say what a publish request answers
+ *     when the node asks the owner before making a package public (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_package_publish, _compose and _compose_set take the visibilities members and
  *     organism:<id> beside private and public (plan doc-mvcn6c7e4e5q, V3.7).
  *   2026-10-12 — aimeat_package_instances names packages:read, the word GET /v1/instances asks; enforced from 4.0.0.
@@ -124,7 +126,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_publish',
-        description: 'Publish a component package: one or more components (app, extension, cortex, translation) that install together.',
+        description: 'Publish a component package: one or more components (app, extension, cortex, translation) that install together. When the node asks the owner before making something public, a package asked public is created private and the answer carries publish_request, with the address to give the owner.',
         caller: 'agent',
         visibility: connectorOnly,
         annotations: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -154,7 +156,7 @@ export const packagesTools = [
         // getting the dependency order right, which is why the only packages on a node were the ones
         // it seeds itself. The node already knows what each app loads, so the caller names apps.
         name: 'aimeat_package_compose',
-        description: 'Make a package out of apps you already published, with the cortexes they load and your own skills bound to them. Names what the installing node must supply itself.',
+        description: 'Make a package out of apps you already published, with the cortexes they load and your own skills bound to them. Names what the installing node must supply itself. When the node asks the owner before making something public, a new package asked public is created private and the answer carries publish_request, with the address to give the owner.',
         caller: 'agent',
         visibility: agentEverywhere,
         // Not idempotent: composing twice under one name is refused as a conflict, and composing under
@@ -179,7 +181,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_compose_set',
-        description: 'Make a set to sell from apps you already published: one package per app (or its next version), and an install bundle that lists them, with the organism and workspaces the apps declare in their aimeat-workspace block (joined on the contract; one organism named after the set), the crews their aimeat-crews blocks carry, and your default config. Run dry_run first: it writes nothing and answers `questions` (what a buyer will be asked), `expects` (what the buyer\'s node must already have), `not_carried` (what stays behind), `capabilities` (what the parts can do), the `bundle`, and every `problem`. Without dry_run a set with any problem is refused and nothing is written. Composing again adds a version to each package and to the set. Then set its terms with aimeat_package_offer. The same as POST /v1/packages/compose-set.',
+        description: 'Make a set to sell from apps you already published: one package per app (or its next version), and an install bundle that lists them, with the organism and workspaces the apps declare in their aimeat-workspace block (joined on the contract; one organism named after the set), the crews their aimeat-crews blocks carry, and your default config. Run dry_run first: it writes nothing and answers `questions` (what a buyer will be asked), `expects` (what the buyer\'s node must already have), `not_carried` (what stays behind), `capabilities` (what the parts can do), the `bundle`, and every `problem`. Without dry_run a set with any problem is refused and nothing is written. Composing again adds a version to each package and to the set. Then set its terms with aimeat_package_offer. When the node asks the owner before making something public, the new packages of a set asked public are created private and the answer carries publish_request (and publish_requests, one per package). The same as POST /v1/packages/compose-set.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Compose a Set to Sell', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

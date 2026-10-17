@@ -754,7 +754,7 @@ export function registerCoreTools(
     registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, sessionScopes, caller);
 
     // ── Data Package Tools (publish/export) — extracted to ./core-datapackage.ts ──
-    registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);
+    registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
 
     // ── Admin Tools (operator-only) — extracted to ./core-admin.ts ──
     registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, sessionScopes);

@@ -24863,6 +24863,8 @@ paths:
       responses:
         '201':
           description: A new version was written
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '200':
           description: Identical content was already published — no new version (unchanged is true)
         '400':
@@ -48042,6 +48044,8 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -48194,6 +48198,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
 
@@ -48235,6 +48241,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
 
   /v1/knowledge/{id}/clone:
     post:
@@ -50494,6 +50502,8 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '413':
@@ -50622,6 +50632,8 @@ paths:
                               packs: { type: array, items: { type: string } }
                           notes: { type: array, items: { type: string } }
                           new_version: { type: boolean, description: True when this published the next version of a package the caller already had. }
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -50727,6 +50739,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '201':
           description: '`data` is `{ set, packages, bundle, questions, expects, not_carried, capabilities, problems }`, with the versions written.'
           content:
@@ -51965,6 +51979,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '202':
+          $ref: '#/components/responses/PublishRequested'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
