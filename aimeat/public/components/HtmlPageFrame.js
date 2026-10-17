@@ -22,6 +22,7 @@
  * @structure HtmlPageFrame({ src, title, text, onReport, reportHint, loading, error, provenance, author, windowUrl, fill })
  * @usage html`<${HtmlPageFrame} src=${doc.frame_url} title=${doc.title} text=${doc.markdown} onReport=${report} provenance=${{ record, recordUrl }} />`
  * @version-history
+ *   v1.2.1 — 2026-10-17 — The strip's English says the page "runs separately" ("runs apart" read as unidiomatic).
  *   v1.2.0 — 2026-10-17 — `fill`: the page alone in the whole browser window, with the AI chip at the
  *     bottom-left as in full screen; `windowUrl`: the strip copies that address (Jouni, 2026-10-17).
  *   v1.1.0 — 2026-10-16 — `provenance`: the AI label in the strip and above the text fallback, and in
@@ -88,7 +89,7 @@ export function HtmlPageFrame({ src, title, text, onReport, reportHint, loading,
       </div>`;
   }
   // Who made the page is shown to the workspace's members only (Jouni, 2026-10-16); a visitor reads that a user made it.
-  const madeBy = author ? (t('pageFrame.madeBy') || '{name} made this page. It runs apart and cannot reach your account.').replace('{name}', author) : t('pageFrame.madeByUser');
+  const madeBy = author ? (t('pageFrame.madeBy') || '{name} made this page. It runs separately and cannot reach your account.').replace('{name}', author) : t('pageFrame.madeByUser');
   return html`
     <div class=${fill ? 'html-page-frame html-page-frame--fill' : 'html-page-frame'} ref=${wrap}>
       <div class="html-page-frame-strip html-page-frame-bar">
