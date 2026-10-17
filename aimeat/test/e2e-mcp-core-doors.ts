@@ -33,6 +33,9 @@
  *   - Phase 6: MCP resources — the memory mapper in resources/list, the storage blob in resources/read
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-core-doors
  * @version-history
+ *   2026-10-17 — 3: the work and write tools miss only one-press words, so a memory:read agent is
+ *     listed them (permission ask, mcp/permission-ask-gate.ts) and each call is refused SCOPE_DENIED
+ *     with the allow address.
  *   2026-10-16 — The requester holds storage:read: the aimeat://storage resource asks the word
  *     aimeat_storage_download asks since QA audit S3-03.
  *   v1.2.0 — 2026-10-12 — The 4.0.0 forms: the requester holds agent:read, the word of the agent
@@ -244,12 +247,15 @@ await test('2. Three MCP sessions open on /v1/mcp', async () => {
 
 console.log('\nPhase 2 — the scope fence, and the same door to an anonymous caller');
 
-await test('3. A memory:read agent is handed the read tools and NONE of the work or write tools', async () => {
+await test('3. A memory:read agent is handed the read tools, and every work or write tool is refused with the allow address', async () => {
     const names = await toolNames(readOnlySession);
     assert(names.includes('aimeat_memory_read'), 'memory:read must carry aimeat_memory_read');
     assert(names.includes('aimeat_memory_list'), 'memory:read must carry aimeat_memory_list');
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
     for (const gated of ['aimeat_memory_write', 'aimeat_action_execute', 'aimeat_work_inbox', 'aimeat_work_accept', 'aimeat_work_deliver']) {
-        assert(!names.includes(gated), `${gated} was offered to an agent holding only memory:read`);
+        assert(names.includes(gated), `${gated} is listed to ask for (its words are one-press)`);
+        const r = await callTool(readOnlySession, gated, {});
+        assert(r.isError && r.text.startsWith('SCOPE_DENIED') && r.text.includes('/v1/allow?'), `${gated} answered an agent holding only memory:read: ${r.text.slice(0, 200)}`);
     }
 });
 

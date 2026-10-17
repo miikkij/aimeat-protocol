@@ -5,6 +5,9 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   2026-10-17 — 29, 33, 39: messages:read, messages:send and contacts:read are one-press, so the tool
+ *     stays listed for an agent without the word (permission ask, mcp/permission-ask-gate.ts) and the
+ *     call is asserted as SCOPE_DENIED with the allow address instead of "not offered".
  *   2026-10-16 — A tool the session was not offered answers SCOPE_DENIED with the word it needs (QA audit E5-04);
  *     the not-offered assertions read that answer as well as the SDK's "not found".
  *   2026-10-15 — Tests 41–43: an agent holding messages:send saves and removes a contact on REST in its
@@ -51,6 +54,8 @@ async function test(name: string, fn: () => Promise<void>) {
     catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
+/** A call refused in front of the tool's handler with the address where the person allows it (permission ask, 2026-10-17). */
+const refusedWithAllow = (text: string) => text.startsWith('SCOPE_DENIED') && text.includes('/v1/allow?');
 
 async function json(path: string, opts: RequestInit = {}) {
     const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
@@ -603,9 +608,9 @@ await test('29. An agent without messages:read is refused on both doors', async 
     const reader = await agentOf(A, 'noresolvebot', ['memory:read']);
     const rest = await lookup(reader.token, 'probe@example.com');
     assert(rest.status === 403, `the REST door answered an agent without the word: ${rest.status} ${JSON.stringify(rest.body.data ?? rest.body.error)}`);
-    // The tool is not registered for a session without the word: SCOPE_DENIED names the word (or the SDK's "not found").
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
     const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_resolve_email', { email: 'probe@example.com' });
-    assert(over.result?.isError === true && /not found|so the tool is offered/.test(String(over.result?.content?.[0]?.text)),
+    assert(over.result?.isError === true && refusedWithAllow(String(over.result?.content?.[0]?.text)),
         `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
 });
 
@@ -706,9 +711,9 @@ await test('33. An agent holding messages:send invites on REST as over MCP, in i
 
     const refused = await invite(reader.token, `g-reader-${Date.now()}@example.com`);
     assert(refused.status === 403, `an agent without messages:send on REST: ${refused.status} ${JSON.stringify(refused.body.data ?? refused.body.error)}`);
-    // The tool is not registered for a session without the word: SCOPE_DENIED names the word (or the SDK's "not found").
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
     const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_invite', { email: `g-reader-mcp-${Date.now()}@example.com` });
-    assert(over.result?.isError === true && /not found|so the tool is offered/.test(String(over.result?.content?.[0]?.text)),
+    assert(over.result?.isError === true && refusedWithAllow(String(over.result?.content?.[0]?.text)),
         `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
 
     // The account's allowance: the agent's invitation above was one, the owner's lookups make it 20.
@@ -829,12 +834,13 @@ await test('38. An agent holding contacts:read lists its owner\'s book on REST a
     assert(full?.last_message === 'private line from H' && !!full?.conversation_id, `with the mailbox word the conversation shows: ${JSON.stringify(full)}`);
 });
 
-await test('39. An agent without contacts:read is refused on REST, and aimeat_contact_list is not offered to it, messages:read or not', async () => {
+await test('39. An agent without contacts:read is refused on REST, and aimeat_contact_list is refused to it over MCP with the allow address, messages:read or not', async () => {
     const reader = await agentOf(H, 'bookblind', ['messages:read']);
     const r = await listAs(reader.token);
     assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status} ${r.body.error?.code}`);
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
     const over = await mcpCallAs(reader.gaii, reader.key, 'aimeat_contact_list', {});
-    assert(over.result?.isError === true && /not found|so the tool is offered/.test(String(over.result?.content?.[0]?.text)),
+    assert(over.result?.isError === true && refusedWithAllow(String(over.result?.content?.[0]?.text)),
         `the tool answered an agent without the word: ${JSON.stringify(over.result ?? over.error).slice(0, 200)}`);
 });
 

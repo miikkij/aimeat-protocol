@@ -29,6 +29,9 @@
  *   - Phase 5: the MCP tools
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=docsign-caller-refusals
  * @version-history
+ *   v1.1.0 — 2026-10-17 — Phase 5: an agent without memory:read is listed aimeat_docsign_requests
+ *     (permission ask, mcp/permission-ask-gate.ts), and its call is refused SCOPE_DENIED with the
+ *     allow address and no request in the answer.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F03b-03, W27).
  */
 import * as ed from '@noble/ed25519';
@@ -250,7 +253,7 @@ async function run(): Promise<void> {
 
     console.log('\nPhase 5 — The MCP tools');
 
-    await test('aimeat_docsign_requests lists what the agent\'s owner is a party to, and not bob\'s; an agent without memory:read is not offered it', async () => {
+    await test('aimeat_docsign_requests lists what the agent\'s owner is a party to, and not bob\'s; an agent without memory:read is refused it with the allow address', async () => {
         const agent = await makeAgent(BASE, alice, ['memory:read']);
         const s = await openSession(BASE, agent.token);
         const r = await callTool(s, 'aimeat_docsign_requests', {});
@@ -259,7 +262,9 @@ async function run(): Promise<void> {
         assert(ids.includes(aliceRequest) && !ids.includes(bobRequest), `alice's request and not bob's: ${JSON.stringify(ids)}`);
         const none = await openSession(BASE, (await makeAgent(BASE, alice, ['catalogue:read'])).token);
         const refused = await callTool(none, 'aimeat_docsign_requests', {});
-        assert(refused.isError && refused.offered === false, `without memory:read: ${refused.text}`);
+        // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+        assert(refused.isError && refused.offered && /^SCOPE_DENIED/.test(refused.text) && refused.text.includes('/v1/allow?') && !refused.text.includes(aliceRequest),
+            `without memory:read: ${refused.text}`);
     });
 
     await test('aimeat_docsign_request_get reads alice\'s request with its checks; bob\'s answers as absent', async () => {

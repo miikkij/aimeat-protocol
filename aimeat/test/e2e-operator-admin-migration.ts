@@ -20,6 +20,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-operator-admin-migration
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-operator-admin-migration
  * @version-history
+ *   2026-10-17 — Permission ask (mcp/permission-ask-gate.ts): 2c asserts the connector's stale MCP
+ *     OAuth token is answered 401 invalid_token at /v1/mcp (it was a session offered no admin tool),
+ *     and the refresh gives the admin tools; 2d and 2f read "not offered" as SCOPE_DENIED without the
+ *     allow address, because the old closing sentence "so the tool is offered" is gone.
  *   2026-10-16 — A tool the session was not offered answers SCOPE_DENIED with the word it needs (QA audit E5-04);
  *     the not-offered assertions read that answer as well as the SDK's "not found".
  *   v1.1.0 — 2026-10-05 — The migrated agent's token passes the HTTP admin routes too (secaudit 2026-10, C2).
@@ -216,6 +220,15 @@ async function mcpSession(token: string) {
     };
 }
 
+/**
+ * The answer to a tool the session was not offered: the SDK's "not found", or SCOPE_DENIED without
+ * the allow address (since 2026-10-17 a tool missing only one-press words is listed and its
+ * SCOPE_DENIED carries /v1/allow?; operator:admin is not one-press).
+ */
+function notOfferedText(text: string): boolean {
+    return /not found/.test(text) || (/^SCOPE_DENIED: /.test(text) && !text.includes('/v1/allow?'));
+}
+
 /** The admin tools this token is offered. */
 async function adminToolsOffered(token: string): Promise<string[]> {
     const tools = await (await mcpSession(token)).list();
@@ -347,10 +360,17 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
     await test('2c. the connector gains the admin tools after refreshing its credential', async () => {
         const held = await scopesOf(op, 'claude');
         assert(held.includes(WORD), `the connector holds [${held.join(', ')}]`);
-        // A new session still uses this token's scope ceiling. The newly granted operator word
-        // takes effect after credential refresh, just as it does through REST.
-        const next = await adminToolsOffered(claude.access);
-        assert(next.length === 0, 'a stale token must not acquire a newly granted operator scope');
+        // A stale token must not acquire a newly granted operator scope. Since 2026-10-17 (permission
+        // ask, mcp/permission-ask-gate.ts staleGrantRefusal) the MCP endpoint answers an MCP OAuth token
+        // older than a permission its agent now holds 401 invalid_token, so the client refreshes; the
+        // newly granted word takes effect only through that refresh.
+        const stale = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${claude.access}` },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'opadmin-e2e', version: '1.0.0' } } }),
+        });
+        assert(stale.status === 401 && /invalid_token/.test(stale.headers.get('www-authenticate') ?? ''),
+            `a stale token must be answered 401 invalid_token, got ${stale.status} ${stale.headers.get('www-authenticate')}`);
         // And when the access token runs out, the refresh the connector makes works across the restart.
         const r = await json('/v1/mcp/token', {
             method: 'POST',
@@ -368,9 +388,10 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
         const token = await agentToken(opNarrow);
         const offered = await adminToolsOffered(token);
         assert(offered.length === 0, `offered ${offered.length}: ${offered.join(', ')}`);
-        // A tool the session was not offered is not registered, and the SDK answers "not found".
+        // A tool the session was not offered is not registered: the SDK answers "not found", or the
+        // SCOPE_DENIED answer hands the agent's page (operator:admin is not one-press, so no /v1/allow?).
         const byName = await (await mcpSession(token)).call('aimeat_admin_stats', {});
-        assert(byName.body.result?.isError === true && /not found|so the tool is offered/.test(String(byName.body.result?.content?.[0]?.text)),
+        assert(byName.body.result?.isError === true && notOfferedText(String(byName.body.result?.content?.[0]?.text)),
             `the narrow agent called aimeat_admin_stats by name and was answered: ${JSON.stringify(byName.body).slice(0, 200)}`);
     });
 
@@ -386,7 +407,7 @@ async function connectClaudeAi(owner: Owner): Promise<Connector> {
         const offered = await adminToolsOffered(token);
         assert(offered.length === 0, `offered ${offered.length}: ${offered.join(', ')}`);
         const byName = await (await mcpSession(token)).call('aimeat_admin_stats', {});
-        assert(byName.body.result?.isError === true && /not found|so the tool is offered/.test(String(byName.body.result?.content?.[0]?.text)),
+        assert(byName.body.result?.isError === true && notOfferedText(String(byName.body.result?.content?.[0]?.text)),
             `the ordinary owner's agent called aimeat_admin_stats by name and was answered: ${JSON.stringify(byName.body).slice(0, 200)}`);
     });
 

@@ -15,6 +15,9 @@
  *   concludes the product is broken.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connections-mcp-surface.test.ts
  * @version-history
+ *   2026-10-17 — aimeat_mail_send has no condition of its own any more: the generic gate applies both
+ *     catalog words, and an agent's person can allow it with one press. Asserted on the catalog and
+ *     scopeAllowsTool instead of on this function's registrations.
  *   2026-10-15 — aimeat_connection_history and aimeat_connection_replies join the set; one scope word
  *     each, so the generic filter gates them like the other read tools.
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -26,6 +29,7 @@ import { registerConnectionTools } from '../../src/mcp/connections.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
+import { requiredScopesForTool, scopeAllowsTool } from '../../src/tool-catalog/scopes.js';
 
 /** A stand-in that records the tool NAMES it was asked to register, and nothing else. */
 function recordingMcp(): { mcp: McpServer; names: string[] } {
@@ -73,42 +77,31 @@ describe('the nine tools', () => {
     });
 });
 
-describe('sending needs both words, and is absent without them', () => {
-    it('is absent with outbound:send alone', () => {
-        // This is the shape that would fail open: a session that may send in the owner's name but
-        // was never granted the mailbox. The tool must not be offered.
-        expect(surfaceFor(['outbound:send'])).not.toContain('aimeat_mail_send');
-    });
-
-    it('is absent with connections:use alone', () => {
-        expect(surfaceFor(['connections:use'])).not.toContain('aimeat_mail_send');
-    });
-
-    it('is absent with neither', () => {
-        expect(surfaceFor([])).not.toContain('aimeat_mail_send');
-    });
-
-    it('appears with both', () => {
-        expect(surfaceFor(['outbound:send', 'connections:use'])).toContain('aimeat_mail_send');
-    });
-
-    it('appears for a session holding a word that covers them', () => {
-        // Scope coverage understands families, and a hand-rolled includes() would refuse a caller
-        // holding a broader grant. Using the shared predicate is what makes this work.
-        expect(surfaceFor(['*'])).toContain('aimeat_mail_send');
+describe('sending needs both words, and the generic gate holds them', () => {
+    // Until 2026-10-17 aimeat_mail_send had a condition of its own here. Its catalog entry names both
+    // words, so the registration gate in mcp/index.ts applies both, as it does for every tool: allowed,
+    // listed for the agent's person to allow with one press (the call is refused with the allow
+    // address, mcp/permission-ask-gate.ts), or absent. A second gate here kept the tool off the list
+    // while the person could have allowed it (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
+    it('the catalog names both words, so the generic gate refuses a session holding only one', () => {
+        expect([...requiredScopesForTool('aimeat_mail_send')].sort()).toEqual(['connections:use', 'outbound:send']);
+        expect(scopeAllowsTool(['outbound:send'], 'aimeat_mail_send')).toBe(false);
+        expect(scopeAllowsTool(['connections:use'], 'aimeat_mail_send')).toBe(false);
+        expect(scopeAllowsTool(['outbound:send', 'connections:use'], 'aimeat_mail_send')).toBe(true);
+        expect(scopeAllowsTool(['*'], 'aimeat_mail_send')).toBe(true);
     });
 });
 
-describe('the other eight do not depend on that condition', () => {
-    it('registers regardless of scopes, because the generic filter is what gates them', () => {
-        // They carry ONE word each in the scope map, and the surface filter applies it above this
-        // function. Registering them here unconditionally is correct; duplicating the filter would
-        // be a second gate to keep in step with the first.
+describe('all nine register regardless of scopes', () => {
+    it('because the generic filter is what gates them', () => {
+        // The surface filter applies each tool's words above this function. Registering them here
+        // unconditionally is correct; duplicating the filter would be a second gate to keep in step
+        // with the first.
         const bare = surfaceFor([]);
         for (const name of [
             'aimeat_connection_providers', 'aimeat_connection_list', 'aimeat_connection_start',
             'aimeat_connection_history', 'aimeat_connection_replies',
-            'aimeat_mail_search', 'aimeat_mail_read', 'aimeat_mail_aliases',
+            'aimeat_mail_search', 'aimeat_mail_read', 'aimeat_mail_aliases', 'aimeat_mail_send',
         ]) {
             expect(bare).toContain(name);
         }

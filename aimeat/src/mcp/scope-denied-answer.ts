@@ -12,17 +12,26 @@
  *   person the tool does not exist; the owner's agent card showed no refusal to grant (QA audit
  *   E5-04). REST answers the same refusal with SCOPE_DENIED and notes it (auth/deny.ts denyScope403).
  *
+ *   Since 2026-10-17 a tool whose missing permissions the agent's person can allow with one press is
+ *   registered and listed (mcp/permission-ask-gate.ts), so this answer is also what such a listed
+ *   tool says when it is called before the person has allowed it.
+ *
  *   HOW. As mcp/moved-tools-answer.ts: the SDK's one tools/call request handler is wrapped after the
  *   tools are registered. A call whose tool needs a permission this request's token does not hold is
  *   answered here; every other call goes to the SDK handler unchanged.
  * @structure answerScopeDeniedTools(mcp, opts)
  * @usage answerScopeDeniedTools(mcp, { missingWords: (name) => [...], principal: () => agentGaii });
  * @version-history
+ *   2026-10-17 — The answer tells the AI what it may not do in plain words and hands it the address
+ *     where the person allows it with one press (services/permission-ask.ts). The permission word
+ *     stays at the end, for the agent's own records, with the instruction not to show it to the
+ *     person (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  *   2026-10-16 — Initial (QA audit E5-04).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { noteMcpScopeRefusal } from './tool-usage-wrap.js';
 import { toolError } from './tool-error.js';
+import { permissionAskText } from '../services/permission-ask.js';
 import { logger } from '../utils/logger.js';
 
 type RequestHandler = (request: { method: string; params?: { name?: unknown } }, extra: unknown) => Promise<unknown>;
@@ -32,14 +41,20 @@ export interface ScopeDeniedOptions {
   missingWords: (name: string) => string[];
   /** The session's principal, for the owner's note. */
   principal: () => string;
+  /** The node's public address, for the address the person allows the permission at. */
+  baseUrl: string;
 }
 
-/** The answer an agent reads: the code REST answers with, the word, and what the person can do. */
-export function scopeDeniedText(name: string, words: string[]): string {
+/**
+ * The answer an agent reads: the code REST answers with, what it may not do yet in plain words, and
+ * the address it hands the person. The permission word closes the text, for the agent's own
+ * records; the person never needs it.
+ */
+export function scopeDeniedText(name: string, words: string[], opts: { baseUrl: string; agentGaii: string }): string {
   const quoted = words.map((w) => `"${w}"`).join(' and ');
   return toolError('SCOPE_DENIED',
-    `${name} needs the permission ${quoted}, which this agent has not been given. `
-    + 'The owner can grant it in the agent\'s settings; then connect again so the tool is offered.').content[0].text;
+    `${permissionAskText({ baseUrl: opts.baseUrl, agentGaii: opts.agentGaii, tool: name, words })} `
+    + `(For your records, not for the person: ${name} needs the permission ${quoted}.)`).content[0].text;
 }
 
 export function answerScopeDeniedTools(mcp: McpServer, opts: ScopeDeniedOptions): void {
@@ -56,6 +71,7 @@ export function answerScopeDeniedTools(mcp: McpServer, opts: ScopeDeniedOptions)
     if (words.length === 0) return original(request, extra);
     // The MCP half of auth/deny.ts: the same note on the agent's card and its open tasks.
     noteMcpScopeRefusal(opts.principal(), words, name);
-    return { content: [{ type: 'text', text: scopeDeniedText(name, words) }], isError: true };
+    const text = scopeDeniedText(name, words, { baseUrl: opts.baseUrl, agentGaii: opts.principal() });
+    return { content: [{ type: 'text', text }], isError: true };
   });
 }

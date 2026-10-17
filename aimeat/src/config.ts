@@ -145,8 +145,9 @@ import { consulDefaults } from './config-consul.js';
  * not, and comes with the "standard" consent preset the owner sees (Jouni 2026-10-06, D4).
  * agent:read is in it because the owner's agent list (GET /v1/agents, aimeat_agents_list) asks it from
  * 4.0.0 (ruling decision-4-0-0-siivouksen-23-avointa-p-t-st-suositusten-mukaan, item 11).
+ * messages:send, storage:write: a person's own AI sends and attaches for them (Jouni 2026-10-17).
  */
-export const SHIPPED_DEFAULT_AGENT_SCOPES = 'memory:read,memory:write,memory:delete,catalogue:read,organism:read,agent:read';
+export const SHIPPED_DEFAULT_AGENT_SCOPES = 'memory:read,memory:write,memory:delete,catalogue:read,organism:read,agent:read,messages:send,storage:write';
 
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const { configPath, cliOverrides, checkSettings = true } = options ?? {};

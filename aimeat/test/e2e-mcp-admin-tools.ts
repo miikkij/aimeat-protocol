@@ -38,6 +38,9 @@
  *   - The account's own tools: secrets, access, usage report, agent statistics
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-admin-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — aimeat_usage_report misses only wallet:read for a memory:read agent, a
+ *     one-press word, so it is listed (permission ask, mcp/permission-ask-gate.ts) and the call is
+ *     refused SCOPE_DENIED with the allow address. The operator tools keep "not offered".
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27).
  */
 import { registerOwner, ownerSignIn, type RegisteredOwner } from './helpers/owner-login.js';
@@ -383,10 +386,12 @@ await test('aimeat_access_list: not offered without account:security; with it, t
         `access_list: ${r.text.slice(0, 300)}`);
 });
 
-await test('aimeat_usage_report: not offered without wallet:read; with it, the owner\'s report by model', async () => {
+await test('aimeat_usage_report: refused with the allow address without wallet:read; with it, the owner\'s report by model', async () => {
     const bare = await openSession(BASE, (await makeAgent(BASE, member, ['memory:read'])).token, 'mem-bare2');
     const refused = await callTool(bare, 'aimeat_usage_report', { report: 'model' });
-    assert(refused.isError && !refused.offered, `expected not offered, got ${refused.text.slice(0, 200)}`);
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    assert(refused.isError && refused.offered && /^SCOPE_DENIED/.test(refused.text) && refused.text.includes('/v1/allow?'),
+        `expected SCOPE_DENIED with the allow address, got ${refused.text.slice(0, 200)}`);
     const holder = await openSession(BASE, (await makeAgent(BASE, member, ['wallet:read'])).token, 'mem-wallet');
     const r = await callTool(holder, 'aimeat_usage_report', { report: 'model' });
     assert(!r.isError && typeof r.data === 'object' && !r.data._text, `usage_report: ${r.text.slice(0, 300)}`);

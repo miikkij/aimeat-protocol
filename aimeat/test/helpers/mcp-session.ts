@@ -25,6 +25,9 @@
  *   const s = await openSession(BASE, agent.token);
  *   const r = await callTool(s, 'aimeat_memory_list', {});      // { isError, offered, data, text }
  * @version-history
+ *   2026-10-17 — `offered: false` from SCOPE_DENIED reads the absence of the allow address
+ *     (/v1/allow?): the old closing sentence "so the tool is offered" is gone, and a tool missing only
+ *     one-press words is listed and answers SCOPE_DENIED with that address (permission ask).
  *   2026-10-16 — `offered: false` also from the SCOPE_DENIED answer a filtered-out tool now gives
  *     instead of "Tool X not found" (QA audit E5-04, merged beside W27).
  *   v1.0.1 — 2026-10-16 — callTool reads `offered: false` only from the SDK's sentence about the tool
@@ -169,9 +172,11 @@ export async function callTool(session: McpSession, name: string, args: Record<s
     const isError = body?.result?.isError === true || body?.error !== undefined;
     // Only the SDK's own sentence about the tool NAME: a handler's "NOT_FOUND: Contact not found" is a
     // refusal by an offered tool, and a looser pattern read it as "not offered". A tool the session's
-    // permissions filtered out answers SCOPE_DENIED with the word it needs (src/mcp/scope-denied-answer.ts,
-    // QA audit E5-04); that sentence ends "so the tool is offered", which no handler writes.
+    // permissions filtered out answers SCOPE_DENIED (src/mcp/scope-denied-answer.ts, QA audit E5-04).
+    // Since 2026-10-17 (permission ask) an agent's tool whose missing words are all one-press stays on
+    // the list, and its SCOPE_DENIED carries the allow address (/v1/allow?); a filtered-out tool's
+    // SCOPE_DENIED hands the agent's page instead. So SCOPE_DENIED without /v1/allow? is "not offered".
     const notOffered = isError && (/Tool [\w.-]+ (?:not found|disabled)|unknown tool/i.test(text)
-        || (/^SCOPE_DENIED: /.test(text) && /so the tool is offered\.?/.test(text)));
+        || (/^SCOPE_DENIED: /.test(text) && !text.includes('/v1/allow?')));
     return { isError, offered: !notOffered, data: toolJson(body), text };
 }

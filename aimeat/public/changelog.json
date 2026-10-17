@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-17",
+      "kind": "feature",
+      "title": {
+        "en": "When your AI needs your permission, you allow it with one press",
+        "fi": "Kun tekoälysi tarvitsee luvan, sallit sen yhdellä painalluksella"
+      },
+      "body": {
+        "en": "When your AI tries something for you that you have not allowed yet, it no longer tells you the name of a permission. It gives you a link, and the page there asks one question in your language: what it wants to do, with Allow and Don't allow. Press Allow and your AI goes on in the same conversation. You also get the same question in your notifications and by email, which you can switch off on the Email page. A new AI connection can now send messages for you and save files from the start.",
+        "fi": "Kun tekoälysi yrittää tehdä puolestasi jotain, mitä et ole vielä sallinut, se ei enää kerro sinulle oikeuden nimeä. Se antaa sinulle linkin, ja sivu kysyy yhden kysymyksen omalla kielelläsi: mitä tekoäly haluaa tehdä. Valitset Salli tai Älä salli. Kun painat Salli, tekoäly jatkaa samassa keskustelussa. Saat saman kysymyksen myös ilmoituksiin ja sähköpostiin. Sähköpostin voit sammuttaa Sähköposti-sivulla. Uusi tekoälyyhteys voi nyt heti alusta lähettää viestejä puolestasi ja tallentaa tiedostoja."
+      }
+    },
+    {
       "date": "2026-10-16",
       "kind": "feature",
       "title": {

@@ -19,6 +19,8 @@
  *   import { scopeSentence, boundaryLines } from '/js/consent-vocab.js';
  *   scopeSentence('storage:write', t)  // "Upload, replace and delete files in your storage."
  * @version-history
+ *   v1.3.0 — 2026-10-17 — A preset holding messages:send says so in a sentence of its own, and the
+ *     messages family leaves its area line: sending is not reading or writing anyone's messages.
  *   v1.0.0 — 2026-08-17 — Extracted the vocabulary the surfaces had each half-invented: the area
  *     line from app-grant.js, the preset sets from agent-consent.html's private (and divergent)
  *     copy, the scope sentences from the scopeUi tree the other surfaces never read.
@@ -83,7 +85,15 @@ export function presetSummary(preset, t) {
   if (preset === 'full') return t('consent.preset.full');
   const tpl = SCOPE_TEMPLATES[preset];
   if (!tpl) return '';
-  return withOrganismWrite(t(`consent.preset.${preset}`, { areas: areaLine(tpl, t) }), tpl, t);
+  // Sending is not "reading and writing your messages": the set reaches no mailbox. So the messages
+  // family leaves the area list and gets a sentence of its own.
+  const areas = areaLine(tpl.filter((s) => !s.startsWith('messages:')), t);
+  return withOrganismWrite(withMessagesSend(t(`consent.preset.${preset}`, { areas }), tpl, t), tpl, t);
+}
+
+/** A set that may send messages says so in a sentence of its own (Jouni, 2026-10-17). */
+function withMessagesSend(summary, scopes, t) {
+  return scopes.includes('messages:send') ? `${summary} ${t('consent.preset.messagesSend')}` : summary;
 }
 
 /**

@@ -18,6 +18,7 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-10-17 — The standard preset holds messages:send (Jouni: "otetaan oletusoikeudet käyttöön").
  *   2026-10-15 — memory:read-as-owner, outside every wildcard: reading the owner's and the sibling
  *     agents' private records with owner_scope (feature-list audit #42).
  *   v1.15.0 — 2026-10-15 — connections:read-as-owner, outside every wildcard: reading what is in the
@@ -384,7 +385,8 @@ export const SCOPE_TEMPLATES = {
   // agent:read: the owner's agent list, which the node's default scopes carry too (2026-10-12).
   // organism:direct is in neither preset on purpose (Jouni, 2026-10-13): an agent approved with a
   // preset writes an app's closed space through the app's own tool; writing it directly is a tick.
-  standard:  ['memory:read', 'memory:write', 'storage:read', 'storage:write', 'catalogue:read', 'social:read', 'work:request', 'work:read', 'organism:read', 'organism:write', 'agent:read'],
+  // messages:send: a person's own AI sends a message for them from the first day (Jouni, 2026-10-17).
+  standard:  ['memory:read', 'memory:write', 'storage:read', 'storage:write', 'catalogue:read', 'social:read', 'messages:send', 'work:request', 'work:read', 'organism:read', 'organism:write', 'agent:read'],
   full:      ['*'],
 };
 

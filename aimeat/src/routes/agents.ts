@@ -29,6 +29,7 @@
  *     registration order preserved. Pure mechanical split, no behavior change.
  *   v1.5.0 -- 2026-10-02 -- GET/PUT /v1/agents/:name/purchase-limit (./agents/purchase-limit.ts).
  *   v1.6.0 -- 2026-10-11 -- POST /v1/agents/:name/stop and /start (./agents/stop-start.ts).
+ *   v1.7.0 -- 2026-10-17 -- GET/POST /v1/agents/:name/allow (./agents/permission-allow.ts).
  */
 import { Router } from 'express';
 import { dirname } from 'node:path';
@@ -44,6 +45,7 @@ import { registerManagementRoutes } from './agents/management.js';
 import { registerOffersRoutes } from './agents/offers.js';
 import { registerPurchaseLimitRoutes } from './agents/purchase-limit.js';
 import { registerStopStartRoutes } from './agents/stop-start.js';
+import { registerPermissionAllowRoutes } from './agents/permission-allow.js';
 
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -57,6 +59,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   registerOffersRoutes(router, config, storage);
   registerPurchaseLimitRoutes(router, config, storage);
   registerStopStartRoutes(router, config, storage);
+  registerPermissionAllowRoutes(router, config, storage);
 
   return router;
 }

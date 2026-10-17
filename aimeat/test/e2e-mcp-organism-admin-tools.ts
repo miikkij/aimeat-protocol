@@ -28,6 +28,9 @@
  *   - Operator repair: admin_organism_ownership, admin_organism_owner_add
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-organism-admin-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — aimeat_organism_invitations misses only organism:read, a one-press word, so
+ *     it is listed for an agent without it (permission ask, mcp/permission-ask-gate.ts) and the call
+ *     is refused SCOPE_DENIED with the allow address.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F06a-01, W27).
  */
 
@@ -177,12 +180,14 @@ await test('aimeat_organism_invite: the creator\'s agent invites X, and the invi
     assert(row && row.role === 'member', `pending invitation for X: ${JSON.stringify(row)}`);
 });
 
-await test('aimeat_organism_invitations: X\'s agent lists the invitation; an agent of X without organism:read is not offered the tool', async () => {
+await test('aimeat_organism_invitations: X\'s agent lists the invitation; an agent of X without organism:read is refused the tool with the allow address', async () => {
     const r = await callTool(xS, 'aimeat_organism_invitations', {});
     assert(!r.isError && Array.isArray(r.data), `list: ${r.text}`);
     assert(r.data.some((i: any) => i.organism_id === orgId && i.role === 'member'), `X's invitation is listed: ${r.text}`);
     const refused = await callTool(xReadlessS, 'aimeat_organism_invitations', {});
-    assert(refused.isError && !refused.offered, `an agent without organism:read read the invitations: ${refused.text}`);
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    assert(refused.isError && refused.offered && /^SCOPE_DENIED/.test(refused.text) && refused.text.includes('/v1/allow?'),
+        `an agent without organism:read read the invitations: ${refused.text}`);
     // The list is the caller's own: M has none, and M's agent does not see X's.
     const theirs = await callTool(mS, 'aimeat_organism_invitations', {});
     assert(!theirs.isError && !theirs.data.some((i: any) => i.organism_id === orgId), `M's agent sees X's invitation: ${theirs.text}`);

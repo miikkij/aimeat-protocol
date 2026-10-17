@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.9.0 — 2026-10-17 — The tools the person can allow with one press are on the list too, and a
+ *     call to one before they allow it answers with the address to give them.
  *   v1.8.0 — 2026-10-14 — Says where the list of places is (tier "places"), for "where do I find X".
  *   v1.7.0 — 2026-10-02 — Says where the setting explanations are (tier "settings"), for when the
  *     person asks what a setting means.
@@ -90,8 +92,11 @@ Each of those has its own handbook, and it is more use than this page.
 ## Two things that are true on every surface
 
 **Your scopes decide what you actually hold.** This surface lists everything the node offers; the
-tools you were given are the ones your permissions allow. When the owner changes them, the node
-says so and a client that follows the spec re-reads the list on its own.
+tools you were given are the ones your permissions allow, and the ones the person can allow with one
+press. Calling one of those before they have allowed it answers SCOPE_DENIED with an address: give
+the person that address in their words, never the name of a permission, and call again when they
+say it is done. When the owner changes your permissions, the node says so and a client that follows
+the spec re-reads the list on its own.
 
 **Say what you did in the person's words.** Ids, keys, scopes and tool names belong in what you do,
 not in what you tell them.

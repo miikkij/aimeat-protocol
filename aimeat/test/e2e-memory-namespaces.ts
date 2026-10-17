@@ -17,6 +17,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-memory-namespaces
  * @version-history
+ *   2026-10-17 — The MCP client refreshes its token on 401 invalid_token and repeats the request, as a
+ *     spec client does: an MCP OAuth token older than a widened grant is answered so
+ *     (mcp/permission-ask-gate.ts).
  *   2026-10-16 — An agent without memory:read is refused its owner's owner-visibility record on GET
  *     /v1/memory/:gaii/:key; an agent holding the word reads it (QA audit S3-03).
  *   2026-10-15 — "the agent CAN read it with ?owner_scope=true" asserted the hole: an agent holding
@@ -94,7 +97,9 @@ function parseSSE(text: string, id: number): any {
     }
     return {};
 }
-async function rpc(method: string, params: Record<string, unknown> = {}, notify = false) {
+/** The refresh grant of the open MCP session, used the way a client that follows the spec uses it. */
+let mcpRefresh = { token: '', clientId: '', clientSecret: '' };
+async function rpc(method: string, params: Record<string, unknown> = {}, notify = false, retried = false): Promise<any> {
     const id = mcpNextId++;
     const res = await fetch(`${BASE}/v1/mcp`, {
         method: 'POST',
@@ -105,6 +110,18 @@ async function rpc(method: string, params: Record<string, unknown> = {}, notify 
         },
         body: JSON.stringify(notify ? { jsonrpc: '2.0', method, params } : { jsonrpc: '2.0', id, method, params }),
     });
+    // A token older than a permission the owner has since given answers 401 invalid_token
+    // (mcp/permission-ask-gate.ts, 2026-10-17); a spec client refreshes it and repeats the request.
+    if (res.status === 401 && !retried && mcpRefresh.token && /invalid_token/.test(res.headers.get('www-authenticate') ?? '')) {
+        await res.text();
+        const tok = await json('/v1/mcp/token', { method: 'POST', body: JSON.stringify({
+            grant_type: 'refresh_token', refresh_token: mcpRefresh.token, client_id: mcpRefresh.clientId, client_secret: mcpRefresh.clientSecret,
+        }) });
+        assert(tok.status === 200, `mcp refresh ${tok.status}: ${JSON.stringify(tok.body)}`);
+        mcpToken = tok.body.access_token;
+        mcpRefresh.token = tok.body.refresh_token;
+        return rpc(method, params, notify, true);
+    }
     const sid = res.headers.get('mcp-session-id');
     if (sid) mcpSession = sid;
     if (notify) { await res.text(); return {}; }
@@ -127,6 +144,7 @@ async function openMcpSession(gaii: string, priv: string): Promise<void> {
     });
     assert(tok.status === 200, `mcp token ${tok.status}: ${JSON.stringify(tok.body)}`);
     mcpToken = tok.body.access_token;
+    mcpRefresh = { token: tok.body.refresh_token, clientId: client.body.client_id, clientSecret: client.body.client_secret };
     mcpSession = '';
     await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'ns-shadow e2e', version: '1.0.0' } });
     await rpc('notifications/initialized', {}, true);

@@ -50,6 +50,9 @@
  *   noteAgentRefusal(req.auth, ['agent:write'], false, 'PATCH /v1/agents/:name/tags');
  *   const { refusals, request } = await readAgentAccess(storage, ownerGhii, 'concierge', agent.defaultScopes ?? ['*']);
  * @version-history
+ *   2026-10-17 — initAgentRefusals takes a listener called once when a refusal opens (not declined, no
+ *     other open refusal for the same words); services/permission-ask-notice.ts asks the person
+ *     (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  *   2026-10-15 — readOwnerAgentAccessOrMarker and agentAccessFields: a failed read of the notes is
  *     answered with `refusals: null` and `refusals_unreadable: true` on every agent row, on REST and
  *     MCP alike, instead of an empty list (feature-list audit #30).
@@ -62,6 +65,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage, MemoryRecord, AgentTaskRecord } from '../storage/interface.js';
+import type { AgentRecord } from '../storage/types/identity.js';
 import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
@@ -143,8 +147,17 @@ const slots = new Map<string, Slot>();
 /** One write at a time per agent, so two refusals in the same moment cannot lose each other's entry. */
 const chains = new Map<string, Promise<void>>();
 
-export function initAgentRefusals(storage: Storage): void {
+/**
+ * Called once when a refusal opens: the agent was refused `words`, the owner has not declined them,
+ * and no other open refusal of the agent already needs the same words. services/permission-ask-notice.ts
+ * asks the person; a listener here keeps this file free of the bell and the email.
+ */
+export type RefusalOpenedListener = (ownerGhii: string, agent: AgentRecord, words: string[]) => void | Promise<void>;
+let openedListener: RefusalOpenedListener | null = null;
+
+export function initAgentRefusals(storage: Storage, onOpened?: RefusalOpenedListener): void {
   storageRef = storage;
+  openedListener = onOpened ?? null;
 }
 
 /**
@@ -265,6 +278,15 @@ async function persistRefusal(
     updatedAt: now,
   };
   await storage.setMemory(record);
+  // Newly opened, not declined, and no other open refusal already asks for the same words: ask the
+  // person once. For an any-of refusal one word is enough, so the first is what the person is asked.
+  const opened = !(at && stillOpen) && !merged.declinedAt;
+  const words = entry.anyOf ? entry.needed.slice(0, 1) : entry.needed;
+  if (opened && openedListener && !kept.some((e) => sameEntry(e, entry.needed, e.call))) {
+    await Promise.resolve(openedListener(ownerGhii, agent, words)).catch((err: unknown) => {
+      logger.warn('agent-refusals: the opened-refusal listener failed; the refusal is still noted', { gaii, error: String(err) });
+    });
+  }
   await noteOpenTasks(storage, gaii, merged);
   // The owner's open agents page reloads on this, so the refusal reaches the card without a reload.
   emitChange('agents', ownerGhii);

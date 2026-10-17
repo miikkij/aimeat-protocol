@@ -18,6 +18,8 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-10-17 — initAgentRefusals gets the listener that asks the person when a refusal opens
+ *     (services/permission-ask-notice.ts).
  *   2026-10-15 — flushProcessBuffers: the shutdown flush of the write buffers, moved from
  *     index-start.ts, and the agent refusal notes flushed with them (feature-list audit #30).
  *   v1.1.0 — 2026-10-02 — initScopeUse: the record of the permissions each `*` agent uses.
@@ -45,6 +47,7 @@ import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
 import { initAgentRefusals } from '../services/agent-refusals.js';
+import { sendPermissionAsk } from '../services/permission-ask-notice.js';
 import { initScopeUse } from '../services/scope-use.js';
 
 export interface ProcessBuffers {
@@ -83,8 +86,10 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // and changed, merged per reader, item, action and minute.
   initClassificationAudit(storage);
   // The agent refusal notes: a scope refusal of an agent goes on its card and its open tasks
-  // (services/agent-refusals.ts). Armed with the refusal log, before any route can refuse.
-  initAgentRefusals(storage);
+  // (services/agent-refusals.ts). Armed with the refusal log, before any route can refuse. A newly
+  // opened refusal the person can allow with one press asks them in the bell and by email
+  // (services/permission-ask-notice.ts).
+  initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
 
   // Generic read-cache invalidation: translate every mutation (`emitChange(domain, ownerGaii?)`)
   // into cache tag drops. The broad `domain:<d>` tag is the safety net for write paths that don't

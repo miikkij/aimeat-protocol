@@ -19,6 +19,9 @@
  *   Part C the arms that generate nothing · Part D refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=iam-generated-extension
  * @version-history
+ *   v1.2.0 — 2026-10-17 — D2: a memory:read agent is offered aimeat_extension_install and
+ *     aimeat_memory_write (permission ask, mcp/permission-ask-gate.ts), and each call is refused
+ *     SCOPE_DENIED with the allow address.
  *   v1.1.0 — 2026-10-01 — Tests 0 and A6 pinned two defects and now assert their fix (audit
  *     2026-10-01, defect B): the tool publishes default_role, version, author and ext_name, and the
  *     matrix is accumulated like the gate. A7 is new: the four inputs reach the gate, the manifest
@@ -440,11 +443,12 @@ await test('D1. REFUSAL: the tool refuses a call whose arguments do not match it
     assert(badTier.isError, `an unknown mutation tier is refused: ${JSON.stringify(badTier.raw).slice(0, 300)}`);
 });
 
-await test('D2. REFUSAL: a tool this session\'s scopes do not cover is not on the surface at all', async () => {
-    // A second agent, narrowed to memory:read. The MCP door registers a tool only when the
-    // session's scopes allow it, so a scope-gated one is absent from tools/list AND unreachable by
-    // name. aimeat_iam_define carries no scope word — it is a pure design function that touches no
-    // storage — so it stays, which is what makes the comparison mean something.
+await test('D2. REFUSAL: a tool this session\'s scopes do not cover is refused with the allow address', async () => {
+    // A second agent, narrowed to memory:read. Listed since 2026-10-17 (permission ask): a one-press
+    // permission keeps the tool on the list and the call is refused with the allow address. ext:write
+    // and memory:write are both one-press words, so the two tools are listed and every call to them
+    // answers SCOPE_DENIED. aimeat_iam_define carries no scope word (it is a pure design function that
+    // touches no storage), so it is listed and answered, which is what makes the comparison mean something.
     const ag = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ name: 'narrowhand', owner: ownerName, capabilities: ['memory'], model: 'gpt-4o' }),
@@ -459,14 +463,15 @@ await test('D2. REFUSAL: a tool this session\'s scopes do not cover is not on th
     narrow = await openSession(ag.body.data.agent.gaii, ag.body.data.private_key, 'narrow');
     const { body } = await rpc(narrow, 'tools/list');
     const names: string[] = body.result.tools.map((t: any) => t.name);
-    assert(!names.includes('aimeat_extension_install'), `ext:write is not held, so the install tool is absent: ${names.length} tools`);
-    assert(!names.includes('aimeat_memory_write'), 'and neither is the write it was not granted');
+    assert(names.includes('aimeat_extension_install'), `ext:write is one-press, so the install tool is listed: ${names.length} tools`);
+    assert(names.includes('aimeat_memory_write'), 'and so is the write it was not granted');
     assert(names.includes('aimeat_iam_define'), 'while the ungated design tool is still there');
 
     const blocked = await call(narrow, 'aimeat_extension_install', { name: 'x', manifest: 'metadata:\n  name: x\n' });
-    assert(blocked.isError, `calling it by name is refused: ${JSON.stringify(blocked.raw).slice(0, 300)}`);
+    assert(blocked.isError && blocked.text.startsWith('SCOPE_DENIED') && blocked.text.includes('/v1/allow?'),
+        `calling it is refused with the allow address: ${JSON.stringify(blocked.raw).slice(0, 300)}`);
     const written = await call(narrow, 'aimeat_memory_write', { key: 'iamgen.probe', value: { x: 1 } });
-    assert(written.isError, `and so is the write: ${JSON.stringify(written.raw).slice(0, 300)}`);
+    assert(written.isError && written.text.startsWith('SCOPE_DENIED'), `and so is the write: ${JSON.stringify(written.raw).slice(0, 300)}`);
 });
 
 await test('D3. REFUSAL: the REST door that installs what this tool designs is 401 without a credential', async () => {

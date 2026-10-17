@@ -30,6 +30,9 @@
  *   - Phase 5: payout status and the payment secret · Phase 6: the AI budget · Phase 7: scope narrowing
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-owner-only-parity
  * @version-history
+ *   v1.1.0 — 2026-10-17 — 2c, 3b, 3e, 5b: the bare agent is missing only a one-press word, so the
+ *     tool stays listed (permission ask, mcp/permission-ask-gate.ts) and the node MCP refusal is
+ *     SCOPE_DENIED with the allow address instead of "not offered"; REST still answers 403.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit D2-02).
  */
 
@@ -138,11 +141,16 @@ await test('2b. contact remove: the same agent removes on both surfaces', async 
     assert(!savedIn(book, bobContact) && !savedIn(book, operatorContact), `both gone from the book: ${short(book.map((c) => [c.contact_id, c.origin]))}`);
 });
 
+// Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+// messages:send, capability:write and commerce:sell are one-press (2c, 3b, 3e, 5b); the words outside every wildcard keep "not offered".
+const refusedWithAllow = (r: { isError: boolean; offered: boolean; text: string }) =>
+    r.isError && r.offered && /^SCOPE_DENIED/.test(r.text) && r.text.includes('/v1/allow?');
+
 await test('2c. contact add/remove: an agent without messages:send is refused on both surfaces', async () => {
     const add = await callTool(bareMcp, 'aimeat_contact_add', { contact_id: bob.name });
-    assert(add.isError && !add.offered, `node MCP add must not be offered: ${add.text.slice(0, 200)}`);
+    assert(refusedWithAllow(add), `node MCP add must be refused with the allow address: ${add.text.slice(0, 200)}`);
     const remove = await callTool(bareMcp, 'aimeat_contact_remove', { contact_id: bobContact });
-    assert(remove.isError && !remove.offered, `node MCP remove must not be offered: ${remove.text.slice(0, 200)}`);
+    assert(refusedWithAllow(remove), `node MCP remove must be refused with the allow address: ${remove.text.slice(0, 200)}`);
     const viaRest = await rest('POST', '/v1/contacts', bare.token, { contact_id: bob.name });
     assert(viaRest.status === 403, `REST add: ${viaRest.status}`);
     const del = await rest('DELETE', `/v1/contacts/${encodeURIComponent(bobContact)}`, bare.token);
@@ -171,7 +179,7 @@ await test('3a. capabilities create: the agent holding capability:write creates 
 
 await test('3b. capabilities create: an agent without capability:write is refused on both surfaces', async () => {
     const mcp = await callTool(bareMcp, 'aimeat_capabilities_create', { name: `parity-bare-${stamp}`, summary: 'refused' });
-    assert(mcp.isError && !mcp.offered, `node MCP must not offer it: ${mcp.text.slice(0, 200)}`);
+    assert(refusedWithAllow(mcp), `node MCP must refuse it with the allow address: ${mcp.text.slice(0, 200)}`);
     const viaRest = await rest('POST', '/v1/capabilities', bare.token, { name: `parity-bare-${stamp}`, summary: 'refused', visibility: 'private' });
     assert(viaRest.status === 403, `REST: ${viaRest.status} ${short(viaRest.body)}`);
 });
@@ -201,7 +209,7 @@ await test('3d. capabilities vouch: the agent vouches for bob\'s on both surface
 
 await test('3e. capabilities vouch: refused without capability:write on both surfaces, and for the agent\'s own on both', async () => {
     const mcp = await callTool(bareMcp, 'aimeat_capabilities_vouch', { id: bobCap });
-    assert(mcp.isError && !mcp.offered, `node MCP must not offer it: ${mcp.text.slice(0, 200)}`);
+    assert(refusedWithAllow(mcp), `node MCP must refuse it with the allow address: ${mcp.text.slice(0, 200)}`);
     const viaRest = await rest('POST', `/v1/capabilities/${encodeURIComponent(bobCap)}/vouch`, bare.token, {});
     assert(viaRest.status === 403, `REST: ${viaRest.status}`);
     const ownMcp = await callTool(workerMcp, 'aimeat_capabilities_vouch', { id: capMcp });
@@ -313,7 +321,7 @@ await test('5a. psp status: the agent holding commerce:sell reads the owner\'s s
 
 await test('5b. psp status: an agent without commerce:sell is refused on both surfaces', async () => {
     const mcp = await callTool(bareMcp, 'aimeat_commerce_psp_status', {});
-    assert(mcp.isError && !mcp.offered, `node MCP must not offer it: ${mcp.text.slice(0, 200)}`);
+    assert(refusedWithAllow(mcp), `node MCP must refuse it with the allow address: ${mcp.text.slice(0, 200)}`);
     const viaRest = await rest('GET', '/v1/commerce/payout', bare.token);
     assert(viaRest.status === 403, `REST: ${viaRest.status}`);
 });

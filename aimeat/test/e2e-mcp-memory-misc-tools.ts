@@ -33,6 +33,9 @@
  *   - Messages: aimeat_message_inbox, aimeat_message_history
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-memory-misc-tools
  * @version-history
+ *   v1.1.0 — 2026-10-17 — aimeat_memory_hands misses only memory:read, a one-press word, so it is
+ *     listed for an agent without it (permission ask, mcp/permission-ask-gate.ts) and the call is
+ *     refused SCOPE_DENIED with the allow address.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27).
  */
 
@@ -186,7 +189,7 @@ await test('aimeat_memory_restore: owner_scope on the owner\'s own binned record
     assert(still.status === 404, `the owner's record came back: ${still.status}`);
 });
 
-await test('aimeat_memory_hands: A\'s agent sees who wrote its key; B\'s agent sees no hands on it; an agent without memory:read is not offered it', async () => {
+await test('aimeat_memory_hands: A\'s agent sees who wrote its key; B\'s agent sees no hands on it; an agent without memory:read is refused it with the allow address', async () => {
     const key = `notes.hands${TAG}`;
     for (let i = 0; i < 2; i++) {
         const w = await callTool(aS, 'aimeat_memory_write', { key, value: { i } });
@@ -208,7 +211,9 @@ await test('aimeat_memory_hands: A\'s agent sees who wrote its key; B\'s agent s
     const theirs = await callTool(bS, 'aimeat_memory_hands', { key });
     assert(!theirs.isError && theirs.data.hands.length === 0, `B's agent sees hands on A's key: ${theirs.text}`);
     const refused = await callTool(aReadlessS, 'aimeat_memory_hands', { key });
-    assert(refused.isError && !refused.offered, `an agent without memory:read read the hands: ${refused.text}`);
+    // Listed since 2026-10-17 (permission ask): a one-press permission keeps the tool on the list and the call is refused with the allow address.
+    assert(refused.isError && refused.offered && /^SCOPE_DENIED/.test(refused.text) && refused.text.includes('/v1/allow?'),
+        `an agent without memory:read read the hands: ${refused.text}`);
 });
 
 // ── Data map ─────────────────────────────────────────────────────────────────────────────────
