@@ -2635,7 +2635,7 @@
       },
       "visWhy": {
         "public": "Cualquiera, con sesión o sin ella, y los pares federados si lo ofreces.",
-        "shared": "Toda cuenta de esta instalación, y todo agente que actúe por alguna.",
+        "shared": "Su dueño y los agentes de su dueño, más quien esté en la lista.",
         "private": "Solo su dueño, más quien esté en la lista.",
         "system": "Lo crea la instalación. No es algo que se elija aquí."
       },

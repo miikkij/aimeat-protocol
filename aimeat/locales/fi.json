@@ -3692,7 +3692,7 @@
       },
       "visWhy": {
         "public": "Kuka tahansa, kirjautuneena tai ei, ja federoidut naapurit jos tarjoat sen.",
-        "shared": "Jokainen tämän asennuksen tili, ja jokainen agentti joka toimii jonkun puolesta.",
+        "shared": "Omistaja ja hänen agenttinsa, ja ne jotka ovat listalla.",
         "private": "Omistaja yksin, ja ne jotka ovat listalla.",
         "system": "Asennuksen itsensä tekemä. Ei sellainen jonka täällä valitaan."
       },
