@@ -12,6 +12,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-17 — +team-data-in-personal-memory (plan V7, the data map step in both build interviews).
+ *     The two types moved verbatim to appdev-pitfall-types.ts and are re-exported here.
  *   2026-10-17 — Every entry re-read against node 4.0.3 (852e0eff6) by the pitfall-list watch and
  *     stamped. Seven corrected: app-declared-unused (a new app forks a genre; mountLoginButton with
  *     onSession), hand-rolled (no atelier.radar: chart with kind "radar"), atelier-register (a proto
@@ -72,44 +74,8 @@
  *     (app-builder-relevant sections only) + recurring app-build lessons.
  */
 
-/** Facet a pitfall applies to. Kept small and app-build-shaped on purpose. */
-export type AppdevPitfallScope =
-  | 'app'       // single-file HTML app itself
-  | 'auth'      // login / session / identity from an app origin
-  | 'ext'       // sandboxed extensions
-  | 'cortex'    // cortex layer / libs
-  | 'iam'       // apps with their own users/roles (aimeat-iam)
-  | 'realtime'  // AimeatRealtime multiplayer
-  | 'ai'        // AI calls from apps
-  | 'mobile'    // mobile / viewport / keyboard
-  | 'publish';  // publishing & updating apps over MCP
-
-export interface AppdevPitfallEntry {
-  /** Stable kebab-case id (referenced from prompts and learned-KB dedup). */
-  id: string;
-  title: string;
-  /** What the builder observes when they hit it. */
-  symptom: string;
-  /** What to do instead. */
-  fix: string;
-  appliesTo: AppdevPitfallScope[];
-  severity: 'info' | 'warn' | 'critical';
-  source: 'curated';
-  /** Entries can be superseded without deletion: outdated drops from default views. */
-  status?: 'active' | 'outdated';
-  /** Pointer into repo docs for maintainers (not served meaningfully to agents). */
-  docRef?: string;
-  updatedAt: string;
-  /**
-   * The day somebody last checked this entry against the platform code, and the node version that
-   * code was. `updatedAt` says when the WORDS changed; these say whether the words are still true.
-   * A registry nobody re-reads goes stale in silence: on 2026-09-13 one learned entry of 166 was
-   * marked outdated, while three that described fixed code were still telling builders to work
-   * around it.
-   */
-  verifiedAt?: string;
-  verifiedVersion?: string;
-}
+import type { AppdevPitfallScope, AppdevPitfallEntry } from './appdev-pitfall-types.js';
+export type { AppdevPitfallScope, AppdevPitfallEntry } from './appdev-pitfall-types.js';
 
 const E = (e: AppdevPitfallEntry): AppdevPitfallEntry => e;
 
@@ -347,6 +313,21 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
+    ...CHECKED,
+  }),
+
+  // ---- whose data it is --------------------------------------------------
+  // TalentGrid on innokas.aimeat.io, 2026-10-17: a company asked for ONE shared talent database
+  // and got an app where every person keeps their own (plan doc-mvcn6c7e4e5q, V7).
+  E({
+    id: 'team-data-in-personal-memory',
+    title: 'A team app built on per-user memory gives every person an empty copy',
+    symptom: 'Each person sees only what they entered themselves, while the team expected one shared list: a colleague adds a candidate and nobody else sees it. The cause is that the app keeps the team\'s data in each signed-in person\'s own memory (AIMEAT.data, or memory keys under the person), which is private to that person by design.',
+    fix: 'Ask the data map step of the build interview BEFORE building: who opens the app, whose each kind of data is (personal, shared by the team, public), who may change the shared data; then confirm a short scenario with named people and wait for a yes. Keep team data in ONE organism workspace (AIMEAT.organism read, writeDraft, publish; AIMEAT.organism.findOrCreateWorkspace or the kit\'s workspacePicker picks it on the first run), keep only each person\'s own view in AIMEAT.data, and limit who opens the app with its open_to setting (signed-in, or organism:<id>). An app already live with team data per person needs the records carried into the workspace once.',
+    appliesTo: ['app'],
+    severity: 'critical',
+    source: 'curated',
+    updatedAt: '2026-10-17',
     ...CHECKED,
   }),
 

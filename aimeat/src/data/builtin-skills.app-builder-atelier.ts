@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.33.0 — 2026-10-17 — Step 1 asks the data map and waits for a yes on a scenario with named
+ *     people before building; team data goes to one organism workspace (services/build-data-map-step.ts).
  *   v1.32.1 — 2026-10-11 — The price parts show a 'morsels' amount as pacing, never as a price
  *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa, kit 0.66.2 money-units.js).
  *   v1.32.0 — 2026-10-11 — Step 8 has a check for an app that shows work happening on the node:
@@ -200,6 +202,14 @@ moved under you says so.
 
 1. **Interview** — what the app does, who uses it, how it should FEEL (this picks the look
    preset), which languages, what it must not do.
+   **THEN THE DATA MAP, AND A YES.** Three more questions, as the specification's interview asks
+   them: who opens the app (just them, their organisation, anyone), whose each kind of data is
+   (personal, shared by the team, public), and who may change the shared data. Then write back a
+   two- or three-sentence scenario from their own idea with named people ("when Teemu adds a
+   candidate, Maija sees them at once in the same list") and build only after they say yes. Team
+   data goes to ONE organism workspace (\`workspacePicker\`, \`AIMEAT.organism\`), never into each
+   person's \`AIMEAT.data\`: that gives every person an empty copy. Who opens it is the app's
+   \`open_to\` setting (\`aimeat_app_manage\` action \`settings\`).
    **PROPOSE, THEN WAIT.** Before any code, show the owner what you are about to build and let
    them choose. FIRST THE LEVEL, which is theirs to choose and never yours: **a quick prototype**
    (a working draft to try one idea, the kit as it comes, no styling), **an ordinary page** (a

@@ -34,6 +34,8 @@
  *   import { buildAppPiece } from './build-app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
+ *   2026-10-17 — The section "How the data map answers steer the build" (build-data-map-step.ts) is
+ *     core, in part `data`.
  *   2026-10-17 — CLASSIC_TRACK_NOTICE names the `aimeat-track` classic declaration and the one use of
  *     the Atelier kit a Classic page may make (library blocks), as the track-mixing check reads it.
  *   2026-10-11 — The live-updates part says when to read it in the builder's terms: before a timer
@@ -85,6 +87,9 @@ export const SECTION_TABLE: Record<string, SectionRule> = {
   '': { id: 'opening', layer: 'core', part: 'start' },
   'Step 0 — Research first (agents with AIMEAT MCP tools)': { id: 'research', layer: 'core', part: 'start' },
   'Step 1 — Interview me first': { id: 'interview', layer: 'core', part: 'start' },
+  // Part `data`, not `start`: the interview's data map questions stay in `start`, and the steer
+  // they lead to did not fit there under MAX_PART_CHARS (build-data-map-step.ts, 2026-10-17).
+  'How the data map answers steer the build': { id: 'data-map-steer', layer: 'core', part: 'data' },
   'Step 2 — Build it (once I have answered)': { id: 'build', layer: 'core', part: 'start' },
   'AIMEAT Platform Instructions': { id: 'build', layer: 'core', part: 'start' },
   "Choose the app's shape (T1/T2/T3)": { id: 'shape', layer: 'core', part: 'start' },

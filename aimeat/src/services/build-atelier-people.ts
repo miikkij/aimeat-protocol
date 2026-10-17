@@ -24,6 +24,8 @@
  * @structure ATELIER_PROPOSAL_SECTION · ATELIER_FORK_PEOPLE_SECTION
  * @usage import { ATELIER_PROPOSAL_SECTION, ATELIER_FORK_PEOPLE_SECTION } from './build-atelier-people.js';
  * @version-history
+ *   v1.6.0 — 2026-10-17 — ADDITIVE: the proposal states the data map and repeats the confirmed
+ *     scenario, one bullet after "Who signs in" (build-data-map-step.ts, plan V7).
  *   v1.5.0 — 2026-09-20 — Components: how to take one another app made, and how to make a
  *     hand-made piece in the shape the Book takes (one prefix, tokens for colours, no script in
  *     the markup), so that it goes onto the shelf as it is when the owner is satisfied.
@@ -40,6 +42,7 @@
  *     BRIDGE in genres.ts), so a form or an empty state is mounted and never hand-made.
  *   v1.0.0 — 2026-09-19 — Initial.
  */
+import { ATELIER_DATA_MAP_PROPOSAL_LINE } from './build-data-map-step.js';
 
 /**
  * The end of the mosaic section. WHY IT EXISTS: until 2026-09-20 the specification asked for two
@@ -110,6 +113,7 @@ export const ATELIER_PROPOSAL_SECTION = '## Then propose, and wait for the answe
   + '- **What you take from the Design Book.** Look before you make (`aimeat_designbook_search`, part `book`): layouts, fills, looks, motion, ambients and effects that each passed their own bench, adopted in one call. The working screen of the app is a mosaic inside the genre, and its arrangement is where a fill from the book lands (part `book` shows how). THIS LINE IS OWED IN EVERY PROPOSAL, word for word in its shape: "From the Design Book I take: <part ids, and what each is for here>", or "From the Design Book I take nothing, because <what you looked at and why none of it fits>". Taking nothing is allowed; taking nothing in silence is not. What you have to make because the book lacks it is written down with its reason in the page\'s build notes; it is offered to the book when the owner is satisfied with the app, and not because the build is finished.\n'
   + '- **The languages: English and Finnish, unless they say otherwise.** Two languages is the default on this node. The language you are talking in is not the app\'s language list. Building for one language is the owner\'s decision, so ask it as a question if you think one is right, and do not decide it.\n'
   + '- **Who signs in**, and what is kept for them. An app nobody signs in to says so here.\n'
+  + ATELIER_DATA_MAP_PROPOSAL_LINE
   + '- **The first screen in one or two sentences**: what the person sees and does first. If that sentence is "a header and some cards", you have not designed it yet.\n\n'
   + 'Offer it as choices the owner can answer with a word. If they said "just build it", still say in one line which genre and which languages you are taking, so they can stop you. Then build on the Atelier track:\n\n';
 

@@ -30,6 +30,8 @@
  *   cd aimeat && pnpm check:prompt-refs            # exits 1 on any finding
  *   cd aimeat && pnpm check:prompt-refs --list     # the sources, and nothing runs
  * @version-history
+ *   v1.2.2 -- 2026-10-17 -- Reads build-data-map-step.ts, the data map step both build interviews
+ *     include (it names aimeat_app_manage and PATCH /v1/apps/:filename).
  *   v1.2.1 -- 2026-10-12 -- Reads the four skills of docs audit phase 5a (data ownership, attached MCP
  *     servers, workflow decisions, bookkeeping), each in its own file.
  *   v1.2.0 -- 2026-10-12 -- Reads the runtime examples (docs/msm-examples, docs/extensions,
@@ -81,6 +83,7 @@ const SOURCES: string[] = [
     'aimeat/src/services/build-app-layers.ts',
     'aimeat/src/services/build-app-prompt-driven.ts',
     'aimeat/src/services/build-atelier-prompt.ts',
+    'aimeat/src/services/build-data-map-step.ts',
     'aimeat/src/services/build-extension-prompt.ts',
     'aimeat/src/services/build-cortex-prompt.ts',
     'aimeat/src/services/appdev-flow-prompt.ts',

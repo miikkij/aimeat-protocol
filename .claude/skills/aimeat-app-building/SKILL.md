@@ -85,6 +85,8 @@ in the node-served spec (`GET /v1/prompts/build-app`, section "If several people
 that is what every builder fetches. Two things belong here as well, because they decide the work
 before any code is written.
 
+**Both build interviews ask the data map step, and nothing is built before a yes.** Three questions (who opens the app: just me, my organisation, anyone; for each kind of data, is it personal, shared by the team or public; who may change the shared data), then a two- or three-sentence scenario from the person's own idea with named people, which they confirm. Team data goes to one organism workspace (`AIMEAT.organism`, `workspacePicker`), never to per-user memory, which gives every person an empty copy (pitfall `team-data-in-personal-memory`; TalentGrid on innokas.aimeat.io was asked for one shared talent database and kept one per person). Who opens it is the app's `open_to` setting. The text is in `aimeat/src/services/build-data-map-step.ts`, included by both `build-app-prompt.ts` and `build-atelier-prompt.ts`; change it there, once.
+
 **The data map is a deliverable, and the owner approves it before the first `set()`.** Columns: what
 · where it lives · who owns it · who can read it · what happens when a member leaves · is it
 personal data. The last two are also exactly what a GDPR audit asks for, so this table is worth
