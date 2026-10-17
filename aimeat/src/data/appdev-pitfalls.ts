@@ -12,6 +12,19 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-17 — Every entry re-read against node 4.0.3 (852e0eff6) by the pitfall-list watch and
+ *     stamped. Seven corrected: app-declared-unused (a new app forks a genre; mountLoginButton with
+ *     onSession), hand-rolled (no atelier.radar: chart with kind "radar"), atelier-register (a proto
+ *     or plain page owes no register), app-grant-role-limits (an app grant can add a space and send
+ *     workspace invitations), no-max-tokens (an owner's saved limit still applies to a job),
+ *     session-fetch-parsed (the lowercase content-type trap is fixed in 3c8615738) and
+ *     mobile-means-fullscreen (the bottom strip is 46px); undeclared-scope-words also names
+ *     social:write for a realtime room, which the publish check now flags. Twelve marked outdated because the build
+ *     specification or a library guide now states the fact and no publish check cites the id:
+ *     unlabelled-ai-output, ai-provenance-dropped-on-save, biometric-inference-needs-your-own-notice,
+ *     pub-urls-for-cross-user-files, ui-component-shapes, handle-both-auth-paths,
+ *     presigned-over-inline, iam-decide-at-framing, realtime-batch-per-tick, realtime-anchor-clock,
+ *     outbound-replay-is-not-a-send, one-file-past-a-megabyte.
  *   2026-10-13 — undeclared-scope-words: the id the publish check carries for a word the code needs on a
  *     4.0 node and aimeat-scopes does not name (services/app-scope-needs.ts).
  *   2026-10-04 — isolated-frame-on-shared-nodes: the frame also takes a package's app on a node one
@@ -101,7 +114,7 @@ export interface AppdevPitfallEntry {
 const E = (e: AppdevPitfallEntry): AppdevPitfallEntry => e;
 
 /** The review that last read every entry against the code. */
-const CHECKED = { verifiedAt: '2026-09-13', verifiedVersion: '3.14.3' } as const;
+const CHECKED = { verifiedAt: '2026-10-17', verifiedVersion: '4.0.3' } as const;
 
 export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   // ---- app basics -------------------------------------------------------
@@ -142,11 +155,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'app-declared-unused',
     title: 'Loaded, declared, and never used',
     symptom: 'The published app opens with no sign-in and no way to change language or theme, or it downloads daisyUI and renders unstyled. Every stylesheet is linked and none of it shows. The publish answer warns about all three shapes; the person finds it in five seconds by opening the app.',
-    fix: 'Fetch `GET /v1/app-templates` and build on a shell. It already carries the login pill (the sign-in, the language switch and the theme control), the design system, and the head declarations in their correct form. Writing the page from nothing means reproducing all of that from memory, and what actually happens is that it is left out. If you keep a stylesheet or `aimeat-auth.js` in the head, use what it provides: call `AIMEAT.auth.login()` at start to restore a session, and treat mounting the pill as half of sign-in, not all of it (see handle-both-auth-paths).',
+    fix: 'Start from what the node hands you, never from an empty page. A new app forks a genre (`aimeat_app_template_get { id: "genre-<id>" }`) and adds the sign-in bar the way the Atelier specification\'s fork section shows. An app already on Classic keeps its shell from `GET /v1/app-templates`, which carries the login pill (the sign-in, the language switch and the theme control), daisyUI and the head declarations. If you keep a stylesheet or `aimeat-auth.js` in the head, use what it provides: mount the bar with `AIMEAT.auth.mountLoginButton(sel, { onSession })`, which restores a returning session and handles a fresh sign-in (see handle-both-auth-paths).',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-10-17',
     ...CHECKED,
   }),
   E({
@@ -175,11 +188,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'hand-rolled',
     title: 'A mechanism written by hand that a library of this node already is',
     symptom: 'The app runs its own speech recognition loop, its own audio graph, its own `fetch` to `/v1/memory`, `/v1/ai/` or `/v1/storage`, its own `EventSource` to the node, its own notification, its own language control, keeps a person\'s data under several `localStorage` keys, or draws a chart in code (SVG shapes or a 2d canvas) on a page that loads the Atelier kit. It works on the day it ships. It stops following the platform the day the route, the token handling or the consent rule behind it changes, and nobody is told. Publishing warns (`app_hints`, pitfall `hand-rolled`) when the page uses the browser API and loads none of the libraries that would have done it.',
-    fix: 'Read the list of libraries BEFORE writing a mechanism: `GET /v1/libs`, or part `libraries` of the build specification. Speech and conversation: `aimeat-voice`. Instruments and samples: `aimeat-audio`. A person\'s data: `aimeat-data`, one record per thing. A model: `aimeat-ai`, or `aimeat-decide` for a decision. Files: `aimeat-storage`. Live updates: `aimeat-live`. Notifications: `aimeat-push`. A chart, a gauge or a radar: `AIMEAT.atelier.chart`, `gauge`, `radar`, which draw in the page\'s own tokens; a genre that draws its own figures keeps them, and the warning stays quiet there. The language switch is in the sign-in bar. A draft or a preference in `localStorage` is fine. If the hand-written mechanism is deliberate, say why to the owner.',
+    fix: 'Read the list of libraries BEFORE writing a mechanism: `GET /v1/libs`, or part `libraries` of the build specification. Speech and conversation: `aimeat-voice`. Instruments and samples: `aimeat-audio`. A person\'s data: `aimeat-data`, one record per thing. A model: `aimeat-ai`, or `aimeat-decide` for a decision. Files: `aimeat-storage`. Live updates: `aimeat-live`. Notifications: `aimeat-push`. A chart, a gauge or a radar: `AIMEAT.atelier.chart` (with `kind: "radar"` for a radar) and `AIMEAT.atelier.gauge`, which draw in the page\'s own tokens; a genre that draws its own figures keeps them, and the warning stays quiet there. The language switch is in the sign-in bar. A draft or a preference in `localStorage` is fine. If the hand-written mechanism is deliberate, say why to the owner.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-09-19',
+    updatedAt: '2026-10-17',
     ...CHECKED,
   }),
   E({
@@ -218,12 +231,12 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   E({
     id: 'atelier-register',
     title: 'An Atelier app that never chose a look',
-    symptom: 'The app is the bare shell with words in it: stacked sections in the default look, the same page every other app built that way has. Publishing REFUSES this (APP_ARTIFACT_BROKEN): an Atelier app with no `aimeat-register` meta in its head, or with the shell\'s REPLACE-ME placeholder still there, does not go live.',
+    symptom: 'The app is the bare shell with words in it: stacked sections in the default look, the same page every other app built that way has. Publishing REFUSES this (APP_ARTIFACT_BROKEN): an Atelier app that states no `aimeat-level`, or states "fine", and has no `aimeat-register` meta in its head, still has the shell\'s REPLACE-ME placeholder, or names an empty `custom:` register, does not go live. A page whose owner chose "proto" or "plain" owes no register (see below-level).',
     fix: 'Start from a genre, never from the bare shell. `GET /v1/designbook?kind=genre` lists the committed registers and `GET /v1/app-templates/genre-<id>` hands over the whole page; every genre already carries `<meta name="aimeat-register" content="genre-<id>">`, so a fork passes the gate by construction. Swap the words, sources and images for the app at hand and keep the physics. A page that commits to a look of its own names it: `<meta name="aimeat-register" content="custom:<name>">`, where the name says what the register is (custom:game, custom:ledger), never "default". The bare shell is a frame, not a page.',
     appliesTo: ['app', 'publish'],
     severity: 'critical',
     source: 'curated',
-    updatedAt: '2026-09-05',
+    updatedAt: '2026-10-17',
     ...CHECKED,
   }),
   E({
@@ -249,10 +262,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'unlabelled-ai-output',
+    id: 'unlabelled-ai-output', status: 'outdated',
     title: 'An app that generates content and never says so',
     symptom: 'The app requests the `ai:use` scope, shows model-written text to a reader, and nothing on the page says a model wrote it. Publishing warns (`ai_hints`) and records a gap on the app; the catalogue card shows an "Unlabelled AI" marker to the owner.',
-    fix: 'Keep the `provenance` object AIMEAT.ai.complete() returns and render the label at first exposure: `AIMEAT.ai.disclose(r.provenance, { target: "#ai-label" })`. It draws the official EU label in the app\'s own theme, replaces whatever was in the target, and draws nothing when the node judges no label owed, so an origin line you want shown regardless is your own element beside it. Declare `<meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no">`, attach the record to anything stored with `AIMEAT.ai.declare(item, r.provenance)`, and open a chat with `AIMEAT.ai.chatNotice()`.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification states this in its AI transparency section. Keep the `provenance` object AIMEAT.ai.complete()returns and render the label at first exposure: `AIMEAT.ai.disclose(r.provenance, { target: "#ai-label" })`. It draws the official EU label in the app\'s own theme, replaces whatever was in the target, and draws nothing when the node judges no label owed, so an origin line you want shown regardless is your own element beside it. Declare `<meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no">`, attach the record to anything stored with `AIMEAT.ai.declare(item, r.provenance)`, and open a chat with `AIMEAT.ai.chatNotice()`.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
@@ -260,10 +273,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'ai-provenance-dropped-on-save',
+    id: 'ai-provenance-dropped-on-save', status: 'outdated',
     title: 'The label is on screen but the stored item forgot where it came from',
     symptom: 'The app renders the AI label correctly, then saves the generated item with AIMEAT.data.set() and the stored record carries no provenance. Anything reading the data later (another app, an agent, the owner in six months) reads it as content of unknown origin.',
-    fix: 'Wrap the value: `await AIMEAT.data.set(key, AIMEAT.ai.declare(item, r.provenance))`. declare() returns a copy carrying `aiProvenance` (the bare record) and `aiProvenanceUrl`, so an item read back has a different shape from the { record, recordUrl } object you rendered from: read `item.aiProvenance` when you disclose a stored item again.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the aimeat-ai library guide and the build specification state this. Wrap the value: `await AIMEAT.data.set(key, AIMEAT.ai.declare(item, r.provenance))`. declare() returns a copy carrying `aiProvenance` (the bare record) and `aiProvenanceUrl`, so an item read back has a different shape from the { record, recordUrl } object you rendered from: read `item.aiProvenance` when you disclose a stored item again.',
     appliesTo: ['app', 'ai'],
     severity: 'warn',
     source: 'curated',
@@ -279,14 +292,13 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-26',
-    verifiedAt: '2026-09-26',
-    verifiedVersion: '3.19.0',
+    ...CHECKED,
   }),
   E({
-    id: 'biometric-inference-needs-your-own-notice',
+    id: 'biometric-inference-needs-your-own-notice', status: 'outdated',
     title: 'Emotion or attention inference is the app owner\'s own duty to declare',
     symptom: 'The app reads a webcam, a microphone or interaction data to infer mood, emotion, attention or any other biometric category, and relies on the platform label to cover it. The platform label describes GENERATED content; it says nothing about inference performed on a person.',
-    fix: 'Tell the people exposed, in your own words, before the inference happens — `AIMEAT.ai.chatNotice({ target, title, body })` renders your wording. The duty sits with you as deployer, because only you know who is in front of the camera and why.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification states this duty in its AI transparency section. Tell the people exposed, in your own words, before the inference happens — `AIMEAT.ai.chatNotice({ target, title, body })` renders your wording. The duty sits with you as deployer, because only you know who is in front of the camera and why.',
     appliesTo: ['app'],
     severity: 'critical',
     source: 'curated',
@@ -305,10 +317,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'pub-urls-for-cross-user-files',
+    id: 'pub-urls-for-cross-user-files', status: 'outdated',
     title: 'Cross-user images/files need public /v1/pub/ URLs',
     symptom: 'Images or files embedded for OTHER users 404 or demand auth: the authed memory and file endpoints only serve the owner. Or a re-uploaded image keeps showing the old picture for a few minutes.',
-    fix: 'For anything another user or an anonymous visitor must see, store it public and reference /v1/pub/{gaii}/{key}. Public files are cached for five minutes, so after a re-upload use the `versioned_url` the upload answer returns. `AIMEAT.storage.viewUrl()` turns a stored reference, including the "gaii/key" form an agent\'s file write returns, into an address the browser can load.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the aimeat-storage library guide states this (viewUrl, versioned_url). For anything another user or an anonymous visitormust see, store it public and reference /v1/pub/{gaii}/{key}. Public files are cached for five minutes, so after a re-upload use the `versioned_url` the upload answer returns. `AIMEAT.storage.viewUrl()` turns a stored reference, including the "gaii/key" form an agent\'s file write returns, into an address the browser can load.',
     appliesTo: ['app'],
     severity: 'warn',
     source: 'curated',
@@ -327,10 +339,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'ui-component-shapes',
+    id: 'ui-component-shapes', status: 'outdated',
     title: 'The AIMEAT.ui components take the shapes their own docs name, not the usual ones',
     symptom: 'A tab strip never reacts, a table row click does nothing, or `input.value` is undefined, while nothing throws.',
-    fix: 'Read the component\'s api_surface (GET /v1/cortex/<pack>) instead of guessing from other libraries: `AIMEAT.ui.nav.Tabs({ target, tabs, active, onChange })` (onChange, not onSelect); DataTable has no row-click callback (use a list component\'s onItemClick, or a column that renders a button); Input and Select return `{ el, getValue(), setValue() }`, so read the value with getValue().',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): each component\'s api_surface in the cortex library guide states these shapes. Read the component\'s api_surface (GET /v1/cortex/<pack>) instead of guessing from other libraries: `AIMEAT.ui.nav.Tabs({ target, tabs, active, onChange })` (onChange, not onSelect); DataTable has no row-click callback (use a list component\'s onItemClick, or a column that renders a button); Input and Select return `{ el, getValue(), setValue() }`, so read the value with getValue().',
     appliesTo: ['app', 'cortex'],
     severity: 'warn',
     source: 'curated',
@@ -351,10 +363,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'handle-both-auth-paths',
+    id: 'handle-both-auth-paths', status: 'outdated',
     title: 'Show the app from onSession: onLogin alone misses a returning user',
     symptom: 'The app works on first sign-in but shows logged-out UI after a reload: onLogin fires on a fresh interactive sign-in, not on a session restored in the background.',
-    fix: 'Pass your "session ready" handler as `mountLoginButton(sel, { onSession: ready })`: it runs once for a restore (`restored: true`) and for a sign-in (`restored: false`), so there is one path instead of two. Without onSession, wire both: `AIMEAT.auth.login().then(s => { if (s) ready(s); })` for the restore and `onLogin: ready` for a fresh sign-in, and make ready() safe to run twice. The pill renders signed-in only from a live session, so a stale stored one no longer shows "logged in" over an app that cannot call anything.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification\'s session section and the aimeat-auth library guide state onSession. Pass your "session ready" handler as `mountLoginButton(sel, { onSession: ready })`: it runs once for a restore (`restored: true`) and for a sign-in (`restored: false`), so there is one path instead of two. Without onSession, wire both: `AIMEAT.auth.login().then(s => { if (s) ready(s); })` for the restore and `onLogin: ready` for a fresh sign-in, and make ready() safe to run twice. The pill renders signed-in only from a live session, so a stale stored one no longer shows "logged in" over an app that cannot call anything.',
     appliesTo: ['auth', 'app'],
     severity: 'warn',
     source: 'curated',
@@ -370,8 +382,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-25',
-    verifiedAt: '2026-09-25',
-    verifiedVersion: '3.19.0',
+    ...CHECKED,
   }),
   E({
     id: 'apps-localhost-cross-site',
@@ -387,12 +398,12 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   E({
     id: 'app-grant-role-limits',
     title: 'App tokens are role "app": organism structure and agent role gates refuse them',
-    symptom: 'An app-grant token gets 403 on a door that requires the agent role whatever scopes it holds: changing a workspace\'s structure (PUT /v1/organisms/:id/workspace, which also carries add_object_types), organism join and member administration. Creating an organism or a workspace is open to an app holding organism:write.',
-    fix: 'Keep the data model inside what an app grant can do, and put server-side rules in an extension (ext: namespace + action checks). A workspace whose manifest must grow a space is changed by the owner or the owner\'s agent, not by the app\'s own grant; an app that finds a space missing says so to the person instead of writing into it.',
+    symptom: 'An app-grant token gets 403 ACCESS_DENIED (Role "agent" required), whatever scopes it holds, when it replaces a workspace\'s whole structure (PUT /v1/organisms/:id/workspace, which also carries add_object_types), edits, deletes, joins or leaves an organism, accepts an invitation, or uses the organism member routes (/members, /admins, /owners, /agents, /invitations, /transfer). An app holding organism:write can still create an organism or a workspace and add a space to a workspace (POST /v1/organisms/:id/workspace/spaces?ws=<id>). The workspace access and email invitation routes that AIMEAT.organism\'s grant, revoke, decide and inviteByEmail call need organism:invite.',
+    fix: 'Keep the data model inside what an app grant can do, and put server-side rules in an extension (ext: namespace + action checks). An app that finds a space missing adds it with POST /v1/organisms/:id/workspace/spaces?ws=<id> and reads `status`: `applied` when the person manages the workspace, `pending_approval` (a suggestion its creator approves) when they contribute to it. Replacing the whole structure is a job for the owner or the owner\'s agent.',
     appliesTo: ['auth', 'ext'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-10-17',
     ...CHECKED,
   }),
   E({
@@ -434,11 +445,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'session-fetch-parsed',
     title: 'session.fetch returns the parsed envelope, and a refusal is a value, not an error',
     symptom: '`resp.json is not a function`; or the app renders nothing after a 403 because it read `resp.data` from `{ ok: false, error }`.',
-    fix: 'Use the value session.fetch resolves to: it is the parsed envelope. Check `res.ok` before `res.data` and show `res.error.message` otherwise; a refusal does not throw. A body that is not JSON (a proxy error page) does reject, so keep a catch. Never set your own lowercase `content-type` header.',
+    fix: 'Use the value session.fetch resolves to: it is the parsed envelope. Check `res.ok` before `res.data` and show `res.error.message` otherwise; a refusal does not throw. A body that is not JSON (a proxy error page) does reject, so keep a catch.',
     appliesTo: ['app', 'ext', 'cortex'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-10-17',
     ...CHECKED,
   }),
   E({
@@ -469,11 +480,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'no-max-tokens',
     title: 'Do not cap an AI call\'s output, and read `truncated` on every answer',
     symptom: 'An answer that stops mid-sentence and reads like a model failure. A cap cuts it in silence, and so can a limit the owner saved in their AI settings.',
-    fix: 'Do not pass max_tokens to AIMEAT.ai.complete(). Every answer carries `finish_reason` and `truncated` (true when the provider cut it at a length limit): when truncated is true, show the answer as unfinished or ask again, never as the whole answer. A generation that needs minutes belongs in AIMEAT.ai.job, which has no cap.',
+    fix: 'Do not pass max_tokens to AIMEAT.ai.complete(). Every answer carries `finish_reason` and `truncated` (true when the provider cut it at a length limit): when truncated is true, show the answer as unfinished or ask again, never as the whole answer. A generation that needs minutes belongs in AIMEAT.ai.job; it passes no cap of its own, but a limit the owner saved still applies there.',
     appliesTo: ['ai'],
     severity: 'critical',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-10-17',
     ...CHECKED,
   }),
   E({
@@ -490,10 +501,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
 
   // ---- publishing over MCP ---------------------------------------------
   E({
-    id: 'presigned-over-inline',
+    id: 'presigned-over-inline', status: 'outdated',
     title: 'Publish files >1 KB via presigned upload, never inline base64',
     symptom: 'A large app inlined as base64 wastes enormous context and tokens and can hit size caps.',
-    fix: 'Call aimeat_app_publish (or storage upload) WITHOUT the content param, receive upload_url, and PUT the raw file in the same shell pipeline: curl -s -X PUT "<upload_url>" -H "Content-Type: text/html" --data-binary @app.html. Never retype or edit an upload URL: request a fresh one. Crew-defs, provenance and the spec token ride along. To change a live app without holding it in context, use the draft tools (see edit-published-app).',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the aimeat_app_publish tool description and the appdev handbook state this. Call aimeat_app_publish (or storage upload) WITHOUT the content param, receive upload_url, and PUT the raw file in the same shell pipeline: curl -s -X PUT "<upload_url>" -H "Content-Type: text/html" --data-binary @app.html. Never retype or edit an upload URL: request a fresh one. Crew-defs, provenance and the spec token ride along. To change a live app without holding it in context, use the draft tools (see edit-published-app).',
     appliesTo: ['publish'],
     severity: 'warn',
     source: 'curated',
@@ -525,10 +536,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
 
   // ---- iam --------------------------------------------------------------
   E({
-    id: 'iam-decide-at-framing',
+    id: 'iam-decide-at-framing', status: 'outdated',
     title: 'Decide at framing time whether the app needs its OWN users (aimeat-iam)',
     symptom: 'An app that needs member roles/levels ships with hand-rolled auth lists in memory keys; retrofitting real IAM later is painful and often forgotten entirely.',
-    fix: 'If the app has its own user community (members, roles, levels, moderation), decide it in the plan/frame phase: the node keeps the roster (AIMEAT.iam.init({ app, roles: { member: [\'use\'] } }), MemberAdmin is the owner\'s roster and approval panel, JoinPanel the applicant\'s form), and the server-side gate is an extension generated by aimeat_iam_define, installed and named in init({ app, ext }). Start from the usecase-app-iam template. Do not bolt it on after the data model exists. A role belongs to the PERSON, so the agents of a member inherit it.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification states this in its own-users section. If the app has its own user community (members, roles, levels, moderation), decide it in the plan/frame phase: the node keeps the roster (AIMEAT.iam.init({ app, roles: { member: [\'use\'] } }), MemberAdmin is the owner\'s roster and approval panel, JoinPanel the applicant\'s form), and the server-side gate is an extension generated by aimeat_iam_define, installed and named in init({ app, ext }). Start from the usecase-app-iam template. Do not bolt it on after the data model exists. A role belongs to the PERSON, so the agents of a member inherit it.',
     appliesTo: ['iam', 'app'],
     severity: 'warn',
     source: 'curated',
@@ -541,11 +552,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'mobile-means-fullscreen',
     title: '"Mobile-optimized" means native full-screen, not trimmed CSS',
     symptom: 'A focused view (chat, editor, wizard) still shares the screen with app chrome on a phone and feels cramped; incremental CSS trims never satisfy.',
-    fix: 'Make the active view take the whole screen under @media (max-width:760px): position: fixed; inset: 0 gated on an is-active class, hide the surrounding chrome, and provide a Back affordance. Give a bottom input row `padding-bottom: var(--aimeat-chrome-bottom, 56px)` so it clears the node\'s own bottom marks.',
+    fix: 'Make the active view take the whole screen under @media (max-width:760px): position: fixed; inset: 0 gated on an is-active class, hide the surrounding chrome, and provide a Back affordance. Give a bottom input row `padding-bottom: var(--aimeat-chrome-bottom, 46px)` so it clears the node\'s own bottom marks.',
     appliesTo: ['mobile'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-10-17',
     ...CHECKED,
   }),
   E({
@@ -639,10 +650,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'realtime-batch-per-tick',
+    id: 'realtime-batch-per-tick', status: 'outdated',
     title: 'The realtime WS is rate-limited: batch per tick',
     symptom: 'A sequencer or a burst of pointer events stops broadcasting after a moment: one frame per event trips the limit of 50 frames a second per peer (the node default), and each refused frame arrives only as an `error` event with code RATE_LIMITED.',
-    fix: 'Send ONE message per tick carrying everything for that tick ({type:"notes-batch", notes:[...]}), throttle pointer streams to about 30 ms batches, and listen on rt.on("error") so a refusal is visible.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the realtime library guide states this. Send ONE message per tick carrying everything forthat tick ({type:"notes-batch", notes:[...]}), throttle pointer streams to about 30 ms batches, and listen on rt.on("error") so a refusal is visible.',
     appliesTo: ['realtime'],
     severity: 'warn',
     source: 'curated',
@@ -661,10 +672,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'realtime-anchor-clock',
+    id: 'realtime-anchor-clock', status: 'outdated',
     title: 'Sync a shared timeline off ONE broadcast anchor, not local clocks',
     symptom: 'Timing drifts between browsers; late joiners are out of phase; tempo changes make the beat jump.',
-    fix: 'Use window.SharedClock from /lib/realtime.js: the leader broadcasts clock.start(), a joiner sends a sync-request and calls clock.adopt(payload), and a tempo change re-anchors instead of jumping. Hand-rolled, it is: broadcast t0 (unix ms of step 0) + bpm and compute step = floor((Date.now()-t0)/stepMs) % N on every client. Never derive shared timing from a local setInterval counter.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the realtime library guide states SharedClock and the leader and joiner flow. Use window.SharedClock from /lib/realtime.js: theleader broadcasts clock.start(), a joiner sends a sync-request and calls clock.adopt(payload), and a tempo change re-anchors instead of jumping. Hand-rolled, it is: broadcast t0 (unix ms of step 0) + bpm and compute step = floor((Date.now()-t0)/stepMs) % N on every client. Never derive shared timing from a local setInterval counter.',
     appliesTo: ['realtime'],
     severity: 'warn',
     source: 'curated',
@@ -685,10 +696,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
 
   // ---- sending and scheduling -------------------------------------------
   E({
-    id: 'outbound-replay-is-not-a-send',
+    id: 'outbound-replay-is-not-a-send', status: 'outdated',
     title: 'replay: true means nothing was sent just now, and an empty link is not a link',
     symptom: 'An app says "you already sent this" and prints a sentence ending in a colon, or links to nothing, for a post that never reached anyone.',
-    fix: 'Read attempt.status before telling a person something went out: replay: true only says this call published nothing. A provider can answer a successful share with an empty external reference, so test a link with `||`, never `??`, before rendering it.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the aimeat-connect library guide states how to read status and replay. Read attempt.status before telling a person something went out: replay: true only says this call published nothing. A provider can answer a successful share with an empty external reference, so test a link with `||`, never `??`, before rendering it.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
@@ -720,10 +731,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
 
   // ---- the app that keeps growing ---------------------------------------
   E({
-    id: 'one-file-past-a-megabyte',
+    id: 'one-file-past-a-megabyte', status: 'outdated',
     title: 'A single-file app past a megabyte slows every edit',
     symptom: 'Changes that used to take five minutes take thirty or forty, and it came on over a couple of days while the node answered normally. Measured on one real app: 3.18 MB, 43 213 lines, 1550 functions, 477 kB of it base64 images inlined into the source, and one line 294 490 characters long; a search that touches that line puts about 70 000 tokens into the conversation in one tool result. The publish answer reports the size (next_steps.size), but only when somebody reads it.',
-    fix: 'An AI edit costs what has to be READ to make it, so the file size IS the edit cost. Three moves, cheapest first: (1) get the assets out: upload each image once (visibility public) and reference https://<node>/v1/pub/<ghii>/<key>, never a data URI in the source; (2) split the sources on your own machine behind a build script that assembles the one HTML file the node serves, starting from GET /v1/app-templates/workstation-project, which ships the guards; (3) edit like the file is big: one change per round, name the function, read the region rather than the file. The skill is node:aimeat-app-workstation. next_steps.size carries the bytes, the share of the node ceiling, the growth per day and the date that rate meets the ceiling.',
+    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification states this. An AI edit costs what has to be READ to make it, so the file size IS the edit cost. Three moves, cheapest first: (1) get the assets out: upload each image once (visibility public) and reference https://<node>/v1/pub/<ghii>/<key>, never a data URI in the source; (2) split the sources on your own machine behind a build script that assembles the one HTML file the node serves, starting from GET /v1/app-templates/workstation-project, which ships the guards; (3) edit like the file is big: one change per round, name the function, read the region rather than the file. The skill is node:aimeat-app-workstation. next_steps.size carries the bytes, the share of the node ceiling, the growth per day and the date that rate meets the ceiling.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
@@ -736,7 +747,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'undeclared-scope-words',
     title: 'From 4.0 a route the app calls refuses a word its aimeat-scopes does not name',
     symptom: 'On a 4.0 node a signed-in app gets 403 SCOPE_DENIED from routes that answered on 3.x: an extension action (/v1/ext/..., AIMEAT.iam, AIMEAT.webhook, a cortex lib that calls one), the agent list (AIMEAT.agents.list, /v1/agents), organism workspaces (AIMEAT.organism.workspaces, AIMEAT.intake.listForms), schedules (POST /v1/schedules, AIMEAT.refinery.schedule) or a schedule edit (PATCH /v1/schedules/:id). The publish answer warns with the word and the line that needs it.',
-    fix: 'Name every word the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these words by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept.',
+    fix: 'Name every word the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access, social:write for a new realtime room. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these words by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',

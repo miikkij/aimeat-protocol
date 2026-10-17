@@ -41,6 +41,8 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   2026-10-17 — The two inline-js-does-not-parse messages give a node command a builder can run, not
+ *     `pnpm check:js-syntax`, which exists only in this repository (pitfall-list round).
  *   2026-10-13 — undeclared-scope-words: a warning naming each word the code (and the cortex libs it loads,
  *     read from this node) needs on a 4.0 node and the sign-in does not ask for (services/app-scope-needs.ts).
  *   2026-10-02 — Classic with kit blocks is a case of its own (wish-a-classic-app-that-loads-the-
@@ -430,8 +432,9 @@ function checkInlineScripts(html: string): AppArtifactFinding[] {
     } catch (err) {
       out.push(finding('inline-js-does-not-parse', 'critical',
         `Inline <script> #${block.index} does not parse, so the browser stops there and the rest of the `
-        + `app never runs: ${(err as Error).message}. Fix the syntax and publish again — locally, `
-        + '`pnpm check:js-syntax --html your-app.html` parses every block the same way this does.'));
+        + `app never runs: ${(err as Error).message}. Fix the syntax and publish again. To parse a block on `
+        + 'your own machine, save its body as block.js and run '
+        + '`node -e \'new (require("vm").Script)(require("fs").readFileSync(process.argv[1],"utf8"))\' block.js`.'));
     }
   }
   return out;
@@ -454,7 +457,7 @@ function checkUnparsedModules(html: string): AppArtifactFinding[] {
     `${skipped.join(', ')} ${one ? 'is a type="module" block and was' : 'are type="module" blocks and were'} `
     + 'not parsed: this node runs without --experimental-vm-modules, so it cannot read module syntax, '
     + 'and a syntax error in there would stop the module in the browser with nothing said here. Parse '
-    + 'it before publishing: `pnpm check:js-syntax --html your-app.html` reads module blocks too.')];
+    + 'it before publishing: save the block as block.mjs and run `node --check block.mjs`.')];
 }
 
 // ── Blocking check 2: do the app's asset URLs exist on this node? ───────────────────────────────

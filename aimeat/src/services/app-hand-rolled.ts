@@ -23,6 +23,7 @@
  * @structure HAND_ROLLED_RULES · handRolledFindings(html)
  * @usage const hints = handRolledFindings(html);
  * @version-history
+ *   v1.1.2 — 2026-10-17 — The chart hint names chart's radar kind; the kit has no atelier.radar() (pitfall-list round).
  *   v1.1.1 — 2026-09-20 — The inline scripts and their block comments are read by utils/html-blocks
  *     in one pass. Both patterns it replaces scanned to the end of the file from every `<script`
  *     and every `/*`, which is quadratic on a page that closes neither (CodeQL js/polynomial-redos,
@@ -103,7 +104,7 @@ export function handRolledFindings(html: string): AppArtifactFinding[] {
     const genre = /<meta\b[^>]*name\s*=\s*["']aimeat-register["'][^>]*content\s*=\s*["']genre-([a-z0-9-]+)["']/i.exec(html.slice(0, 8192))?.[1];
     const genreDraws = genre ? /<svg|createElementNS|getContext\(/.test((GENRE_BODIES as Record<string, string>)[genre] ?? '') : false;
     if (!genreDraws) {
-      found.push('a chart drawn in code (SVG shapes or a 2d canvas) while the kit is loaded: `AIMEAT.atelier.chart` draws bars, lines, areas, donuts, scatter and sparklines in the page\'s own tokens and follows the theme, and `gauge` and `radar` are beside it');
+      found.push('a chart drawn in code (SVG shapes or a 2d canvas) while the kit is loaded: `AIMEAT.atelier.chart` draws bars, lines, areas, donuts, scatter and sparklines in the page\'s own tokens and follows the theme (`kind: "radar"` draws a radar), and `AIMEAT.atelier.gauge` is beside it');
     }
   }
   // A draft and a preference are not a store; a third key is.

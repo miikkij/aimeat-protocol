@@ -34,6 +34,8 @@
  *   import { buildAppPiece } from './build-app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
+ *   2026-10-17 — CLASSIC_TRACK_NOTICE names the `aimeat-track` classic declaration and the one use of
+ *     the Atelier kit a Classic page may make (library blocks), as the track-mixing check reads it.
  *   2026-10-11 — The live-updates part says when to read it in the builder's terms: before a timer
  *     around a read. Its old line described what the part does, and a builder about to poll did
  *     not recognise their case in it.
@@ -278,7 +280,8 @@ export function layeredBuildAppPrompt(full: string, baseUrl: string): { prompt: 
  */
 export const CLASSIC_TRACK_NOTICE = '### Which track this is\n'
   + 'This is the CLASSIC build specification. A NEW app is built on the Atelier track instead: forked from a genre, with the served component kit carrying the header, the sign-in and the loading, empty and error states. Its specification is `aimeat_handbook_get { tier: "build-app-atelier" }`, and its skill is `node:aimeat-app-builder-atelier`. '
-  + 'Read on here only if you are improving an app that is already Classic, or the owner asked for the Classic track by name. If you began on Atelier, stay on it: the two guides do not describe each other, and changing over in the middle means starting again.\n\n';
+  + 'Read on here only if you are improving an app that is already Classic, or the owner asked for the Classic track by name. If you began on Atelier, stay on it: the two guides do not describe each other, and changing over in the middle means starting again. '
+  + 'Declare `<meta name="aimeat-track" content="classic">` in the head. A Classic page may load the Atelier kit for a library block it calls, such as `AIMEAT.atelier.members` or `aiTask`, but it never draws the Atelier shell with `atelier.app()`.\n\n';
 
 export interface SpecPiece { id: string; kind: 'part' | 'section'; text: string }
 

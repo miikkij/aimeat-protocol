@@ -31,6 +31,7 @@
  *   const libs = await loadLibs(cortexLibRefs(html));
  *   const { missing } = undeclaredScopeNeeds(html, libs);
  * @version-history
+ *   v1.0.2 — 2026-10-17 — A realtime room made with createRoom() or a POST to /v1/realtime/rooms needs social:write (pitfall-list round).
  *   v1.0.1 — 2026-10-15 — cortexLibRefs bounds the cortex name and the file path in its pattern
  *     (CodeQL js/polynomial-redos).
  *   v1.0.0 — 2026-10-13 — Initial.
@@ -95,6 +96,9 @@ const RULES: Rule[] = [
   { word: 'social:read', re: new RegExp(`${LIT}/v1/appeals['"\\x60?]`, 'g') },
   { word: 'catalogue:read', re: new RegExp(`${LIT}/v1/cortex/[^'"\\x60/\\s]+(?:/prompts|/ontology)`, 'g') },
   { word: 'work:request', re: new RegExp(`${LIT}/v1/federation/cross-node/work`, 'g') },
+  // A realtime room made by the realtime library or by a POST (routes/realtime.ts); a list is a GET and open.
+  { word: 'social:write', re: /\b[A-Za-z_$][\w$]*\.createRoom\s*\(/g },
+  { word: 'social:write', re: new RegExp(`${LIT}/v1/realtime/rooms['"\\x60]\\s*,\\s*\\{[^}]{0,80}?method\\s*:\\s*['"\\x60]POST['"\\x60]`, 'gi') },
 ];
 
 /** The text around a match, on one line, for the owner to read. */

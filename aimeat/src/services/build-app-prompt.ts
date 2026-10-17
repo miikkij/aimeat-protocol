@@ -15,6 +15,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-10-17 — Pitfall-list round: the first declared language is a fallback, an agent's MCP upload is addressed by its embed_url, the realtime sample takes a ws ticket and names social:write, and the width check adds a per-element measure under overflow-x: clip. Additive.
  *   2026-10-13 — The scope notes name the words node 4.0 asks of an app's calls (ext:invoke, agent:read, task:write, workflow:write, organism:read, organism:invite). Additive.
  *   2026-10-11 — A comment calls a morsel amount pacing, not a price (no prompt text changed).
  *   2026-10-11 — Events first, a timer last: the section "Live updates without a firehose" moved to build-events-first.ts and opens with that rule; the real-time section's last line points a simple app at AIMEAT.live, where it said "on a timer".
@@ -245,7 +246,7 @@ function composeAppPrompt(
   body += 'var lang = AIMEAT.auth.getLang();                 // "en" | "fi" — resolved ?lang= > localStorage > cookie > navigator\n';
   body += 'window.addEventListener("aimeat-lang-change", function (e) { lang = e.detail.lang; render(); });\n';
   body += '```\n';
-  body += 'Declare one language (or none) and no control renders. The choice is stored under the ONE platform key `aimeat-lang`, the same one the AIMEAT SPA and the sign-in modal use, so an app and the site agree. `AIMEAT.auth.setLang("fi")` sets it programmatically. Do not invent a second key, a second control, or a `?locale=` parameter.\n\n';
+  body += 'Declare one language (or none) and no control renders. The choice is stored under the ONE platform key `aimeat-lang`, the same one the AIMEAT SPA and the sign-in modal use, so an app and the site agree. `AIMEAT.auth.setLang("fi")` sets it programmatically. Do not invent a second key, a second control, or a `?locale=` parameter. The first language in `aimeat-locales` is a fallback, not a default: a browser set to another declared language wins over it. When the app must open in one language until the person picks another, read `?lang=` and `localStorage["aimeat-lang"]` yourself, fall back to your own default, and pass the result to `AIMEAT.auth.setLang()`.\n\n';
 
   body += '### App permissions (scopes)\n';
   body += 'An app that declares nothing gets the DEFAULT grant: `memory:read memory:write storage:read storage:write`. If the app needs more, declare EVERY scope it uses in the head — the user approves them at sign-in:\n';
@@ -421,7 +422,7 @@ function composeAppPrompt(
   body += "// Save that url (or { owner: session.ghii, key }) in the entry's memory record.\n";
   body += '```\n';
   body += "Gotcha: `AIMEAT.storage.publicUrl(key)` returns the OWNER's `/v1/storage/...` URL, which requires the owner's auth — it will NOT load for other users. Cross-user image display always uses `/v1/pub/<owner-ghii>/<key>`.\n";
-  body += "The same rule covers the app's OWN pictures — logo, background, samples. An asset inlined as a data URI is carried in the source forever and re-uploaded on every publish; one app on this node reached 3.18 MB that way, of which 477 kB was base64 and one line was 294 490 characters long, and its author's small changes went from five minutes to forty. Past roughly 300 kB, keep the sources split behind a build step on your own machine that assembles the one HTML file: skill `node:aimeat-app-workstation`, starter `GET /v1/app-templates/workstation-project`.\n\n";
+  body += "The same rule covers the app's OWN pictures — logo, background, samples. An asset inlined as a data URI is carried in the source forever and re-uploaded on every publish; one app on this node reached 3.18 MB that way, of which 477 kB was base64 and one line was 294 490 characters long, and its author's small changes went from five minutes to forty. Past roughly 300 kB, keep the sources split behind a build step on your own machine that assembles the one HTML file: skill `node:aimeat-app-workstation`, starter `GET /v1/app-templates/workstation-project`. A file that an agent uploads over MCP (aimeat_storage_upload) is stored under the agent's GAII, not the owner's: use the `embed_url` the upload returns, and never build a `/v1/pub/<owner>/<key>` address for that file by hand.\n\n";
 
   // The prompt-driven workflow (aimeat-prompt.js): AI work done in the person's own chat. Its own
   // file, services/build-app-prompt-driven.ts, because this one is at the 800-line limit.
@@ -509,13 +510,13 @@ function composeAppPrompt(
 
   // Real-time / multiplayer
   body += '### Real-time / multiplayer (optional)\n';
-  body += 'For shared live state (presence boards, 1v1 games) use realtime rooms via your authenticated session.fetch:\n';
+  body += 'For shared live state (presence boards, 1v1 games) use realtime rooms via your authenticated session.fetch. Creating a room needs `social:write` in aimeat-scopes:\n';
   body += '```javascript\n';
   body += '// 1) create or join a room\n';
   body += 'const room = (await session.fetch("/v1/realtime/rooms", { method: "POST",\n';
   body += '  body: JSON.stringify({ name: "my-room" }) })).data;   // → { id, ws_url }\n';
-  body += '// 2) open a WebSocket for live presence + messages\n';
-  body += 'const ws = new WebSocket(location.origin.replace(/^http/, "ws") + room.ws_url);\n';
+  body += 'const t = (await session.fetch("/v1/ws/ticket", { method: "POST", body: JSON.stringify({ socket: "realtime" }) })).data.ticket;   // 2) a single-use ticket: the node refuses a socket with no credential\n';
+  body += 'const ws = new WebSocket(location.origin.replace(/^http/, "ws") + room.ws_url + "&ticket=" + encodeURIComponent(t));\n';
   body += 'ws.onmessage = (e) => handle(JSON.parse(e.data));\n';
   body += '// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n';
   body += '```\n';
@@ -600,7 +601,7 @@ function composeAppPrompt(
   body += '- **The login pill folds itself on a phone, at any address the app is served from.** At 600px and below `mountLoginButton` shows one small button and puts the rest in a popover: signed in, the account button holds the whole pill; signed out, Sign In stays in the row and the language, light/dark and palette controls sit behind a settings button. Pass `compact: false` only if you lay out the full row yourself. Do NOT put other fixed-width widgets in the header row next to it; let header children shrink (`min-width: 0`).\n';
   body += '- **CSS grid: use `grid-template-columns: … minmax(0,1fr)` and `min-width: 0` on grid/flex children.** A plain `1fr` is `minmax(auto,1fr)`, so a wide non-wrapping child (a table, `<pre>`, long code) inflates the track and overflows the page even inside an `overflow-x:auto` wrapper. `minmax(0,…)` + `min-width:0` let it shrink so the wrapper actually scrolls.\n';
   body += '- **Wrap wide content** — put tables / code blocks / diagrams in a `overflow-x:auto` container, and `flex-wrap: wrap` any toolbar/nav row whose item count can grow (tabs, pager dots).\n';
-  body += '- **Verify**: at 390px (portrait) AND ~844px (landscape), `document.documentElement.scrollWidth === clientWidth` (zero horizontal overflow) and body text stays ≥14px.\n';
+  body += '- **Verify**: at 390px (portrait) AND ~844px (landscape), `document.documentElement.scrollWidth === clientWidth` (zero horizontal overflow) and body text stays ≥14px. Under `overflow-x: clip` that check passes even when something is cut off at the edge, so also measure per element: `[...document.querySelectorAll("body *")].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5)` must be empty.\n';
   body += 'For a focused view (chat/editor/wizard) on ≤760px, go full-screen (`position:fixed; inset:0` gated on an is-active class) with a Back affordance, rather than sharing the screen with app chrome.\n\n';
 
   // Mobile INPUT, which is a different failure from mobile layout and was missing until
