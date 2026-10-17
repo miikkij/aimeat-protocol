@@ -86,7 +86,8 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/
 import { verifyShareToken, shareTokenVersionOf } from '../../services/share-token.js';
 import { emitMemoryWritten } from '../../services/event-bus.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../../services/doc-images.js';
-import { resolveIdentity, isSameOwner, isGEAI, localAccountName, isForeignPrincipal } from '../../utils/gaii.js';
+import { resolveIdentity, isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
+import { isNodeAccount } from '../../services/audience.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
@@ -652,7 +653,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     if (share.access === 'open') return null;
     // A session signed in on ANOTHER node is a visitor here, not an account of this node: 'account'
     // means this node's accounts and their agents (plan doc-mvcn6c7e4e5q, V0.5).
-    const authed = !!req.auth && req.auth.anonymous !== true && !isForeignPrincipal(req.auth);
+    const authed = isNodeAccount(req.auth);
     if (share.access === 'account') {
       return authed ? null : { code: 'SHARE_ACCOUNT_REQUIRED', message: 'Sign in to view these shared documents' };
     }
