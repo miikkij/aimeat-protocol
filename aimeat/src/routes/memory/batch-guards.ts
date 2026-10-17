@@ -5,6 +5,8 @@
  * @description Identical entry guards used by both memory batch routes.
  * @structure batchKeyRefusal; storageReferenceRefusal; visibilityRefusal
  * @version-history
+ *   2026-10-17 — visibilityRefusal names 'organism:<organism id>' among the words a write takes; the
+ *     membership refusal itself is the shared writer's (services/organism-visibility.ts).
  *   2026-10-16 — visibilityRefusal: an entry of the bulk write takes the visibilities the single write takes, read from MemoryWriteSchema (QA audit list review).
  *   1.1.0 2026-10-11 An `agents.` key that carries an identity where the name belongs is refused.
  *   1.0.0 2026-09-27 Extract the shared rules and apply file-reference checks on restore.
@@ -15,6 +17,7 @@ import { agentKeyRefusal } from '../../utils/agent-key-address.js';
 import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secret-records.js';
 import { isAnonymousGaii } from './shared.js';
 import { MemoryWriteSchema } from '../../models/schemas.js';
+import { MEMORY_WRITE_VISIBILITIES } from '../../utils/visibility-words.js';
 
 export function batchKeyRefusal(roles: string[], gaii: string, key: string): string | null {
   if (isServerWrittenKey(key)) return serverWrittenKeyRefusal(key).message;
@@ -43,7 +46,7 @@ export async function storageReferenceRefusal(storage: Storage, gaii: string, va
  */
 export function visibilityRefusal(visibility: unknown): string | null {
   if (MemoryWriteSchema.shape.visibility.safeParse(visibility).success) return null;
-  const allowed = MemoryWriteSchema.shape.visibility.unwrap().options.join(', ');
+  const allowed = [...MEMORY_WRITE_VISIBILITIES, 'organism:<organism id>'].join(', ');
   return `visibility "${String(visibility)}" is not one a memory write takes. Use one of ${allowed}, or leave it out for private. `
     + 'A record a workspace reads is written through the workspace (aimeat_workspace_write).';
 }

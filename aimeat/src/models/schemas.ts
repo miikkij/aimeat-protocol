@@ -15,6 +15,9 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Organism visibility — 2026-10-17 — MemoryWriteSchema, MemoryUpdateSchema and ChunkedUploadInitSchema
+ *     take 'organism:<organism id>' (utils/visibility-words.ts); the chunked init takes 'members' too,
+ *     as POST /v1/storage does (plan doc-mvcn6c7e4e5q, V3.2/V3.3).
  *   Dispute verdict — 2026-10-15 — OperatorRulingSchema.ruling is one of DISPUTE_VERDICTS (requester_wins, provider_wins, split), as openapi.yaml states; it took any text (feature-list audit #143).
  *   Consent reach — 2026-10-12 — ConsentCreateSchema takes `local`, `federation`, `auth` and the
  *     deprecated aliases `private` and `dmz`, with no default: the service decides it by version
@@ -43,6 +46,7 @@ import { z } from 'zod';
 import { annotationErrors } from '../utils/onto-context.js';
 import { CONSENT_REACH_INPUTS } from '../utils/consent-reach.js';
 import { AiProvenanceBodyFields } from '../tool-catalog/ai-provenance-schema.js';
+import { memoryWriteVisibilitySchema, storedVisibilitySchema } from '../utils/visibility-words.js';
 
 // ── Semantic Ontology (Phase 0.7b) ─────────────────────────
 
@@ -129,7 +133,8 @@ export const OtkGenerateSchema = z.object({
 export const MemoryWriteSchema = z.object({
     key: z.string().min(1).max(256),
     value: z.unknown(),
-    visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).optional(),
+    // 'organism:<organism id>' too: the active members of one organism (utils/visibility-words.ts).
+    visibility: memoryWriteVisibilitySchema.optional(),
     group_id: z.string().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).optional(), // max 1 year
@@ -150,7 +155,7 @@ export const MemoryWriteSchema = z.object({
 
 export const MemoryUpdateSchema = z.object({
     value: z.unknown().optional(),
-    visibility: z.enum(['private', 'owner', 'group', 'members', 'public']).optional(),
+    visibility: memoryWriteVisibilitySchema.optional(),
     group_id: z.string().optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).nullable().optional(),
@@ -356,7 +361,8 @@ export const ChunkedUploadInitSchema = z.object({
     key: z.string().min(1).max(256),
     mime_type: z.string().min(1),
     chunk_size: z.number().int().positive(),
-    visibility: z.enum(['private', 'owner', 'group', 'public', 'workspace']).optional(),
+    // Every visibility POST /v1/storage takes, 'members' and 'organism:<organism id>' included.
+    visibility: storedVisibilitySchema.optional(),
     total_chunks: z.number().int().positive().optional(),
     // The same binding POST /v1/storage takes (2026-09-29): a 'group' file names its group, a
     // 'workspace' file its workspaces as "<organismId>/<workspaceId>".

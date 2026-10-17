@@ -16,6 +16,9 @@
  * @structure registerPublicReadRoute(router, ctx)
  * @usage registerPublicReadRoute(router, ctx);   // from registerKeyRoutes, last
  * @version-history
+ *   2026-10-17 — An 'organism:<id>' record is read by that organism's active members and their
+ *     admitted agents (audienceAllows through authorizeRead); a signed-in reader outside it gets 403
+ *     NOT_ORGANISM_MEMBER, an anonymous one the miss a members record gives (plan doc-mvcn6c7e4e5q, V3.2).
  *   2026-10-16 — A record that is not public needs memory:read from a signed-in caller that is not
  *     the account holder in person: an app grant (whose identity is its owner's GHII) or an agent
  *     without the word gets 403 SCOPE_DENIED (QA audit S3-03).
@@ -40,6 +43,8 @@ import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../
 import { type MemoryRouteCtx, visibilityToZone } from './shared.js';
 import { callerOf } from '../../middleware/caller.js';
 import { denyScope403 } from '../../auth/deny.js';
+import { isForeignPrincipal } from '../../utils/gaii.js';
+import { isOrganismVisibilityWord } from '../../utils/visibility-words.js';
 
 export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, stats, resolve } = ctx;
@@ -131,6 +136,27 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
       });
       // Every signed-in account of the node is not every member of the organism (item 1).
       if (await keptInside('to every account of this node')) return;
+    } else if (isOrganismVisibilityWord(stored.visibility)) {
+      // One organism's active members and their admitted agents (services/audience.ts, through the
+      // shared guard). Anonymous gets what it gets for a members record: a miss. It does not depend on
+      // the consent layer, as 'members' does not.
+      if (isAnonymousReader) { miss(); return; }
+      if (refuseWithoutReadWord()) return;
+      const decision = await authorizeRead(storage, config, {
+        ownerGaii: stored.ownerGaii,
+        accessorGaii,
+        resourceKey: key,
+        visibility: stored.visibility,
+        accessorFederated: isForeignPrincipal(req.auth),
+        action: 'read',
+      });
+      if (!decision.allowed) {
+        res.status(403).json(error(config.nodeId, 'NOT_ORGANISM_MEMBER',
+          'This record is visible to the active members of one organism, and you are not one of them. Ask its owner to share it with you another way.'));
+        return;
+      }
+      // A record under another organism's key space still leaves that organism only as its label allows.
+      if (await keptInside('to the members of an organism')) return;
     } else {
       // Non-public data: if consent is not enabled, fall back to old behavior (404)
       if (!config.consentEnabled) { miss(); return; }

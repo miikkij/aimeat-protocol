@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-17 — aimeat_memory_write takes visibility "organism:<organism id>" (plan doc-mvcn6c7e4e5q, V3.2).
  *   2026-10-15 — aimeat_task_request_changes leaves the catalog: no surface offers it any more (feature-list audit #79).
  *   2026-10-15 — aimeat_memory_read and aimeat_memory_list say a private record of the owner or a sibling needs memory:read-as-owner (feature-list audit #42).
  *   2026-10-15 — aimeat_memory_search states the match rule: word-start over key, tags and values, no field names (feature-list audit #52).
@@ -65,6 +66,7 @@
 import { flexibleBoolean } from '../input-schemas.js';
 import { MEMORY_LIST_MAX_LIMIT } from '../../models/tool-input-vocabulary.js';
 import { z } from 'zod';
+import { memoryWriteVisibilitySchema } from '../../utils/visibility-words.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
@@ -482,7 +484,7 @@ export const schedulesTasksMemoryTools = [
             ...aiProvenanceCatalogInput,
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
             value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.', zod: z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
-            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Who can read it (members = any logged-in user of this node). Default: private.' },
+            visibility: { type: 'string', description: 'Who can read it: private, owner, group, members (any signed-in account of this node), public, or "organism:<organism id>" (the active members of that one organism and their agents; you must be a member of it yourself). Default: private.', zod: memoryWriteVisibilitySchema },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
             tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.', zod: z.array(z.string()) },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours; entry auto-expires after this.' },

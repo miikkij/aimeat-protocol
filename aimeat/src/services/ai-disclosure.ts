@@ -30,6 +30,8 @@
  *   import { disclosureFor } from './ai-disclosure.js';
  *   const d = disclosureFor(record, { visibility: 'public', humanAudience: true }, config.aiLabelPublic);
  * @version-history
+ *   v1.4.1 — 2026-10-17 — SurfaceContext.visibility is StoredVisibility, so an 'organism:<id>' item
+ *     is described as not anonymously readable (plan doc-mvcn6c7e4e5q, V3.2).
  *   v1.4.0 — 2026-10-08 — The deep-fake rule reads the record's own `mediaKind` (the surface may
  *     still say better) and reaches image, audio and video only; code and data had been counted as
  *     deep fakes. Its reason is `art50_4_deepfake` only when the declarer said the content
@@ -55,6 +57,7 @@ import {
   asKnownProvenance, isSyntheticMedia,
   type MaybeAiProvenance, type AiDisclosureReason, type AiMediaKind,
 } from '../models/ai-provenance-schemas.js';
+import type { StoredVisibility } from '../storage/interface.js';
 
 export type DisclosureStrength = 'full' | 'light' | 'none';
 
@@ -71,8 +74,9 @@ export type DisclosureLabelPolicy = 'strict' | 'light' | 'off';
 
 /** What the surface serving the content knows about itself. */
 export interface SurfaceContext {
-  /** How the item is reachable. `public` = anonymously readable. */
-  visibility: 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public';
+  /** How the item is reachable. `public` = anonymously readable; every other value, an
+   *  `organism:<id>` one included, is not. */
+  visibility: StoredVisibility;
   /** Is a natural person the audience HERE? `false` = machine-to-machine (MCP, API, feed). */
   humanAudience: boolean;
   /**

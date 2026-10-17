@@ -17,6 +17,8 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   2026-10-17 -- Init takes visibility 'members' and 'organism:<id>' and refuses one naming an organism
+ *     the uploader's account is not an active member of, before any chunk (plan doc-mvcn6c7e4e5q, V3.3).
  *   2026-10-16 -- Bounds and completeness (QA audit F05b-02). The bytes a session may hold are the
  *     smaller of the chunked ceiling and the per-file ceiling complete enforces, checked at init and on
  *     every chunk; a principal holds at most MAX_OPEN_UPLOADS sessions; a chunk index past total_chunks
@@ -44,6 +46,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitRecordChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { appOwnedKeyRefusal, writeStorageFile } from '../services/storage-file-write.js';
+import { organismVisibilityRefusal } from '../services/organism-visibility.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { ChunkedUploadInitSchema, validateBody } from '../models/schemas.js';
@@ -102,6 +105,13 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         const owned = appOwnedKeyRefusal(String(key));
         if (owned) {
             res.status(owned.status).json(error(config.nodeId, owned.code, owned.message));
+            return;
+        }
+        // 'organism:<id>' names an organism the uploader's account is a member of; refused before any
+        // chunk, and the shared write asks again at complete.
+        const audience = await organismVisibilityRefusal(storage, visibility, { identity: gaii });
+        if (audience) {
+            res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
             return;
         }
 

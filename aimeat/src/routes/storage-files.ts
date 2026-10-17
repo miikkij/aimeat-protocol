@@ -11,6 +11,11 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-17 — Visibility 'organism:<id>' (plan doc-mvcn6c7e4e5q, V3.3): GET /v1/pub serves such a
+ *     file to the organism's active members and admitted agents (the shared guard, independent of the
+ *     consent layer; anonymous 404, a signed-in non-member 403 NOT_ORGANISM_MEMBER). PATCH
+ *     /v1/storage/{key}/visibility takes every visibility the upload takes, members, workspace and
+ *     organism:<id> included, and refuses an organism the file owner's account is not a member of.
  *   2026-10-16 — The image of a shared page carries the AI label decided for the share's reader
  *     (public on an open share); it was decided as private.
  *   2026-10-16 — GET /v1/pub/:gaii/{key}?share=<org>/<ws>/<space>/<id>: a workspace-scoped image of a
@@ -125,7 +130,9 @@ import { emitChange } from '../services/event-bus.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
+import { isOrganismVisibilityWord, STORED_VISIBILITY_WORDS } from '../utils/visibility-words.js';
+import { isStoredVisibility, organismVisibilityRefusal } from '../services/organism-visibility.js';
 import { callerOf } from '../middleware/caller.js';
 import { denyScope403 } from '../auth/deny.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
@@ -392,14 +399,28 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     router.patch('/v1/storage/{*key}/visibility', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const gaii = resolve(req);
         const key = extractKey(req.params);
-        const { visibility } = req.body ?? {};
+        const { visibility, workspaceRef, workspace_refs, workspace_ref } = req.body ?? {};
 
-        if (!visibility || !['private', 'owner', 'public'].includes(visibility)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "owner", or "public"'));
+        // Every visibility the upload takes (2026-10-17), as PATCH /v1/memory/files/{key}/visibility
+        // does: 'workspace' (re)binds to one or more "<org>/<ws>", 'organism:<id>' names an organism
+        // the file owner's account is an active member of. 'group' keeps the group the file has.
+        if (!isStoredVisibility(visibility)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                `visibility must be one of: ${STORED_VISIBILITY_WORDS.join(', ')}, or "organism:<organism id>"`));
+            return;
+        }
+        const wsRefStr = normalizeWorkspaceRefs(workspace_refs, workspace_ref ?? workspaceRef);
+        if (visibility === 'workspace' && !wsRefStr) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"'));
+            return;
+        }
+        const audience = await organismVisibilityRefusal(storage, visibility, { identity: gaii, federated: isForeignPrincipal(req.auth) });
+        if (audience) {
+            res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
             return;
         }
 
-        const updated = await storage.updateFileVisibility(gaii, key, visibility);
+        const updated = await storage.updateFileVisibility(gaii, key, visibility, visibility === 'workspace' ? wsRefStr : undefined);
         if (!updated) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
             return;
@@ -534,8 +555,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        // Consent layer off → preserve the legacy existence-hiding behavior.
-        if (!config.consentEnabled) {
+        // Consent layer off → preserve the legacy existence-hiding behavior. An 'organism:<id>' file is
+        // decided by membership, not consent, so it goes on to the guard either way.
+        if (!config.consentEnabled && !isOrganismVisibilityWord(file.visibility)) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
             return;
         }
@@ -574,6 +596,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             workspaceRef: file.workspaceRef,
             accessorSub: req.auth?.sub,
             accessorOwner: req.auth?.owner as string | undefined,
+            accessorFederated: isForeignPrincipal(req.auth),
             action: 'read',
         });
 
@@ -582,6 +605,11 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // unauthenticated callers keep the 404 existence-hiding convention for file URLs.
             if (isAnonymous) {
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+                return;
+            }
+            if (result.reason === 'not_organism_member') {
+                res.status(403).json(error(config.nodeId, 'NOT_ORGANISM_MEMBER',
+                    'This file is visible to the active members of one organism, and you are not one of them. Ask its owner to share it with you another way.'));
                 return;
             }
             res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `You have not given permission for this: ${result.reason}. You can change what you share in Profile → Consent.`));

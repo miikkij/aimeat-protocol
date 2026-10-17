@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.17.0 — 2026-10-17 — visibility 'organism:<id>': refused with 400 NOT_ORGANISM_MEMBER, nothing
+ *     written, when the writer's account is not an active member of that organism (plan
+ *     doc-mvcn6c7e4e5q, V3.2; services/organism-visibility.ts).
  *   v1.16.0 — 2026-10-16 — PUT /v1/memory/:key writes through here (QA audit D2-03, F05a-03): `valueUnchanged` + `keptProvenanceId` keep the stored provenance on a metadata-only edit, and an overwrite keeps the record's flag count, CORS origin list and version tracking instead of resetting them.
  *   2026-10-16 — A write of an agent's live crew definition that changes its browser site list is
  *     refused unless the owner writes it in person (403 OWNER_APPROVES_SITES, crewSitesWriteRefusal;
@@ -131,6 +134,7 @@ import { agentKeyRefusal } from '../utils/agent-key-address.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { canonicalAppToolsKey } from './app-tools-key.js';
 import { classifyAfterWrite } from './classify-on-write.js';
+import { organismVisibilityRefusal } from './organism-visibility.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -265,7 +269,10 @@ export type MemoryWriteResult =
             | 'TOLL_MORSELS_MISMATCH' | 'INVALID_INPUT'
             // A write of an agent's live crew definition that changes its browser site list, not by
             // the owner in person (QA audit F07b-02).
-            | 'OWNER_APPROVES_SITES';
+            | 'OWNER_APPROVES_SITES'
+            // visibility 'organism:<id>' naming an organism the writer's account is not an active
+            // member of (services/organism-visibility.ts).
+            | 'NOT_ORGANISM_MEMBER';
         message: string;
         details?: unknown;
     };
@@ -340,6 +347,12 @@ export async function writeMemoryRecord(
             message: 'Anonymous agents can only write to keys prefixed with "anonymous."',
         };
     }
+    // 1b'. A record made visible to one organism names an organism the writer's account is an active
+    //      member of, decided by services/audience.ts through services/organism-visibility.ts.
+    const audienceRefusal = await organismVisibilityRefusal(storage, input.visibility, {
+        identity: caller.principal, federated: isForeignPrincipal(caller),
+    });
+    if (audienceRefusal) return { ok: false, ...audienceRefusal };
 
     // 1c. An organism.* key belongs to a shared space, and who may write one is decided by
     //     services/organism-namespace-access.ts — the whole rule, not a floor under it. This used to

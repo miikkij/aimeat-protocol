@@ -27,10 +27,13 @@
  *   const a = parseAudience(app.access);          // { level: 'organism', organismId } | ...
  *   if (!(await audienceAllows(storage, a, req.auth))) → refuse
  * @version-history
+ *   v1.0.1 — 2026-10-17 — The organism id grammar is utils/visibility-words.ts ORGANISM_ID_RE, which
+ *     the request schemas and the tool catalog validate with too (V3.2).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.0).
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { agentBarred } from './organism-agent-access.js';
+import { ORGANISM_ID_RE } from '../utils/visibility-words.js';
 
 export type AudienceLevel = 'private' | 'members' | 'organism' | 'public';
 
@@ -47,9 +50,6 @@ export interface AudienceAuth {
   anonymous?: boolean;
   federated?: boolean;
 }
-
-/** An organism id as the node mints it (a UUID) or as tests and imports write it. */
-const ORGANISM_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 /** Read a stored or requested audience. Null for anything that is not one of the four forms. */
 export function parseAudience(value: unknown): Audience | null {

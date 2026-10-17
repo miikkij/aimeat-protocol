@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 -- 2026-10-17 -- POST and PATCH .../visibility take 'organism:<id>' and refuse one naming an
+ *     organism the uploader's account is not an active member of (plan doc-mvcn6c7e4e5q, V3.3).
  *   v1.7.1 -- 2026-10-11 -- Upload and delete leave the change event to their service, which scopes
  *     it to the owner of a file nobody else reads; the tag update scopes its own.
  *   v1.7.0 -- 2026-10-08 -- POST takes ai_provenance / ai_provenance_id (inline and presigned), and the
@@ -37,7 +39,9 @@ import type { Router } from 'express';
 import type { StorageFileRecord } from '../../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
-import { isOwnerInPerson } from '../../utils/gaii.js';
+import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
+import { STORED_VISIBILITY_WORDS } from '../../utils/visibility-words.js';
+import { isStoredVisibility, organismVisibilityRefusal } from '../../services/organism-visibility.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';
@@ -78,9 +82,15 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // Files now share memory's full tier set. 'workspace' names one or more "<org>/<ws>" (a file can be
     // shared into several workspaces) so members of ANY of them can read it (authorizeRead/canReadWorkspace).
-    const VIS = ['private', 'owner', 'group', 'workspace', 'members', 'public'];
-    if (visibility !== undefined && !VIS.includes(visibility)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `visibility must be one of: ${VIS.join(', ')}`));
+    // 'organism:<id>' too (2026-10-17): the shared write refuses one the uploader's account is not a member of.
+    if (visibility !== undefined && !isStoredVisibility(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `visibility must be one of: ${STORED_VISIBILITY_WORDS.join(', ')}, or "organism:<organism id>"`));
+      return;
+    }
+    // Asked before a presigned URL is minted too, so no URL is handed out for a file that cannot land.
+    const audience = await organismVisibilityRefusal(storage, visibility, { identity: gaii, federated: isForeignPrincipal(req.auth) });
+    if (audience) {
+      res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
       return;
     }
     const wsRefStr = normalizeWorkspaceRefs(workspace_refs, workspaceRef);
@@ -184,14 +194,18 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Full tier parity (was private/owner/public only). 'workspace' (re)binds the file to one or more
     // "<org>/<ws>" — this is how a file gets shared into an ADDITIONAL workspace: PATCH the full desired
     // list. requireExternalPrincipal (not requireRole('agent')) so an app/owner can rebind its OWN file.
-    const VIS = ['private', 'owner', 'group', 'workspace', 'members', 'public'];
-    if (!visibility || !VIS.includes(visibility)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `visibility must be one of: ${VIS.join(', ')}`));
+    if (!isStoredVisibility(visibility)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `visibility must be one of: ${STORED_VISIBILITY_WORDS.join(', ')}, or "organism:<organism id>"`));
       return;
     }
     const wsRefStr = normalizeWorkspaceRefs(workspace_refs, workspaceRef);
     if (visibility === 'workspace' && !wsRefStr) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspaceRef) as one or more "<organismId>/<workspaceId>"'));
+      return;
+    }
+    const audience = await organismVisibilityRefusal(storage, visibility, { identity: gaii, federated: isForeignPrincipal(req.auth) });
+    if (audience) {
+      res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
       return;
     }
 
