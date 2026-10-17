@@ -11,6 +11,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-18 — aimeat_organism_create and aimeat_organism_update ask the publish gate with the
+ *     session's caller and render `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-16 — aimeat_organism_archive runs organismArchiveOp (services/organism-archive-op.ts), the
  *     operation POST /v1/organisms/:id/archive runs: the role comes from archiveRoleOf, so an attached
@@ -563,6 +565,8 @@ export function registerOrganismsTools(
             // same call POST /v1/organisms makes).
             const result = await createOrganismRecord({ storage, config }, getOwnerName(), {
                 name, description, type, joinPolicy: join_policy, visibility, shape, lang,
+                // A public organism asks the node's publish gate, as POST /v1/organisms does.
+                publishGate: { caller: caller() },
             });
             if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
             const record = result.organism;
@@ -574,6 +578,8 @@ export function registerOrganismsTools(
                         created: true,
                         organism: { id: record.id, name: record.name, board_id: record.boardId, visibility: record.visibility, join_policy: record.joinPolicy },
                         ...(result.workspaces ? { workspaces: result.workspaces, workspaces_not_created: result.workspacesNotCreated ?? [] } : {}),
+                        ...(result.publishRequest ? { publish_request: result.publishRequest } : {}),
+                        ...(result.warnings ? { warnings: result.warnings } : {}),
                     }, null, 2),
                 }],
             };
@@ -606,10 +612,16 @@ export function registerOrganismsTools(
                 name, description, readme, interests, joinPolicy: join_policy, visibility,
                 // An MCP session is always an agent, never the person in person.
                 agentAccess: agent_access, callerIsPerson: false,
+                // Making it public asks the node's publish gate, as PUT /v1/organisms/:id does.
+                publishGate: { caller: caller() },
             });
             if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
             emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ updated: true, organism_id, name: result.organism.name, readme_set: result.readmeSet }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({
+                updated: true, organism_id, name: result.organism.name, visibility: result.organism.visibility, readme_set: result.readmeSet,
+                ...(result.publishRequest ? { publish_request: result.publishRequest } : {}),
+                ...(result.warnings ? { warnings: result.warnings } : {}),
+            }, null, 2) }] };
         },
     );
 

@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-18 — registerSkillsTools and registerCortexTools receive the session's caller: the publish
+ *     gate asks about it (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — registerPublishRequestTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   2026-10-17 — registerExposureTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   2026-10-16 — registerExtensionsTools receives getToken: aimeat_extension_invoke gives an action's
@@ -214,7 +216,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAppdevResearchTools(mcp, storage, config, agentGaii);
     registerAppTemplateProposalTools(mcp, storage, config, agentGaii);
     registerAppdevProofTools(mcp, storage, config, agentGaii, scopes, caller);
-    registerSkillsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerSkillsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerOperatorConfigTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerComplianceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
     registerDataMapTools(mcp, storage, config, agentGaii, () => scopes, caller);
@@ -239,7 +241,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // The chat surface's way to the tools it registers switched off (mcp/tool-loader.ts). Only there:
     // on every other surface everything registered is already on.
     if (deps.role === 'chat') registerToolLoader(mcp);
-    registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+    registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii, scopes);

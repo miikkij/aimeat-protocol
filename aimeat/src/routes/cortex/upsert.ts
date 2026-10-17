@@ -9,6 +9,10 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.6.0 — 2026-10-18 — The create branch asks the publish gate as installCortex does: a manifest
+ *     asking for `public` by an agent without publish:public creates the cortex private, and the
+ *     answer carries `asked` (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4). The update
+ *     branch keeps the visibility the cortex has, as before.
  *   v1.5.0 — 2026-09-28 — A cortex a managed package install owns is refused a redeploy, 409
  *     MANAGED_BY_PACKAGE (services/packages/install/package-managed.ts).
  *   v1.4.0 — 2026-09-26 — The presigned cortex upload replaces an installed cortex through
@@ -36,6 +40,8 @@ import {
 import { activateExtension, activationRefusal, deactivateExtension } from './activation.js';
 import { refreshCortexDependencies } from '../../services/dependency-map.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
+import { cortexPublishAsk, fileCortexAsk } from '../../services/cortex-visibility.js';
+import type { DoorAsk, PublishGateInput } from '../../services/publish-requests/door.js';
 import {
   snapshotCortexVersion, keptVersionRefusal, cortexCodeOf, cortexLibsAfterDeploy,
 } from '../../services/component-versions.js';
@@ -43,7 +49,7 @@ import { logger } from '../../utils/logger.js';
 
 /** What an upsert did. `record` carries what the answer and lib_urls are built from. */
 export type CortexUpsertResult =
-  | { action: 'created'; record: CortexExtensionRecord; warnings?: string[] }
+  | { action: 'created'; record: CortexExtensionRecord; warnings?: string[]; asked?: DoorAsk }
   | { action: 'unchanged'; record: CortexExtensionRecord }
   | {
     action: 'updated';
@@ -77,7 +83,8 @@ const upsertRefusal = (status: number, code: string, message: string, details?: 
 export async function upsertCortex(
   deps: CortexDeps,
   caller: CortexCaller,
-  input: { name?: string; manifest: unknown; libs?: unknown },
+  /** `publishGate`: the door's caller; a new cortex whose manifest asks for `public` asks the gate. */
+  input: { name?: string; manifest: unknown; libs?: unknown; publishGate?: PublishGateInput },
   mayReplaceOthers: boolean = caller.isOperator,
 ): Promise<CortexOutcome<CortexUpsertResult>> {
   const { storage, config } = deps;
@@ -144,6 +151,10 @@ export async function upsertCortex(
     // recorded and never served, it answered 201 and the app 404'd on the script.
     const missing = libsWithoutContent(parsed.components, newLibs);
     if (missing.length) return upsertRefusal(400, 'INVALID_MANIFEST', missingLibsMessage(missing));
+    // The publish gate, as installCortex asks it (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4).
+    const ask = cortexPublishAsk(deps, input.publishGate, undefined, parsed.visibility);
+    if (ask?.kind === 'refused') return upsertRefusal(ask.status, ask.code, ask.message);
+    if (ask) parsed.visibility = 'private';
     for (const [filename, content] of Object.entries(newLibs)) {
       await storage.setCortexLibFile(name, filename, content);
     }
@@ -152,7 +163,8 @@ export async function upsertCortex(
     await snapshotCortexVersion(storage, record, newLibs, ownerName)
       .catch(err => logger.warn('PUT /v1/cortex/:name: version not kept', { name, version: parsed.version, error: String(err) }));
     emitChange('cortex');
-    return { ok: true, value: { action: 'created', record, warnings: result.warnings } };
+    const asked = await fileCortexAsk(deps, input.publishGate, ask, record);
+    return { ok: true, value: { action: 'created', record, warnings: result.warnings, asked } };
   }
 
   // ── UPDATE branch: only the installing owner, or an operator the door lets through, may replace it. ──

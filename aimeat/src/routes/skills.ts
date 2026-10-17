@@ -19,6 +19,9 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-10-18 — POST /v1/skills and PATCH /v1/skills/:name ask the publish gate for a user skill made
+ *     public: an agent without publish:public keeps the skill's level (`owner` when new) and the answer
+ *     is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4; services/skill-publish-gate.ts).
  *   2026-10-17 — POST /v1/skills and PATCH /v1/skills/:name take `organism:<id>` for a user skill:
  *     the active members of one organism read it (plan doc-mvcn6c7e4e5q, V3.9). Naming an organism the
  *     caller is not in is 400 NOT_ORGANISM_MEMBER before anything is written; the accessor carries the
@@ -48,7 +51,7 @@
  *     for claude.ai skill uploads and manual installs into ~/.claude/skills; supports @semver pins.
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry REST surface (node + user scopes).
  */
-import { Router, type Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { ZipArchive } from 'archiver';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -71,6 +74,9 @@ import {
 } from '../services/skills.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { requireScopeUnlessSelf } from '../auth/self-or-scope.js';
+import { callerOf } from '../middleware/caller.js';
+import { skillPublishAsk, userSkillState, fileSkillAsk } from '../services/skill-publish-gate.js';
+import type { PublishGateInput } from '../services/publish-requests/door.js';
 
 export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -92,6 +98,11 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       // The organisation level asks services/audience.ts with the session itself.
       auth,
     };
+  }
+
+  /** The caller the publish gate asks about (services/skill-publish-gate.ts): the session, and an app grant's app. */
+  function publishGateOf(req: Request): PublishGateInput {
+    return { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) };
   }
 
   /** Anon-mode injects a truthy shared identity — never treat it as an owner/agent. */
@@ -181,6 +192,14 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(400).json(error(config.nodeId, 'INVALID_INPUT', SKILL_VISIBILITY_HINT));
         return;
       }
+      // Making a user skill public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4): on an ask
+      // the skill keeps its level (`owner` when new) and the owner gets a request.
+      const gate = publishGateOf(req);
+      const ask = skillPublishAsk({ storage, config }, gate, scope, level);
+      if (ask?.kind === 'refused') {
+        res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
+        return;
+      }
       // How SKILL.md was written: a declaration or an attached record id, validated as every REST
       // declaration is; publishSkill records it, or the node's stamp for an agent publisher.
       const declaration = parseDeclaredProvenanceInput((req.body ?? {}).ai_provenance);
@@ -204,7 +223,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         owner: accessor.ownerName,
         publisher: req.auth!.sub as string,
         files,
-        visibility: level,
+        visibility: ask ? undefined : level,
         // The accessor is the membership gate of a workspace and of an organisation level.
         accessor,
         ...(scope === 'workspace' ? { organismId: organism, workspaceId: ws } : {}),
@@ -215,8 +234,12 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         },
       });
       emitChange('skills');
-      res.status(201).json(success(config.nodeId, {
+      const asked = ask ? await fileSkillAsk({ storage, config }, gate, ask, summary) : {};
+      // 202 when the skill kept its level and making it public waits for the owner.
+      res.status(asked.publishRequest ? 202 : 201).json(success(config.nodeId, {
         skill: summary, ai_provenance_id: summary.aiProvenanceId ?? null,
+        ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
+        ...(asked.warnings ? { warnings: asked.warnings } : {}),
         ...(await provenanceWriteEcho(storage, config, {
           storedId: summary.aiProvenanceId, declared: declaration.declared,
           declaredId: typeof provenanceIdIn === 'string' && provenanceIdIn ? provenanceIdIn : undefined,
@@ -360,6 +383,24 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       const scope: 'node' | 'user' = scopeQ === 'node' ? 'node' : 'user';
       if (scope === 'node' && !accessor.isOperator) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Skills shared with the whole node are looked after by whoever runs it. Ask them, or publish this one under your own name instead.'));
+        return;
+      }
+      // Making a user skill public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4): on an ask
+      // the skill keeps its level and the owner gets a request.
+      const gate = publishGateOf(req);
+      const state = scope === 'user' ? await userSkillState({ storage, config }, accessor.ownerName, name) : null;
+      const ask = state ? skillPublishAsk({ storage, config }, gate, scope, visibility, state.visibility) : null;
+      if (ask?.kind === 'refused') {
+        res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
+        return;
+      }
+      if (ask && state) {
+        const asked = await fileSkillAsk({ storage, config }, gate, ask, { owner: accessor.ownerName, name, ...state });
+        res.status(asked.publishRequest ? 202 : 200).json(success(config.nodeId, {
+          skill: { name, owner: accessor.ownerName, scope, version: state.version, visibility: state.visibility },
+          ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
+          ...(asked.warnings ? { warnings: asked.warnings } : {}),
+        }));
         return;
       }
       // The owner comes from the session, never from the request: a user-scope skill under

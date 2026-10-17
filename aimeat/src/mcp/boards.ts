@@ -11,6 +11,8 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-18 — aimeat_board_create asks the publish gate with the session's caller and renders
+ *     `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — An organism board (`organism:<id>`, plan doc-mvcn6c7e4e5q V3.5): the list, the
  *     resource and every write hand the session's auth to the board services, which decide it by
  *     membership (boardVisibleToCaller); its default posting rule reads 'members'.
@@ -235,6 +237,8 @@ export function registerBoardsTools(
             // board built over MCP ran on the defaults and its posts were gone after seven days.
             const out = await createBoard({ storage, config }, await boardCaller(), {
                 name, visibility, description, allowedGaiis: allowed_gaiis, rules,
+                // A public board asks the node's publish gate, as POST /v1/boards does.
+                publishGate: { caller: caller() },
             });
             if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
             const board = out.board;
@@ -253,6 +257,8 @@ export function registerBoardsTools(
                         effective_rules: effective,
                         note: lifetimeNote(effective),
                         created_at: board.createdAt,
+                        ...(out.publishRequest ? { publish_request: out.publishRequest } : {}),
+                        ...(out.warnings ? { warnings: out.warnings } : {}),
                     }, null, 2),
                 }],
             };

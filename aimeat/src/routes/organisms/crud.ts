@@ -6,6 +6,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-18 — POST /v1/organisms and PUT /v1/organisms/:id ask the publish gate: a public organism
+ *     by an agent without publish:public is made private (or keeps its level) and the answer is 202
+ *     with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — SECURITY: GET /v1/organisms lists only 'public' and 'listed' organisms to a caller
  *     who is not the member asked about or an operator. ?visibility=private went to storage as the
  *     caller wrote it, and answered every private organism's name, description, creator, owners and
@@ -74,6 +77,7 @@ import { purgeClassificationAudit } from '../../services/classification/audit.js
 import { purgeExceptions } from '../../services/classification/exceptions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { callerOf } from '../../middleware/caller.js';
 
 /** What GET /v1/organisms lists to a caller who is neither the member asked about nor an operator:
  *  the same two visibilities the directory indexes (services/directory.ts). */
@@ -111,6 +115,8 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       name, description, type, location, interests,
       joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
       shape, lang,
+      // A public organism asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
+      publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) },
     });
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
@@ -118,9 +124,12 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     }
 
     // A shaped create names the workspaces it could not make, so a 201 never hides a missing one.
-    res.status(201).json(success(config.nodeId, {
+    // 202 when the organism was made private and making it public waits for the owner.
+    res.status(result.publishRequest ? 202 : 201).json(success(config.nodeId, {
       organism: result.organism,
       ...(result.workspaces ? { workspaces: result.workspaces, workspaces_not_created: result.workspacesNotCreated ?? [] } : {}),
+      ...(result.publishRequest ? { publish_request: result.publishRequest } : {}),
+      ...(result.warnings ? { warnings: result.warnings } : {}),
     }, [
       { description: 'View organism', method: 'GET', url: `/v1/organisms/${result.organism.id}` },
       { description: 'List members', method: 'GET', url: `/v1/organisms/${result.organism.id}/members` },
@@ -342,12 +351,19 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       name, description, type, location, interests, readme,
       joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
       agentAccess: agent_access, callerIsPerson: isOwnerPrincipal(req.auth),
+      // Making it public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
+      publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) },
     });
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
-    res.json(success(config.nodeId, { organism: result.organism, readme: result.readme }));
+    // 202 when the rest applied and making it public waits for the owner.
+    res.status(result.publishRequest ? 202 : 200).json(success(config.nodeId, {
+      organism: result.organism, readme: result.readme,
+      ...(result.publishRequest ? { publish_request: result.publishRequest } : {}),
+      ...(result.warnings ? { warnings: result.warnings } : {}),
+    }));
   });
 
   /* ── DELETE /v1/organisms/:id — Delete organism ── */

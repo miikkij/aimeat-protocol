@@ -25,6 +25,11 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.4.0 — 2026-10-18 — setWorkspaceShareOp takes `publishGate`, the door's caller (plan
+ *     doc-mvcn6c7e4e5q, V4): a change that lets anyone with the link read what they could not (access
+ *     set to open, or a target shared under open access), by an agent without publish:public, is
+ *     stored with that part held back, and the answer carries `publish_request` and `asked`
+ *     (services/workspace-share-gate.ts).
  *   v1.3.0 — 2026-10-17 — access 'organism': only the members of the workspace's own organism (plan doc-mvcn6c7e4e5q V3.4).
  *   v1.2.0 — 2026-10-17 — Sharing one HTML page answers `window_url` beside `viewer_url`: the page alone
  *     in the whole browser window (Jouni, 2026-10-17: a link to share that opens only the page).
@@ -46,6 +51,9 @@ import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
 import { isHtmlPageValue, HTML_PAGE_SHARE_DAYS } from './html-page.js';
 import { logger } from '../utils/logger.js';
+import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
+import type { PublishGateInput } from './publish-requests/door.js';
+import { newlyOpened, withholdOpening, fileShareAsk } from './workspace-share-gate.js';
 
 /** The share as the node decides with it: every field present. */
 export function resolveShare(v: ShareMeta | null | undefined): ResolvedShare {
@@ -128,7 +136,8 @@ export interface SetShareBody {
 }
 
 export type SetShareResult =
-    | { ok: true; data: Record<string, unknown> }
+    /** `asked`: the opening part waits for the owner (data.publish_request); a door answers 202. */
+    | { ok: true; data: Record<string, unknown>; asked?: boolean }
     | { ok: false; status: number; code: string; message: string };
 
 const isBoolMap = (m: unknown): m is Record<string, boolean> =>
@@ -160,6 +169,8 @@ export async function setWorkspaceShareOp(
     deps: { storage: Storage; config: AimeatConfig },
     who: { sub?: string; owner?: string },
     args: { orgId: string; ws: string; body: SetShareBody },
+    /** The door's caller, for the publish gate. Absent (an approved request's applier): not asked. */
+    publishGate?: PublishGateInput,
 ): Promise<SetShareResult> {
     const { storage, config } = deps;
     const { orgId, ws } = args;
@@ -236,14 +247,32 @@ export async function setWorkspaceShareOp(
     };
     if (next.access === 'password' && !next.passwordHash) return refuse(400, 'INVALID_INPUT', "access 'password' requires a password to be set");
 
+    // The publish gate (plan doc-mvcn6c7e4e5q, V4), before anything is stored: a change that lets
+    // anyone with the link read what they could not, by a caller the node asks the owner about, is
+    // stored with that part held back (services/workspace-share-gate.ts).
+    const opened = publishGate ? newlyOpened(prev, next) : [];
+    let ask: Extract<PublishAsk, { kind: 'ask' }> | null = null;
+    let held: Record<string, unknown> | null = null;
+    if (opened.length && publishGate) {
+        const asked = publishAskOf(deps, publishGate.caller, publishGate.app);
+        if (asked.kind === 'refused') return refuse(asked.status, asked.code, asked.message);
+        if (asked.kind === 'ask') { ask = asked; held = withholdOpening(prev, next, opened, untilIn); }
+    }
+    // A held-back `open` leaves the password level in place, which still needs its password.
+    if (next.access === 'password' && !next.passwordHash) return refuse(400, 'INVALID_INPUT', "access 'password' requires a password to be set; the share stays password-protected until the owner approves opening it");
+
     const key = `organism.${orgId}.w.${ws}.meta.share`;
     const existing = await readWorkspaceMetaRecord(storage, orgId, ws, 'meta.share', config.nodeId);
     const now = new Date(nowMs).toISOString();
+    const version = existing ? existing.version + 1 : 1;
     await storage.setMemory({
         key, ownerGaii: existing?.ownerGaii ?? reg.record.ownerGaii, value: next, visibility: 'private', tags: ['share'], ttlHours: null,
-        version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+        version, createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
     emitChange('organisms');
+    const requested = ask && held && publishGate
+        ? await fileShareAsk(deps, publishGate, ask, { orgId, ws, wsName: reg.entry.name ?? ws, version, from: prev.access, opened }, held)
+        : {};
 
     // Public landing feed: once, on the FIRST public edge of this call (the workspace, a space, or a page).
     const newlyPublic = (
@@ -276,6 +305,9 @@ export async function setWorkspaceShareOp(
             ...(alone ? { window_url: `${config.baseUrl}${alone}` } : {}),
             ...(page && until[sharedNow[0]] ? { ends_at: until[sharedNow[0]] } : {}),
             ...(feedKey ? { ics_key: feedKey.key, ics_url: `/v1/organisms/${orgId}/workspace/public/records?ws=${encodeURIComponent(ws)}&space=<space>&format=ics&key=${feedKey.key}` } : {}),
+            ...(requested.publishRequest ? { publish_request: requested.publishRequest } : {}),
+            ...(requested.warnings ? { warnings: requested.warnings } : {}),
         },
+        ...(requested.publishRequest ? { asked: true } : {}),
     };
 }

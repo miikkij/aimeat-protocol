@@ -8,8 +8,11 @@
  *   - registerCortexTools() - registers all cortex tools on an McpServer instance
  * @usage
  *   import { registerCortexTools } from './cortex.js';
- *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+ *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-18 — aimeat_cortex_install (install, and update:true under a new name) asks the publish
+ *     gate with the session's caller when the manifest asks for `public`, and renders the cortex's
+ *     `visibility` and `publish_request` (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-05 — aimeat_cortex_install registers the catalog's schema, and its upload offer is
  *     cortexUploadOffer(), the one POST /v1/cortex answers (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -69,6 +72,9 @@ import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { toolError } from './tool-error.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import type { PublishGateInput } from '../services/publish-requests/door.js';
+import { cortexAskedFields } from '../services/cortex-visibility.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -79,7 +85,13 @@ export function registerCortexTools(
     emitResourceListChanged: (agentGaii: string) => void,
     /** This session's granted scopes: the namespace claim is asked of them. */
     scopes: readonly string[] = [],
+    /** The session's caller (services/caller-context.ts): the publish gate asks about it. */
+    sessionCaller?: () => CallerContext,
 ): void {
+    /** The publish gate's caller: the session's, or one built from this session's facts. */
+    const publishGate = (): PublishGateInput => ({
+        caller: sessionCaller ? sessionCaller() : agentSessionCaller(getAgentGaii(), localAccountName(getAgentGaii()), scopes, config.nodeId, storage),
+    });
 
     /**
      * The owner behind this session. Every ownership check here compares against it, and it is what
@@ -212,7 +224,7 @@ export function registerCortexTools(
             // lifecycle tools below. A cortex that is not yours is refused in the words the install
             // branch already uses for a name another owner holds.
             if (update) {
-                const up = await upsertCortex({ storage, config }, caller, { manifest, libs }, false);
+                const up = await upsertCortex({ storage, config }, caller, { manifest, libs, publishGate: publishGate() }, false);
                 if (!up.ok) {
                     return { content: [{ type: 'text' as const, text: refusalText(up.refusal) }], isError: true };
                 }
@@ -230,13 +242,15 @@ export function registerCortexTools(
                             ...(done.action === 'updated' ? { reinitialized: done.reinitialized } : {}),
                             component_count: done.record.components.length,
                             ...(done.action !== 'unchanged' ? { warnings: done.warnings } : {}),
+                            ...(done.action === 'created' ? { visibility: done.record.visibility, ...cortexAskedFields(done.asked, done.warnings) } : {}),
                             lib_urls: cortexLibUrls(config.baseUrl, done.record),
                         }, null, 2),
                     }],
                 };
             }
 
-            const out = await installCortex({ storage, config }, caller, { manifest, libs });
+            // A manifest asking for `public` asks the node's publish gate, as POST /v1/cortex does.
+            const out = await installCortex({ storage, config }, caller, { manifest, libs, publishGate: publishGate() });
             if (!out.ok) {
                 // An installed name of your own is a redeploy the caller did not ask for; say how.
                 const hint = out.refusal.code === 'CONFLICT'
@@ -244,7 +258,7 @@ export function registerCortexTools(
                 return { content: [{ type: 'text' as const, text: refusalText(out.refusal) + hint }], isError: true };
             }
 
-            const { record, warnings } = out.value;
+            const { record, warnings, asked } = out.value;
             emitResourceListChanged(agentGaii);
 
             return {
@@ -255,10 +269,12 @@ export function registerCortexTools(
                         namespace: record.namespace,
                         version: record.version,
                         status: record.status,
+                        visibility: record.visibility,
                         installed_at: record.installedAt,
                         installed_by: record.installedBy,
                         component_count: record.components.length,
                         warnings,
+                        ...cortexAskedFields(asked, warnings),
                         // The exact script src for each lib. The address follows the record's name,
                         // and an author who guessed the namespaced form got a 404 inside the app.
                         lib_urls: cortexLibUrls(config.baseUrl, record),

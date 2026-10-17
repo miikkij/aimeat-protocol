@@ -7,6 +7,9 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.22.0 -- 2026-10-18 -- PUT …/workspace/share asks the publish gate: opening the share to anyone
+ *     with the link by an agent without publish:public stores the rest and answers 202 with
+ *     `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   v1.21.0 -- 2026-10-17 -- A share for the organism's members refuses a signed-in outsider with 403 SHARE_MEMBERS_ONLY (V3.4).
  *   v1.20.0 -- 2026-10-16 -- The share routes decide each item's AI label for the reader the share
  *     serves (shareServedVisibility: public on an open share); it was decided as private, so an
@@ -591,9 +594,11 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       orgId: req.params.id as string,
       ws: typeof req.query.ws === 'string' ? req.query.ws : '',
       body: (req.body ?? {}) as SetShareBody,
-    });
+      // Opening it to anyone with the link asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
+    }, { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) });
     if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
-    res.json(success(config.nodeId, r.data));
+    // 202 when the opening part waits for the owner; the rest of the change is stored.
+    res.status(r.asked ? 202 : 200).json(success(config.nodeId, r.data));
   });
 
   /* ── POST /v1/organisms/:id/workspace/share/unlock — NO AUTH. Exchange the share password for a

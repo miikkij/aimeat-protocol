@@ -38,6 +38,7 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-10-18 — ROUTE_CEILING 488: POST /v1/cortex/{name}/visibility is refused to another owner by test/e2e-publish-gate-shared.ts.
  *   2026-10-17 — ROUTE_CEILING 489: PATCH /v1/storage/{key}/visibility is refused to an anonymous
  *     caller by test/e2e-audience-memory-files.ts.
  *   2026-10-16 — ROUTE_CEILING 491: e2e-notifications refuses DELETE /v1/notifications to an agent
@@ -85,7 +86,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 489;
+export const ROUTE_CEILING = 488;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

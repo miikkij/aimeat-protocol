@@ -13,6 +13,10 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.12.0 — 2026-10-18 — POST /v1/boards and PATCH /v1/boards/:boardId/visibility ask the publish
+ *     gate: a public board by an agent without publish:public is made private (or keeps its level)
+ *     and the answer is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4). The visibility
+ *     change moved to services/board-visibility.ts unchanged, which the approval runs too.
  *   v1.11.0 — 2026-10-17 — A board at `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5): POST and PATCH
  *     visibility take it when the caller is an active member (else 400 NOT_ORGANISM_MEMBER, nothing
  *     written) and never federate it; GET /v1/boards lists it to members only; the posts, the single
@@ -91,8 +95,9 @@ import { boardReadRefusal, boardOrganismAudience, organismBoardAdmits } from '..
 import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
 import {
   createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
-  publicBoardCeiling, boardVisibilityRefusal,
 } from '../services/board-write.js';
+import { setBoardVisibility } from '../services/board-visibility.js';
+import { callerOf } from '../middleware/caller.js';
 import { operatorOverride, rolesWithOperator } from '../services/operator-override.js';
 import { resolveIdentity, isSameOwner, localAccountName, isOwnerInPerson } from '../utils/gaii.js';
 import {
@@ -120,20 +125,27 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       gaii: resolve(req),
       roles: await rolesWithOperator(storage, req.auth),
       auth: req.auth,
-    }, { name, visibility, description, allowedGaiis: allowed_gaiis, federate, rules });
+    }, {
+      name, visibility, description, allowedGaiis: allowed_gaiis, federate, rules,
+      // A public board asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
+      publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) },
+    });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
     const board = out.board;
 
-    res.status(201).json(success(config.nodeId, {
+    // 202 when the board was made private and making it public waits for the owner.
+    res.status(out.publishRequest ? 202 : 201).json(success(config.nodeId, {
       id: board.id,
       name: board.name,
       visibility: board.visibility,
       federate: board.federate ?? false,
       rules: boardRulesBlock(board),
       created_at: board.createdAt,
+      ...(out.publishRequest ? { publish_request: out.publishRequest } : {}),
+      ...(out.warnings ? { warnings: out.warnings } : {}),
     }, [
       { description: 'Post to this board', method: 'POST', url: `/v1/boards/${board.id}/posts` },
       { description: 'View posts', method: 'GET', url: `/v1/boards/${board.id}/posts` },
@@ -241,49 +253,23 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner can change visibility'));
       return;
     }
+    // The level, the organisation and federation rules, the public-board ceiling and the publish
+    // gate live in services/board-visibility.ts, which an approved publish request runs too.
     const { visibility: requested, federate } = req.body ?? {};
-    if (requested !== undefined && !(['private', 'public', 'shared'].includes(requested) || boardOrganismAudience(String(requested)))) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility must be "private", "public", "shared" or "organism:<organism id>"'));
+    const out = await setBoardVisibility({ storage, config }, { gaii, roles: await rolesWithOperator(storage, req.auth), auth: req.auth }, board, {
+      visibility: requested, federate,
+      publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth?.app ? { app: req.auth.app } : {}) },
+    });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    if (requested === undefined && typeof federate !== 'boolean') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility or federate must be provided'));
-      return;
-    }
-    // An organisation level names an organism the caller is in, checked before anything is written
-    // (services/board-write.ts boardVisibilityRefusal, the same check create makes).
-    let visibility: string | undefined = requested;
-    if (requested !== undefined) {
-      const level = await boardVisibilityRefusal(storage, requested, { auth: req.auth });
-      if (!level.ok) {
-        res.status(level.status).json(error(config.nodeId, level.code, level.message));
-        return;
-      }
-      visibility = level.visibility;
-    }
-    // An organisation's board is never federated: its readers are the organism's members here.
-    if (boardOrganismAudience(visibility ?? board.visibility) && federate === true) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A board shared with an organisation stays on this node, so it cannot be federated.'));
-      return;
-    }
-    // Only when this flip is INTO public and the board is not already there — re-saving a board that
-    // is public counts itself and would refuse an edit that changes nothing.
-    if (visibility === 'public' && board.visibility !== 'public') {
-      const ceiling = await publicBoardCeiling({ storage, config }, { gaii, roles: await rolesWithOperator(storage, req.auth) }, 'public');
-      if (ceiling) {
-        res.status(ceiling.status).json(error(config.nodeId, ceiling.code, ceiling.message));
-        return;
-      }
-    }
-    const toOrganism = !!visibility && boardOrganismAudience(visibility) !== null;
-    const updated = await storage.updateBoardVisibility(boardId, visibility || board.visibility,
-      toOrganism ? false : (typeof federate === 'boolean' ? federate : undefined));
-    if (!updated) {
-      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update board visibility'));
-      return;
-    }
-    res.json(success(config.nodeId, { id: updated.id, visibility: updated.visibility, federate: updated.federate ?? false }));
-    emitChange('boards');
+    // 202 when the board kept its level and making it public waits for the owner.
+    res.status(out.publishRequest ? 202 : 200).json(success(config.nodeId, {
+      id: out.board.id, visibility: out.board.visibility, federate: out.board.federate ?? false,
+      ...(out.publishRequest ? { publish_request: out.publishRequest } : {}),
+      ...(out.warnings ? { warnings: out.warnings } : {}),
+    }));
   });
 
   // ── Update board members ───────────────────────────────

@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-18 — aimeat_workspace_share, aimeat_organism_create and aimeat_organism_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_workspace_share takes access "organism": the members of the workspace's organism (V3.4).
  *   2026-10-17 — aimeat_workspace_share names `window_url`, an HTML page alone in the whole browser window.
  *   2026-10-16 — aimeat_workspace_share: share a page, a space or the workspace outside the organism
@@ -499,7 +500,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_workspace_share',
-        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node), "organism" (only the members of this workspace\'s organism) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person, and for an HTML page also `window_url`, the page alone in the whole browser window. Only the workspace creator or an organism admin, or their own agent, may change sharing.',
+        description: 'Share a published page, a whole document space or the whole workspace OUTSIDE the organism, and get the link to hand out. Name a page with `space` + `id`, a space with `space` alone, the workspace with neither. `shared: false` stops sharing it. `access` is who may open the link: "open" (anyone with it), "account" (anyone signed in to this node), "organism" (only the members of this workspace\'s organism) or "password" (give `password`, 4–128 characters); it applies to everything the workspace shares. `until` (an ISO date) ends the share then, "none" removes the end; an HTML page shared with no end lasts 90 days, a Markdown page has no end. Only published pages are ever shown, so publish first (aimeat_workspace_publish). The answer carries `viewer_url`, the address to give the person, and for an HTML page also `window_url`, the page alone in the whole browser window. Only the workspace creator or an organism admin, or their own agent, may change sharing. When the node asks the owner before making something public, opening the link to anyone stores the rest of the change and answers with publish_request: tell the owner what waits and give them its approve_url.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Share Workspace Pages', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -576,7 +577,7 @@ export const organismsWorkspacesAppsTools = [
     ...workspaceMemberChangeTools,
     {
         name: 'aimeat_organism_create',
-        description: 'Create a new ORGANISM (a shared, governed container for people + agents): one place every AI the person connects and every person they invite reads and writes. You become its creator/admin/member, and it gets a discussion board. Give a `shape` to start it with ready workspaces (own-work, team, company, family, club, project; GET /v1/organisms/shapes lists what each makes), or add workspaces afterwards with aimeat_workspace_create. With a shape the answer lists `workspaces` (made) and `workspaces_not_created` (each with its reason); create a missing one with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch.',
+        description: 'Create a new ORGANISM (a shared, governed container for people + agents): one place every AI the person connects and every person they invite reads and writes. You become its creator/admin/member, and it gets a discussion board. Give a `shape` to start it with ready workspaces (own-work, team, company, family, club, project; GET /v1/organisms/shapes lists what each makes), or add workspaces afterwards with aimeat_workspace_create. With a shape the answer lists `workspaces` (made) and `workspaces_not_created` (each with its reason); create a missing one with aimeat_workspace_create. Use this to bootstrap a collaboration space from scratch. When the node asks the owner before making something public, a public organism (the default) is created private and the answer carries publish_request: tell the owner what waits and give them its approve_url.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Create Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -594,7 +595,7 @@ export const organismsWorkspacesAppsTools = [
     },
     {
         name: 'aimeat_organism_update',
-        description: 'Update an ORGANISM in place (creator/admin only): its name, description (the short tagline), interests, join policy, visibility, and/or its free-form README — a markdown body (mermaid diagrams + aimeat-memory live-data blocks allowed) shown at the top of the organism home that explains what the organism is about and is kept up to date. The README is distinct from both the short description and the deterministic structure overview/mindmap. Pass only the fields you want to change.',
+        description: 'Update an ORGANISM in place (creator/admin only): its name, description (the short tagline), interests, join policy, visibility, and/or its free-form README — a markdown body (mermaid diagrams + aimeat-memory live-data blocks allowed) shown at the top of the organism home that explains what the organism is about and is kept up to date. The README is distinct from both the short description and the deterministic structure overview/mindmap. Pass only the fields you want to change. When the node asks the owner before making something public, visibility public keeps the level it had, the other fields change, and the answer carries publish_request: tell the owner what waits and give them its approve_url.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Update Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

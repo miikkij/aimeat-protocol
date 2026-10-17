@@ -47,6 +47,10 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.6.0 -- 2026-10-18 -- createBoard takes `publishGate`, the door's caller (plan doc-mvcn6c7e4e5q,
+ *     V4): a public board by an agent without publish:public, or an app grant when the gate covers
+ *     apps, is made private and the answer carries `publishRequest`. fileBoardAsk() files it, for the
+ *     visibility change in services/board-visibility.ts too.
  *   v1.5.0 -- 2026-10-17 -- A board at `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5): create checks
  *     it with boardVisibilityRefusal (the caller's owner an active member, else 400 before the write)
  *     and stores it never federated; subscribe and react ask boardVisibleToCaller, which decides an
@@ -76,6 +80,9 @@ import { isSameOwner, ownerGhiiOf } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { parseAudience, audienceAllows, formatAudience, type AudienceAuth } from './audience.js';
 import { boardOrganismAudience, organismBoardAdmits } from './board-read-access.js';
+import { isRaiseToPublic } from './publish-gate.js';
+import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
+import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
 
 /** The bounds BoardRulesSchema applies on the HTTP door. */
 export const BOARD_RULE_LIMITS = {
@@ -310,6 +317,8 @@ export interface BoardCreateInput {
     federate?: boolean;
     /** The board's own rules, as sent (see normalizeBoardRules). */
     rules?: unknown;
+    /** The door's caller: a public board by one the node asks the owner about is made private. */
+    publishGate?: PublishGateInput;
 }
 
 /** Create one board. The order is the HTTP route's order: shape, then who may open one, then write. */
@@ -317,7 +326,7 @@ export async function createBoard(
     deps: BoardWriteDeps,
     caller: BoardWriteCaller,
     input: BoardCreateInput,
-): Promise<BoardCreateResult> {
+): Promise<BoardCreateResult & DoorAsk> {
     const { storage } = deps;
 
     const name = String(input.name ?? '').trim();
@@ -329,7 +338,15 @@ export async function createBoard(
     }
     const level = await boardVisibilityRefusal(storage, input.visibility, caller);
     if (!level.ok) return level;
-    const visibility = level.visibility;
+    let visibility = level.visibility;
+    // The publish gate (plan doc-mvcn6c7e4e5q, V4), before the first write: asked by a caller the
+    // node asks the owner about, the board is made private and the request is filed once it exists.
+    let ask: Extract<PublishAsk, { kind: 'ask' }> | null = null;
+    if (input.publishGate && isRaiseToPublic(undefined, visibility)) {
+        const asked = publishAskOf(deps, input.publishGate.caller, input.publishGate.app);
+        if (asked.kind === 'refused') return { ok: false, status: asked.status, code: asked.code, message: asked.message };
+        if (asked.kind === 'ask') { ask = asked; visibility = 'private'; }
+    }
     // An organisation's board stays on this node: its readers are the organism's members here.
     const organismBoard = boardOrganismAudience(visibility) !== null;
     const rules = normalizeBoardRules(input.rules);
@@ -361,7 +378,21 @@ export async function createBoard(
     // A board list open in a browser listens on the 'boards' domain. Without this the new board
     // waits for a reload.
     emitChange('boards');
+    if (ask && input.publishGate) return { ok: true, board, ...(await fileBoardAsk(deps, input.publishGate, ask, board)) };
     return { ok: true, board };
+}
+
+/** File the request to make the board public, once it exists at the level it has (plan doc-mvcn6c7e4e5q, V4). */
+export function fileBoardAsk(
+    deps: BoardWriteDeps, gate: PublishGateInput, ask: Extract<PublishAsk, { kind: 'ask' }>, board: Pick<BoardRecord, 'id' | 'name' | 'visibility'>,
+): Promise<DoorAsk> {
+    // A board has no version: its name is what the owner reads in the request, and an approval of a
+    // board renamed since is outdated (apply-board.ts).
+    return fileAskForDoor(deps, gate, ask.requester, {
+        kind: 'board', target: { board_id: board.id, name: board.name },
+        title: `the board ${board.name}`, name: board.name,
+        change: { field: 'visibility', from: board.visibility, to: 'public' },
+    }, board.visibility);
 }
 
 export type BoardSubscribeResult = { ok: true; subscription: BoardSubscriptionRecord } | BoardWriteRefusal;

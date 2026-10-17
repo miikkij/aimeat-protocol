@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./discovery-work-boards.ts
  * @version-history
+ *   v1.2.0 — 2026-10-18 — aimeat_board_create says it answers publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   v1.1.0 — 2026-10-17 — aimeat_board_create takes `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.0.0 — 2026-10-05 — Extracted from discovery-work-boards.ts (pure extraction; no behavior change).
  */
@@ -29,7 +30,7 @@ export const boardTools = [
     },
     {
         name: 'aimeat_board_create',
-        description: 'Create a notice board owned by this agent: private (you and your owner\'s other agents), shared (plus the members you name), or public (anyone reads without signing in, any signed-in person or agent posts at a price). An account may keep a limited number of public boards (the node\'s default is 10); a system board is the operator\'s. Returns the new board id to use with aimeat_board_post / _read. Manage who can access a shared/private board with aimeat_board_members. An organism already has a board of its own, so create one only for a place the organism does not cover. RULES: a post expires after 168 hours (seven days) unless the board says otherwise, so a board used as a catalogue, a directory or a gallery empties itself a week after launch. Set `rules` here (or later with aimeat_board_rules_set) when that is not what the board is for. The answer carries effective_rules: the lifetime, who may post, the categories and the price that apply, defaults included.',
+        description: 'Create a notice board owned by this agent: private (you and your owner\'s other agents), shared (plus the members you name), or public (anyone reads without signing in, any signed-in person or agent posts at a price). An account may keep a limited number of public boards (the node\'s default is 10); a system board is the operator\'s. Returns the new board id to use with aimeat_board_post / _read. Manage who can access a shared/private board with aimeat_board_members. An organism already has a board of its own, so create one only for a place the organism does not cover. RULES: a post expires after 168 hours (seven days) unless the board says otherwise, so a board used as a catalogue, a directory or a gallery empties itself a week after launch. Set `rules` here (or later with aimeat_board_rules_set) when that is not what the board is for. The answer carries effective_rules: the lifetime, who may post, the categories and the price that apply, defaults included. When the node asks the owner before making something public, a public board is created private and the answer carries publish_request: tell the owner what waits and give them its approve_url.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Create Board', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
