@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-17 — direct_messages.sentByAgent and sentByAgentName (migration 0105).
  *   2026-10-15 — memory.searchValues: the FTS triggers index the scalar values to six levels without field names, the PostgreSQL rule; rows that predate it are filled at start (schema-memory-search.ts, feature-list audit #52).
  *   2026-10-11 — agents.stoppedAt and agents.stoppedBy: an agent can be stopped (migration 0101 says
  *     why). The agents table's column block from the push layer to the v2 identity moves to
@@ -421,6 +422,10 @@ export function initializeSchema(db: Database.Database): void {
   // today's badge exactly: inbound copies inherit readAt, everything else is stamped seen so the
   // whole history does not light up at once.
   safeAddColumn('direct_messages', 'ownerReadAt', 'TEXT');
+  // The agent that sent a message in its owner's name, and its name as the owner sees it. NULL =
+  // the sender wrote it themself, or the sending node did not say. Mirrors Postgres migration 0105.
+  safeAddColumn('direct_messages', 'sentByAgent', 'TEXT');
+  safeAddColumn('direct_messages', 'sentByAgentName', 'TEXT');
   db.exec("UPDATE direct_messages SET ownerReadAt = readAt WHERE ownerReadAt IS NULL AND direction = 'inbound'");
   db.exec("UPDATE direct_messages SET ownerReadAt = createdAt WHERE ownerReadAt IS NULL AND direction <> 'inbound'");
   db.exec('CREATE INDEX IF NOT EXISTS idx_direct_messages_owner_unread ON direct_messages(ownerGhii, conversationId) WHERE ownerReadAt IS NULL');

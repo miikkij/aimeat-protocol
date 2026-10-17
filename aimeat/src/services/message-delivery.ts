@@ -12,6 +12,7 @@
  *   - startMessageRetryJob(config, storage, peers) — periodic sweep (DECISION #6)
  * @usage import { deliverDirectMessage, startMessageRetryJob } from '../services/message-delivery.js';
  * @version-history
+ *   v1.6.0 -- 2026-10-17 -- The payload carries sentByAgent / sentByAgentName, the agent that sent the message in the sender's name.
  *   v1.5.0 -- 2026-10-06 -- A read receipt carries a delivery proof: the peer and the send time (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.4.0 -- 2026-10-06 -- A message names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
  *   v1.3.0 -- 2026-10-05 -- Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
@@ -70,6 +71,10 @@ function buildMessagePayload(config: AimeatConfig, record: DirectMessageRecord, 
       broadcastId: record.broadcastId ?? null,
       respondable: record.respondable ?? null,
       replyToId: record.replyToId ?? null,
+      // The agent that sent this in the sender's name. The receiving node keeps it only when the agent
+      // belongs to the sender (routes/federation-sync/messaging.ts); an older node ignores both.
+      sentByAgent: record.sentByAgent ?? null,
+      sentByAgentName: record.sentByAgentName ?? null,
       createdAt: record.createdAt,
     },
     timestamp: new Date().toISOString(),

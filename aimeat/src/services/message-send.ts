@@ -11,6 +11,9 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.9.0 — 2026-10-17 — sentByAgent / sentByAgentName: the agent that sends in the sender's name is
+ *     written on every copy, named in the recipient's bell and carried to another node
+ *     (services/message-send-as-owner.ts).
  *   v1.8.0 — 2026-09-24 — SECURITY (audit A5-3): the account's send limit (services/message-send-limit.ts)
  *     is asked here, before anything is read or written. A send that carries no turn is counted here
  *     and refused RATE_LIMITED past the limit; `sendLimit` carries the turn a door took before its
@@ -103,6 +106,13 @@ export interface SendMessageInput {
    * held it. Naming the acting agent here lets the send find the bytes and record their real holder.
    */
   actingGaii?: string;
+  /**
+   * The agent that sends this in the sender's name, and its name as the owner sees it
+   * (DirectMessageRecord.sentByAgent). Set by services/message-send-as-owner.ts only; written on both
+   * copies and carried to the recipient's node.
+   */
+  sentByAgent?: string;
+  sentByAgentName?: string;
   /**
    * The account's send limit (services/message-send-limit.ts). Omitted, this send is counted here.
    * A turn: the door counted it before writing anything of its own. 'exempt': the node's own message,
@@ -217,6 +227,8 @@ export type SendMessageResult =
 export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInput): Promise<SendMessageResult> {
   const { config, storage } = ctx;
   const { senderGhii, recipientGhii, body, replyToId, subject, interactive, broadcastId, respondable, kind, aiProvenanceId } = input;
+  // Which agent sent this in the sender's name: on every copy written below, and in the payload.
+  const sentBy = input.sentByAgent ? { sentByAgent: input.sentByAgent, sentByAgentName: input.sentByAgentName } : {};
 
   // The account's send limit, before anything is read or written. Every door reaches delivery
   // through here, so a send nobody counted yet is counted now.
@@ -263,7 +275,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       await storage.createDirectMessage({
         id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
         body, attachments, interactive, broadcastId, respondable, kind, status: 'undeliverable', direction: 'outbound',
-        replyToId, origin: 'local', originNodeId: config.nodeId, aiProvenanceId,
+        replyToId, origin: 'local', originNodeId: config.nodeId, aiProvenanceId, ...sentBy,
         error: 'blocked', createdAt: now,
       });
       return { ok: false, code: 'BLOCKED' };
@@ -280,7 +292,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
         id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
         body, attachments, interactive, broadcastId, respondable, kind,
         status: 'delivered', direction: 'inbound', replyToId,
-        origin: 'local', originNodeId: config.nodeId, aiProvenanceId,
+        origin: 'local', originNodeId: config.nodeId, aiProvenanceId, ...sentBy,
         createdAt: now, deliveredAt: now,
       };
       await storage.createDirectMessage(note);
@@ -296,7 +308,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     body, attachments, interactive, broadcastId, respondable, kind,
     status: isLocal ? 'delivered' : 'queued',
     direction: 'outbound', replyToId,
-    origin: 'local', originNodeId: config.nodeId, aiProvenanceId,
+    origin: 'local', originNodeId: config.nodeId, aiProvenanceId, ...sentBy,
     createdAt: now, deliveredAt: isLocal ? now : undefined,
   };
   await storage.createDirectMessage(senderCopy);
@@ -341,7 +353,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     await storage.createDirectMessage({
       id, ownerGhii: inboundOwner, conversationId, subject, senderGhii, recipientGhii,
       body, attachments, interactive, broadcastId, respondable, kind, status: 'delivered', direction: 'inbound',
-      replyToId, origin: 'local', originNodeId: config.nodeId, aiProvenanceId,
+      replyToId, origin: 'local', originNodeId: config.nodeId, aiProvenanceId, ...sentBy,
       createdAt: now, deliveredAt: now,
     });
 
@@ -357,11 +369,13 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     }
 
     if (!ownAgent) {
+      // The bell names the agent too when one sent this in the sender's name.
+      const who = input.sentByAgent ? `${senderGhii} (${input.sentByAgentName || parseGaiiLoose(input.sentByAgent).agent})` : senderGhii;
       await notify(storage, deliveryGhii, {
         type: isRequest ? 'direct_message_request' : 'direct_message',
-        title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
+        title: isRequest ? `${who} wants to message you` : `New message from ${who}`,
         body: messagePreviewWithAttachments(body, attachments),
-        i18n: { key: isRequest ? 'direct_message_request' : 'direct_message', vars: { who: senderGhii, preview: messagePreviewWithAttachments(body, attachments) } },
+        i18n: { key: isRequest ? 'direct_message_request' : 'direct_message', vars: { who, preview: messagePreviewWithAttachments(body, attachments) } },
         // Request → 'req:<conversationId>': while pending it lands on the inbox requests list, but once
         // the request is accepted the same notification opens the now-existing thread (see inbox-tab
         // consumeDeepLink). A delivered DM deep-links straight to its conversation.

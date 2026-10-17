@@ -5805,6 +5805,16 @@ components:
             the bytes, not about whose row it is. ABSENT MEANS UNSTATED, never "a human wrote it" —
             a message that arrived over federation from a peer that strips provenance is unstated,
             because the id is node-local and does not cross the boundary.
+        sentByAgent:
+          type: string
+          description: >-
+            The agent (GAII) that sent this message in its owner's name (POST /v1/messages/as-owner,
+            aimeat_dm_send_as_owner). `senderGhii` stays the owner. Both copies carry it, and it travels
+            to the recipient's node, which keeps it only when the agent belongs to the sender. Absent:
+            the sender wrote it themself, or the sending node did not say.
+        sentByAgentName:
+          type: string
+          description: The agent's name as its owner sees it, written when it was sent.
         createdAt: { type: string, format: date-time }
         deliveredAt: { type: string, format: date-time }
         readAt: { type: string, format: date-time }
@@ -56908,6 +56918,36 @@ paths:
   # Direct Messages (human↔human GHII messaging + federation)
   # ============================================================
 
+  /v1/messages/as-owner:
+    post:
+      operationId: sendDirectMessageAsOwner
+      summary: An agent sends a direct message in its owner's name
+      description: >-
+        The REST twin of aimeat_dm_send_as_owner (services/message-send-as-owner.ts). The sender is the
+        calling agent's own owner, derived from its credential, so an agent can speak only for its own
+        owner. The address is resolved as POST /v1/messages resolves it: a person, an agent, an app,
+        `support@operators`, or a group thread named by `conversation_id`. The message carries
+        `sentByAgent` and `sentByAgentName` on every copy, so the owner and the recipient both see which
+        agent sent it, and the provenance record names the agent. Needs `messages:send-as-owner`; a
+        caller that is not an agent answers 403 NOT_AN_AGENT. `interactive` (questions) is refused
+        here: an agent asks in its own name with POST /v1/messages. The account's send limit applies
+        (429 RATE_LIMITED with Retry-After).
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DirectMessageSend' }
+      responses:
+        '201':
+          description: "{ message_id, conversation_id, sent_as, sent_by_agent, sent_by_agent_name, recipient, status, delivered_to?, awaiting_approval?, ai_provenance_id? }"
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/AimeatError' }
   /v1/messages:
     post:
       operationId: sendDirectMessage

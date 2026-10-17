@@ -31,6 +31,8 @@
  *   const convo = await createGroupConversation(ctx, { createdBy, participants, subject });
  *   await sendGroupMessage(ctx, { conversationId: convo.id, senderGhii, body });
  * @version-history
+ *   v1.4.0 — 2026-10-17 — sentByAgent / sentByAgentName: a message an agent sends in its owner's name
+ *     says so on every participant's copy (services/message-send-as-owner.ts).
  *   v1.3.0 — 2026-09-24 — SECURITY (audit A5-3): sendGroupMessage asks the account's send limit
  *     (services/message-send-limit.ts) before it reads or writes anything, and answers RATE_LIMITED
  *     past it. A door that took the turn before its own writes hands it on in `sendLimit`.
@@ -174,6 +176,9 @@ export interface GroupSendInput {
   interactive?: InteractivePayload;
   replyToId?: string;
   aiProvenanceId?: string;
+  /** The agent that sends this in the sender's name, and its name (DirectMessageRecord.sentByAgent). */
+  sentByAgent?: string;
+  sentByAgentName?: string;
   /** The account's send limit (services/message-send-limit.ts). Omitted, this send is counted here;
    *  a turn means the door counted it before writing anything of its own. */
   sendLimit?: SendLimitMark;
@@ -214,6 +219,8 @@ export async function sendGroupMessage(ctx: DeliveryCtx, input: GroupSendInput):
     interactive: input.interactive,
     replyToId: input.replyToId,
     aiProvenanceId: input.aiProvenanceId,
+    sentByAgent: input.sentByAgent,
+    sentByAgentName: input.sentByAgentName,
     origin: 'local',
     originNodeId: config.nodeId,
     createdAt: now,
@@ -245,6 +252,8 @@ export interface FanOutMessage {
   interactive?: InteractivePayload;
   replyToId?: string;
   aiProvenanceId?: string;
+  sentByAgent?: string;
+  sentByAgentName?: string;
   /** 'local' when this node produced the message, 'federation' when it arrived signed from a peer. */
   origin: 'local' | 'federation';
   originNodeId: string;
@@ -320,6 +329,8 @@ export async function fanOutToParticipants(
       origin: msg.origin,
       originNodeId: msg.originNodeId,
       aiProvenanceId: msg.aiProvenanceId,
+      sentByAgent: msg.sentByAgent,
+      sentByAgentName: msg.sentByAgentName,
       createdAt: msg.createdAt,
       deliveredAt: msg.deliveredAt,
     });

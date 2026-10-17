@@ -105,6 +105,7 @@
     "0101_agent_stopped.sql": "3b40a85ff4c155238cc650b473543f2f7bf1c08e56f34a16959c0a841cb4dd90",
     "0102_app_community.sql": "9ee12e9b29134a2ec0da5ec576de00d0942eb1201fa74bee2ca526543ea2a5a9",
     "0103_page_files_owner_only.sql": "13ee8730eb6ee4594d2387277e49e2f237ada48a0bcba487e68073435f197780",
-    "0104_app_access.sql": "30bd07a2f7c15a788afb24d02d91bc0d0f023c210e8d73b2b502066c06c8ca2a"
+    "0104_app_access.sql": "30bd07a2f7c15a788afb24d02d91bc0d0f023c210e8d73b2b502066c06c8ca2a",
+    "0105_direct_message_sent_by_agent.sql": "01cb510e3edae0a70dbaf55c2d140b7cd70fd15ca76098c02fcdc8cf60ab4f5c"
   }
 }

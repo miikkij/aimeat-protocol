@@ -9,6 +9,8 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.7.0 — 2026-10-17 — sentByAgent / sentByAgentName on the message, and lastSentByAgent on both
+ *     conversation-list reads (migration 0105).
  *   v1.6.0 — 2026-09-13 — Both conversation-list reads carry lastForeignAt (the newest message not
  *     written by the account's own agents) and the thread's opener, for the Messages list's archive
  *     and rules. Parity with the SQLite repo.
@@ -76,6 +78,8 @@ function toDirectMessageRecord(r: Selectable<DirectMessage>): DirectMessageRecor
   if (r.replyToId) record.replyToId = r.replyToId;
   if (r.error) record.error = r.error;
   if (r.aiProvenanceId) record.aiProvenanceId = r.aiProvenanceId;
+  if (r.sentByAgent) record.sentByAgent = r.sentByAgent;
+  if (r.sentByAgentName) record.sentByAgentName = r.sentByAgentName;
   if (r.deliveredAt) record.deliveredAt = iso(r.deliveredAt);
   if (r.readAt) record.readAt = iso(r.readAt);
   if (r.ownerReadAt) record.ownerReadAt = iso(r.ownerReadAt);
@@ -129,7 +133,9 @@ export const directMessageMethods = {
       attachments: jsonb(record.attachments ?? null), interactive: jsonb(record.interactive ?? null), broadcastId: record.broadcastId ?? null,
       respondable: record.respondable ?? null, kind: record.kind ?? null, status: record.status, direction: record.direction, replyToId: record.replyToId ?? null,
       origin: record.origin, originNodeId: record.originNodeId, error: record.error ?? null,
-      aiProvenanceId: record.aiProvenanceId ?? null, createdAt: new Date(record.createdAt),
+      aiProvenanceId: record.aiProvenanceId ?? null,
+      sentByAgent: record.sentByAgent ?? null, sentByAgentName: record.sentByAgentName ?? null,
+      createdAt: new Date(record.createdAt),
       deliveredAt: record.deliveredAt ? new Date(record.deliveredAt) : null, readAt: record.readAt ? new Date(record.readAt) : null,
       ownerReadAt: record.ownerReadAt ? new Date(record.ownerReadAt) : null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -218,7 +224,7 @@ export const directMessageMethods = {
 
     const results: ConversationSummary[] = [];
     for (const g of groups) {
-      const last = await this.db.selectFrom('DirectMessage').select(['body', 'direction', 'senderGhii', 'recipientGhii', 'broadcastId'])
+      const last = await this.db.selectFrom('DirectMessage').select(['body', 'direction', 'senderGhii', 'recipientGhii', 'broadcastId', 'sentByAgent', 'sentByAgentName'])
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).orderBy('createdAt', 'desc').limit(1).executeTakeFirst();
       const unreadRow = await this.db.selectFrom('DirectMessage').select(this.db.fn.countAll<number>().as('n'))
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).whereRef('senderGhii', '<>', 'ownerGhii').where('ownerReadAt', 'is', null).executeTakeFirst();
@@ -235,6 +241,7 @@ export const directMessageMethods = {
         lastMessage: last?.body ?? '',
         lastDirection,
         lastSenderGhii: last?.senderGhii ?? '',
+        ...(last?.sentByAgent ? { lastSentByAgent: last.sentByAgent, lastSentByAgentName: last.sentByAgentName ?? undefined } : {}),
         messageCount: Number(g.messageCount ?? 0),
         unread: Number(unreadRow?.n ?? 0),
         updatedAt: g.updatedAt ? iso(g.updatedAt) : '',
@@ -266,9 +273,9 @@ export const directMessageMethods = {
     `.execute(this.db);
     if (groups.rows.length === 0) return {};
 
-    const lasts = await sql<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null }>`
-      SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii", "broadcastId" FROM (
-        SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii", "broadcastId",
+    const lasts = await sql<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string; broadcastId: string | null; sentByAgent: string | null; sentByAgentName: string | null }>`
+      SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii", "broadcastId", "sentByAgent", "sentByAgentName" FROM (
+        SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii", "broadcastId", "sentByAgent", "sentByAgentName",
                ROW_NUMBER() OVER (PARTITION BY "ownerGhii", "conversationId" ORDER BY "createdAt" DESC, "id" DESC) AS rn
         FROM "DirectMessage" WHERE "ownerGhii" IN (${owners})
       ) t WHERE rn = 1
@@ -306,6 +313,7 @@ export const directMessageMethods = {
         lastMessage: last?.body ?? '',
         lastDirection,
         lastSenderGhii: last?.senderGhii ?? '',
+        ...(last?.sentByAgent ? { lastSentByAgent: last.sentByAgent, lastSentByAgentName: last.sentByAgentName ?? undefined } : {}),
         messageCount: Number(g.messageCount ?? 0),
         unread: Number(g.unread ?? 0),
         updatedAt: g.updatedAt ? iso(g.updatedAt) : '',

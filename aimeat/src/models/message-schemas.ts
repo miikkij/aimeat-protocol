@@ -9,6 +9,7 @@
  * @structure MessageAttachmentInputSchema, InteractivePayloadSchema, MessageSendSchema
  * @usage import { MessageSendSchema } from '../models/message-schemas.js';
  * @version-history
+ *   v1.6.0 -- 2026-10-17 -- MessageSendAsOwnerSchema for POST /v1/messages/as-owner: no `interactive`, strict.
  *   v1.5.0 -- 2026-10-08 -- MessageSendSchema and BroadcastSendSchema take ai_provenance and
  *     ai_provenance_id (aiprov D5). The objects stripped them, so a REST or connector sender's
  *     declaration vanished and the message was stamped from the principal alone.
@@ -132,6 +133,24 @@ export const MessageSendSchema = z.object({
 }).refine(
   d => (d.body?.trim().length ?? 0) > 0 || (d.attachments?.length ?? 0) > 0 || d.interactive != null,
   { message: 'A message must have a body, an attachment, or an interactive payload' },
+);
+
+/**
+ * POST /v1/messages/as-owner (routes/messages-as-owner.ts): what aimeat_dm_send_as_owner takes. No
+ * `interactive`: an agent asks its questions in its own name with POST /v1/messages. Strict, so a
+ * field the route does not take is refused rather than dropped.
+ */
+export const MessageSendAsOwnerSchema = z.object({
+  to: z.string().min(3).max(256).optional().default(''),
+  body: z.string().max(200_000).optional().default(''),
+  reply_to: z.string().uuid().optional(),
+  conversation_id: z.string().min(8).max(64).optional(),
+  subject: z.string().min(1).max(200).optional(),
+  attachments: z.array(MessageAttachmentInputSchema).max(20).optional(),
+  ...AiProvenanceBodyFields,
+}).strict().refine(
+  d => (d.body?.trim().length ?? 0) > 0 || (d.attachments?.length ?? 0) > 0,
+  { message: 'A message must have a body or an attachment' },
 );
 
 // ── Broadcast / send-to-many ──

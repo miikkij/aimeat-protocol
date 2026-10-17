@@ -10,7 +10,10 @@
 //  - an agent may only ever send as its OWN owner (no cross-owner impersonation — there is no owner param);
 //  - an agent WITHOUT the scope cannot use it;
 //  - a file the AGENT uploaded arrives as the recipient's own readable copy, and a file nothing holds
-//    refuses the send rather than reporting it delivered (4c, 4d — the defect measured 2026-09-08).
+//    refuses the send rather than reporting it delivered (4c, 4d — the defect measured 2026-09-08);
+//  - 2026-10-17: both copies and the owner's list row name the agent that sent it (7); POST
+//    /v1/messages/as-owner does the same and refuses an agent without the word and an owner (8, 9);
+//    a send to support@operators reaches the group thread (10).
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -305,6 +308,68 @@ await test('6. Cannot address the owner itself (own-owner-only sender; no self-s
     const client = await connectMcp(sendbot.gaii, sendbot.key);
     const { ok } = await client.call('aimeat_dm_send_as_owner', { to: alice.ghii, body: 'to myself' });
     assert(!ok, 'sending to your own owner identity must be rejected');
+});
+
+// ── 2026-10-17: the message says which agent sent it (wish-agentin-omistajan-nimiss-l-hett-m-viesti-n-ytt-mik-agentti-s) ──
+// Until then the agent was only in the node log and the provenance record: Alice's list read "You: ..."
+// and Bob saw only Alice. Jouni: the recipient sees it too.
+console.log('\nPhase 2: the message names the agent that sent it');
+
+async function agentRestToken(gaii: string, key: string): Promise<string> {
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(key, gaii + ts) }) });
+    assert(tok.status === 200, `agent token ${tok.status}: ${JSON.stringify(tok.body)}`);
+    return tok.body.data.token as string;
+}
+
+await test('7. Both copies name the agent: Bob\'s inbox, Alice\'s thread and Alice\'s list row', async () => {
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const m = (inbox.body.data.messages as any[]).find(x => /AI:n avustama/.test(x.body));
+    assert(m !== undefined, 'Bob has the message');
+    assert(m.senderGhii === alice.ghii, `still from Alice, got ${m.senderGhii}`);
+    assert(m.sentByAgent === sendbot.gaii, `Bob's copy names the agent, got ${m.sentByAgent}`);
+    assert(m.sentByAgentName === 'sendbot', `Bob's copy carries the agent's name, got ${m.sentByAgentName}`);
+    const thread = await json(`/v1/messages/conversations/${m.conversationId}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+    const mine = (thread.body.data.messages as any[]).find(x => x.id === m.id);
+    assert(mine?.sentByAgent === sendbot.gaii, `Alice's copy names the agent, got ${JSON.stringify(mine?.sentByAgent)}`);
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    const row = (convs.body.data.conversations as any[]).find(c => c.conversationId === m.conversationId);
+    assert(row?.sentByAgent === sendbot.gaii && row?.sentByAgentName === 'sendbot', `Alice's row names the agent, got ${JSON.stringify({ a: row?.sentByAgent, n: row?.sentByAgentName })}`);
+});
+
+await test('8. POST /v1/messages/as-owner sends in Alice\'s name and names the agent (the connector\'s route)', async () => {
+    const token = await agentRestToken(sendbot.gaii, sendbot.key);
+    const r = await json('/v1/messages/as-owner', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ to: bob.ghii, body: 'REST delegated reply' }) });
+    assert(r.status === 201, `as-owner ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data.sent_as === alice.ghii && r.body.data.sent_by_agent === sendbot.gaii, `answer ${JSON.stringify(r.body.data)}`);
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const m = (inbox.body.data.messages as any[]).find(x => x.body === 'REST delegated reply');
+    assert(m?.senderGhii === alice.ghii && m?.sentByAgent === sendbot.gaii, `Bob's copy ${JSON.stringify(m && { s: m.senderGhii, a: m.sentByAgent })}`);
+});
+
+await test('9. POST /v1/messages/as-owner refuses an agent without the word (403) and an owner (403 NOT_AN_AGENT)', async () => {
+    const token = await agentRestToken(plainbot.gaii, plainbot.key);
+    const r = await json('/v1/messages/as-owner', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ to: bob.ghii, body: 'plainbot as alice' }) });
+    assert(r.status === 403, `plainbot ${r.status}`);
+    const o = await json('/v1/messages/as-owner', { method: 'POST', headers: { Authorization: `Bearer ${alice.token}` }, body: JSON.stringify({ to: bob.ghii, body: 'alice herself' }) });
+    assert(o.status === 403 && o.body.error?.code === 'NOT_AN_AGENT', `owner ${o.status} ${o.body.error?.code}`);
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(!(inbox.body.data.messages as any[]).some(x => x.body === 'plainbot as alice' || x.body === 'alice herself'), 'a refused send delivered something');
+});
+
+await test('10. To support@operators it reaches the group thread, and the operator sees the agent', async () => {
+    // Bob is not the operator (Alice, the first owner on this node, is). His agent writes to support in
+    // his name: the MCP tool wrote this as a 1:1 to the literal address until 2026-10-17, and it stayed queued.
+    const bobbot = await createAgent(bobName, bob.token, 'bobbot', ['messages:send', 'messages:send-as-owner']);
+    const client = await connectMcp(bobbot.gaii, bobbot.key);
+    const { ok, body } = await client.call('aimeat_dm_send_as_owner', { to: 'support@operators', subject: 'Delegated support question', body: 'Asked by my agent' });
+    assert(ok, `call ${JSON.stringify(body.result ?? body.error)}`);
+    const res = toolResult(body);
+    assert(res.status === 'delivered' && res.sent_by_agent === bobbot.gaii, `answer ${JSON.stringify(res)}`);
+    const thread = await json(`/v1/messages/conversations/${res.conversation_id}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(thread.status === 200, `operator thread ${thread.status}`);
+    const m = (thread.body.data.messages as any[]).find(x => x.body === 'Asked by my agent');
+    assert(m?.senderGhii === bob.ghii && m?.sentByAgent === bobbot.gaii, `the operator's copy ${JSON.stringify(m && { s: m.senderGhii, a: m.sentByAgent })}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
