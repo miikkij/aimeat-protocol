@@ -18,6 +18,9 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.7.0 — 2026-10-17 — A workspace shared with access 'account' refuses the visitor (401
+ *     SHARE_ACCOUNT_REQUIRED) and admits a local account. It failed before the fix: the visitor read
+ *     the share with 200 (plan doc-mvcn6c7e4e5q, V0.5).
  *   v1.6.2 — 2026-10-14 — The connectivity-key case is gone with the route (feature-list audit row
  *     202): POST /v1/auth/connectivity-key answers 404 to everyone, asserted in e2e-account-doors 44.
  *   v1.6.1 — 2026-10-12 — The probe action of "the visitor's sent work is their own" is published with
@@ -184,6 +187,30 @@ async function run() {
         const c = claims(fedToken);
         assert(c.federated === true && c.owner === `${namesake}@${homeNodeId}` && JSON.stringify(c.roles) === '["federated"]',
             `the session this suite is about: ${JSON.stringify({ federated: c.federated, owner: c.owner, roles: c.roles })}`);
+    });
+
+    await test('A workspace shared with "signed-in accounts only" is this node\'s accounts: the visitor gets 401', async () => {
+        // 'account' admitted any non-anonymous session, a visitor from another node included
+        // (plan doc-mvcn6c7e4e5q, V0.5). The local namesake's own share is the shape.
+        const o = await json('/v1/organisms', as(alice.token, { method: 'POST', body: JSON.stringify({ name: `NS Share ${stamp}`, description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }) }));
+        assert(o.status === 201, `org ${o.status}`);
+        const orgId = o.body.data.organism.id as string;
+        const WS = 'wsfed';
+        const root = `organism.${orgId}.w.${WS}`;
+        await json('/v1/memory', as(alice.token, { method: 'POST', body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [{ id: WS, name: 'Handbook', createdAt: new Date().toISOString(), createdBy: namesake }] }, visibility: 'private' }) }));
+        await json('/v1/memory', as(alice.token, { method: 'POST', body: JSON.stringify({ key: `${root}.meta.manifest`, value: {
+            manifestVersion: '1.0', id: orgId, name: 'Handbook', kind: 'project', status: 'active',
+            objectTypes: [{ name: 'page', schemaRef: 'schema:page@1', namespace: 'shared.pages', backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'document' }],
+        }, visibility: 'private' }) }));
+        await json('/v1/memory', as(alice.token, { method: 'POST', body: JSON.stringify({ key: `${root}.shared.pages.intro.latest`, value: { id: 'intro', title: 'Intro', markdown: '# Intro' }, visibility: 'private' }) }));
+        const put = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, as(alice.token, { method: 'PUT', body: JSON.stringify({ spaces: { page: true }, access: 'account' }) }));
+        assert(put.status === 200 && put.body.data.share.access === 'account', `share: ${put.status} ${JSON.stringify(put.body)}`);
+        const local = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, as(bob.token));
+        assert(local.status === 200, `a local account reads the account share: ${local.status}`);
+        const visitor = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`, as(fedToken));
+        assert(visitor.status === 401 && visitor.body.error?.code === 'SHARE_ACCOUNT_REQUIRED',
+            `a visitor from another node read an account-only share: ${visitor.status} ${JSON.stringify(visitor.body?.error ?? visitor.body).slice(0, 200)}`);
+        await json(`/v1/organisms/${orgId}`, as(alice.token, { method: 'DELETE' }));
     });
 
     // ── The identity itself. Everything below follows from this one answer. ──
