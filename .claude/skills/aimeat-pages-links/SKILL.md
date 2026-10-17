@@ -93,7 +93,7 @@ curl -s -X PUT "https://aimeat.io/v1/organisms/<org>/workspace/share?ws=<ws>" \
 The `docs` map is keyed **`spaceName/docId`**. `until` is a map of end dates keyed the same way
 (`*` for the workspace, `space:<name>` for a space, `<spaceName>/<docId>` for a page), each an ISO
 date or `null` to remove it. `access` is `open` (the internet), `account` (any
-signed-in identity on this node) or `password`. For anything developer-facing use `account`; `open`
+signed-in identity on this node), `organism` (the members of the workspace's own organism) or `password`. For anything developer-facing use `account`; `open`
 puts it on the internet and posts a line to the node's public activity feed.
 
 `GET` the same path to read the current state before changing it: the PUT merges, but `access` is

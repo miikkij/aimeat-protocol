@@ -14,6 +14,7 @@
  * @structure HTML_PAGE_SKILL_ENTRY
  * @usage import { HTML_PAGE_SKILL_ENTRY } from './builtin-skills.html-page.js';
  * @version-history
+ *   v1.3.0 — 2026-10-17 — A share can be for the organisation's members only (access `organism`, plan V3.4).
  *   v1.2.0 — 2026-10-17 — `window_url`: the page alone in the whole browser window, and the strip's
  *     button that copies it.
  *   v1.1.0 — 2026-10-16 — "Say how the page was made": ai_provenance on the write, and when the
@@ -44,7 +45,7 @@ An HTML page is a page of a workspace's document space, beside the Markdown page
 whole HTML document. The node shows it in a frame that is isolated from everything else: the page's
 script runs, but it has no network, no storage that outlives the tab, and no way to reach the
 person's account or anybody else's. It is shared like any page: with the workspace's members, or
-with a link (anyone, signed-in people, or a password). The node writes the page's text into the
+with a link (anyone, signed-in people, only the organisation's members, or a password). The node writes the page's text into the
 page itself, so search and every AI that reads the workspace read it as text.
 
 Choose it when the person wants something to SHOW: slides, a one-off presentation, a report with a
@@ -63,7 +64,8 @@ chart, a page with pictures. Choose something else when:
 2. **Publish it**: \`aimeat_workspace_publish\` with the space's \`namespace\` and the \`id\`. Only
    published pages are ever shown outside. A page keeps its last five versions.
 3. **Share it**: \`aimeat_workspace_share\` with \`space\`, \`id\` and \`shared: true\` (and \`access\` when the
-   person wants a password or signed-in readers only). Give the person the \`viewer_url\` from the
+   person wants a password, signed-in readers only (\`account\`), or the organisation's members only
+   (\`organism\`)). Give the person the \`viewer_url\` from the
    answer. A link to an HTML page ends after 90 days unless you pass \`until\` (an ISO date, or "none");
    say so, and when it ends (\`ends_at\`). The answer also carries \`window_url\`: the same page alone
    in the whole browser window, with only its AI label at the bottom-left. Give that one when the
