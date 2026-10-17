@@ -8,6 +8,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-10-17 — SECURITY: shareGateDenied does not count a visitor from another node as signed in,
+ *     so an 'account' share is this node's accounts only (plan doc-mvcn6c7e4e5q, V0.5).
  *   2026-10-16 — The public collectors are imported from services/workspace-public-collectors.ts,
  *     where they moved unchanged.
  *   2026-10-16 — readShareMeta, redactShare and memberRole delegate to services/workspace-share.ts,
@@ -84,7 +86,7 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/
 import { verifyShareToken, shareTokenVersionOf } from '../../services/share-token.js';
 import { emitMemoryWritten } from '../../services/event-bus.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../../services/doc-images.js';
-import { resolveIdentity, isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
+import { resolveIdentity, isSameOwner, isGEAI, localAccountName, isForeignPrincipal } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
@@ -648,7 +650,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     req: Request, organism: { agentGaiis: string[] }, id: string, ws: string, share: ResolvedShare,
   ): Promise<{ code: string; message: string } | null> => {
     if (share.access === 'open') return null;
-    const authed = !!req.auth && req.auth.anonymous !== true;
+    // A session signed in on ANOTHER node is a visitor here, not an account of this node: 'account'
+    // means this node's accounts and their agents (plan doc-mvcn6c7e4e5q, V0.5).
+    const authed = !!req.auth && req.auth.anonymous !== true && !isForeignPrincipal(req.auth);
     if (share.access === 'account') {
       return authed ? null : { code: 'SHARE_ACCOUNT_REQUIRED', message: 'Sign in to view these shared documents' };
     }
