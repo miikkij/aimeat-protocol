@@ -28,6 +28,8 @@
  *   v1.7.0 — 2026-10-12 — setAppParked becomes setAppListing (the `parked` and `community` pair in
  *     one write); the readers carry `community`, and includeCommunity lets a signed-in viewer's
  *     listing return other owners' community apps (migration 0102).
+ *   v1.8.0 — 2026-10-17 — `access` (who may open the app): createApp writes it, both readers carry
+ *     it, and setAppAccess sets it on every version row (migration 0104).
  */
 import { sql } from 'kysely';
 import { mergeLegal } from '../../../types/apps.js';
@@ -58,6 +60,7 @@ function toApp(r: Selectable<App>): AppRecord {
     accessCode: r.accessCode ?? undefined,
     parked: r.parked ? true : undefined,
     community: r.parked && r.community ? true : undefined,
+    access: r.access ?? undefined,
     forkable: r.forkable ? true : undefined,
     operatorHidden: r.operatorHidden ? true : undefined,
     operatorHiddenBy: r.operatorHiddenBy ?? undefined,
@@ -81,7 +84,7 @@ function toApp(r: Selectable<App>): AppRecord {
  */
 const SUMMARY_COLUMNS = [
   'ownerGaii', 'ownerName', 'filename', 'versionNumber', 'manifest', 'mimeType', 'size',
-  'accessCode', 'parked', 'community', 'forkable', 'operatorHidden', 'operatorHiddenBy', 'operatorHiddenAt',
+  'accessCode', 'parked', 'community', 'access', 'forkable', 'operatorHidden', 'operatorHiddenBy', 'operatorHiddenAt',
   'operatorHideReason', 'operatorSeoBlocked', 'operatorSeoBlockedBy', 'operatorSeoBlockedAt',
   'operatorSeoBlockReason', 'aiProvenanceId', 'createdAt',
 ] as const;
@@ -100,6 +103,7 @@ function toAppSummary(r: AppSummaryRow): AppSummaryRecord {
     accessCode: r.accessCode ?? undefined,
     parked: r.parked ? true : undefined,
     community: r.parked && r.community ? true : undefined,
+    access: r.access ?? undefined,
     forkable: r.forkable ? true : undefined,
     operatorHidden: r.operatorHidden ? true : undefined,
     operatorHiddenBy: r.operatorHiddenBy ?? undefined,
@@ -200,6 +204,7 @@ export const appMethods = {
       versionNumber: record.versionNumber, manifest: jsonb(record.manifest), mimeType: record.mimeType,
       size: record.size, data: record.data, accessCode: record.accessCode ?? null,
       parked: record.parked ?? false, community: !!(record.parked && record.community), forkable: record.forkable ?? false,
+      access: record.access ?? null,
       operatorHidden: record.operatorHidden ?? false, operatorHiddenBy: record.operatorHiddenBy ?? null,
       operatorHiddenAt: record.operatorHiddenAt ? new Date(record.operatorHiddenAt) : null,
       operatorHideReason: record.operatorHideReason ?? null, createdAt: new Date(record.createdAt),
@@ -378,6 +383,12 @@ export const appMethods = {
   async setAppListing(this: PostgresKyselyStorage, ownerGaii: string, filename: string, listing: AppListing): Promise<boolean> {
     // The listing applies to the whole app — flag every version row, both columns in one write.
     const r = await this.db.updateTable('App').set({ parked: listing !== 'listed', community: listing === 'community' }).where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
+  },
+
+  async setAppAccess(this: PostgresKyselyStorage, ownerGaii: string, filename: string, access: string | null): Promise<boolean> {
+    // Who may open the app applies to the whole app — every version row. Stored as given.
+    const r = await this.db.updateTable('App').set({ access }).where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0) > 0;
   },
 

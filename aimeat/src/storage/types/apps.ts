@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.18.0 — 2026-10-17 — AppRecord gains `access`: who may open the app (absent anyone,
+ *     'signed-in', 'organism:<id>'), separate from the listing.
  *   v1.17.0 — 2026-10-12 — AppRecord gains `community` and AppListOptions `includeCommunity`: a
  *     parked app can be listed to the node's signed-in members only. AppListing names the three
  *     states (listed, community, unlisted) and appListingOf reads them from a record.
@@ -358,6 +360,13 @@ export interface AppRecord {
   // listed = !parked, community = parked && community, unlisted = parked && !community.
   // A property of the app (owner+filename), mirrored onto every version row. Default false.
   community?: boolean;
+  /**
+   * Who may OPEN the app, which is separate from where it is listed. Absent means anyone.
+   * Otherwise 'signed-in' (any account of this node) or 'organism:<organismId>' (the members of
+   * one organism). Stored as given; the service validates it. A property of the app
+   * (owner+filename), written to every version row by setAppAccess.
+   */
+  access?: string;
   // Fork permission: when true, ANY authenticated user may fork this app into their
   // own catalogue via POST /v1/apps/:owner/:filename/fork. When false (default), only
   // the owner and the owner's own agents (same owner component) — and operators — may

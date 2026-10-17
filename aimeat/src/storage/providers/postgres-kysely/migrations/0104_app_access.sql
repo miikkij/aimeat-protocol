@@ -1,0 +1,17 @@
+-- 0104_app_access.sql
+--
+-- Who may open an app, as one stored decision on the app.
+--
+-- Until now the listing ("parked", "community") said where an app is SHOWN, and anyone who had the
+-- address could open it (an access code aside). The plan doc-mvcn6c7e4e5q (V2.1) separates the two:
+-- the listing stays where the app is shown, and this column says who may open it.
+--
+--   "App"."access"   NULL on every existing row, which means anyone may open the app.
+--                    'signed-in'           any account of this node.
+--                    'organism:<id>'       the members of one organism.
+--
+-- The storage layer stores the string as given; the service validates it. Written to every version
+-- row of the app together by setAppAccess, as setAppListing does for the listing pair.
+--
+-- Mirrors the SQLite column added in schema.ts.
+ALTER TABLE "App" ADD COLUMN IF NOT EXISTS "access" TEXT;
