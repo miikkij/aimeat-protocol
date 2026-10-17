@@ -57,6 +57,7 @@ import { initConfirmTokenKeys } from '../services/operator-confirm.js';
 import { initDownloadTokenKeys } from '../services/download-token.js';
 import { initShareTokenKeys } from '../services/share-token.js';
 import { initPageFrameTokenKeys } from '../services/page-frame-token.js';
+import { initDesignBookPreviewTokenKeys } from '../services/design-book/preview-token.js';
 import { initDraftTokenKeys } from '../services/draft-token.js';
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
@@ -422,6 +423,7 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
     initConfirmTokenKeys(privateKey, publicKey);
     initShareTokenKeys(privateKey, publicKey);
     initPageFrameTokenKeys(privateKey, publicKey);
+    initDesignBookPreviewTokenKeys(privateKey, publicKey);
     initDraftTokenKeys(privateKey, publicKey);
     logger.info('Node keys initialized for JWT signing');
   } catch (err) {

@@ -14,6 +14,10 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.8.0 — 2026-10-17 — SECURITY: a part in proposal is not previewed for the anonymous internet.
+ *     The preview opens it for a signed-in caller or a frame holding the token the list and the
+ *     detail read hand out as `preview_url` (an hour, one part); every part in those reads carries
+ *     `preview_url` (plan doc-mvcn6c7e4e5q, V0.4).
  *   v1.7.0 — 2026-10-16 — The two read routes carry each part's provenance (`ai_provenance` per part;
  *     for one part also the AI-Disclosure and Link headers and `meta.provenance`), so a gallery shows
  *     the AI label a part an AI wrote owes (services/design-book/part-provenance.ts). The preview
@@ -67,6 +71,7 @@ import { getAppTemplates } from '../data/app-templates.js';
 import { grownGenrePage, isGrownGenreBody } from '../services/design-book/grown-genre.js';
 import { resolveAppUrls } from './apps/helpers.js';
 import { isOperatorCaller } from '../services/operator-override.js';
+import { designBookPreviewToken, designBookPreviewTokenOpens } from '../services/design-book/preview-token.js';
 
 export function designbookRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -102,6 +107,18 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
    *  header). Anonymous-mode sessions count as signed out here. */
   const isSignedIn = (req: Request) => !!req.auth && !req.auth.anonymous;
 
+  /** Where a frame shows each part. A published part's address is public; a part in proposal only
+   *  reaches a signed-in reader's list, and its address carries a token naming it, because the
+   *  frame that loads it carries no session. */
+  async function previewUrls(rows: Array<{ id: string; status: string }>): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    for (const r of rows) {
+      const base = `/v1/designbook/${encodeURIComponent(r.id)}/preview`;
+      out.set(r.id, r.status === 'published' ? base : `${base}?t=${encodeURIComponent(await designBookPreviewToken(r.id))}`);
+    }
+    return out;
+  }
+
   // The catalogue view — PUBLIC for the published shelf, the way an app's stored layout is
   // (the sessionless /ui read set the precedent): a visitor who has not signed in browses the
   // finished Book read-only instead of meeting a blank wall. A signed-in caller also sees the
@@ -136,7 +153,8 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // Each part carries its own record, `ai_provenance`: a gallery labels the parts an AI wrote.
       const recordOf = await partProvenanceIds(storage, config, rows.map(r => r.id));
       const served = await loadServedProvenanceMany(storage, config, [...recordOf.values()]);
-      const parts = rows.map(r => ({ ...r, ...provenanceItemBlock(served.get(recordOf.get(r.id) ?? '')) }));
+      const previews = await previewUrls(rows);
+      const parts = rows.map(r => ({ ...r, preview_url: previews.get(r.id), ...provenanceItemBlock(served.get(recordOf.get(r.id) ?? '')) }));
       res.json(success(config.nodeId, { parts, count: rows.length }, [
         { description: 'Read one part whole', method: 'GET', url: '/v1/designbook/{id}' },
         { description: 'Propose a part (the bench runs first)', method: 'POST', url: '/v1/designbook' },
@@ -170,7 +188,8 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // `meta.provenance` and the part's own `ai_provenance`.
       const prov = await loadServedProvenance(storage, config, (await partProvenanceIds(storage, config, [out.part.id])).get(out.part.id));
       setProvenanceHeaders(res, prov);
-      res.json(success(config.nodeId, { ...out, part: { ...out.part, ...provenanceItemBlock(prov) } }, [
+      const preview_url = (await previewUrls([out.part])).get(out.part.id);
+      res.json(success(config.nodeId, { ...out, part: { ...out.part, preview_url, ...provenanceItemBlock(prov) } }, [
         { description: 'Adopt into one of your apps', method: 'POST', url: `/v1/designbook/${encodeURIComponent(out.part.id)}/adopt` },
       ], envelopeMeta(prov)));
     } catch (err) { refuse(res, err); }
@@ -178,9 +197,9 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
 
   // The GRAPHICAL preview: one part rendered as the real page the bench measures — the kit, the
   // part's body, demo rows — for the gallery's iframes and anyone who wants to SEE a part
-  // instead of reading its JSON. Sessionless for every part that exists, published or not: the
-  // part is a public-visibility record readable through the public memory door already, so this
-  // door shows nothing that address does not serve — it only renders it. Served HTML from a
+  // instead of reading its JSON. Sessionless for a published part. A part in proposal is stored for
+  // the node's signed-in members (service.ts) and shown here to a signed-in caller or a frame holding
+  // the token the list hands out (services/design-book/preview-token.ts). Served HTML from a
   // route is the bench-page exception, not a per-service UI: the builder lives in the service
   // (preview.ts), the bench renders the identical page, and any client may embed it.
   router.get('/v1/designbook/:id/preview', async (req: Request, res: Response) => {
@@ -198,6 +217,12 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
         part = await book.storedPart(id);
       } catch (err) {
         if (!(err instanceof DesignBookError) || err.status !== 404) throw err;
+      }
+      // A part still in proposal is shown to signed-in readers only, as the list and the detail
+      // read do. A frame carries no session, so it shows one with the token those reads hand out
+      // in `preview_url`; without either it answers like a part that does not exist.
+      if (part && part.status !== 'published' && !isSignedIn(req) && !(await designBookPreviewTokenOpens(req.query.t, id))) {
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
       }
       const served = part ? null : getAppTemplates().find(t => t.kind === 'genre' && t.id === id);
       if (!part && !served) {
