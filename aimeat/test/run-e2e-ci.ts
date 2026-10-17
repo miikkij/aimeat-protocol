@@ -1334,6 +1334,9 @@ const ALL_SUITES = [
     'test/e2e-mcp-compliance-tools.ts',
     'test/e2e-mcp-admin-tools.ts',
     'test/e2e-mcp-ai-tools.ts',
+    // Reference pictures and a mask on the image AI: what OpenRouter, the OpenAI type and an
+    // OpenAI-compatible server receive, and the refusals that send nothing (Comicland v3 A-1, A-2).
+    'test/e2e-ai-image-references.ts',
     'test/e2e-mcp-mail-connection-tools.ts',
     'test/e2e-mcp-proxy-tools.ts',
     'test/e2e-mcp-owner-only-parity.ts',

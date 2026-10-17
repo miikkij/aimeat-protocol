@@ -16,6 +16,7 @@
  * @usage
  *   import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
  * @version-history
+ *   2026-10-18 -- aimeat_image_generate takes `reference_images` and `mask` (Comicland v3 A-1, A-2).
  *   2026-10-18 -- aimeat_app_draft_write and aimeat_app_draft_seed forward `notice` (DRAFT_NOTICE_PARAM).
  *   2026-09-28 -- aimeat_image_generate takes `role`, the AI role the call runs as.
  *   2026-09-27 -- aimeat_app_screenshot moved into aimeat_app_manage (action "screenshot").
@@ -136,9 +137,14 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             provider: { type: 'string', description: 'One of the owner\'s AI providers, or a type. No fallback then.' },
             fallback: { type: 'boolean', description: 'false keeps the call on its first provider.' },
             role: { type: 'string', description: AI_ROLE_PARAM },
+            reference_images: { type: 'array', description: 'Up to 16 pictures the model works from, each { storage_key } or { data_url }.' },
+            mask: { type: 'object', description: 'A PNG whose transparent pixels mark the area of the first reference to redraw.' },
         },
         handler: ({ client }, input) => {
             const body: JsonObject = { prompt: requiredString(input, 'prompt') };
+            // Passed as given: the route reads and checks every picture (services/ai/call-files.ts).
+            if (Array.isArray(input.reference_images)) body.reference_images = input.reference_images;
+            if (input.mask && typeof input.mask === 'object') body.mask = input.mask;
             const size = optionalString(input, 'size'); if (size) body.size = size;
             const key = optionalString(input, 'storage_key'); if (key) body.storage_key = key;
             if (optionalBoolean(input, 'public')) body.public = true;

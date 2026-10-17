@@ -872,6 +872,15 @@ components:
         channels: { type: integer, nullable: true, example: 1 }
         sample_format: { type: string, nullable: true, enum: [s16le, s16be, f32le, null], example: s16le }
 
+    AiImageInput:
+      type: object
+      description: >-
+        One input picture of an image call: a picture in the caller's storage by its key (preferred),
+        or a data: URL. The format is read from the bytes; an https URL is not accepted.
+      properties:
+        storage_key: { type: string, maxLength: 512 }
+        data_url: { type: string, description: 'data:<mime>;base64,<bytes>' }
+
     AiCallRole:
       type: string
       minLength: 1
@@ -20654,6 +20663,15 @@ paths:
         default is private. A private picture's answer also carries `download_url`, a signed address
         that loads without a sign-in for `download_expires_in_seconds` (an hour): its `url` needs
         storage:read, which an app holding only ai:use does not have, and an <img> sends no header.
+
+        `reference_images` are pictures the model works from, so a character, a place or a style
+        stays the same from picture to picture. `mask` redraws part of the first reference: a PNG
+        whose transparent pixels mark the area to redraw. OpenRouter and xAI have no mask
+        parameter, so there the mask goes to the model as one more picture with a sentence that
+        says what it is, and `mask_mode` answers `guided`; elsewhere it is `native`. A key is read
+        in the caller's own storage; an agent also reaches a picture it made itself, which this
+        route stored in its owner's storage. The model needs to take pictures as input, or the
+        provider refuses (422).
       tags: [AI]
       security:
         - BearerAuth: []
@@ -20669,6 +20687,16 @@ paths:
                   type: string
                   description: What the picture should show.
                   maxLength: 4000
+                reference_images:
+                  type: array
+                  maxItems: 16
+                  description: Pictures the model works from (PNG, JPEG, WebP or GIF, 40 MB in all). A data_url counts against the request body limit as well.
+                  items:
+                    $ref: '#/components/schemas/AiImageInput'
+                mask:
+                  allOf:
+                    - $ref: '#/components/schemas/AiImageInput'
+                  description: A PNG the size of the first reference; its transparent pixels are redrawn and the rest is kept. Needs reference_images.
                 size:
                   type: string
                   description: Provider-specific size string, e.g. "1024x1024". Passed through untouched.
@@ -20714,6 +20742,11 @@ paths:
                           model: { type: string }
                           visibility: { type: string, enum: [public, private] }
                           url: { type: string }
+                          download_url: { type: string, description: 'A private picture only: a signed address that loads without a sign-in.' }
+                          download_expires_in_seconds: { type: integer }
+                          route: { type: object, additionalProperties: true, description: 'Who chose the provider, who answered, and every attempt.' }
+                          reference_count: { type: integer, description: 'How many reference pictures the model was given.' }
+                          mask_mode: { type: string, enum: [native, guided], description: 'With a mask: the provider''s own mask parameter (native), or the mask followed as one more picture (guided).' }
                           usage:
                             type: object
                             properties:
@@ -20726,7 +20759,9 @@ paths:
                               spent_today_usd: { type: number }
                               remaining_usd: { type: number }
         '400':
-          description: INVALID_BODY, PROMPT_TOO_LONG, NO_IMAGE_MODEL when neither the owner nor the node has named one, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)
+          description: INVALID_BODY (including a reference that is not a picture, or a mask without references or not a PNG), FILES_TOO_LARGE, PROMPT_TOO_LONG, NO_IMAGE_MODEL when neither the owner nor the node has named one, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)
+        '404':
+          description: NOT_FOUND - a reference_images or mask storage_key is not in the caller's storage
         '409':
           description: AI_ROLE_NOT_BOUND - the app's role runs only once the owner binds it (PUT /v1/ai/roles)
         '401':

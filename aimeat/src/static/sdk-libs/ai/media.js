@@ -11,13 +11,16 @@
  * @structure image(opts) · transcribe(opts) · embed(opts)
  * @usage const pic = await AIMEAT.ai.image({ app_id, prompt, confirm: true }); img.src = pic.src;
  * @version-history
+ *   v1.2.0 - 2026-10-18 - image() takes `reference_images` and `mask` (stored keys, data: URLs, Blobs),
+ *     so an app keeps a character's look from panel to panel and redraws part of a picture
+ *     (Comicland v3 A-1, A-2).
  *   v1.1.0 - 2026-09-28 - routing() carries `role`, the AI role the call runs as, so image, transcribe,
  *     embed and complete send it; it is part of what makes two calls the same call.
  *   v1.0.1 - 2026-09-28 - image() answers `src`, which loads for a private picture too (the signed
  *     download_url); `url` needed storage:read. Found by the V5 browser check.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: image, transcribe and embed for apps.
  */
-import { paid, postJson, isBlob, blobToBase64 } from './call.js';
+import { paid, postJson, isBlob, blobToBase64, blobToDataUrl } from './call.js';
 import { capabilities, priceEstimate } from './capabilities.js';
 
 /**
@@ -36,6 +39,20 @@ export function routing(opts) {
 }
 
 /**
+ * One input picture as /v1/ai/image takes it: a Blob or File becomes a data: URL, an object with
+ * `storage_key` or `data_url` passes as it is.
+ * @param {any} p
+ * @returns {Promise<{ storage_key?: string, data_url?: string }>}
+ */
+async function pictureInput(p) {
+  if (isBlob(p)) return { data_url: await blobToDataUrl(/** @type {Blob} */ (p)) };
+  if (p && typeof p === 'object' && (p.storage_key || p.data_url)) {
+    return p.storage_key ? { storage_key: String(p.storage_key) } : { data_url: String(p.data_url) };
+  }
+  throw new Error('a reference image is { storage_key }, { data_url }, or a Blob');
+}
+
+/**
  * A picture from a prompt. Resolves with { src, storage_key, url, download_url?, mime_type, size,
  * model, visibility, route, usage, budget, provenance }. The picture is stored in the person's own
  * storage. Show it with `src`: for a private picture that is `download_url`, a signed address that
@@ -46,18 +63,31 @@ export function routing(opts) {
  * `size` ('1024x1024' and the like) and `model` are optional. `storage_key` chooses where it is
  * stored. A picture costs money on most providers: pass `confirm: true` and the dialog shows the
  * catalogue's price per picture when it is known.
+ *
+ * `reference_images` (up to 16) are pictures the model works from, so a character, a place or a
+ * style stays the same from picture to picture: each is `{ storage_key }` (a picture in the person's
+ * storage, the better choice), `{ data_url }`, or a Blob or File. `mask` redraws part of the FIRST
+ * reference: a PNG of the same size whose transparent pixels mark the area to redraw. The answer's
+ * `mask_mode` says whether the provider applied it as a mask ('native') or followed it as one more
+ * picture ('guided', on OpenRouter and xAI, which have no mask parameter).
  * @param {any} opts
  * @returns {Promise<any>}
  */
 export async function image(opts) {
   if (!opts || typeof opts !== 'object') throw new Error('opts object required');
   if (!opts.prompt) throw new Error('opts.prompt required');
+  if (opts.reference_images != null && !Array.isArray(opts.reference_images)) throw new Error('opts.reference_images must be an array');
+  const refs = opts.reference_images ? await Promise.all(opts.reference_images.map(pictureInput)) : undefined;
+  const mask = opts.mask ? await pictureInput(opts.mask) : undefined;
   const body = {
     prompt: opts.prompt, model: opts.model, size: opts.size, storage_key: opts.storage_key,
     public: opts.public === true ? true : undefined, app_id: opts.app_id, ...routing(opts),
+    ...(refs && refs.length ? { reference_images: refs } : {}),
+    ...(mask ? { mask } : {}),
   };
   return paid(opts, {
-    key: ['ai-image', opts.app_id, opts.model, opts.size, opts.storage_key, opts.provider, opts.role, opts.prompt],
+    key: ['ai-image', opts.app_id, opts.model, opts.size, opts.storage_key, opts.provider, opts.role, opts.prompt,
+      JSON.stringify(refs ? refs.map(r => r.storage_key || String(r.data_url).length) : []), mask ? (mask.storage_key || String(mask.data_url).length) : ''],
     what: 'Make a picture on your own AI provider.',
     label: 'The picture',
     remember: 'ai-image:' + (opts.app_id || 'app'),

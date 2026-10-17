@@ -13,6 +13,7 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-18 — POST /v1/ai/image is parsed at the large JSON limit: it carries reference pictures.
  *   2026-10-17 — contentAccessGate after appOriginSignIn: a node set to signed-in content access
  *     refuses everyone who is not one of its accounts, outside a short open list (plan doc-mvcn6c7e4e5q V1).
  *   2026-10-16 — ConfigSources carries the settings loadConfig() set aside (`settingFallbacks`), for
@@ -202,7 +203,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
     // aimeat_datapackage_publish with its 8 MB one-call cap) and was parsed at the small limit, so
     // the tools' own caps and the advice they carry were unreachable: express answered 413 first
     // (2026-09-08, e2e-mcp-dm-datapackage and e2e-mcp-extensions-apps).
-    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp');
+    // /v1/ai/image takes reference pictures as data: URLs, which the small limit answered with 413 after
+    // two or three pages; stored pictures by key are read on the node and count only against
+    // IMAGE_INPUT_LIMITS (services/ai/call-files.ts).
+    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp') || req.path === '/v1/ai/image';
     const limit = needsLargeBody ? `${config.jsonBodyLimitLargeMb}mb` : `${config.jsonBodyLimitMb}mb`;
     // A UCP request may be signed (RFC 9421), and its Content-Digest is over the exact bytes, so the
     // UCP paths keep the raw body beside the parsed one (routes/ucp-checkout.ts).

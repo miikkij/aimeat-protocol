@@ -15,6 +15,8 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-18 — `reference_images` and `mask`, read with readImageInputs as on POST /v1/ai/image; the
+ *     result says reference_count and mask_mode (Comicland v3 A-1, A-2).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-08 — The result names the picture's provenance record: provenance_id and record_url.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -34,6 +36,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { generateForOwner } from '../services/ai-image.js';
+import { readImageInputs } from '../services/ai/call-files.js';
+import { readerForAgent } from '../services/classification/reader.js';
 import { AiCompletionError } from '../services/ai/completion.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
@@ -51,7 +55,7 @@ export function registerAiImageTool(
         descriptionFor('aimeat_image_generate'),
         zodShapeFor('aimeat_image_generate'),
         annotationsFor('aimeat_image_generate'),
-        async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback, role }) => {
+        async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback, role, reference_images, mask }) => {
             // The OWNER's identity, not the agent's. The API key, the daily budget and the spend
             // record all live under the owner — an agent has no key of its own and its balance is
             // always zero — so an agent making a picture spends the person's allowance, which is
@@ -64,6 +68,11 @@ export function registerAiImageTool(
             // Who asked, for the agent's own key and cap; the owner above still pays and stores.
             const { agent } = aiPayerOf(getAgentGaii());
             try {
+                // The pictures the model works from: the agent's own files, or pictures it made with
+                // this tool before (which live in the owner's storage), under the agent's reader.
+                const inputs = reference_images !== undefined || mask !== undefined
+                    ? await readImageInputs(storage, readerForAgent({ storage, config }, getAgentGaii()), getAgentGaii(), { references: reference_images, mask }, gaii)
+                    : undefined;
                 const r = await generateForOwner(storage, config, gaii, {
                     prompt, size, storageKey: storage_key,
                     publicVisibility: isPublic === true, model, appId: app_id,
@@ -71,6 +80,8 @@ export function registerAiImageTool(
                     ...(provider ? { provider } : {}),
                     ...(fallback !== undefined ? { fallback } : {}),
                     ...(role ? { role } : {}),
+                    ...(inputs?.references.length ? { references: inputs.references } : {}),
+                    ...(inputs?.mask ? { mask: inputs.mask } : {}),
                 });
                 const base = config.baseUrl.replace(/\/+$/, '');
                 // The service builds the URL that actually loads for the visibility's audience —
@@ -88,6 +99,8 @@ export function registerAiImageTool(
                             model: r.model,
                             visibility: r.visibility,
                             url: `${base}${path}`,
+                            reference_count: r.referenceCount,
+                            ...(r.maskMode ? { mask_mode: r.maskMode } : {}),
                             cost_usd: r.usage.costUsd,
                             cost_exact: r.usage.costExact,
                             remaining_today_usd: r.budget.remainingUsd,

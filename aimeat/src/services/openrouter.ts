@@ -8,12 +8,18 @@
  *   the model listings. Text completions go through the gateway (services/ai/gateway.ts) since
  *   2026-09-28. Every function here reaches the network through safeFetch.
  * @structure
- *   - generateImage(apiKey, model, prompt, baseUrl?, opts?) — POST /images/generations
+ *   - generateImage(apiKey, model, prompt, baseUrl?, opts?) — POST /images/generations; with input
+ *     pictures POST /images (OpenRouter) or /images/edits (OpenAI-compatible), ImageInputs
  *   - transcribe(apiKey, model, audio, baseUrl?, opts?) — call audio transcriptions (STT)
  *   - chatCompletionRaw / speechRaw / generationCost — the proxy's and the voice stream's transport
  *   - listModels(apiKey, baseUrl?, modality?) — fetch available models
  *   - sniffImage(bytes) — a picture's format and pixel size from its header
  * @version-history
+ *   v4.2.0 — 2026-10-18 — generateImage takes input pictures (`inputs`): reference images, and a mask
+ *     that redraws part of the first one. OpenRouter gets them as `input_references` on its
+ *     documented `/images` endpoint, with the mask as a last reference the prompt explains; another
+ *     OpenAI-compatible server gets the OpenAI images API's `/images/edits` multipart. A call with no
+ *     input picture is the same request as before (Comicland v3 A-1, A-2).
  *   v4.1.0 — 2026-10-08 — A non-OK answer carries its status, its Retry-After and its reason by the one
  *     policy (services/ai/errors.ts providerReason: 4 KB read, the JSON message, redacted, 300
  *     characters), where it carried up to 64 KB of the raw body, and the model list carried none. A
@@ -167,6 +173,70 @@ export function sniffImage(b: Buffer): { mime?: string; width?: number; height?:
 const IMAGE_MODERATION_ATTEMPTS = 3;
 
 /**
+ * The input pictures of an image call, and which of the two wire shapes carries them.
+ *
+ * `openrouter`: OpenRouter's documented image endpoint, `POST {baseUrl}/images` with
+ * `input_references` (up to 16, data: URLs). It has no mask field, so a mask travels as one more
+ * reference after the pictures, and the prompt says what it is (`maskMode: 'guided'`).
+ * `openai`: the OpenAI images API every other OpenAI-compatible server copies,
+ * `POST {baseUrl}/images/edits` as multipart, one `image[]` part per picture and a `mask` part,
+ * which the model applies to the first picture (`maskMode: 'native'`).
+ */
+export interface ImageInputs {
+  references: Array<{ data: Buffer; mime: string }>;
+  mask?: { data: Buffer; mime: string };
+  wire: 'openrouter' | 'openai';
+}
+
+/** The sentence a guided mask adds to the prompt: the model reads the mask as one more picture. */
+export const GUIDED_MASK_SENTENCE = 'The last reference image is a mask for the first one. Redraw only the area that is transparent in the mask, and keep everything else in the first image exactly as it is.';
+
+function imageRequestUrl(baseUrl: string, inputs: ImageInputs | undefined): string {
+  if (!inputs) return `${baseUrl}/images/generations`;
+  return inputs.wire === 'openrouter' ? `${baseUrl}/images` : `${baseUrl}/images/edits`;
+}
+
+function dataUrlOf(p: { data: Buffer; mime: string }): string {
+  return `data:${p.mime};base64,${p.data.toString('base64')}`;
+}
+
+/** The headers and body of one image request, in the shape its wire takes (ImageInputs). */
+function imageRequestBody(
+  apiKey: string | undefined, baseUrl: string, model: string, prompt: string, size: string | undefined, inputs: ImageInputs | undefined,
+): { headers: Record<string, string>; body: string | FormData } {
+  const headers = providerHeaders(apiKey, baseUrl);
+  if (!inputs) {
+    return {
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, ...(size ? { size } : {}), usage: { include: true } }),
+    };
+  }
+  if (inputs.wire === 'openrouter') {
+    const pictures = inputs.mask ? [...inputs.references, inputs.mask] : inputs.references;
+    return {
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        prompt: inputs.mask ? `${prompt}\n\n${GUIDED_MASK_SENTENCE}` : prompt,
+        ...(size ? { size } : {}),
+        input_references: pictures.map(p => ({ type: 'image_url', image_url: { url: dataUrlOf(p) } })),
+        usage: { include: true },
+      }),
+    };
+  }
+  // Multipart: fetch writes the boundary into Content-Type itself, so none is set here.
+  const form = new FormData();
+  form.append('model', model);
+  form.append('prompt', prompt);
+  if (size) form.append('size', size);
+  inputs.references.forEach((p, i) => {
+    form.append('image[]', new Blob([new Uint8Array(p.data)], { type: p.mime }), `reference-${i + 1}.${p.mime.split('/')[1]}`);
+  });
+  if (inputs.mask) form.append('mask', new Blob([new Uint8Array(inputs.mask.data)], { type: inputs.mask.mime }), 'mask.png');
+  return { headers, body: form };
+}
+
+/**
  * Generate an image, OpenAI-compatible (`POST {baseUrl}/images/generations`).
  *
  * The retry is not defensive padding. Some providers' moderation throws false positives on ordinary
@@ -179,21 +249,22 @@ export async function generateImage(
   model: string,
   prompt: string,
   baseUrl: string = OPENROUTER_BASE,
-  opts?: { size?: string; signal?: AbortSignal },
+  opts?: { size?: string; signal?: AbortSignal; inputs?: ImageInputs },
 ): Promise<ImageGenerationResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
   // The caller's reason to stop, combined with the timeout rather than replacing it.
   const signal = opts?.signal ? AbortSignal.any([controller.signal, opts.signal]) : controller.signal;
-  logger.info(`[openrouter] image: model=${model}, size=${opts?.size ?? 'default'}`);
+  const inputs = opts?.inputs && opts.inputs.references.length > 0 ? opts.inputs : undefined;
+  logger.info(`[openrouter] image: model=${model}, size=${opts?.size ?? 'default'}`
+    + (inputs ? `, references=${inputs.references.length}, mask=${inputs.mask ? 'yes' : 'no'}, wire=${inputs.wire}` : ''));
 
   try {
     let lastErr: (Error & { status?: number }) | null = null;
     for (let attempt = 1; attempt <= IMAGE_MODERATION_ATTEMPTS; attempt++) {
-      const resp = await safeFetch(`${baseUrl}/images/generations`, {
+      const resp = await safeFetch(imageRequestUrl(baseUrl, inputs), {
         method: 'POST',
-        headers: { ...providerHeaders(apiKey, baseUrl), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, prompt, ...(opts?.size ? { size: opts.size } : {}), usage: { include: true } }),
+        ...imageRequestBody(apiKey, baseUrl, model, prompt, opts?.size, inputs),
         signal,
       });
 

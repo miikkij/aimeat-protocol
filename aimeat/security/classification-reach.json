@@ -835,6 +835,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI usage counters."
     },
+    "src/services/ai/call-files.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-18 (Comicland v3 A-1), the node's own read: readOwnPictureInPayerStorage looks up a file in the agent's owner's storage only to read its aiProvenanceId and compare that record's principal with the calling agent. Nothing is shown or sent from that lookup; the picture's content is then loaded through readAiFile, which passes the classification reader."
+    },
     "src/services/ai/capabilities.ts": {
       "reads": {
         "getMemory": 1

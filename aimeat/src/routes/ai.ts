@@ -22,6 +22,9 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-10-18 — POST /v1/ai/image takes `reference_images` (up to 16 stored pictures or data: URLs the
+ *     model works from) and `mask` (a PNG that marks the area of the first reference to redraw), and
+ *     answers `reference_count` and `mask_mode` (Comicland v3 A-1, A-2).
  *   2026-10-16 — POST /v1/ai/settings admits the owner's agent holding memory:write-reserved and
  *     memory:write-as-owner, the words aimeat_operator_ai_config asks on the node MCP, and writes the
  *     owner's record (resolveWriteTarget); the connector's copy of the tool calls this route (QA audit D2-02).
@@ -113,7 +116,7 @@ import { getUsageHistory } from '../services/ai-usage-history.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
 import { registerVoiceRoutes, voiceAppId } from './ai-voice.js';
 import { generateForOwner } from '../services/ai-image.js';
-import { readCallFiles, readCallerAudio } from '../services/ai/call-files.js';
+import { readCallFiles, readCallerAudio, readImageInputs } from '../services/ai/call-files.js';
 import { readCallRole } from '../services/ai/call-guards.js';
 import { generateDownloadToken } from '../services/download-token.js';
 
@@ -389,13 +392,19 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       // Paid by the human, in the agent's name, like /v1/ai/complete; the picture lands in the
       // payer's storage, which is where the MCP tool has always put it.
       const { payer: gaii, agent } = aiPayerOf(resolve(req));
-      const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback, role: roleField } = req.body as {
+      const { prompt, model, size, storage_key, public: isPublic, app_id, provider, fallback, role: roleField, reference_images, mask } = req.body as {
         prompt?: string; model?: string; size?: string; storage_key?: string;
         public?: boolean; app_id?: string; provider?: string; fallback?: boolean; role?: unknown;
+        reference_images?: unknown; mask?: unknown;
       };
 
       try {
         const role = readCallRole(roleField);
+        // The pictures the model works from, read under the caller's classification reader before
+        // anything is spent (services/ai/call-files.ts readImageInputs).
+        const inputs = reference_images !== undefined || mask !== undefined
+          ? await readImageInputs(storage, readerFor({ storage, config }, req.auth), resolve(req), { references: reference_images, mask }, gaii)
+          : undefined;
         // No cancel on a client disconnect: the picture is stored and billed when it arrives, as it
         // always has been, because a provider may charge for a generation the node stopped reading.
         const r = await generateForOwner(storage, config, gaii, {
@@ -405,6 +414,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           ...(typeof provider === 'string' && provider ? { provider } : {}),
           ...(typeof fallback === 'boolean' ? { fallback } : {}),
           ...(role ? { role } : {}),
+          ...(inputs?.references.length ? { references: inputs.references } : {}),
+          ...(inputs?.mask ? { mask: inputs.mask } : {}),
         });
         const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
         setProvenanceHeaders(res, prov);
@@ -428,6 +439,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           // owner, discovered by the first imagery-pipeline demo.
           url: r.fetchUrl,
           route: r.route,
+          reference_count: r.referenceCount,
+          ...(r.maskMode ? { mask_mode: r.maskMode } : {}),
           usage: { cost_usd: r.usage.costUsd, cost_exact: r.usage.costExact },
           budget: {
             daily_budget_usd: r.budget.dailyBudgetUsd,
