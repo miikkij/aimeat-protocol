@@ -35,6 +35,10 @@
  *   // fire-and-forget at boot, after storage is ready
  *   migrateAgentScopeVocabulary(storage).catch(err => logger.error(…));
  * @version-history
+ *   v1.6.0 — 2026-10-18 — The agent half's record is claimed before the work (services/once-only-step.ts),
+ *     and every agent's and app grant's list is written on the list that was read
+ *     (services/scope-list-swap.ts): two node processes starting together run the agent half once, and no
+ *     boot step drops a word another one adds (check:atomic-writes).
  *   v1.5.0 — 2026-09-30 — SECURITY: the agent half widens only agents approved before 2026-08-10
  *     (agentPredatesVocabulary, the cutoff app grants already had), and runs once per node
  *     (AGENT_VOCABULARY_MIGRATION_KEY). It ran on every boot over every agent, so an agent approved
@@ -62,6 +66,8 @@
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { claimOnceOnlyStep } from './once-only-step.js';
+import { changeScopeList } from './scope-list-swap.js';
 
 /**
  * The words added on 2026-08-10, and what each one covers. Every existing agent gets all of them,
@@ -162,6 +168,33 @@ export async function migrateAgentScopeVocabulary(storage: Storage, namedAt: str
         // (see the warning below) and it was previously invisible.
         if (!Array.isArray(held)) { noScopeList++; continue; }
 
+        // Written on the list that was read (services/scope-list-swap.ts): a word another boot step,
+        // another node process or the owner adds meanwhile stays, and the words are worked out again
+        // from the stored list.
+        if (await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, held, vocabularyFor)) changed++;
+    }
+
+    if (changed) {
+        logger.info('Scope vocabulary migration: existing agents grandfathered onto the new words', {
+            agentsUpdated: changed,
+            scopes: GRANDFATHERED_SCOPES.join(', '),
+        });
+    }
+    if (noScopeList) {
+        // These agents keep whatever config.defaultAgentScopes says, which names none of the words
+        // above. Every gate that now asks for one of them refuses this agent, and the owner's only
+        // fix is to set its scopes explicitly in the agent editor. Say so out loud rather than
+        // leaving the population to be discovered by a support ticket.
+        logger.warn('Scope vocabulary migration: agents with no recorded scope list were left alone', {
+            agents: noScopeList,
+            effect: 'they fall back to config.defaultAgentScopes, which carries none of these words',
+        });
+    }
+    return changed;
+}
+
+/** The list an agent holding `held` gets from the vocabulary, or null when it lacks nothing. */
+function vocabularyFor(held: readonly string[]): string[] | null {
         // The grandfathered words ride inside a wildcard already, so a '*' agent needs none of them.
         const missing: string[] = held.includes('*')
             ? []
@@ -183,29 +216,7 @@ export async function migrateAgentScopeVocabulary(storage: Storage, namedAt: str
         for (const c of CONDITIONAL_SCOPES) {
             if (scopeIsCovered(ownerGranted, c.when) && !held.includes(c.grant)) missing.push(c.grant);
         }
-        if (!missing.length) continue;
-
-        await storage.updateAgent(agent.gaii, { defaultScopes: [...held, ...missing] });
-        changed++;
-    }
-
-    if (changed) {
-        logger.info('Scope vocabulary migration: existing agents grandfathered onto the new words', {
-            agentsUpdated: changed,
-            scopes: GRANDFATHERED_SCOPES.join(', '),
-        });
-    }
-    if (noScopeList) {
-        // These agents keep whatever config.defaultAgentScopes says, which names none of the words
-        // above. Every gate that now asks for one of them refuses this agent, and the owner's only
-        // fix is to set its scopes explicitly in the agent editor. Say so out loud rather than
-        // leaving the population to be discovered by a support ticket.
-        logger.warn('Scope vocabulary migration: agents with no recorded scope list were left alone', {
-            agents: noScopeList,
-            effect: 'they fall back to config.defaultAgentScopes, which carries none of these words',
-        });
-    }
-    return changed;
+        return missing.length ? [...held, ...missing] : null;
 }
 
 /**
@@ -252,13 +263,15 @@ export async function migrateAppGrantScopeVocabulary(storage: Storage): Promise<
     let changed = 0;
 
     for (const grant of grants) {
-        const held = grant.scopes;
-        if (!Array.isArray(held) || held.includes('*')) continue;
         if (!appGrantPredatesVocabulary(grant)) continue;
-        const missing = GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
-        if (!missing.length) continue;
-        await storage.updateAppGrant(grant.grantId, { scopes: [...held, ...missing] });
-        changed++;
+        // Written on the list that was read (services/scope-list-swap.ts), so a refresh, the owner's
+        // edit or another boot step meanwhile is kept.
+        const widened = await changeScopeList(storage, { kind: 'app-grant', id: grant.grantId }, grant.scopes, held => {
+            if (held.includes('*')) return null;
+            const missing = GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
+            return missing.length ? [...held, ...missing] : null;
+        });
+        if (widened) changed++;
     }
 
     if (changed) {
@@ -277,8 +290,9 @@ export async function migrateAppGrantScopeVocabulary(storage: Storage): Promise<
  *
  * THE AGENT HALF RUNS ONCE PER NODE, and AGENT_VOCABULARY_MIGRATION_KEY under the node's system
  * identity says it has. Run on every boot, it handed the words back to an older agent whose owner
- * took one away, so "take this away" lasted until the next restart. The record is written after the
- * agents, so a boot that stops half way runs it again. The app-grant half needs no record: an owner's
+ * took one away, so "take this away" lasted until the next restart. The record is claimed before the
+ * agents and written over the claim after them (services/once-only-step.ts), so of two node processes
+ * one runs it, and a boot whose run fails runs it again next time. The app-grant half needs no record: an owner's
  * narrowing stamps the grant (scopesFixedAt), and the migration leaves a stamped grant alone.
  */
 export async function migrateScopeVocabulary(storage: Storage, nodeId?: string): Promise<{ agents: number; appGrants: number }> {
@@ -290,23 +304,18 @@ export async function migrateScopeVocabulary(storage: Storage, nodeId?: string):
 
 /** The agent half, unless this node's record says it has run; then the record. */
 async function migrateAgentScopeVocabularyOnce(storage: Storage, nodeId: string): Promise<number> {
-    const system = `system@${nodeId}`;
-    if (await storage.getMemory(system, AGENT_VOCABULARY_MIGRATION_KEY)) return 0;
-    const agents = await migrateAgentScopeVocabulary(storage);
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: AGENT_VOCABULARY_MIGRATION_KEY,
-        ownerGaii: system,
-        value: { at: now, agents },
-        visibility: 'private',
-        tags: ['migration'],
-        // Never swept: a record that expired would run the migration again at the next boot.
-        ttlHours: null,
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-    });
-    return agents;
+    // Claimed before the agents (services/once-only-step.ts), so of two node processes starting
+    // together one runs it; a failed run removes the claim, so the next boot runs it again.
+    const claim = await claimOnceOnlyStep(storage, `system@${nodeId}`, AGENT_VOCABULARY_MIGRATION_KEY);
+    if (!claim) return 0;
+    try {
+        const agents = await migrateAgentScopeVocabulary(storage);
+        await claim.finish({ at: new Date().toISOString(), agents });
+        return agents;
+    } catch (err) {
+        await claim.release();
+        throw err;
+    }
 }
 
 /** The record that says this node has run the agent half, under `system@<nodeId>`. */

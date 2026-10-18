@@ -43,8 +43,10 @@
  *
  *   WHEN. Only on a node that runs REST_SCOPE_GATES_ENFORCED_IN or later, so a 3.x node does not run it
  *   and its first 4.0.x start does. ONCE per half, recorded under `system@<nodeId>`
- *   (REST_SCOPE_KEEP_WORKING_KEY, APP_SCOPE_KEEP_WORKING_KEY) after the work, so a start that stops
- *   half way runs it again, and a word the owner removes later stays removed.
+ *   (REST_SCOPE_KEEP_WORKING_KEY, APP_SCOPE_KEEP_WORKING_KEY), and a word the owner removes later stays
+ *   removed. Each record is claimed before its half and written over the claim after it
+ *   (services/once-only-step.ts), so of two node processes starting together one runs each half; a
+ *   start whose step fails removes the claims, so the next start runs it again.
  *
  *   WHAT THE OWNER AND THE OPERATOR SEE. One line on each owner's activity feed for the agents
  *   (`scope_words_kept`, linking to the agent list) and one for the published apps
@@ -62,6 +64,9 @@
  *   const before = new Date().toISOString();
  *   migrateRestScopeKeepWorkingOnce(storage, config, { existedBefore: before });
  * @version-history
+ *   v1.2.0 — 2026-10-18 — Both records are claimed before the work (services/once-only-step.ts) and each
+ *     scope list is written on the list that was read (services/scope-list-swap.ts), the take-back from
+ *     anonymous mode's shared agent included (check:atomic-writes).
  *   v1.1.0 — 2026-10-13 — The published apps half (APP_SCOPE_KEEP_WORKING_KEY, keepWorkingAppsOnce), its
  *     feed line and its counts in the one incident. The principals half takes back from anonymous mode's
  *     shared agent the words the two earlier steps wrote on it (their run records name it), recorded as
@@ -77,6 +82,8 @@ import { REST_SCOPE_GATES_ENFORCED_IN } from '../utils/rest-scope-release.js';
 import { recordAccountEvent } from './account-events.js';
 import { recordSecurityIncident } from './security-incident.js';
 import { keepWorkingAppsOnce, type KeptApp } from './app-scope-allowance.js';
+import { claimOnceOnlyStep } from './once-only-step.js';
+import { changeScopeList } from './scope-list-swap.js';
 import {
   AGENT_READ_GRANT_KEY, AGENT_READ_WORDS, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS, isSharedAnonymous,
 } from './rest-scope-gates-migration.js';
@@ -242,11 +249,12 @@ async function takeBackFromSharedAnonymous(storage: Storage, system: string): Pr
       const named = (rec?.value as { agents?: unknown } | undefined)?.agents;
       if (Array.isArray(named) && named.includes(agent.gaii)) written.push(...words.map(w => w.word));
     }
-    const held = agent.defaultScopes ?? [];
-    const removed = written.filter(w => held.includes(w));
-    if (!removed.length) continue;
-    await storage.updateAgent(agent.gaii, { defaultScopes: held.filter(w => !removed.includes(w)) });
-    return { id: agent.gaii, removed };
+    const changed = await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes ?? [], held => {
+      const removed = written.filter(w => held.includes(w));
+      return removed.length ? held.filter(w => !removed.includes(w)) : null;
+    });
+    if (!changed) continue;
+    return { id: agent.gaii, removed: changed.before.filter(w => !changed.after.includes(w)) };
   }
   return null;
 }
@@ -270,36 +278,41 @@ export async function migrateRestScopeKeepWorkingOnce(
   const result: KeepWorkingResult = { ran: false, agents: [], ecosystemApps: [], apps: [] };
   if (!versionAtLeast(opts.version ?? getSoftwareVersion(), REST_SCOPE_GATES_ENFORCED_IN)) return result;
   const system = `system@${config.nodeId}`;
-  const principalsDue = !(await storage.getMemory(system, REST_SCOPE_KEEP_WORKING_KEY));
-  const appsDue = !(await storage.getMemory(system, APP_SCOPE_KEEP_WORKING_KEY));
-  if (!principalsDue && !appsDue) return result;
+  // Each half's record is claimed before its work (services/once-only-step.ts), so of two node
+  // processes starting together one runs each half, and nobody is told twice.
+  const principals = await claimOnceOnlyStep(storage, system, REST_SCOPE_KEEP_WORKING_KEY);
+  const apps = await claimOnceOnlyStep(storage, system, APP_SCOPE_KEEP_WORKING_KEY);
+  if (!principals && !apps) return result;
   const cutoff = Date.parse(opts.existedBefore ?? new Date().toISOString());
 
-  if (principalsDue) await keepPrincipals(storage, cutoff, result);
-  const anonymous = principalsDue ? await takeBackFromSharedAnonymous(storage, system) : null;
-  // The apps, under their own record, so a node that ran the principals' half before apps were part
-  // of this step still runs the apps' half once.
-  if (appsDue) result.apps = await keepWorkingAppsOnce(storage, config, cutoff);
+  try {
+    if (principals) await keepPrincipals(storage, cutoff, result);
+    const anonymous = principals ? await takeBackFromSharedAnonymous(storage, system) : null;
+    // The apps, under their own record, so a node that ran the principals' half before apps were part
+    // of this step still runs the apps' half once.
+    if (apps) result.apps = await keepWorkingAppsOnce(storage, config, cutoff);
 
-  const changed = [...result.agents, ...result.ecosystemApps];
-  if (principalsDue) await tellOwners(storage, config, changed);
-  if (appsDue) await tellAppOwners(storage, config, result.apps);
-  if (changed.length + result.apps.length > 0) await tellOperator(storage, config, result);
+    const changed = [...result.agents, ...result.ecosystemApps];
+    if (principals) await tellOwners(storage, config, changed);
+    if (apps) await tellAppOwners(storage, config, result.apps);
+    if (changed.length + result.apps.length > 0) await tellOperator(storage, config, result);
 
-  if (principalsDue) {
-    await writeRunRecord(storage, system, REST_SCOPE_KEEP_WORKING_KEY, {
+    const at = new Date().toISOString();
+    await principals?.finish({
+      at,
       words: REST_SCOPE_KEEP_WORKING_WORDS.map(w => w.word),
       agents: result.agents.map(a => ({ id: a.id, words: a.words })),
       ecosystemApps: result.ecosystemApps.map(a => ({ id: a.id, words: a.words })),
       sharedAnonymousTakenBack: anonymous,
     });
-  }
-  if (appsDue) {
-    await writeRunRecord(storage, system, APP_SCOPE_KEEP_WORKING_KEY, {
-      apps: result.apps.map(a => ({ id: a.appId, words: a.words, grants: a.grants })),
-    });
+    await apps?.finish({ at, apps: result.apps.map(a => ({ id: a.appId, words: a.words, grants: a.grants })) });
+  } catch (err) {
+    await principals?.release();
+    await apps?.release();
+    throw err;
   }
   result.ran = true;
+  const changed = [...result.agents, ...result.ecosystemApps];
   if (changed.length + result.apps.length > 0) {
     logger.info(`REST scope gates: ${result.agents.length} agent(s), ${result.ecosystemApps.length} ecosystem app(s) `
       + `and ${result.apps.length} published app(s) kept working from 3.x with the words 4.0.0 checks`,
@@ -308,39 +321,34 @@ export async function migrateRestScopeKeepWorkingOnce(
   return result;
 }
 
-/** The record that says one half of the step ran, never swept. */
-async function writeRunRecord(storage: Storage, system: string, key: string, value: Record<string, unknown>): Promise<void> {
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key, ownerGaii: system, value: { at: now, ...value }, visibility: 'private', tags: ['migration'],
-    // Never swept: a record that expired would run the step again at the next start.
-    ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-  });
+/** The words `held` lacks, as the new list, or null when it lacks none. */
+function withKeptWords(kind: 'agent' | 'ecosystem') {
+  return (held: readonly string[]): string[] | null => {
+    const missing = wordsToKeepWorking(held, kind);
+    return missing.length ? [...held, ...missing] : null;
+  };
 }
 
-/** The agents and ecosystem apps half: each missing word onto each principal that existed before. */
+/**
+ * The agents and ecosystem apps half: each missing word onto each principal that existed before. Each
+ * list is written on the list that was read (services/scope-list-swap.ts), so a word another step or
+ * the owner adds meanwhile stays.
+ */
 async function keepPrincipals(storage: Storage, cutoff: number, result: KeepWorkingResult): Promise<void> {
-  for (const listed of await storage.listAgents()) {
-    if (!existed(listed.createdAt, cutoff) || isSharedAnonymous(listed.owner)) continue;
-    // Read again just before the write, because the write replaces the whole list.
-    const agent = await storage.getAgent(listed.gaii);
-    const held = agent?.defaultScopes;
-    if (!agent || !Array.isArray(held)) continue;
-    const missing = wordsToKeepWorking(held, 'agent');
-    if (!missing.length) continue;
-    await storage.updateAgent(agent.gaii, { defaultScopes: [...held, ...missing] });
-    result.agents.push({ id: agent.gaii, owner: agent.owner, name: agent.name, words: missing });
+  const added = (c: { before: readonly string[]; after: string[] }) => c.after.slice(c.before.length);
+  for (const agent of await storage.listAgents()) {
+    if (!existed(agent.createdAt, cutoff) || isSharedAnonymous(agent.owner)) continue;
+    const changed = await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes, withKeptWords('agent'));
+    if (changed) result.agents.push({ id: agent.gaii, owner: agent.owner, name: agent.name, words: added(changed) });
   }
 
   for (const owner of await storage.listOwners()) {
     if (isSharedAnonymous(owner.name)) continue;
     for (const app of await storage.getEcosystemAppsByOwner(owner.name)) {
       if (app.status !== 'approved' && app.status !== 'active') continue;
-      if (!existed(app.createdAt, cutoff) || !Array.isArray(app.scopes)) continue;
-      const missing = wordsToKeepWorking(app.scopes, 'ecosystem');
-      if (!missing.length) continue;
-      await storage.updateEcosystemApp(app.geai, { scopes: [...app.scopes, ...missing] });
-      result.ecosystemApps.push({ id: app.geai, owner: app.owner, name: app.displayName || app.app, words: missing });
+      if (!existed(app.createdAt, cutoff)) continue;
+      const changed = await changeScopeList(storage, { kind: 'ecosystem-app', id: app.geai }, app.scopes, withKeptWords('ecosystem'));
+      if (changed) result.ecosystemApps.push({ id: app.geai, owner: app.owner, name: app.displayName || app.app, words: added(changed) });
     }
   }
 }

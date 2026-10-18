@@ -16,8 +16,9 @@
  *   system identity when the migration has run, never to expire, and every later boot reads that and
  *   does nothing. Run on every boot instead, it would hand the word back to an agent whose owner took
  *   it away, and to every full-access agent made later, which is the reach the word exists to
- *   withhold. The record is written after the agents, so a boot that stops half way runs it again,
- *   and the second run skips every agent that already holds the word.
+ *   withhold. The record is claimed before the agents and written over the claim after them
+ *   (services/once-only-step.ts), so of two node processes starting together one runs it; a boot
+ *   whose run fails removes the claim, and the next run skips every agent that already holds the word.
  *
  *   WHAT THE OWNER SEES. One line on the operator's activity feed, `operator_admin_granted`, naming
  *   the agents that got the word; the feed says where to take it away. An owner whose agents did not
@@ -31,12 +32,16 @@
  *
  *   AFTER THE SCOPE-VOCABULARY MIGRATION, NEVER BESIDE IT. Both rewrite an agent's whole scope list,
  *   so run side by side one could write over the other's addition; the boot chains this one after it
- *   (server-bootstrap/service-init.ts), and each agent is read again just before it is written.
+ *   (server-bootstrap/service-init.ts), and each agent's list is written only over the list that was
+ *   read (services/scope-list-swap.ts), which also holds when another node process runs the
+ *   vocabulary step at the same moment.
  * @structure OPERATOR_ADMIN_MIGRATION_KEY · OperatorAdminMigration · migrateOperatorAdminOnce(storage, config)
  * @usage
  *   const r = await migrateOperatorAdminOnce(storage, config);
  *   if (r.ran) logger.info(`${r.granted.length} operator account(s) changed`);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The record is claimed before the work (services/once-only-step.ts) and each
+ *     agent's list is written on the list that was read (services/scope-list-swap.ts) (check:atomic-writes).
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-25 — Initial.
  */
@@ -46,6 +51,8 @@ import { OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { recordAccountEvent } from './account-events.js';
 import { logger } from '../utils/logger.js';
+import { claimOnceOnlyStep } from './once-only-step.js';
+import { changeScopeList } from './scope-list-swap.js';
 
 /** The record that says this node has run the migration, under `system@<nodeId>`. */
 export const OPERATOR_ADMIN_MIGRATION_KEY = 'migrations.operator-admin';
@@ -73,51 +80,46 @@ export async function migrateOperatorAdminOnce(
   storage: Storage,
   config: Pick<AimeatConfig, 'nodeId' | 'accountEventWindow'>,
 ): Promise<OperatorAdminMigration> {
-  const system = `system@${config.nodeId}`;
-  if (await storage.getMemory(system, OPERATOR_ADMIN_MIGRATION_KEY)) return { ran: false, granted: [] };
-
-  const byOwner = new Map<string, AgentRecord[]>();
-  for (const agent of await storage.listAgents()) {
-    if (needsTheWord(agent)) byOwner.set(agent.owner, [...(byOwner.get(agent.owner) ?? []), agent]);
-  }
+  // Claimed before the work (services/once-only-step.ts), so of two node processes starting together
+  // one runs it and each operator is told once.
+  const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, OPERATOR_ADMIN_MIGRATION_KEY);
+  if (!claim) return { ran: false, granted: [] };
 
   const granted: OperatorAdminMigration['granted'] = [];
-  for (const [owner, listed] of byOwner) {
-    // The account first: the word means nothing on an account that does not run the node.
-    if (!isOperatorAccount(await storage.getOwner(owner))) continue;
-    const names: string[] = [];
-    for (const { gaii } of listed) {
-      // Read again just before the write, because the write replaces the whole list.
-      const agent = await storage.getAgent(gaii);
-      if (!agent || !needsTheWord(agent)) continue;
-      await storage.updateAgent(gaii, { defaultScopes: [...(agent.defaultScopes ?? []), OPERATOR_ADMIN_SCOPE] });
-      names.push(agent.name);
+  try {
+    const byOwner = new Map<string, AgentRecord[]>();
+    for (const agent of await storage.listAgents()) {
+      if (needsTheWord(agent)) byOwner.set(agent.owner, [...(byOwner.get(agent.owner) ?? []), agent]);
     }
-    if (names.length === 0) continue;
-    granted.push({ owner, agents: names });
-    await recordAccountEvent(storage, {
-      ownerGhii: `${owner}@${config.nodeId}`,
-      kind: 'operator_admin_granted',
-      subject: OPERATOR_ADMIN_SCOPE,
-      link: '/v1/profile?tab=agents',
-      data: { names: names.join(', '), count: String(names.length) },
-    }, config);
+
+    for (const [owner, listed] of byOwner) {
+      // The account first: the word means nothing on an account that does not run the node.
+      if (!isOperatorAccount(await storage.getOwner(owner))) continue;
+      const names: string[] = [];
+      for (const agent of listed) {
+        // Written on the list that was read (services/scope-list-swap.ts), because the write replaces
+        // the whole list: a word another boot step or the owner adds meanwhile stays.
+        const changed = await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes,
+          held => (needsTheWord({ defaultScopes: [...held] }) ? [...held, OPERATOR_ADMIN_SCOPE] : null));
+        if (changed) names.push(agent.name);
+      }
+      if (names.length === 0) continue;
+      granted.push({ owner, agents: names });
+      await recordAccountEvent(storage, {
+        ownerGhii: `${owner}@${config.nodeId}`,
+        kind: 'operator_admin_granted',
+        subject: OPERATOR_ADMIN_SCOPE,
+        link: '/v1/profile?tab=agents',
+        data: { names: names.join(', '), count: String(names.length) },
+      }, config);
+    }
+    await claim.finish({ at: new Date().toISOString(), operators: granted.length, agents: granted.reduce((n, g) => n + g.agents.length, 0) });
+  } catch (err) {
+    await claim.release();
+    throw err;
   }
 
-  const now = new Date().toISOString();
   const agents = granted.reduce((n, g) => n + g.agents.length, 0);
-  await storage.setMemory({
-    key: OPERATOR_ADMIN_MIGRATION_KEY,
-    ownerGaii: system,
-    value: { at: now, operators: granted.length, agents },
-    visibility: 'private',
-    tags: ['migration'],
-    // Never swept: a record that expired would run the migration again at the next boot.
-    ttlHours: null,
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-  });
   logger.info('operator:admin migration: the operator\'s full-access agents keep the admin tools', {
     operators: granted.length, agents,
   });

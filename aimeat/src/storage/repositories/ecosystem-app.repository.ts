@@ -8,6 +8,7 @@
  * @structure EcosystemAppRepository — EcosystemApp CRUD + EcoAuth handshake methods
  * @usage Part of the composed `Storage` interface (storage/interface.ts).
  * @version-history
+ *   v1.2.0 — 2026-10-18 — setEcosystemAppScopesIf: the scope list written on the list that was read (check:atomic-writes, boot migrations).
  *   v1.0.0 — 2026-06-14 — Created for ecosystem-apps foundation (chunk 1).
  *   v1.1.0 — 2026-06-15 — Add automation-recipe CRUD (feature B4): per-(owner, app) rule that
  *     materialises an agent task when the app publishes data on a matching memory key glob.
@@ -21,6 +22,8 @@ export interface EcosystemAppRepository {
   getEcosystemAppByOwnerAndApp(owner: string, app: string): Promise<EcosystemAppRecord | null>;
   getEcosystemAppsByOwner(owner: string): Promise<EcosystemAppRecord[]>;
   updateEcosystemApp(geai: string, updates: Partial<EcosystemAppRecord>): Promise<EcosystemAppRecord | null>;
+  /** The scope list written only if the stored one still equals `expected` (agent.repository.ts setAgentScopesIf). */
+  setEcosystemAppScopesIf?(geai: string, expected: readonly string[], next: string[]): Promise<boolean>;
   deleteEcosystemApp(geai: string): Promise<boolean>;
 
   // ── "Hello integration" handshake (mirror of the device-auth repository) ──

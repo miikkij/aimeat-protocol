@@ -25,6 +25,9 @@
  * @usage
  *   const key = await canonicalAppToolsKey(storage, ownerGhii, 'apps.nuotta.tools'); // 'apps.nuotta.html.tools'
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The record is claimed before the work (services/once-only-step.ts), and a
+ *     manifest is created under the filename key only if that key is still empty (createMemoryIfAbsent),
+ *     so a publish there while the step runs stays (check:atomic-writes).
  *   v1.0.0 — 2026-09-27 — Initial (wish-tools-for-sale-published-over-mcp-do-not-show-in-the-app-cat).
  */
 import type { AimeatConfig } from '../config.js';
@@ -34,6 +37,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { listAllOfferings } from './exchange-market.js';
 import { reconcileAfterSourceWrite } from './exchange-projection.js';
 import { logger } from '../utils/logger.js';
+import { claimOnceOnlyStep } from './once-only-step.js';
 
 /**
  * The app id a tool manifest belongs under, for an owner GHII. See THE RULE in the header.
@@ -79,17 +83,39 @@ export interface AppToolsKeyMigration {
  * EXCHANGE listing, because a contract names its listing and would lose it.
  *
  * Throws when a write fails and then leaves no record, so the next boot tries again; a manifest
- * already carried over is not found a second time.
+ * already carried over is not found a second time. The record is claimed before the work, so of two
+ * node processes starting together one runs it.
  */
 export async function migrateAppToolsKeysOnce(
     storage: Storage, config: Pick<AimeatConfig, 'nodeId'>,
 ): Promise<AppToolsKeyMigration> {
     const system = `system@${config.nodeId}`;
-    if (await storage.getMemory(system, APP_TOOLS_KEY_MIGRATION_KEY)) return { ran: false, moved: [], left: [] };
+    // Claimed before the work (services/once-only-step.ts), so of two node processes starting
+    // together one runs it; a run that fails removes the claim, so the next boot runs it again.
+    const claim = await claimOnceOnlyStep(storage, system, APP_TOOLS_KEY_MIGRATION_KEY);
+    if (!claim) return { ran: false, moved: [], left: [] };
 
     const moved: string[] = [];
     const left: string[] = [];
+    try {
+        await carryManifests(storage, config, system, moved, left);
+        await claim.finish({ at: new Date().toISOString(), moved, left });
+    } catch (err) {
+        await claim.release();
+        throw err;
+    }
+    if (moved.length || left.length) {
+        logger.info('app tool manifests: carried over to the app filename key', { moved, left });
+    }
+    return { ran: true, moved, left };
+}
+
+/** The work of migrateAppToolsKeysOnce: each manifest carried to its filename key, or named in `left`. */
+async function carryManifests(
+    storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, system: string, moved: string[], left: string[],
+): Promise<void> {
     let listed: Awaited<ReturnType<typeof listAllOfferings>> | null = null;
+    const taken = (label: string) => left.push(`${label} (the filename key already holds a manifest)`);
 
     for (const owner of await storage.listOwners()) {
         const ownerGhii = `${owner.name}@${config.nodeId}`;
@@ -101,10 +127,7 @@ export async function migrateAppToolsKeysOnce(
             if (canonical === appId) continue;
             const label = `${owner.name}: ${appId} -> ${canonical}`;
             const toKey = appToolsKey(canonical);
-            if (await storage.getMemory(ownerGhii, toKey)) {
-                left.push(`${label} (the filename key already holds a manifest)`);
-                continue;
-            }
+            if (await storage.getMemory(ownerGhii, toKey)) { taken(label); continue; }
             listed ??= (await listAllOfferings(storage)).filter(o => o.state === 'listed');
             if (listed.some(o => o.providerOwner === owner.name && o.surface?.appId === appId)) {
                 left.push(`${label} (it has a live EXCHANGE listing)`);
@@ -112,29 +135,15 @@ export async function migrateAppToolsKeysOnce(
             }
             const rec = await storage.getMemory(ownerGhii, summary.key);
             if (!rec) continue;
-            await storage.setMemory({ ...rec, key: toKey, updatedAt: new Date().toISOString() });
+            // Created only if the filename key is still empty: a manifest published there after the
+            // check above stays, and this one is left for the owner like any other taken key.
+            const carried = { ...rec, key: toKey, updatedAt: new Date().toISOString() };
+            const created = storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(carried) : (await storage.setMemory(carried), true);
+            if (!created) { taken(label); continue; }
             await reconcileAfterSourceWrite(storage, ownerGhii, toKey);
             await storage.deleteMemory(ownerGhii, summary.key, system);
             await reconcileAfterSourceWrite(storage, ownerGhii, summary.key);
             moved.push(label);
         }
     }
-
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: APP_TOOLS_KEY_MIGRATION_KEY,
-        ownerGaii: system,
-        value: { at: now, moved, left },
-        visibility: 'private',
-        tags: ['migration'],
-        // Never swept: a record that expired would run the migration again at the next boot.
-        ttlHours: null,
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-    });
-    if (moved.length || left.length) {
-        logger.info('app tool manifests: carried over to the app filename key', { moved, left });
-    }
-    return { ran: true, moved, left };
 }

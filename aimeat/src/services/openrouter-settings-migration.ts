@@ -26,49 +26,61 @@
  * @usage
  *   migrateImplicitFreeModelOnce(storage, config.nodeId).catch(err => logger.error(…));
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The mark is claimed before the work (services/once-only-step.ts), and each
+ *     owner's record is written on the version that was read, so a save made meanwhile stands
+ *     (check:atomic-writes).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { Storage } from '../storage/interface.js';
 import { holdsImplicitFreeModel } from './ai-model-defaults.js';
 import { logger } from '../utils/logger.js';
+import { claimOnceOnlyStep } from './once-only-step.js';
+import { CAS_ATTEMPTS } from './record-cas.js';
 
 export const IMPLICIT_FREE_MODEL_KEY = 'migrations.openrouter-implicit-free-model';
 const SETTINGS_KEY = 'openrouter.settings';
 
-/** Written after the work, so a boot that stops half way runs it again; never swept. */
-async function markDone(storage: Storage, nodeId: string, value: Record<string, unknown>): Promise<void> {
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: IMPLICIT_FREE_MODEL_KEY, ownerGaii: `system@${nodeId}`, value: { at: now, ...value },
-        visibility: 'private', tags: ['migration'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-    });
+/**
+ * Clear the free router nobody chose from one owner's settings record, on the version that was read:
+ * a save that lands after the read makes the write fail, and the record is read and tested again, so
+ * the owner's save stands. True when it cleared something.
+ */
+async function clearImplicitFreeModel(storage: Storage, gaii: string): Promise<boolean> {
+    for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+        const rec = await storage.getMemory(gaii, SETTINGS_KEY);
+        if (!rec || !rec.value || typeof rec.value !== 'object') return false;
+        const prefs = rec.value as Record<string, unknown>;
+        if (!holdsImplicitFreeModel(prefs)) return false;
+        const rest = { ...prefs };
+        delete rest.model;
+        const next = { ...rec, key: SETTINGS_KEY, value: rest, version: rec.version + 1, updatedAt: new Date().toISOString() };
+        const written = storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(next, rec.version) : (await storage.setMemory(next), true);
+        if (written) return true;
+    }
+    throw new Error(`${gaii} ${SETTINGS_KEY} changed under every one of ${CAS_ATTEMPTS} attempts; the next boot tries again`);
 }
 
 /**
  * Once per node: every owner's settings record that holds the free router nobody chose loses its
  * `model`, so the node's default applies. Returns how many records it changed. Running it again
- * after a partial run is safe: a record it cleared no longer holds the value.
+ * after a partial run is safe: a record it cleared no longer holds the value. The mark is claimed
+ * before the work (services/once-only-step.ts), so of two node processes starting together one runs it.
  */
 export async function migrateImplicitFreeModelOnce(
     storage: Storage, nodeId: string,
 ): Promise<{ ran: boolean; cleared: number }> {
-    const system = `system@${nodeId}`;
-    if (await storage.getMemory(system, IMPLICIT_FREE_MODEL_KEY)) return { ran: false, cleared: 0 };
+    const claim = await claimOnceOnlyStep(storage, `system@${nodeId}`, IMPLICIT_FREE_MODEL_KEY);
+    if (!claim) return { ran: false, cleared: 0 };
     let cleared = 0;
-    for (const owner of await storage.listOwners()) {
-        const gaii = `${owner.name}@${nodeId}`;
-        const rec = await storage.getMemory(gaii, SETTINGS_KEY);
-        if (!rec || !rec.value || typeof rec.value !== 'object') continue;
-        const prefs = rec.value as Record<string, unknown>;
-        if (!holdsImplicitFreeModel(prefs)) continue;
-        const rest = { ...prefs };
-        delete rest.model;
-        await storage.setMemory({
-            ...rec, value: rest, version: rec.version + 1, updatedAt: new Date().toISOString(),
-        });
-        cleared++;
+    try {
+        for (const owner of await storage.listOwners()) {
+            if (await clearImplicitFreeModel(storage, `${owner.name}@${nodeId}`)) cleared++;
+        }
+        await claim.finish({ at: new Date().toISOString(), cleared });
+    } catch (err) {
+        await claim.release();
+        throw err;
     }
-    await markDone(storage, nodeId, { cleared });
     if (cleared > 0) logger.info(`AI settings: the free router nobody chose was cleared from ${cleared} owner record(s); the node's default model applies`);
     return { ran: true, cleared };
 }

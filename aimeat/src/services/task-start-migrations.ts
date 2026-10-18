@@ -3,7 +3,9 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Two one-time changes that follow the task-start rulings of 2026-10-02 (Jouni), each
- *   run once per node at boot and marked done under the node's system identity.
+ *   run once per node at boot and marked done under the node's system identity. The mark is claimed
+ *   before the work (services/once-only-step.ts), so of two node processes starting together one runs
+ *   each change and each owner is told once.
  *
  *   1. BASIC AGENTS START ON THEIR OWN (ruling A). The basic agents an owner got before 2026-10-02
  *      (concierge, workflow manager) still waited for a Start press nobody had told the customer
@@ -25,6 +27,9 @@
  *   migrateBasicAgentsTaskStartOnce(storage, config).catch(err => logger.error(…));
  *   grantPurgeToAppGrantsOnce(storage, config.nodeId).catch(err => logger.error(…));
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Both marks are claimed before the work (services/once-only-step.ts); the app
+ *     grant lists are written on the list that was read (services/scope-list-swap.ts), and a basic agent
+ *     is read again just before its setting is written (check:atomic-writes).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -32,6 +37,8 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
 import { notify, type NotifyInput } from './notify.js';
 import { logger } from '../utils/logger.js';
+import { claimOnceOnlyStep } from './once-only-step.js';
+import { changeScopeList } from './scope-list-swap.js';
 
 export const BASIC_AGENTS_START_KEY = 'migrations.basic-agents-task-start';
 export const PURGE_WORD_KEY = 'migrations.memory-purge-app-grants';
@@ -64,57 +71,62 @@ export function basicAgentsStartNotice(names: string[]): NotifyInput {
     };
 }
 
-/** Written after the work, so a boot that stops half way runs it again; never swept. */
-async function markDone(storage: Storage, nodeId: string, key: string, value: Record<string, unknown>): Promise<void> {
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key, ownerGaii: `system@${nodeId}`, value: { at: now, ...value },
-        visibility: 'private', tags: ['migration'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-    });
-}
-
 /**
  * Ruling A, once per node. Returns how many agents and owners it changed. Running it again after a
  * partial run is safe: an agent it set is no longer "nobody has set", so it is neither changed nor
- * announced twice.
+ * announced twice. The mark is claimed before the work (services/once-only-step.ts) and written over
+ * the claim after it; a run that fails removes the claim, so the next boot runs it again.
  */
 export async function migrateBasicAgentsTaskStartOnce(
     storage: Storage, config: Pick<AimeatConfig, 'nodeId'>,
 ): Promise<{ ran: boolean; agents: number; owners: number }> {
-    const system = `system@${config.nodeId}`;
-    if (await storage.getMemory(system, BASIC_AGENTS_START_KEY)) return { ran: false, agents: 0, owners: 0 };
+    const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, BASIC_AGENTS_START_KEY);
+    if (!claim) return { ran: false, agents: 0, owners: 0 };
     const byOwner = new Map<string, string[]>();
     let agents = 0;
-    for (const agent of await storage.listAgents()) {
-        if (!isUnsetBasicAgent(agent)) continue;
-        await storage.updateAgent(agent.gaii, { taskStart: 'automatic' });
-        agents++;
-        const names = byOwner.get(agent.owner) ?? [];
-        names.push(agent.displayName || agent.name);
-        byOwner.set(agent.owner, names);
+    try {
+        for (const listed of await storage.listAgents()) {
+            if (!isUnsetBasicAgent(listed)) continue;
+            // Read again just before the write: an owner who set the switch since the list keeps it.
+            const agent = await storage.getAgent(listed.gaii);
+            if (!agent || !isUnsetBasicAgent(agent)) continue;
+            await storage.updateAgent(agent.gaii, { taskStart: 'automatic' });
+            agents++;
+            const names = byOwner.get(agent.owner) ?? [];
+            names.push(agent.displayName || agent.name);
+            byOwner.set(agent.owner, names);
+        }
+        for (const [owner, names] of byOwner) {
+            // Best-effort per owner: one failed notice must not stop the next owner's.
+            await notify(storage, `${owner}@${config.nodeId}`, basicAgentsStartNotice(names))
+                .catch(err => logger.warn('basic agents start: the owner could not be told', { owner, error: String(err) }));
+        }
+        await claim.finish({ at: new Date().toISOString(), agents, owners: byOwner.size });
+    } catch (err) {
+        await claim.release();
+        throw err;
     }
-    for (const [owner, names] of byOwner) {
-        // Best-effort per owner: one failed notice must not stop the next owner's.
-        await notify(storage, `${owner}@${config.nodeId}`, basicAgentsStartNotice(names))
-            .catch(err => logger.warn('basic agents start: the owner could not be told', { owner, error: String(err) }));
-    }
-    await markDone(storage, config.nodeId, BASIC_AGENTS_START_KEY, { agents, owners: byOwner.size });
     if (agents > 0) logger.info(`Basic agents: ${agents} of ${byOwner.size} owner(s) now start their tasks by themselves`);
     return { ran: true, agents, owners: byOwner.size };
 }
 
 /** Ruling B, once per node: an app grant that held `memory:delete` keeps its delete. */
 export async function grantPurgeToAppGrantsOnce(storage: Storage, nodeId: string): Promise<{ ran: boolean; grants: number }> {
-    const system = `system@${nodeId}`;
-    if (await storage.getMemory(system, PURGE_WORD_KEY)) return { ran: false, grants: 0 };
+    const claim = await claimOnceOnlyStep(storage, `system@${nodeId}`, PURGE_WORD_KEY);
+    if (!claim) return { ran: false, grants: 0 };
     let grants = 0;
-    for (const grant of await storage.listAppGrants()) {
-        const held = grant.scopes;
-        if (!Array.isArray(held) || !held.includes('memory:delete') || held.includes('memory:purge')) continue;
-        await storage.updateAppGrant(grant.grantId, { scopes: [...held, 'memory:purge'] });
-        grants++;
+    try {
+        for (const grant of await storage.listAppGrants()) {
+            // Written on the list that was read (services/scope-list-swap.ts), so a refresh or another boot step meanwhile is kept.
+            const changed = await changeScopeList(storage, { kind: 'app-grant', id: grant.grantId }, grant.scopes,
+                held => (held.includes('memory:delete') && !held.includes('memory:purge') ? [...held, 'memory:purge'] : null));
+            if (changed) grants++;
+        }
+        await claim.finish({ at: new Date().toISOString(), grants });
+    } catch (err) {
+        await claim.release();
+        throw err;
     }
-    await markDone(storage, nodeId, PURGE_WORD_KEY, { grants });
     if (grants > 0) logger.info(`memory:purge: given to ${grants} app grant(s) that held memory:delete`);
     return { ran: true, grants };
 }

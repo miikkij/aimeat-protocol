@@ -28,12 +28,16 @@
  * @structure CARRIED_FORWARD · carriedForwardWords(held) · migrateToolScopeWordsOnce(storage, nodeId)
  * @usage migrateToolScopeWordsOnce(storage, config.nodeId).catch(err => logger.error(…));
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The record is claimed before the work (services/once-only-step.ts) and each
+ *     agent's list is written on the list that was read (services/scope-list-swap.ts) (check:atomic-writes).
  *   v1.0.0 — 2026-10-06 — Initial (secaudit 2026-10 follow-up audit, finding 1).
  */
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { agentPredatesVocabulary } from './scope-vocabulary-migration.js';
+import { claimOnceOnlyStep } from './once-only-step.js';
+import { changeScopeList } from './scope-list-swap.js';
 
 /** When aimeat.io first ran the words (its build muwbbfy7). An agent approved later chose from a screen that showed today's presets. */
 export const TOOL_SCOPE_WORDS_SHIPPED_AT = '2026-10-06T06:43:27.000Z';
@@ -56,37 +60,30 @@ export function carriedForwardWords(held: readonly string[]): string[] {
 
 /**
  * Give the carried-forward words to every agent approved before they shipped, unless this node's
- * record says it has run. The record is written after the agents, so a boot that stops half way runs
- * it again; after that an owner who takes a word away keeps it away.
+ * record says it has run. The record is claimed before the agents and written over the claim after them
+ * (services/once-only-step.ts), so of two node processes starting together one runs it, and a boot whose
+ * run fails runs it again next time; after that an owner who takes a word away keeps it away.
  */
 export async function migrateToolScopeWordsOnce(storage: Storage, nodeId: string): Promise<{ ran: boolean; agents: number }> {
-    const system = `system@${nodeId}`;
-    if (await storage.getMemory(system, TOOL_SCOPE_WORDS_KEY)) return { ran: false, agents: 0 };
+    const claim = await claimOnceOnlyStep(storage, `system@${nodeId}`, TOOL_SCOPE_WORDS_KEY);
+    if (!claim) return { ran: false, agents: 0 };
 
     let agents = 0;
-    for (const agent of await storage.listAgents()) {
-        if (!agentPredatesVocabulary(agent, TOOL_SCOPE_WORDS_SHIPPED_AT)) continue;
-        const held = agent.defaultScopes;
-        if (!Array.isArray(held)) continue;
-        const missing = carriedForwardWords(held);
-        if (!missing.length) continue;
-        await storage.updateAgent(agent.gaii, { defaultScopes: [...held, ...missing] });
-        agents++;
+    try {
+        for (const agent of await storage.listAgents()) {
+            if (!agentPredatesVocabulary(agent, TOOL_SCOPE_WORDS_SHIPPED_AT)) continue;
+            // Written on the list that was read (services/scope-list-swap.ts); an agent with no list is left alone.
+            const changed = await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes, held => {
+                const missing = carriedForwardWords(held);
+                return missing.length ? [...held, ...missing] : null;
+            });
+            if (changed) agents++;
+        }
+        await claim.finish({ at: new Date().toISOString(), agents, words: CARRIED_FORWARD.map(c => c.grant) });
+    } catch (err) {
+        await claim.release();
+        throw err;
     }
-
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: TOOL_SCOPE_WORDS_KEY,
-        ownerGaii: system,
-        value: { at: now, agents, words: CARRIED_FORWARD.map(c => c.grant) },
-        visibility: 'private',
-        tags: ['migration'],
-        // Never swept: a record that expired would run the migration again at the next boot.
-        ttlHours: null,
-        version: 1,
-        createdAt: now,
-        updatedAt: now,
-    });
     if (agents > 0) logger.info(`Tool scope words: ${agents} agent(s) approved before ${TOOL_SCOPE_WORDS_SHIPPED_AT} keep their workspace read and send tools`);
     return { ran: true, agents };
 }

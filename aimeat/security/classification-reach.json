@@ -1029,7 +1029,7 @@
     },
     "src/services/app-tools-key.ts": {
       "reads": {
-        "getMemory": 3,
+        "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A one-time migration of manifest keys."
@@ -1865,6 +1865,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker and track records."
     },
+    "src/services/once-only-step.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-18 (check:atomic-writes, boot migrations), the node's own reads: a boot step's run-once marker under the node's system identity, read to claim it before the work and to release this process's own claim after a failed run. No content is shown to anyone."
+    },
     "src/services/onboarding-validator.ts": {
       "reads": {
         "getMemory": 2,
@@ -1882,15 +1888,9 @@
     },
     "src/services/openrouter-settings-migration.ts": {
       "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02, the node's own read: the run-once marker under the node's system identity, and each owner's openrouter.settings record, read to clear the free router a key-only save wrote. No content is shown to anyone."
-    },
-    "src/services/operator-admin-migration.ts": {
-      "reads": {
         "getMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A migration marker."
+      "why": "Reviewed 2026-10-02, the node's own read: the run-once marker under the node's system identity, and each owner's openrouter.settings record, read to clear the free router a key-only save wrote. No content is shown to anyone. 2026-10-18: the marker is read by services/once-only-step.ts."
     },
     "src/services/organism-comments.ts": {
       "reads": {
@@ -2184,17 +2184,11 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The refinery config record, read for its connection id."
     },
-    "src/services/rest-scope-gates-migration.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-12, the node's own reads: the two run-once markers under the node's system identity that say each REST scope gate grant (packages:read, then agent:read) has run. No content is shown to anyone."
-    },
     "src/services/rest-scope-keep-working-migration.ts": {
       "reads": {
-        "getMemory": 3
+        "getMemory": 1
       },
-      "why": "Reviewed 2026-10-13, the node's own reads: the two run-once markers under the node's system identity that say each half of the 4.0.x keep-working scope grant (principals, published apps) has run, and the earlier steps' run records, read for the agent ids they name. No content is shown to anyone."
+      "why": "Reviewed 2026-10-13, the node's own reads: the two run-once markers under the node's system identity that say each half of the 4.0.x keep-working scope grant (principals, published apps) has run, and the earlier steps' run records, read for the agent ids they name. No content is shown to anyone. 2026-10-18: the two markers are read by services/once-only-step.ts; the run records stay here."
     },
     "src/services/schedule-write.ts": {
       "reads": {
@@ -2213,12 +2207,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-02, the node's own read: the service-owned record of which permissions each of the owner's `*` agents used (scope-use.agents), read to build the narrowing and to decide when `*` holds the agent's tasks. No content is shown to anyone."
-    },
-    "src/services/scope-vocabulary-migration.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-30, the node's own read: a migration marker under the node's system identity (migrations.scope-vocabulary-agents)."
     },
     "src/services/screenshot-capture.ts": {
       "reads": {
@@ -2316,12 +2304,6 @@
       },
       "why": "Reviewed 2026-10-11, the node's own read: a finished task's result record, of which only `visibility` and `workspaceRef` are used, to say which workspaces the result is shared with. The value is never returned from here; the deliverable itself is read through the memory routes."
     },
-    "src/services/task-start-migrations.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-02, the node's own read: the two run-once markers under the node's system identity that say a one-time task-start change has run. No content is shown to anyone."
-    },
     "src/services/themes/fonts.ts": {
       "reads": {
         "listAllMemoryMeta": 1,
@@ -2337,12 +2319,6 @@
         "listMemoryHistory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: system theme records, their earlier versions, and each person's theme choice."
-    },
-    "src/services/tool-scope-words-migration.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-06, the node's own read: the run-once marker under the node's system identity that says the 2026-10-06 tool scope words migration has run. No content is shown to anyone."
     },
     "src/services/track-registry.ts": {
       "reads": {

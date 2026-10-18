@@ -11,6 +11,7 @@
  *   - balance ops: debitBalance, creditBalance, creditBalanceCapped (atomic)
  *
  * @version-history
+ *   v1.2.0 — 2026-10-18 — setAgentScopesIf: the scope list written on the list that was read (check:atomic-writes, boot migrations).
  *   v1.1.0 — 2026-09-09 — getAgentByName and transferBalance deleted: no caller.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -24,6 +25,13 @@ export interface AgentRepository {
    *  a key, empty array if none). Batches the members-roster fan-out (getAgentsByOwner per member). */
   getAgentsByOwners(owners: string[]): Promise<Record<string, AgentRecord[]>>;
   updateAgent(gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null>;
+  /**
+   * Write `next` as the agent's scope list only if the stored list still equals `expected`, the list
+   * the caller read (an empty `expected` also matches no list). False when another writer changed it
+   * meanwhile, so the caller reads again and merges. The agent row has no version column, so the
+   * condition is the value itself (services/scope-list-swap.ts).
+   */
+  setAgentScopesIf?(gaii: string, expected: readonly string[], next: string[]): Promise<boolean>;
   deleteAgent(gaii: string): Promise<boolean>;
   listAgents(): Promise<AgentRecord[]>;
 

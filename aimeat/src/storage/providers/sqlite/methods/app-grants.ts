@@ -8,12 +8,14 @@
  * @structure appGrantMethods
  * @usage Object.assign(SqliteStorage.prototype, appGrantMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-18 — setAppGrantScopesIf: the scope list written only if it still equals the list read (check:atomic-writes, boot migrations).
  *   v1.0.0 — 2026-10-05 — createAppGrant, getAppGrant, getAppGrantByRefreshHash, getAppGrantByOwnerAndApp,
  *     listAppGrantsByOwner, listAppGrants, updateAppGrant, deserializeAppGrant moved here from apps.ts so the
  *     file mirrors postgres-kysely/methods/app-grants.ts (secaudit 2026-10, M8).
  */
 import type { AppGrantRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { sameScopeList } from '../../../scope-list.js';
 
 export const appGrantMethods = {
 
@@ -87,6 +89,16 @@ export const appGrantMethods = {
       .run(...params);
     if (result.changes === 0) return null;
     return this.getAppGrant(grantId);
+  },
+
+  async setAppGrantScopesIf(this: SqliteStorage, grantId: string, expected: readonly string[], next: string[]): Promise<boolean> {
+    // Read, test and write in one immediate transaction with no await between them.
+    return this.db.transaction(() => {
+      const row = this.db.prepare('SELECT scopes FROM app_grants WHERE grantId = ?').get(grantId) as { scopes: string | null } | undefined;
+      if (!row || !sameScopeList(row.scopes ? JSON.parse(row.scopes) as string[] : null, expected)) return false;
+      this.db.prepare('UPDATE app_grants SET scopes = ? WHERE grantId = ?').run(JSON.stringify(next), grantId);
+      return true;
+    }).immediate();
   },
 
   deserializeAppGrant(this: SqliteStorage, row: Record<string, unknown>): AppGrantRecord {

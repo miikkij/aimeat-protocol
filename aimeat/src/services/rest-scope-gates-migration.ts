@@ -38,14 +38,20 @@
  *   packages:read (routes/app-grant-vocabulary.ts lists it), and its owner sees it on the consent screen;
  *   until 4.0.0 the call still works and carries the Deprecation header that says so.
  *
- *   ONCE PER NODE, recorded under `system@<nodeId>` (REST_SCOPE_GATES_KEY) after the principals, so a
- *   boot that stops half way runs it again, and an owner who later takes the word away keeps it away.
+ *   ONCE PER NODE, recorded under `system@<nodeId>` (REST_SCOPE_GATES_KEY), and an owner who later takes
+ *   the word away keeps it away. The record is claimed before the principals and written over the claim
+ *   after them (services/once-only-step.ts): a boot whose step fails removes the claim and the next boot
+ *   runs it again; a process that stops without either leaves a claim the next start takes over once it
+ *   lapses.
  *   A principal made after the run chose from a screen that lists the word.
  * @structure REST_SCOPE_GATES_KEY · REST_SCOPE_NEW_WORDS · AGENT_READ_GRANT_KEY · AGENT_READ_WORDS ·
  *   isSharedAnonymous(owner) · missingNewWords(held, words?) · migrateRestScopeGatesOnce(storage, nodeId) ·
  *   migrateAgentReadGrantOnce(storage, nodeId)
  * @usage migrateRestScopeGatesOnce(storage, config.nodeId).then(() => migrateAgentReadGrantOnce(storage, config.nodeId))
  * @version-history
+ *   v1.3.0 — 2026-10-18 — The record is claimed before the work (services/once-only-step.ts) and each scope
+ *     list is written on the list that was read (services/scope-list-swap.ts): two node processes starting
+ *     together run each step once and keep each other's words (check:atomic-writes).
  *   v1.2.0 — 2026-10-13 — Both steps skip anonymous mode's shared agent (isSharedAnonymous). The words they
  *     already gave it are taken back once by the 4.0.x step (services/rest-scope-keep-working-migration.ts).
  *   v1.1.1 — 2026-10-13 — Header only: the "only new words" rule is superseded for 4.0.x by the third step,
@@ -59,6 +65,8 @@
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { claimOnceOnlyStep } from './once-only-step.js';
+import { changeScopeList } from './scope-list-swap.js';
 
 /** The record under `system@<nodeId>` that says this node has run the grant. */
 export const REST_SCOPE_GATES_KEY = 'migrations.rest-scope-gates-4-0-0';
@@ -111,70 +119,61 @@ export interface RestScopeGatesMigrationResult {
 
 /** Give the new words (packages:read) to every existing principal that could reach their routes, unless this node has run it. */
 export async function migrateRestScopeGatesOnce(storage: Storage, nodeId: string): Promise<RestScopeGatesMigrationResult> {
-  const system = `system@${nodeId}`;
-  if (await storage.getMemory(system, REST_SCOPE_GATES_KEY)) return { ran: false, agents: [], ecosystemApps: [] };
-  return grantWords(storage, system, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS);
+  return grantWords(storage, `system@${nodeId}`, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS);
 }
 
 /** Give agent:read to every existing principal that could reach the agent list, unless this node has run it. */
 export async function migrateAgentReadGrantOnce(storage: Storage, nodeId: string): Promise<RestScopeGatesMigrationResult> {
-  const system = `system@${nodeId}`;
-  if (await storage.getMemory(system, AGENT_READ_GRANT_KEY)) return { ran: false, agents: [], ecosystemApps: [] };
-  return grantWords(storage, system, AGENT_READ_GRANT_KEY, AGENT_READ_WORDS);
+  return grantWords(storage, `system@${nodeId}`, AGENT_READ_GRANT_KEY, AGENT_READ_WORDS);
 }
 
-/** One step, not yet run: the words to every agent and approved ecosystem app with a recorded list, recorded under `key`. */
+/**
+ * One step: the words to every agent and approved ecosystem app with a recorded list, recorded under
+ * `key`. The record is claimed before the work (services/once-only-step.ts), so of two node processes
+ * starting together one runs it; each list is written on the list that was read
+ * (services/scope-list-swap.ts), so a word another step or the owner adds meanwhile stays.
+ */
 async function grantWords(
   storage: Storage, system: string, key: string, words: ReadonlyArray<{ word: string; opens: string }>,
 ): Promise<RestScopeGatesMigrationResult> {
   const result: RestScopeGatesMigrationResult = { ran: false, agents: [], ecosystemApps: [] };
-
-  for (const agent of await storage.listAgents()) {
-    // Anonymous mode's shared agent: anyone may hold it, and its words are fixed in
-    // auth/anonymous-scopes.ts. Until 2026-10-13 these steps gave it their word too; the 4.0.x step
-    // takes those back once (services/rest-scope-keep-working-migration.ts).
-    if (isSharedAnonymous(agent.owner)) continue;
-    const held = agent.defaultScopes;
-    // No recorded list: the agent is minted from config.defaultAgentScopes, and writing a list here
-    // would replace that fallback rather than extend it (services/scope-vocabulary-migration.ts).
-    if (!Array.isArray(held)) continue;
+  const claim = await claimOnceOnlyStep(storage, system, key);
+  if (!claim) return result;
+  const add = (held: readonly string[]) => {
     const missing = missingNewWords(held, words);
-    if (!missing.length) continue;
-    await storage.updateAgent(agent.gaii, { defaultScopes: [...held, ...missing] });
-    result.agents.push(agent.gaii);
-  }
+    return missing.length ? [...held, ...missing] : null;
+  };
 
-  for (const owner of await storage.listOwners()) {
-    if (isSharedAnonymous(owner.name)) continue;
-    for (const app of await storage.getEcosystemAppsByOwner(owner.name)) {
-      if (app.status !== 'approved' && app.status !== 'active') continue;
-      const held = app.scopes;
-      if (!Array.isArray(held)) continue;
-      const missing = missingNewWords(held, words);
-      if (!missing.length) continue;
-      await storage.updateEcosystemApp(app.geai, { scopes: [...held, ...missing] });
-      result.ecosystemApps.push(app.geai);
+  try {
+    for (const agent of await storage.listAgents()) {
+      // Anonymous mode's shared agent: anyone may hold it, and its words are fixed in
+      // auth/anonymous-scopes.ts. Until 2026-10-13 these steps gave it their word too; the 4.0.x step
+      // takes those back once (services/rest-scope-keep-working-migration.ts).
+      if (isSharedAnonymous(agent.owner)) continue;
+      // No recorded list: the agent is minted from config.defaultAgentScopes, and writing a list here
+      // would replace that fallback rather than extend it (services/scope-vocabulary-migration.ts).
+      // changeScopeList leaves such an agent alone.
+      if (await changeScopeList(storage, { kind: 'agent', id: agent.gaii }, agent.defaultScopes, add)) result.agents.push(agent.gaii);
     }
-  }
 
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key,
-    ownerGaii: system,
-    value: {
-      at: now,
+    for (const owner of await storage.listOwners()) {
+      if (isSharedAnonymous(owner.name)) continue;
+      for (const app of await storage.getEcosystemAppsByOwner(owner.name)) {
+        if (app.status !== 'approved' && app.status !== 'active') continue;
+        if (await changeScopeList(storage, { kind: 'ecosystem-app', id: app.geai }, app.scopes, add)) result.ecosystemApps.push(app.geai);
+      }
+    }
+
+    await claim.finish({
+      at: new Date().toISOString(),
       words: words.map(w => w.word),
       agents: result.agents,
       ecosystemApps: result.ecosystemApps,
-    },
-    visibility: 'private',
-    tags: ['migration'],
-    // Never swept: a record that expired would run the grant again at the next boot.
-    ttlHours: null,
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-  });
+    });
+  } catch (err) {
+    await claim.release();
+    throw err;
+  }
   result.ran = true;
   if (result.agents.length + result.ecosystemApps.length > 0) {
     logger.info(`REST scope gates: gave ${words.map(w => w.word).join(', ')} to ${result.agents.length} agent(s) `

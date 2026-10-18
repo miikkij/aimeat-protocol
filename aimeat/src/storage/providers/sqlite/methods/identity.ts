@@ -8,6 +8,7 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.5.0 — 2026-10-18 — setAgentScopesIf: the scope list written only if it still equals the list read (check:atomic-writes, boot migrations).
  *   v1.4.0 — 2026-10-18 — clearance on create, update and read (migration 0107, plan doc-mvdipuyqraas L2).
  *   2026-10-16 — operatorAccountState takes { claim } and needs nothing for it: transactions are serialised
  *     (Jouni, 2026-10-16).
@@ -25,6 +26,7 @@
  *     mirrors postgres-kysely/methods/identity.ts (secaudit 2026-10, M8).
  */
 import type { OwnerRecord, AgentRecord, GHIIRecord, GHIIPatch } from '../../../interface.js';
+import { sameScopeList } from '../../../scope-list.js';
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
 import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
@@ -315,6 +317,16 @@ export const identityMethods = {
     const rows = this.db.prepare(`SELECT * FROM agents WHERE owner IN (${p}) ORDER BY createdAt ASC, gaii ASC`).all(...owners) as Record<string, unknown>[];
     for (const r of rows) { const a = this.deserializeAgent(r); (out[a.owner] ??= []).push(a); }
     return out;
+  },
+
+  async setAgentScopesIf(this: SqliteStorage, gaii: string, expected: readonly string[], next: string[]): Promise<boolean> {
+    // Read, test and write in one immediate transaction with no await between them.
+    return this.db.transaction(() => {
+      const row = this.db.prepare('SELECT defaultScopes FROM agents WHERE gaii = ?').get(gaii) as { defaultScopes: string | null } | undefined;
+      if (!row || !sameScopeList(row.defaultScopes ? JSON.parse(row.defaultScopes) as string[] : null, expected)) return false;
+      this.db.prepare('UPDATE agents SET defaultScopes = ? WHERE gaii = ?').run(JSON.stringify(next), gaii);
+      return true;
+    }).immediate();
   },
 
   async updateAgent(this: SqliteStorage, gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null> {

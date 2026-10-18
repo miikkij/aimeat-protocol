@@ -8,6 +8,7 @@
  * @structure ecosystemMethods
  * @usage Object.assign(SqliteStorage.prototype, ecosystemMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-18 — setEcosystemAppScopesIf: the scope list written only if it still equals the list read (check:atomic-writes, boot migrations).
  *   v1.0.0 — 2026-10-05 — 17 methods (createEcosystemApp, getEcosystemApp, getEcosystemAppByOwnerAndApp, …)
  *     moved here from federation-oauth.ts so the file mirrors postgres-kysely/methods/ecosystem.ts (secaudit
  *     2026-10, M8).
@@ -15,6 +16,7 @@
 import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import * as ecosystemAppRepo from '../repos/ecosystem-app.js';
+import { sameScopeList } from '../../../scope-list.js';
 
 export const ecosystemMethods = {
 
@@ -33,6 +35,15 @@ export const ecosystemMethods = {
   },
   async updateEcosystemApp(this: SqliteStorage, geai: string, updates: Partial<EcosystemAppRecord>): Promise<EcosystemAppRecord | null> {
     return ecosystemAppRepo.updateEcosystemApp(this.db, geai, updates);
+  },
+  async setEcosystemAppScopesIf(this: SqliteStorage, geai: string, expected: readonly string[], next: string[]): Promise<boolean> {
+    // Read, test and write in one immediate transaction with no await between them.
+    return this.db.transaction(() => {
+      const row = this.db.prepare('SELECT scopes FROM ecosystem_apps WHERE geai = ?').get(geai) as { scopes: string | null } | undefined;
+      if (!row || !sameScopeList(row.scopes ? JSON.parse(row.scopes) as string[] : null, expected)) return false;
+      this.db.prepare('UPDATE ecosystem_apps SET scopes = ? WHERE geai = ?').run(JSON.stringify(next), geai);
+      return true;
+    }).immediate();
   },
   async deleteEcosystemApp(this: SqliteStorage, geai: string): Promise<boolean> {
     return ecosystemAppRepo.deleteEcosystemApp(this.db, geai);

@@ -10,6 +10,7 @@
  *            token hash, the live (owner, app) lookup, and listing by owner.
  * @usage import type { AppGrantRepository } from './repositories/app-grant.repository.js';
  * @version-history
+ *   v1.4.0 — 2026-10-18 — setAppGrantScopesIf: the scope list written on the list that was read (check:atomic-writes, boot migrations).
  *   v1.3.0 — 2026-09-26 — updateAppGrant takes ownerAddedScopes: the words the owner added by hand.
  *   v1.2.0 — 2026-09-09 — deleteAppGrant deleted: no caller (a grant is revoked, never removed).
  *   v1.0.0 — 2026-06-20 — Initial: app grants (owner-issued app authorizations)
@@ -41,4 +42,6 @@ export interface AppGrantRepository {
    */
   listAppGrants(): Promise<AppGrantRecord[]>;
   updateAppGrant(grantId: string, updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels' | 'scopesFixedAt' | 'ownerAddedScopes'>>): Promise<AppGrantRecord | null>;
+  /** The scope list written only if the stored one still equals `expected` (agent.repository.ts setAgentScopesIf). */
+  setAppGrantScopesIf?(grantId: string, expected: readonly string[], next: string[]): Promise<boolean>;
 }
