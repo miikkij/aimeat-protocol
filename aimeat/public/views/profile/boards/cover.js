@@ -11,6 +11,7 @@
  * @structure renderBoardsView · renderCover · secFollowed · secRecent · secPublic · ownBoardForm · secApp
  * @usage import { renderBoardsView } from './boards/cover.js';
  * @version-history
+ *   v1.15.2 -- 2026-10-18 -- The "{n} public boards" tag counts every public board, the person's own included; it counted only the public boards of others.
  *   v1.15.1 -- 2026-10-11 -- The app guide link opens the node's app build specification (/v1/prompts/build-app); it opened /docs/app-developer-ai-guide.md, which no route serves.
  *   v1.15.0 -- 2026-10-02 -- The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
  *   v1.14.0 --2026-09-26 -- On the component kit (page group G7): the frame is the SettingsPage (tags, loud action, rail as data), the strip the FigureStrip, the fold tabs the Tab and Tabs, "show the rest" the More line, the own-board form the Fields with the Choice and the TextField, the app fold the Beside with the Code block, the folds the Section fold with the long line cut. The file writes no class.
@@ -40,7 +41,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { Section } from '/components/Section.js';
 import { SettingsPage } from '/components/SettingsPage.js';
@@ -94,7 +95,7 @@ function renderCover(ctx) {
   const myStanding = recent.map(r => r.authors?.[ctx.session?.ghii]).find(Boolean);
   const latest = recent[0];
   const ownBoards = ctx.boards.filter(b => ctx.isMine(b)).length;
-  const chip = (n, key, tone) => ({ label: c(key, { n }), tone });
+  const chip = (n, key, tone) => ({ label: tn('profile.boards.cover.' + key, n), tone });
   const strip = html`<${FigureStrip} items=${[
     { n: fresh, tone: fresh ? 'coral' : undefined, label: c('stripNew'), sub: c('stripNewSub') },
     latest
@@ -108,7 +109,9 @@ function renderCover(ctx) {
   const marks = [
     chip(ctx.followed.length, 'chipFollowed'),
     fresh ? chip(fresh, 'chipNew', 'coral') : null,
-    chip(ctx.others.length, 'chipPublic'),
+    // Every public board here, the person's own and the followed ones too: the chip counted only the
+    // public boards of others (section 03), and read "0 public boards" over a list with a public one.
+    chip(ctx.boards.filter(b => b.visibility === 'public' || b.visibility === 'system').length, 'chipPublic'),
     ownBoards ? chip(ownBoards, 'chipOwn') : null,
   ];
   const openOwn = () => { ctx.setFold('own', true); scrollToSection('bp-own'); };

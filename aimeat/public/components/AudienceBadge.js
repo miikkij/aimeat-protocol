@@ -27,6 +27,8 @@
  *   html`<${AudienceBadge} app=${app} />`
  *   html`<${AudienceBadge} audience=${shareAudienceOf(share.access, orgId)} />`
  * @version-history
+ *   v1.2.0 — 2026-10-18 — An eye before the words and semibold words: on a board's page it read as one
+ *     more of the tags beside it; the same mark everywhere it stands.
  *   v1.1.0 — 2026-10-18 — Its own sheet (audience-badge.css): it sizes to its words instead of filling
  *     a listing cell, 11.5px words, and a link or a code in the attention colours instead of coral
  *     (3.43:1 on the page); drawn here on the Tag's classes rather than through Mark.
@@ -40,6 +42,16 @@ import { useOrganismName } from '/js/organism-names.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
+
+/**
+ * The eye before the words: what makes the badge read as "who can read this" beside other tags (a
+ * board's "0 notices", "A board of my own"), in a list and on a page head alike. 16px grid, drawn in
+ * the words' colour.
+ */
+const eye = () => html`<svg class="audience-badge-eye" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+  <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+  <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.4" />
+</svg>`;
 
 /** The Tag's tone for each level; a link or a code is the badge's own attention tone. */
 const TONE = { public: 'poster-chip--sun', private: 'poster-chip--dim', link: 'audience-badge--open', code: 'audience-badge--open' };
@@ -56,7 +68,7 @@ export function AudienceBadge({ value, audience, app, organismName, onClick, exp
   const keys = audienceKeys(a, !!name);
   const cls = cx('poster-chip', 'audience-badge', TONE[a.level]);
   const title = t(keys.who, { name });
-  const words = t(keys.word, { name });
+  const words = html`${eye()}<span>${t(keys.word, { name })}</span>`;
   if (onClick) {
     return html`<button type="button" class=${cx(cls, 'mark-button')} title=${title}
       aria-expanded=${expanded === undefined ? undefined : String(!!expanded)} onClick=${onClick}>${words}</button>`;

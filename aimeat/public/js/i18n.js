@@ -9,12 +9,14 @@
  *   - loadTranslations(): fetches en.json as fallback + the active locale, version-cache-busted
  *   - t(key, vars) / tOr(key, fallbackText, vars): dot-key lookup with {var} interpolation
  *   - tEn(key): a key's English text, whatever the active locale
+ *   - tn(key, n, vars): a count in the language's plural form (`<key>_one`, `<key>_other`, …)
  *   - switchLocale() / onLocaleChange(): change locale and notify subscribed listeners
  *   - flatten(): internal — collapses nested translation objects to dot-notation keys
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-10-14 — tEn(): a key's English text, for the menu find's English words.
+ *   v1.2.0 — 2026-10-18 — tn(): a count in the language's plural form, through Intl.PluralRules.
  */
 import { detectLocale, persistLocale } from './utils.js';
 import { swallowed } from '/js/swallowed.js';
@@ -76,6 +78,20 @@ export function t(key, vars) {
     }
   }
   return str;
+}
+
+/**
+ * A count in words, in the language's plural form: the key `<key>_<category>` (the Intl.PluralRules
+ * category of `n` for the page's language: `one`, `other`, and in other languages `few`, `many`) when
+ * the language has it, else `<key>`. `n` is passed into `{n}`. "1 keys" is what this prevents: a key
+ * whose text says "{n} keys" carries `<key>_one` = "{n} key" beside it.
+ */
+export function tn(key, n, vars) {
+  // currentLocale is one of the tags i18n.ts LOCALES ships, each a valid BCP 47 tag.
+  const category = new Intl.PluralRules(currentLocale).select(Number(n));
+  const plural = `${key}_${category}`;
+  const chosen = (translations[plural] ?? fallback[plural]) !== undefined ? plural : key;
+  return t(chosen, { n, ...vars });
 }
 
 /** Translate a key, but fall back to `fallbackText` when the key is missing.
