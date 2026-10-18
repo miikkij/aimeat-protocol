@@ -1,0 +1,109 @@
+{
+  "note": "REPORT, never a gate. The node routes that both browser client libraries call (the portal's aimeat/public/js/services/ and the app libraries in aimeat/src/static/sdk-libs/, served as /v1/libs/aimeat-*.js) with different query parameter names, as `pnpm audit:browser-libs -- --write` last recorded them. A difference is a place to look, not a defect: the two serve different screens and may ask a route for different things. `pnpm debt` counts the entries. Written 2026-10-18 (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille, brief doc-mvdq71zdgo3o).",
+  "portalRoutes": 591,
+  "appRoutes": 233,
+  "sharedRoutes": 74,
+  "differences": {
+    "/v1/agents/{}/messages": {
+      "portal": [],
+      "apps": [
+        "per_page"
+      ]
+    },
+    "/v1/ai/capabilities": {
+      "portal": [],
+      "apps": [
+        "app_id"
+      ]
+    },
+    "/v1/ai/models": {
+      "portal": [
+        "capability",
+        "type"
+      ],
+      "apps": []
+    },
+    "/v1/apps": {
+      "portal": [
+        "building",
+        "limit",
+        "offset"
+      ],
+      "apps": [
+        "limit"
+      ]
+    },
+    "/v1/boards/{}/posts": {
+      "portal": [
+        "limit"
+      ],
+      "apps": []
+    },
+    "/v1/catalogue": {
+      "portal": [
+        "owner"
+      ],
+      "apps": []
+    },
+    "/v1/contacts": {
+      "portal": [],
+      "apps": [
+        "q"
+      ]
+    },
+    "/v1/memory": {
+      "portal": [
+        "agent",
+        "count",
+        "include",
+        "limit",
+        "per_page",
+        "prefix",
+        "tags"
+      ],
+      "apps": [
+        "agent",
+        "limit",
+        "owner_scope",
+        "per_page",
+        "prefix"
+      ]
+    },
+    "/v1/memory/search": {
+      "portal": [
+        "q"
+      ],
+      "apps": []
+    },
+    "/v1/memory/{}": {
+      "portal": [
+        "soft"
+      ],
+      "apps": [
+        "owner_scope",
+        "soft"
+      ]
+    },
+    "/v1/organisms": {
+      "portal": [
+        "member"
+      ],
+      "apps": [
+        "member",
+        "per_page"
+      ]
+    },
+    "/v1/organisms/{}/search": {
+      "portal": [],
+      "apps": [
+        "q"
+      ]
+    },
+    "/v1/wallet/transactions": {
+      "portal": [
+        "per_page"
+      ],
+      "apps": []
+    }
+  }
+}

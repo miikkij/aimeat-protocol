@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-10-18: check:python-shapes and check:python-daemon, the Python package against the node's schemas and the connector.
  *  - 2026-10-18: check:audience-badge, every view that shows the owner their content draws the AudienceBadge (plan doc-mvcn6c7e4e5q, V6.4).
  *  - 2026-10-16: check:posture-defaults (invariants 8 and 10) and check:own-node-backend (a suite's own node follows the run's backend) (QA audit S10-05, P1-02).
  *  - 1.20.0 (2026-10-16): check:mcp-test-calls, the ratchet on catalog MCP tools no E2E suite calls (QA audit W27); check:denial-coverage also asks every authenticated route for a refusal test (W29, P3-08).
@@ -51,6 +52,10 @@ export const FAST_CHECKS = [
     { script: 'check:living-nodes', label: 'Living node vocabulary ↔ the node modules\' own JSDoc' },
     { script: 'check:mcp-tools', label: 'MCP tool surface/handler parity' },
     { script: 'check:mcp-schemas', label: 'MCP tool input-schema parity' },
+    // Wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille (2026-10-18): the Python
+    // package and the connector are written twice, and nothing compared them.
+    { script: 'check:python-shapes', label: 'The Python offer and signal builders name every node schema field, or the difference is listed; the pytest fixture is fresh' },
+    { script: 'check:python-daemon', label: 'The Python daemon and aimeat connect agree on loopback routes, node REST routes and MCP tool names, or the difference is listed' },
     { script: 'check:plain-language', label: 'Plain language for the messages a person hears' },
     { script: 'check:poster-shapes', label: 'Design-language shapes live in poster.css, not in view sheets' },
     { script: 'check:ui-library', label: 'Every interface part is in the component catalogue, and its facts are fresh' },

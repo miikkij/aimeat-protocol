@@ -44,6 +44,9 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   2026-10-18 — The pairs written twice join the report: offer and signal fields the Python builders
+ *     lack, the Python daemon's differences from aimeat connect, and the browser library routes called
+ *     with different parameters (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille).
  *   2026-10-16 — The catalog MCP tools no E2E suite calls, the suites whose only refusal is an
  *     anonymous 401 and the authenticated routes no suite refuses join the report (QA audit W27, W29, P3-08).
  *   v1.5.0 — 2026-10-16 — Every backlog file under security/ is on the report (thirteen joined:
@@ -172,6 +175,11 @@ const RATCHETS: Ratchet[] = [
     { file: 'aimeat/security/field-reach-exemptions.json', label: 'REST reads with no agent twin', check: 'check:field-reach', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/connect-serve-parity-exemptions.json', label: 'MCP tools not on connect serve', check: 'check:mcp-tools', count: exemptMap },
     { file: 'aimeat/security/mcp-uncalled-tools.json', label: 'MCP tools no E2E suite calls', check: 'check:mcp-test-calls', count: exemptMap },
+    // Wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille (2026-10-18): the pairs
+    // written twice. The browser libraries' row is a report (audit:browser-libs), never a gate.
+    { file: 'aimeat/security/python-shape-parity.json', label: 'Offer and signal fields Python lacks', check: 'check:python-shapes', count: exemptMap, open: exemptOpen },
+    { file: 'aimeat/security/python-daemon-parity.json', label: 'Python daemon vs connector', check: 'check:python-daemon', count: exemptMap, open: exemptOpen },
+    { file: 'aimeat/security/browser-lib-routes.json', label: 'Browser libs, parameters differ', check: 'audit:browser-libs', count: raw => Object.keys((parse(raw).differences ?? {}) as Json).length },
     {
         file: 'aimeat/security/storage-owner-relations.json',
         label: 'Identity columns, policy open',
