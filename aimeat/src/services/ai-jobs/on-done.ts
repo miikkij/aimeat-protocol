@@ -22,9 +22,16 @@
  *   engine-ai-step.ts v1.2.0 on 2026-08-30: a step went green while its downstream read the wrong
  *   data, and nothing anywhere said so. Green and wrong is the worst available outcome, and a
  *   half-finished chain reporting success is the same shape.
- * @structure OnDoneOutcome · fireOnDone(deps, job)
- * @usage const outcome = await fireOnDone({ storage, config, service, emailService }, job);
+ *
+ *   THE ANSWER TRAVELS WITH THE CALL. The answer lands in the owner's namespace, which the sandbox
+ *   cannot read, so the input carries it as `result` when its JSON fits in ON_DONE_RESULT_MAX_BYTES.
+ *   A larger one is left out and `result_too_large: true` says so; `ctx.ai.result(job_id)` reads it
+ *   then, and at any later time (service.ts readResult).
+ * @structure OnDoneOutcome · ON_DONE_RESULT_MAX_BYTES · onDoneResultFields(value) · fireOnDone(deps, job, value)
+ * @usage const outcome = await fireOnDone({ storage, config, service, emailService }, job, value);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The input carries the answer as `result`, or `result_too_large: true` past
+ *     64 kB. Before this, the action was told where the answer was and could not read it there.
  *   v1.0.0 — 2026-08-31 — Initial.
  *   v1.0.1 — 2026-09-26 — The job owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
@@ -53,7 +60,19 @@ export type OnDoneOutcome =
     | { ok: true }
     | { ok: false; chainStopped?: AiJobChainStop; error: { code: string; message: string } };
 
-export async function fireOnDone(deps: OnDoneDeps, job: AiJobRecord): Promise<OnDoneOutcome> {
+/** The largest answer, as UTF-8 JSON, the on_done input carries. Most text answers are far below
+ *  it; a larger one is read with ctx.ai.result rather than copied into the sandbox's input. */
+export const ON_DONE_RESULT_MAX_BYTES = 64 * 1024;
+
+/** The answer's fields of the on_done input: `result`, or `result_too_large` when it does not fit. */
+export function onDoneResultFields(value: unknown): { result: unknown } | { result_too_large: true } {
+    const json = JSON.stringify(value ?? null);
+    return Buffer.byteLength(json, 'utf8') <= ON_DONE_RESULT_MAX_BYTES
+        ? { result: value ?? null }
+        : { result_too_large: true };
+}
+
+export async function fireOnDone(deps: OnDoneDeps, job: AiJobRecord, value: unknown): Promise<OnDoneOutcome> {
     const { storage, config, service, emailService } = deps;
     if (!job.on_done) return { ok: true };
 
@@ -68,7 +87,7 @@ export async function fireOnDone(deps: OnDoneDeps, job: AiJobRecord): Promise<On
         await runExtensionActionAsSystem({ storage, config, emailService }, {
             extensionName: job.on_done.extension,
             actionId: job.on_done.action,
-            input: { job_id: job.id, state: job.state, result_key: job.result_key },
+            input: { job_id: job.id, state: job.state, result_key: job.result_key, ...onDoneResultFields(value) },
             // The owner's own name rather than a machine's: this call acts in their name, on their
             // extension, with their key behind it, and naming them is more honest.
             callerGaii: job.owner,

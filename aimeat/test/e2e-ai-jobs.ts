@@ -20,6 +20,9 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.6.0 — 2026-10-18 — 7c and 7d: an on_done action gets the private answer in its input and reads
+ *     it with ctx.ai.result, later too; a job of the owner's that the extension did not start, another
+ *     owner's job and a key written again after the job are refused.
  *   v1.5.1 — 2026-10-16 — The suite's setup no longer matched the product: its node started with
  *     AIMEAT_AI_JOB_MAX_CHAIN=0, and since 2026-10-16 (QA audit W34, config-start-check.ts) a node
  *     refuses to start on a value outside a setting's range, which for the chain depth is 1-1000. The
@@ -310,6 +313,14 @@ const SCRIPT_CHAIN = `export default async function(ctx, input) {
     await ctx.memory.set('chain.attempt' + depth, started);
     return { started: started };
 }`;
+// Reads the answer both ways: from its on_done input and with ctx.ai.result. Called directly with
+// `peek`, it answers what ctx.ai.result says about any job id.
+const SCRIPT_READ = `export default async function(ctx, input) {
+    if (input.peek) return await ctx.ai.result(input.peek);
+    const read = await ctx.ai.result(input.job_id);
+    await ctx.memory.set('read.ran', { result: input.result, too_large: input.result_too_large === true, read: read });
+    return { ok: true };
+}`;
 const SCRIPT_THROW = `export default async function(ctx, input) {
     throw new Error('the callback refused to work');
 }`;
@@ -550,6 +561,65 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(mark.status === 200, `the callback's own record ${mark.status}`);
         assert(mark.body.data.value.job_id === r.body.data.job_id, 'the callback was told which job');
         assert(mark.body.data.value.result_key === 'aijob.callback.result', 'and where the answer went');
+    });
+
+    // ── 7c/7d. The callback reads a PRIVATE answer: in its input, and with ctx.ai.result ──
+    await installExtension(a, 'aijobread', 'got', SCRIPT_READ);
+    let readJobId = '';
+    await test('7c. on_done gets the private answer in its input, and ctx.ai.result reads it there too', async () => {
+        const r = await startJob(a, {
+            prompt: 'read me back', result_key: 'aijob.read.result', result_visibility: 'private',
+            on_done: { extension: 'aijobread', action: 'got' },
+        });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        readJobId = r.body.data.job_id;
+        const done = await waitForState(a, readJobId, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        const ran = await json('/v1/memory/ext:aijobread/read.ran');
+        assert(ran.status === 200, `the callback's own record ${ran.status}`);
+        const v = ran.body.data.value;
+        assert(v.result === STUB_CONTENT, `input.result: ${JSON.stringify(v.result)}`);
+        assert(v.too_large === false, 'a small answer is not flagged too large');
+        assert(v.read?.ok === true && v.read.job_id === readJobId, `ctx.ai.result: ${JSON.stringify(v.read)}`);
+        assert(v.read.value === STUB_CONTENT, `ctx.ai.result value: ${JSON.stringify(v.read.value)}`);
+        const rec = await readMemory(a, 'aijob.read.result');
+        assert(rec.body.data.visibility === 'private', `the answer stays private: ${rec.body.data.visibility}`);
+    });
+
+    await test('7d. ctx.ai.result reads the answer later, and refuses a job this extension did not start', async () => {
+        const peek = (id: string) => json('/v1/ext/aijobread/got', {
+            method: 'POST', headers: auth(a.token), body: JSON.stringify({ peek: id }),
+        });
+        const later = await peek(readJobId);
+        assert(later.status === 200, `peek ${later.status}: ${JSON.stringify(later.body?.error)}`);
+        assert(later.body.data.ok === true && later.body.data.state === 'done' && later.body.data.value === STUB_CONTENT,
+            `a later read: ${JSON.stringify(later.body.data)}`);
+
+        // A job the owner started without the extension: not this extension's to read.
+        const plain = await startJob(a, { prompt: 'not for the extension', result_key: 'aijob.read.plain' });
+        assert(plain.status === 202, `start ${plain.status}`);
+        await waitForState(a, plain.body.data.job_id, ['done', 'failed']);
+        const foreign = await peek(plain.body.data.job_id);
+        assert(foreign.body.data.ok === false && foreign.body.data.code === 'AI_JOB_NOT_FOUND',
+            `another job of the owner: ${JSON.stringify(foreign.body.data)}`);
+
+        // Another owner's job reads the same as one that does not exist.
+        const theirs = await startJob(b, { prompt: 'b only', result_key: 'aijob.read.theirs' });
+        assert(theirs.status === 202, `b start ${theirs.status}`);
+        await waitForState(b, theirs.body.data.job_id, ['done', 'failed']);
+        const cross = await peek(theirs.body.data.job_id);
+        assert(cross.body.data.ok === false && cross.body.data.code === 'AI_JOB_NOT_FOUND',
+            `another owner's job: ${JSON.stringify(cross.body.data)}`);
+
+        // The owner writes the key again: that is the owner's own data now, not the job's answer.
+        const over = await json('/v1/memory', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ key: 'aijob.read.result', value: 'the owner wrote this later', visibility: 'private' }),
+        });
+        assert(over.status === 200 || over.status === 201, `overwrite ${over.status}`);
+        const gone = await peek(readJobId);
+        assert(gone.body.data.ok === false && gone.body.data.code === 'AI_JOB_RESULT_GONE',
+            `after the key was written again: ${JSON.stringify(gone.body.data)}`);
     });
 
     // ── 6. A callback that throws fails the job ──

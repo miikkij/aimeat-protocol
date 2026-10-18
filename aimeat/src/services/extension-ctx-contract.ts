@@ -13,6 +13,7 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   2026-10-18 — ctx.ai.result(jobId): the answer of a job this extension started, for its installer.
  *   2026-10-18 — ctx.caller.anonymous (a visitor on a public action), ctx.caller.adult (verified
  *     adult yes/no, method, time) and ctx.caller.subscriptions (Comicland v3 A-7, A-3, A-5).
  *   2026-10-16 — ExtensionLimits.wallClockMs: the wall-clock limit of a whole run (QA audit S7-02).
@@ -145,6 +146,16 @@ export interface ExtensionCtx {
         }): Promise<
             | { ok: true; job_id: string; queue_position: number }
             | { ok: false; code: string; message: string; retry_after_s?: number }
+        >;
+        /**
+         * The answer of a job this extension started (or is the `on_done` of), read from the
+         * installer's namespace without the answer having to be public. `value` is present once the
+         * answer is written, which is already true inside `on_done`. Answers a decision, never a
+         * throw. services/ai-jobs/service.ts readResult.
+         */
+        result(jobId: string): Promise<
+            | { ok: true; job_id: string; state: string; result_key: string; value?: unknown }
+            | { ok: false; code: string; message: string }
         >;
     };
     consent: {

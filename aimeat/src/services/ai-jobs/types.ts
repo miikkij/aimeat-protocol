@@ -10,9 +10,12 @@
  *   `completeForOwner` already picks the key, enforces the daily budget and the per-app quota,
  *   records per-app usage and stamps provenance. What is new is the queue, the handle and the
  *   callback.
- * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError
+ * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError ·
+ *   AiJobResultRead · AiJobStarter
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.8.0 — 2026-10-18 — `result_version` on the record and `readResult` on AiJobStarter, so an
+ *     extension reads the answer of a job it started without the answer being public (ctx.ai.result).
  *   v1.7.0 — 2026-10-08 — AiJobRecord.error carries `status` and `details` (aiprov plan, A11).
  *   v1.6.1 — 2026-10-06 — StartAiJobContext.limit is 'exempt' only for a chain's continuation
  *     (secaudit 2026-10 follow-up, A5).
@@ -82,6 +85,10 @@ export interface AiJobRecord {
 
     result_key: string;
     result_visibility: 'private' | 'owner' | 'public';
+    /** The version of the record at `result_key` that this job wrote. Set once the answer is
+     *  written, which is before `on_done` runs. `readResult` hands the answer out only while the
+     *  record is still this version: a later write to the same key is somebody else's data. */
+    result_version?: number;
     /** Parse the answer as JSON before storing it, so a malformed answer fails HERE rather than
      *  becoming a string every downstream reader has to re-parse and none of them validates. For a
      *  transcription it stores `{ text, language, seconds, model }` in place of the bare text. */
@@ -224,9 +231,22 @@ export interface StartAiJobContext {
 }
 
 /**
- * The one method the extension capability needs, named as an interface so services/ai-jobs/
+ * What `ctx.ai.result(job_id)` answers. `value` is present once the answer is written, which is
+ * already true inside the job's own `on_done` action, while `state` still reads `running` there.
+ * A job this extension did not start, or one of another owner, is `AI_JOB_NOT_FOUND`, the same
+ * answer a job that does not exist gets. `AI_JOB_RESULT_GONE`: the record at `result_key` was
+ * deleted or written again after the job wrote it.
+ */
+export type AiJobResultRead =
+    | { ok: true; job_id: string; state: AiJobState; result_key: string; value?: unknown }
+    | { ok: false; code: 'AI_JOB_NOT_FOUND' | 'AI_JOB_RESULT_GONE' | 'AI_JOB_RESULT_FAILED'; message: string };
+
+/**
+ * The two methods the extension capability needs, named as an interface so services/ai-jobs/
  * ext-capability.ts does not have to import the service that imports it back.
  */
 export interface AiJobStarter {
     startJob(input: StartAiJobInput, ctx: StartAiJobContext): Promise<StartAiJobResult>;
+    /** The answer of a job `extension` started (or names as its `on_done`) for `ownerGhii`. */
+    readResult(ownerGhii: string, jobId: string, extension: string): Promise<AiJobResultRead>;
 }

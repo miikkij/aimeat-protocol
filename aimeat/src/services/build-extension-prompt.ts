@@ -18,6 +18,9 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.7.1 — 2026-10-18 — ADDITIVE: the on_done input carries the answer as `result`, and
+ *     `ctx.ai.result(job_id)` reads it back. The row said the action could read the answer, and the
+ *     sandbox could not reach the owner's namespace it lands in.
  *   v1.7.0 — 2026-10-18 — An action with `public: true` answers a visitor, read-only (the sentence that
  *     said every action needs a signed-in caller became false); ctx.caller.adult and
  *     ctx.caller.subscriptions, and the `subscription.plans` record (Comicland v3 A-7, A-3, A-5).
@@ -153,7 +156,8 @@ function sandboxSection(): string {
     '| `ctx.calendar.toInstant(local, timeZone)` / `fromInstant(instant, timeZone)` | A zone\'s local time to an instant and back. `toInstant` throws for a local time that does not exist in the zone (the hour a clock skips in spring) |',
     '| `ctx.calendar.normalize(event)` | The event as the library stores it, or a throw saying what is wrong: an end before its start, a local time that does not exist, a date in the wrong form. Call it before you store an event somebody proposed |',
     '| `ctx.calendar.fromICS(text)` / `toICS(events, {name})` | An ICS calendar text to events and back (text of at most 1 MB). Every refusal of `ctx.calendar` is thrown as `CALENDAR: <what is wrong>`: catch it and answer the person in words |',
-    '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing |',
+    '| `ctx.ai.start({prompt, result_key, on_done, model, system_prompt, json, prompt_key, input_keys, result_visibility, op, provider, audio_key, language, size})` | Start a BACKGROUND model call and get `{ok: true, job_id, queue_position}` back at once. `op`: text (default), image (a picture into storage) or transcribe (the audio at `audio_key`). The answer lands at `result_key`; `on_done: {extension, action}` then calls one of this extension\'s own actions. Billed to the extension\'s owner, never to the caller. A full queue answers `{ok: false, code, message}` instead of throwing. The `on_done` action gets `{job_id, state, result_key, result}`: `result` is the answer, or `result_too_large: true` stands in its place when the answer is over 64 kB. `ctx.memory.get(result_key)` does NOT reach it: the answer is in the owner\'s namespace, not this extension\'s |',
+    '| `ctx.ai.result(job_id)` | The answer of a job this extension started, at any later time: `{ok: true, job_id, state, result_key, value}`, `value` present once the answer is written (already inside `on_done`). The answer stays private to the owner; never set `result_visibility: \'public\'` to read it. `{ok: false, code}`: AI_JOB_NOT_FOUND (not this extension\'s job), AI_JOB_RESULT_GONE (the record was deleted or written again) |',
     '| `ctx.buy(appRef, tool, input)` | Buy one call of another owner\'s app tool, billed to this extension\'s owner. Needs a contract they already hold, else `{ok: false, code: \'NO_CONTRACT\'}` |',
     '| `ctx.wallet.consume(amount, reason)` | Debit morsels of pacing from the CALLER; `{success}`. Throws on an amount that is not positive or is over the node\'s per-call ceiling |',
     '| `ctx.wallet.getBalance()` | The caller\'s morsel balance |',
