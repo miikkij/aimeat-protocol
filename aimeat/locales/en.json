@@ -22258,16 +22258,16 @@
     }
   },
   "news": {
-    "titleSince": "New since you last looked",
-    "titleWindow": "The most important changes of the last {n} days",
+    "titleSince": "System updates since you last looked",
+    "titleWindow": "The most important system updates of the last {n} days",
     "highlights": "Important",
-    "others": "Other changes",
-    "moreOne": "One more change is in the history.",
-    "moreN": "{n} more changes are in the history.",
+    "others": "Other system updates",
+    "moreOne": "One more system update is in the history.",
+    "moreN": "{n} more system updates are in the history.",
     "read": "Read",
-    "history": "Everything that has changed →",
+    "history": "All system updates →",
     "for": "For: {who}",
-    "countTitle": "{n} new changes on your home",
+    "countTitle": "{n} new system updates on your home",
     "who": {
       "user": "You",
       "agent": "Your AI and agents",
