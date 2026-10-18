@@ -24,6 +24,10 @@
  *     in force for an item shows it to an AI reader ("the AI cannot send what it cannot see",
  *     decided 2026-09-30), and each such showing is audited as the exception's use; the audience
  *     rule still applies, and an anonymous reader gets nothing from it.
+ *   AN AGENT'S CLEARANCE (plan doc-mvdipuyqraas, L2.2): an agent of this node reads nothing whose
+ *     effective label ranks above the clearance its owner set on it (clearance.ts). show() hides
+ *     and audits such an item as refused (purpose `clearance`), useForAi() refuses the call, and
+ *     leave() keeps it behind; no exception and no app rule opens it. No clearance is no limit.
  *   THE LABEL DECIDED ON IS THE EFFECTIVE ONE (plan doc-mvdipuyqraas, L1.3): the item's own label
  *     or the default, raised to the label of its workspace, its organism, its board or its app when
  *     that is higher (effective.ts). A refusal's audit row and a left-behind reason say "from its
@@ -58,6 +62,9 @@
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.7.0 — 2026-10-18 — An agent's clearance is part of the one decision: show() hides what ranks
+ *     above it, useForAi() refuses it and leave() keeps it behind (clearance.ts, plan
+ *     doc-mvdipuyqraas L2.2).
  *   v2.6.0 — 2026-10-18 — decideAll decides on the effective label (effective.ts effectiveLabels,
  *     container labels in one batch per kind and scope); a refusal and a left-behind item name the
  *     container whose label decided, and leave() returns `from` (plan doc-mvdipuyqraas, L1.3).
@@ -94,6 +101,7 @@ import { mergePolicy, weakerFields, type PolicyLayer } from './levels.js';
 import { ClassificationError, targetId } from './labels.js';
 import { effectiveLabels, type EffectiveFrom } from './effective.js';
 import { audienceCheck } from './audience.js';
+import { clearanceFor } from './clearance.js';
 import { recordClassificationAudit, type ClassificationAuditEvent } from './audit.js';
 import { activeExceptionsFor, recordAutoException, recordExceptionUse, type ClassificationException } from './exceptions.js';
 
@@ -256,6 +264,8 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
     : foreign ? who.auth!.owner
     : ownerName ? `${ownerName}@${deps.config.nodeId}` : null;
   const inside = audienceCheck(deps.storage, { owner, ownerName });
+  // An agent's clearance (plan doc-mvdipuyqraas, L2.2): one agent read per reader, only when asked.
+  const clearance = clearanceFor(deps, who);
   const warnings: ContentReader['warnings'] = [];
   const audit = (d: Decided, action: ClassificationAuditEvent['action'], purpose?: string) => recordClassificationAudit({
     scope: d.target.scope, ownerGaii: auditOwnerOf(d.target.scope), kind: d.target.kind, key: d.target.key,
@@ -302,6 +312,9 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         const d = decided[i];
         if (!d) { out.push(items[i]); continue; }
         if (!(await inside(d.label.audience, d.target.scope))) { audit(d, 'refused', `audience${viaContainer(d)}`); continue; }
+        // Above the agent's clearance: hidden and counted, whatever exception the person made for
+        // AI reading, because the clearance is the owner's limit on this one agent.
+        if (await clearance.refuses(d.label, d.policy)) { audit(d, 'refused', `clearance${viaContainer(d)}`); continue; }
         // An anonymous reader is read the strictest way, as an AI (decided 2026-09-30): nothing
         // tells who is behind it, so what the label hides from an AI does not reach it either.
         if (who.kind === 'ai' || who.kind === 'anonymous') {
@@ -338,7 +351,7 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       for (const d of decided) {
         if (!d) continue;
         const outside = who.kind !== 'system' && !(await inside(d.label.audience, d.target.scope));
-        if (outside) { refused.push(d); continue; }
+        if (outside || await clearance.refuses(d.label, d.policy)) { refused.push(d); continue; }
         if (d.label.aiVisibility === 'hidden') {
           if (!app) { refused.push(d); continue; }
           const g = `${d.target.scope}\u0000${d.label.id}`;
@@ -371,8 +384,11 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       const decided = await decideAll(deps, items.map(targetOf));
       const destination = destinationOf(where);
       // What stays behind, per item: the organism rule, or (for an AI) a label that hides it from AI.
-      const why: Array<'organism' | 'ai' | null> = decided.map(d => {
+      // Above an agent's clearance it stays behind too: an agent does not send out what it may not read.
+      const aboveClearance = await Promise.all(decided.map(d => (d ? clearance.refuses(d.label, d.policy) : false)));
+      const why: Array<'organism' | 'ai' | 'clearance' | null> = decided.map((d, i) => {
         if (!d) return null;
+        if (aboveClearance[i]) return 'clearance';
         // The rule is about leaving an ORGANISM, wherever the copy goes. A person's own content is
         // theirs to send: the default label (internal) may not leave an organism, and binding
         // personal content to it would stop every person's own public records at the border.
@@ -388,7 +404,7 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       // A person's exception in force lets an item through: 'leave' for any reader and destination,
       // 'ai-send' when the reader is an AI. Read only when something would stay behind.
       const active = app ? new Map<string, ClassificationException[]>()
-        : await exceptionsFor(deps, decided.filter((d, i): d is Decided => !!d && !!why[i]));
+        : await exceptionsFor(deps, decided.filter((d, i): d is Decided => !!d && !!why[i] && why[i] !== 'clearance'));
       const kept: typeof items[number][] = [];
       const left: Array<{ item: typeof items[number]; label: string; reason: string; from: EffectiveFrom }> = [];
       const appActs = new Map<string, { d: Decided; n: number }>();
@@ -396,6 +412,13 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         const d = decided[i];
         const rule = why[i];
         if (!d || !rule) { kept.push(items[i]); continue; }
+        // No exception and no app rule opens what the agent's clearance closes.
+        if (rule === 'clearance') {
+          audit(d, 'refused', `${where.kind}: clearance${viaContainer(d)}`);
+          left.push({ item: items[i], label: d.label.id, from: d.from,
+            reason: `classified ${d.label.name.en}${viaContainer(d)}, above what this agent may read. Its owner sets what it may read on the agent's page.` });
+          continue;
+        }
         if (app) {
           const g = `${d.target.scope}\u0000${d.label.id}`;
           appActs.set(g, { d: appActs.get(g)?.d ?? d, n: (appActs.get(g)?.n ?? 0) + 1 });

@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.36.0 -- 2026-10-18 -- Classified content: an agent's clearance hides what is classified above
+ *     it, and only the owner raises it (plan doc-mvdipuyqraas, L2).
  *   v1.35.0 -- 2026-10-18 -- Classified content: an organism, a workspace, a board and an app carry a
  *     classification, and `get` answers the effective one (plan doc-mvdipuyqraas, L1).
  *   v1.34.0 -- 2026-10-18 -- Adult status, subscriptions, provenance in exported files (Comicland v3).
@@ -120,7 +122,11 @@ highly confidential records reach you with \`classification_warning\`: use them 
 you were given, and copy them nowhere else. Your owner or an organism may choose a classification
 that hides content from AI. Such a record is not in your lists and reads as absent, and a call that
 names it is refused with \`CLASSIFIED\`: tell your owner it is classified, and do not retry or reach
-for it another way. When you send content out (an export, a share link, another node, an outside
+for it another way. Your owner may also set how high a classification you yourself may read (your
+clearance, \`clearance\` on your entry in GET /v1/agents): anything classified higher is hidden from
+you in the same way, and stays behind when you send content out. You cannot change your own; with
+\`agent:permissions\` you may lower another agent's (\`aimeat_operator_agent_configure\`, \`clearance\`),
+and only your owner raises one. When you send content out (an export, a share link, another node, an outside
 service), what a classification hides from AI stays behind, and so does an organism's content that
 may not leave it; the answer names each item. Only your owner can make an exception, signed in
 themselves in their Data Wallet with a written reason, so tell them what you wanted to send and why;

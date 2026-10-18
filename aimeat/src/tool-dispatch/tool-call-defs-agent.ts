@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 -- aimeat_operator_agent_configure forwards `clearance` to PATCH /v1/agents/:name/clearance (plan doc-mvdipuyqraas, L2.3).
  *   2026-10-17 -- aimeat_dm_send_as_owner posts to POST /v1/messages/as-owner: it sends in the owner's
  *     name, as the node MCP tool does, where it sent as the agent through POST /v1/messages.
  *   2026-10-16 -- The comments on aimeat_operator_agent_configure and aimeat_operator_ai_config say what the
@@ -740,7 +741,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
     {
         // Operator config-enactment. The server MCP tool runs propose-then-confirm with no single REST
         // route; the shell path APPLIES DIRECTLY through the per-field routes that exist —
-        // PATCH /v1/agents/:name/{mode,tags,scopes}. Those routes carry the real authz: scopes admits the
+        // PATCH /v1/agents/:name/{mode,tags,scopes,clearance}. Those routes carry the real authz: scopes admits the
         // owner, or an agent holding agent:permissions + agent:write that only narrows (the node MCP
         // tool's rule); mode/tags are same-owner with agent:write. display_name/description have no
         // route (shell-unsupported).
@@ -763,6 +764,8 @@ export const agentTools: ConnectCliToolDefinition[] = [
             if (tags !== undefined) await step('tags', client.patch(`/v1/agents/${encodeURIComponent(target)}/tags`, { tags }));
             const scopes = optionalArray(input, 'scopes');
             if (scopes !== undefined) await step('scopes', client.patch(`/v1/agents/${encodeURIComponent(target)}/scopes`, { scopes }));
+            // null is a value here (no limit), so it is forwarded as given; the route decides who may.
+            if (input.clearance !== undefined) await step('clearance', client.patch(`/v1/agents/${encodeURIComponent(target)}/clearance`, { clearance: input.clearance ?? null }));
             if (optionalString(input, 'display_name') !== undefined) unsupported.push('display_name');
             if (optionalString(input, 'description') !== undefined) unsupported.push('description');
             const data = { agent: target, applied, ...(unsupported.length ? { unsupported, note: 'These fields have no REST route — use the server MCP tool or the profile UI.' } : {}) };

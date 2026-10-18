@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 -- A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 -- An imported agent is tagged `unlisted` too when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   2026-10-17 -- announceScopes() moved unchanged to ./announce-scopes.ts, which ./permission-allow.ts
  *     calls as well.
@@ -93,6 +94,7 @@ import { leaveMemories } from '../../services/classification-exits.js';
 import { actionPricingFromRecord } from '../../services/action-pacing.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../../config-pacing.js';
 import { agentListingTags } from '../../services/content-defaults.js';
+import { newAgentClearance } from '../../services/agent-clearance.js';
 
 /** Why the read-through doors are the owner's in person: letting an agent read mail is consent. */
 const READ_IN_PERSON = 'Letting an agent read your mail is your own decision, so only you, signed in yourself, can make it here.';
@@ -222,6 +224,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       morselBalance: 0, // agents use GHII owner balance
       // `unlisted` too when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
       ...agentListingTags(config, Array.isArray(agentData.tags) ? agentData.tags : []),
+      ...newAgentClearance(config),
       // The scope list Postgres gave an imported agent, written out so SQLite gives the same: the
       // Postgres store fills ['*'] for a missing list and SQLite left it empty, so an imported agent
       // held every scope on one backend and none on the other (Jouni, 2026-10-15: Postgres is the

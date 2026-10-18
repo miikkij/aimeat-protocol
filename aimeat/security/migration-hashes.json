@@ -107,6 +107,7 @@
     "0103_page_files_owner_only.sql": "13ee8730eb6ee4594d2387277e49e2f237ada48a0bcba487e68073435f197780",
     "0104_app_access.sql": "30bd07a2f7c15a788afb24d02d91bc0d0f023c210e8d73b2b502066c06c8ca2a",
     "0105_direct_message_sent_by_agent.sql": "01cb510e3edae0a70dbaf55c2d140b7cd70fd15ca76098c02fcdc8cf60ab4f5c",
-    "0106_company_front_page_access.sql": "fa440410d6411d87de67f77b11de07cf9e1cb82d5ca8cf55ca4931e6195d14e5"
+    "0106_company_front_page_access.sql": "fa440410d6411d87de67f77b11de07cf9e1cb82d5ca8cf55ca4931e6195d14e5",
+    "0107_agent_clearance.sql": "cd2a6c4ee2e2bc6ace604062dc12a9905004ce3d3255e049f8519c5aa3477f96"
   }
 }

@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-10-18 — clearance on create and read (migration 0107, plan doc-mvdipuyqraas L2). updateAgent passes it through.
  *   2026-10-16 — operatorAccountState({ claim: true }) takes a transaction-scoped advisory lock first, the
  *     single claim to the first operator (Jouni, 2026-10-16).
  *   2026-10-16 — operatorAccountState: two EXISTS queries (QA audit P7-10).
@@ -82,6 +83,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     mcpClient: r.mcpClient ?? null, mcpLastSeen: r.mcpLastSeen ?? null,
     ...(r.taskStart === 'automatic' || r.taskStart === 'confirm' ? { taskStart: r.taskStart } : {}),
     ...(r.stoppedAt ? { stoppedAt: r.stoppedAt, stoppedBy: r.stoppedBy ?? null } : {}),
+    ...(r.clearance ? { clearance: r.clearance } : {}),
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };
@@ -186,7 +188,7 @@ export const identityMethods = {
       identityVersion: a.identityVersion ?? null,
       cardJws: a.cardJws ?? null, cardIssuedAt: a.cardIssuedAt ?? null, enrolledAt: a.enrolledAt ?? null,
       mcpClient: a.mcpClient ?? null, mcpLastSeen: a.mcpLastSeen ?? null, taskStart: a.taskStart ?? null,
-      stoppedAt: a.stoppedAt ?? null, stoppedBy: a.stoppedBy ?? null,
+      stoppedAt: a.stoppedAt ?? null, stoppedBy: a.stoppedBy ?? null, clearance: a.clearance ?? null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();

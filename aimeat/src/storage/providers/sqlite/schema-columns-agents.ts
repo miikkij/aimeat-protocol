@@ -10,6 +10,7 @@
  * @structure applyAgentRuntimeColumns(safeAddColumn)
  * @usage applyAgentRuntimeColumns(safeAddColumn) from sqlite/schema.ts initializeSchema.
  * @version-history
+ *   v1.1.0 — 2026-10-18 — agents.clearance (migration 0107, plan doc-mvdipuyqraas L2).
  *   v1.0.0 — 2026-10-11 — Moved out of schema.ts unchanged (max-file-lines).
  */
 import type { SafeAddColumn } from './schema-columns-scheduler.js';
@@ -65,4 +66,6 @@ export function applyAgentRuntimeColumns(safeAddColumn: SafeAddColumn): void {
   // Which AI tool the agent last spoke from over MCP, and when (migration 0063 on Postgres).
   safeAddColumn('agents', 'mcpClient', 'TEXT');
   safeAddColumn('agents', 'mcpLastSeen', 'TEXT');
+  // The highest classification label the agent may read; NULL = no limit (migration 0107).
+  safeAddColumn('agents', 'clearance', 'TEXT');
 }

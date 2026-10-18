@@ -23,6 +23,7 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 — An approved proposal's agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   2026-10-15 — The approval's `llm_choice` carries `warning` when the owner's model policy leaves
  *     the picked model out (feature-list audit #82).
@@ -84,6 +85,7 @@ import {
 } from '../../services/agent-proposals.js';
 import { logger } from '../../utils/logger.js';
 import { agentListingTags } from '../../services/content-defaults.js';
+import { newAgentClearance } from '../../services/agent-clearance.js';
 
 const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'];
 const VALID_RUN_MODES = ['resident', 'spawn'];
@@ -265,6 +267,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       mode: proposal.mode as never,
       // `unlisted` too when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
       ...agentListingTags(config, ['agent.proposed']),
+      ...newAgentClearance(config),
       runMode: runMode.run_mode as never,
       identityVersion: 2,
       // WHO ASKED, not who approved. `registeredBy` is the creation ledger and the fence the

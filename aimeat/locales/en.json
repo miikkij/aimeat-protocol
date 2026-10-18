@@ -12388,7 +12388,9 @@
     "cfgDesc_docsign_app_url": "The address of the signing app. A person asked to sign gets a notification that opens it on the request. Empty: the notification names the request without a link.",
     "cfgDesc_docsign_eudi_enabled": "A person can sign a PDF with an EU Digital Identity Wallet: the wallet makes the signature, and this server seals that it was given. Needs the wallet access certificate (docsign.eudi_rp_credential). Off by default.",
     "cfgDesc_docsign_eudi_rp_credential": "A PEM file with this server's wallet access certificate: the EC private key, then the certificate naming this server (DNS:<host> or URI:https://<host>), then its CA if there is one. A registrar issues it (for the EU reference wallet, registry.serviceproviders.eudiw.dev); convert its .p12 file to PEM with openssl. Set in .env and restart. Empty: wallet signing is not ready. Setup step by step: docs/document-signing.md.",
-    "cfgDesc_docsign_eudi_test_roots": "Trust the test certificate authorities of the EU reference wallet when checking a signature. A signature that chains to one is reported as a test signature with no legal effect, never as qualified. Turn off once national wallets are in use."
+    "cfgDesc_docsign_eudi_test_roots": "Trust the test certificate authorities of the EU reference wallet when checking a signature. A signature that chains to one is reported as a test signature with no legal effect, never as qualified. Turn off once national wallets are in use.",
+    "cfg_classification_agent_clearance_default": "What a new agent may read at most",
+    "cfgDesc_classification_agent_clearance_default": "The id of the highest classification a new agent may read, such as sisainen for Internal. Empty: no limit. Agents that exist keep what they have."
   },
   "dev": {
     "crumb": "For developers",
@@ -18183,6 +18185,19 @@
         "byYou": "you",
         "byAgent": "your agent {name}",
         "byApp": "the app {name}"
+      },
+      "clearance": {
+        "label": "May read at most",
+        "none": "no limit",
+        "change": "Change",
+        "close": "Close",
+        "choose": "The highest classification this agent may read",
+        "noLimit": "No limit",
+        "save": "Save",
+        "saved": "This agent may now read at most: {label}.",
+        "cleared": "This agent may now read everything its permissions reach.",
+        "failed": "The change was not saved.",
+        "hint": "Content classified higher is hidden from this agent. Your other agents can lower this, and only you can raise it."
       }
     },
     "scopes": {
@@ -24302,6 +24317,19 @@
         "ex2": "50 EUR and no limit in USD: the agent can pay in euros, and a purchase priced in dollars is refused.",
         "ex3": "500 EUR: an agent that orders supplies for your company. Each day's orders stay under 500 euros.",
         "tip": "Set the lowest limit that lets the agent do its job, and check on the card what it spent today. The limit does not apply to your own purchases or to pacing. Only you can change the limit, signed in yourself."
+      },
+      "clearance": {
+        "title": "May read at most",
+        "short": "The highest classification this agent may read. Content classified higher is hidden from it.",
+        "what": "Content on your AIMEAT can carry a classification, such as Public, Internal or Confidential. Here you choose the highest classification this agent may read. Content with a higher classification is hidden from the agent everywhere: in memory, files, workspace documents and board posts. A workspace, an organism, a board or an app with a higher classification makes everything in it count as that high. The agent does not see the hidden content, and your classification log counts each time it was kept from the agent. The agent also cannot send such content to an AI or out of your AIMEAT. This applies only while classification is on.",
+        "range": "One of the classifications of your classification policy, or No limit. A new agent starts with No limit, unless the operator of this service chose another start value.",
+        "lowLabel": "A low classification, such as Internal",
+        "low": "The agent reads only content that is not sensitive. Good for an agent that talks to customers or works for many people.",
+        "highLabel": "No limit",
+        "high": "The agent reads everything its permissions reach, as before.",
+        "ex1": "Internal: a customer service agent reads your product notes, but not the confidential contracts.",
+        "ex2": "Confidential: a research agent reads your confidential plans, but not the highly confidential ones.",
+        "tip": "Another of your agents can lower this if you gave it the permission to change agents' permissions. Only you, signed in yourself, can raise it or remove the limit, and an agent can never change its own."
       }
     },
     "access": {
@@ -25067,6 +25095,15 @@
           "ex1": "Both (the default): most servers. Changes arrive quickly, and the round catches anything missed.",
           "ex2": "Scheduled: a server on a slow connection, or one paid by use, that sends everything in one batch.",
           "tip": "Keep Both. Pick Scheduled only when the traffic between servers must stay low."
+        }
+      },
+      "classification": {
+        "agent_clearance_default": {
+          "title": "Start value for what a new agent may read",
+          "short": "The highest classification a new agent may read. Empty: no limit.",
+          "what": "Each agent can have a highest classification it may read. Content classified higher is hidden from the agent and counted. This setting gives that value to every agent created after the change. Agents that already exist keep what they have, and each owner can change it on the agent's page. It applies only while classification is on.",
+          "range": "The id of a classification of this service's classification policy, such as sisainen for Internal or luottamuksellinen for Confidential. Empty (the default): no limit.",
+          "tip": "Leave it empty unless the agents on this service should start limited. A company service where agents serve many people can start them at Internal."
         }
       }
     },

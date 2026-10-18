@@ -81,6 +81,8 @@ export interface Agent {
   /** ISO time the agent was stopped, and who stopped it; both null while it runs (migration 0101). */
   stoppedAt: string | null;
   stoppedBy: string | null;
+  /** The highest classification label id the agent may read; null = no limit (migration 0107). */
+  clearance: string | null;
   /** What code backs this agent, as its runtime reports it (AgentRuntimeSource). */
   runtimeSource: unknown | null;
   identityVersion: number | null;

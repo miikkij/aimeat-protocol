@@ -30,6 +30,7 @@
  *   v1.5.0 -- 2026-10-02 -- GET/PUT /v1/agents/:name/purchase-limit (./agents/purchase-limit.ts).
  *   v1.6.0 -- 2026-10-11 -- POST /v1/agents/:name/stop and /start (./agents/stop-start.ts).
  *   v1.7.0 -- 2026-10-17 -- GET/POST /v1/agents/:name/allow (./agents/permission-allow.ts).
+ *   v1.8.0 -- 2026-10-18 -- PATCH /v1/agents/:name/clearance (./agents/clearance.ts, plan doc-mvdipuyqraas L2).
  */
 import { Router } from 'express';
 import { dirname } from 'node:path';
@@ -46,6 +47,7 @@ import { registerOffersRoutes } from './agents/offers.js';
 import { registerPurchaseLimitRoutes } from './agents/purchase-limit.js';
 import { registerStopStartRoutes } from './agents/stop-start.js';
 import { registerPermissionAllowRoutes } from './agents/permission-allow.js';
+import { registerClearanceRoutes } from './agents/clearance.js';
 
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -60,6 +62,7 @@ export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   registerPurchaseLimitRoutes(router, config, storage);
   registerStopStartRoutes(router, config, storage);
   registerPermissionAllowRoutes(router, config, storage);
+  registerClearanceRoutes(router, config, storage);
 
   return router;
 }

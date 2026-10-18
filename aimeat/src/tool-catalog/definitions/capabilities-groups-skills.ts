@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-18 — aimeat_operator_agent_configure takes `clearance`, lowering only (plan doc-mvdipuyqraas, L2.3).
  *   2026-10-18 — aimeat_skill_publish and aimeat_skill_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_skill_publish and aimeat_skill_update take visibility `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.9).
  *   2026-10-17 — aimeat_skill_publish's description: a SKILL.md description with a colon is folded or quoted, or BAD_YAML (pitfall-list round).
@@ -736,7 +737,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_operator_agent_configure',
-        description: 'Configure a same-owner agent with PROPOSE-THEN-CONFIRM. Without confirm_token nothing is applied: the tool returns the current state, the proposed state, a field-level diff, and a single-use confirm_token (10 min TTL) bound to exactly this change — show the diff to the owner. Calling again with the same arguments plus the token applies it; changing anything invalidates the token. Configurable: display_name, description, mode, tags, scopes. Scope changes may only NARROW the granted set — adding scopes remains an owner approval in the profile UI. (Connector/CLI apply directly through the per-field routes, which ask the same words and allow an agent only to narrow scopes; display_name/description are shell-unsupported.)',
+        description: 'Configure a same-owner agent with PROPOSE-THEN-CONFIRM. Without confirm_token nothing is applied: the tool returns the current state, the proposed state, a field-level diff, and a single-use confirm_token (10 min TTL) bound to exactly this change — show the diff to the owner. Calling again with the same arguments plus the token applies it; changing anything invalidates the token. Configurable: display_name, description, mode, tags, scopes, clearance. Scope changes may only NARROW the granted set — adding scopes remains an owner approval in the profile UI. clearance (the highest classification the agent may read) may only be LOWERED here; raising or removing it is the owner\'s, in person, and no agent changes its own. (Connector/CLI apply directly through the per-field routes, which ask the same words and allow an agent only to narrow scopes; display_name/description are shell-unsupported.)',
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Configure Agent (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -755,6 +756,7 @@ export const capabilitiesGroupsSkillsTools = [
             mode: { type: 'string', enum: ['interactive', 'autonomous', 'task-runner', 'coordinator', 'workstation'], description: 'New agent mode.' },
             tags: { type: 'array', description: 'Replacement tag list.', zod: z.array(z.string()) },
             scopes: { type: 'array', description: 'Replacement scope list (narrowing only).', zod: z.array(z.string()) },
+            clearance: { type: 'string', description: 'The highest classification the agent may read, as the classification\'s id (for example sisainen); content classified higher is hidden from it while classification is on. Lowering only: you can set a lower one, or one where there was none. Raising it or null (no limit) is the owner\'s decision on the agent\'s page, and you cannot change your own.', zod: z.string().max(40).nullable() },
             confirm_token: { type: 'string', description: 'On the node\'s own MCP: the token from the propose step; omit it to propose and see the change first. The shell and the connector apply directly, because the REST routes take no token.' },
         },
     },

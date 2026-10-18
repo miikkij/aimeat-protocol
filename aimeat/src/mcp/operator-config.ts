@@ -9,13 +9,16 @@
  *   single-use, 10 min TTL) it applies. Server MCP surface only (not the connector CLI).
  *
  *   Tool: aimeat_operator_agent_configure — update a SAME-OWNER agent's display_name /
- *   description / mode / tags / scopes. Scope changes may only NARROW the granted set
+ *   description / mode / tags / scopes / clearance. Scope changes may only NARROW the granted set
  *   (drop scopes); adding scopes stays an owner-approval action in the profile UI, so
  *   an agent can never talk itself into more privilege through this tool.
  * @structure registerOperatorConfigTools() — registers the tools on an McpServer
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   2026-10-18 — aimeat_operator_agent_configure takes `clearance`, the highest classification the
+ *     agent may read, written through services/agent-clearance.ts: lowering only, never the caller's
+ *     own, checked at propose time as a dry run (plan doc-mvdipuyqraas, L2.3).
  *   2026-10-06 — aimeat_operator_agent_configure and aimeat_operator_ai_config register the catalog's
  *     schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 -- The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -68,6 +71,7 @@ import {
     type AgentProfileFields,
 } from '../services/agent-profile-write.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { setAgentClearance } from '../services/agent-clearance.js';
 
 const CONFIGURE_ACTION = 'agent_configure';
 
@@ -77,6 +81,8 @@ interface AgentConfigChange {
     mode?: string;
     tags?: string[];
     scopes?: string[];
+    /** The highest classification label the agent may read; null = no limit (plan doc-mvdipuyqraas L2). */
+    clearance?: string | null;
 }
 
 function currentView(agent: AgentRecord): AgentConfigChange {
@@ -86,6 +92,7 @@ function currentView(agent: AgentRecord): AgentConfigChange {
         mode: (agent as { mode?: string }).mode ?? 'interactive',
         tags: agent.tags ?? [],
         scopes: (agent as { defaultScopes?: string[] }).defaultScopes ?? [],
+        clearance: agent.clearance ?? null,
     };
 }
 
@@ -135,7 +142,7 @@ export function registerOperatorConfigTools(
         // The catalog's schema, which carries the bounds this tool wrote (secaudit 2026-10 follow-up, Part B).
         zodShapeFor('aimeat_operator_agent_configure'),
         annotationsFor('aimeat_operator_agent_configure'),
-        async ({ agent_name, display_name, description, mode, tags, scopes, confirm_token }) => {
+        async ({ agent_name, display_name, description, mode, tags, scopes, clearance, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
             // One target resolution, the writer's: a bare name becomes a GAII under the CALLER's
             // own owner, and anything already GAII-shaped has to survive the ownership check below
@@ -150,6 +157,7 @@ export function registerOperatorConfigTools(
             if (mode !== undefined) proposed.mode = mode;
             if (tags !== undefined) proposed.tags = tags;
             if (scopes !== undefined) proposed.scopes = scopes;
+            if (clearance !== undefined) proposed.clearance = clearance === '' ? null : clearance;
             if (Object.keys(proposed).length === 0) {
                 return ok({ agent: agent_name, current: currentView(agent), diff: {}, note: 'Nothing proposed — pass the fields to change.' });
             }
@@ -183,6 +191,15 @@ export function registerOperatorConfigTools(
             // because that is what the confirm call will write.
             const normalised = normaliseAgentProfile(config, profileFieldsOf(proposed));
             if (!normalised.ok) return err(`${normalised.code}: ${normalised.message}`);
+
+            // The clearance has its own writer and its own rules (services/agent-clearance.ts): an
+            // agent lowers another agent's only, never its own, and a raise or a removal is the
+            // owner's in person, which an MCP session never is. Asked at propose time too, as a dry
+            // run, so a refused change is never shown as approvable.
+            if (proposed.clearance !== undefined) {
+                const check = await setAgentClearance({ storage, config }, caller(), agent_name, proposed.clearance, { dryRun: true });
+                if (!check.ok) return err(`${check.code}: ${check.message}`);
+            }
             if (normalised.updates.tags !== undefined) proposed.tags = normalised.updates.tags;
 
             const current = currentView(agent);
@@ -219,10 +236,20 @@ export function registerOperatorConfigTools(
             // way PATCH /v1/agents/:name/tags and /mode do. This door used to write the record
             // itself, so a tag nobody else would accept got stored and a mode change left the
             // onboarding flow counting against the wrong denominator.
-            const outcome = await setAgentProfile({ storage, config }, callerOwner, agent_name, profileFieldsOf(proposed));
-            if (!outcome.ok) return err(`${outcome.code}: ${outcome.message}`);
+            const profile = profileFieldsOf(proposed);
+            let after = agent;
+            if (Object.keys(profile).length > 0) {
+                const outcome = await setAgentProfile({ storage, config }, callerOwner, agent_name, profile);
+                if (!outcome.ok) return err(`${outcome.code}: ${outcome.message}`);
+                after = outcome.agent;
+            }
+            if (proposed.clearance !== undefined && 'clearance' in diff) {
+                const set = await setAgentClearance({ storage, config }, caller(), agent_name, proposed.clearance);
+                if (!set.ok) return err(`${set.code}: ${set.message}`);
+                after = set.agent;
+            }
             logger.info(`Operator-configure applied to ${targetGaii}`, { by: agentGaii, fields: Object.keys(diff) });
-            return ok({ mode: 'applied', agent: agent_name, applied: diff, current: currentView(outcome.agent) });
+            return ok({ mode: 'applied', agent: agent_name, applied: diff, current: currentView(after) });
         },
     );
 

@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-18 — The consent, account-events and classification rows moved unchanged to config-schema-data-access.ts (max-file-lines), where classification.agent_clearance_default joined them (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-16 — node.page_host, the host the HTML pages of workspaces run on (config-schema-pages.ts).
  *   2026-10-16 — node.type takes mirror, as the loader does; the start check (config-start-check.ts) runs these validators over the environment (QA audit D8-02).
  *   2026-10-16 — eudiw.enabled refuses true on every write path (the config route, a stored value and Consul at start), with the reason in `refusal` (QA audit D6-01, F21b-01).
@@ -118,6 +119,7 @@ import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
 import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
 import { RATE_LIMIT_CONFIG_FIELDS } from './config-schema-rate-limits.js';
 import { CONNECT_CLIENT_CONFIG_FIELDS } from './config-schema-connections.js';
+import { DATA_ACCESS_CONFIG_FIELDS } from './config-schema-data-access.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -272,11 +274,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'smtpUser', dotPath: 'email.smtp_user', envVar: 'AIMEAT_SMTP_USER', type: 'string', validate: () => true, immutable: true, description: 'SMTP username (secret)', adminDisplay: 'configured' },
   { key: 'smtpPass', dotPath: 'email.smtp_pass', envVar: 'AIMEAT_SMTP_PASS', type: 'string', validate: () => true, immutable: true, description: 'SMTP password (secret)', adminDisplay: 'configured' },
 
-  // ── Consent (Phase 0.3, mutable) ──
-  { key: 'consentEnabled', dotPath: 'consent.enabled', envVar: 'AIMEAT_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Consent layer enabled' },
-  { key: 'accountEventWindow', dotPath: 'account_events.window', envVar: 'AIMEAT_ACCOUNT_EVENT_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10, immutable: false, description: 'Events kept in an account live "what has happened" window before the oldest are archived', range: '10-10000' },
-  { key: 'consentAuditRetentionDays', dotPath: 'consent.audit_retention_days', envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'Consent audit log retention in days', range: '1-3650' },
-  { key: 'classificationMode', dotPath: 'classification.mode', envVar: 'AIMEAT_CLASSIFICATION', type: 'string', ...oneOf('off', 'owner', 'all'), immutable: false, description: 'Classification: off (nothing changes), owner (each owner decides for their own content) or all (on for every owner)' },
+  // ── Consent (Phase 0.3) and classification (TARGET-082), mutable ──
+  ...DATA_ACCESS_CONFIG_FIELDS,
 
   // ── TOTP (Phase 0.5, mutable) ──
   { key: 'totpEnabled', dotPath: 'totp.enabled', envVar: 'AIMEAT_TOTP_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'TOTP two-factor authentication enabled' },
