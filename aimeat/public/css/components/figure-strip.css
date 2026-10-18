@@ -10,6 +10,9 @@
  *   Drawn by components/FigureStrip.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.7.0 — 2026-10-18 — og-strip--stacked (FigureStrip `stacked`): the number, its word and its line
+ *     on three rows the figures share, at every width; under 1100px every strip but the free one is drawn
+ *     so (a short word stood beside its number and a long one under it, and the lines did not line up).
  *   v1.6.2 — 2026-10-18 — Under 1100px, where the figures stand two to a row, the third figure starts at
  *     the left edge as the first does (it kept the 1.1rem a figure has beside another).
  *   v1.6.1 — 2026-09-27 — .og-strip--free's number at the face's own spacing, as the old .vis-stat-val
@@ -75,6 +78,19 @@
      beside it keeps the gap (the third figure stood 1.1rem in from the first). */
   .og-strip > :nth-child(odd) { padding-left: 0; }
   .og-strip > :nth-child(even) { padding-left: 1.1rem; }
+}
+
+/* stacked: every figure the same three rows, the number, its word under it, then its line, and the
+   figures side by side share those rows (subgrid), so a word that wraps moves the lines of the whole
+   row together. Under 1100px every strip but the free one is drawn so: two to a row, a short word
+   stood beside its number and a longer one under it, and the lines sat at different heights. */
+.og-strip--stacked { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; row-gap: .25rem; }
+.og-strip--stacked > div, .og-strip--stacked > button { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-items: start; gap: .25rem 0; }
+.og-strip--stacked > * > * { min-width: 0; }
+@media (max-width: 1100px) {
+  .og-strip:not(.og-strip--free) { display: grid; grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; row-gap: .25rem; }
+  .og-strip:not(.og-strip--free) > div, .og-strip:not(.og-strip--free) > button { display: grid; grid-row: span 3; grid-template-rows: subgrid; align-items: start; gap: .25rem 0; }
+  .og-strip:not(.og-strip--free) > * > * { min-width: 0; }
 }
 
 /* Free: the figures stand free inside a section, no rules, each number over its word in the row

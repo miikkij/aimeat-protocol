@@ -9,6 +9,7 @@
  * @structure KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { KIT_DEMOS } from './demos-kit.js';
  * @version-history
+ *   v1.3.0 — 2026-10-18 — The figure strip's stacked cut.
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Loud quiet, SettingBox pre, Meter's tones, Result and a
  *     FigureStrip of buttons; the operator pages' parts in the operator's frame.
  *   v1.1.0 — 2026-09-27 — The kit's demos: action-component, mark, note, box, avatar, roads, figure; card moved in
@@ -267,6 +268,10 @@ export const KIT_DEMOS = {
     ]} />`) },
     { name: 'long, wrap', render: () => root(html`<${FigureStrip} wrap items=${[
       { n: 'orders@lumo-bakery.example', tone: 'long', label: 'address', sub: 'every letter to this address reaches your inbox and your agents' }, { n: 2, label: 'aliases', sub: '' },
+    ]} />`) },
+    { name: 'stacked', render: () => root(html`<${FigureStrip} stacked wrap items=${[
+      { n: 5, label: 'Open to everyone', sub: 'no sign-in needed' }, { n: 1, label: 'Anyone with the link', sub: 'the address is enough' },
+      { n: 2, label: 'Signed-in accounts', sub: 'any account here' }, { n: 2, label: 'Members only', sub: 'of one shared place' },
     ]} />`) },
     { name: 'lead and flush', render: () => root(html`<${FigureStrip} lead items=${[{ n: 57, label: 'boards' }, { n: 3, label: 'yours' }]} /><${Box}><${FigureStrip} flush items=${[{ n: 4, label: 'rules' }]} /><//>`) },
     { name: 'loading', render: () => root(html`<${FigureStrip} loading=${4} />`) },

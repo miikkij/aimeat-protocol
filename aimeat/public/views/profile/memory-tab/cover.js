@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.29.1 -- 2026-10-18 -- A count of keys is said in the language's plural form (i18n.js tn): "1 key", not "1 keys".
  *   v1.29.0 -- 2026-10-18 -- Who can read a key or a file is the AudienceBadge (Private, "<organism> members", Signed-in, Public), on the key lists, the search, the record page and each file's row, where it was the stored word (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.28.0 -- 2026-10-16 -- Until the records have loaded the cover says so: a failed load shows the
  *     could-not-load note with Retry in "Mine" and the other parts stay blank, a failed file load the
@@ -68,7 +69,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { date as fmtDate, num as fmtNum } from '/js/format.js';
 import TagEditor from '/js/components/tag-editor.js';
 import AuthImage from '/js/components/auth-image.js';
@@ -107,6 +108,8 @@ export const SYSTEM_SPACES = new Set(['notif', 'ai-usage', 'commerce', 'agents',
 const STALE_DAYS = 90;
 const TABLE_ROWS = 12;   // a table shows this many key spaces before asking for the rest
 const c = (key, fb) => tr('profile.memory.cover.' + key, fb);
+/** "1 key", "12 keys", in the language's plural form; `shown` is the number as written (num()). */
+const keysN = (n, shown = n) => tn('profile.memory.cover.keysN', n, { n: shown });
 const num = (n) => fmtNum(Number(n || 0));
 const day = (iso) => fmtDate(iso);
 const agentOf = (gaii) => { const s = String(gaii || ''); return s.includes('#') ? s.split('#')[0] : ''; };
@@ -256,8 +259,8 @@ function renderCover(ctx) {
   const sysBytes = cls.sys.reduce((n, s) => n + s.bytes, 0);
   const seenRows = [];
   const publicSome = publicKeys.slice(0, 3).map(m => m.key).join(' · ') + (publicKeys.length > 3 ? ' …' : '');
-  if (publicKeys.length) seenRows.push(html`<${ListRow} key="pub"><${Name} meta=${publicSome}>${c('publicKeys', '{n} public keys').replace('{n}', String(publicKeys.length))}<//><${Cell} line>${visMark('public')}<//><${Doors} /><//>`);
-  if (membersKeys.length) seenRows.push(html`<${ListRow} key="mem"><${Name}>${c('membersKeys', '{n} keys for signed-in users').replace('{n}', String(membersKeys.length))}<//><${Cell} line>${visMark('members')}<//><${Doors} /><//>`);
+  if (publicKeys.length) seenRows.push(html`<${ListRow} key="pub"><${Name} meta=${publicSome}>${tn('profile.memory.cover.publicKeys', publicKeys.length)}<//><${Cell} line>${visMark('public')}<//><${Doors} /><//>`);
+  if (membersKeys.length) seenRows.push(html`<${ListRow} key="mem"><${Name}>${tn('profile.memory.cover.membersKeys', membersKeys.length)}<//><${Cell} line>${visMark('members')}<//><${Doors} /><//>`);
   for (const sh of shares || []) {
     const to = ' → ' + (groups.find(g => g.id === sh.group_id)?.name || sh.group_id);
     seenRows.push(html`<${ListRow} key=${'sh' + sh.id}>
@@ -266,7 +269,7 @@ function renderCover(ctx) {
       <${Doors}><${Action} small row soft onClick=${() => ctx.revokeCoveringShare(sh)}>${t('profile.memory.shRevoke') || 'Stop sharing'}<//><//>
     <//>`);
   }
-  if (fedKeys.length) seenRows.push(html`<${ListRow} key="fed"><${Name} meta=${fedKeys.slice(0, 3).join(' · ')}>${c('fedKeys', '{n} keys in the federation').replace('{n}', String(fedKeys.length))}<//><${Cell} line><${Mark} tone="dim">${c('federation', 'federation')}<//><//><${Doors} /><//>`);
+  if (fedKeys.length) seenRows.push(html`<${ListRow} key="fed"><${Name} meta=${fedKeys.slice(0, 3).join(' · ')}>${tn('profile.memory.cover.fedKeys', fedKeys.length)}<//><${Cell} line><${Mark} tone="dim">${c('federation', 'federation')}<//><//><${Doors} /><//>`);
 
   let counter = 0; const next = () => String(++counter).padStart(2, '0');
   const sections = [];
@@ -294,7 +297,7 @@ function renderCover(ctx) {
     <//>` : null;
 
   const marks = [
-    { label: `${num(all.length)} ${c('figKeys', 'keys')}` },
+    { label: keysN(all.length, num(all.length)) },
     { label: formatBytes(bytes) },
     changedToday ? { label: c('changedToday', '{n} changed today').replace('{n}', String(changedToday)), tone: 'sun' } : null,
     // Several agents: the drop-down that chooses whose memory is read. One: its name, dim (it chooses nothing).
@@ -344,7 +347,7 @@ function renderCover(ctx) {
         <${Note} kind="hint">${c('orgHint', 'An organism’s content lives in your memory when you or your agents wrote it. It is managed on the organism’s page; here it shows so you know what you own and how much it takes.')}<//>
       <//>
 
-      <${Section} fold id="mp-sys" num=${nSys} title=${c('sys', 'The machine’s bookkeeping')} sub=${`${sysCount} ${c('figKeys', 'keys')} · ${formatBytes(sysBytes)}`} open=${sysOpen} onToggle=${() => setSysOpen(o => !o)}>
+      <${Section} fold id="mp-sys" num=${nSys} title=${c('sys', 'The machine’s bookkeeping')} sub=${`${keysN(sysCount)} · ${formatBytes(sysBytes)}`} open=${sysOpen} onToggle=${() => setSysOpen(o => !o)}>
         <${Note} kind="hint">${c('sysHint', 'What your environment and your agents write for their own use: notices, meters, receipts. Yours as well, but rarely for you to read.')}<//>
         ${cls.sys.length ? spaceTable(ctx, cls.sys, { head: false, id: 'sys' }) : none()}
       <//>
@@ -392,7 +395,7 @@ function renderSpace(ctx, id) {
   if (spaceSort === 'alpha') items.sort((a, b) => a.key.localeCompare(b.key));
   else if (spaceSort === 'size') items.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0));
   const kind = s.bucket === 'org' ? c('kindOrg', 'organism') : s.bucket === 'sys' ? c('kindSys', 'bookkeeping') : c('kindOwn', 'your key space');
-  const sub = html`<span>${kind}</span><span>${s.items.length} ${c('figKeys', 'keys')}</span><span>${formatBytes(s.bytes)}</span>${s.publicN ? html`<${Mark} tone="sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}<//>` : null}`;
+  const sub = html`<span>${kind}</span><span>${keysN(s.items.length)}</span><span>${formatBytes(s.bytes)}</span>${s.publicN ? html`<${Mark} tone="sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}<//>` : null}`;
   const doors = html`
     ${prefix ? html`<${Action} small soft onClick=${() => { setSearchScopePrefix(prefix); setShowSearch(true); pickView({ kind: 'cover' }); }}>${c('searchHere', 'Search this space')}<//>` : null}
     <${Action} small onClick=${() => setShowMemForm(v => !v)}>${c('newEntry', '+ New entry')}<//>`;

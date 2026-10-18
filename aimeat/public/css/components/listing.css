@@ -12,6 +12,7 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.31.1 — 2026-10-18 — item-kind-state-doors: a door's words wrap inside its column.
  *   v1.31.0 — 2026-10-18 — The cut item-kind-state-doors (What others can see, plan doc-mvcn6c7e4e5q V6.2): the name keeps 12rem and the doors wrap; under 1180px a row is a card with 40px doors.
  *   v1.30.0 — 2026-10-11 — The cut name-state-price-doors (the Offers selling register) keeps its price-and-pacing column under 1100px and drops only who sees it; on a phone its rows stack with their column names (List labels), so it no longer shows its heading row there.
  *   v1.29.0 — 2026-09-29 — The cut name-desc-count-when-doors (the Data Wallet's trail and its
@@ -226,6 +227,8 @@
    own line, the kind and the audience under it, then the doors as 40px touch targets. */
 .listing--item-kind-state-doors { grid-template-columns: minmax(12rem, 1fr) minmax(4.5rem, max-content) max-content minmax(9rem, 13rem); }
 .listing--item-kind-state-doors > .listing-row > .listing-doors { flex-wrap: wrap; white-space: normal; justify-content: flex-start; gap: .2rem .9rem; }
+/* A door's words wrap inside the column ("Abrir Catálogo de aplicaciones" is wider than 13rem). */
+.listing--item-kind-state-doors > .listing-row > .listing-doors > .poster-action { white-space: normal; text-align: left; max-width: 100%; }
 @media (max-width: 1180px) {
   .listing--item-kind-state-doors { grid-template-columns: minmax(0, 1fr) max-content; }
   .listing--item-kind-state-doors > .listing-row--head > div { display: none; }

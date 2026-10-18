@@ -27,6 +27,8 @@
  * @structure LEVELS · KINDS · closeOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.2.0 — 2026-10-18 — The figures are the stacked strip (number, word and line on shared rows), and
+ *     "Copy for your AI" says so in the site's toast.
  *   v1.1.0 — 2026-10-18 — From the browser check of 1c0b57fba: the list is the cut item-kind-state-doors
  *     (the name keeps 12rem, the doors wrap, a card under 1180px with 40px doors), "Close it" asks in
  *     the site's confirm dialog instead of window.confirm, and the way to another page reads as a verb.
@@ -113,7 +115,7 @@ const levelKey = (lv) => (lv === 'signed-in' ? 'signedIn' : lv);
 
 function Strip({ report }) {
   const failed = report.failed.length > 0;
-  return html`<${FigureStrip} lead wrap items=${LEVELS.map((lv) => ({
+  return html`<${FigureStrip} lead wrap stacked items=${LEVELS.map((lv) => ({
     key: lv,
     n: report.counts.by_level[lv] ?? 0,
     tone: lv === 'public' && report.counts.by_level[lv] ? 'notice' : undefined,
@@ -131,26 +133,27 @@ function Edges({ report }) {
     ${report.hidden_by_classification ? html`<${Note} kind="aside" size="small">${x('hidden', { n: report.hidden_by_classification })}<//>` : null}`;
 }
 
-function ItemRow({ item, busy, onClose }) {
+function ItemRow({ item, busy, onClose, onCopied }) {
   const close = closeOf(item);
   const place = close ? null : PLACE[item.kind];
   const appHref = !close && item.kind === 'app' ? `/v1/appcat?q=${enc(item.title)}` : null;
   const forAi = x('aiPrompt', { title: item.title, how: item.how_to_close });
   return html`
     <${Row}>
-      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')} clip>${item.title}<//>
+      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')}>${item.title}<//>
       <${Cell} meta>${kindWord(item.kind)}<//>
       <${Cell}><${AudienceBadge} audience=${exposureAudienceOf(item)} /><//>
       <${Doors}>
         ${close ? html`<${Action} small row tone="danger" disabled=${busy} onClick=${() => onClose(item, close)}>${x('closeIt')}<//>` : null}
         ${place ? html`<${Action} small row onClick=${() => openTab(place[0])}>${x('goThere', { page: t(place[1]) })}<//>` : null}
         ${appHref ? html`<${Action} small row href=${appHref} newTab>${x('goThere', { page: t('catalog.title') })}<//>` : null}
-        <${Action} small row soft copy=${forAi}>${x('copyForAi')}<//>
+        <${Action} small row soft copy=${forAi} onCopied=${onCopied}>${x('copyForAi')}<//>
       <//>
     <//>`;
 }
 
-export default function ExposureTab() {
+/** @param {{ showToast?: (msg: string, kind?: unknown) => void }} props the profile shell's tab props */
+export default function ExposureTab({ showToast }) {
   const [report, setReport] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -194,6 +197,9 @@ export default function ExposureTab() {
     }
   };
 
+  // The site's toast after a copy, as the other copy doors say it (the link's own "✓ Copied" too).
+  const copied = () => showToast?.(x('copiedForAi'));
+
   const items = report?.items ?? [];
   const total = report?.counts?.total ?? 0;
   return html`
@@ -201,7 +207,7 @@ export default function ExposureTab() {
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.exposure')]}
       title=${x('title')}
       desc=${x('intro')}
-      strip=${report ? html`<${Strip} report=${report} />` : html`<${FigureStrip} lead loading=${4} />`}
+      strip=${report ? html`<${Strip} report=${report} />` : html`<${FigureStrip} lead stacked loading=${4} />`}
       after=${html`<${ConfirmUI} />`}>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${message ? html`<${Note} kind="message">${message}<//>` : null}
@@ -214,7 +220,7 @@ export default function ExposureTab() {
             empty=${report.failed.length ? x('emptyPartial') : x('empty')}
             rows=${items}
             render=${(item) => html`<${ItemRow} key=${`${item.kind}|${item.id}|${item.level}`} item=${item}
-              busy=${busy === `${item.kind}|${item.id}`} onClose=${onClose} />`} />
+              busy=${busy === `${item.kind}|${item.id}`} onClose=${onClose} onCopied=${copied} />`} />
           ${items.length < total ? html`<${Note} kind="hint">${x('countedNotListed', { n: total - items.length })}<//>` : null}
           <${Note} kind="hint">${x('askYourAi')}<//>
         <//>

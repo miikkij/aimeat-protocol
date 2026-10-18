@@ -7,6 +7,7 @@
  * @structure KIT_ENTRIES
  * @usage import { KIT_ENTRIES } from './entries-kit.js';
  * @version-history
+ *   v1.3.0 — 2026-10-18 — FigureStrip's `stacked` variant (og-strip--stacked).
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Loud quiet, SettingBox pre (the setting-box entry names Box.js
  *     as its module now), Meter's tones and Result, a FigureStrip item's onClick and title.
  *   v1.1.0 — 2026-09-27 — The seven kit components: action-component, mark, note, box, avatar, roads, figure;
@@ -345,7 +346,7 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
         summary: 'A few figures between two heavy ink rules: the number in the poster face, its word, a small typewriter line under it; two to a row on a phone. With free, the figures stand in a section without the rules, each number over its word in coral capitals. A page passes the figures as data to FigureStrip.',
         module: '/components/FigureStrip.js', sheet: '/css/components/figure-strip.css',
         data: {
-            shape: 'FigureStrip({ items: [{ n, of, label, sub, tone, key, onClick, title }], loading, wrap, flush, lead, free })',
+            shape: 'FigureStrip({ items: [{ n, of, label, sub, tone, key, onClick, title }], loading, wrap, flush, lead, free, stacked })',
             fields: {
                 onClick: 'the figure is a button (a filter, a door to its page) whose word underlines under the pointer', title: 'the figure\'s tooltip',
                 n: 'the figure: a number, a word or a time; "…" while it loads, "·" when there is none', of: 'the "of how many" after it ("/4"), smaller and grey',
@@ -370,6 +371,7 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
             { name: 'wrap', prop: 'wrap', class: 'og-strip--wrap', when: 'the lines under the figures are read whole' },
             { name: 'flush', prop: 'flush', class: 'og-strip--flush', when: 'the strip opens its box' },
             { name: 'lead', prop: 'lead', class: 'og-strip--lead', when: 'the strip opens a tab\'s content' },
+            { name: 'stacked', prop: 'stacked', class: 'og-strip--stacked', when: 'the number, its word and its line on three rows every figure shares, at every width (every strip under 1100px)' },
             { name: 'buttons', prop: 'items[].onClick, title', when: 'figures that are filters or doors (the operator\'s Overview, Applications, Owners, Security, CORS and Compliance strips)' },
             { name: 'free', prop: 'free', class: 'og-strip--free', when: 'figures inside a section with no rules (an app\'s visitor numbers): each number over its word in coral capitals' },
         ],

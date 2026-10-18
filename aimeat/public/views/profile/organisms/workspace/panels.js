@@ -10,6 +10,7 @@
  * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   v2.25.1 -- 2026-10-18 -- The share panel: a space's page count is words at the hint's size in the language's plural form ("2 documents"), whether a password is set is a sentence at the hint's size (both were under 11px), and its strings lose their emoji and em-dashes ("🔗", "🔒", "📣", "🔑").
  *   v2.25.0 -- 2026-10-18 -- A shared page says who can open it, in words (AudienceBadge from the share's access: anyone with the link, with the password, signed-in, or the organism's members) (plan doc-mvcn6c7e4e5q, V6.4).
  *   v2.24.0 -- 2026-10-16 -- A shared page with an end date says when its link ends, with "Extend 90 days" beside it.
  *   v2.23.0 -- 2026-10-02 -- The question marks that explain the workspace settings: workspace.autonomy, workspace.member_changes, workspace.publish_gate (components/HelpTip.js).
@@ -64,7 +65,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { Box, SettingBox } from '/components/Box.js';
 import { Card } from '/components/Card.js';
@@ -204,13 +205,13 @@ export function renderShareTab(ctx) {
           ${share.public
             ? html`<${Box} packed>
                 <${Line} wrap gap="medium" justify="between">
-                  <span>${t('organisms.feedPublishedAll') || '📣 This whole workspace is published to the public feed.'}</span>
+                  <span>${t('organisms.feedPublishedAll')}</span>
                   <${Action} small disabled=${shareBusy} onClick=${() => patchShare({ public: false })}>${t('organisms.feedUnpublish') || 'Unpublish'}<//>
                 <//>
               <//>`
             : html`<${Loud} control disabled=${shareBusy}
                 onClick=${() => { if (window.confirm(t('organisms.feedPublishConfirm') || 'Publish every published document in this workspace to the public activity feed on the front page?')) patchShare({ public: true }); }}>
-                ${t('organisms.feedPublishBtn') || '📣 Publish to public feed'}
+                ${t('organisms.feedPublishBtn')}
               <//>`}
         <//>` : null}
       ${docTypes.length === 0 ? html`<${Note} kind="quiet">${t('organisms.noDocSpaces') || 'This workspace has no document spaces to share.'}<//>` : html`
@@ -224,7 +225,7 @@ export function renderShareTab(ctx) {
                 <${Row} key=${'sh' + ot.name}>
                   <${Cell}>
                     <${Check} checked=${spaceOn} disabled=${shareBusy} onChange=${(on) => patchShare({ spaces: { [ot.name]: on } })}>
-                      ${wsT('type.' + ot.name) || ot.name} <${Mark}>${docs.length} ${t('organisms.docs') || 'docs'}<//>
+                      ${wsT('type.' + ot.name) || ot.name} <${Note} inline>${tn('organisms.docsN', docs.length)}<//>
                     <//>
                     ${docs.length === 0
                       ? html`<${Note} kind="quiet">${t('organisms.noPublishedDocs') || 'No published documents yet — publish a page to share it.'}<//>`
@@ -258,14 +259,12 @@ export function renderShareTab(ctx) {
                   if (sharePw.trim().length >= 4) { patchShare({ access: 'password', password: sharePw.trim() }); setSharePw(''); return; }
                   // No password yet: don't error out — keep the current mode, point at the field instead.
                   e.currentTarget.checked = share.access === 'password';
-                  showToast(t('organisms.sharePasswordMissing') || 'Type a password (at least 4 characters) below — setting it turns password protection on');
+                  showToast(t('organisms.sharePasswordMissing'));
                   const inp = document.getElementById('pj-share-pw-input'); if (inp) inp.focus();
                 }}>${t('organisms.shareAccessPassword') || 'Anyone with the link and the password'}<//>
               <${Space} above="none">
                 <${Line} wrap>
-                  <${Mark} kind="status" tone=${share.has_password ? 'fine' : 'off'}>${share.has_password
-                    ? (t('organisms.sharePasswordSet') || '🔑 A password is set')
-                    : (t('organisms.sharePasswordUnset') || 'No password set')}<//>
+                  <${Note} inline>${share.has_password ? t('organisms.sharePasswordSet') : t('organisms.sharePasswordUnset')}<//>
                   <${TextField} type="password" id="pj-share-pw-input" size="medium" autoComplete="new-password"
                     placeholder=${pwWords} ariaLabel=${pwWords} value=${sharePw} disabled=${shareBusy} onInput=${setSharePw} />
                   <${Action} small disabled=${shareBusy || sharePw.trim().length < 4}
@@ -280,13 +279,13 @@ export function renderShareTab(ctx) {
                 <//>
               <//>
               <${Check} radio name="pj-share-access" checked=${share.access === 'account'} disabled=${shareBusy}
-                onChange=${() => patchShare({ access: 'account' })}>${t('organisms.shareAccessAccount') || 'Signed-in users only — any account on this node, not just members'}<//>
+                onChange=${() => patchShare({ access: 'account' })}>${t('organisms.shareAccessAccount')}<//>
             <//>
-            <${Note}>${t('organisms.shareAccessNote') || "Default: anyone with the link. Workspace members always see these pages through their membership regardless of this choice — it only gates the public link. If you don't want outsiders at all, simply don't share."}<//>
+            <${Note}>${t('organisms.shareAccessNote')}<//>
           <//>` : null}
         ${anythingPublic() ? html`
           <${Actions}>
-            <${Action} small href=${viewerUrl} newTab>${'🔗 '}${t('organisms.openPublicViewer') || 'Open public viewer'}<//>
+            <${Action} small href=${viewerUrl} newTab>${t('organisms.openPublicViewer')}<//>
             <${Action} small copy=${window.location.origin + viewerUrl} onCopied=${() => showToast(t('organisms.linkCopied') || 'Link copied')}>${t('common.copyLink') || 'Copy link'}<//>
           <//>` : null}
       `}
@@ -299,7 +298,7 @@ export function renderReviewTab(ctx) {
     <${Card} tone="section">
       <${Check} inline checked=${gateOn} onChange=${() => toggleGate()} disabled=${busy}
         help="workspace.publish_gate">
-        ${'🔒 '}${t('organisms.publishGate') || 'Require review before publishing'}
+        ${t('organisms.publishGate')}
       <//>
       ${approvals.length === 0
         ? html`<${Note} kind="quiet">${t('organisms.reviewEmpty') || 'Nothing waiting for review.'}<//>`

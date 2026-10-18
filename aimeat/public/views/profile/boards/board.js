@@ -11,6 +11,7 @@
  * @structure renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
+ *   v1.14.1 — 2026-10-18 — The notices tag in the language's plural form ("1 notice").
  *   v1.14.0 — 2026-10-18 — The first tag under a board's title is the AudienceBadge: who can read the board, in words (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.13.0 — 2026-10-02 — The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
  *   v1.12.0 —2026-09-26 — On the component kit (page group G7): the tags, the strip and the rail are data (the topics and the most thanked as rail items), the category filter the Tabs in the fold tone, "show more" the More line, the composer the Beside with the TextField, TextArea and Choice (a chosen category pressed again clears it), the rules the Fields with the Choice, the members the Tags with their remove mark and the TextField with its add door, the hairlines the Split. The file writes no class.
@@ -38,7 +39,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tn } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
@@ -77,7 +78,7 @@ export function renderBoard(ctx, b) {
 
   const marks = [
     html`<${AudienceBadge} key="aud" value=${b.visibility} />`,
-    { label: c('chipNotices', { n: page.posts.length + (page.cursor ? '+' : '') }) },
+    { label: tn('profile.boards.cover.chipNotices', page.cursor ? 2 : page.posts.length, { n: page.posts.length + (page.cursor ? '+' : '') }) },
     b.owner_gaii ? { label: mine ? c('ownBoard') : c('chipKeeper', { name: ownerOf(b.owner_gaii) }) } : null,
     { label: priceWords(b), tone: 'dim' },
     { label: c('chipLifetime', { n: ttlDays }), tone: 'dim' },
