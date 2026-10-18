@@ -4,6 +4,27 @@
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-agents-keep-working-with-the-permissions-they-use",
+      "highlight": true,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Agents keep working, with the permissions they use",
+        "fi": "Agentit jatkavat työtään niillä oikeuksilla, joita ne käyttävät"
+      },
+      "summary": {
+        "en": "An agent with all permissions is narrowed to what it used, and its work goes on without asking you.",
+        "fi": "Kaikkien oikeuksien agentti rajataan siihen, mitä se käytti, ja sen työ jatkuu kysymättä sinulta."
+      },
+      "body": {
+        "en": "An agent you gave all permissions works freely for two weeks while AIMEAT notes which permissions it actually uses. Until now its tasks then stopped to wait for your OK, every one of them. Now AIMEAT narrows the agent to the permissions it used, its tasks go on as before, and you get one message in the bell and by email that lists what it kept. If the agent later needs something more, you hear about it in the bell and by email too: an ordinary permission is one Allow press, and for a stronger one, such as buying or sending mail as you, the message takes you to the agent's page, where you decide. You can switch the email off on the Email page.",
+        "fi": "Agentti, jolle annoit kaikki oikeudet, toimii vapaasti kaksi viikkoa, ja sillä aikaa AIMEAT kirjaa, mitä oikeuksia se oikeasti käyttää. Tähän asti sen tehtävät jäivät sen jälkeen odottamaan lupaasi, jokainen erikseen. Nyt AIMEAT rajaa agentin niihin oikeuksiin, joita se käytti, sen tehtävät jatkuvat kuten ennenkin, ja saat kelloon ja sähköpostiin yhden viestin, jossa luetellaan sille jääneet oikeudet. Jos agentti myöhemmin tarvitsee jotain muuta, kuulet siitäkin kellosta ja sähköpostista: tavallisen luvan annat yhdellä Salli-painalluksella, ja vahvemmasta, kuten ostamisesta tai postin lähettämisestä sinun nimissäsi, viesti vie agentin sivulle, jossa päätät itse. Sähköpostin voit kytkeä pois Sähköposti-sivulta."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "feature",
       "id": "2026-10-18-see-when-an-app-or-an-agent-can-invite-people",
       "highlight": false,
       "audience": [
