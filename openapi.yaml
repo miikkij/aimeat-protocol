@@ -70753,7 +70753,9 @@ paths:
         `ticket` (from `POST /v1/events/ticket` or `POST /v1/events/visitor-ticket`), not a bearer
         token. Every stream opens with `event: hello` and `data: {"build":"…"}`, the build that
         answers. A signed-in stream then emits `data: {"domains":[...]}` frames listing the changed
-        data domains; a stream opened for one app emits `event: app` with
+        data domains. A change in one organism workspace is also the domain
+        `workspace:<organismId>/<workspaceId>`, sent only to streams of that organism's members. A
+        stream opened for one app emits `event: app` with
         `data: {"kind":"version","version":N}` or `data: {"kind":"draft"}` instead. `:keepalive`
         comments every 15s. Response is `text/event-stream`; 503 when the visitor streams are at their cap.
       parameters:

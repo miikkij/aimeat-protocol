@@ -40,8 +40,11 @@
  *     5. A written record carries provenance: level 'ai-generated', method 'fully-generated', the
  *        pipeline `ext.<name>.<action>` naming the extension, stamped by the NODE (it ran the
  *        script) rather than declared by the caller, so no provenance:write is asked of a token
- *        that only holds memory:write. The bytes were produced by a script, not typed by the
- *        person whose name is on the record.
+ *        that only holds memory:write. EXCEPT a person's own call to an extension that can reach
+ *        no model (neither the `ai` nor the `network` capability): the script only arranged what
+ *        the person typed, so the record is the person's own write, as aimeat_workspace_write by
+ *        that person would be, and carries no AI record. An agent's, an ecosystem app's and every
+ *        model-reaching extension's writes keep the node's stamp.
  * @structure
  *   - workspaceDeclarationOf() — the manifest's declaration, read from the record
  *   - buildExtensionWorkspace() — the capability plus a recorder of the last refusal
@@ -52,6 +55,10 @@
  *   const ctx = buildExtensionCtx({ …, workspace: wsCap.workspace });
  *   … catch (err) { const r = workspaceRefusalFor(err, wsCap); if (r) res.status(r.status).json(error(…, r.code, r.message)); }
  * @version-history
+ *   v1.7.0 — 2026-10-18 — A person's own call to an extension that can reach no model writes the
+ *     person's text, without the node's AI stamp (guard 5). A client typed "Toimii!!" into an app
+ *     and the record said AI had produced it and nobody had read it
+ *     (wish-ihmisen-laajennuksen-kautta-kirjoittama-teksti-ei-ole-teko-l).
  *   v1.6.1 — 2026-10-13 — The capability hands the caller's scopes to the fenced-space rule on every
  *     operation: a session that covers organism:direct writes a record space that names extensions
  *     directly, also through an extension the space does not name (ruled by the developer on
@@ -97,7 +104,9 @@ import {
 import { buildRowCalls, type ExtensionWorkspaceRefusal } from './extension-workspace-rows.js';
 import { archiveRecordsBatchOp } from './archive.js';
 import { extensionMarker, fencedSpaceRefusal } from './fenced-space.js';
-import { emitChange } from './event-bus.js';
+import { emitChange, emitWorkspaceChange } from './event-bus.js';
+import { isNonHumanPrincipal } from './ai-provenance.js';
+import { capabilitiesOfRecord } from './extension-capability-declaration.js';
 
 // The declaration itself (WorkspaceDeclaration, WORKSPACE_DECLARATION_KEY, workspaceDeclarationOf)
 // is the leaf module extension-workspace-declaration.ts, so the manifest builder and the CRUD
@@ -131,6 +140,9 @@ export interface ExtensionWorkspaceDeps {
     /** Who invoked the action: the resolved principal, the bare owner name, the session's roles
      *  and scopes. The scopes decide the authority question for anything that is not an owner. */
     caller: { gaii: string; owner: string; roles: string[]; scopes: string[] };
+    /** The extension holds the `ai` or the `network` capability, so its script may have had a model
+     *  produce what it writes (guard 5). */
+    reachesModel: boolean;
 }
 
 export interface ExtensionWorkspaceCapability {
@@ -156,8 +168,9 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
     // are asked exactly as before.
     // The caller's scopes ride along for the same rule: a session that covers organism:direct
     // writes such a space directly, whichever extension its call arrives through. They are the
-    // token's own words (routes/extensions/actions.ts hands them over), and the provenance rule
-    // that also reads them is not asked here, because every write below carries the node's stamp.
+    // token's own words (routes/extensions/actions.ts hands them over). The provenance rule that also
+    // reads them meets no declaration from here: a write carries the node's stamp, or for a person's
+    // own call nothing at all (guard 5).
     const through = extensionMarker(deps.installer, extName);
     const opsCaller: WorkspaceOpsCaller = workspaceCallerOf({ principal: caller.gaii, ownerName: caller.owner, roles: caller.roles, scopes: caller.scopes, extension: through }, config);
     // The classification reader of the caller who invoked the action (TARGET-082).
@@ -192,13 +205,17 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
         }
     };
 
-    // Guard 5: what an extension-written record says about itself. A script produced the bytes;
-    // the person on the record did not type them. This is the NODE's stamp (it ran the script), not
-    // a declaration by the caller, which is why it needs no provenance:write on the caller's token:
-    // an agent holding only memory:write could otherwise never write through an extension at all.
-    // The pipeline names the extension and the action, and lands in the record's notes.
+    // Guard 5: what an extension-written record says about itself. This is the NODE's stamp (it ran
+    // the script), not a declaration by the caller, which is why it needs no provenance:write on the
+    // caller's token: an agent holding only memory:write could otherwise never write through an
+    // extension at all. The pipeline names the extension and the action, and lands in the record's
+    // notes. A person calling an extension that can reach no model gets no stamp: the script arranged
+    // the person's own words, and the write is theirs, read by the same rule a direct write is
+    // (provenanceForWrite, which records nothing for a person who declared nothing).
     const provenance = { level: 'ai-generated' as const, method: 'fully-generated' as const };
     const pipeline = `ext.${extName}.${actionId}`;
+    const stamped = deps.reachesModel || isNonHumanPrincipal(caller.gaii);
+    const nodeStamp = stamped ? provenance : undefined;
 
     const workspace: NonNullable<ExtensionCtx['workspace']> = {
         index: async (organismId, ws) => {
@@ -216,7 +233,7 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
             // gives it; the service spells that `null`.
             const ifVersion = opts?.ifVersion === undefined ? undefined : (opts.ifVersion === 0 ? null : opts.ifVersion);
             return settle(await writeWorkspaceDraftsOp(ops, opsCaller, {
-                organismId, ws, space, id, value, pipeline, nodeStamp: provenance,
+                organismId, ws, space, id, value, pipeline, nodeStamp,
                 ...(ifVersion !== undefined ? { ifVersion } : {}),
             }));
         },
@@ -227,7 +244,7 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
             }
             return settle(await writeWorkspaceDraftsOp(ops, opsCaller, {
                 organismId, ws, space, id: opts?.id, section: opts?.section,
-                value: { title: doc.title, markdown: doc.markdown }, pipeline, nodeStamp: provenance,
+                value: { title: doc.title, markdown: doc.markdown }, pipeline, nodeStamp,
             }));
         },
         publish: async (organismId, ws, namespace, id, opts) => {
@@ -235,14 +252,14 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
             return settle(await publishWorkspaceOp(ops, opsCaller, { organismId, ws, namespace, id, expectedVersion: opts?.expectedVersion ?? null }));
         },
         // The batch: ONE host call, one bulk write, the function POST .../workspace/records/publish
-        // runs. Every direct value gets the node's provenance stamp, as write() gives a draft.
+        // runs. Every direct value gets the node's provenance stamp when write() would give one.
         publishRecords: async (organismId, ws, namespace, records, opts) => {
             allow('write');
             if (!Array.isArray(records) || records.length === 0) refuse(400, 'INVALID_INPUT', 'publishRecords() needs a non-empty array of { id, value, visibility? }');
             return settle(await publishRecordsBatchOp(ops, opsCaller, {
                 organismId, ws, namespace, records,
                 expectedVersions: opts?.expectedVersions, createOnly: opts?.createOnly === true, dryRun: opts?.dryRun === true,
-                nodeStamp: { pipeline, level: provenance.level, method: provenance.method },
+                ...(nodeStamp ? { nodeStamp: { pipeline, level: nodeStamp.level, method: nodeStamp.method } } : {}),
             }));
         },
         // Deleting records (into the bin) asks memory:delete of a token, as POST .../workspace/records/delete does.
@@ -260,7 +277,7 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
             // the space does not name archives none of its records for an agent.
             const r = await archiveRecordsBatchOp(storage, { principal: caller.gaii, ownerName: caller.owner }, { organismId, ws, namespace, ids },
                 keys => fencedSpaceRefusal(ops, { principal: caller.gaii, roles: caller.roles, scopes: caller.scopes, extension: through }, organismId, ws, { keys }));
-            if (r.ok) emitChange('organisms');
+            if (r.ok) { emitChange('organisms'); emitWorkspaceChange(organismId, ws); }
             return settle(r);
         },
         ...buildRowCalls({ config, storage, extName, installer: deps.installer, declaration, reader, refuse }),
@@ -272,7 +289,7 @@ export function buildExtensionWorkspace(deps: ExtensionWorkspaceDeps): Extension
 export interface AttachExtensionWorkspaceArgs {
     config: AimeatConfig;
     storage: Storage;
-    ext: Pick<ExtensionRecord, 'name' | 'config' | 'installedBy'>;
+    ext: Pick<ExtensionRecord, 'name' | 'config' | 'installedBy' | 'actions' | 'limits'>;
     actionId: string;
     caller: { gaii: string; owner: string; roles: string[]; scopes: string[] };
 }
@@ -282,9 +299,12 @@ export interface AttachExtensionWorkspaceArgs {
 export function attachExtensionWorkspace(args: AttachExtensionWorkspaceArgs): Partial<ExtensionWorkspaceCapability> {
     const declaration = workspaceDeclarationOf(args.ext);
     if (!declaration) return {};
+    // The capabilities the sandbox enforces (ctx.ai and ctx.fetch refuse without them), read by the
+    // same function every road builds its ctx from.
+    const caps = capabilitiesOfRecord(args.ext);
     return buildExtensionWorkspace({
         config: args.config, storage: args.storage, extName: args.ext.name, actionId: args.actionId,
-        declaration, installer: args.ext.installedBy, caller: args.caller,
+        declaration, installer: args.ext.installedBy, caller: args.caller, reachesModel: caps.ai || caps.network,
     });
 }
 

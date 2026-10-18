@@ -2701,10 +2701,10 @@
      "slug": "g-13-live-updates",
      "cells": [
       "<strong>Live updates</strong>",
-      "Open pages hear about a change as it happens, one shared connection across tabs, at most one signal per second.",
+      "Open pages hear about a change as it happens, one shared connection across tabs, at most one signal per second. A page that shows one organism workspace hears that workspace by name (<code>workspace:&lt;organism&gt;/&lt;workspace&gt;</code>) when something in it changes, and nothing else; only the organism's members hear it.",
       "<code>/v1/events</code>, <code>aimeat-live</code>"
      ],
-     "plain": "Live updates Open pages hear about a change as it happens, one shared connection across tabs, at most one signal per second. /v1/events, aimeat-live"
+     "plain": "Live updates Open pages hear about a change as it happens, one shared connection across tabs, at most one signal per second. A page that shows one organism workspace hears that workspace by name (workspace:<organism>/<workspace>) when something in it changes, and nothing else; only the organism's members hear it. /v1/events, aimeat-live"
     },
     {
      "slug": "g-13-public-activity",

@@ -11,6 +11,8 @@
  *     3. An app-grant stream does NOT mark the owner present. Only a real owner session may.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sse.ts
  * @version-history
+ *   v1.3.0 — 2026-10-18 — Phase 7: a change in one workspace is that workspace's own domain, told to
+ *     the organism's members and to nobody else.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-11 — Phase 6: one owner's private record and file are not another owner's
  *     event, a public record still is, and so is the write that takes it private. The last test
@@ -379,6 +381,53 @@ async function main() {
             assert(again.status === 200, `private update: ${again.status}`);
             await settle();
             assert(count(other!, 'memory') === after, `B heard a write to a record that is private now: ${JSON.stringify(domainsSeen(other!.text()))}`);
+        });
+
+        console.log('\nPhase 7: A workspace\'s own domain, told to the organism\'s members only');
+        // Until 2026-10-18 a page showing one workspace had only `memory` and `organisms` to listen
+        // to, and a memory write anywhere on the node is a `memory` frame for every open stream: the
+        // Kehitysputki app re-read its workspace and redrew about once a second on aimeat.io. A change
+        // in one workspace is now `workspace:<organismId>/<ws>`, sent to the organism's members alone
+        // (wish-reaaliaikainen-tapahtuma-kertoo-mink-ty-tilan-tieto-muuttui).
+        const WS = 'ssews';
+        let wsOrg = '';
+        const wsDomain = () => `workspace:${wsOrg}/${WS}`;
+        const writeInWs = async (id: string) => {
+            const w = await json('/v1/memory', { method: 'POST', headers: authA, body: JSON.stringify({ key: `organism.${wsOrg}.w.${WS}.shared.note.${id}.draft`, value: { id, title: id }, visibility: 'private' }) });
+            assert(w.status === 200 || w.status === 201, `workspace write ${id}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        };
+        await test('a write in a workspace reaches a member\'s stream as that workspace\'s domain', async () => {
+            assert(!!mine, 'A stream open');
+            const org = await json('/v1/organisms', { method: 'POST', headers: authA, body: JSON.stringify({ name: 'SSE Workspace Org', description: 'd', type: 'project', join_policy: 'open', visibility: 'public' }) });
+            assert(org.status === 201, `organism: ${org.status} ${JSON.stringify(org.body?.error)}`);
+            wsOrg = org.body.data.organism.id;
+            const reg = await json('/v1/memory', { method: 'POST', headers: authA, body: JSON.stringify({ key: `organism.${wsOrg}.meta.workspaces`, value: { workspaces: [{ id: WS, name: 'Notes', createdAt: new Date().toISOString(), createdBy: user }] }, visibility: 'private' }) });
+            assert(reg.status === 200 || reg.status === 201, `registry: ${reg.status}`);
+            const man = { manifestVersion: '1.0', id: wsOrg, name: 'Notes', kind: 'project', status: 'active',
+                objectTypes: [{ name: 'note', schemaRef: 'schema:note@1', namespace: 'shared.note', backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records', versioned: true }] };
+            const mr = await json('/v1/memory', { method: 'POST', headers: authA, body: JSON.stringify({ key: `organism.${wsOrg}.w.${WS}.meta.manifest`, value: man, visibility: 'private' }) });
+            assert(mr.status === 200 || mr.status === 201, `manifest: ${mr.status} ${JSON.stringify(mr.body?.error)}`);
+            await settle();
+            await writeInWs('n1');
+            // HOLE: before this change no frame named the workspace; a page could only hear `memory`.
+            await mine!.waitFor(t => domainsSeen(t).includes(wsDomain()), 6_000, 'the workspace domain on A\'s stream');
+        });
+
+        await test('a stream of someone outside the organism never hears that workspace', async () => {
+            assert(!!other, 'B stream open');
+            await settle();
+            assert(!domainsSeen(other!.text()).some(d => d.startsWith('workspace:')),
+                `B is no member and heard: ${JSON.stringify(domainsSeen(other!.text()).filter(d => d.startsWith('workspace:')))}`);
+        });
+
+        await test('once B joins, B\'s new stream hears the workspace too', async () => {
+            const j = await json(`/v1/organisms/${wsOrg}/join`, { method: 'POST', headers: { Authorization: `Bearer ${B.token}` }, body: '{}' });
+            assert(j.status === 201 || j.status === 200, `B joins: ${j.status} ${JSON.stringify(j.body?.error)}`);
+            const joined = await openStream(B.token);
+            await joined.waitFor(t => t.includes(':open'), 3_000, 'the :open comment on B\'s new stream');
+            await writeInWs('n2');
+            await joined.waitFor(t => domainsSeen(t).includes(wsDomain()), 6_000, 'the workspace domain on B\'s stream after joining');
+            joined.close();
         });
 
         other?.close();

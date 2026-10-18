@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.5.0 — 2026-10-18 — A workspace's own domain (`workspace:<organismId>/<ws>`) passes for a
+ *     principal holding organism:read, as the `organisms` domain does.
  *   v1.0.0 — 2026-07-25 — Initial: scope-gated SSE domains (an app-grant stream no longer
  *     sees every domain in the owner's keyspace).
  *   v1.4.0 — 2026-09-19 — `ai-decisions` → ai:use: what the decision model decided (TARGET-080).
@@ -42,6 +44,7 @@
  * instances, extensions, cortex, skills, portfolio, ecosystem-apps, presence, realtime).
  */
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { WORKSPACE_DOMAIN_PREFIX } from '../services/event-bus.js';
 
 export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // Owner data the app already reads
@@ -146,8 +149,13 @@ export function allowedDomains(scopes: string[] | undefined): Set<string> | null
   return out;
 }
 
-/** Keep only the domains this principal may see. `allow === null` passes everything through. */
+/**
+ * Keep only the domains this principal may see. `allow === null` passes everything through. A
+ * workspace's own domain (`workspace:<organismId>/<ws>`) is one organism workspace, so it is read
+ * with the word the `organisms` domain asks; who among those principals hears it at all is the
+ * stream's members-only rule (routes/sse.ts).
+ */
 export function filterDomains(domains: string[], allow: Set<string> | null): string[] {
   if (!allow) return domains;
-  return domains.filter(d => allow.has(d));
+  return domains.filter(d => allow.has(d) || (d.startsWith(WORKSPACE_DOMAIN_PREFIX) && allow.has('organisms')));
 }

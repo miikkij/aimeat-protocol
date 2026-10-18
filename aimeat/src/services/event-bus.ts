@@ -30,6 +30,10 @@
  *     space, which the workflow engine's `workspace.rows` triggers start from.
  *   v1.7.0 — 2026-10-18 — The `appChange` channel: one app's new version or draft change, which the
  *     SSE transport forwards to the streams opened for that app (the app page's update news).
+ *   v1.8.0 — 2026-10-18 — emitWorkspaceChange: a change in one workspace is the live domain
+ *     `workspace:<organismId>/<ws>`, told only to the organism's members (ChangeEvent.organismId).
+ *     A written key inside a workspace and an appended row emit it from here; the workspace
+ *     operations that write no key (a draft, a delete, an archive) call it themselves.
  */
 import { EventEmitter } from 'node:events';
 
@@ -46,10 +50,45 @@ export interface ChangeEvent {
    * (organisms, boards, public activity, …) visible to other owners. See sse.ts owner filter.
    */
   ownerGaii?: string;
+  /**
+   * The organism whose MEMBERS this change concerns. When set, the SSE transport forwards the event
+   * only to streams whose account is an active member of that organism (services/audience.ts
+   * isOrganismMember). Set by emitWorkspaceChange: the domain names one workspace, and that name and
+   * its timing are the members' business only.
+   */
+  organismId?: string;
 }
 
 export function emitChange(domain: string, ownerGaii?: string): void {
   bus.emit('change', { domain, timestamp: Date.now(), ...(ownerGaii ? { ownerGaii } : {}) } satisfies ChangeEvent);
+}
+
+/** Every workspace domain starts with this; the rest is `<organismId>/<workspaceId>`. */
+export const WORKSPACE_DOMAIN_PREFIX = 'workspace:';
+
+/** The live domain of one organism workspace: what a page subscribes to with AIMEAT.live. */
+export function workspaceDomain(organismId: string, ws: string): string {
+  return `${WORKSPACE_DOMAIN_PREFIX}${organismId}/${ws}`;
+}
+
+const WORKSPACE_KEY = /^organism\.([^.]+)\.w\.([^.]+)\./;
+
+/** The organism and workspace a memory key lies in, or null for a key outside every workspace. */
+export function workspaceOfKey(key: string): { organismId: string; ws: string } | null {
+  const m = WORKSPACE_KEY.exec(key);
+  return m ? { organismId: m[1]!, ws: m[2]! } : null;
+}
+
+/**
+ * Something in one workspace changed: a record, a draft, a document, a row, a deletion. The domain
+ * names the workspace, so a page that shows it re-reads only when its own workspace changed. The
+ * `memory` and `organisms` events stay as they are; until 2026-10-18 they were all a page had, and a
+ * memory write anywhere on the node woke every open workspace page, about once a second on a busy node
+ * (wish-reaaliaikainen-tapahtuma-kertoo-mink-ty-tilan-tieto-muuttui).
+ */
+export function emitWorkspaceChange(organismId: string, ws: string): void {
+  if (!organismId || !ws) return;
+  bus.emit('change', { domain: workspaceDomain(organismId, ws), timestamp: Date.now(), organismId } satisfies ChangeEvent);
 }
 
 /** The visibilities under which only the owner and the owner's own agents and apps read a record. */
@@ -210,6 +249,10 @@ export interface MemoryWriteEvent {
 
 export function emitMemoryWritten(ownerGaii: string, key: string, op?: 'created' | 'updated'): void {
   bus.emit('memoryWritten', { ownerGaii, key, ...(op ? { op } : {}), timestamp: Date.now() } satisfies MemoryWriteEvent);
+  // Every central write path names its key here, so a key inside a workspace tells that workspace's
+  // open pages from this one place.
+  const inWs = workspaceOfKey(key);
+  if (inWs) emitWorkspaceChange(inWs.organismId, inWs.ws);
 }
 
 export function onMemoryWrittenEvent(handler: (evt: MemoryWriteEvent) => void): void {
@@ -244,6 +287,7 @@ export interface RowsAppendedEvent {
 
 export function emitRowsAppended(evt: Omit<RowsAppendedEvent, 'timestamp'>): void {
   bus.emit('rowsAppended', { ...evt, timestamp: Date.now() } satisfies RowsAppendedEvent);
+  emitWorkspaceChange(evt.organismId, evt.wsId);
 }
 
 export function onRowsAppendedEvent(handler: (evt: RowsAppendedEvent) => void): void {

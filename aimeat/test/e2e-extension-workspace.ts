@@ -21,6 +21,8 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   v1.7.0 — 2026-10-18 — An agent's write through the extension is marked AI output and a person's
+ *     own write is not (wish-ihmisen-laajennuksen-kautta-kirjoittama-teksti-ei-ole-teko-l).
  *   v1.6.0 — 2026-10-12 — B's two agents also hold ext:invoke, the word node 4.0.0 asks on POST
  *     /v1/ext/:name/:action (REST scope gates), so the happy path runs there and the memory:write
  *     refusal is still the SCOPE_DENIED that names memory:write.
@@ -260,6 +262,29 @@ await test('Attribution: the activity feed credits B\'s agent, not the extension
     const ev = (act.body.data.events as any[]).find(e => e.instance === 'c1' && e.action === 'publish');
     assert(!!ev, `no publish event for c1 in ${JSON.stringify(act.body.data.events)}`);
     assert(ev.actor === B.name && ev.agent === B_AGENT, `actor/agent: ${JSON.stringify(ev)}`);
+});
+
+// WHO WROTE IT. A script that can reach no model only arranges what its caller sent, so a person's
+// own call writes the person's text and an agent's call writes the agent's. Until 2026-10-18 every
+// record said AI had produced it, including a client's own "Toimii!!" typed into an app
+// (wish-ihmisen-laajennuksen-kautta-kirjoittama-teksti-ei-ole-teko-l).
+await test('Provenance: an agent\'s write through the extension is marked AI output, a person\'s own write is not', async () => {
+    const provenanceOf = async (key: string) => {
+        const rec = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(B.token) });
+        assert(rec.status === 200, `read ${key} ${rec.status}`);
+        return rec.body.data.ai_provenance_id as string | undefined;
+    };
+    const agentPid = await provenanceOf(`${root()}.shared.claim.c1.latest`);
+    assert(typeof agentPid === 'string' && agentPid.length > 0, `the agent's record carries a provenance record: ${agentPid}`);
+    const prov = await json(`/v1/provenance/${agentPid}`, { headers: { ...auth(B.token), Accept: 'application/json' } });
+    const p = prov.body.data.provenance ?? prov.body.data;
+    assert(p.level === 'ai-generated' && p.generator?.pipeline === `ext.${EXT}.claim`, `agent: ${p.level} ${JSON.stringify(p.generator)}`);
+
+    const r = await invoke(EXT, 'claim', B.token, { id: 'c-person', port: '40256', publish: true });
+    assert(r.status === 200, `person claim ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    // HOLE: the person's record carried the node's ai-generated stamp before this change.
+    const personPid = await provenanceOf(`${root()}.shared.claim.c-person.latest`);
+    assert(personPid === undefined || personPid === null, `a person's own write carries no AI record: ${personPid}`);
 });
 
 await test('The owner in person (A, the creator) needs no scope', async () => {

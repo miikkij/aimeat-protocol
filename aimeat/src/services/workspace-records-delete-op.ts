@@ -10,11 +10,13 @@
  * @usage
  *   const r = await deleteRecordsBatchOp(deps, caller, { organismId, ws, namespace, ids });
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A delete tells the workspace's live domain (services/event-bus.ts
+ *     emitWorkspaceChange), so an open page of that workspace re-reads.
  *   v1.0.0 — 2026-10-16 — Moved from services/workspace-tool-ops.ts (max-file-lines), no behaviour change.
  */
 import { checkDeleteGuard } from './write-guards.js';
 import { isSameOwner } from '../utils/gaii.js';
-import { emitChange } from './event-bus.js';
+import { emitChange, emitWorkspaceChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -112,6 +114,7 @@ export async function deleteRecordsBatchOp(
     }
     if (removed > 0) {
         emitChange('organisms');
+        if (ws) emitWorkspaceChange(organismId, ws);
         void updateOrganismStructure(storage, config, organismId, { event: `deleted ${deleted.length} record(s) in ${namespace}`, actor: callerId })
             .catch(err => { logger.warn('deleteRecordsBatchOp: timeline best-effort', { error: String(err) }); });
     }
