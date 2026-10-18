@@ -33230,7 +33230,11 @@ paths:
         signed-in content access. Checks that the caller may open it (and its access code when it has
         one, sent as `code`), then answers the address to open: the app's own origin, or the apex
         inline address on a node without app origins, carrying `access`, a grant valid for an hour
-        that names this app only. The owner and an operator always pass. The SPA page /v1/app-open
+        that names this app only and names the caller as its `viewer` claim. The app origin accepts
+        the grant in the query once: it answers `302` with `Cache-Control: no-store` to the same
+        address without `access` and sets the grant as the host-only cookie `aimeat_app_access`
+        (HttpOnly, SameSite=Lax, Secure on an https node, Max-Age the grant's remaining lifetime), so
+        an address a person copies carries no grant. The owner and an operator always pass. The SPA page /v1/app-open
         calls this with the session a page load cannot carry. Refusals: 401 without an account, 403
         ACCESS_DENIED for an account the app does not open for, 403 ACCESS_CODE_REQUIRED when the
         code is missing or wrong, 404 for an unknown or hidden app, 409 PACED_APP for an app taken
@@ -33288,7 +33292,10 @@ paths:
         with `Cache-Control: no-store` to the app origin, carrying `access=<grant>`: a signed,
         one-app, one-hour token saying the apex authorized this delivery. The app origin holds no
         session, so that grant is the whole check it makes; a gated app requested there without one
-        answers the same `404` an unmapped subdomain does. Ungated apps keep the plain `301`.
+        answers the same `404` an unmapped subdomain does. Ungated apps keep the plain `301`. The app
+        origin takes the grant out of the address on arrival: `302` to the same address without
+        `access` (other parameters such as `unlock=1` kept), with the grant set as the host-only
+        HttpOnly SameSite=Lax cookie `aimeat_app_access`, which grants the requests after it.
 
         **Older versions (`?version=N`):** the gates are the app's current settings, read from the
         latest version: its access code, its operator hide, its pacing amount and its copy
@@ -68771,7 +68778,10 @@ paths:
         and answers the address to open: the portfolio origin carrying `access`, a grant valid for an
         hour that names this page only (an app grant opens no page, and this grant opens no app and no
         other page), or the apex page /v1/portfolio/{username} with `expires_in` null on a node without
-        the portfolio origin, which reads the page with the person's session. The owner always passes.
+        the portfolio origin, which reads the page with the person's session. The grant names the
+        caller as its `viewer` claim. The portfolio origin accepts the grant in the query once: `302`
+        to the same address without `access`, with the grant set as the host-only HttpOnly
+        SameSite=Lax cookie `aimeat_page_access`, which grants the requests after it. The owner always passes.
         The SPA page /v1/app-open calls this with the session a page load cannot carry. Refusals: 401
         without an account, 403 ACCESS_DENIED for an account the page does not open for, 404 when the
         person has no page switched on.
@@ -74484,7 +74494,10 @@ paths:
         to signed-in content access. For any signed-in person, not only the company's owner: checks
         that the caller may open the page and answers the company's address carrying `access`, a grant
         valid for an hour that names this front page only (an app grant opens no page, and this grant
-        opens no app and no other page). The owner always passes. The SPA page /v1/app-open calls this
+        opens no app and no other page) and names the caller as its `viewer` claim. The company origin
+        accepts the grant in the query once: `302` to the same address without `access`, with the grant
+        set as the host-only HttpOnly SameSite=Lax cookie `aimeat_page_access`, which grants the
+        requests after it. The owner always passes. The SPA page /v1/app-open calls this
         with the session a page load cannot carry. Refusals: 401 without an account, 403 ACCESS_DENIED
         for an account the page does not open for, 404 for an unknown or inactive company, one whose
         address serves nothing, or a node without company addresses.

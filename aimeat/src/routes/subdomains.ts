@@ -14,6 +14,11 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.32.0 — 2026-10-18 — SECURITY: a restricted app's grant leaves the address. The app origin
+ *     accepts `?access=` once, sets it as the host-only `aimeat_app_access` cookie and answers 302 to
+ *     the address without it; later requests are granted by the cookie (routes/origin-grant-cookie.ts).
+ *     The path form forwards the query grant to the per-app origin as before, and on the shared host
+ *     scopes the cookie to the app's path (plan doc-mvcn6c7e4e5q, V2).
  *   v1.31.0 — 2026-10-18 — The portfolio and company origins ask who may open the page (its `access`,
  *     services/page-access.ts): a page that needs a sign-in is served only with a page grant, and a
  *     browser without one goes to /v1/app-open (routes/page-open.ts pageOriginRefused; plan
@@ -171,6 +176,7 @@ import { registerAppOriginDocs, appOriginFor } from './subdomain-origin-docs.js'
 import { detectLocale, type Locale } from '../i18n.js';
 import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain-app-gate.js';
 import { pageOriginRefused } from './page-open.js';
+import { originGrant, APP_ACCESS_COOKIE } from './origin-grant-cookie.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -679,9 +685,12 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // code or the licence (services/app-access-token.ts). This origin holds no session, so the
     // grant is the whole authorization. Without one the answer stays the uniform 404 an unmapped
     // subdomain gets, so the origin still tells a stranger nothing about which apps exist.
-    if (appIsRestricted(config, app) && !(await appAccessGranted(req.query.access, app.ownerName, app.filename))) {
-      if (unlockRedirect(req, res, config, app)) return;
-      return notFound();
+    // The query grant is accepted once and moved to a host-only cookie, with a 302 to the address
+    // without it, so the address a person copies carries no grant (routes/origin-grant-cookie.ts).
+    if (appIsRestricted(config, app)) {
+      const grant = await originGrant(req, res, config, { cookie: APP_ACCESS_COOKIE, path: '/', verify: t => appAccessGranted(t, app.ownerName, app.filename) });
+      if (grant === 'answered') return;
+      if (grant === 'refused') return unlockRedirect(req, res, config, app) ? undefined : notFound();
     }
 
     // Agent Face: an agent preferring text/markdown (Accept negotiation, or ?format=md) gets the
@@ -726,11 +735,13 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const bareOwner = localAccountName(owner);
     const app = await resolveServableApp(storage, `${bareOwner}/${filename}`);
     if (!app) return next();
-    if (appIsRestricted(config, app) && !(await appAccessGranted(req.query.access, app.ownerName, app.filename))) {
-      if (unlockRedirect(req, res, config, app)) return;
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown app'));
-      return;
-    }
+    const restricted = appIsRestricted(config, app);
+    // On the shared host a grant cookie is scoped to this app's path, the only part of the address
+    // that tells one app from another here.
+    const grantSpec = { cookie: APP_ACCESS_COOKIE, path: req.path, verify: (t: unknown) => appAccessGranted(t, app.ownerName, app.filename) };
+    const refuse = () => { if (!unlockRedirect(req, res, config, app)) res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown app')); };
+    // The query grant is not moved here: the per-app origin below receives it and moves it there.
+    if (restricted && await originGrant(req, res, config, grantSpec, { moveToCookie: false }) === 'refused') { refuse(); return; }
     const sub = await ensureAppSubdomain(storage, config, bareOwner, filename);
     if (sub) {
       let scheme = 'https', portSuffix = '';
@@ -743,7 +754,13 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/${q >= 0 ? req.originalUrl.slice(q) : ''}`);
       return;
     }
-    const discoverShared = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
+    // No per-app origin: the app is served on this shared host, so the grant moves to the cookie here.
+    if (restricted) {
+      const grant = await originGrant(req, res, config, grantSpec);
+      if (grant === 'refused') refuse();
+      if (grant !== 'granted') return;
+    }
+    const discoverShared ={ baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
     await serveApp(res, storage, app, csp, apexOrigin,
       { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) }, discoverShared,
       await loadServedProvenance(storage, config, app.aiProvenanceId), // no subdomain available → serve on the shared host (no SSO)

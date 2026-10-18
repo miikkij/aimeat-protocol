@@ -15,6 +15,9 @@
  *   Self-spawns its own node with the app origin provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-access
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The grant leaves the address: the origin answers the first request with
+ *     ?access= by a 302 without it and a host-only HttpOnly SameSite=Lax cookie; the cookie serves this
+ *     app and no other; a tampered cookie serves nothing and is cleared; the grant names its viewer.
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V2.7).
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -68,9 +71,23 @@ async function startServer(): Promise<ChildProcess> {
     return waitForServer(child, BASE, { label: 'the app-access node' });
 }
 
-/** The app page on its own origin, the way a browser opens it. */
-function onOrigin(sub: string, pathAndQuery: string, accept = 'text/html') {
-    return hostRequest(BASE, pathAndQuery, `${sub}.${APP_HOST}:${PORT}`, { headers: { 'x-app-origin': '1', 'x-subdomain': sub, Accept: accept } });
+/** The app page on its own origin, the way a browser opens it. `cookie` is sent as the Cookie header. */
+function onOrigin(sub: string, pathAndQuery: string, accept = 'text/html', cookie?: string) {
+    return hostRequest(BASE, pathAndQuery, `${sub}.${APP_HOST}:${PORT}`, { headers: { 'x-app-origin': '1', 'x-subdomain': sub, Accept: accept, ...(cookie ? { Cookie: cookie } : {}) } });
+}
+/** The Set-Cookie lines of a response, as they came off the wire. */
+function setCookies(res: { rawHeaders: string[] }): string[] {
+    const out: string[] = [];
+    for (let i = 0; i < res.rawHeaders.length; i += 2) if (res.rawHeaders[i].toLowerCase() === 'set-cookie') out.push(res.rawHeaders[i + 1]);
+    return out;
+}
+/** A grant's claims, read without verifying (the node verifies; the test reads what it carries). */
+const claimsOf = (grant: string) => JSON.parse(Buffer.from(grant.split('.')[1], 'base64url').toString('utf8'));
+/** The grant moved through the origin: the first request with ?access= and what it answered. */
+async function hop(sub: string, pathAndQuery: string) {
+    const res = await onOrigin(sub, pathAndQuery);
+    const line = setCookies(res).find(c => c.startsWith('aimeat_app_access=')) ?? '';
+    return { res, line, cookie: line.split(';')[0] };
 }
 
 async function main() {
@@ -120,7 +137,9 @@ async function main() {
             const open = await json(`/v1/apps/${owner}/${file}/open`, { method: 'POST', headers: auth(outsiderTok), body: '{}' });
             assert(open.status === 200, `open ${open.status} ${JSON.stringify(open.body)}`);
             const u = new URL(open.body.data.url);
-            const page = await onOrigin(sub, `${u.pathname}${u.search}`);
+            const h = await hop(sub, `${u.pathname}${u.search}`);
+            assert(h.res.status === 302 && h.cookie !== '', `the grant hop: ${h.res.status} ${h.res.header('location')}`);
+            const page = await onOrigin(sub, h.res.header('location')!, 'text/html', h.cookie);
             assert(page.status === 200 && page.body.includes(BODY), `granted: ${page.status}`);
             const anonOpen = await json(`/v1/apps/${owner}/${file}/open`, { method: 'POST', body: '{}' });
             assert(anonOpen.status === 401, `a stranger asked for the address: ${anonOpen.status}`);
@@ -148,6 +167,39 @@ async function main() {
             const grant = new URL(m.body.data.url).searchParams.get('access')!;
             const wrong = await onOrigin('other-tool', `/?access=${encodeURIComponent(grant)}`, 'application/json');
             assert(wrong.status === 404 && !wrong.body.includes('OTHER'), `a grant opened another app: ${wrong.status}`);
+        });
+
+        await test('the grant leaves the address: 302 without it, a host-only HttpOnly Lax cookie, and the cookie serves this app only', async () => {
+            const m = await json(`/v1/apps/${owner}/${file}/open`, { method: 'POST', headers: auth(memberTok), body: '{}' });
+            assert(m.status === 200, `member open ${m.status}`);
+            const u = new URL(m.body.data.url);
+            const grant = u.searchParams.get('access')!;
+            const claims = claimsOf(grant);
+            assert(claims.viewer === `${member}@${NODE_ID}` && claims.sub === `${owner}@${NODE_ID}`, `the grant names the person it was handed to: ${JSON.stringify(claims)}`);
+
+            const h = await hop(sub, `/?keep=1&access=${encodeURIComponent(grant)}`);
+            assert(h.res.status === 302, `the first request with the grant: ${h.res.status}`);
+            const loc = h.res.header('location') ?? '';
+            assert(loc === '/?keep=1', `the address without the grant, the rest kept: ${loc}`);
+            assert((h.res.header('cache-control') ?? '').includes('no-store'), 'the hop must not be cached');
+            assert(!h.res.body.includes(BODY), 'the hop carries none of the app');
+            const attrs = h.line.split(';').map(s => s.trim().toLowerCase());
+            assert(h.cookie === `aimeat_app_access=${grant}`, `the cookie carries the grant: ${h.line.slice(0, 60)}`);
+            assert(attrs.includes('httponly') && attrs.includes('samesite=lax') && attrs.includes('path=/'), `cookie attributes: ${h.line}`);
+            assert(!attrs.some(a => a.startsWith('domain=')), `the cookie is host-only: ${h.line}`);
+            const maxAge = Number(attrs.find(a => a.startsWith('max-age='))?.slice(8));
+            assert(maxAge > 3500 && maxAge <= 3600, `Max-Age is the grant's remaining hour: ${maxAge}`);
+
+            const served = await onOrigin(sub, loc, 'text/html', h.cookie);
+            assert(served.status === 200 && served.body.includes(BODY), `the cookie alone serves: ${served.status}`);
+            const elsewhere = await onOrigin('other-tool', '/', 'application/json', h.cookie);
+            assert(elsewhere.status === 404 && !elsewhere.body.includes('OTHER'), `the cookie opened another app's origin: ${elsewhere.status}`);
+            const tampered = `aimeat_app_access=${grant.slice(0, -4)}${grant.endsWith('AAAA') ? 'BBBB' : 'AAAA'}`;
+            const t = await onOrigin(sub, '/', 'application/json', tampered);
+            assert(t.status === 404 && !t.body.includes(BODY), `a tampered cookie served: ${t.status}`);
+            const tb = await onOrigin(sub, '/', 'text/html', tampered);
+            assert(tb.status === 302 && (tb.header('location') ?? '').includes('/v1/app-open?app='), `a tampered cookie sends the browser to sign in: ${tb.status}`);
+            assert(setCookies(tb).some(c => c.startsWith('aimeat_app_access=;')), 'the tampered cookie is cleared');
         });
 
         await test('FAILURE: an owner naming an organism they are not in is refused, and nothing in the same PATCH is written', async () => {

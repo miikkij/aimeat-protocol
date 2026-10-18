@@ -21,6 +21,9 @@
  *   gate set to `agents`.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-page-access
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The grant leaves the address: the first request with ?access= answers 302
+ *     without it and a host-only HttpOnly SameSite=Lax cookie; the cookie serves this page and no
+ *     other; a tampered cookie serves nothing and is cleared; the grant names its viewer.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V3.10).
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -79,14 +82,35 @@ async function startServer(): Promise<ChildProcess> {
     return waitForServer(child, BASE, { label: 'the page-access node' });
 }
 
-/** GET a page origin the way nginx forwards it: a Host in the family and the family's marker. */
-function onOrigin(family: 'portfolio' | 'co' | 'app', sub: string, pathAndQuery: string, accept = 'text/html') {
+/** GET a page origin the way nginx forwards it: a Host in the family and the family's marker. `cookie` is the Cookie header. */
+function onOrigin(family: 'portfolio' | 'co' | 'app', sub: string, pathAndQuery: string, accept = 'text/html', cookie?: string) {
     const host = family === 'portfolio' ? PORTFOLIO_HOST : family === 'co' ? CO_HOST : APP_HOST;
     const marker = family === 'portfolio' ? 'x-portfolio-origin' : family === 'co' ? 'x-co-origin' : 'x-app-origin';
-    return hostRequest(BASE, pathAndQuery, `${sub}.${host}:${PORT}`, { headers: { [marker]: '1', 'x-subdomain': sub, Accept: accept } });
+    return hostRequest(BASE, pathAndQuery, `${sub}.${host}:${PORT}`, { headers: { [marker]: '1', 'x-subdomain': sub, Accept: accept, ...(cookie ? { Cookie: cookie } : {}) } });
 }
 /** The path and query of an address the open route answered, for onOrigin. */
 const pathOf = (url: string) => { const u = new URL(url); return `${u.pathname}${u.search}`; };
+/** The Set-Cookie lines of a response, as they came off the wire. */
+function setCookies(res: { rawHeaders: string[] }): string[] {
+    const out: string[] = [];
+    for (let i = 0; i < res.rawHeaders.length; i += 2) if (res.rawHeaders[i].toLowerCase() === 'set-cookie') out.push(res.rawHeaders[i + 1]);
+    return out;
+}
+/** A grant's claims, read without verifying (the node verifies; the test reads what it carries). */
+const claimsOf = (grant: string) => JSON.parse(Buffer.from(grant.split('.')[1], 'base64url').toString('utf8'));
+/**
+ * Open a page origin the way a browser does with the address the open route answered: the first
+ * request carries ?access= and must answer 302 without it and the grant cookie; the second request,
+ * with the cookie only, is what serves. Returns the served response and the cookie.
+ */
+async function openWithGrant(family: 'portfolio' | 'co', sub: string, url: string) {
+    const first = await onOrigin(family, sub, pathOf(url));
+    const line = setCookies(first).find(c => c.startsWith('aimeat_page_access=')) ?? '';
+    const loc = first.header('location') ?? '';
+    if (first.status !== 302 || line === '' || loc.includes('access=')) throw new Error(`the grant hop: ${first.status} ${loc} ${line.slice(0, 40)}`);
+    const cookie = line.split(';')[0];
+    return { served: await onOrigin(family, sub, loc, 'text/html', cookie), cookie, line, loc, first };
+}
 
 async function main() {
     const server = await startServer();
@@ -150,7 +174,7 @@ async function main() {
             assert(anonOpen.status === 401, `a stranger asked for the address: ${anonOpen.status}`);
             const o = await open(`/v1/portfolio/${owner}/open`, outsiderTok);
             assert(o.status === 200 && o.body.data.expires_in === 3600 && o.body.data.url.includes(`${owner}.${PORTFOLIO_HOST}`), `open ${o.status} ${JSON.stringify(o.body)}`);
-            const granted = await onOrigin('portfolio', owner, pathOf(o.body.data.url));
+            const { served: granted } = await openWithGrant('portfolio', owner, o.body.data.url);
             assert(granted.status === 200 && granted.body.includes(OWNER_PAGE), `granted ${granted.status}`);
 
             const cs = await put(`/v1/companies/${companyId}/front-page`, ownerTok, { access: 'signed-in' });
@@ -161,7 +185,7 @@ async function main() {
             assert(capi.status === 404 && !capi.body.includes(CO_PAGE), `company api ${capi.status}`);
             const co = await open(`/v1/companies/${companyId}/open`, outsiderTok);
             assert(co.status === 200 && co.body.data.url.includes(`${slug}.${CO_HOST}`), `company open ${co.status} ${JSON.stringify(co.body)}`);
-            const cg = await onOrigin('co', slug, pathOf(co.body.data.url));
+            const { served: cg } = await openWithGrant('co', slug, co.body.data.url);
             assert(cg.status === 200 && cg.body.includes(CO_PAGE), `company granted ${cg.status}`);
         });
 
@@ -180,7 +204,7 @@ async function main() {
             const m = await open(`/v1/portfolio/${owner}/open`, memberTok);
             assert(m.status === 200, `member portfolio ${m.status}`);
             memberPortfolioGrant = new URL(m.body.data.url).searchParams.get('access')!;
-            const mp = await onOrigin('portfolio', owner, pathOf(m.body.data.url));
+            const { served: mp } = await openWithGrant('portfolio', owner, m.body.data.url);
             assert(mp.status === 200 && mp.body.includes(OWNER_PAGE), `member granted ${mp.status}`);
             const mc = await open(`/v1/companies/${companyId}/open`, memberTok);
             assert(mc.status === 200, `member company ${mc.status}`);
@@ -226,6 +250,32 @@ async function main() {
             const appGrant = new URL(appOpen.body.data.url).searchParams.get('access')!;
             const appOnPage = await onOrigin('portfolio', owner, `/?access=${encodeURIComponent(appGrant)}`, 'application/json');
             assert(appOnPage.status === 404 && !appOnPage.body.includes(OWNER_PAGE), `an app grant opened a page: ${appOnPage.status}`);
+        });
+
+        await test('the grant leaves the address: 302 without it, a host-only HttpOnly Lax cookie that opens this page only', async () => {
+            const claims = claimsOf(memberPortfolioGrant);
+            assert(claims.viewer === `${member}@${NODE_ID}` && claims.typ === 'page-access', `the grant names the person it was handed to: ${JSON.stringify(claims)}`);
+            const g = await openWithGrant('portfolio', owner, `http://x/?access=${encodeURIComponent(memberPortfolioGrant)}`);
+            assert(g.loc === '/', `the address without the grant: ${g.loc}`);
+            assert((g.first.header('cache-control') ?? '').includes('no-store'), 'the hop must not be cached');
+            assert(!g.first.body.includes(OWNER_PAGE), 'the hop carries none of the page');
+            assert(g.cookie === `aimeat_page_access=${memberPortfolioGrant}`, `the cookie carries the grant: ${g.line.slice(0, 60)}`);
+            const attrs = g.line.split(';').map(s => s.trim().toLowerCase());
+            assert(attrs.includes('httponly') && attrs.includes('samesite=lax') && attrs.includes('path=/'), `cookie attributes: ${g.line}`);
+            assert(!attrs.some(a => a.startsWith('domain=')), `the cookie is host-only: ${g.line}`);
+            assert(g.served.status === 200 && g.served.body.includes(OWNER_PAGE), `the cookie alone serves: ${g.served.status}`);
+
+            const otherPage = await onOrigin('portfolio', member, '/', 'application/json', g.cookie);
+            assert(otherPage.status === 404 && !otherPage.body.includes(MEMBER_PAGE), `the cookie opened another page's origin: ${otherPage.status}`);
+            const coWithIt = await onOrigin('co', slug, '/', 'application/json', g.cookie);
+            assert(coWithIt.status === 404 && !coWithIt.body.includes(CO_PAGE), `the cookie opened the company origin: ${coWithIt.status}`);
+            const tampered = `aimeat_page_access=${memberPortfolioGrant.slice(0, -4)}${memberPortfolioGrant.endsWith('AAAA') ? 'BBBB' : 'AAAA'}`;
+            const t = await onOrigin('portfolio', owner, '/', 'application/json', tampered);
+            assert(t.status === 404 && !t.body.includes(OWNER_PAGE), `a tampered cookie served: ${t.status}`);
+            assert(setCookies(t).some(c => c.startsWith('aimeat_page_access=;')), 'the tampered cookie is cleared');
+
+            const c = await openWithGrant('co', slug, `http://x/?access=${encodeURIComponent(memberCompanyGrant)}`);
+            assert(c.served.status === 200 && c.served.body.includes(CO_PAGE), `the company cookie serves: ${c.served.status}`);
         });
 
         await test('the exposure report reads the level: both pages at organism', async () => {

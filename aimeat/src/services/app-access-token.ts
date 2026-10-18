@@ -18,7 +18,9 @@
  *   enough that a reload during a working session does not dead-end, short enough that a copied
  *   address is not a lasting substitute for the code. That is already stricter than what it
  *   replaces, since the apex URL a visitor holds today carries the access code itself, and the code
- *   does not expire and is the same for everyone.
+ *   does not expire and is the same for everyone. The grant arrives in the query on the first request
+ *   only: the origin moves it into a host-only cookie and redirects to the address without it
+ *   (routes/origin-grant-cookie.ts), so the address a person copies carries no grant.
  *
  *   Modelled on services/draft-token.ts, which answers the same question for an unpublished draft.
  *   This one reads the node keypair at call time through getNodeCryptoKeys() instead of keeping its
@@ -29,11 +31,16 @@
  *   - appAccessGranted() — the app origin's whole check: signed by this node, unexpired, this app
  *   - PageRef · pageRefId() — the page a page grant names: a welcome page or a company front page
  *   - generatePageAccessToken() · pageAccessGranted() — the same grant for those two origins
+ *   - grantExpiresAt() — the expiry of a grant already verified, for the origin cookie's Max-Age
  * @usage
  *   const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename });
  *   if (!(await appAccessGranted(req.query.access, app.ownerName, app.filename))) return notFound();
  *   if (!(await pageAccessGranted(req.query.access, { kind: 'company', id: company.id }))) → redirect or 404
  * @version-history
+ *   v1.2.0 — 2026-10-18 — A grant minted for a signed-in person carries a `viewer` claim, that
+ *     person's GHII (plan doc-mvcn6c7e4e5q, V2): the open routes set it, the access-code flow has no
+ *     person and sets none. `sub` keeps its meaning (the app owner). grantExpiresAt() reads the
+ *     expiry of a grant already verified, for the origin cookie's Max-Age (routes/origin-grant-cookie.ts).
  *   v1.1.0 — 2026-10-18 — Page grants (plan doc-mvcn6c7e4e5q, V3.10): `typ: 'page-access'` naming one
  *     welcome page or one company front page, for their session-less origins. The `typ` keeps the two
  *     kinds apart: an app grant opens no page, a page grant opens no app and no other page.
@@ -41,7 +48,7 @@
  *     code-gated app stops being the exception to H-2 origin isolation.
  *   v1.0.1 — 2026-09-26 — bare() takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
-import { SignJWT, jwtVerify } from 'jose';
+import { SignJWT, jwtVerify, decodeJwt } from 'jose';
 import { randomUUID } from 'node:crypto';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -59,6 +66,12 @@ export interface AppAccessTokenPayload {
     sub: string;
     /** The app filename this grant opens, extension included. */
     filename: string;
+    /**
+     * The GHII of the signed-in person the grant was minted for (POST /v1/apps/:owner/:filename/open).
+     * Absent for the access-code flow, which knows no person. The origin does not authorize on it;
+     * it names who the grant was handed to.
+     */
+    viewer?: string;
 }
 
 /** The owner's account name, with this node's `@node-id` removed; another node's identity stays whole. */
@@ -67,15 +80,16 @@ function bare(owner: string): string {
 }
 
 /**
- * Mint an app-access grant. Call it only where the caller has just been authorized for this app:
- * the grant carries no viewer identity, because the origin that consumes it cannot establish one.
+ * Mint an app-access grant. Call it only where the caller has just been authorized for this app.
+ * `viewer` names the signed-in person when there is one; the origin that consumes the grant cannot
+ * establish a viewer itself, so the claim is the only record of who the grant was handed to.
  */
 export async function generateAppAccessToken(
     payload: AppAccessTokenPayload,
     ttlSeconds: number = APP_ACCESS_TTL_SECONDS,
 ): Promise<string> {
     const { privateKey } = getNodeCryptoKeys();
-    return new SignJWT({ typ: 'app-access', filename: payload.filename })
+    return new SignJWT({ typ: 'app-access', filename: payload.filename, ...(payload.viewer ? { viewer: payload.viewer } : {}) })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         // EdDSA signing is deterministic: without a nonce two grants minted in the same second for
         // the same app would be the same string, which makes one leaked address indistinguishable
@@ -122,12 +136,14 @@ export function pageRefId(ref: PageRef): string {
 
 /**
  * Mint a grant for one welcome page or one company front page. Call it only after the caller was
- * authorized for that page (routes/page-open.ts): the grant carries no viewer identity, for the same
- * reason the app grant carries none.
+ * authorized for that page (routes/page-open.ts). `viewer` is the signed-in person's GHII, as on the
+ * app grant.
  */
-export async function generatePageAccessToken(ref: PageRef, ttlSeconds: number = APP_ACCESS_TTL_SECONDS): Promise<string> {
+export async function generatePageAccessToken(
+    ref: PageRef, ttlSeconds: number = APP_ACCESS_TTL_SECONDS, viewer?: string,
+): Promise<string> {
     const { privateKey } = getNodeCryptoKeys();
-    return new SignJWT({ typ: 'page-access', page: pageRefId(ref) })
+    return new SignJWT({ typ: 'page-access', page: pageRefId(ref), ...(viewer ? { viewer } : {}) })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setJti(randomUUID())
         .setIssuedAt()
@@ -149,5 +165,20 @@ export async function pageAccessGranted(token: unknown, ref: PageRef): Promise<b
     } catch (err) {
         logger.warn('page-access grant rejected → the page answers as unknown', { error: String(err) });
         return false;
+    }
+}
+
+/**
+ * The expiry of a grant, in seconds since the epoch, or null when it carries none. It reads the claim
+ * WITHOUT verifying the signature, so call it only on a grant appAccessGranted() or
+ * pageAccessGranted() has just accepted.
+ */
+export function grantExpiresAt(token: string): number | null {
+    try {
+        const { exp } = decodeJwt(token);
+        return typeof exp === 'number' ? exp : null;
+    } catch (err) {
+        logger.warn('a grant\'s expiry could not be read', { error: String(err) });
+        return null;
     }
 }
