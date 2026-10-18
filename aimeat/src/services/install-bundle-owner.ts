@@ -20,6 +20,9 @@
  *   what was made is kept in the same record an install set keeps.
  * @structure bundleInstallOf() · installSetForOwner()
  * @version-history
+ *   v1.3.0 — 2026-10-18 — The install claims the set's record before it makes anything
+ *     (install-set-run.ts claimRun) and its last write removes the claim (finishRun): a second
+ *     install of the same set at the same moment answers 409 SET_INSTALL_IN_PROGRESS (atomic-write round).
  *   v1.2.0 — 2026-10-10 — The record's applied_by is the owner's GHII, and the set's pulls no longer
  *     say they are an install set's, so with package federation off an owner's set install cannot pull
  *     from a peer (secaudit 2026-10-10, I18).
@@ -37,9 +40,10 @@ import { checkWorkspaceManifest } from './workspace-provision.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isOwnerInPerson } from '../utils/gaii.js';
 import {
-    reach, localGroupOf, installedInstanceOf, readRecord, writeRecord, appliedRecordKey,
+    reach, localGroupOf, installedInstanceOf, appliedValue, appliedRecordKey,
     newAppliedRecord, createOrganisms, linkAppsToWorkspaces, type ApplyDeps, type AppliedRecord,
 } from './install-set-apply.js';
+import { claimRun, finishRun } from './install-set-run.js';
 
 export interface SetInstallInput {
     groupId: string;
@@ -141,7 +145,14 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
     // applied_by is the owner's GHII, never the bare account name: the bare name "startup" read as the
     // start-up apply's record in install-set-trust.ts (secaudit 2026-10-10, I18).
     const key = appliedRecordKey(owner, input.groupId);
-    const record = (await readRecord(storage, key)) ?? newAppliedRecord(owner, { group_id: input.groupId, local_group_id: input.groupId, node_id: remote?.nodeId ?? null, version: '', name: bundle.name }, caller.ownerGhii);
+    // One run at a time across node processes (install-set-run.ts): the record is claimed before
+    // anything is made, and a second install of the same set at the same moment is refused here.
+    const claimed = await claimRun(storage, key, appliedValue, () => newAppliedRecord(owner, { group_id: input.groupId, local_group_id: input.groupId, node_id: remote?.nodeId ?? null, version: '', name: bundle.name }, caller.ownerGhii));
+    if (!claimed) {
+        return { ok: false, status: 409, code: 'SET_INSTALL_IN_PROGRESS', message: 'This set is being installed by another request right now, and this request made nothing of it. Wait for that one to end, then install the set again to continue.' };
+    }
+    const record = claimed.record;
+    const finish = () => finishRun(storage, key, appliedValue, record, claimed.claim);
     record.applied_by = caller.ownerGhii;
     record.applied_at = new Date().toISOString();
     record.runs += 1;
@@ -165,15 +176,15 @@ export async function installSetForOwner(deps: ApplyDeps, caller: PackageActCall
             record.packages[pkg.groupId] = { group_id: pkg.groupId, local_group_id: local, instance_id: out.instance.id, result: 'installed', mode: pkg.mode, ...(out.warnings.length ? { warnings: out.warnings } : {}) };
         }
         if (requests.length) {
-            await writeRecord(storage, key, record);
+            await finish();
             return { ok: true, kind: 'set-waiting', record, requests };
         }
         await createOrganisms(deps, owner, names as Record<string, string>, bundle, record);
         await linkAppsToWorkspaces(deps, owner, bundle, record);
     } catch (err) {
-        await writeRecord(storage, key, record);
+        await finish();
         return { ok: false, status: 500, code: 'SET_INSTALL_FAILED', message: `The set was installed in part: ${err instanceof Error ? err.message : String(err)}. What was made is recorded, and installing the set again continues from there.` };
     }
-    await writeRecord(storage, key, record);
+    await finish();
     return { ok: true, kind: 'set-installed', record, warnings, agents_proposed: proposed };
 }

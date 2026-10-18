@@ -27,6 +27,7 @@
  *   applyAppInvitesForVerifiedEmail
  * @usage await applyAppInvitesForVerifiedEmail(storage, config.nodeId, emailHash, ghii);
  * @version-history
+ *   v1.3.0 — 2026-10-18 — putInvite writes on the record's version (app-members.ts updateAppRecord).
  *   v1.2.0 — 2026-10-05 — applyAppInvitesForVerifiedEmail takes `only`: the one app whose invitation
  *     link a new account accepted, before its address is verified (secaudit 2026-10, APP-2).
  *   v1.1.0 — 2026-10-01 — The invitation carries a sign-up link and lives 7 days (was 30); a cancel
@@ -36,7 +37,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { listAppRecords, readAppRecord } from './app-record-keys.js';
-import { slugOf, sameApp, accountOf, writePrivateRecord } from './app-members.js';
+import { slugOf, sameApp, accountOf, updateAppRecord } from './app-members.js';
 import { approveMember, appStem } from './app-member-approve.js';
 import { appMemberInviteEmail, type NoticeLang } from './app-member-notices.js';
 import { inviteEmailHash } from './invitations.js';
@@ -101,21 +102,23 @@ export async function putInvite(
   input: { appId: string; emailHash: string; emailShown: string; role: string; note?: string; invitedBy: string },
 ): Promise<AppMemberInvite> {
   const key = inviteKey(input.appId, input.emailHash);
-  const prev = (await readAppRecord(storage, NS_INVITE, key, input.appId))?.value as AppMemberInvite | undefined;
-  const now = new Date();
-  const rec: AppMemberInvite = {
-    id: prev?.id ?? `inv_${randomUUID().replace(/-/g, '').slice(0, 20)}`,
-    appId: input.appId,
-    emailHash: input.emailHash,
-    emailShown: input.emailShown.trim().slice(0, 254),
-    role: input.role,
-    note: (input.note ?? '').slice(0, 400),
-    invitedBy: input.invitedBy,
-    at: now.toISOString(),
-    expiresAt: new Date(now.getTime() + INVITE_DAYS * 86_400_000).toISOString(),
-  };
-  await writePrivateRecord(storage, NS_INVITE, key, rec, { tags: ['app-member'], createdAt: prev ? undefined : rec.at });
-  return rec;
+  // On the record's version: two invitations of one address at the same moment answer one id, the
+  // one the stored record keeps and the emailed link names.
+  const stored = await updateAppRecord<AppMemberInvite>(storage, NS_INVITE, key, input.appId, (prev) => {
+    const now = new Date();
+    return {
+      id: prev?.id ?? `inv_${randomUUID().replace(/-/g, '').slice(0, 20)}`,
+      appId: input.appId,
+      emailHash: input.emailHash,
+      emailShown: input.emailShown.trim().slice(0, 254),
+      role: input.role,
+      note: (input.note ?? '').slice(0, 400),
+      invitedBy: input.invitedBy,
+      at: now.toISOString(),
+      expiresAt: new Date(now.getTime() + INVITE_DAYS * 86_400_000).toISOString(),
+    };
+  }, { tags: ['app-member'] });
+  return stored!;
 }
 
 /** Delete the invitation of one address to one app. */

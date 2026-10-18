@@ -18,9 +18,13 @@
  *   storage backends, and the roster cannot be read by the world because it never lives in an app's
  *   own namespace.
  * @structure NS · slugOf/memberKey/requestKey · listMembers/getMember/putMember/removeMember ·
- *   listRequests/putRequest/removeRequest · AppMemberRecord/AppMemberRequest · writePrivateRecord
+ *   listRequests/putRequest/removeRequest · AppMemberRecord/AppMemberRequest · updateAppRecord ·
+ *   writePrivateRecord
  * @usage const roster = await listMembers(storage, 'alice/app.html');
  * @version-history
+ *   v1.7.0 — 2026-10-18 — putMember, removeMember and putRequest read and write the row on its version
+ *     (updateAppRecord, over record-cas.ts updateRecord), so a change made to the same row at the same
+ *     moment is applied to rather than written over (atomic-write round).
  *   v1.6.0 — 2026-10-05 — normalizeAccess lives here, beside the plan it reads (it was in
  *     app-member-rules.ts for one commit, which made an import cycle through app-audit.ts), and
  *     forgetVisit says whether there was a visit to forget (secaudit 2026-10, APP-1 and APP-5).
@@ -49,6 +53,7 @@
 import { appKeySegment, equalAppId, readAppRecord, listAppRecords } from './app-record-keys.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 /**
  * A plan's `access` as it is stored: `members-only`, `free`, or `members-free` for anything else.
@@ -295,8 +300,17 @@ export async function putMember(
 ): Promise<AppMemberRecord> {
   const account = accountOf(input.account);
   // The RAW row, so re-approving somebody whose term lapsed renews them rather than treating them
-  // as brand new and losing when they first joined.
-  const prev = await getMemberRow(storage, input.appId, account);
+  // as brand new and losing when they first joined. Read and written on its version, so a change of
+  // the development right at the same moment is carried rather than written over.
+  const stored = await updateAppRecord<AppMemberRecord>(storage, NS_MEMBER, memberKey(input.appId, account), input.appId, (prev) => memberRow(input, account, prev));
+  return stored!;
+}
+
+function memberRow(
+  input: { appId: string; role: string; level?: number | null; note?: string;
+    approvedBy: string; offerings?: string[]; expiresAt?: string | null; renewal?: AppMemberRecord['renewal'] },
+  account: string, prev: AppMemberRecord | null,
+): AppMemberRecord {
   const now = new Date().toISOString();
   const rec: AppMemberRecord = {
     appId: input.appId,
@@ -318,7 +332,6 @@ export async function putMember(
     ...(prev?.devSince ? { devSince: prev.devSince } : {}),
     ...(prev?.devBy ? { devBy: prev.devBy } : {}),
   };
-  await writePrivateRecord(storage, NS_MEMBER, memberKey(input.appId, account), rec, { createdAt: prev ? undefined : now });
   return rec;
 }
 
@@ -461,21 +474,26 @@ export async function removeMember(
   // The RAW row: a lapsed membership is exactly the one the sweep needs to remove, and reading it
   // through getMember — which hides lapsed rows — left the sweep revoking the grants and then
   // finding nothing to delete, so the dead row stayed on the roster and kept holding a seat.
-  const prev = await getMemberRow(storage, appId, principal);
-  if (!prev) return null;
-  await readAppRecord(storage, NS_MEMBER, memberKey(appId, principal), appId);
   // The development right lives on the same row and was granted through a different route. Removing
   // somebody from the member list took it with it, silently. The row stays as a pure builder's row
   // (empty role, nothing carried, no term), which is the shape putDevGrant writes for one. The
   // development-right revoke passes keepDevRight: false, because there the right is what goes.
-  if (typeof prev.dev === 'number' && opts.keepDevRight !== false) {
-    const now = new Date().toISOString();
-    await writePrivateRecord(storage, NS_MEMBER, memberKey(appId, principal), {
-      ...prev, role: '', level: null, offerings: [], expiresAt: null, renewal: null, updatedAt: now,
-    });
-    return prev;
-  }
-  await storage.deleteMemory(NS_MEMBER, memberKey(appId, principal));
+  // Decided on the row as it is stored and written on its version, so a revoke of the right at the
+  // same moment is not written back.
+  let prev: AppMemberRecord | null = null;
+  let drop = false;
+  await updateAppRecord<AppMemberRecord>(storage, NS_MEMBER, memberKey(appId, principal), appId, (cur) => {
+    prev = cur;
+    drop = false;
+    if (!cur) return UNCHANGED;
+    if (typeof cur.dev === 'number' && opts.keepDevRight !== false) {
+      return { ...cur, role: '', level: null, offerings: [], expiresAt: null, renewal: null, updatedAt: new Date().toISOString() };
+    }
+    drop = true;
+    return UNCHANGED;
+  });
+  if (!prev) return null;
+  if (drop) await storage.deleteMemory(NS_MEMBER, memberKey(appId, principal));
   return prev;
 }
 
@@ -504,28 +522,49 @@ export async function putRequest(
   input: { appId: string; account: string; note?: string; state?: AppMemberRequest['state'] },
 ): Promise<AppMemberRequest> {
   const account = accountOf(input.account);
-  const existing = await readAppRecord(storage, NS_REQUEST, requestKey(input.appId, account), input.appId);
-  const prev = existing?.value as AppMemberRequest | undefined;
-  const now = new Date().toISOString();
-  const state = input.state ?? 'pending';
-  // Asking again after a decline is a new ask: it is dated now and carries no decision.
-  const reask = prev?.state === 'declined' && state === 'pending';
-  const rec: AppMemberRequest = {
-    appId: input.appId,
-    owner: account,
-    note: input.note ?? prev?.note ?? '',
-    at: reask ? now : (prev?.at ?? now),
-    state,
-    ...(state === 'declined' ? { decidedAt: now } : {}),
-  };
-  await writePrivateRecord(storage, NS_REQUEST, requestKey(input.appId, account), rec, { createdAt: prev ? undefined : rec.at });
-  return rec;
+  // On the version that was read: the owner's decision and the person's note edit at the same moment
+  // each apply to what the other wrote.
+  const stored = await updateAppRecord<AppMemberRequest>(storage, NS_REQUEST, requestKey(input.appId, account), input.appId, (prev) => {
+    const now = new Date().toISOString();
+    const state = input.state ?? 'pending';
+    // Asking again after a decline is a new ask: it is dated now and carries no decision.
+    const reask = prev?.state === 'declined' && state === 'pending';
+    return {
+      appId: input.appId,
+      owner: account,
+      note: input.note ?? prev?.note ?? '',
+      at: reask ? now : (prev?.at ?? now),
+      state,
+      ...(state === 'declined' ? { decidedAt: now } : {}),
+    };
+  });
+  return stored!;
 }
 
 /** Drop an ask entirely (the owner declining and forgetting, or an approval consuming it). */
 export async function removeRequest(storage: Storage, appId: string, principal: string): Promise<void> {
   await readAppRecord(storage, NS_REQUEST, requestKey(appId, principal), appId);
   await storage.deleteMemory(NS_REQUEST, requestKey(appId, principal));
+}
+
+/**
+ * Change one private app record on the version that was read (record-cas.ts updateRecord): of two
+ * writers at the same moment, the second re-reads and applies its change to what the first wrote.
+ * A legacy row is moved to its current key first (readAppRecord). `mutate` gets the row, or null
+ * when there is none or it belongs to another app (`appId` null: no app to compare), and may run
+ * more than once. Answers the row as stored.
+ */
+export async function updateAppRecord<T extends object>(
+  storage: Storage, ns: string, key: string, appId: string | null,
+  mutate: (cur: T | null) => T | typeof UNCHANGED, opts: { tags?: string[] } = {},
+): Promise<T | null> {
+  if (appId) await readAppRecord(storage, ns, key, appId);
+  const tags = opts.tags ?? ['app-member'];
+  return updateRecord<T | null>(storage, ns, key, (v) => {
+    const row = v as (T & { appId?: unknown }) | undefined;
+    if (!row || typeof row !== 'object') return null;
+    return !appId || (typeof row.appId === 'string' && sameApp(row.appId, appId)) ? row : null;
+  }, mutate, { tag: tags[0]!, tags });
 }
 
 /** One private write, in the shape the memory substrate expects. */

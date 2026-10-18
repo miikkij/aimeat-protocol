@@ -38,6 +38,8 @@
  *   await settleDefaultCapsAtStart(config, storage);        // server-bootstrap/config-init.ts
  *   await decideDefaultCap(config, storage, { incidentId, name: 'sisainen', resolution: 'apply', by });
  * @version-history
+ *   v1.2.0 — 2026-10-18 — An approved cap is written on the node policy's version (system-record.ts
+ *     updateSystem), so two caps approved at the same moment are both kept (atomic-write round).
  *   v1.1.0 — 2026-10-18 — The offer of a node that ran before waits while classification is off
  *     (recorded as pending) and opens when the switch is turned on, or at a start with it on.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L5.1, L5.2).
@@ -55,6 +57,7 @@ import { DEFAULT_CAPS_KEY, readDefaultCapsState, type DefaultCapsState } from '.
 import { AUDIENCE_LEVEL_WORDS, isAudienceLevel } from './audience-levels.js';
 import { validateNodePolicy } from './levels.js';
 import { NODE_POLICY_KEY, type PolicyChange } from './policy.js';
+import { updateSystem, UNCHANGED } from './system-record.js';
 
 export const DEFAULT_CAPS_INCIDENT_TYPE = 'classification_default_caps';
 
@@ -194,28 +197,28 @@ export type DecideCapResult =
  * did: the cap put on, the label had a cap of its own, or the label is not in the policy.
  */
 async function applyCap(storage: Storage, nodeId: string, id: string, cap: string, by: { principal: string; kind: 'human' | 'ai' }): Promise<'applied' | 'own-cap' | 'no-label'> {
-  const system = `system@${nodeId}`;
-  const existing = await storage.getMemory(system, NODE_POLICY_KEY);
-  const rec = isObj(existing?.value) ? existing!.value as Record<string, unknown> : {};
-  const stored = isObj(rec.policy) ? rec.policy : null;
-  // A node with no stored policy stores its default labels: the rest of the policy keeps following
-  // the code's defaults (policy.ts reads a stored policy over them).
-  const labels = (stored && Array.isArray(stored.labels) ? stored.labels : defaultPolicy().labels) as Array<Record<string, unknown>>;
-  const at = labels.findIndex(l => isObj(l) && l.id === id);
-  if (at < 0) return 'no-label';
-  if (isAudienceLevel(labels[at]!.maxAudience)) return 'own-cap';
-  const nextLabels = labels.map((l, i) => (i === at ? { ...l, maxAudience: cap } : l));
-  const policy = { ...(stored ?? {}), labels: nextLabels };
-  // The whole policy as it will be read must still pass; a cap only narrows, so it does.
-  validateNodePolicy({ ...defaultPolicy(), ...policy });
-  const now = new Date().toISOString();
-  const change: PolicyChange = { at: now, by: by.principal, source: by.kind, action: 'set', humanSaid: `default audience cap of ${id} approved on the Security page` };
-  const history = [...(Array.isArray(rec.history) ? rec.history as PolicyChange[] : []), change].slice(-HISTORY);
-  await storage.setMemory({
-    key: NODE_POLICY_KEY, ownerGaii: system, value: { policy, history, proposal: rec.proposal ?? null },
-    visibility: 'private', tags: ['classification-policy'], ttlHours: null,
-    version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-  });
+  // On the policy's version (system-record.ts updateSystem): two caps approved at the same moment are
+  // both written, each onto the policy the other stored.
+  let outcome = 'applied' as 'applied' | 'own-cap' | 'no-label';
+  await updateSystem(storage, nodeId, NODE_POLICY_KEY, (v) => (isObj(v) ? v : {}), (rec) => {
+    const stored = isObj(rec.policy) ? rec.policy : null;
+    // A node with no stored policy stores its default labels: the rest of the policy keeps following
+    // the code's defaults (policy.ts reads a stored policy over them).
+    const labels = (stored && Array.isArray(stored.labels) ? stored.labels : defaultPolicy().labels) as Array<Record<string, unknown>>;
+    const at = labels.findIndex(l => isObj(l) && l.id === id);
+    if (at < 0) { outcome = 'no-label'; return UNCHANGED; }
+    if (isAudienceLevel(labels[at]!.maxAudience)) { outcome = 'own-cap'; return UNCHANGED; }
+    outcome = 'applied';
+    const nextLabels = labels.map((l, i) => (i === at ? { ...l, maxAudience: cap } : l));
+    const policy = { ...(stored ?? {}), labels: nextLabels };
+    // The whole policy as it will be read must still pass; a cap only narrows, so it does.
+    validateNodePolicy({ ...defaultPolicy(), ...policy });
+    const now = new Date().toISOString();
+    const change: PolicyChange = { at: now, by: by.principal, source: by.kind, action: 'set', humanSaid: `default audience cap of ${id} approved on the Security page` };
+    const history = [...(Array.isArray(rec.history) ? rec.history as PolicyChange[] : []), change].slice(-HISTORY);
+    return { policy, history, proposal: rec.proposal ?? null };
+  }, null, 'classification-policy');
+  if (outcome !== 'applied') return outcome;
   emitChange('classification');
   return 'applied';
 }

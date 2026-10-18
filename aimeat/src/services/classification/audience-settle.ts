@@ -36,6 +36,9 @@
  * @structure LoweredItem · settleAudienceAfterRise() · registerAudienceSettle()
  * @usage registerAudienceSettle(storage, config);   // once, at boot (server-bootstrap/routes-loader.ts)
  * @version-history
+ *   v1.2.0 — 2026-10-18 — A memory record is lowered on the version that was read (setMemoryIfVersion,
+ *     re-read on a conflict), so an owner's write at the same moment is kept; the lowering now bumps
+ *     the record's version like any other write (atomic-write round).
  *   v1.1.0 — 2026-10-18 — A rise on an app lowers the stored files in the app's own namespace too, with
  *     the same audit row and the same one notification (plan doc-mvdipuyqraas, L3 gap closed in L5).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L3.4).
@@ -46,6 +49,7 @@ import { appSlug, ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../event-bus.js';
 import { notify } from '../notify.js';
+import { CAS_ATTEMPTS } from '../record-cas.js';
 import { updateOrganismRecord } from '../organism-lifecycle.js';
 import { applyOwnerSettingsUpdate, type AppSettingsInput } from '../app-settings.js';
 import { generateAccessCode } from '../app-publish-exposure.js';
@@ -102,13 +106,19 @@ function memoryCandidate(ctx: Ctx, rec: Pick<MemoryRecord, 'ownerGaii' | 'key' |
   return {
     target, level, name: rec.key, owner: ownerGhiiOf(rec.ownerGaii),
     async lower(cap) {
-      const full = await ctx.storage.getMemory(rec.ownerGaii, rec.key);
-      if (!full) return null;
       const visibility = visibilityWithin(cap, scopeOrganism(target.scope));
-      // Only the level changes: the bytes and their provenance stay as they are.
-      await ctx.storage.setMemory({ ...full, visibility, groupId: undefined, workspaceRef: undefined, updatedAt: new Date().toISOString() });
-      emitChange('memory', ownerGhiiOf(rec.ownerGaii));
-      return audienceOfVisibility(visibility);
+      // Only the level changes: the bytes and their provenance stay as they are. Written on the
+      // version that was read, so an owner's write between the read and the write is lowered on a
+      // fresh read rather than written over.
+      for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+        const full = await ctx.storage.getMemory(rec.ownerGaii, rec.key);
+        if (!full) return null;
+        const next = { ...full, key: rec.key, visibility, groupId: undefined, workspaceRef: undefined, version: full.version + 1, updatedAt: new Date().toISOString() };
+        if (ctx.storage.setMemoryIfVersion ? !(await ctx.storage.setMemoryIfVersion(next, full.version)) : !(await ctx.storage.setMemory(next))) continue;
+        emitChange('memory', ownerGhiiOf(rec.ownerGaii));
+        return audienceOfVisibility(visibility);
+      }
+      throw new Error(`${rec.ownerGaii} ${rec.key} changed under every one of ${CAS_ATTEMPTS} attempts; try again`);
     },
   };
 }

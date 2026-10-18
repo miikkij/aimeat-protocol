@@ -32,6 +32,10 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.10.0 -- 2026-10-18 -- publishSkill and setSkillVisibility write the manifest on the version they
+ *     read (setMemoryIfVersion / createMemoryIfAbsent) and make the write again on a fresh read when
+ *     another writer came between, so two publishes at the same moment get two versions and two
+ *     snapshots, and a visibility change beside a publish keeps both (atomic-write round).
  *   v1.9.0 -- 2026-10-17 -- A user skill may be read by `organism:<id>`, the active members of one
  *     organism (plan doc-mvcn6c7e4e5q, V3.9): publishSkill and setSkillVisibility take it, refused
  *     before any write unless the caller is in that organism; the read gate is mayReadSkill
@@ -69,6 +73,7 @@ import { canReadWorkspace } from './workspace-access.js';
 import { localAccountName } from '../utils/gaii.js';
 import { showSkillRecords } from './skill-reader.js';
 import { listAcrossOwners, freshestByKey } from './skill-records.js';
+import { CAS_ATTEMPTS } from './record-cas.js';
 import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenance.js';
 import { mayReadSkill, publisherMayName, skillVisibilityOf, storedSkillVisibility, type SkillVisibility } from './skill-audience.js';
 
@@ -203,83 +208,103 @@ export async function publishSkill(
   const mKey = isWs ? wsManifestKey(org, ws, name) : manifestKey(name);
   const fKey = (path: string) => isWs ? wsFileKey(org, ws, name, path) : fileKey(name, path);
 
-  // For versioning look at the freshest existing manifest across owners (workspace) or own (node/user).
-  let existing = await storage.getMemory(ownerGaii, mKey);
-  if (isWs) {
-    const all = await listAcrossOwners(storage, mKey);
-    const freshest = freshestByKey(all).get(mKey);
-    if (freshest && (!existing || String(freshest.updatedAt) > String(existing.updatedAt))) existing = freshest;
-  }
-  const existingValue = existing?.value as SkillManifestValue | undefined;
-  const version = existingValue?.version ? bumpPatch(existingValue.version) : '1.0.0';
-  const chosen = opts.visibility ?? (existing ? skillVisibilityOf(existing) as SkillVisibility : undefined) ?? (opts.scope === 'node' ? 'members' : 'owner');
-  const stored = storedSkillVisibility(chosen);
-  const visibility: MemoryRecord['visibility'] = isWs ? 'workspace' : stored.record;
   const workspaceRef = isWs ? `${org}/${ws}` : undefined;
   // How SKILL.md was made, decided before the first write so a refused declaration stores nothing.
-  const aiProvenanceId = await skillProvenanceId(storage, config, opts.provenance, String(opts.files.get('SKILL.md') ?? ''), visibility);
+  // Once per visibility, so a write made again below does not record it twice.
+  const provenanceIds = new Map<string, Promise<string | undefined>>();
+  const provenanceFor = (visibility: MemoryRecord['visibility']) => {
+    if (!provenanceIds.has(visibility)) provenanceIds.set(visibility, skillProvenanceId(storage, config, opts.provenance, String(opts.files.get('SKILL.md') ?? ''), visibility));
+    return provenanceIds.get(visibility)!;
+  };
 
-  // Write file records (mirroring the manifest's visibility), then remove stale ones (own copies).
-  const fileIndex: Array<{ path: string; size: number }> = [];
-  const fileTexts: Record<string, string> = {};
-  for (const [path, content] of opts.files) {
-    const text = content.toString();
-    fileTexts[path] = text;
-    fileIndex.push({ path, size: Buffer.byteLength(text) });
-    const prior = await storage.getMemory(ownerGaii, fKey(path));
-    await storage.setMemory({
-      key: fKey(path),
+  // The manifest is written on the version of the own record read at the start of the write. When
+  // another publish or a visibility change wrote it meanwhile, the whole write is made again on a
+  // fresh read, so two publishes at the same moment get two versions and two snapshots.
+  const writeOnce = async () => {
+    // For versioning look at the freshest existing manifest across owners (workspace) or own (node/user).
+    const own = await storage.getMemory(ownerGaii, mKey);
+    let existing = own;
+    if (isWs) {
+      const all = await listAcrossOwners(storage, mKey);
+      const freshest = freshestByKey(all).get(mKey);
+      if (freshest && (!existing || String(freshest.updatedAt) > String(existing.updatedAt))) existing = freshest;
+    }
+    const existingValue = existing?.value as SkillManifestValue | undefined;
+    const version = existingValue?.version ? bumpPatch(existingValue.version) : '1.0.0';
+    const chosen = opts.visibility ?? (existing ? skillVisibilityOf(existing) as SkillVisibility : undefined) ?? (opts.scope === 'node' ? 'members' : 'owner');
+    const stored = storedSkillVisibility(chosen);
+    const visibility: MemoryRecord['visibility'] = isWs ? 'workspace' : stored.record;
+    const aiProvenanceId = await provenanceFor(visibility);
+
+    // Write file records (mirroring the manifest's visibility), then remove stale ones (own copies).
+    const fileIndex: Array<{ path: string; size: number }> = [];
+    const fileTexts: Record<string, string> = {};
+    for (const [path, content] of opts.files) {
+      const text = content.toString();
+      fileTexts[path] = text;
+      fileIndex.push({ path, size: Buffer.byteLength(text) });
+      const prior = await storage.getMemory(ownerGaii, fKey(path));
+      await storage.setMemory({
+        key: fKey(path),
+        ownerGaii,
+        value: text,
+        visibility,
+        ...(workspaceRef ? { workspaceRef } : {}),
+        tags: ['skill-file'],
+        ttlHours: null,
+        version: (prior?.version ?? 0) + 1,
+        createdAt: prior?.createdAt ?? now,
+        updatedAt: now,
+        ...(path === 'SKILL.md' && aiProvenanceId ? { aiProvenanceId } : {}),
+      });
+    }
+    const stale = (existingValue?.files ?? []).filter(f => !opts.files.has(f.path));
+    for (const f of stale) {
+      await storage.deleteMemory(ownerGaii, fKey(f.path));
+    }
+
+    const manifest: SkillManifestValue = {
+      type: 'skill',
+      name,
+      description: parsed.frontmatter.description,
+      version,
+      files: fileIndex,
+      publishedBy: opts.publisher,
+      createdAt: existingValue?.createdAt ?? now,
+      updatedAt: now,
+    };
+    if (parsed.frontmatter.license) manifest.license = parsed.frontmatter.license;
+    if (parsed.frontmatter.compatibility) manifest.compatibility = parsed.frontmatter.compatibility;
+    if (parsed.frontmatter.metadata) manifest.metadata = parsed.frontmatter.metadata;
+    if (typeof binding === 'string') manifest.binding = binding;
+    if (typeof supersededBy === 'string') manifest.supersededBy = supersededBy;
+    // The owner editing a package's skill keeps it the package's: the update sees the edit, the uninstall removes it.
+    const fromPackage = opts.fromPackage ?? (opts.scope === 'user' ? existingValue?.fromPackage : undefined);
+    if (fromPackage) manifest.fromPackage = fromPackage;
+    if (!isWs && stored.audience) manifest.audience = stored.audience;
+
+    const next: MemoryRecord = {
+      key: mKey,
       ownerGaii,
-      value: text,
+      value: manifest,
       visibility,
       ...(workspaceRef ? { workspaceRef } : {}),
-      tags: ['skill-file'],
+      tags: ['skill', `scope:${opts.scope}`],
       ttlHours: null,
-      version: (prior?.version ?? 0) + 1,
-      createdAt: prior?.createdAt ?? now,
+      version: (own?.version ?? 0) + 1,
+      createdAt: own?.createdAt ?? now,
       updatedAt: now,
-      ...(path === 'SKILL.md' && aiProvenanceId ? { aiProvenanceId } : {}),
-    });
-  }
-  const stale = (existingValue?.files ?? []).filter(f => !opts.files.has(f.path));
-  for (const f of stale) {
-    await storage.deleteMemory(ownerGaii, fKey(f.path));
-  }
-
-  const manifest: SkillManifestValue = {
-    type: 'skill',
-    name,
-    description: parsed.frontmatter.description,
-    version,
-    files: fileIndex,
-    publishedBy: opts.publisher,
-    createdAt: existingValue?.createdAt ?? now,
-    updatedAt: now,
+      ...(aiProvenanceId ? { aiProvenanceId } : {}),
+    };
+    const record = own
+      ? (storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(next, own.version) : await storage.setMemory(next))
+      : (storage.createMemoryIfAbsent ? await storage.createMemoryIfAbsent(next) : await storage.setMemory(next));
+    return record ? { record, manifest, version, visibility, fileTexts } : null;
   };
-  if (parsed.frontmatter.license) manifest.license = parsed.frontmatter.license;
-  if (parsed.frontmatter.compatibility) manifest.compatibility = parsed.frontmatter.compatibility;
-  if (parsed.frontmatter.metadata) manifest.metadata = parsed.frontmatter.metadata;
-  if (typeof binding === 'string') manifest.binding = binding;
-  if (typeof supersededBy === 'string') manifest.supersededBy = supersededBy;
-  // The owner editing a package's skill keeps it the package's: the update sees the edit, the uninstall removes it.
-  const fromPackage = opts.fromPackage ?? (opts.scope === 'user' ? existingValue?.fromPackage : undefined);
-  if (fromPackage) manifest.fromPackage = fromPackage;
-  if (!isWs && stored.audience) manifest.audience = stored.audience;
-
-  const ownExisting = await storage.getMemory(ownerGaii, mKey);
-  const record = await storage.setMemory({
-    key: mKey,
-    ownerGaii,
-    value: manifest,
-    visibility,
-    ...(workspaceRef ? { workspaceRef } : {}),
-    tags: ['skill', `scope:${opts.scope}`],
-    ttlHours: null,
-    version: (ownExisting?.version ?? 0) + 1,
-    createdAt: ownExisting?.createdAt ?? now,
-    updatedAt: now,
-    ...(aiProvenanceId ? { aiProvenanceId } : {}),
-  });
+  let written: Awaited<ReturnType<typeof writeOnce>> = null;
+  for (let attempt = 0; attempt < CAS_ATTEMPTS && !written; attempt++) written = await writeOnce();
+  if (!written) throw new Error(`skill ${name} changed under every one of ${CAS_ATTEMPTS} attempts; try again`);
+  const { record, manifest, version, visibility, fileTexts } = written;
 
   // Version snapshot for `@{semver}` pins: an immutable {manifest, files} copy per publish,
   // pruned to the newest VERSION_SNAPSHOTS_KEPT (own copies only).
@@ -583,18 +608,24 @@ export async function setSkillVisibility(
 ): Promise<SkillSummary | null> {
   await assertSkillVisibility(storage, scope, visibility, accessor ?? { ownerName: owner ?? null });
   const ownerGaii = scopeOwnerGhii(config, scope, owner);
-  const manifest = await storage.getMemory(ownerGaii, manifestKey(name));
-  if (!manifest) return null;
-  const now = new Date().toISOString();
   const stored = storedSkillVisibility(visibility);
-  const files = await storage.listMemory(ownerGaii, { prefix: filePrefix(name) });
-  for (const f of files) {
-    await storage.setMemory({ ...f, visibility: stored.record, version: f.version + 1, updatedAt: now });
+  // Written on the manifest's version: when a publish wrote it meanwhile, the files and the manifest
+  // are set again on a fresh read, so neither the new version nor the visibility is lost.
+  for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+    const manifest = await storage.getMemory(ownerGaii, manifestKey(name));
+    if (!manifest) return null;
+    const now = new Date().toISOString();
+    const files = await storage.listMemory(ownerGaii, { prefix: filePrefix(name) });
+    for (const f of files) {
+      await storage.setMemory({ ...f, visibility: stored.record, version: f.version + 1, updatedAt: now });
+    }
+    const value: SkillManifestValue = { ...(manifest.value as SkillManifestValue) };
+    if (stored.audience) value.audience = stored.audience; else delete value.audience;
+    const next = { ...manifest, key: manifestKey(name), value, visibility: stored.record, version: manifest.version + 1, updatedAt: now };
+    const record = storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(next, manifest.version) : await storage.setMemory(next);
+    if (record) return toSummary(record, scope, scope === 'user' ? (owner ?? null) : null);
   }
-  const value: SkillManifestValue = { ...(manifest.value as SkillManifestValue) };
-  if (stored.audience) value.audience = stored.audience; else delete value.audience;
-  const record = await storage.setMemory({ ...manifest, value, visibility: stored.record, version: manifest.version + 1, updatedAt: now });
-  return toSummary(record, scope, scope === 'user' ? (owner ?? null) : null);
+  throw new Error(`skill ${name} changed under every one of ${CAS_ATTEMPTS} attempts; try again`);
 }
 
 /** Refuse the organisation level outside a user skill, or naming an organism the caller is not in. */

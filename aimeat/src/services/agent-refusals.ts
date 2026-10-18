@@ -50,6 +50,9 @@
  *   noteAgentRefusal(req.auth, ['agent:write'], false, 'PATCH /v1/agents/:name/tags');
  *   const { refusals, request } = await readAgentAccess(storage, ownerGhii, 'concierge', agent.defaultScopes ?? ['*']);
  * @version-history
+ *   2026-10-18 — A refusal note and a decline write the record on its version (record-cas.ts
+ *     updateRecord): the per-agent chain orders writes within one process only, and two node
+ *     processes on one database each wrote the copy they had read (atomic-write round).
  *   2026-10-17 — initAgentRefusals takes a listener called once when a refusal opens (not declined, no
  *     other open refusal for the same words); services/permission-ask-notice.ts asks the person
  *     (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
@@ -64,12 +67,13 @@
  *   v1.0.0 — 2026-09-30 — Initial.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, MemoryRecord, AgentTaskRecord } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import type { AgentRecord } from '../storage/types/identity.js';
 import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 export const AGENT_REFUSALS_SPEC = 'aimeat.agent-refusals/v1';
 export const AGENT_SCOPE_REQUEST_SPEC = 'aimeat.agent-scope-request/v1';
@@ -245,39 +249,34 @@ async function persistRefusal(
   const agent = await storage.getAgent(gaii);
   if (!agent) return;
   const held = agent.defaultScopes ?? ['*'];
-  const existing = await storage.getMemory(ownerGhii, key);
-  const rec = existing ? asRefusals(existing.value, gaii) : { spec: AGENT_REFUSALS_SPEC, agentGaii: gaii, entries: [] as AgentRefusalEntry[] };
-  const at = rec.entries.find((e) => sameEntry(e, entry.needed, entry.call));
-  // A closed entry starts over: the permission was granted and then taken away again, or the old
-  // one aged out, and a count carried across that gap would describe two different situations.
-  const stillOpen = at && openRefusals([at], held, Date.now()).length === 1;
-  // The owner declines a PERMISSION, not a route: a new call refused for the same scopes an open,
-  // declined refusal needed is declined with it, so the agent trying another door does not ask again.
-  const declinedBefore = rec.entries.find((e) => e.declinedAt && e !== at
-    && openRefusals([e], held, Date.now()).length === 1 && sameEntry(e, entry.needed, e.call))?.declinedAt;
-  const merged: AgentRefusalEntry = at && stillOpen
-    ? { ...at, anyOf: entry.anyOf, count: at.count + delta.count, lastAt: delta.lastAt }
-    : {
-      needed: entry.needed, anyOf: entry.anyOf, call: entry.call, count: delta.count, firstAt: delta.firstAt, lastAt: delta.lastAt,
-      ...(declinedBefore ? { declinedAt: declinedBefore } : {}),
-    };
-  const others = rec.entries.filter((e) => e !== at);
-  const kept = openRefusals(others, held, Date.now())
-    .sort((a, b) => b.lastAt.localeCompare(a.lastAt))
-    .slice(0, REFUSAL_MAX_ENTRIES - 1);
-  const now = new Date().toISOString();
-  const record: MemoryRecord = {
-    key,
-    ownerGaii: ownerGhii,
-    value: { spec: AGENT_REFUSALS_SPEC, agentGaii: gaii, entries: [merged, ...kept] } satisfies AgentRefusalsRecord,
-    visibility: 'owner',
-    tags: ['agent-refusals', 'system'],
-    ttlHours: null,
-    version: (existing?.version ?? 0) + 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  };
-  await storage.setMemory(record);
+  // On the record's version (record-cas.ts updateRecord): the per-agent chain above orders writes in
+  // one process only, so a note or a decline from another process at the same moment is merged with
+  // rather than written over. What is decided below is the last, written attempt's.
+  let at: AgentRefusalEntry | undefined;
+  let stillOpen = false;
+  let merged!: AgentRefusalEntry;
+  let kept: AgentRefusalEntry[] = [];
+  await updateRecord<AgentRefusalsRecord>(storage, ownerGhii, key, (v) => asRefusals(v, gaii), (rec) => {
+    at = rec.entries.find((e) => sameEntry(e, entry.needed, entry.call));
+    // A closed entry starts over: the permission was granted and then taken away again, or the old
+    // one aged out, and a count carried across that gap would describe two different situations.
+    stillOpen = !!at && openRefusals([at], held, Date.now()).length === 1;
+    // The owner declines a PERMISSION, not a route: a new call refused for the same scopes an open,
+    // declined refusal needed is declined with it, so the agent trying another door does not ask again.
+    const declinedBefore = rec.entries.find((e) => e.declinedAt && e !== at
+      && openRefusals([e], held, Date.now()).length === 1 && sameEntry(e, entry.needed, e.call))?.declinedAt;
+    merged = at && stillOpen
+      ? { ...at, anyOf: entry.anyOf, count: at.count + delta.count, lastAt: delta.lastAt }
+      : {
+        needed: entry.needed, anyOf: entry.anyOf, call: entry.call, count: delta.count, firstAt: delta.firstAt, lastAt: delta.lastAt,
+        ...(declinedBefore ? { declinedAt: declinedBefore } : {}),
+      };
+    const others = rec.entries.filter((e) => e !== at);
+    kept = openRefusals(others, held, Date.now())
+      .sort((a, b) => b.lastAt.localeCompare(a.lastAt))
+      .slice(0, REFUSAL_MAX_ENTRIES - 1);
+    return { spec: AGENT_REFUSALS_SPEC, agentGaii: gaii, entries: [merged, ...kept] } satisfies AgentRefusalsRecord;
+  }, { tag: 'agent-refusals', tags: ['agent-refusals', 'system'], visibility: 'owner' });
   // Newly opened, not declined, and no other open refusal already asks for the same words: ask the
   // person once. For an any-of refusal one word is enough, so the first is what the person is asked.
   const opened = !(at && stillOpen) && !merged.declinedAt;
@@ -558,24 +557,23 @@ export async function declineRefusals(storage: Storage, gaii: string, needed?: s
     if (!agent) return;
     const ownerGhii = ownerGhiiOf(gaii);
     const key = agentRefusalsKey(parsed.agent);
-    const existing = await storage.getMemory(ownerGhii, key);
-    if (!existing) return;
-    const rec = asRefusals(existing.value, gaii);
-    const open = new Set(openRefusals(rec.entries, agent.defaultScopes ?? ['*'], Date.now()));
-    const now = new Date().toISOString();
-    const entries = rec.entries.map((e) => {
-      if (!open.has(e) || e.declinedAt) return e;
-      if (needed && !e.needed.some((s) => needed.includes(s))) return e;
-      declined += 1;
-      return { ...e, declinedAt: now };
-    });
+    // On the record's version, so a refusal noted by another process at the same moment is kept and
+    // the decline is not written over (record-cas.ts updateRecord).
+    await updateRecord<AgentRefusalsRecord | null>(storage, ownerGhii, key, (v) => (v === undefined ? null : asRefusals(v, gaii)), (rec) => {
+      declined = 0;
+      if (!rec) return UNCHANGED;
+      const open = new Set(openRefusals(rec.entries, agent.defaultScopes ?? ['*'], Date.now()));
+      const now = new Date().toISOString();
+      const entries = rec.entries.map((e) => {
+        if (!open.has(e) || e.declinedAt) return e;
+        if (needed && !e.needed.some((s) => needed.includes(s))) return e;
+        declined += 1;
+        return { ...e, declinedAt: now };
+      });
+      if (declined === 0) return UNCHANGED;
+      return { spec: AGENT_REFUSALS_SPEC, agentGaii: gaii, entries } satisfies AgentRefusalsRecord;
+    }, { tag: 'agent-refusals', tags: ['agent-refusals', 'system'], visibility: 'owner' });
     if (declined === 0) return;
-    await storage.setMemory({
-      ...existing,
-      value: { spec: AGENT_REFUSALS_SPEC, agentGaii: gaii, entries } satisfies AgentRefusalsRecord,
-      version: (existing.version ?? 0) + 1,
-      updatedAt: now,
-    });
     emitChange('agents', ownerGhii);
   };
   const next = (chains.get(gaii) ?? Promise.resolve()).then(run);

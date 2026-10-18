@@ -29,12 +29,14 @@
  * @usage
  *   const on = gateApplies(await gateSettingOf(storage, ownerGhii, agent), rule);
  * @version-history
+ *   v1.2.0 — 2026-10-18 — writeAgentGate writes `decide.agents` on its version (record-cas.ts
+ *     updateRecord), so two agents' switches set at the same moment are both kept.
  *   v1.1.0 — 2026-09-20 — A stop tells the owner (notify): the open item alone is silent until they
  *     happen to look, and an agent stands still meanwhile.
  *   v1.0.0 — 2026-09-20 — Initial: decision rules on the node.
  */
 import type { Storage, AiDecisionAnswer, AiDecisionOutcome } from '../../storage/interface.js';
-import { upsertPrivateRecord } from '../private-record.js';
+import { updateRecord } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { addItem } from '../open-items.js';
 import { notify } from '../notify.js';
@@ -67,11 +69,13 @@ export async function writeAgentGate(storage: Storage, ownerGhii: string, agent:
   if (setting !== 'on' && setting !== 'off' && setting !== 'rule' && setting !== null) {
     throw new DecideError('INVALID_BODY', 400, "gate is 'on', 'off' or 'rule' (each rule's own default).");
   }
-  const rec = (await storage.getMemory(ownerGhii, DECIDE_AGENTS_RECORD))?.value as AgentsRecord | undefined;
-  const agents = { ...(rec?.agents ?? {}) };
-  if (setting === 'on' || setting === 'off') agents[agent] = { ...(agents[agent] ?? {}), gate: setting };
-  else delete agents[agent];
-  await upsertPrivateRecord(storage, ownerGhii, DECIDE_AGENTS_RECORD, { agents }, ['decide', 'gate']);
+  // On the record's version: the switches of two agents set at the same moment are both kept.
+  await updateRecord<AgentsRecord>(storage, ownerGhii, DECIDE_AGENTS_RECORD, (v) => ({ agents: { ...((v as AgentsRecord | undefined)?.agents ?? {}) } }), (cur) => {
+    const agents = { ...cur.agents };
+    if (setting === 'on' || setting === 'off') agents[agent] = { ...(agents[agent] ?? {}), gate: setting };
+    else delete agents[agent];
+    return { agents };
+  }, { tag: 'decide', tags: ['decide', 'gate'] });
   emitChange('agents', ownerGhii);
   return setting === 'on' || setting === 'off' ? setting : 'rule';
 }
