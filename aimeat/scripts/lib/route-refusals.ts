@@ -23,6 +23,7 @@
  *   that answers an anonymous caller differently rather than refusing, has no refusal to test.
  * @structure authenticatedOperations · routeMatchers · testBlocks · refusalIn · namedRoutes · helperRoutes · refusedRoutes
  * @version-history
+ *   v1.0.1 -- 2026-10-19 -- A helper's name is regex-escaped in full, backslash included, before it is built into a pattern (CodeQL 1746).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit P3-08, W29).
  */
 import { readFileSync } from 'node:fs';
@@ -198,7 +199,10 @@ export function refusedRoutes(sources: string[], matchers: Matcher[]): Set<Route
             if (!r.s401 && !r.s403) continue;
             for (const key of namedRoutes(block, matchers)) covered.add(key);
             for (const [name, routes] of helpers) {
-                if (new RegExp(`(?<![\\w$.])${name.replace(/\$/g, '\\$')}\\s*\\(`).test(block)) for (const key of routes) covered.add(key);
+                // An identifier holds only `\w` and `$`, so escaping every regex metacharacter
+                // (backslash first among them) matches exactly what escaping `$` alone did.
+                const escaped = name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&');
+                if (new RegExp(`(?<![\\w$.])${escaped}\\s*\\(`).test(block)) for (const key of routes) covered.add(key);
             }
         }
     }

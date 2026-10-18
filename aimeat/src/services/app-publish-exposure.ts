@@ -11,9 +11,10 @@
  * @structure publishExposure() · generateAccessCode()
  * @usage const { parked, community, forkable, accessCode, access } = publishExposure(config, live, input.accessCode);
  * @version-history
+ *   v1.0.1 -- 2026-10-19 -- generateAccessCode draws each character with crypto.randomInt instead of a random byte modulo 31 (CodeQL 1751).
  *   v1.0.0 — 2026-10-17 — Initial (moved the carry-forward out of app-publish.ts and added the first-publish defaults).
  */
-import { randomBytes } from 'node:crypto';
+import { randomInt } from 'node:crypto';
 import type { AppRecord } from '../storage/interface.js';
 
 /** The access-code part of a publish request: the caller named a code (or none), or said nothing. */
@@ -31,9 +32,9 @@ export interface PublishExposure {
 /** An access code a person can type: eight characters without look-alikes. */
 export function generateAccessCode(): string {
   const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
-  const bytes = randomBytes(8);
+  // randomInt draws each character evenly; a byte modulo 31 favoured the first eight.
   let out = '';
-  for (const b of bytes) out += alphabet[b % alphabet.length];
+  for (let i = 0; i < 8; i++) out += alphabet[randomInt(alphabet.length)];
   return out;
 }
 

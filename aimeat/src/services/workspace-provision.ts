@@ -12,6 +12,8 @@
  *   - WorkspaceProvisionError: thrown for a malformed manifest (surfaces as 400/validation)
  * @usage const { ws } = await provisionWorkspace(storage, config, { orgId, ownerName, ownerGhii, name, manifest, schemas });
  * @version-history
+ *   v1.4.1 -- 2026-10-19 -- The ws id's three random base-36 characters come from crypto.randomInt, not
+ *     Math.random(): the id reaches access decisions as a workspace label key (CodeQL 1753, 1754).
  *   v1.4.0 -- 2026-10-18 -- A new workspace's name and summary meet the detection rules written for
  *     workspaces (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   v1.3.0 -- 2026-09-28 -- checkWorkspaceManifest(): an install set checks every workspace of its
@@ -29,6 +31,7 @@
  *     via the shared backfillManifestEnvelope() instead of only id+status, so a provision with just
  *     objectTypes validates first try (matches the MCP _create fix).
  */
+import { randomInt } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } from './workspace-meta.js';
@@ -103,7 +106,8 @@ export async function provisionWorkspace(
   man.objectTypes = normalizeObjectTypes(man.objectTypes as Array<Record<string, unknown>>) as unknown[];
 
   const schemaMap = input.schemas ?? {};
-  const wsId = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  // Same shape as before (`ws-` + base-36 time + three base-36 characters), drawn from crypto.
+  const wsId = 'ws-' + Date.now().toString(36) + randomInt(36 ** 3).toString(36).padStart(3, '0');
   const root = `organism.${input.orgId}.w.${wsId}`;
   const now = new Date().toISOString();
 

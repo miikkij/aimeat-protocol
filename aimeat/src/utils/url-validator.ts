@@ -10,6 +10,8 @@
  *   the request to an internal target.
  * @usage const resp = await safeFetch(url, { method, headers, body });
  * @version-history
+ *   2026-10-19 -- Comment at safeFetch's fetch call: why CodeQL js/request-forgery 1745 is a false
+ *     positive there. No code change.
  *   2026-10-16 — The loopback exception is decided on an address (a literal, or what a name resolves to),
  *     not on host text starting with "127." (QA audit S4-01), and safeFetch connects every validated hop
  *     through the connect-time guard, so the socket opens only to an address that was checked (QA audit
@@ -272,6 +274,12 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
     }
     let resp: Response;
     try {
+      // CodeQL js/request-forgery reports this call because `target` is caller-supplied: this function
+      // exists to fetch an address its caller does not control (an OAuth client metadata URL, a link
+      // to unfurl, a peer's base URL). The guard is above and per hop: the host allowlist, then
+      // validateOutboundUrl, then guardedDispatcher(), which checks the address the socket opens to
+      // (not used only for an origin the operator listed), and every redirect comes back through
+      // this loop. The query has no model for that guard.
       resp = await fetch(target, hopInit);
     } catch (err) {
       // A refusal at connect time arrives as fetch's "fetch failed" with the reason as its cause.

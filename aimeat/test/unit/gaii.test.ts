@@ -9,7 +9,35 @@ import {
     isValidGAII,
     isValidGHII,
     RESERVED_NAMES,
+    appSlug,
 } from '../../src/utils/gaii.js';
+
+describe('appSlug (CodeQL 1752: the hyphen trim is one pass)', () => {
+    it('gives the slugs the regex trim gave', () => {
+        // Each expected value is what `/^-+|-+$/g` produced before 2026-10-19.
+        const cases: Array<[string, string]> = [
+            ['nuotta.html', 'nuotta-html'],
+            ['Drum News.HTML', 'drum-news-html'],
+            ['--a--b--', 'a-b'],
+            ['apps/owner/My App.html', 'my-app-html'],
+            ['.x.', 'app-x'],
+            ['ab', 'app-ab'],
+            ['', 'app-'],
+            ['___', 'app-'],
+            ['-----x', 'app-x'],
+            ['Ääkköset.html', 'kk-set-html'],
+            [`${'a'.repeat(70)}.html`, 'a'.repeat(64)],
+        ];
+        for (const [input, slug] of cases) expect(appSlug(input), input).toBe(slug);
+    });
+
+    it('finishes fast on a long run of separators', () => {
+        const started = performance.now();
+        expect(appSlug(`x${'-'.repeat(100_000)}x`)).toBe('x-x');
+        expect(appSlug(`${'.'.repeat(100_000)}x${'-'.repeat(100_000)}`)).toBe('app-x');
+        expect(performance.now() - started).toBeLessThan(500);
+    });
+});
 
 describe('buildGAII', () => {
     it('constructs agent#owner@node format', () => {

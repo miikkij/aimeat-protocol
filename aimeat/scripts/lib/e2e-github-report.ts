@@ -26,6 +26,7 @@
  *   changes that action in the same piece of work.
  * @structure failedTestLines() · githubAnnotations() · githubSummary()
  * @version-history
+ *   v1.1.1 -- 2026-10-19 -- A summary table cell escapes backslash before the pipe, so a backslash in a note cannot unescape it (CodeQL 1750).
  *   v1.1.0 -- 2026-10-18 -- The list annotation carries a line per suite past the eighth, and the
  *     header names the reader (wish-lifecycle-central-y-ajon-punainen-sarja-h-iri-ksi-commit-v-l).
  *   v1.0.0 -- 2026-10-16 -- Initial: the nightly sweep names its red suites in public.
@@ -94,7 +95,9 @@ export function githubAnnotations(red: RedSuite[], backend: string): string[] {
 export function githubSummary(red: RedSuite[], backend: string, totals: { passed: number; failed: number; total: number }): string {
     const head = `### E2E on ${backend}: ${totals.passed} passed, ${totals.failed} failed out of ${totals.total}\n\n`;
     if (red.length === 0) return `${head}Every suite is green.\n`;
-    const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+    // Backslash first: a `\` already in the note before a `|` would pair with the escape added for
+    // the pipe (`\\|`), and the pipe would split the table cell.
+    const cell = (s: string) => s.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, '<br>');
     const rows = red.map(r => `| ${r.name} | ${r.passed}/${r.total} | ${cell(r.note)} | ${cell(r.failures.join('\n'))} |`);
     return `${head}| Red suite | Passed | Note | First failed tests |\n|---|---|---|---|\n${rows.join('\n')}\n`;
 }

@@ -38,13 +38,14 @@
  *   if (setupCodeRequired(config) && !hasOperator) logger.warn(`Setup code: ${setupCodeGateFor(config).issue()} ...`);
  *   const gate = setupCodeGateFor(config); if (!gate.matches(body.setupCode)) refuse();
  * @version-history
+ *   v1.2.1 -- 2026-10-19 -- Each character of the code is drawn with crypto.randomInt instead of a random byte modulo the alphabet (CodeQL 1749).
  *   v1.2.0 — 2026-10-16 — The code is needed while the node has no operator, not only no owner; the
  *     refusals say "operator" (Jouni, 2026-10-16).
  *   v1.1.0 — 2026-10-16 — setupCodeRefusal and SETUP_CODE_USED_MESSAGE moved here from routes/setup.ts, so
  *     the registration routes refuse the first account with the same codes and sentences (Jouni, 2026-10-16).
  *   v1.0.0 — 2026-10-16 — Initial (Jouni, 2026-10-16: first-owner setup needs a one-time code on a public node).
  */
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import type { AimeatConfig } from '../config-types.js';
 import { isLoopbackBaseUrl } from '../utils/test-money-guard.js';
 
@@ -77,9 +78,8 @@ export class SetupCodeGate {
 
   /** Generate a new code, keep its digest, and return the code for the start log. Replaces any earlier one. */
   issue(): string {
-    const bytes = randomBytes(CODE_LENGTH);
     let code = '';
-    for (let i = 0; i < CODE_LENGTH; i++) code += ALPHABET[bytes[i] % ALPHABET.length];
+    for (let i = 0; i < CODE_LENGTH; i++) code += ALPHABET[randomInt(ALPHABET.length)];
     this.hash = digest(code);
     this.held = null;
     return `${code.slice(0, 4)}-${code.slice(4, 8)}-${code.slice(8)}`;
