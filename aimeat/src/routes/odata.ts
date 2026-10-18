@@ -29,6 +29,8 @@
  *   - GET /v1/odata/:owner/:name/:resource  the entity set
  * @usage app.use(odataRouter(config, storage))
  * @version-history
+ *   2026-10-19 -- Entity-set and error bodies go through sendODataJson: the same content type and body,
+ *     set as a header before the send, plus `X-Content-Type-Options: nosniff` (CodeQL 1743).
  *   2026-10-17 — The feed reads with the caller's auth: a package published members, organism:<id> or
  *     private answers 404 to whom its audience does not admit, and a public one stays open to anyone
  *     (plan doc-mvcn6c7e4e5q, V3.8; services/datapackage/audience.ts).
@@ -48,9 +50,19 @@ import type { Descriptor } from '../services/datapackage/contract.js';
  * connector does not read, so a genuine refusal would surface in Excel as "something went wrong".
  */
 function odataError(res: Response, status: number, code: string, message: string): void {
-    res.status(status)
-        .type('application/json;odata.metadata=minimal')
-        .send(JSON.stringify({ error: { code, message } }, null, 2));
+    res.status(status);
+    sendODataJson(res, { error: { code, message } });
+}
+
+/**
+ * An OData JSON body. The content type is set on the response before the body, with
+ * `X-Content-Type-Options: nosniff`, so a browser cannot read a query value echoed in a nextLink or
+ * an error message as HTML (CodeQL js/reflected-xss 1743). Express adds `charset=utf-8` as before.
+ */
+function sendODataJson(res: Response, body: unknown): void {
+    res.setHeader('Content-Type', 'application/json;odata.metadata=minimal');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.send(JSON.stringify(body, null, 2));
 }
 
 /** Every OData response says which version it is, and none of them may be cached as a document: the
@@ -146,7 +158,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
             value: page.rows,
             ...(page.next ? { '@odata.nextLink': nextLinkFor(entitySetUrl, params, page.next, contentHash) } : {}),
         };
-        res.type('application/json;odata.metadata=minimal').send(JSON.stringify(body, null, 2));
+        sendODataJson(res, body);
     });
 
     /** What a caller gets for asking about a feed that does not exist as a whole. */

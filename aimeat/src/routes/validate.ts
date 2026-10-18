@@ -12,6 +12,8 @@
  *   - validateRouter(config): mounts POST /v1/validate returning validity/errors or a no-rules note
  *
  * @version-history
+ *   2026-10-19 -- findValidationRule takes the trailing slashes off with stripTrailingSlashes, a one-pass
+ *     scan, instead of `/\/+$/`, which is quadratic on a long run of slashes (CodeQL 1742).
  *   2026-10-15 — A concrete address (/v1/memory/my-key) finds its rule by route pattern; an address
  *     with no rule answers `valid: null, checked: false` instead of `valid: true`; answers carry
  *     `checked` and the `matched` pattern (feature-list audit #187).
@@ -20,6 +22,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
+import { stripTrailingSlashes } from '../utils/url-validator.js';
 import type { z } from 'zod';
 import {
     OwnerRegistrationSchema, AgentRegistrationSchema, AuthTokenRequestSchema,
@@ -77,7 +80,7 @@ function patternMatches(pattern: string, path: string): boolean {
  * a pattern. Null when this node has no rule for that address and method.
  */
 export function findValidationRule(method: string, endpoint: string): { pattern: string; schema: z.ZodType<unknown> } | null {
-    const path = endpoint.split('?')[0]!.replace(/\/+$/, '') || '/';
+    const path = stripTrailingSlashes(endpoint.split('?')[0]!) || '/';
     const verb = method.toUpperCase();
     const pattern = SCHEMA_MAP[path] ? path : Object.keys(SCHEMA_MAP).find(p => p.includes(':') && patternMatches(p, path));
     const schema = pattern ? SCHEMA_MAP[pattern]![verb] : undefined;

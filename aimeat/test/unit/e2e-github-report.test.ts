@@ -78,4 +78,8 @@ describe('githubSummary', () => {
     it('says green for a green run', () => {
         expect(githubSummary([], 'sqlite', { passed: 5, failed: 0, total: 5 })).toContain('Every suite is green.');
     });
+    it('keeps a note with a backslash before a pipe in one cell (CodeQL 1750)', () => {
+        const md = githubSummary([red('e2e-x', { note: 'C:\\|D' })], 'sqlite', { passed: 3, failed: 1, total: 4 });
+        expect(md).toContain('| C:\\\\\\|D |');
+    });
 });

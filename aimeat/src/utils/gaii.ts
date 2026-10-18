@@ -20,6 +20,8 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   2026-10-19 -- appSlug trims the hyphens with a one-pass scan instead of `/^-+|-+$/g`, which is
+ *     quadratic on a long run of hyphens (CodeQL 1752). Same slugs.
  *   2026-10-15 — appGranteeAsGeai: an MCP grant written for `app:{owner}/{file}` names the GEAI the
  *     app calls with (feature-list audit #12).
  *   v1.11.0 — 2026-10-14 — mayActOnAgent: the one answer to "may this caller act on the agent a
@@ -457,8 +459,17 @@ export function resolveIdentity(
  */
 export function appSlug(appId: string): string {
   const base = appId.includes('/') ? (appId.split('/').pop() as string) : appId;
-  const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64);
+  const slug = trimHyphens(base.toLowerCase().replace(/[^a-z0-9]+/g, '-')).slice(0, 64);
   return slug.length >= 3 ? slug : `app-${slug}`.slice(0, 64);
+}
+
+/** `s` without its leading and trailing hyphens, in one pass (`/^-+|-+$/g` is quadratic on a long run). */
+function trimHyphens(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s.charCodeAt(start) === 45 /* '-' */) start += 1;
+  while (end > start && s.charCodeAt(end - 1) === 45 /* '-' */) end -= 1;
+  return s.slice(start, end);
 }
 
 /**

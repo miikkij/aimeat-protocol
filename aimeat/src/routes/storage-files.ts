@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-19 -- A raw-body upload whose `?key=` is not one string (repeated, so an array) gets 400
+ *     "key is required" from the shared write instead of reaching it as an array (CodeQL 1755, 1756).
  *   2026-10-18 — The presigned answer carries the shared mint's `warnings` (PUBLIC_IS_SIGNED_IN_HERE, plan V1.6).
  *   2026-10-18 — POST /v1/storage (inline, raw body, presigned) without a visibility takes
  *     visibility.file_default; `visibility: 'default'` (the SDK's word) takes visibility.app_upload_default
@@ -333,7 +335,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             mimeType = mime_type ?? 'application/octet-stream';
         } else {
             // Raw body upload
-            key = req.query.key as string ?? `file-${Date.now()}`;
+            // A repeated `?key=` arrives as an array; it is no key, and the shared write refuses ''.
+            const queryKey: unknown = req.query.key;
+            key = typeof queryKey === 'string' ? queryKey : queryKey === undefined ? `file-${Date.now()}` : '';
             visibility = uploadVisibilityOf(config, req.query.visibility as string | undefined, isAppGrantRoles(req.auth!.roles));
             const chunks: Buffer[] = [];
             for await (const chunk of req) {

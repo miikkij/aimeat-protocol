@@ -24,9 +24,10 @@
  * @usage
  *   cd aimeat && pnpm build && node scripts/pack-smoke.mjs [--keep]   # --keep leaves the directory
  * @version-history
+ *   v1.0.1 -- 2026-10-19 -- npm runs without a shell on Windows too: node.exe runs npm-cli.js with an argument array (CodeQL 1747, 1748).
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W08, P6-04).
  */
-import { execFileSync, execSync, spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -38,13 +39,28 @@ const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP = process.argv.includes('--keep');
 const READY_MS = 180_000;
 /**
- * Run npm. On Windows npm is npm.cmd, which Node starts only through a shell, so the arguments are
- * quoted into one command line there (a temp path may hold a space); elsewhere npm runs directly.
+ * npm's own entry script on Windows, where `npm` is npm.cmd and Node starts a .cmd only through a
+ * shell. The candidates are the two npm.cmd itself picks from: a global npm in the default prefix
+ * (%APPDATA%\npm) first, then the npm installed beside node.exe.
+ */
+function npmCliOnWindows() {
+    const candidates = [
+        ...(process.env.APPDATA ? [join(process.env.APPDATA, 'npm', 'node_modules', 'npm', 'bin', 'npm-cli.js')] : []),
+        join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    ];
+    const found = candidates.find(p => existsSync(p));
+    if (!found) throw new Error(`pack-smoke: npm-cli.js not found (looked in ${candidates.join(', ')}).`);
+    return found;
+}
+
+/**
+ * Run npm with an argument array and no shell, so a file name (the packed tarball, a temp path with
+ * a space) is one argument and never part of a command line. On Windows that means node.exe running
+ * npm-cli.js directly instead of npm.cmd.
  */
 function npm(args, opts) {
     if (process.platform !== 'win32') return execFileSync('npm', args, opts);
-    const quote = (a) => (/[\s"&|<>^]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
-    return execSync(['npm', ...args].map(quote).join(' '), opts);
+    return execFileSync(process.execPath, [npmCliOnWindows(), ...args], opts);
 }
 
 function fail(message, logFile) {

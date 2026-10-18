@@ -135,4 +135,14 @@ describe('#187 POST /v1/validate looks a route up by its pattern', () => {
     expect(findValidationRule('PUT', '/v1/memory/a/b')).toBeNull();
     expect(findValidationRule('PUT', '/v1/memory/')).toBeNull();
   });
+
+  it('findValidationRule drops trailing slashes in one pass (CodeQL 1742)', () => {
+    expect(findValidationRule('POST', '/v1/memory/')?.pattern).toBe('/v1/memory');
+    expect(findValidationRule('POST', '/v1/memory///?x=1')?.pattern).toBe('/v1/memory');
+    expect(findValidationRule('POST', '/v1/work/tc-1/deliver//')?.pattern).toBe('/v1/work/:tc/deliver');
+    expect(findValidationRule('POST', '///')).toBeNull();
+    const started = performance.now();
+    expect(findValidationRule('POST', `/v1/${'/'.repeat(100_000)}x`)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(500);
+  });
 });
