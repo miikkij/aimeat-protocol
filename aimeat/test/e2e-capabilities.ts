@@ -6,6 +6,9 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   2026-10-18 — An agent that lost capability:write is refused DELETE of its own capability with 403
+ *     SCOPE_DENIED and the record stays; given the word back, it deletes. Red with
+ *     requireScope('capability:write') removed from the route (wish-kolme-puuttuvaa-kieltotesti-maksuosoite-ty-nkulun-ajo-ja-kyv).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-13 — The pacing amount is cost.toll_morsels: the new name is taken as it is, the
  *     old cost.morsels is taken on POST and PUT with the Deprecation headers, counted and stored under
@@ -67,6 +70,8 @@ import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { suitePort } from './helpers/free-port.js';
 import { registerOwner, ownerSignIn, tokenRoles } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
+import * as ed from '@noble/ed25519';
 
 // ─── State ───
 const ownerName = 'captest-' + Math.random().toString(36).slice(2, 8);
@@ -849,6 +854,54 @@ await test('A vouch is one row per person: dedup, comment landing, and taking on
 
 // ─── Phase 9: Delete ───
 console.log('\nPhase 9 — Delete');
+
+// Every delete in this file is the owner's, and an owner passes requireScope without holding a word,
+// so removing requireScope('capability:write') on this route left the suite green (quality round
+// 2026-10-18). A capability belongs to the principal that created it, so the agent here creates its
+// own, the owner then takes capability:write away, and the word is the only check left between the
+// agent and the delete of its own record.
+async function agentToken(gaii: string, privateKey: string): Promise<string> {
+    const timestamp = new Date().toISOString();
+    const sig = await ed.signAsync(new TextEncoder().encode(gaii + timestamp), Buffer.from(privateKey, 'base64'));
+    const r = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature: Buffer.from(sig).toString('base64') }) });
+    assert(r.status === 200, `agent token: ${r.status} ${JSON.stringify(r.body.error)}`);
+    return r.body.data.token as string;
+}
+
+await test('DELETE /v1/capabilities/:id — an agent needs capability:write', async () => {
+    const id = 'scope-del-' + Math.random().toString(36).slice(2, 8);
+    const owner = { name: ownerName, token: ownerToken };
+    const agent = await makeAgent(BASE, owner, ['work:request', 'capability:write']);
+    const created = await json('/v1/capabilities', {
+        method: 'POST', headers: { 'Authorization': `Bearer ${agent.token}` },
+        body: JSON.stringify({
+            id, name: 'Scope Delete', summary: 'Test',
+            source: { type: 'manual', ref: 'manual', version: '1.0.0' },
+            callable: false, visibility: 'private', status: 'active',
+        }),
+    });
+    assert(created.status === 201, `the agent creates its capability: ${created.status} ${JSON.stringify(created.body.error)}`);
+    const setScopes = async (scopes: string[]) => {
+        const r = await json(`/v1/agents/${agent.name}/scopes`, { method: 'PATCH', headers: { 'Authorization': `Bearer ${ownerToken}` }, body: JSON.stringify({ scopes }) });
+        assert(r.status === 200, `owner sets the agent's scopes to ${scopes.join(',')}: ${r.status} ${JSON.stringify(r.body.error)}`);
+        return agentToken(agent.gaii, agent.privateKey);
+    };
+
+    const narrow = await setScopes(['work:request']);
+    const refused = await json(`/v1/capabilities/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${narrow}` } });
+    assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED' && /capability:write/.test(refused.body.error?.message ?? ''),
+        `DELETE without capability:write: expected 403 SCOPE_DENIED naming capability:write, got ${refused.status} ${JSON.stringify(refused.body.error)}`);
+    const kept = await json(`/v1/capabilities/${id}`, { headers: { 'Authorization': `Bearer ${narrow}` } });
+    assert(kept.status === 200, `the refused DELETE left the capability in place: ${kept.status}`);
+
+    // POSITIVE CONTROL: the same agent, given the word back, removes it.
+    const wide = await setScopes(['work:request', 'capability:write']);
+    const removed = await json(`/v1/capabilities/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${wide}` } });
+    assert(removed.status === 200 && removed.body.data?.deleted === true,
+        `DELETE with capability:write: expected 200, got ${removed.status} ${JSON.stringify(removed.body.error)}`);
+    const gone = await json(`/v1/capabilities/${id}`, { headers: { 'Authorization': `Bearer ${wide}` } });
+    assert(gone.status === 404, `the allowed DELETE removed it: ${gone.status}`);
+});
 
 await test('DELETE manual capability', async () => {
     const { status, body } = await json(`/v1/capabilities/${capId}`, {

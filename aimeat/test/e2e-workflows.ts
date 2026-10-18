@@ -6,6 +6,9 @@
  *   steps via simulated task completion (the onTaskTerminal hook). Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows
  * @version-history
+ *   2026-10-18 — An agent holding every word the steps cost but not workflow:write is refused POST
+ *     /v1/workflows/:id/run with 403 SCOPE_DENIED and no run starts; red with requireScope('workflow:write')
+ *     removed from the route (wish-kolme-puuttuvaa-kieltotesti-maksuosoite-ty-nkulun-ajo-ja-kyv).
  *   2026-10-16 — The improve prompt refuses a principal without workflow:read and the chat prompt one without agent:read and memory:read; another owner reaches neither this owner's workflow nor offers (QA audit P3-03).
  *   v1.0.0 — 2026-06-13 — Initial Phase 4 coverage.
  *   v1.1.0 — 2026-06-15 — notify_on_finish: opt-in gate + success/failure finish-notification coverage.
@@ -1068,6 +1071,30 @@ async function run() {
     // …and the scoped agent may remove it, so the refusal was the word and not the door.
     const delOk = await json('/v1/workflows/agent-denied-wf', { method: 'DELETE', headers: scoped });
     assert(delOk.status === 200, `DELETE with workflow:write: ${delOk.status} ${JSON.stringify(delOk.body.error)}`);
+  });
+
+  // Starting a run dispatches agents and writes memory, so it takes workflow:write as a save does.
+  // Every run above is the owner's, and the step words refuse a narrow agent before the run starts,
+  // so removing requireScope('workflow:write') on the run route left this suite green (quality round
+  // 2026-10-18). The agent here holds every word the run's steps cost and only lacks workflow:write.
+  await test('workflow:write is what an agent needs to start a run', async () => {
+    const save = await json('/v1/workflows/agent-run-wf', { method: 'PUT', headers: auth, body: JSON.stringify(WORKFLOW) });
+    assert(save.status === 200, `owner saves the workflow: ${save.status} ${JSON.stringify(save.body.error)}`);
+    const steps = ['workflow:read', 'memory:read', 'work:request'];
+    const noWrite = await mintAgent('wf-run-nowrite', steps);
+    const withWrite = await mintAgent('wf-run-write', [...steps, 'workflow:write']);
+
+    const refused = await json('/v1/workflows/agent-run-wf/run', { method: 'POST', headers: noWrite.headers, body: JSON.stringify({ mode: 'signals-only' }) });
+    assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED' && /workflow:write/.test(refused.body.error?.message ?? ''),
+      `a run without workflow:write: expected 403 SCOPE_DENIED naming workflow:write, got ${refused.status} ${JSON.stringify(refused.body.error)}`);
+    const runs = await json('/v1/workflows/agent-run-wf/runs?include=checks', { headers: auth });
+    assert(runs.status === 200 && runs.body.data?.count === 0, `the refused call started no run: ${JSON.stringify(runs.body.data)}`);
+
+    // POSITIVE CONTROL: the same call with the one word more starts the check.
+    const started = await json('/v1/workflows/agent-run-wf/run', { method: 'POST', headers: withWrite.headers, body: JSON.stringify({ mode: 'signals-only' }) });
+    assert(started.status === 200 && typeof started.body.data?.runId === 'string',
+      `a run with workflow:write: expected 200 with a runId, got ${started.status} ${JSON.stringify(started.body.error)}`);
+    await json('/v1/workflows/agent-run-wf', { method: 'DELETE', headers: auth });
   });
 
   // ── an ai step's input_keys answers to the same undeclared-var check as its siblings ──
