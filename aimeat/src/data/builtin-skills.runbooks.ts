@@ -15,6 +15,8 @@
  *   2026-10-18 — manage-my-agents: a change with no level gets the node's starting level, and a new agent may start unlisted (plan doc-mvcn6c7e4e5q, V5).
  *   2026-10-18 — manage-my-agents: a stored file made public, and a bulk write or an import, wait for
  *     the owner the same way (publish_requests per record; plan doc-mvcn6c7e4e5q, V4).
+ *   2026-10-18 — manage-my-agents: `invites_people` on an agent row, and that the owner is told
+ *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-18 — manage-my-agents: publish:public, and what a write that makes a record public answers
  *     without it (plan doc-mvcn6c7e4e5q, V4.6).
  *   2026-10-17 — manage-my-agents: a refusal is answered with the one-press allow address
@@ -193,6 +195,10 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
   what such an agent uses, its tasks wait for the owner. \`aimeat_agents_list\` shows the permissions
   it used (\`task_start_wildcard.proposal\`); read them to the owner, and when they agree, narrow the
   agent to them with \`aimeat_agent_scope_narrow\`.
+- **An agent that invites people.** \`invites_people: true\` on an agent's row means its permissions
+  cover \`organism:invite\`: it can invite people into the shared spaces the owner belongs to, and an
+  invitation can create a new account. That is allowed. When you describe the agent to the owner,
+  say it.
 
 Where agents run, for the owner:
 

@@ -23,6 +23,7 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   2026-10-18 — The proposal answer's `next_step` says when the proposed agent may invite people (organism:invite).
  *   2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 — An approved proposal's agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   2026-10-15 — The approval's `llm_choice` carries `warning` when the owner's model policy leaves
@@ -150,7 +151,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       already_waiting: out.alreadyWaiting ?? false,
       approval_url: approvalUrl,
       // Said plainly, because an agent relaying this to a person should be able to say it as-is.
-      next_step: proposalNextStep(out.proposal.display_name, approvalUrl, out.alreadyWaiting ?? false),
+      next_step: proposalNextStep(out.proposal.display_name, approvalUrl, out.alreadyWaiting ?? false, out.proposal.scopes),
     }, [
       { description: 'The owner approves it', method: 'POST', url: `/v1/agents/v2/agent-proposals/${out.proposal.id}/approve` },
       { description: 'See it in the profile', method: 'GET', url: '/v1/profile?tab=agents' },

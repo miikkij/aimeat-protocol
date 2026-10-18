@@ -11,7 +11,8 @@
  *   that guessing cannot come back without turning this suite red.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-map
  * @version-history
- *   2026-10-16 — The map of an app that is not public (unlisted, behind an access code, listed to the community, hidden by an operator) goes only to whoever may see the app; another owner, another owner's agent over MCP and a caller with no token get a 404 (QA audit list review).
+ *   2026-10-18 — An app that asks for organism:invite and does not say in its map that it invites people gets DATAMAP_INVITES_UNSTATED; the machinery word or the `invites` statement clears it, and a tie keeps the statement. An agent holding organism:invite is listed with `invites_people: true` on GET /v1/agents and aimeat_agents_list (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
+ *   2026-10-16 —The map of an app that is not public (unlisted, behind an access code, listed to the community, hidden by an operator) goes only to whoever may see the app; another owner, another owner's agent over MCP and a caller with no token get a 404 (QA audit list review).
  *   v2.2.0 — 2026-09-26 — A6-10 on the MCP door: aimeat_app_get gives another owner's agent the
  *     manifest without `dataMap.gap`. Failed on the code before the fix: the gap was there.
  *   v2.1.0 — 2026-09-24 — A6-10: another owner and a caller with no token read the stamp without
@@ -75,6 +76,9 @@ const APP_HTML = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="aimeat-scopes" content="memory:read memory:write">
 <title>Map probe</title></head><body><h1>Map probe</h1></body></html>`;
 
+/** An app that asks for organism:invite: it may invite people into organisms. */
+const INVITING_HTML = APP_HTML.replace('content="memory:read memory:write"', 'content="memory:read memory:write organism:invite"');
+
 /** A complete map for a group app whose rows really do land where the group can read them. */
 const GOOD_MAP = {
     spec: 'aimeat.datamap/2',
@@ -101,10 +105,10 @@ const CONTRADICTED_MAP = {
 };
 
 /** An agent of this owner, and its token. aimeat_app_get asks no scope word, so memory:read does. */
-async function agentOf(o: Owner): Promise<string> {
+async function agentOf(o: Owner, scopes: string[] = ['memory:read']): Promise<string> {
     const reg = await json('/v1/agents', {
         method: 'POST', headers: auth(o.token),
-        body: JSON.stringify({ name: `dmapag${Date.now() % 100000}${Math.floor(Math.random() * 900 + 100)}`, owner: o.name, scopes: ['memory:read'] }),
+        body: JSON.stringify({ name: `dmapag${Date.now() % 100000}${Math.floor(Math.random() * 900 + 100)}`, owner: o.name, scopes }),
     });
     assert(reg.status === 201, `agent registration ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
     const gaii = reg.body.data.agent.gaii as string;
@@ -154,11 +158,11 @@ async function mcpCall(token: string, name: string, args: Record<string, unknown
     return { raw, parsed, isError: !!out?.result?.isError };
 }
 
-async function publish(o: Owner, filename: string): Promise<void> {
+async function publish(o: Owner, filename: string, htmlText: string = APP_HTML): Promise<void> {
     const r = await json('/v1/apps', {
         method: 'POST', headers: auth(o.token),
         body: JSON.stringify({
-            filename, content: Buffer.from(APP_HTML).toString('base64'),
+            filename, content: Buffer.from(htmlText).toString('base64'),
             mime_type: 'text/html', name: 'Map probe', description: 'E2E',
         }),
     });
@@ -377,6 +381,98 @@ async function publish(o: Owner, filename: string): Promise<void> {
         assert(operator.status === 200, `the operator reads it: ${operator.status}`);
         refused(await readMap(other.name, 'probe-hidden.html', third.token), 'another owner');
         refused(await readMap(other.name, 'probe-hidden.html'), 'a caller with no token');
+    });
+
+    // An app that may invite people says so in its map (Jouni, 2026-10-18): organism:invite lets it
+    // invite people into organisms, and an invitation can create a new account. Allowed, and visible.
+    await test('an app that asks for organism:invite and does not say it invites people gets a finding, at publish and on the map', async () => {
+        await publish(o, 'probe-invites.html', INVITING_HTML);
+        const r = await json(`/v1/datamap/apps/${o.name}/probe-invites.html`, { headers: auth(o.token) });
+        const codes = (r.body.data.findings ?? []).map((f: { code: string }) => f.code);
+        assert(codes.includes('DATAMAP_MISSING') && codes.includes('DATAMAP_INVITES_UNSTATED'),
+            `an app with no map and the scope gets both findings: ${JSON.stringify(codes)}`);
+        const w = await json(`/v1/datamap/apps/${o.name}/probe-invites.html`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify(GOOD_MAP),
+        });
+        assert(w.status === 200, `write ${w.status}`);
+        const after = (w.body.data.findings ?? []).map((f: { code: string }) => f.code);
+        assert(after.length === 1 && after[0] === 'DATAMAP_INVITES_UNSTATED',
+            `a complete map that does not say it invites people has exactly that finding: ${JSON.stringify(after)}`);
+        assert(w.body.data.stamp?.gap?.code === 'DATAMAP_INVITES_UNSTATED', `and the stamp carries it: ${JSON.stringify(w.body.data.stamp)}`);
+    });
+
+    await test('the app that says it invites people, and how, has no finding, and the statement is served back whole', async () => {
+        const stated = { ...GOOD_MAP, invites: { does: ['sends-email-invitations', 'creates-accounts'], into: 'the team organism the person picks' } };
+        const w = await json(`/v1/datamap/apps/${o.name}/probe-invites.html`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify(stated),
+        });
+        assert(w.status === 200, `write ${w.status}`);
+        assert((w.body.data.findings ?? []).length === 0, `nothing missing: ${JSON.stringify(w.body.data.findings)}`);
+        const r = await json(`/v1/datamap/apps/${o.name}/probe-invites.html`);
+        assert(r.status === 200, `a caller with no token reads the map: ${r.status}`);
+        assert(JSON.stringify(r.body.data.data_map?.invites) === JSON.stringify(stated.invites),
+            `the statement is public, as the rest of the map: ${JSON.stringify(r.body.data.data_map?.invites)}`);
+        // The machinery word alone is a statement too.
+        const word = await json(`/v1/datamap/apps/${o.name}/probe-invites.html`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify({ ...GOOD_MAP, machinery: ['invites-people'] }),
+        });
+        assert((word.body.data.findings ?? []).length === 0, `the machinery word is enough: ${JSON.stringify(word.body.data.findings)}`);
+        // An app without the scope is asked nothing.
+        const plain = await json(`/v1/datamap/apps/${o.name}/probe-good.html`, { headers: auth(o.token) });
+        assert(!(plain.body.data.findings ?? []).some((f: { code: string }) => f.code === 'DATAMAP_INVITES_UNSTATED'),
+            'an app that does not ask for organism:invite needs no statement');
+    });
+
+    await test('tying an agent to the app keeps the invites statement', async () => {
+        const stated = { ...GOOD_MAP, invites: { does: ['mints-access-codes'], into: 'the team organism' } };
+        await json(`/v1/datamap/apps/${o.name}/probe-invites.html`, { method: 'PUT', headers: auth(o.token), body: JSON.stringify(stated) });
+        const agentName = `dmapinv${Date.now() % 100000}`;
+        const reg = await json('/v1/agents', {
+            method: 'POST', headers: auth(o.token), body: JSON.stringify({ name: agentName, owner: o.name, scopes: ['memory:read'] }),
+        });
+        assert(reg.status === 201, `agent ${reg.status}`);
+        const tie = await json(`/v1/datamap/apps/${o.name}/probe-invites.html/agents/${agentName}`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify({ made_for: true }),
+        });
+        assert(tie.status === 200, `tie ${tie.status}: ${JSON.stringify(tie.body?.error)}`);
+        assert(tie.body.data.data_map?.invites?.does?.[0] === 'mints-access-codes', `the tie kept the statement: ${JSON.stringify(tie.body.data.data_map?.invites)}`);
+        assert(!(tie.body.data.findings ?? []).some((f: { code: string }) => f.code === 'DATAMAP_INVITES_UNSTATED'), 'and has no invites finding');
+    });
+
+    // The agent side of the same ruling: an agent that holds organism:invite says so on its page and
+    // card, derived from its scopes, so the statement cannot go out of date.
+    await test('an agent that holds organism:invite is listed as one that invites people, on REST and over MCP; one without it is not', async () => {
+        const mk = async (scopes: string[]): Promise<string> => {
+            const name = `dmapag${Date.now() % 100000}${Math.floor(Math.random() * 900 + 100)}`;
+            const reg = await json('/v1/agents', { method: 'POST', headers: auth(o.token), body: JSON.stringify({ name, owner: o.name, scopes }) });
+            assert(reg.status === 201, `agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+            return name;
+        };
+        const inviter = await mk(['memory:read', 'organism:invite']);
+        const reader = await mk(['memory:read']);
+        const list = await json('/v1/agents', { headers: auth(o.token) });
+        const row = (n: string) => (list.body?.data?.agents ?? []).find((a: { name: string }) => a.name === n);
+        assert(row(inviter)?.invites_people === true, `the inviting agent: ${JSON.stringify(row(inviter)?.invites_people)}`);
+        assert(row(reader)?.invites_people === false, `the reading agent: ${JSON.stringify(row(reader)?.invites_people)}`);
+        const mcp = await mcpCall(await agentOf(o, ['memory:read', 'agent:read']), 'aimeat_agents_list', {});
+        assert(!mcp.isError && mcp.parsed, `aimeat_agents_list answers: ${mcp.raw.slice(0, 200)}`);
+        const mrow = (n: string) => (mcp.parsed.agents ?? []).find((a: { name: string }) => a.name === n);
+        assert(mrow(inviter)?.invites_people === true && mrow(reader)?.invites_people === false,
+            `the MCP list says the same: ${JSON.stringify([mrow(inviter)?.invites_people, mrow(reader)?.invites_people])}`);
+    });
+
+    await test('a proposed agent that would hold organism:invite says so in the answer the person reads before approving', async () => {
+        const propose = (name: string, scopes: string[]) => json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ name, purpose: 'Brings new members into the team organism.', scopes }),
+        });
+        const stem = `dmprop${Date.now() % 100000}`;
+        const yes = await propose(`${stem}a`, ['memory:read', 'organism:invite']);
+        assert(yes.status === 201, `propose ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+        assert(String(yes.body.data.next_step).includes('invite people'), `the answer says it: ${yes.body.data.next_step}`);
+        const no = await propose(`${stem}b`, ['memory:read']);
+        assert(no.status === 201, `propose ${no.status}`);
+        assert(!String(no.body.data.next_step).includes('invite people'), `and only then: ${no.body.data.next_step}`);
     });
 
     await test('an unknown app is a 404, not an empty map', async () => {

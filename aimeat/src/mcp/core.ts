@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-18 — aimeat_agents_list answers `invites_people` per agent, as GET /v1/agents does (services/agent-invites.ts).
  *   2026-10-18 — aimeat_memory_write without a visibility takes visibility.memory_default (plan V5.1).
  *   2026-10-18 — aimeat_memory_write asks the publish gate: a public write without publish:public is
  *     stored at the level it had and answers with `publish_request` (plan doc-mvcn6c7e4e5q, V4.4).
@@ -199,6 +200,7 @@ import type { CallerContext } from '../services/caller-context.js';
 import { presentWorkCost } from '../services/morsel.js';
 import { presentActionPricing } from '../services/action-pacing.js';
 import { memoryVisibilityDefault } from '../services/content-defaults.js';
+import { invitesPeople } from '../services/agent-invites.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -410,6 +412,7 @@ export function registerCoreTools(
                     // started again, and a runtime reads that here (services/agent-stop-rules.ts).
                     ...stoppedView(a),
                     default_scopes: a.defaultScopes ?? ['*'],
+                    invites_people: invitesPeople(a.defaultScopes ?? ['*']),
                     ...agentAccessFields(a.defaultScopes ?? ['*'], access, a.name),
                 })),
             });

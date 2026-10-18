@@ -14,11 +14,15 @@
  *   Preset summaries are generated FROM the actual SCOPE_TEMPLATES sets, so the description can not
  *   drift from what the preset grants. `t` is injected so the module stays pure and unit-testable,
  *   like scope-model.js beneath it.
- * @structure scopeSentence · familyName · areaLine · presetSummary · requestedSummary · boundaryLines
+ * @structure scopeSentence · familyName · areaLine · presetSummary · requestedSummary · invitesPeople ·
+ *   invitesSentence · boundaryLines
  * @usage
  *   import { scopeSentence, boundaryLines } from '/js/consent-vocab.js';
  *   scopeSentence('storage:write', t)  // "Upload, replace and delete files in your storage."
  * @version-history
+ *   v1.4.0 — 2026-10-18 — invitesPeople(scopes) and invitesSentence(t): an agent whose permissions
+ *     cover organism:invite may invite people, and an invitation can create an account; the agent
+ *     page, the agent card and the proposal list say so (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   v1.3.0 — 2026-10-17 — A preset holding messages:send says so in a sentence of its own, and the
  *     messages family leaves its area line: sending is not reading or writing anyone's messages.
  *   v1.0.0 — 2026-08-17 — Extracted the vocabulary the surfaces had each half-invented: the area
@@ -32,7 +36,7 @@
  *     preset carries the word since D4 and the summary said only "read and write" (audit of the
  *     secaudit last items, finding 5).
  */
-import { SCOPE_TEMPLATES, NOT_IN_WILDCARD } from '/views/profile/agents/scope-model.js';
+import { SCOPE_TEMPLATES, NOT_IN_WILDCARD, expandScopes } from '/views/profile/agents/scope-model.js';
 
 export { SCOPE_TEMPLATES, NOT_IN_WILDCARD };
 
@@ -114,6 +118,20 @@ export function requestedSummary(scopes, t) {
   const list = Array.isArray(scopes) ? scopes.filter((s) => typeof s === 'string') : [];
   if (list.length === 0) return '';
   return withOrganismWrite(t('consent.preset.asked', { areas: areaLine(list, t) }), list, t);
+}
+
+/**
+ * True when these permissions cover organism:invite, read the way the node reads them: the agent may
+ * invite people into the organisms its owner belongs to, and an invitation can create a new account.
+ * Prefer the node's own answer (`invites_people` on GET /v1/agents) where a page has it.
+ */
+export function invitesPeople(scopes) {
+  return expandScopes(Array.isArray(scopes) ? scopes : []).has('organism:invite');
+}
+
+/** The sentence a page shows for an agent that may invite people (Jouni, 2026-10-18). */
+export function invitesSentence(t) {
+  return t('consent.preset.invitesPeople');
 }
 
 /**

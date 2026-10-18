@@ -12,9 +12,14 @@
  *
  *   PURE. No storage, no clock: the caller passes `at`, so the same map always yields the same
  *   summary and a unit test can assert it.
- * @structure summariseMap · checkMap · noMapStamp · FINDING_CODES
+ * @structure summariseMap · checkMap · statesInvites · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.4.0 — 2026-10-18 — DATAMAP_INVITES_UNSTATED: an app whose declared scopes cover
+ *     organism:invite and whose map has neither the machinery word `invites-people` nor an `invites`
+ *     statement is a finding, after DATAMAP_NO_ROWS, also beside DATAMAP_MISSING. checkMap and
+ *     stampFor take the app's declared scopes; without them nothing is asked
+ *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   v1.3.0 — 2026-10-11 — DATAMAP_ROW_BAD_AGENT: a row's optional `agent` that cannot be an agent's
  *     name is a finding, after the missing `why` and before the classification one, and never a
  *     refusal.
@@ -30,6 +35,7 @@ import {
   type DataMap, type DataMapRow, type DataMapStamp, type DataMapGap, type DataLocation,
 } from './data-map-types.js';
 import { isValidAgentName } from '../../utils/gaii.js';
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
 
 /** Findings, worst first. The order is the order a reader should care. */
 export const FINDING_CODES = [
@@ -40,6 +46,7 @@ export const FINDING_CODES = [
   'DATAMAP_FORM_CONTRADICTED',
   'DATAMAP_ROW_NO_WHY',
   'DATAMAP_NO_ROWS',
+  'DATAMAP_INVITES_UNSTATED',
   'DATAMAP_ROW_BAD_AGENT',
   'DATAMAP_ROW_BAD_CLASSIFICATION',
 ] as const;
@@ -61,6 +68,38 @@ const badClassification = (r: DataMapRow): boolean =>
  * the map is written, and the pages that read the tie say so then.
  */
 const badAgent = (r: DataMapRow): boolean => r.agent !== undefined && !isValidAgentName(r.agent);
+
+/** The scope that lets an app invite people into organisms, where an invitation can create an account. */
+export const INVITE_SCOPE = 'organism:invite';
+
+/**
+ * True when the map says the app invites people: the machinery word `invites-people`, or an
+ * `invites` statement that names at least one act or where it invites people to.
+ */
+export function statesInvites(map: DataMap): boolean {
+  if (Array.isArray(map.machinery) && map.machinery.includes('invites-people')) return true;
+  const inv = map.invites;
+  if (!inv || typeof inv !== 'object') return false;
+  const does = Array.isArray(inv.does) ? inv.does.filter(d => typeof d === 'string' && d.trim()) : [];
+  return does.length > 0 || (typeof inv.into === 'string' && inv.into.trim().length > 0);
+}
+
+/**
+ * The finding for an app that declares organism:invite and says nothing about it. Inviting people is
+ * allowed, and a person who installs the app reads it here (Jouni, 2026-10-18). The scope is read
+ * the way requireScope reads it, so `organism:*` and `*` count.
+ */
+function invitesFinding(map: DataMap | null, declaredScopes: readonly string[]): { code: FindingCode; message: string } | null {
+  if (!scopeIsCovered(declaredScopes, INVITE_SCOPE)) return null;
+  if (map && map.source !== 'none' && statesInvites(map)) return null;
+  return {
+    code: 'DATAMAP_INVITES_UNSTATED',
+    message: `This app asks for ${INVITE_SCOPE}, so it can invite people into organisms, and an invitation `
+      + 'can create a new account. The map does not say so. Add "invites-people" to `machinery`, or an '
+      + '`invites` statement: { "does": ["sends-email-invitations", "mints-access-codes", "creates-accounts", '
+      + '"grants-workspace-access", "manages-members"], "into": "which organisms" }.',
+  };
+}
 
 export type FindingCode = typeof FINDING_CODES[number];
 
@@ -141,9 +180,15 @@ export interface MapCheck {
   gap: DataMapGap | null;
 }
 
-/** What is still missing from a map somebody wrote. Never blocks anything. */
-export function checkMap(map: DataMap | null, at: string): MapCheck {
+/**
+ * What is still missing from a map somebody wrote. Never blocks anything.
+ *
+ * `declaredScopes` are the words of the app's `<meta name="aimeat-scopes">` (parseAppScopes). They
+ * decide only whether the map has to say that the app invites people; omitted, nothing is asked.
+ */
+export function checkMap(map: DataMap | null, at: string, declaredScopes: readonly string[] = []): MapCheck {
   const findings: { code: FindingCode; message: string }[] = [];
+  const invites = invitesFinding(map, declaredScopes);
 
   if (!map || map.source === 'none') {
     findings.push({
@@ -151,8 +196,10 @@ export function checkMap(map: DataMap | null, at: string): MapCheck {
       message: 'This app has no data map. Whoever builds or edits it next has to read the source to '
         + 'find out where its data goes, which is how data ends up wherever was easiest to reach.',
     });
+    if (invites) findings.push(invites);
     return { findings, gap: { code: 'DATAMAP_MISSING', message: findings[0].message, at } };
   }
+  if (invites) findings.push(invites);
 
   if (!map.what.trim() || !map.usedFor.trim()) {
     findings.push({
@@ -217,8 +264,8 @@ export function checkMap(map: DataMap | null, at: string): MapCheck {
 }
 
 /** The stamp a list renders from, without reading the document. */
-export function stampFor(map: DataMap | null, appId: string, at: string): DataMapStamp {
-  const check = checkMap(map, at);
+export function stampFor(map: DataMap | null, appId: string, at: string, declaredScopes: readonly string[] = []): DataMapStamp {
+  const check = checkMap(map, at, declaredScopes);
   const rows = map?.held ?? [];
   return {
     spec: DATA_MAP_SPEC,

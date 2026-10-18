@@ -24,6 +24,10 @@
  * @structure DataMap(props) · dataMapState(map)
  * @usage html`<${DataMap} map=${m} findings=${f} say=${(k) => x(k)} />`
  * @version-history
+ *   v1.1.0 — 2026-10-18 — "Who it invites": the app invites people into organisms and an invitation
+ *     can create an account, from the machinery word `invites-people` or the `invites` statement
+ *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien). model.js is untouched, so
+ *     the app catalogue's byte copy stays the same.
  *   v1.0.0 — 2026-09-27 — Initial: the old app catalogue's data map (js/data-map.js panelHtml) as a
  *     Preact component over the shared vocabulary (appcat detail builder B).
  */
@@ -71,6 +75,26 @@ function ElsewhereRow({ row, say }) {
 
 const Part = ({ children }) => html`<h4 class="data-map-part">${children}</h4>`;
 
+/** The acts an `invites` statement may name, each with its own words; an unknown act prints as written. */
+const INVITE_ACTS = ['sends-email-invitations', 'mints-access-codes', 'creates-accounts', 'grants-workspace-access', 'manages-members'];
+
+/**
+ * The app invites people into organisms, and an invitation can create a new account: the machinery
+ * word `invites-people` or the `invites` statement (Jouni, 2026-10-18). Null when the map says neither.
+ */
+function Invites({ map, say }) {
+  const inv = map.invites && typeof map.invites === 'object' ? map.invites : null;
+  const does = Array.isArray(inv?.does) ? inv.does.filter((d) => typeof d === 'string' && d) : [];
+  const into = typeof inv?.into === 'string' ? inv.into.trim() : '';
+  const word = Array.isArray(map.machinery) && map.machinery.includes('invites-people');
+  if (!word && !does.length && !into) return null;
+  return html`
+    <${Part}>${say('dataMap.invitesLabel')}<//>
+    <p class="data-map-text">${say('dataMap.invites.lead')}</p>
+    ${does.length ? html`<ul class="data-map-bullets">${does.map((d) => html`<li key=${d}>${INVITE_ACTS.includes(d) ? say('dataMap.invites.' + d) : d}</li>`)}</ul>` : null}
+    ${into ? html`<p class="data-map-fact"><b>${say('dataMap.invites.intoLabel')}</b> ${into}</p>` : null}`;
+}
+
 /**
  * @param {{ map?: any, findings?: Array<{ message: string }>, say?: (key: string) => string, loading?: boolean }} props
  */
@@ -95,6 +119,7 @@ export function DataMap({ map, findings = [], say = t, loading }) {
     ${places.length ? html`<ul class="data-map-places">${places.map((p) => html`<li key=${p.where}>${labelOf(say, 'where', p.where)} · ${p.n}</li>`)}</ul>` : null}
     ${rows.length ? html`<${Part}>${say('dataMap.rowsLabel')}<//>${rows.map((r, i) => html`<${HeldRow} key=${r.what || i} row=${r} say=${say} />`)}` : null}
     ${(map.machinery || []).length ? html`<${Part}>${say('dataMap.machineryLabel')}<//><p class="data-map-text">${map.machinery.join(' · ')}</p>` : null}
+    <${Invites} map=${map} say=${say} />
     ${(map.leaves || []).length ? html`<${Part}>${say('dataMap.leavesLabel')}<//><ul class="data-map-bullets">${map.leaves.map((l, i) => html`<li key=${i}>${l.what} → ${l.to}${l.recallable ? null : html` <span class="data-map-norecall">${say('dataMap.leaves.noRecall')}</span>`}</li>`)}</ul>` : null}
     ${(map.elsewhere || []).length ? html`<${Part}>${say('dataMap.elsewhereLabel')}<//>${map.elsewhere.map((r, i) => html`<${ElsewhereRow} key=${i} row=${r} say=${say} />`)}` : null}
     ${found}

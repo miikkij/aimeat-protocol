@@ -26,6 +26,7 @@
  * @structure NewAgentPanel({ session, showToast, onCreated, agents, open, setOpen, onWaiting })
  * @usage <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} />
  * @version-history
+ *   v2.16.0 -- 2026-10-18 -- A waiting proposal whose permissions cover organism:invite says that the agent may invite people.
  *   v2.15.0 -- 2026-10-08 -- An agent approved with no connector connected is "waiting for your connector": it gets its key when the connector connects, without a press.
  *   v2.14.0 -- 2026-10-02 -- The question marks that explain what the agent reaches and how it runs: access.scopes, agent.run_mode (components/HelpTip.js).
  *   v2.13.0 --2026-10-01 -- A `draft` from the page's examples fills the form; the section is 03, under
@@ -67,7 +68,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { areaLine } from '/js/consent-vocab.js';
+import { areaLine, invitesPeople, invitesSentence } from '/js/consent-vocab.js';
 import { Section } from '/components/Section.js';
 import { CREW_TEMPLATES, buildTemplate } from './crew-templates.js';
 import { SCOPE_TEMPLATES } from './scope-model.js';
@@ -273,7 +274,8 @@ export default function NewAgentPanel({ session, showToast, onCreated, agents, o
                 <${Desc} sub=${html`
                     ${t('profile.agents.new.proposedBy').replace('{who}', pr.proposed_by)}
                     ${(pr.scopes ?? []).length > 0 && html` · ${areaLine(pr.scopes, t)}`}
-                    ${!pr.crew_def && html` · ${t('profile.agents.new.noDefinition')}`}`}>${pr.purpose}<//>
+                    ${!pr.crew_def && html` · ${t('profile.agents.new.noDefinition')}`}
+                    ${invitesPeople(pr.scopes ?? []) && html` · ${invitesSentence(t)}`}`}>${pr.purpose}<//>
                 <${Doors}>
                   <${Loud} control disabled=${busy} onClick=${() => settle(pr, 'approve')}>
                     ${t('profile.agents.new.approve')}

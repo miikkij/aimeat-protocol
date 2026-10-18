@@ -17,6 +17,7 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-18 — aimeat_agent_propose's next_step says when the proposed agent may invite people (proposalNextStep with the proposal's permissions).
  *   2026-10-14 — aimeat_connector_list answers `tunnel_enabled` too, through connectorListAnswer, the
  *     function GET /v1/agents/v2/connectors calls.
  *   2026-10-10 — aimeat_connector_list and aimeat_connector_rename: the machines the owner's agents
@@ -284,7 +285,7 @@ export function registerAgentManagementTools(
                         created: false,
                         already_waiting: out.alreadyWaiting ?? false,
                         approval_url: approvalUrl,
-                        next_step: proposalNextStep(out.proposal.display_name, approvalUrl, out.alreadyWaiting ?? false),
+                        next_step: proposalNextStep(out.proposal.display_name, approvalUrl, out.alreadyWaiting ?? false, out.proposal.scopes),
                     }, null, 2),
                 }],
             };
