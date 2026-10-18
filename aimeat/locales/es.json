@@ -13499,16 +13499,16 @@
     "insufficientPack": "También puedes comprarle más capacidad de ritmo a quien gestiona este servicio: {n} morsels por {price}."
   },
   "news": {
-    "titleSince": "Novedades desde tu última visita",
-    "titleWindow": "Los cambios más importantes de los últimos {n} días",
+    "titleSince": "Actualizaciones del sistema desde tu última visita",
+    "titleWindow": "Las actualizaciones del sistema más importantes de los últimos {n} días",
     "highlights": "Importante",
-    "others": "Otros cambios",
-    "moreOne": "Hay un cambio más en el historial.",
-    "moreN": "Hay {n} cambios más en el historial.",
+    "others": "Otras actualizaciones del sistema",
+    "moreOne": "Hay una actualización del sistema más en el historial.",
+    "moreN": "Hay {n} actualizaciones del sistema más en el historial.",
     "read": "Leído",
-    "history": "Todo lo que ha cambiado →",
+    "history": "Todas las actualizaciones del sistema →",
     "for": "Para: {who}",
-    "countTitle": "{n} cambios nuevos en tu inicio",
+    "countTitle": "{n} actualizaciones del sistema nuevas en tu inicio",
     "who": {
       "user": "Tú",
       "agent": "Tu IA y tus agentes",

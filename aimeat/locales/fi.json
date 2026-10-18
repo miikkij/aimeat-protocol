@@ -22238,16 +22238,16 @@
     }
   },
   "news": {
-    "titleSince": "Uutta sitten viime käyntisi",
-    "titleWindow": "Tärkeimmät muutokset viimeisen {n} päivän ajalta",
+    "titleSince": "Uudet järjestelmäpäivitykset viime käyntisi jälkeen",
+    "titleWindow": "Tärkeimmät järjestelmäpäivitykset viimeisen {n} päivän ajalta",
     "highlights": "Tärkeä",
-    "others": "Muut muutokset",
-    "moreOne": "Yksi muutos lisää on historiassa.",
-    "moreN": "{n} muutosta lisää on historiassa.",
+    "others": "Muut järjestelmäpäivitykset",
+    "moreOne": "Yksi järjestelmäpäivitys lisää on historiassa.",
+    "moreN": "{n} järjestelmäpäivitystä lisää on historiassa.",
     "read": "Luettu",
-    "history": "Kaikki muutokset →",
+    "history": "Kaikki järjestelmäpäivitykset →",
     "for": "Kenelle: {who}",
-    "countTitle": "{n} uutta muutosta Kodissasi",
+    "countTitle": "{n} uutta järjestelmäpäivitystä Kodissasi",
     "who": {
       "user": "Sinä",
       "agent": "Tekoälysi ja agenttisi",
