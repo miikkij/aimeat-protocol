@@ -9,11 +9,14 @@
  *   the reader's own format through /js/format.js, the site's rule). Pure functions over the
  *   store's rows, so every list and the rail read the same answers (the old render.js, rows.js and
  *   server-io.js rules, features.md F19–F20, F32–F33, F46, F73–F76, F156–F161).
- * @structure KUNTO_KEYS · STATES · LISTINGS · appName · appIcon · appDesc · appTags · shipsAgents · kunto(sa, bound) ·
+ * @structure KUNTO_KEYS · STATES · LISTINGS · OPEN_TO · openToOf(sa) · openToPlace(sa) ·
+ *   openToSentenceKey(sa, nodeSignedIn) · appName · appIcon · appDesc · appTags · shipsAgents · kunto(sa, bound) ·
  *   stateOf(sa) · tagCounts(rows) · filterRows(rows, f) · sortRows(rows, mode) · stateCounts(rows, bound) ·
  *   fmtKb(bytes) · fmtDate(iso) · fmtNum(n) · host()
  * @usage import { filterRows, sortRows } from '/views/appcat/model.js';
  * @version-history
+ *   v1.3.0 — 2026-10-18 — Who may open an app: OPEN_TO, openToOf, openToPlace and openToSentenceKey
+ *     read the row's `open_to` (plan doc-mvcn6c7e4e5q, V2.5).
  *   v1.2.0 — 2026-10-18 — The search finds an app by its file name too (?q=hello.html found nothing).
  *   v1.1.0 — 2026-10-12 — Three listings: listed, community (signed-in members of the node only) and
  *     unlisted. stateOf reads the listing's `listing`, and the state rows count and filter all three.
@@ -30,6 +33,38 @@ export const KUNTO_KEYS = ['noMap', 'noAi', 'specOff', 'seoOff', 'stale60', 'noS
 export const STATES = ['listed', 'community', 'unlisted', 'draft'];
 /** The three listings, in the order the Manage section offers them. */
 export const LISTINGS = ['listed', 'community', 'unlisted'];
+/** Who may open an app (the row's `open_to`), as the Manage section offers it; `organism` names one place. */
+export const OPEN_TO = ['anyone', 'signedIn', 'organism'];
+
+/**
+ * Who may open the app, as one of OPEN_TO: the row's `open_to` ('anyone', 'signed-in', the owner's
+ * 'organism:<id>' or everybody else's 'organism'), or '' when the row does not say (an app from
+ * another node).
+ */
+export function openToOf(sa) {
+  const v = sa && sa.open_to;
+  if (v === 'anyone') return 'anyone';
+  if (v === 'signed-in') return 'signedIn';
+  if (typeof v === 'string' && (v === 'organism' || v.startsWith('organism:'))) return 'organism';
+  return '';
+}
+
+/** The organism's id in the owner's own `open_to` ('organism:<id>'), else ''. */
+export function openToPlace(sa) {
+  const v = sa && sa.open_to;
+  return typeof v === 'string' && v.startsWith('organism:') ? v.slice('organism:'.length) : '';
+}
+
+/**
+ * The key of the sentence that says who may open the app (appcat.openTo.*), or '' when the row does
+ * not say. `nodeSignedIn`: the node shows its content to signed-in people only (js/site.js
+ * signedInOnly), which makes an app open to anyone need a sign-in all the same.
+ */
+export function openToSentenceKey(sa, nodeSignedIn) {
+  const level = openToOf(sa);
+  if (level === 'anyone' && nodeSignedIn) return 'openTo.nodeSignedIn';
+  return level ? 'openTo.' + level : '';
+}
 
 const man = (sa) => (sa && sa.manifest) || {};
 

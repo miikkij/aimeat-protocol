@@ -14,10 +14,12 @@
  *   The decision itself is services/audience.ts, the same one every content kind asks. The owner and
  *   an operator are exempt the way they are exempt from the code: the caller of mayOpenApp decides
  *   that, because the operator pass writes a trail line (routes/apps/read.ts operatorReads).
- * @structure APP_ACCESS_VALUES · parseAppAccessInput · appAccessOf · appAudience · appNeedsCodeOrPayment · appNeedsSignIn · mayOpenApp
+ * @structure APP_ACCESS_VALUES · parseAppAccessInput · appAccessOf · appAccessLevelOf · appAudience · appNeedsCodeOrPayment · appNeedsSignIn · mayOpenApp
  * @usage
  *   if (appNeedsSignIn(config, app) && !(await mayOpenApp(storage, config, app, req.auth))) → refuse
  * @version-history
+ *   v1.1.0 — 2026-10-18 — appAccessLevelOf: the setting without the organism's id, for a listing row
+ *     read by someone other than the owner (plan doc-mvcn6c7e4e5q, V2.5).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V2.1).
  */
 import type { Storage, AppRecord } from '../storage/interface.js';
@@ -51,6 +53,16 @@ export function appAccessOf(app: Pick<AppRecord, 'access'> | null | undefined): 
   if (v === 'signed-in') return 'signed-in';
   if (typeof v === 'string' && parseAudience(v)?.level === 'organism') return v as AppAccess;
   return 'anyone';
+}
+
+/**
+ * The app's own setting as anybody but its owner reads it: the level without the organism's id
+ * ('anyone' | 'signed-in' | 'organism'), so a listing says who may open an app without naming the
+ * owner's organism to people outside it.
+ */
+export function appAccessLevelOf(app: Pick<AppRecord, 'access'> | null | undefined): 'anyone' | 'signed-in' | 'organism' {
+  const own = appAccessOf(app);
+  return own === 'anyone' || own === 'signed-in' ? own : 'organism';
 }
 
 /**

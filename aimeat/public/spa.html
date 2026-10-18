@@ -1038,7 +1038,8 @@
     // trip in front of every date on the screen.
     import { loadDisplayPrefs } from '/js/display-prefs.js';
     import { initThemeSystem, setTheme } from '/js/theme.js';
-    import { siteLink } from '/js/site.js';
+    import { siteLink, signInFirst, signedInOnly } from '/js/site.js';
+    import { getSession } from '/js/services/auth.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
@@ -1132,6 +1133,9 @@
       '/v1/profile':     () => import('/views/profile.js' + B),
       '/v1/home':        () => import('/views/home/index.js' + B),
       '/v1/app-grant':   () => import('/views/app-grant.js' + B),
+      // Opening an app, a welcome page or a company front page that needs a sign-in (routes/apps/open.ts,
+      // routes/page-open.ts). A spaRoute in routes/portal.ts too.
+      '/v1/app-open':    () => import('/views/app-open.js' + B),
       '/v1/invite':      () => import('/views/invite-accept.js' + B),
       // The owner confirms a sign-in round an agent started (secrets audit 2026-10-09). A spaRoute
       // in routes/portal.ts too, or F5 is a 404.
@@ -1214,6 +1218,17 @@
       return ROUTES[pathname] || ROUTES['/v1/portal'];
     }
 
+    // The view to draw at an address. On a node that shows its content to signed-in accounts only
+    // (window.__SITE.contentAccess, routes/portal-spa.ts), a visitor without a session gets the
+    // sign-in page in place of every view but the steps of signing in (js/site.js signInFirst); the
+    // API would refuse each view's reads anyway. The address stays, so the view opens once the
+    // session arrives (App routes again on a sign-in change). Not in matchRoute: findRoute asks that
+    // one whether a /v1/ address is the SPA's at all, and the answer must not depend on the session.
+    const SIGN_IN_FIRST = () => import('/views/sign-in-first.js' + B);
+    function viewFor(pathname, search) {
+      return signInFirst(pathname, !!getSession()) ? SIGN_IN_FIRST : matchRoute(pathname, search);
+    }
+
     // ── App Component ──
     function App() {
       const [View, setView] = useState(null);
@@ -1223,7 +1238,7 @@
       // Navigate to a route
       const navigate = useCallback(async (path, replace = false) => {
         const url = new URL(path, window.location.origin);
-        const loader = matchRoute(url.pathname, url.search);
+        const loader = viewFor(url.pathname, url.search);
         // The look follows the address: AIMEAT's own pages wear the chosen theme, the others do not.
         window.__aimeatLook?.apply(url.pathname);
         
@@ -1291,7 +1306,7 @@
         // Handle back/forward
         const onPopState = () => {
           window.__aimeatLook?.apply(location.pathname);
-          const loader = matchRoute(location.pathname, location.search);
+          const loader = viewFor(location.pathname, location.search);
           loader().then(mod => {
             setViewError(null);
             setView(() => mod.default);
@@ -1353,6 +1368,16 @@
       useEffect(() => {
         return onLocaleChange((loc) => setLocale(loc));
       }, []);
+
+      // On a signed-in-only node the view depends on the session (viewFor): a sign-in in the dialog
+      // opens the page the visitor came for at the same address, and a sign-out puts the sign-in
+      // page back. The first run is the initial load, which the effect above already routed.
+      const signedIn = !!useSession();
+      const sessionSeen = useRef(false);
+      useEffect(() => {
+        if (!sessionSeen.current) { sessionSeen.current = true; return; }
+        if (signedInOnly()) navigate(location.pathname + location.search, true);
+      }, [signedIn, navigate]);
 
       const retryView = useCallback(() => {
         navigate(location.pathname + location.search, true);
@@ -1587,7 +1612,9 @@
       const hiddenSet = new Set(navConfig.hidden);
       // Operator-owned apps (siteKey) resolve their href from window.__SITE and drop out of
       // the nav entirely when this node has not configured one.
-      const visibleLinks = navConfig.order
+      // On a signed-in-only node a visitor without a session reaches no public page (each shows the
+      // sign-in page), so the bar carries no links for them: the sign-in pill is the one way on.
+      const visibleLinks = (signedInOnly() && !session) ? [] : navConfig.order
         .map(id => linkById[id])
         .filter(l => l && !hiddenSet.has(l.id))
         .filter(l => (l.when === 'anon' ? !session : l.when === 'auth' ? !!session : true))
@@ -1693,6 +1720,18 @@
       // they sign in. The session comes from the ONE session source, so the footer leaves the
       // moment the profile itself appears (2026-09-06).
       const session = useSession();
+      // On a signed-in-only node the sign-in page stands in for every public page, and the footer's
+      // other links would only lead to it again: it carries the privacy policy and the terms, the two
+      // pages the server serves to anyone (middleware/content-access-gate.ts).
+      if (signInFirst(location.pathname, !!session)) {
+        return html`
+          <footer class="site-footer">
+            <div class="site-footer-row">
+              <a href=${getLocale() === 'en' ? '/v1/privacy' : '/v1/privacy/' + getLocale()}>${tr('footer.privacy', 'Privacy')}</a>
+              <a href=${getLocale() === 'en' ? '/v1/terms' : '/v1/terms/' + getLocale()}>${tr('footer.terms', 'Terms')}</a>
+            </div>
+          </footer>`;
+      }
       const signedOutDoor = location.pathname === '/v1/profile' && !session;
       if (!FOOTER_ROUTES.has(location.pathname) && !signedOutDoor) return null;
       return html`

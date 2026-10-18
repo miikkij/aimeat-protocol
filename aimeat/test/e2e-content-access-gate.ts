@@ -20,6 +20,8 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A stranger's browser gets the shell with the sign-in page at every page
+ *     address, the open page and the other steps of signing in included (plan doc-mvcn6c7e4e5q, V1.5).
  *   v1.0.1 — 2026-10-18 — The granted origin answers the grant with a 302 and the grant cookie, and
  *     serves on the cookie (plan doc-mvcn6c7e4e5q, V2).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V1.7).
@@ -194,6 +196,32 @@ async function main() {
             assert(body.includes('"contentAccess":"signed-in"'), 'window.__SITE does not say signed-in');
             const md = await fetch(`${BASE}/?format=md`);
             assert(!(await md.text()).includes('Gate Demo'), 'the markdown front page named an app');
+        });
+
+        await test('a stranger\'s browser gets the shell with the sign-in page at every page address, the steps of signing in included', async () => {
+            // The shell routes on the client: it shows /views/sign-in-first.js in place of every view but
+            // the steps of signing in (js/site.js signInFirst). The server's half is that every one of
+            // these addresses answers the shell, never a 401 or a 404, and that the files it loads are there.
+            for (const path of ['/', '/v1/portal', '/v1/how-it-works', '/v1/publicworkspaceviewer?org=x&ws=y', `/v1/portfolio/${owner}`,
+                `/v1/app-open?app=${encodeURIComponent(`${owner}/${filename}`)}`, '/v1/invite?token=x', '/v1/app-grant', '/v1/oauth-round?state=x', '/v1/allow?agent=x&need=y']) {
+                const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'text/html' } });
+                const body = await res.text();
+                assert(res.status === 200, `${path}: ${res.status}`);
+                assert(body.includes('"contentAccess":"signed-in"') && body.includes('/views/sign-in-first.js'), `${path}: not the signed-in-only shell`);
+            }
+            for (const file of ['/views/sign-in-first.js', '/views/app-open.js', '/js/site.js']) {
+                const res = await fetch(`${BASE}${file}`);
+                assert(res.status === 200, `${file}: ${res.status}`);
+            }
+            const site = await (await fetch(`${BASE}/js/site.js`)).text();
+            const steps = /SIGN_IN_STEPS = new Set\(\[([^\]]*)\]\)/.exec(site)?.[1] ?? '';
+            for (const step of ['/v1/app-grant', '/v1/app-open', '/v1/invite', '/v1/oauth-round', '/v1/allow']) {
+                assert(steps.includes(`'${step}'`), `${step} is not a step of signing in: ${steps}`);
+            }
+            // FAILURE: a viewer of shared content is not a step of signing in; it asks for the sign-in.
+            for (const viewer of ['/v1/publicworkspaceviewer', '/v1/publicknowledgeviewer', '/v1/portfolio', '/v1/portal']) {
+                assert(!steps.includes(`'${viewer}'`), `${viewer} would reach a stranger without the sign-in`);
+            }
         });
 
         await test('robots.txt disallows everything, and the bootstrap says content_access', async () => {
