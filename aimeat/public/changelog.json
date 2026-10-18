@@ -5,6 +5,18 @@
       "date": "2026-10-18",
       "kind": "feature",
       "title": {
+        "en": "See when an app or an agent can invite people",
+        "fi": "Näet, kun sovellus tai agentti voi kutsua ihmisiä"
+      },
+      "body": {
+        "en": "An app or an agent can invite people into the shared spaces you belong to, and an invitation can create a new account. That stays possible, because sometimes it is part of the job. Now you can see it. An app's page says under Where this app puts what whom it invites and how: invitations by email, invitation codes or new accounts. An app that can invite people and does not say so gets a note for its owner. An agent that can invite people says so on its page, on its card and in the proposal you approve, and your AI reads the same from the list of your agents.",
+        "fi": "Sovellus tai agentti voi kutsua ihmisiä jaettuihin tiloihin, joissa olet mukana, ja kutsu voi luoda uuden tilin. Se on edelleen mahdollista, koska joskus se kuuluu työhön. Nyt näet sen. Sovelluksen sivulla kohdassa Mihin tämä sovellus panee mitä kerrotaan, ketä se kutsuu ja miten: kutsuja sähköpostilla, kutsukoodeja tai uusia tilejä. Jos sovellus voi kutsua ihmisiä eikä kerro sitä, sen omistaja saa huomautuksen. Agentti, joka voi kutsua ihmisiä, kertoo sen sivullaan, kortillaan ja ehdotuksessa, jonka hyväksyt. Tekoälysi lukee saman agenttiesi listasta."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "feature",
+      "title": {
         "en": "Classify whole places and set what each agent may read",
         "fi": "Luokittele kokonaisia paikkoja ja päätä, mitä kukin agentti saa lukea"
       },
