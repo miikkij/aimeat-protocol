@@ -20,6 +20,8 @@
  *   v1.x, findings()).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-gates-fail.test.ts
  * @version-history
+ *   2026-10-18 — check:browser-libs refuses a baseline missing a differing route and one listing a route
+ *     that no longer differs.
  *   2026-10-18 — check:atomic-writes reports a planted read-then-write, directly and through wrappers,
  *     passes the same with a version condition, and stays blind to two key expressions for one record
  *     (wish wish-tarkistus-ei-atomiselle-kirjoitukselle-uudessa-koodissa).
@@ -384,10 +386,39 @@ describe('check:python-shapes and check:python-daemon refuse a difference nobody
         expect(r.code).toBe(1);
         expect(r.out).toContain('rest.connector-only:POST /v1/agents/{}/tasks/{}/complete');
     });
-    it('stays blind to what a field means (its documented limit): the namespace-versus-name defect of the open incident passes', () => {
-        // daemon.py keys its manifest map by objectType.name; keying it by namespace changes no name the check reads.
+    it('stays blind to what a field means (its documented limit): a change to the manifest key of _space_contract passes', () => {
+        // The kind of difference of incident incident-aimeat-crewai-the-contract-engagement-gate-never-finds-a-spa-mv5fhg3s: no name the check reads changes.
         const r = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'daemon.py', from: 'ot["name"]: ot["contract"]', to: 'ot["namespace"]: ot["contract"]' }) });
         expect(r.code).toBe(0);
+    });
+});
+
+describe('check:browser-libs refuses a differing route the baseline does not list, and a listed one that stopped differing', { timeout: 120_000 }, () => {
+    const BASE = join(AIMEAT, 'security', 'browser-lib-routes.json');
+    /** A baseline copy with `edit` applied to its differences. */
+    function baseline(edit: (d: Record<string, unknown>) => void): string {
+        const j = JSON.parse(readFileSync(BASE, 'utf8')) as { differences: Record<string, unknown> };
+        edit(j.differences);
+        return join(tree({ 'b.json': JSON.stringify(j) }), 'b.json');
+    }
+    const check = (path: string): { code: number; out: string } => {
+        const r = spawnSync(process.execPath, ['--import', TSX, join(AIMEAT, 'scripts', 'audit-browser-libs.ts'), '--check'],
+            { cwd: AIMEAT, encoding: 'utf8', timeout: 60_000, env: { ...process.env, AIMEAT_BROWSER_LIBS_BASELINE: path } });
+        return { code: r.status ?? -1, out: `${r.stdout}${r.stderr}` };
+    };
+    it('passes the tree against its own baseline', () => {
+        expect(check(baseline(() => undefined)).code).toBe(0);
+    });
+    it('refuses a route that differs and is not listed (the number grew)', () => {
+        const first = Object.keys((JSON.parse(readFileSync(BASE, 'utf8')) as { differences: Record<string, unknown> }).differences)[0];
+        const r = check(baseline(d => { delete d[first]; }));
+        expect(r.code).toBe(1);
+        expect(r.out).toContain(`${first} is called with different parameters`);
+    });
+    it('refuses a listed route that no longer differs, so the gain is kept', () => {
+        const r = check(baseline(d => { d['/v1/no-such-route'] = { portal: [], apps: ['x'] }; }));
+        expect(r.code).toBe(1);
+        expect(r.out).toContain('/v1/no-such-route, which no longer differs');
     });
 });
 

@@ -8,10 +8,10 @@
  *   two; this lists the routes BOTH call, and among those the ones they call with different query
  *   parameters, which is where one of them is likely to have missed a change the other followed.
  *
- *   REPORT ONLY (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille, brief
- *   doc-mvdq71zdgo3o): `pnpm audit:browser-libs` prints it and never fails on a difference;
- *   `--write` records the current differences in security/browser-lib-routes.json, and `pnpm debt`
- *   counts that file, so the number is visible and its history is in git.
+ *   A SHRINK-ONLY RATCHET (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille,
+ *   brief doc-mvdq71zdgo3o; first a report, a gate since Jouni's yes on 2026-10-18):
+ *   `pnpm audit:browser-libs` prints it, `pnpm check:browser-libs` fails on a differing route that
+ *   security/browser-lib-routes.json does not list, and `pnpm debt` counts that file.
  *
  *   READING THE SOURCE. Every string or template literal that contains `/v1/`, outside comments. The
  *   path is the literal from `/v1/` to its query; a literal that ends in `/` and is followed by
@@ -24,6 +24,7 @@
  *   - PORTAL_DIR, APPS_DIR, APPS_SKIP, BASELINE
  * @usage import { libraryCalls, routeDifferences } from './inventory/browser-lib-routes.js';
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The report became a shrink-only gate (scripts/audit-browser-libs.ts --check).
  *   v1.0.0 — 2026-10-18 — Initial (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';

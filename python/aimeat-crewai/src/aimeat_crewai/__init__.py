@@ -26,6 +26,10 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.36.0 -- 2026-10-18 -- `build_offer()` requires `deliverable`, as the node's OfferSchema does
+    (offers.py, DELIVERABLE_FORMATS). It raised nothing before and the node's catalogue then left out
+    the agent's whole offers document; now a missing deliverable or one that is not a dict is a
+    TypeError and a format the node does not accept a ValueError, each naming the field. MINOR, NOT PATCH: a call that worked now raises.
   0.34.0 -- 2026-10-11 -- An offer has two values: a money price (`build_offer(price_money=...)`,
     `priceMoney`) and a pacing amount in morsels per use (`toll_morsels=`, `tollMorsels`). A morsel
     paces use and is never a price. `build_offer(price={"morsels": n})` is deprecated: it warns and
@@ -235,7 +239,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.35.1"
+__version__ = "0.36.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

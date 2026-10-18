@@ -3,6 +3,17 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.36.0 - 2026-10-18
+
+- **`build_offer()` asks for a `deliverable`, as the node does.** The node refuses an offer without
+  one, and its catalogue then left out every offer of that agent, with no message. Now
+  `build_offer()` without `deliverable=`, or with one that is not a dict, raises `TypeError`, and a
+  deliverable whose `format` the node does not accept raises `ValueError`; both name the field. The smallest one the node accepts
+  is `deliverable={"format": "document"}`; add `"location": {"key": "<memory key>"}` to make the
+  offer usable in a workflow. The formats are in `aimeat_crewai.offers.DELIVERABLE_FORMATS`.
+- **Upgrading:** a call to `build_offer()` without `deliverable=` worked before and raises now.
+  Add the deliverable your agent produces. An offers document you write by hand is not checked.
+
 ## 0.35.1 - 2026-10-15
 
 - **A retire stops only your own agent.** When two owners each have an agent with the same name in

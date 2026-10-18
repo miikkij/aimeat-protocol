@@ -240,14 +240,18 @@ def test_the_deprecated_price_never_reaches_the_offer() -> None:
     assert offer_errors(offer) == []
 
 
-def test_an_offer_without_a_deliverable_is_the_listed_difference() -> None:
-    """The node requires `deliverable`; build_offer does not. Listed, with what it costs, in
-    aimeat/security/python-shape-parity.json. When build_offer starts requiring it, this test
-    fails, and the entry is deleted with it."""
-    bare = build_offer(id="x", title="t", ask="a")
-    assert offer_errors(bare) == ["$: missing required 'deliverable'"]
-    if ALLOWLIST.exists():
-        assert "offer.required.node-only:deliverable" in _allowlisted()
+def test_build_offer_requires_a_deliverable_as_the_node_does() -> None:
+    """OfferSchema requires `deliverable`, and the node's catalogue drops a whole offers document
+    that does not parse, so an offer without one is refused here, naming the field (0.36.0)."""
+    with pytest.raises(TypeError, match="deliverable"):
+        build_offer(id="x", title="t", ask="a")  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="deliverable"):
+        build_offer(id="x", title="t", ask="a", deliverable={"location": {"key": "k"}})
+    with pytest.raises(TypeError, match="deliverable"):
+        build_offer(id="x", title="t", ask="a", deliverable=None)  # type: ignore[arg-type]
+    smallest = build_offer(id="x", title="t", ask="a", deliverable={"format": "document"})
+    assert offer_errors(smallest) == []
+    assert "offer.required.node-only:deliverable" not in _allowlisted()
 
 
 def test_an_offers_document_is_one_the_node_accepts() -> None:
@@ -260,3 +264,5 @@ def test_an_offers_document_is_one_the_node_accepts() -> None:
 def test_the_constants_are_the_nodes() -> None:
     assert offers_module.TOLL_MORSELS_MAX == NODE["constants"]["TOLL_MORSELS_MAX"]
     assert NONE == NODE["constants"]["REQUIRED_TO_FUNCTION_NONE"]
+    node_formats = OFFER["properties"]["deliverable"]["properties"]["format"]["enum"]
+    assert set(offers_module.DELIVERABLE_FORMATS) == set(node_formats)

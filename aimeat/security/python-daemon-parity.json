@@ -43,6 +43,6 @@
     "tool.not-on-connector:aimeat_offers_publish": "A CrewAI tool the package itself defines (offers_tool.py, @tool), which publishes the offers document with publish_offers(). It is the package's own tool, never loaded from the connector. Read 2026-10-18."
   },
   "known": {
-    "incident-aimeat-crewai-the-contract-engagement-gate-never-finds-a-spa-mv5fhg3s": "daemon.py _space_contract keys the workspace manifest by objectType.name, while the record event's `space` carries the space's namespace (src/services/connect-tunnel-push.ts, `space: namespace`). Both are strings in a field called space, so a name comparison cannot tell them apart. Open incident; the fix belongs in aimeat-crewai and needs a release."
+    "incident-aimeat-crewai-the-contract-engagement-gate-never-finds-a-spa-mv5fhg3s": "Known difference in daemon.py _space_contract; see incident incident-aimeat-crewai-the-contract-engagement-gate-never-finds-a-spa-mv5fhg3s."
   }
 }
