@@ -45,6 +45,7 @@ import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { notify } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
+import { updateRecord, UNCHANGED } from '../services/record-cas.js';
 
 /** Where an extension keeps its plans, in its own namespace. */
 export const PLANS_KEY = 'subscription.plans';
@@ -105,7 +106,11 @@ export async function readPlan(storage: Storage, ext: string, planId: string): P
 }
 
 async function readRecord(storage: Storage, ownerGhii: string, ext: string, plan: string): Promise<SubscriptionRecord | null> {
-  const v = (await storage.getMemory(ownerGhii, subKey(ext, plan)))?.value as SubscriptionRecord | undefined;
+  return parseRecord((await storage.getMemory(ownerGhii, subKey(ext, plan)))?.value);
+}
+
+function parseRecord(value: unknown): SubscriptionRecord | null {
+  const v = value as SubscriptionRecord | undefined;
   return v && typeof v.active_until === 'string' ? v : null;
 }
 
@@ -203,9 +208,9 @@ export async function listSubscriptions(storage: Storage, ownerGhii: string, now
 
 /** Stop the renewal; the period paid for runs to its end. Null when the buyer has no such subscription. */
 export async function cancelSubscription(storage: Storage, ownerGhii: string, ext: string, plan: string) {
-  const rec = await readRecord(storage, ownerGhii, ext, plan);
+  const rec = await updateRecord(storage, ownerGhii, subKey(ext, plan), parseRecord,
+    cur => cur ? { ...cur, auto_renew: false, updated_at: new Date().toISOString() } : UNCHANGED, { tag: SUBSCRIPTION_ACTION });
   if (!rec) return null;
-  await putRecord(storage, { ...rec, auto_renew: false, updated_at: new Date().toISOString() });
   emitChange('commerce', ownerGhii);
   return { ext, plan, active_until: rec.active_until, auto_renew: false };
 }
@@ -250,7 +255,9 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     const told = sub.last_failure?.reason.startsWith(`[${sub.active_until}]`);
-    await putRecord(storage, { ...sub, last_failure: { at: new Date().toISOString(), reason: `[${sub.active_until}] ${reason}` }, updated_at: new Date().toISOString() });
+    await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
+      ...(cur ?? sub), last_failure: { at: new Date().toISOString(), reason: `[${sub.active_until}] ${reason}` }, updated_at: new Date().toISOString(),
+    }), { tag: SUBSCRIPTION_ACTION });
     if (!told) {
       const date = sub.active_until.slice(0, 10);
       await notify(storage, sub.buyer_ghii, {
@@ -263,11 +270,12 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
     }
     return { result: 'failed', detail: reason };
   }
-  const nextUntil = new Date(Date.parse(sub.active_until) + plan.period_days * DAY_MS).toISOString();
-  await putRecord(storage, {
-    ...sub, amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
-    active_until: nextUntil, last_order: reference, updated_at: new Date().toISOString(),
-  });
+  const renewed = await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
+    ...(cur ?? sub), amount: plan.amount, currency: plan.currency, period_days: plan.period_days, title: plan.title,
+    active_until: new Date(Date.parse((cur ?? sub).active_until) + plan.period_days * DAY_MS).toISOString(),
+    last_order: reference, updated_at: new Date().toISOString(),
+  }), { tag: SUBSCRIPTION_ACTION });
+  const nextUntil = renewed!.active_until;
   // The seller's net of the renewal, shared with the plan's payees by the seller's split, as at checkout.
   const net = plan.amount - percentFee(plan.amount, commerceFeePercent(config));
   try {

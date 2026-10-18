@@ -22,6 +22,9 @@
  * @structure ucpCheckoutRouter
  * @usage router.use(ucpCheckoutRouter(config, storage)); // from commerceUcpRouter
  * @version-history
+ *   v1.0.1 — 2026-10-18 — The Idempotency-Key is claimed with a pending record written on the
+ *     record's version before the request runs, so two requests with one key at the same moment run
+ *     once; the other is 409 idempotency_conflict (wish-rahapolkujen-kilpatilanteet).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
  */
 import { Router, type Request, type Response } from 'express';
@@ -94,29 +97,48 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     return profileUrl;
   }
 
-  /** Idempotency: the stored answer to a repeated key, or a 409 for the same key with another body. */
-  async function replay(req: Request, res: Response, sellerGhii: string | null, profileUrl: string): Promise<{ done: boolean; store: (status: number, body: unknown) => Promise<void> }> {
+  /**
+   * Idempotency: the stored answer to a repeated key, or a 409 for the same key with another body.
+   * The first request with a key claims it with a pending record, written only if nobody wrote the
+   * key meanwhile (createMemoryIfAbsent, or setMemoryIfVersion over a released one), so a second
+   * request with the same key at the same moment is refused rather than run a second time.
+   * `release` marks the claim released when the request ends without an answer to store, so a retry
+   * with the key runs again, as it did before the claim.
+   */
+  type Replay = { done: boolean; store: (status: number, body: unknown) => Promise<void>; release: () => Promise<void> };
+  type Prior = { bodyHash: string; status?: number; body?: unknown; pending?: boolean; released?: boolean };
+  async function replay(req: Request, res: Response, sellerGhii: string | null, profileUrl: string): Promise<Replay> {
     const key = req.get('idempotency-key');
-    const noop = { done: false, store: async () => undefined };
+    const noop: Replay = { done: false, store: async () => undefined, release: async () => undefined };
     if (!key || !sellerGhii) return noop;
-    if (!/^[A-Za-z0-9_-]{16,128}$/.test(key)) { protocolError(res, 400, 'invalid_request', 'Idempotency-Key must be 16 to 128 letters, digits, dashes or underscores.'); return { done: true, store: noop.store }; }
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(key)) { protocolError(res, 400, 'invalid_request', 'Idempotency-Key must be 16 to 128 letters, digits, dashes or underscores.'); return { ...noop, done: true }; }
     const memKey = `commerce.ucp.idem.${createHash('sha256').update(`${profileUrl}|${req.method}|${req.path}|${key}`).digest('hex').slice(0, 40)}`;
     const bodyHash = createHash('sha256').update(rawOf(req) ?? Buffer.alloc(0)).digest('hex');
-    const prior = (await storage.getMemory(sellerGhii, memKey))?.value as { bodyHash: string; status: number; body: unknown } | undefined;
-    if (prior) {
+    const recordOf = (value: Prior): MemoryRecord => {
+      const now = new Date().toISOString();
+      return {
+        key: memKey, ownerGaii: sellerGhii, value: value as unknown as Record<string, unknown>,
+        visibility: 'owner', tags: ['ucp'], ttlHours: 48, version: 1, createdAt: now, updatedAt: now,
+      } as MemoryRecord;
+    };
+    const answerPrior = (prior: Prior): Replay => {
       if (prior.bodyHash !== bodyHash) protocolError(res, 409, 'idempotency_conflict', 'This Idempotency-Key was used with another body.');
-      else res.status(prior.status).json(prior.body);
-      return { done: true, store: noop.store };
-    }
+      else if (prior.pending) protocolError(res, 409, 'idempotency_conflict', 'A request with this Idempotency-Key is still being handled. Send it again in a moment to read its answer.');
+      else res.status(prior.status!).json(prior.body);
+      return { ...noop, done: true };
+    };
+    const stored = await storage.getMemory(sellerGhii, memKey);
+    const prior = stored?.value as Prior | undefined;
+    if (prior && !prior.released) return answerPrior(prior);
+    const pending = recordOf({ bodyHash, pending: true });
+    const claimed = stored
+      ? (storage.setMemoryIfVersion ? await storage.setMemoryIfVersion(pending, stored.version) : await storage.setMemory(pending))
+      : (storage.createMemoryIfAbsent ? await storage.createMemoryIfAbsent(pending) : await storage.setMemory(pending));
+    if (!claimed) return answerPrior({ bodyHash, pending: true });
     return {
       done: false,
-      store: async (status: number, body: unknown) => {
-        const now = new Date().toISOString();
-        await storage.setMemory({
-          key: memKey, ownerGaii: sellerGhii, value: { bodyHash, status, body } as Record<string, unknown>,
-          visibility: 'owner', tags: ['ucp'], ttlHours: 48, version: 1, createdAt: now, updatedAt: now,
-        } as MemoryRecord);
-      },
+      store: async (status: number, body: unknown) => { await storage.setMemory(recordOf({ bodyHash, status, body })); },
+      release: async () => { await storage.setMemory(recordOf({ bodyHash, released: true })); },
     };
   }
 
@@ -129,14 +151,16 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
   router.post('/ucp/2026-08-25/checkout-sessions', limit, async (req, res) => {
     const profileUrl = await platformOf(req, res, false);
     if (!profileUrl) return;
+    let release = async (): Promise<void> => undefined;
     try {
       const body = (req.body ?? {}) as { line_items?: unknown; buyer?: unknown };
       // A create's replay record lives under the seller, who is known only once the lines are read.
       const r = await replay(req, res, await sellerOfLines(storage, config, body.line_items as never), profileUrl);
       if (r.done) return;
+      release = r.release;
       const session = await createGuestCheckout(storage, config, { profileUrl, lineItems: body.line_items as never, buyer: body.buyer });
       await answer(res, 201, session, r.store);
-    } catch (e) { fail(res, e); }
+    } catch (e) { await release(); fail(res, e); }
   });
 
   router.get('/ucp/2026-08-25/checkout-sessions/:id', limit, async (req, res) => {
@@ -156,7 +180,7 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     try {
       const body = (req.body ?? {}) as { line_items?: unknown; buyer?: unknown };
       await answer(res, 200, await updateGuestCheckout(storage, config, id, profileUrl, { lineItems: body.line_items as never, buyer: body.buyer }), r.store);
-    } catch (e) { fail(res, e); }
+    } catch (e) { await r.release(); fail(res, e); }
   });
 
   router.post('/ucp/2026-08-25/checkout-sessions/:id/complete', limit, async (req, res) => {
@@ -167,7 +191,7 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     if (r.done) return;
     try {
       await answer(res, 200, await completeGuestCheckout(storage, config, id, profileUrl, (req.body ?? {}).payment), r.store);
-    } catch (e) { fail(res, e); }
+    } catch (e) { await r.release(); fail(res, e); }
   });
 
   router.post('/ucp/2026-08-25/checkout-sessions/:id/cancel', limit, async (req, res) => {
@@ -178,7 +202,7 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     if (r.done) return;
     try {
       await answer(res, 200, await cancelGuestCheckout(storage, config, id, profileUrl), r.store);
-    } catch (e) { fail(res, e); }
+    } catch (e) { await r.release(); fail(res, e); }
   });
 
   router.get('/ucp/2026-08-25/orders/:id', limit, async (req, res) => {

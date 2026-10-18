@@ -58,6 +58,7 @@ import { getFeedSettings } from '../services/visibility/merchant-feed-settings.j
 import { listOwnerProducts, resolveFeedId } from '../services/visibility/merchant-feed.js';
 import { ucpAgentFamily } from '../services/visibility/attribution.js';
 import { platformProfile } from '../services/ucp/platform-profile.js';
+import { updateRecord, UNCHANGED } from '../services/record-cas.js';
 import { ucpSigningKey } from '../services/ucp/ucp-keys.js';
 import { signMessage } from '../services/ucp/http-signatures.js';
 
@@ -354,7 +355,12 @@ export async function completeGuestCheckout(
   // Lock against a second complete arriving at the same time.
   session.status = 'complete_in_progress';
   session.updatedAt = nowIso();
-  await putRecord(storage, session.sellerGhii, sessionKey(id), session, KEEP_HOURS);
+  let claimed = false;
+  await updateRecord(storage, session.sellerGhii, sessionKey(id), (v) => (v ?? null) as UcpGuestSession | null, (cur) => {
+    claimed = !!cur && cur.status !== 'complete_in_progress' && cur.status !== 'completed' && cur.status !== 'canceled';
+    return claimed ? { ...cur!, status: 'complete_in_progress' as const, updatedAt: session.updatedAt } : UNCHANGED;
+  }, { tag: 'ucp', ttlHours: KEEP_HOURS, visibility: 'owner' });
+  if (!claimed) throw new UcpError(200, 'checkout_locked', 'The checkout is being completed and cannot change now.', 'recoverable');
 
   let repriced: UcpLine[];
   try {

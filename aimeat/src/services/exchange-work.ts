@@ -9,12 +9,15 @@
  *   budget — through the SAME G1 entitlement + G2 settlement as a synchronous call (settlement-rail ⊥
  *   pricing-model). Unlike data/app-tool calls (synchronous), the charge fires when the agent delivers, not
  *   on a request. Memory-backed under a system namespace; surfaced to the two parties by the authorised routes.
- * @structure AgentWork · newWorkId · putWork · getWork · listWorkByConsumer / ByProvider · workView / workViews
+ * @structure AgentWork · newWorkId · putWork · claimWorkForDelivery · releaseWorkClaim · getWork · listWorkByConsumer / ByProvider · workView / workViews
  * @usage
  *   const w = await putWork(storage, { workId: newWorkId(), offeringId, consumerGaii, ... });
  *   // on delivery the exchange route settles via settleMeteredCoordinate against the consumer.
  *   res.json(success(nodeId, { work: await workView(storage, config, w) }));
  * @version-history
+ *   v1.3.0 — 2026-10-18 — claimWorkForDelivery / releaseWorkClaim: a delivery claims the work on its
+ *     record's version before it settles, so two deliveries at the same moment settle once
+ *     (wish-rahapolkujen-kilpatilanteet).
  *   v1.2.0 — 2026-10-08 — workView / workViews: the one wire shape of a work item, used by the REST
  *     routes and the MCP tools. It carries ai_provenance_id and the record itself, because the
  *     record is private and the buyer could not resolve a bare id.
@@ -29,6 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { EntitlementUnit } from './metered-entitlements.js';
 import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlock } from './ai-provenance-marks.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 const NS = 'exchange-work';
 const keyOf = (id: string): string => `xwork.${id}`;
@@ -48,7 +52,8 @@ export interface AgentWork {
   input: unknown;
   output: unknown;
   note: string;
-  state: 'open' | 'delivered' | 'cancelled';
+  /** `delivering` while one delivery holds the claim and settles (claimWorkForDelivery). */
+  state: 'open' | 'delivering' | 'delivered' | 'cancelled';
   unit: EntitlementUnit;
   currency: string | null;
   chargedUnits: number;  // amount settled on delivery, in `unit` (0 until delivered)
@@ -82,6 +87,25 @@ export async function putWork(storage: Storage, w: AgentWork): Promise<AgentWork
     ttlHours: null, version: 1, createdAt: w.createdAt || now, updatedAt: now,
   });
   return w;
+}
+
+/**
+ * Move a work item from `open` to `delivering` on the stored record's version (services/record-cas.ts),
+ * before its delivery settles anything. Of two deliveries that both read it open, one claims it and
+ * goes on; the other gets null and is refused WORK_NOT_OPEN, so the consumer is charged once.
+ */
+export async function claimWorkForDelivery(storage: Storage, id: string): Promise<AgentWork | null> {
+  const out: { claimed: AgentWork | null } = { claimed: null };
+  await updateRecord(storage, NS, keyOf(id), v => (v ?? null) as AgentWork | null, cur => {
+    out.claimed = cur && cur.workId && cur.state === 'open' ? { ...cur, state: 'delivering' } : null;
+    return out.claimed ?? UNCHANGED;
+  }, { tag: 'exchange-work' });
+  return out.claimed;
+}
+
+/** Put a claimed work item back to `open`, after a refusal that settled nothing. */
+export async function releaseWorkClaim(storage: Storage, w: AgentWork): Promise<void> {
+  await putWork(storage, { ...w, state: 'open' });
 }
 
 export async function getWork(storage: Storage, id: string): Promise<AgentWork | null> {
