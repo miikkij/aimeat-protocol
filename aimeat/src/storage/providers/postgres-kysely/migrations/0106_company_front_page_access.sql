@@ -1,0 +1,13 @@
+-- 0106_company_front_page_access.sql
+--
+-- Who may open a company's front page, as one stored decision on the company (plan doc-mvcn6c7e4e5q,
+-- V3.10). The same three values an app's "access" takes (0104):
+--
+--   "Company"."frontPageAccess"   NULL on every existing row, which means anyone may open the page.
+--                                 'signed-in'           any account of this node.
+--                                 'organism:<id>'       the members of one organism.
+--
+-- The storage layer stores the string as given; the service validates it (services/page-access.ts).
+--
+-- Mirrors the SQLite column added in schema.ts.
+ALTER TABLE "Company" ADD COLUMN IF NOT EXISTS "frontPageAccess" TEXT;

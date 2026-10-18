@@ -8,6 +8,7 @@
  * @structure companyMethods — CRUD + slug resolution
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-18 — frontPageAccess (migration 0106): who may open the front page (V3.10).
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
 import { sql, type Selectable } from 'kysely';
@@ -29,6 +30,7 @@ function toCompany(r: Selectable<CompanyRow>): CompanyRecord {
     descriptionProvenanceId: r.descriptionProvenanceId ?? null,
     organismId: r.organismId ?? null,
     frontPage: { kind: r.frontPageKind as CompanyFrontPageKind, target: r.frontPageTarget },
+    frontPageAccess: r.frontPageAccess ?? null,
     businessId: r.businessId ?? null,
     vatId: r.vatId ?? null,
     streetAddress: r.streetAddress ?? null,
@@ -57,6 +59,7 @@ function values(row: CompanyRecord) {
     organismId: row.organismId,
     frontPageKind: row.frontPage.kind,
     frontPageTarget: row.frontPage.target,
+    frontPageAccess: row.frontPageAccess ?? null,
     businessId: row.businessId,
     vatId: row.vatId,
     streetAddress: row.streetAddress,

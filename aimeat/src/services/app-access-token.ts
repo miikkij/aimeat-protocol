@@ -27,10 +27,16 @@
  *   - APP_ACCESS_TTL_SECONDS — the grant's lifetime
  *   - generateAppAccessToken() — mint, after the apex has authorized the viewer
  *   - appAccessGranted() — the app origin's whole check: signed by this node, unexpired, this app
+ *   - PageRef · pageRefId() — the page a page grant names: a welcome page or a company front page
+ *   - generatePageAccessToken() · pageAccessGranted() — the same grant for those two origins
  * @usage
  *   const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename });
  *   if (!(await appAccessGranted(req.query.access, app.ownerName, app.filename))) return notFound();
+ *   if (!(await pageAccessGranted(req.query.access, { kind: 'company', id: company.id }))) → redirect or 404
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Page grants (plan doc-mvcn6c7e4e5q, V3.10): `typ: 'page-access'` naming one
+ *     welcome page or one company front page, for their session-less origins. The `typ` keeps the two
+ *     kinds apart: an app grant opens no page, a page grant opens no app and no other page.
  *   v1.0.0 — 2026-08-11 — Initial. Audit H-19: gate the unlock rather than the app HTML, so a
  *     code-gated app stops being the exception to H-2 origin isolation.
  *   v1.0.1 — 2026-09-26 — bare() takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -102,6 +108,46 @@ export async function appAccessGranted(token: unknown, ownerBare: string, filena
         // Fails closed, and says so once: a grant that stopped verifying is the difference between
         // "this app is gone" and "your link expired", and only the log can tell them apart.
         logger.warn('app-access grant rejected → the app answers as unknown', { error: String(err) });
+        return false;
+    }
+}
+
+/** The page a page grant opens: one owner's welcome page, or one company's front page (by company id). */
+export type PageRef = { kind: 'portfolio'; owner: string } | { kind: 'company'; id: string };
+
+/** The one string a page grant carries for its page. The account name is compared lower-cased, as the origin label is. */
+export function pageRefId(ref: PageRef): string {
+    return ref.kind === 'portfolio' ? `portfolio:${bare(ref.owner).toLowerCase()}` : `company:${ref.id}`;
+}
+
+/**
+ * Mint a grant for one welcome page or one company front page. Call it only after the caller was
+ * authorized for that page (routes/page-open.ts): the grant carries no viewer identity, for the same
+ * reason the app grant carries none.
+ */
+export async function generatePageAccessToken(ref: PageRef, ttlSeconds: number = APP_ACCESS_TTL_SECONDS): Promise<string> {
+    const { privateKey } = getNodeCryptoKeys();
+    return new SignJWT({ typ: 'page-access', page: pageRefId(ref) })
+        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+        .setJti(randomUUID())
+        .setIssuedAt()
+        .setExpirationTime(`${ttlSeconds}s`)
+        .sign(privateKey);
+}
+
+/**
+ * Does this token open this page? True only for a page grant this node signed, inside its lifetime,
+ * naming exactly this page. An app grant (`typ: 'app-access'`) is false here, and a page grant is
+ * false in appAccessGranted, so neither kind opens the other.
+ */
+export async function pageAccessGranted(token: unknown, ref: PageRef): Promise<boolean> {
+    if (typeof token !== 'string' || token === '') return false;
+    try {
+        const { publicKey } = getNodeCryptoKeys();
+        const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
+        return payload.typ === 'page-access' && payload.page === pageRefId(ref);
+    } catch (err) {
+        logger.warn('page-access grant rejected → the page answers as unknown', { error: String(err) });
         return false;
     }
 }

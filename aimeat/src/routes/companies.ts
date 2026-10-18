@@ -13,6 +13,10 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-18 — Who may open the front page (plan doc-mvcn6c7e4e5q, V3.10): PUT /v1/companies/:id/front-page
+ *     takes `access` (anyone, signed-in, organism:<id>; `kind` may be left out to change only that), a
+ *     company answers `front_page_access`, and new POST /v1/companies/:id/open answers the address with a
+ *     page grant for a signed-in person the page opens for (routes/page-open.ts).
  *   2026-10-18 — PUT /v1/companies/:id/front-page and PUT /v1/companies/:id/portfolio pass the publish
  *     gate (services/company/company-publish-gate.ts): pointing an address that serves nothing at a page, by a
  *     caller the owner is asked about, stores the page, leaves the address as it is and answers 202
@@ -32,7 +36,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config-types.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
@@ -53,7 +57,9 @@ import {
   getCompanyPortfolio, deleteCompanyPortfolio,
 } from '../services/company/company-portfolio.js';
 import { safeFetch } from '../utils/url-validator.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
+import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
+import { answerPageOpen } from './page-open.js';
 
 const IdentitySchema = {
   description: z.string().max(500).nullish(),
@@ -109,13 +115,19 @@ const PortfolioSchema = z.object({
 }).strict();
 
 const FrontPageSchema = z.object({
-  kind: z.enum(['app', 'portfolio', 'redirect', 'none']),
+  /** Omitted: the address keeps serving what it serves, and only `access` changes. */
+  kind: z.enum(['app', 'portfolio', 'redirect', 'none']).optional(),
   target: z.string().max(500).optional(),
-}).strict();
+  /** Who may open the front page: anyone, signed-in or organism:<id> (services/page-access.ts). */
+  access: z.string().max(120).nullable().optional(),
+}).strict().refine(b => b.kind !== undefined || b.access !== undefined, { message: 'Send kind, access, or both.' });
 
-/** Wire shape: the record plus the address it answers on (derived, never stored). */
+/** Wire shape: the record plus the address it answers on and who may open it (derived, never stored). */
 function withAddress(config: AimeatConfig, company: CompanyRecord): Record<string, unknown> {
-  return { ...company, address: companyAddress(config, company), co_origin_enabled: config.coOriginEnabled };
+  return {
+    ...company, address: companyAddress(config, company), co_origin_enabled: config.coOriginEnabled,
+    front_page_access: pageAccessOf(company.frontPageAccess),
+  };
 }
 
 function sendErr(res: Response, config: AimeatConfig, e: unknown): boolean {
@@ -315,17 +327,47 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(400).json(error(config.nodeId, 'INVALID_FRONT_PAGE', parsed.error.message));
         return;
       }
+      // Who may open the front page (V3.10), checked for the setter before any write.
+      let access: string | null | undefined;
+      if (parsed.data.access !== undefined) {
+        const a = await parsePageAccessInput(storage, parsed.data.access, { identity: resolve(req), federated: isForeignPrincipal(req.auth) });
+        if ('refusal' in a) {
+          res.status(a.refusal.status).json(error(config.nodeId, a.refusal.code, a.refusal.message));
+          return;
+        }
+        access = a.store;
+      }
       // Through the publish gate (services/company/company-publish-gate.ts): pointing an address that serves
-      // nothing at a page makes it public, and a caller the owner is asked about files a request.
+      // nothing at a page open to anyone, or opening a served page to anyone, makes it public, and a
+      // caller the owner is asked about files a request for that one change.
       const { company, asked } = await setCompanyFrontPageGated({ storage, config },
-        { caller: callerOf(req, config.nodeId, storage), app: req.auth?.app }, resolve(req), req.params.id as string, {
-          kind: parsed.data.kind, target: parsed.data.target ?? '',
-        });
+        { caller: callerOf(req, config.nodeId, storage), app: req.auth?.app }, resolve(req), req.params.id as string,
+        parsed.data.kind ? { kind: parsed.data.kind, target: parsed.data.target ?? '' } : null, access);
       emitChange('companies', resolve(req));
       res.status(askedStatus(asked, 200)).json(success(config.nodeId, { company: withAddress(config, company), ...publishAskedFields(asked) }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }
+  });
+
+  /* POST /v1/companies/:id/open — the address that opens a front page needing a sign-in (V3.10).
+   *
+   * For any signed-in person, not only the company's owner: the company origin holds no session, so
+   * the SPA page /v1/app-open asks here with the person's session and goes to the address answered,
+   * which carries a one-hour page grant (routes/page-open.ts answerPageOpen decides). A company that
+   * serves nothing, or is not active, answers 404 as its address does.
+   */
+  router.post('/v1/companies/:id/open', requireAuth(), requireRole('owner'), async (req, res) => {
+    const company = await storage.getCompany(req.params.id as string);
+    if (!company || company.status !== 'active' || company.frontPage.kind === 'none') {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No page here.'));
+      return;
+    }
+    const address = config.coOriginEnabled ? companyAddress(config, company) : null;
+    await answerPageOpen(req, res, config, storage, {
+      ref: { kind: 'company', id: company.id }, access: company.frontPageAccess,
+      ownerName: localAccountName(company.ownerGhii), url: address ? `${address}/` : null,
+    });
   });
 
   /* GET /v1/companies/:id/front-page/check — does the public face answer?

@@ -19,6 +19,7 @@
  * @structure CompanyFrontPage · CompanyRecord · CompanyQuery · NewCompanyInput
  * @usage import type { CompanyRecord } from '../models/company-schemas.js';
  * @version-history
+ *   v1.3.0 — 2026-10-18 — frontPageAccess: who may open the front page (plan doc-mvcn6c7e4e5q, V3.10).
  *   v1.2.0 — 2026-10-05 — descriptionProvenanceId: the description carries AI provenance (secaudit
  *     2026-10, M3 follow-up; the developer's decision).
  *   v1.1.0 — 2026-08-08 — Front page kind 'portfolio': a company's own HTML page.
@@ -68,6 +69,11 @@ export interface CompanyRecord {
   /** The organism this company's data lives in (workspaces, finance area, team). */
   organismId: string | null;
   frontPage: CompanyFrontPage;
+  /**
+   * Who may open the front page (services/page-access.ts): null for anyone, 'signed-in', or
+   * 'organism:<id>'. Kept apart from `frontPage` so pointing the address elsewhere keeps it.
+   */
+  frontPageAccess: string | null;
   // ── Legal identity: the seller-party snapshot an invoice needs ──
   businessId: string | null;
   vatId: string | null;

@@ -7,6 +7,7 @@
  * @structure companyMethods — CRUD + slug resolution
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-18 — frontPageAccess (schema.ts safeAddColumn): who may open the front page (V3.10).
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
 import type { CompanyRepository } from '../../../repositories/company.repository.js';
@@ -29,6 +30,7 @@ function toCompany(r: Row): CompanyRecord {
     descriptionProvenanceId: s('descriptionProvenanceId'),
     organismId: s('organismId'),
     frontPage: { kind: r.frontPageKind as CompanyFrontPageKind, target: (r.frontPageTarget as string) ?? '' },
+    frontPageAccess: s('frontPageAccess'),
     businessId: s('businessId'),
     vatId: s('vatId'),
     streetAddress: s('streetAddress'),
@@ -62,14 +64,16 @@ export const companyMethods: CompanyRepository & ThisType<SqliteStorage> = {
       INSERT INTO companies (
         id, slug, ownerGhii, name, description, organismId, frontPageKind, frontPageTarget,
         businessId, vatId, streetAddress, postalCode, city, country, email, phone,
-        iban, bic, einvoiceAddress, einvoiceOperator, status, createdAt, updatedAt, descriptionProvenanceId
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        iban, bic, einvoiceAddress, einvoiceOperator, status, createdAt, updatedAt, descriptionProvenanceId,
+        frontPageAccess
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
       row.id, row.slug, row.ownerGhii, row.name, row.description, row.organismId,
       row.frontPage.kind, row.frontPage.target,
       row.businessId, row.vatId, row.streetAddress, row.postalCode, row.city, row.country,
       row.email, row.phone, row.iban, row.bic, row.einvoiceAddress, row.einvoiceOperator,
       row.status, row.createdAt, row.updatedAt, row.descriptionProvenanceId,
+      row.frontPageAccess ?? null,
     );
   },
 
@@ -104,13 +108,13 @@ export const companyMethods: CompanyRepository & ThisType<SqliteStorage> = {
         slug = ?, name = ?, description = ?, organismId = ?, frontPageKind = ?, frontPageTarget = ?,
         businessId = ?, vatId = ?, streetAddress = ?, postalCode = ?, city = ?, country = ?,
         email = ?, phone = ?, iban = ?, bic = ?, einvoiceAddress = ?, einvoiceOperator = ?,
-        status = ?, updatedAt = ?, descriptionProvenanceId = ?
+        status = ?, updatedAt = ?, descriptionProvenanceId = ?, frontPageAccess = ?
       WHERE id = ?
     `).run(
       row.slug, row.name, row.description, row.organismId, row.frontPage.kind, row.frontPage.target,
       row.businessId, row.vatId, row.streetAddress, row.postalCode, row.city, row.country,
       row.email, row.phone, row.iban, row.bic, row.einvoiceAddress, row.einvoiceOperator,
-      row.status, row.updatedAt, row.descriptionProvenanceId, row.id,
+      row.status, row.updatedAt, row.descriptionProvenanceId, row.frontPageAccess ?? null, row.id,
     );
   },
 

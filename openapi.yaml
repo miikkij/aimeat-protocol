@@ -68506,6 +68506,9 @@ paths:
                             type: object
                             nullable: true
                             description: Saved portfolio configuration, or null if none.
+                          access:
+                            type: string
+                            description: "Who may open the page: 'anyone', 'signed-in' or 'organism:<organism id>'."
                           standalone_url:
                             type: string
                             nullable: true
@@ -68529,7 +68532,16 @@ paths:
       operationId: putPortfolioConfig
       tags: [Owner]
       summary: Save the owner's portfolio configuration
-      description: Persists the request body as the authenticated owner's portfolio configuration in memory. Requires owner auth.
+      description: >-
+        Merges the request body onto the authenticated owner's portfolio configuration in memory.
+        Requires owner auth. `access` says who may open the page, the three values an app's `open_to`
+        takes: 'anyone' (the default), 'signed-in' (accounts of this node) or 'organism:<id>' (that
+        organism's members; 400 NOT_ORGANISM_MEMBER when the owner is not an active member, before
+        anything is written). A page that needs a sign-in is served on the portfolio origin only with
+        a grant from POST /v1/portfolio/{username}/open, and GET /v1/portfolio/data/{username} answers
+        401 or 403 to a caller it does not open for. Publish gate: switching on a page open to anyone,
+        or opening a page that is on to anyone, by a caller the owner is asked about, saves everything
+        else and answers 202 with publish_request for that one change.
       security:
         - BearerAuth: []
       requestBody:
@@ -68542,6 +68554,10 @@ paths:
               properties:
                 enabled: { type: boolean }
                 tags: { type: array, items: { type: string } }
+                access:
+                  type: string
+                  nullable: true
+                  description: "Who may open the page: 'anyone', 'signed-in' or 'organism:<organism id>'."
       responses:
         '202':
           $ref: '#/components/responses/PublishRequested'
@@ -68602,6 +68618,12 @@ paths:
                     true when the person approved the page and wants it public now: switches their
                     page on, unless they switched it off themselves. Without it the page is stored
                     and the switch stays as it was.
+                access:
+                  type: string
+                  nullable: true
+                  description: >-
+                    Who may open the page: 'anyone', 'signed-in' or 'organism:<organism id>', as on
+                    PUT /v1/portfolio/config. Omit it to keep the current setting.
       responses:
         '202':
           $ref: '#/components/responses/PublishRequested'
@@ -68662,6 +68684,8 @@ paths:
         and viewer/auth context. Auth is optional; when the viewer is authenticated the response
         marks `viewer_is_owner` and exposes the `owner_gaiis` allowlist used by the portfolio
         viewer's fetch bridge. 404 if the user is unknown, has no agent, or has not enabled a portfolio.
+        A page whose `access` is 'signed-in' or an organism answers 401 SIGN_IN_REQUIRED without an
+        account and 403 ACCESS_DENIED to an account it does not open for; the owner always reads it.
       parameters:
         - name: username
           in: path
@@ -68697,6 +68721,41 @@ paths:
                           viewer_is_owner: { type: boolean }
                           owner_gaiis: { type: array, items: { type: string } }
                           standalone_url: { type: string, nullable: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/portfolio/{username}/open:
+    post:
+      operationId: openPortfolioPage
+      tags: [Owner]
+      summary: The address that opens a welcome page needing a sign-in
+      description: >-
+        For a welcome page whose `access` is `signed-in` or an organism, or any page on a node set to
+        signed-in content access. For any signed-in person: checks that the caller may open the page
+        and answers the address to open: the portfolio origin carrying `access`, a grant valid for an
+        hour that names this page only (an app grant opens no page, and this grant opens no app and no
+        other page), or the apex page /v1/portfolio/{username} with `expires_in` null on a node without
+        the portfolio origin, which reads the page with the person's session. The owner always passes.
+        The SPA page /v1/app-open calls this with the session a page load cannot carry. Refusals: 401
+        without an account, 403 ACCESS_DENIED for an account the page does not open for, 404 when the
+        person has no page switched on.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: '{ url, expires_in } — open `url` in the browser.'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
   # ── Admin Federation ──────────────────────────
@@ -74357,8 +74416,8 @@ paths:
     put:
       operationId: setCompanyFrontPage
       tags: [Companies]
-      summary: Set what the company address serves
-      description: "kind 'portfolio' serves the page published via PUT /v1/companies/{id}/portfolio (409 NO_PORTFOLIO when none exists); kind 'app' serves one of YOUR published apps (\"owner/file.html\"; someone else's answers 403 FRONT_PAGE_NOT_YOURS) through the same isolated app-serving path; 'redirect' 301s to an absolute http(s) URL; 'none' keeps the address reserved and unserved, which answers 404 like any unmapped address."
+      summary: Set what the company address serves, and who may open it
+      description: "kind 'portfolio' serves the page published via PUT /v1/companies/{id}/portfolio (409 NO_PORTFOLIO when none exists); kind 'app' serves one of YOUR published apps (\"owner/file.html\"; someone else's answers 403 FRONT_PAGE_NOT_YOURS) through the same isolated app-serving path; 'redirect' 301s to an absolute http(s) URL; 'none' keeps the address reserved and unserved, which answers 404 like any unmapped address. `access` says who may open the front page, the three values an app's `open_to` takes: 'anyone' (the default), 'signed-in' (accounts of this node) or 'organism:<id>' (that organism's members; 400 NOT_ORGANISM_MEMBER when the owner is not an active member, before anything is written). A front page that needs a sign-in is served on the company origin only with a grant from POST /v1/companies/{id}/open; a browser without one is sent to /v1/app-open?company=<id>. Send `access` without `kind` to change only who may open it. The company answers `front_page_access`. Publish gate: pointing an address that serves nothing at a page open to anyone, or opening a served front page to anyone, by a caller the owner is asked about, applies everything else and answers 202 with publish_request for that one change."
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody:
@@ -74367,14 +74426,40 @@ paths:
           application/json:
             schema:
               type: object
-              required: [kind]
+              description: At least one of kind and access.
               properties:
-                kind: { type: string, enum: [app, portfolio, redirect, none] }
+                kind: { type: string, enum: [app, portfolio, redirect, none], description: Omit it to keep what the address serves. }
                 target: { type: string, description: '"owner/file.html" for app, an absolute URL for redirect' }
+                access:
+                  type: string
+                  nullable: true
+                  description: "Who may open the front page: 'anyone', 'signed-in' or 'organism:<organism id>'. Omit it to keep the current setting."
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '202': { $ref: '#/components/responses/PublishRequested' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/companies/{id}/open:
+    post:
+      operationId: openCompanyFrontPage
+      tags: [Companies]
+      summary: The address that opens a company front page needing a sign-in
+      description: >-
+        For a front page whose `access` is `signed-in` or an organism, or any front page on a node set
+        to signed-in content access. For any signed-in person, not only the company's owner: checks
+        that the caller may open the page and answers the company's address carrying `access`, a grant
+        valid for an hour that names this front page only (an app grant opens no page, and this grant
+        opens no app and no other page). The owner always passes. The SPA page /v1/app-open calls this
+        with the session a page load cannot carry. Refusals: 401 without an account, 403 ACCESS_DENIED
+        for an account the page does not open for, 404 for an unknown or inactive company, one whose
+        address serves nothing, or a node without company addresses.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: '{ url, expires_in } — open `url` in the browser.'
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

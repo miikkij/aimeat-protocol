@@ -33,6 +33,9 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   2026-10-18 — aimeat-welcome-pages: `access` says who may open the person's page or the company's
+ *     front page (anyone, signed-in, organism:<id>); ask the person, and `html` may be left out to
+ *     change only that (plan doc-mvcn6c7e4e5q, V3.10).
  *   2026-10-18 — aimeat-welcome-pages: an answer with `publish_request` means the node asks the person
  *     before the page goes public; tell them and give them the approve_url (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — aimeat-mail-to-data: a read of the owner's mailbox without connections:read-as-owner
@@ -262,6 +265,12 @@ aimeat_portfolio_publish({ html: "<!DOCTYPE html>…", enable: true })
   the page is stored and stays off until they approve. Tell them in one sentence and give them the
   \`approve_url\` from the answer. A company page answers the same way when its address served
   nothing before.
+- \`access\` says who may open the page: \`"anyone"\` (the default), \`"signed-in"\` (people signed in
+  to this node; others are asked to sign in first) or \`"organism:<id>"\` (the members of one
+  organisation the person belongs to). Ask the person which one they want; never pick it for them.
+  \`aimeat_portfolio_publish({ access: "signed-in" })\` without \`html\` changes only that. Opening a
+  page that is on to anyone can answer with \`publish_request\` too. For a company's page the same
+  choice is \`access\` on \`aimeat_company_front_page\` (\`kind\` may be left out).
 - When the page is the person's profile, their business card, what goes on it comes from the
   interview in \`aimeat-guided-journey\`, stage 1: their words, a schema.org \`Person\` block in a
   \`<script type="application/ld+json">\` tag, and a short "For AIs" section. The page is served as it

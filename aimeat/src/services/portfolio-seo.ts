@@ -24,15 +24,19 @@
  * @usage
  *   if (!portfolioSeoIndexable(resolved.portfolioConfig, config)) res.setHeader('X-Robots-Tag', …);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A page whose `access` is not anyone is never indexable (V3.10).
  *   v1.0.0 — 2026-08-25 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { PublicPage } from '../data/public-pages.js';
+import { pageAccessOf } from './page-access.js';
 
 /** The portfolio's own config record (`portfolio.config`), as far as this decision needs it. */
 export interface PortfolioSeoConfig {
   enabled?: unknown;
   seoIndex?: unknown;
+  /** Who may open the page (services/page-access.ts); anything but anyone keeps it out of search. */
+  access?: unknown;
   title?: unknown;
   tagline?: unknown;
   description?: unknown;
@@ -52,6 +56,8 @@ export function portfolioSeoIndexable(
   if (!portfolioConfig) return false;
   // Not published at all is not a search question.
   if (!portfolioConfig.enabled) return false;
+  // A page that opens only for signed-in people or one organism is not for a search engine either.
+  if (pageAccessOf(portfolioConfig.access) !== 'anyone') return false;
   return portfolioConfig.seoIndex === true;
 }
 

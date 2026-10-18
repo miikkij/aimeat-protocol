@@ -808,6 +808,7 @@ export interface Company {
   einvoiceAddress: string | null;
   einvoiceOperator: string | null;
   email: string | null;
+  frontPageAccess: string | null;
   frontPageKind: Generated<string>;
   frontPageTarget: Generated<string>;
   iban: string | null;

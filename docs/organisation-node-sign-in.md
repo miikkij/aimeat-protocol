@@ -3,8 +3,8 @@
 *How to run one AIMEAT node for your company and the partner companies you approve, with Microsoft
 Entra ID as the way in.*
 
-**Version:** 1.2 — Section 6a: the node shows its content to signed-in accounts only
-**Date:** 2026-10-17
+**Version:** 1.3 — Section 6a: a welcome page and a company front page take the same access as an app
+**Date:** 2026-10-18
 **License:** MIT
 
 ---
@@ -159,6 +159,10 @@ the node serve nothing to anyone who is not signed in to one of its own accounts
 - Apps open only after a sign-in. A browser that opens an app without a session is sent to
   `/v1/app-open`, signs in there, and comes back to the app. An owner can narrow an app further to
   one organism's members (`open_to` on the app's settings).
+- A person's welcome page and a company's front page take the same three choices as an app, on any
+  node: anyone, signed-in, or one organism's members (`access` on `PUT /v1/portfolio/config` and
+  `PUT /v1/companies/:id/front-page`, or `aimeat_portfolio_publish` and `aimeat_company_front_page`).
+  A browser without a sign-in goes through the same `/v1/app-open` page and comes back to the page.
 - Portfolio and company addresses answer 404, robots.txt disallows everything, the sitemaps and
   the public feeds answer 401, and an anonymous visitor to a realtime room is refused.
 - A visitor signed in on another node is not an account here and gets the same 401.

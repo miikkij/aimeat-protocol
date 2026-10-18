@@ -21,6 +21,8 @@
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   2026-10-18 — setFrontPage also writes `frontPageAccess`, who may open the front page, and keeps what
+ *     the address serves when `front` is null; a new company is open to anyone (V3.10).
  *   2026-10-18 — setFrontPage's checks are resolveFrontPage (pure extraction), which the publish gate
  *     asks before it files a request (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-10 — The description's provenance record is held and stored only after the company row
@@ -178,6 +180,7 @@ export async function createCompany(storage: Storage, ownerGhii: string, input: 
     descriptionProvenanceId: await descriptionProvenance(storage, description, provenance, held),
     organismId: trimOrNull(input.organismId, 80),
     frontPage: { kind: 'none', target: '' },
+    frontPageAccess: null,
     businessId: trimOrNull(input.businessId, 35),
     vatId: trimOrNull(input.vatId, 35),
     streetAddress: trimOrNull(input.streetAddress, 70),
@@ -243,12 +246,17 @@ export async function updateCompany(storage: Storage, ownerGhii: string, id: str
 /**
  * Sets what the company address serves. An 'app' front page must be an app THIS owner
  * published — pointing a company address at someone else's app would let it wear that
- * app as its own.
+ * app as its own. `front` null keeps what the address serves. `access` is who may open the front
+ * page as stored (null for anyone, services/page-access.ts, checked by the caller); undefined keeps it.
  */
-export async function setFrontPage(storage: Storage, ownerGhii: string, id: string, front: CompanyFrontPage): Promise<CompanyRecord> {
+export async function setFrontPage(
+  storage: Storage, ownerGhii: string, id: string, front: CompanyFrontPage | null, access?: string | null,
+): Promise<CompanyRecord> {
   const company = await requireOwnCompany(storage, ownerGhii, id);
-  const resolved = await resolveFrontPage(storage, ownerGhii, company, front);
-  const next: CompanyRecord = { ...company, frontPage: resolved, updatedAt: new Date().toISOString() };
+  const resolved = front ? await resolveFrontPage(storage, ownerGhii, company, front) : company.frontPage;
+  const next: CompanyRecord = {
+    ...company, frontPage: resolved, ...(access !== undefined ? { frontPageAccess: access } : {}), updatedAt: new Date().toISOString(),
+  };
   await storage.updateCompany(next);
   return next;
 }

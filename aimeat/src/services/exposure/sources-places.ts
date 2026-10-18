@@ -19,6 +19,8 @@
  *     as services/share-provenance.ts does. An open share is 'link', an account share 'signed-in'.
  *     A password share is not counted: a stranger needs the password too.
  *   - An organism: its visibility, and its member roster when the roster is set public.
+ *   - The welcome page while it is switched on, and a company front page while the address serves
+ *     something: their own `access` (services/page-access.ts pageAccessLevel) names who opens them.
  *
  *   Who a share or an organism belongs to: an organism counts for the people who hold it
  *   (services/organism-ownership.ts); a workspace share for its workspace's creator and for the
@@ -26,6 +28,8 @@
  * @structure appSource · workspaceShareSource · organismSource · boardSource · portfolioSource · companySource
  * @usage import { appSource } from './sources-places.js';
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The welcome page and a company front page are counted at the level their
+ *     `access` names (signed-in or one organism), not always public (V3.10).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
  */
 import type { OrganismRecord } from '../../storage/interface.js';
@@ -39,6 +43,8 @@ import { workspaceRegistrations } from '../workspace-meta-read.js';
 import { isOrganismOwner } from '../organism-ownership.js';
 import { companyAddress } from '../company/company-service.js';
 import { listPublishedMembers } from '../portfolio-members.js';
+import { portfolioSwitchState } from '../portfolio-config.js';
+import { pageAccessLevel } from '../page-access.js';
 import {
   type ExposureContext, type ExposureItem, type ExposureLevel, type ExposureSource,
   levelOfVisibility, ownerIdentities,
@@ -206,10 +212,14 @@ export const portfolioSource: ExposureSource = {
     // (services/portfolio-members.ts, the same candidates resolvePublishedPortfolio serves from).
     const published = await ctx.memo('portfolios', () => listPublishedMembers(ctx.storage));
     if (!published.some(m => m.username === ownerName)) return [];
+    // Who may open it: the page's own `access` (services/page-access.ts), as the portfolio origin reads it.
+    const lv = pageAccessLevel((await portfolioSwitchState(ctx.storage, ownerName, ctx.config.nodeId)).access);
     return [{
-      kind: 'portfolio', id: ownerName, title: 'Your welcome page', level: 'public',
+      kind: 'portfolio', id: ownerName, title: 'Your welcome page', ...lv,
       url: `${ctx.base}/v1/portfolio/${enc(ownerName)}`,
-      how_to_close: 'Switch the page off with PUT /v1/portfolio/config and {"enabled":false}; no MCP tool switches it off.',
+      how_to_close: lv.level === 'public'
+        ? 'Choose who may open it with aimeat_portfolio_publish (access "signed-in" or "organism:<id>"), or switch the page off with PUT /v1/portfolio/config and {"enabled":false}.'
+        : 'Switch the page off with PUT /v1/portfolio/config and {"enabled":false}, or narrow who may open it with aimeat_portfolio_publish (access "organism:<id>").',
     }];
   },
 };
@@ -223,8 +233,8 @@ export const companySource: ExposureSource = {
       if (c.status !== 'active' || c.frontPage.kind === 'none') continue;
       const url = companyAddress(ctx.config, c);
       out.push({
-        kind: 'company', id: c.id, title: c.name, level: 'public', ...(url ? { url } : {}),
-        how_to_close: `Stop serving the company's address with aimeat_company_front_page and kind "none" (PUT /v1/companies/${enc(c.id)}/front-page with {"kind":"none"}).`,
+        kind: 'company', id: c.id, title: c.name, ...pageAccessLevel(c.frontPageAccess), ...(url ? { url } : {}),
+        how_to_close: `Choose who may open it with aimeat_company_front_page (access "signed-in" or "organism:<id>"), or stop serving the company's address with kind "none" (PUT /v1/companies/${enc(c.id)}/front-page with {"kind":"none"}).`,
       });
     }
     return out;

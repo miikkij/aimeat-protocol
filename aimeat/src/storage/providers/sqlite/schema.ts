@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-18 — companies.frontPageAccess (migration 0106).
  *   2026-10-17 — direct_messages.sentByAgent and sentByAgentName (migration 0105).
  *   2026-10-15 — memory.searchValues: the FTS triggers index the scalar values to six levels without field names, the PostgreSQL rule; rows that predate it are filled at start (schema-memory-search.ts, feature-list audit #52).
  *   2026-10-11 — agents.stoppedAt and agents.stoppedBy: an agent can be stopped (migration 0101 says
@@ -698,6 +699,8 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('ai_decisions', 'providerKind', 'TEXT');
   // The AI-provenance record of a company's current description. Mirrors Postgres 0095.
   safeAddColumn('companies', 'descriptionProvenanceId', 'TEXT');
+  // Who may open a company's front page: NULL anyone, 'signed-in' or 'organism:<id>'. Mirrors Postgres 0106.
+  safeAddColumn('companies', 'frontPageAccess', 'TEXT');
   // A stored file's AI-provenance record, and the index PUBLICLY_LINKED reads. Mirrors Postgres 0096.
   safeAddColumn('storage_files', 'aiProvenanceId', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_storage_files_ai_provenance ON storage_files(aiProvenanceId) WHERE aiProvenanceId IS NOT NULL;');
