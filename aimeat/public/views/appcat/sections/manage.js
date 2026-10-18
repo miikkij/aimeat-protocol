@@ -11,9 +11,12 @@
  *   manifest, protection, onDone }. A listing or fork change redraws only this section, so the page keeps its
  *   scroll, and then reads the listing again. Delete stays under Actions, the one door out, as on the
  *   old page. The shell draws the chapter line and the headline from `meta`; this is the body.
- * @structure meta · ManageSection({ d }) · AccessCode({ d, onSaved, onCancel })
+ * @structure meta · ManageSection({ d }) · AccessCode({ d, onSaved, onCancel }) · OpenTo({ d, raw, onSet, busy })
  * @usage const mod = await import('./sections/manage.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.3.0 — 2026-10-18 — Who can open it, under the listing: anyone with the link, people signed in
+ *     here, or the members of one shared place the owner belongs to (`open_to` on PATCH
+ *     /v1/apps/:filename), and the sentence that says it (plan doc-mvcn6c7e4e5q, V2.5).
  *   v1.2.0 — 2026-10-12 — The Unlist / List publicly button becomes a three-way choice: Listed,
  *     Community (only people signed in to this node see it in the community list) and Unlisted, with
  *     a line under it that says who sees the app.
@@ -33,8 +36,11 @@ import { Note } from '/components/Note.js';
 import { TextField } from '/components/TextField.js';
 import { Fields } from '/components/Field.js';
 import { Choice } from '/components/Choice.js';
-import { LISTINGS, stateOf } from '/views/appcat/model.js';
+import { Select } from '/components/Select.js';
+import { LISTINGS, OPEN_TO, stateOf, openToOf, openToPlace, openToSentenceKey } from '/views/appcat/model.js';
 import { getSession } from '/js/services/auth.js';
+import { apiGet } from '/js/api.js';
+import { signedInOnly } from '/js/site.js';
 import { x } from '/views/appcat/i18n.js';
 import { patchApp, errorText, isOperator, noticeKind } from '/views/appcat/sections/app-write.js';
 
@@ -81,6 +87,61 @@ function AccessCode({ d, onSaved, onCancel }) {
     <${Note} kind="report" chapter keep tone=${status ? status.tone : undefined}>${status ? status.text : ''}<//>`;
 }
 
+/**
+ * Who can open the app (PATCH /v1/apps/:filename `open_to`), beside its listing: anyone with the link,
+ * people signed in here, or the members of one shared place the owner belongs to. Choosing a place
+ * writes nothing until the place is picked. The sentence under it is the one the app's detail head
+ * shows to everybody (appcat.openTo.*).
+ */
+function OpenTo({ d, raw, onSet, busy }) {
+  const row = { open_to: raw };
+  const value = openToOf(row) || 'anyone';
+  const place = openToPlace(row);
+  // The shared places the owner is a member of, read once when the section opens.
+  const [places, setPlaces] = useState(null);
+  // 'organism' chosen while no place is picked yet: the picker shows, nothing is written.
+  const [picking, setPicking] = useState(false);
+  useEffect(() => {
+    const owner = getSession()?.owner;
+    if (!owner) { setPlaces([]); return undefined; }
+    let live = true;
+    apiGet('/v1/organisms?member=' + encodeURIComponent(owner)).then((json) => {
+      if (live) setPlaces((json.data && json.data.organisms) || []);
+    }).catch((e) => { console.warn('[appcat] shared places not read; the place choice stays closed', e); if (live) setPlaces([]); });
+    return () => { live = false; };
+  }, [d.ref]);
+  useEffect(() => { setPicking(false); }, [value, place]);
+
+  const shown = picking ? 'organism' : value;
+  const noPlaces = Array.isArray(places) && places.length === 0;
+  const choose = (v) => {
+    if (busy || v === shown) return;
+    if (v === 'organism') { setPicking(true); return; }
+    setPicking(false);
+    onSet(v === 'signedIn' ? 'signed-in' : 'anyone');
+  };
+  const placeName = place && Array.isArray(places) ? (places.find((o) => o.id === place) || {}).name || '' : '';
+  // While a place is being picked, nothing is said: the setting has not changed yet.
+  let sentence = '';
+  if (!picking) sentence = value === 'organism' && placeName
+    ? x('openTo.organismNamed', { place: placeName })
+    : x(openToSentenceKey(row.open_to ? row : { open_to: 'anyone' }, signedInOnly()));
+  return html`
+    <${Fields} plain chapter>
+      <${Choice} label=${x('manage.openToLabel')} value=${shown} onChange=${choose}
+        options=${OPEN_TO.map((v) => ({
+          value: v, label: x('manage.openTo.' + v),
+          disabled: v === 'organism' && noPlaces, title: v === 'organism' && noPlaces ? x('manage.openToNoPlaces') : undefined,
+        }))} />
+      ${shown === 'organism' && Array.isArray(places) && places.length ? html`
+        <${Select} line fit label=${x('manage.openToPlace')} value=${picking ? '' : place}
+          placeholder=${x('manage.openToPick')} placeholderDisabled disabled=${busy}
+          options=${places.map((o) => [o.id, o.name || o.id])}
+          onChange=${(id) => { if (id && id !== place) onSet('organism:' + id); }} />` : null}
+    <//>
+    ${sentence ? html`<${Note} kind="quiet" chapter>${sentence}<//>` : null}`;
+}
+
 export default function ManageSection({ d }) {
   const app = d.app || {};
   // The row's state, flipped at once after a write so the switches answer before the listing does.
@@ -91,15 +152,16 @@ export default function ManageSection({ d }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => { setLocal({}); setEditing(0); }, [d.ref]);
   // A fresh listing row is the truth again once it has come.
-  useEffect(() => { setLocal({}); }, [app.listing, app.parked, app.forkable, app.protected]);
+  useEffect(() => { setLocal({}); }, [app.listing, app.parked, app.forkable, app.protected, app.open_to]);
 
   const listing = 'listing' in local ? local.listing : stateOf(app);
+  const openTo = 'open_to' in local ? local.open_to : app.open_to;
   const forkable = 'forkable' in local ? local.forkable : !!app.forkable;
   const hasCode = 'protected' in local ? local.protected : !!app.protected;
   const prot = (app.manifest && app.manifest.protection) || {};
   const anyProt = !!(prot.obfuscate || prot.domainLock || prot.watermark || prot.noRawDownload);
 
-  /** Set one switch on the record (listing or forkable). */
+  /** Set one switch on the record (listing, open_to or forkable). */
   const flip = async (key, value) => {
     if (busy || (key === 'listing' && value === listing)) return;
     if (!getSession()?.jwt) { const t = x('common.loginRequired'); d.notice(t, noticeKind(t)); return; }
@@ -123,6 +185,7 @@ export default function ManageSection({ d }) {
         onChange=${(v) => flip('listing', v)} options=${LISTINGS.map((v) => [v, x('state.' + v)])} />
     <//>
     <${Note} kind="quiet" chapter>${x('manage.listingHint.' + listing)}<//>
+    <${OpenTo} d=${d} raw=${openTo} busy=${busy} onSet=${(v) => flip('open_to', v)} />
     <${Actions} chapter>
       <${Action} small title=${x(forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')}
         onClick=${() => flip('forkable', !forkable)}>${x(forkable ? 'card.forkableOn' : 'card.forkableOff')}<//>

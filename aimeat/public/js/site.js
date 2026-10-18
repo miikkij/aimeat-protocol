@@ -11,8 +11,14 @@
  *   - hasSite(key)  — presence test for hiding a nav item or a whole section
  *   - siteContacts() — the people to show, in approach order (possibly none)
  *   - contactHref(subject) — mailto: for the first contact, or '' when nobody is configured
+ *   - signedInOnly() — the node shows its content to signed-in accounts only (contentAccess)
+ *   - SIGN_IN_STEPS · signInFirst(pathname, signedIn) — which SPA addresses a visitor without a
+ *     session reaches on such a node, and whether this one shows the sign-in page instead
  * @usage import { siteLink, hasSite } from '/js/site.js';
  * @version-history
+ *   v1.5.0 — 2026-10-18 — signedInOnly(), SIGN_IN_STEPS and signInFirst(): on a node set to show its
+ *     content to signed-in accounts only, a visitor without a session sees the sign-in page in place
+ *     of every view except the steps of signing in (plan doc-mvcn6c7e4e5q, V1.5).
  *   v1.0.0 — 2026-07-28 — Initial. Makes every public-page app reference operator-configurable
  *     so a node that is not aimeat.io never advertises aimeat.io's apps or contact details.
  *   v1.1.0 — 2026-07-28 — Contacts become a list with roles (a company has more than one
@@ -119,4 +125,35 @@ export function contactHref(subject) {
   const first = siteContacts()[0];
   if (!first) return '';
   return subject ? `mailto:${first.email}?subject=${encodeURIComponent(subject)}` : `mailto:${first.email}`;
+}
+
+/**
+ * True when this node shows its content to its own signed-in accounts only (config contentAccess
+ * 'signed-in'; routes/portal-spa.ts puts it on window.__SITE). The API refuses a visitor without a
+ * session there (middleware/content-access-gate.ts), so the SPA shows such a visitor the sign-in page.
+ * @returns {boolean}
+ */
+export function signedInOnly() {
+  return site().contentAccess === 'signed-in';
+}
+
+/**
+ * The SPA addresses that are steps of signing in, so a visitor without a session reaches them on a
+ * signed-in-only node: an app's consent (app-grant), opening an app or a page that needs a sign-in
+ * (app-open), an invitation (invite), a sign-in round an agent started (oauth-round) and allowing
+ * what an agent asked for (allow). Each one asks for the sign-in itself. The agent device consent
+ * (/v1/agents/verify) and the OAuth consent are the server's own pages and never reach the SPA.
+ */
+export const SIGN_IN_STEPS = new Set(['/v1/app-grant', '/v1/app-open', '/v1/invite', '/v1/oauth-round', '/v1/allow']);
+
+/**
+ * Whether the view at `pathname` gives way to the sign-in page: on a signed-in-only node, for a
+ * visitor without a session, everywhere except the steps of signing in. The public viewers (a shared
+ * workspace, a welcome page, an app's guide) are content, so they ask for the sign-in too.
+ * @param {string} pathname
+ * @param {boolean} signedIn
+ * @returns {boolean}
+ */
+export function signInFirst(pathname, signedIn) {
+  return signedInOnly() && !signedIn && !SIGN_IN_STEPS.has(pathname);
 }

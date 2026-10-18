@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.17.0 — 2026-10-18 — GET /v1/apps carries `open_to`, who may open the app: the owner's own value
+ *     (anyone, signed-in, organism:<id>), and for everyone else the level only (organism without its
+ *     id), so the catalogue can say who opens an app (plan doc-mvcn6c7e4e5q, V2.5).
  *   v1.16.0 — 2026-10-12 — GET /v1/apps carries `listing` (listed, community, unlisted), and a member
  *     of this node (signed in, not anonymous, not a visitor from another node) also gets the apps
  *     other owners listed to the community. GET /v1/admin/apps carries `listing` too.
@@ -65,6 +68,7 @@ import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app-similarity.js';
 import { publicAppManifest } from '../../services/app-public-manifest.js';
 import { appToll, presentAppManifest } from '../../services/app-pacing.js';
+import { appAccessOf, appAccessLevelOf } from '../../services/app-access.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app-seo.js';
@@ -228,6 +232,9 @@ export function registerCatalogueAdminRoutes(
                 // listed | community | unlisted. `parked` stays for older clients: true for both
                 // community and unlisted, since neither is on a public surface.
                 listing: appListingOf(app),
+                // Who may open it (PATCH /v1/apps/:filename `open_to`): the owner reads the value they
+                // set, everyone else the level, without the organism's id.
+                open_to: isOwn ? appAccessOf(app) : appAccessLevelOf(app),
                 parked: !!app.parked,
                 forkable: !!app.forkable,
                 has_draft: buildingOnly ? !!sharedDrafts.get(app.ownerGaii)?.has(app.filename)

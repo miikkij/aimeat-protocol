@@ -4562,6 +4562,13 @@ components:
             Where the app is listed. `listed`: every catalogue, search and other nodes. `community`:
             only in the catalogue listing of people signed in to this node, and nowhere public.
             `unlisted`: only in its owner's own list. A link opens the app in all three.
+        open_to:
+          type: string
+          description: >-
+            Who may open the app (PATCH /v1/apps/{filename} `open_to`). The owner reads the value they
+            set: `anyone`, `signed-in` or `organism:<id>`. Everyone else reads the level only:
+            `anyone`, `signed-in` or `organism`, without the organism's id. On a node set to show its
+            content to signed-in accounts only, `anyone` still needs a sign-in.
         parked: { type: boolean, description: True when the app is off every public surface (listing community or unlisted). Kept for older clients; read `listing`. }
         forkable: { type: boolean, description: True when other users are allowed to fork this app (the owner and their agents can always fork it) }
         has_draft: { type: boolean, description: True for a pending draft when the viewer owns the app or explicitly requests building=true and holds its development right. False for other viewers. }

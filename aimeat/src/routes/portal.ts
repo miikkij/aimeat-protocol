@@ -14,6 +14,7 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-10-18 — /v1/app-open joins the SPA routes: the page that opens an app, a welcome page or a company front page needing a sign-in.
  *   2026-10-18 — /v1/portfolio/:username gives a page that is not open to anyone the generic head (V3.10).
  *   2026-10-11 — GET /v1/build also says which commit runs, when the process started and whether
  *     the build is behind its source (utils/build-stamp.ts runningBuild).
@@ -589,6 +590,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/transparency',
     '/v1/start',
     '/v1/app-grant',   // H-2 app-grant consent page (SPA)
+    '/v1/app-open',    // Opening an app or a page that needs a sign-in (SPA, ?app=<owner>/<file>, ?portfolio=<user>, ?company=<id>; routes/apps/open.ts, routes/page-open.ts)
     '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)
     '/v1/oauth-round', // The owner confirms a sign-in round an agent started (SPA, ?state=)
     '/v1/allow',       // The owner allows what their agent asked for with one press (SPA, ?agent=&need=)

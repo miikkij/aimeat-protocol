@@ -15,6 +15,8 @@
  *   Self-spawns its own node with the app origin provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-access
  * @version-history
+ *   v1.2.0 — 2026-10-18 — GET /v1/apps carries `open_to` (the owner's value, the level for anyone
+ *     else), and /v1/app-open is an SPA address (plan doc-mvcn6c7e4e5q, V2.5).
  *   v1.1.0 — 2026-10-18 — The grant leaves the address: the origin answers the first request with
  *     ?access= by a 302 without it and a host-only HttpOnly SameSite=Lax cookie; the cookie serves this
  *     app and no other; a tampered cookie serves nothing and is cleared; the grant names its viewer.
@@ -156,6 +158,29 @@ async function main() {
             assert(apex.status === 403, `outsider apex ${apex.status}`);
             const own = await fetch(`${BASE}/v1/apps/${owner}/${file}`, { headers: auth(ownerTok) });
             assert(own.status === 200, `the owner always opens it: ${own.status}`);
+        });
+
+        await test('the catalogue says who opens it: the owner reads the organism, another account only the level', async () => {
+            const listed = await settings({ listing: 'listed' });
+            assert(listed.status === 200, `list it ${listed.status}`);
+            const rowOf = async (tok: string) => {
+                const r = await json('/v1/apps?limit=200', { headers: auth(tok) });
+                assert(r.status === 200, `listing ${r.status}`);
+                return (r.body.data.apps as any[]).find(a => a.owner === owner && a.filename === file);
+            };
+            const own = await rowOf(ownerTok);
+            assert(own?.open_to === `organism:${orgId}`, `the owner's row: ${JSON.stringify(own?.open_to)}`);
+            const seen = await rowOf(outsiderTok);
+            assert(seen?.open_to === 'organism', `another account's row: ${JSON.stringify(seen?.open_to)}`);
+            assert(!JSON.stringify(seen).includes(orgId), 'another account read the organism id');
+            const back = await settings({ listing: 'unlisted' });
+            assert(back.status === 200, `unlist it ${back.status}`);
+        });
+
+        await test('the open page is an SPA address: a reload of /v1/app-open serves the shell, not a 404', async () => {
+            const page = await fetch(`${BASE}/v1/app-open?app=${encodeURIComponent(`${owner}/${file}`)}`, { headers: { Accept: 'text/html' } });
+            const body = await page.text();
+            assert(page.status === 200 && body.includes('/views/app-open.js'), `shell ${page.status}`);
         });
 
         await test('a grant for this app opens no other app', async () => {
