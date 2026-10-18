@@ -4089,6 +4089,7 @@
     },
     "noAddress": "no address for outsiders",
     "closeIt": "Close it",
+    "closeTitle": "Close it to people outside",
     "goThere": "Open {page}",
     "copyForAi": "Copy for your AI",
     "aiPrompt": "Close this on my AIMEAT so that people outside can no longer read it: \"{title}\". How: {how}",

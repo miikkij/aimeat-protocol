@@ -9,6 +9,7 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.9.1 — 2026-10-18 — AudienceBadge has its own sheet (audience-badge.css): it sizes to its words, and a link or a code is the attention tone.
  *   v1.9.0 — 2026-10-18 — AudienceBadge (components/AudienceBadge.js): who can read one thing of the
  *     person's, in words, on the Tag (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.8.1 — 2026-10-16 — HtmlPageFrame takes `provenance` (the AI label in its strip) and `author`.
@@ -83,8 +84,8 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
     },
     {
         id: 'audience-badge', name: 'AudienceBadge', kind: 'component', status: 'active',
-        summary: 'Who can read one thing of the person\'s, in words on a tag: Private, "<organism> members", Signed-in, Anyone with the code (or the password), Anyone with the link, Public; the tooltip says it in a sentence. It wears the Tag.',
-        module: '/components/AudienceBadge.js', sheet: '/css/components/mark.css', classes: ['poster-chip'],
+        summary: 'Who can read one thing of the person\'s, in words on a tag: Private, "<organism> members", Signed-in, Anyone with the code (or the password), Anyone with the link, Public; the tooltip says it in a sentence. It wears the Tag, as wide as its words wherever it stands.',
+        module: '/components/AudienceBadge.js', sheet: '/css/components/audience-badge.css',
         data: {
             shape: 'AudienceBadge({ value, audience, app, organismName, onClick, expanded })',
             fields: {
@@ -98,7 +99,7 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         useFor: ['Every view that shows the owner their own content: a record, a file, a workspace page, an app, a package, a knowledge package, a board, a skill (pnpm check:audience-badge holds the list).'],
         variants: [
             { name: 'public', prop: "value='public'", when: 'anyone can read it and it can be listed: on the sun' },
-            { name: 'anyone with the link or a code', prop: "value='link' | 'code' | 'password'", when: 'a stranger with the address reads it: coral' },
+            { name: 'anyone with the link or a code', class: 'audience-badge--open', prop: "value='link' | 'code' | 'password'", when: 'a stranger with the address reads it: ink words on the pale attention ground, an amber frame' },
             { name: 'signed-in, organism members', prop: "value='members' | 'organism:<id>'", when: 'only accounts here, or one organism\'s members: plain' },
             { name: 'private', prop: "value='private'", when: 'only the person, their agents or people they named: dim' },
         ],

@@ -1,0 +1,32 @@
+/**
+ * @file public/css/components/audience-badge.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The AudienceBadge (components/AudienceBadge.js): who can read one thing, said on the
+ *   Tag (poster.css .poster-chip, its frame, corner and letters). This sheet holds what the Tag alone
+ *   does not: the badge is as wide as its words wherever it stands (a listing cell is a grid that
+ *   stretches its children, which drew it as a field across the column), its words are 11.5px, and
+ *   a thing a stranger with the address can read is said in the attention colours, a pair that
+ *   reads 4.5:1 or better in both themes and is not the coral of a destructive action.
+ * @structure .audience-badge · --open (anyone with the link, the code or the password)
+ * @version-history
+ *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V6.4; the browser check of 1c0b57fba).
+ */
+.audience-badge {
+  justify-self: start;
+  align-self: center;
+  width: max-content;
+  max-width: 100%;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+/* The words stay ink on the pale attention ground (about 15:1 light, 12:1 dark); the frame carries the
+   attention colour. --warn-fg on --warn-bg measures 4.51:1, too near the line for 11.5px words. */
+.audience-badge--open {
+  border-color: var(--warn-fg);
+  background: var(--warn-bg);
+  color: var(--text);
+}
