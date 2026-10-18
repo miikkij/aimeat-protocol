@@ -33,12 +33,16 @@
  *   have been; it never says anybody who should be got in. Only a test with a second fixture does,
  *   and writing that test is the part no gate will remind you of.
  * @structure
- *   - main(): report; --strict exits 1 on an unlisted door; --seed rewrites the exemption file
+ *   - main(): report; --strict exits 1 on an unlisted door or a listed door that no longer exists;
+ *     --seed rewrites the exemption file
  * @usage
  *   cd aimeat && pnpm check:owner-principal            # report
  *   cd aimeat && pnpm check:owner-principal --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:owner-principal --seed     # rewrite the exemption file
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Scans all of src/ less inventory/program.ts GATE_SCAN_EXCLUDE (no new door
+ *     in src/commerce or the other seven directories), and a listed door that is gone fails (wish
+ *     wish-identiteettitarkistukset-kaupank-yntikoodiin-ja-kolmeen-muuh).
  *   v1.0.0 — 2026-09-04 — Initial, the fourth of the four written rules that had no gate.
  */
 import { staleTriage, reportTriageClock } from './inventory/triage-clock.js';
@@ -46,7 +50,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ownerDecisions, PRINCIPAL_GUARDS, type OwnerDecision } from './inventory/owner-decisions.js';
-import { srcProgram } from './inventory/program.js';
+import { inGateScope, srcProgram } from './inventory/program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..');
@@ -73,7 +77,10 @@ export function main(): boolean {
     // check-identity-resolution.ts: the worst owner-as-principal defect in the tree
     // (mcp/oauth.ts, a credential-granting door gated on `agent.owner !== payload.owner`) sat on a
     // surface this gate had never read, while the gate reported green.
-    const { program, files } = srcProgram(/[/\\]src[/\\](routes|services|mcp)[/\\]/);
+    // ALL OF src/ FROM 2026-10-18, less the exclusion list in inventory/program.ts; the reason is in
+    // check-identity-resolution.ts.
+    const { program, files: srcFiles } = srcProgram();
+    const files = srcFiles.filter(f => inGateScope(f.fileName));
     const all = ownerDecisions(program, files, AIMEAT);
     // A door that names the principal is asking the right question already; the name comparison beside
     // it is a second, narrower one. Those are not the gate's business.
@@ -109,7 +116,7 @@ export function main(): boolean {
     console.log('');
     console.log('  Invariant 11: is the refusal a principal, or a name?');
     console.log('  ' + '─'.repeat(62));
-    console.log(`  refusals on \`owner\`  ${String(all.length).padStart(3)}   in src/routes, src/services and src/mcp`);
+    console.log(`  refusals on \`owner\`  ${String(all.length).padStart(3)}   in src/ (less tests, generated, static, data)`);
     console.log(`  doors, name only     ${String(units.length).padStart(3)}   nothing on the door names the principal`);
     console.log(`  doors that name it   ${String(all.filter(r => r.namesPrincipal).length).padStart(3)}   not reported (${PRINCIPAL_GUARDS.join(', ')})`);
     console.log(`  listed               ${String(listed.length).padStart(3)}   of which triaged: ${triaged.length}`);
@@ -137,10 +144,12 @@ export function main(): boolean {
     const clock = staleTriage(exempt.exempt, exempt.maxAgeDays ?? 90);
     if (reportTriageClock('owner-principal', clock, exempt.maxAgeDays ?? 90)) return false;
 
+    // A LISTED DOOR THAT IS GONE FAILS, from 2026-10-18, for the reason in check-identity-resolution.ts.
     if (stale.length > 0) {
-        console.log(`  ✓ ${stale.length} listed door${stale.length === 1 ? '' : 's'} gone. Remove to lock the gain in:`);
-        for (const k of stale) console.log(`    ${k}`);
-        return true;
+        console.error(`✖ ${stale.length} listed door${stale.length === 1 ? '' : 's'} gone. Remove from`);
+        console.error('  security/owner-principal-exemptions.json, so a new door of the same name is read:');
+        for (const k of stale) console.error(`    ${k}`);
+        return false;
     }
 
     console.log(`  ✓ no door refuses on the owner name alone, beyond the ${listed.length} listed`);

@@ -33,13 +33,18 @@
  *   NOT triaged: each one is a question nobody has answered yet, kept so the gate can refuse a NEW
  *   one. The count may only go down.
  * @structure
- *   - sourceFiles(): routes and services, through the compiler's own file list
- *   - main(): read the exemption file, report, and on --strict exit 1 on an unlisted unit
+ *   - the scan: all of src/ less inventory/program.ts GATE_SCAN_EXCLUDE, through the compiler's own file list
+ *   - main(): read the exemption file, report, and on --strict exit 1 on an unlisted unit or a
+ *     listed unit that no longer exists
  * @usage
  *   cd aimeat && pnpm check:identity-resolution            # report
  *   cd aimeat && pnpm check:identity-resolution --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:identity-resolution --seed     # rewrite the exemption file
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Scans all of src/ less an exclusion list (src/commerce, src/auth,
+ *     src/middleware and five more directories had never been read; 13 units joined, all triaged),
+ *     and a listed unit that is gone fails instead of passing with a ✓ (wish
+ *     wish-identiteettitarkistukset-kaupank-yntikoodiin-ja-kolmeen-muuh).
  *   v1.0.0 — 2026-09-04 — Initial. Measured before it existed: the identity rule was one of four
  *     written rules with no gate at all, and the only one whose failure hides itself from agent tests.
  */
@@ -48,7 +53,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { identityReads, type IdentityRead } from './inventory/identity-reads.js';
-import { srcProgram } from './inventory/program.js';
+import { inGateScope, srcProgram } from './inventory/program.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const AIMEAT = resolve(HERE, '..');
@@ -77,7 +82,11 @@ export function main(): boolean {
     // authorization is an owner-NAME comparison, on a surface neither identity ratchet had ever
     // looked at. A gate that reports green over an unexamined directory is worse than no gate,
     // because the green is read as a verdict on the whole tree.
-    const { program, files } = srcProgram(/[/\\]src[/\\](routes|services|mcp)[/\\]/);
+    // ALL OF src/ FROM 2026-10-18, less the exclusion list in inventory/program.ts, so a new directory
+    // is read by default. The inclusion list had grown by one name per review that found a defect
+    // outside it; src/commerce, the densest defect area of new code, was never on it.
+    const { program, files: srcFiles } = srcProgram();
+    const files = srcFiles.filter(f => inGateScope(f.fileName));
     const all = identityReads(program, files, AIMEAT);
     const bare = all.filter(r => !r.resolvesToo);
     // The unit is what is decided about, so several reads inside one handler are one entry. The one
@@ -123,7 +132,7 @@ export function main(): boolean {
     console.log('');
     console.log('  Identity: does the unit resolve the caller, or read `sub` raw?');
     console.log('  ' + '─'.repeat(62));
-    console.log(`  reads of \`sub\`      ${String(all.length).padStart(3)}   in src/routes, src/services and src/mcp`);
+    console.log(`  reads of \`sub\`      ${String(all.length).padStart(3)}   in src/ (less tests, generated, static, data)`);
     console.log(`  units, sub only     ${String(units.length).padStart(3)}   never call resolveIdentity`);
     console.log(`  of those, hand it on${String(units.filter(u => u.asArgument).length).padStart(3)}   pass \`sub\` to a call — triage these first`);
     console.log(`  units, both         ${String(all.filter(r => r.resolvesToo).length).padStart(3)}   not reported: the unit does resolve`);
@@ -152,10 +161,14 @@ export function main(): boolean {
     const clock = staleTriage(exempt.exempt, exempt.maxAgeDays ?? 90);
     if (reportTriageClock('identity-resolution', clock, exempt.maxAgeDays ?? 90)) return false;
 
+    // A LISTED UNIT THAT IS GONE FAILS, from 2026-10-18. It used to print a ✓ and pass, and four
+    // such keys sat in this file unremoved: an entry whose handler no longer exists is a clearance
+    // waiting for a new handler of the same name to inherit it unread.
     if (stale.length > 0) {
-        console.log(`  ✓ ${stale.length} listed unit${stale.length === 1 ? '' : 's'} gone. Remove to lock the gain in:`);
-        for (const k of stale) console.log(`    ${k}`);
-        return true;
+        console.error(`✖ ${stale.length} listed unit${stale.length === 1 ? '' : 's'} gone. Remove from`);
+        console.error('  security/identity-resolution-exemptions.json, so a new unit of the same name is read:');
+        for (const k of stale) console.error(`    ${k}`);
+        return false;
     }
 
     console.log(`  ✓ no unit reads \`sub\` without resolving, beyond the ${listed.length} listed`);

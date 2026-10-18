@@ -20,6 +20,9 @@
  *   v1.x, findings()).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-gates-fail.test.ts
  * @version-history
+ *   2026-10-18 — check:identity-resolution and check:owner-principal read all of src/ less an
+ *     exclusion list, and a planted name comparison in src/commerce is reported
+ *     (wish wish-identiteettitarkistukset-kaupank-yntikoodiin-ja-kolmeen-muuh).
  *   2026-10-18 — check:python-shapes and check:python-daemon each refuse a planted copy of the Python
  *     package and an allowlist missing an entry, and audit:browser-libs reports a planted difference
  *     (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille).
@@ -38,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { collectFederationWrites } from '../../scripts/check-federation-signatures.js';
 import { identityReads } from '../../scripts/inventory/identity-reads.js';
 import { ownerDecisions } from '../../scripts/inventory/owner-decisions.js';
+import { inGateScope } from '../../scripts/inventory/program.js';
 import { collectDoors, openWriteDoors, toRows } from '../../scripts/inventory/doors.js';
 import { staleTriage } from '../../scripts/inventory/triage-clock.js';
 import { scopeParityFindings, scopeParitySources } from '../../scripts/check-scope-parity.js';
@@ -234,6 +238,29 @@ describe('check:owner-principal finds a refusal decided by the owner name alone'
     it('marks the door that names the principal, and leaves a 409 lockout guard out', () => {
         expect(rows.find(r => r.unit === 'POST /v1/principal/:o')).toMatchObject({ namesPrincipal: true });
         expect(rows.find(r => r.unit === 'POST /v1/conflict/:o')).toBeUndefined();
+    });
+});
+
+// ── Invariants 1 and 11: the scan covers all of src/, so src/commerce is read ──
+describe('check:identity-resolution and check:owner-principal read all of src/ less an exclusion list', () => {
+    it('scans src/commerce, src/auth, src/middleware and a directory nobody has named yet', () => {
+        for (const dir of ['commerce', 'auth', 'middleware', 'tool-dispatch', 'brand-new-dir']) {
+            expect(inGateScope(join(AIMEAT, 'src', dir, 'x.ts'))).toBe(true);
+        }
+    });
+    it('leaves out unit tests, generated files, static browser code and seeded data', () => {
+        for (const p of ['src/commerce/__tests__/x.test.ts', 'src/services/x.test.ts', 'src/services/ui-library/facts.generated.ts', 'src/static/x.ts', 'src/data/x.ts']) {
+            expect(inGateScope(join(AIMEAT, p))).toBe(false);
+        }
+    });
+    it('reports a planted name comparison and a raw `sub` handed on inside src/commerce', () => {
+        const t = typed({ 'src/commerce/fixture.ts': DECLS + [
+            "export function refund(auth: VerifiedToken, order: { owner: string }) { if (auth.owner !== order.owner) throw new Error('not yours'); }",
+            'export function fileOrder(auth: VerifiedToken) { save(auth.sub); }',
+        ].join('\n') });
+        const scanned = t.files.filter(f => inGateScope(f.fileName));
+        expect(ownerDecisions(t.program, scanned, t.root).find(r => r.unit === 'refund')).toMatchObject({ file: 'src/commerce/fixture.ts', namesPrincipal: false });
+        expect(identityReads(t.program, scanned, t.root).find(r => r.unit === 'fileOrder')).toMatchObject({ file: 'src/commerce/fixture.ts', resolvesToo: false, asArgument: true });
     });
 });
 
