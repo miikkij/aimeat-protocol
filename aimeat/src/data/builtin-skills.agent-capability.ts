@@ -33,6 +33,7 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.7.1 — 2026-10-18 — The ctx.ai row says the extension reads the answer back, privately.
  *   v1.7.0 — 2026-10-14 — "What an app tool is": the permission organism:direct lets one agent
  *     write a closed space directly, the list of a closed space is changed only by the person in
  *     person or by such an agent, and an app names its extension on an existing workspace's space
@@ -172,7 +173,7 @@ This is what an agent reaches through an app tool. The extension's manifest decl
 | \`ctx.workspace\` | Reads and writes workspace records, and reads and appends the rows of a row space that names the extension. |
 | \`ctx.memory\` | Keeps the extension's own data and reads public records. |
 | \`ctx.files\` | Reads and writes files in the node's storage. |
-| \`ctx.ai\` | Starts a model call that runs in the background: text, a picture, or the transcription of a stored audio file. The extension's owner pays for it. |
+| \`ctx.ai\` | Starts a model call that runs in the background: text, a picture, or the transcription of a stored audio file. The extension's owner pays for it, and the extension reads the answer back while it stays private to the owner. |
 | \`ctx.email\`, \`ctx.notify\` | Sends an email through the node's mail service, or a notice to the owner. |
 | \`ctx.buy\` | Buys one call of another app's tool, under a contract the extension's owner holds. |
 | \`ctx.calendar\` | Calendar arithmetic on the node, with the library the browser uses (\`aimeat-calendar\`): the occurrences of repeating events in a range, free time, a time zone's local time to an instant and back, ICS text to events and back. An extension has no time-zone data of its own, so a calendar tool ("what is booked this week", "when is free") is built on these calls and stores events in the library's event shape. |

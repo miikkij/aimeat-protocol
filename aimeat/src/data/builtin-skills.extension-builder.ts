@@ -27,6 +27,7 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-18 — How an extension reads the answer of its ctx.ai.start job: input.result, ctx.ai.result.
  *   2026-10-18 — A `public: true` action answers a visitor, read-only; ctx.caller.adult and
  *     ctx.caller.subscriptions (Comicland v3 A-7, A-3, A-5).
  *   2026-10-16 — A run ends at a wall-clock limit, waiting included (QA audit S7-02).
@@ -116,6 +117,9 @@ may already do it.
   throw when it is wrong.
 - **On a schedule, a workflow step or an \`on_done\` callback, a normal return is a success** whatever
   it contains, so a failed precondition must \`throw\`.
+- \`ctx.ai.start\` writes its answer into the owner's namespace, which \`ctx.memory.get\` does not reach.
+  The \`on_done\` action gets it as \`input.result\` (\`input.result_too_large: true\` past 64 kB), and
+  \`ctx.ai.result(job_id)\` reads it at any later time. Never make the answer public to read it.
 - An \`undefined\` or \`null\` argument to a \`ctx\` call throws, naming the method.
 - \`ctx.fetch(url, opts)\` answers \`{ status, ok, text, headers }\`. \`text\` is the body as a string:
   \`JSON.parse(res.text)\`; there is no \`json()\`. It reads at most 4 MB of one answer.

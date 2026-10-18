@@ -813,9 +813,9 @@
     },
     "src/services/ai-jobs/service.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. 2026-10-18: readResult hands a job's answer to the extension that started it, through presentMemory with the job's own reader (starter.ts jobReader)."
     },
     "src/services/ai-jobs/store.ts": {
       "reads": {

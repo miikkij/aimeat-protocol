@@ -96,7 +96,8 @@ guest receives is missing from that table, so change the table in the same commi
 - An `undefined` or `null` argument to a `ctx` call throws, naming the method and the position
   (until 2026-09-13 it crossed the bridge as the text "undefined").
 - `ctx.ai.start` starts a background model call, billed to the extension's owner, and is absent on a
-  schedule and a workflow step. For a synchronous paid answer, call the provider through `ctx.fetch`
+  schedule and a workflow step. Its answer lands in the owner's namespace, out of `ctx.memory`'s
+  reach: the `on_done` action gets it as `input.result`, and `ctx.ai.result(job_id)` reads it later. For a synchronous paid answer, call the provider through `ctx.fetch`
   with a `type: secret` config or a `{{secret:NAME}}` header. A secret nobody set is `undefined` in
   `ctx.config` (until 2026-09-13 it read as the descriptor object or the mask, both truthy).
 - An extension can itself be an AI provider: `provides.ai_provider` in the manifest and one `ai.<op>`

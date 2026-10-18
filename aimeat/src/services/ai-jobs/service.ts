@@ -71,6 +71,7 @@ import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
 import { jobReader } from './starter.js';
 import { warningsNote } from '../classification/reader.js';
+import { presentMemory } from '../classification/present-memory.js';
 import { fireOnDone } from './on-done.js';
 import { aiOpOf, aiOpRefusal } from './op.js';
 import { runJobOp, assertAudioInReach } from './run-op.js';
@@ -246,10 +247,16 @@ export class AiJobService implements AiJobStarter {
         const base = { ok: true as const, job_id: job.id, state: job.state, result_key: job.result_key };
         if (job.result_version === undefined) return base;
         const record = await this.storage.getMemory(job.owner, job.result_key);
-        if (!record || record.version !== job.result_version) {
-            return { ok: false, code: 'AI_JOB_RESULT_GONE', message: `The record at "${job.result_key}" was deleted or written again after the job wrote it.` };
+        // Through the job's own classification reader, the one its inputs were read with
+        // (starter.ts): a label the owner put on the answer since applies, and what it hides reads
+        // as absent, as it does to ctx.memory.getPublic.
+        const shown = record && record.version === job.result_version
+            ? await presentMemory(jobReader({ storage: this.storage, config: this.config }, job), record)
+            : null;
+        if (!shown) {
+            return { ok: false, code: 'AI_JOB_RESULT_GONE', message: `The answer at "${job.result_key}" is no longer there: the record was deleted or written again after the job wrote it.` };
         }
-        return { ...base, value: record.value };
+        return { ...base, value: shown.value };
     }
 
     /** `state` defaults to the live ones, which is what "what am I waiting for" means. */
