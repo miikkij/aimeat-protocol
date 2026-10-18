@@ -17,6 +17,18 @@
       "date": "2026-10-17",
       "kind": "feature",
       "title": {
+        "en": "Share an HTML page that fills the whole window",
+        "fi": "HTML-sivun voi jakaa koko ikkunan kokoisena"
+      },
+      "body": {
+        "en": "A shared HTML page now has a second link that opens the page alone in the whole browser window, with only its AI label in the corner. Copy it from the bar above the page, or ask your AI: it gets the link when it shares the page. A page's own pictures, stylesheets, scripts and fonts now load in every browser. Before this fix the browser blocked them.",
+        "fi": "Jaetulla HTML-sivulla on nyt toinen linkki, joka avaa pelkän sivun koko selainikkunaan. Kulmassa näkyy vain sivun AI-merkintä. Linkin voi kopioida sivun yläpuolella olevasta palkista, ja tekoälysi saa sen, kun se jakaa sivun. Sivun omat kuvat, tyylit, skriptit ja fontit latautuvat nyt kaikissa selaimissa. Ennen korjausta selain esti ne."
+      }
+    },
+    {
+      "date": "2026-10-17",
+      "kind": "feature",
+      "title": {
         "en": "You see who wrote a message, and you reply in your agent's conversations",
         "fi": "Näet, kuka viestin kirjoitti, ja vastaat agenttisi keskusteluihin"
       },
