@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-10-18 — publishWorkspaceOp and publishRecordsBatchOp take a space by its name as well as its
+ *     namespace (resolveSpaceNamespace), as the write op does, before the role check and the fence.
  *   2026-10-16 — An HTML page (a document value with `html`) is checked and given its text before the
  *     schema reads it (services/html-page.ts normalizeHtmlPageValue); the index marks a page `kind:
  *     'html'`, the day it was last opened and whether it went `stale` (services/workspace-opened.ts).
@@ -128,7 +130,7 @@ import { readStoredSections } from './workspace-sections.js';
 import { emitChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from './doc-images.js';
-import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem } from './workspace-write-items.js';
+import { normalizeWriteItems, resolveWriteItem, resolveSpaceNamespace, type ResolvedWriteItem } from './workspace-write-items.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
 import { fileDocumentInSection, isRefusal } from './workspace-member-changes.js';
 import { writeProvenanceEcho, readProvenanceMany } from '../mcp/ai-provenance-result.js';
@@ -507,7 +509,9 @@ export async function publishWorkspaceOp(
     deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, args: PublishWorkspaceArgs,
 ): Promise<WorkspaceOpResult<{ published: string; version: number; skipped?: boolean }>> {
     const { storage, config } = deps;
-    const { organismId, ws, namespace, id } = args;
+    const { organismId, ws, id } = args;
+    // A space's name is taken as well as its namespace, before the role check and the fence read it.
+    const namespace = await resolveSpaceNamespace(storage, organismId, ws, args.namespace);
     const H = createOrganismHelpers(config, storage);
     const deny = await denyReason(storage, caller, organismId); if (deny) return deny;
     const role = await memberRoleOf(storage, caller, organismId);
@@ -599,12 +603,14 @@ export async function publishRecordsBatchOp(
     deps: WorkspaceOpsDeps, caller: WorkspaceOpsCaller, args: PublishRecordsBatchArgs,
 ): Promise<WorkspaceOpResult<PublishRecordsBatchData>> {
     const { storage, config } = deps;
-    const { organismId, ws, namespace } = args;
+    const { organismId, ws } = args;
     const useRecords = Array.isArray(args.records) && args.records.length > 0;
     const list: unknown[] = useRecords ? args.records! : (Array.isArray(args.instances) ? args.instances : []);
-    if (typeof namespace !== 'string' || !namespace || list.length === 0) {
+    if (typeof args.namespace !== 'string' || !args.namespace || list.length === 0) {
         return refuse(400, 'INVALID_INPUT', 'namespace (string) and instances[] or records[] (non-empty) are required');
     }
+    // A space's name is taken as well as its namespace, before the role check and the fence read it.
+    const namespace = await resolveSpaceNamespace(storage, organismId, ws, args.namespace);
     if (list.length > BATCH_PUBLISH_MAX) {
         return refuse(400, 'INVALID_INPUT', `At most ${BATCH_PUBLISH_MAX} records per request; this one has ${list.length}. Send the rest in a second call.`);
     }

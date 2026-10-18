@@ -5,6 +5,8 @@
  *   schema) via REST, then drives the tools as the owner's agent over MCP, and checks the
  *   membership gate with a second owner's organism.
  * @version-history
+ *   2026-10-18 — Test 7b: _publish and _revert_to_draft take the space name _write took. Green by
+ *     asserting the hole closed: publish by name answered "declares no space" beside a list showing it.
  *   2026-10-17 — Test 48: the MCP OAuth token older than the widened grant may be answered 401
  *     invalid_token (mcp/permission-ask-gate.ts); refused either way, and nothing is written.
  *   v1.0.0 — 2026-06-08 — Initial creation (5 workspace tools).
@@ -259,6 +261,20 @@ await test('7. after publish: object present, draft gone', async () => {
     const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids: ['n1'] }, 1071);
     const item = (JSON.parse(rd.result.content[0].text).items || []).find((d: any) => d.id === 'n1');
     assert(item && item.published === true && item.value.title === 'Hello', 'batch-open returns the full published value');
+});
+
+await test('7b. publish and revert_to_draft take the space name that write took (note, not shared.notes)', async () => {
+    // Found 2026-10-18: a draft written into space `note` was refused on publish with "declares no
+    // space note" beside a list that showed note (shared.notes).
+    const w = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'byname', value: { title: 'By name' } }, 1501);
+    assert(w.result.isError !== true, `write: ${w.result.content?.[0]?.text}`);
+    const p = await A.client.call('aimeat_workspace_publish', { organism_id: orgId, ws: WS, namespace: 'note', id: 'byname' }, 1502);
+    assert(p.result.isError !== true, `publish by name: ${p.result.content?.[0]?.text}`);
+    const pub = JSON.parse(p.result.content[0].text);
+    assert(pub.version === 1 && String(pub.published).endsWith('.shared.notes.byname'), `published under shared.notes, got ${JSON.stringify(pub)}`);
+    const r = await A.client.call('aimeat_workspace_revert_to_draft', { organism_id: orgId, ws: WS, namespace: 'note', id: 'byname' }, 1503);
+    assert(r.result.isError !== true, `revert by name: ${r.result.content?.[0]?.text}`);
+    assert(String(JSON.parse(r.result.content[0].text).reopened).endsWith('.shared.notes.byname'), 'reopened under shared.notes');
 });
 
 await test('7c. index carries bytes, and batch-open reports unknown ids as missing', async () => {

@@ -17,6 +17,10 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-18 — aimeat_workspace_revert_to_draft takes a space by its name as well as its namespace
+ *     (resolveSpaceNamespace), as _write does and as POST /v1/organisms/:id/revert now does; _publish
+ *     does it in publishWorkspaceOp. A name used to answer "declares no space" beside a list that
+ *     showed it.
  *   2026-10-18 — aimeat_workspace_update: a new name meets the detection rules written for
  *     workspaces (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   2026-10-18 — aimeat_workspace_share asks the publish gate with the session's caller: opening the
@@ -182,6 +186,7 @@ import { registerWorkspaceCreateTool } from './workspace-create.js';
 import { registerWorkspaceRowTools } from './workspace-rows.js';
 import { registerWorkspaceDocumentTools } from './workspace-documents.js';
 import { archivedRefusal } from '../services/workspace-write-guards.js';
+import { resolveSpaceNamespace } from '../services/workspace-write-items.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -466,7 +471,9 @@ export function registerWorkspaceTools(
     mcp.tool('aimeat_workspace_revert_to_draft', descriptionFor('aimeat_workspace_revert_to_draft'),
         zodShapeFor('aimeat_workspace_revert_to_draft'),
         annotationsFor('aimeat_workspace_revert_to_draft'),
-        async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
+        async ({ organism_id, ws, namespace: given, id }): Promise<TextResult> => {
+            // A space's name is taken as well as its namespace, before the role check and the fence read it.
+            const namespace = await resolveSpaceNamespace(storage, organism_id, ws, given);
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const revertRole = await memberRoleOf(organism_id);
             if (!revertRole || !canWriteNamespaceRule(revertRole, namespace)) {

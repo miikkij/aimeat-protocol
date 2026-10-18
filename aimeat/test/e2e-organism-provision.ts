@@ -9,6 +9,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=organism-provision
  * @version-history
+ *   v1.3.0 — 2026-10-18 — A space named by its name: the single publish, the batch publish and the
+ *     revert take it and write under the namespace; a memory key carrying the name is refused with
+ *     the namespace to use; a non-member is refused (403). Went green by asserting the hole closed:
+ *     publish by name answered 422 "declares no space" beside a list that showed the space.
  *   v1.2.0 — 2026-09-13 — UNDECLARED_SPACE is a refusal (the developer's decision): 422 and nothing
  *     written on POST /v1/memory (owner and app-grant roads, .draft and .latest), PUT /v1/memory/:key,
  *     the single publish (gate off, and gate on before an approval is filed), an approval that would
@@ -311,6 +315,52 @@ async function main() {
         const read = await json(`/v1/organisms/${orgId}/workspace?ws=${ws}`, { headers: auth(ownerToken) });
         const listed = ((read.body.data?.objects ?? {}) as Record<string, Array<{ id?: string }>>).campaign ?? [];
         assert(['k1', 'k2', 'k3'].every(id => listed.some(o => o.id === id)), `the declared space lists what was written, got ${JSON.stringify(listed.map(o => o.id))}`);
+    });
+
+    // ── A space named by its NAME (campaign) where the namespace (crm.campaigns) was asked ────────
+    //
+    // aimeat_workspace_write takes a space by name or namespace, and publish and revert took only the
+    // namespace: a draft written into `notes` was refused on publish with "declares no space notes",
+    // beside a list that showed notes (shared.notes). Found on 2026-10-18 publishing a plan document.
+
+    await test('POST /v1/organisms/:id/publish with the space name publishes the draft under its namespace', async () => {
+        const w = await json('/v1/memory', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ key: memKey('crm.campaigns', 'n1', 'draft'), value: { id: 'n1', title: 'Autumn' }, visibility: 'private' }) });
+        assert(w.status === 201, `draft: ${w.status} ${JSON.stringify(w.body.error)}`);
+        const r = await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ ws, namespace: 'campaign', id: 'n1' }) });
+        assert(r.status === 200 && r.body.data?.published === true, `publish by name: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(r.body.data?.namespace === 'crm.campaigns', `answers the namespace it published into, got ${JSON.stringify(r.body.data?.namespace)}`);
+        const latest = await readKey(memKey('crm.campaigns', 'n1', 'latest'));
+        assert(latest.status === 200, `published under crm.campaigns, got ${latest.status}`);
+        const stray = await readKey(memKey('campaign', 'n1', 'latest'));
+        assert(stray.status === 404, `nothing under the name, got ${stray.status}`);
+    });
+
+    await test('the batch publish and the revert take the space name too', async () => {
+        const b = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ ws, namespace: 'campaign', records: [{ id: 'n2', value: { id: 'n2' } }] }) });
+        assert(b.status === 200 && b.body.data?.published === 1, `batch by name: ${b.status} ${JSON.stringify(b.body.data ?? b.body.error)}`);
+        assert((await readKey(memKey('crm.campaigns', 'n2', 'latest'))).status === 200, 'batch published under crm.campaigns');
+        const r = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ ws, namespace: 'campaign', id: 'n2' }) });
+        assert(r.status === 200, `revert by name: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert((await readKey(memKey('crm.campaigns', 'n2', 'draft'))).status === 200, 'reopened under crm.campaigns');
+    });
+
+    await test('a memory key that carries the space name → 422 that names the namespace to use, nothing stored', async () => {
+        const key = memKey('campaign', 'n3', 'draft');
+        const r = await json('/v1/memory', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ key, value: { id: 'n3' }, visibility: 'private' }) });
+        const problem = undeclaredProblem(r, 'campaign');
+        assert(problem === '', `key by name: ${problem}`);
+        const e = refusalOf(r.body);
+        assert(String(e.message).includes('crm.campaigns') && String(e.details?.how_to_fix).includes('crm.campaigns'), `names the namespace, got ${e.message}`);
+        assert(!String(e.message).includes('declares no space'), `does not say the space is undeclared, got ${e.message}`);
+        assert((await readKey(key)).status === 404, 'nothing stored');
+    });
+
+    await test('a non-member publishing by space name is refused for access (403), and nothing is published', async () => {
+        const w = await json('/v1/memory', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ key: memKey('crm.campaigns', 'n4', 'draft'), value: { id: 'n4' }, visibility: 'private' }) });
+        assert(w.status === 201, `draft: ${w.status}`);
+        const r = await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: auth(owner2Token), body: JSON.stringify({ ws, namespace: 'campaign', id: 'n4' }) });
+        assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert((await readKey(memKey('crm.campaigns', 'n4', 'latest'))).status === 404, 'nothing published');
     });
 
     await test('schema lock enforced: an INVALID contact (bad enum + extra field) → 422', async () => {

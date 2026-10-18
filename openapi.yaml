@@ -43668,7 +43668,7 @@ paths:
               type: object
               required: [namespace, id]
               properties:
-                namespace: { type: string, description: "Relative namespace, e.g. meta.goals or shared.deliverables" }
+                namespace: { type: string, description: "Relative namespace, e.g. meta.goals or shared.deliverables. With `ws`, the space's name as the workspace manifest declares it (deliverables) is taken too." }
                 id: { type: string, description: The instance id whose .draft to publish }
                 ws: { type: string, description: "Workspace id — publishes the draft under organism.{id}.w.{ws}.* (omit for the legacy organism-level root)" }
       responses:
@@ -43774,7 +43774,7 @@ paths:
               type: object
               required: [namespace, id]
               properties:
-                namespace: { type: string, description: "Relative namespace, e.g. meta.goals or shared.deliverables" }
+                namespace: { type: string, description: "Relative namespace, e.g. meta.goals or shared.deliverables. With `ws`, the space's name as the workspace manifest declares it (deliverables) is taken too." }
                 id: { type: string, description: The instance id of the published record to reopen }
                 ws: { type: string, description: "Workspace id — operates on organism.{id}.w.{ws}.* (omit for the legacy organism-level root)" }
       responses:

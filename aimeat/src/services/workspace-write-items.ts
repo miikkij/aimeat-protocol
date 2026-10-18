@@ -14,12 +14,17 @@
  *   auto-generated id when the caller gives none, so a half-written batch that the caller retries
  *   would otherwise duplicate the documents that already landed.
  * @structure MAX_BATCH_ITEMS · genDocId() · normalizeWriteItems() · resolveSpace() · resolveWriteItem()
- *   · isPlatformWorkspaceNamespace() · undeclaredSpaceRefusal() · readPublishSpace() · undeclaredSpaceForKey()
+ *   · isPlatformWorkspaceNamespace() · undeclaredSpaceRefusal() · readPublishSpace() · resolveSpaceNamespace()
+ *   · undeclaredSpaceForKey()
  * @usage const norm = normalizeWriteItems({ space, value, id, section, items });
  *   if ('error' in norm) return fail(norm.error);
  *   const resolved = norm.items.map(it => resolveWriteItem(it, objectTypes));
  *   const refusal = await undeclaredSpaceForKey(storage, key);   // before anything is written
  * @version-history
+ *   v1.6.0 — 2026-10-18 — resolveSpaceNamespace(): a publish, a batch publish and a reopen take a
+ *     space by its name as the write tools do. The UNDECLARED_SPACE refusal for a member who named a
+ *     declared space by its name says which namespace it has, instead of "declares no space" beside
+ *     a list that shows it.
  *   v1.5.0 — 2026-09-25 — The UNDECLARED_SPACE refusal names the member's door too: a contributor
  *     adds the space with aimeat_workspace_space_add, under the workspace's rule.
  *   v1.4.0 — 2026-09-24 — readPublishSpace takes the space's own settings (`ot`) from the copy of the
@@ -304,6 +309,13 @@ export function undeclaredSpaceRefusal(
     const declared = types
         .filter(o => typeof o.namespace === 'string' && !!o.namespace && isMemoryBackedSpace(o))
         .map(o => ({ name: o.name || (o.namespace as string), namespace: o.namespace as string }));
+    // The caller named a declared space by its NAME where a namespace is required (a memory key).
+    // Say so first: "declares no space notes" beside a list that shows notes reads as a node fault.
+    const byName = audience === 'member' ? declared.find(d => d.name === space && d.namespace !== space) : undefined;
+    if (byName) {
+        const how = `Use the namespace ${byName.namespace}: a memory key and a workspace record key carry the namespace, not the space's name.`;
+        return refusal(`Nothing was written: "${space}" is the name of a space in workspace ${ctx.ws}, and its namespace is ${byName.namespace}. ${how}`, { namespace: space, declared_spaces: declared, how_to_fix: how });
+    }
     const how = `Declare the space, then write again: ${declareRoute}. ${declareWho}`;
     const head = `Nothing was written: the manifest of workspace ${ctx.ws} declares no space "${space}" that holds workspace records, and a workspace read lists only the spaces its manifest declares.`;
     if (audience === 'writer') {
@@ -349,6 +361,28 @@ export async function readPublishSpace(
         ? undeclaredSpaceRefusal(namespace, copies.flatMap(typesOf), { organismId, ws, audience: opts?.audience })
         : null;
     return { ot, refusal };
+}
+
+/**
+ * The namespace a publish, a batch publish or a reopen names, when the caller gave the space's NAME.
+ * The write tools take a space by name or by namespace (resolveSpace above), so a document written
+ * into `notes` was then refused on publish as an undeclared space, by a message that listed `notes`
+ * as declared. Returns `given` unchanged when a declared space has it as its namespace, when no
+ * memory-backed space has it as its name, or when two copies of the manifest map the name to
+ * different namespaces; otherwise the one namespace that name declares. Call it before anything that
+ * reads the namespace: the role check, the fenced-space rule and the key are all built from it.
+ */
+export async function resolveSpaceNamespace(
+    storage: Storage, organismId: string, ws: string | undefined, given: string,
+): Promise<string> {
+    if (!ws || !given || given.includes('.')) return given;
+    const mkey = `organism.${organismId}.w.${ws}.meta.manifest`;
+    const copies = (await storage.listAllMemory({ prefix: mkey, limit: 10, archived: 'include' })).items.filter(r => r.key === mkey);
+    const types = copies.flatMap(r => (r.value as { objectTypes?: WriteObjectType[] } | undefined)?.objectTypes ?? [])
+        .filter((o): o is WriteObjectType => !!o && typeof o === 'object');
+    if (types.some(o => o.namespace === given)) return given;
+    const named = new Set(types.filter(o => o.name === given && typeof o.namespace === 'string' && !!o.namespace && isMemoryBackedSpace(o)).map(o => o.namespace as string));
+    return named.size === 1 ? [...named][0] : given;
 }
 
 /**

@@ -6,6 +6,8 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-18 — POST /publish and POST /revert take a space by its name as well as its
+ *     namespace (resolveSpaceNamespace), as the write tools do, before the role check and the fence.
  *   v1.6.1 — 2026-10-13 — POST /publish, POST /revert and the suggestion decision hand the session's
  *     scopes to the fenced-space rule: a session that covers organism:direct publishes and reopens
  *     a record of a space that names extensions directly (ruled by the developer on 2026-10-13).
@@ -52,7 +54,7 @@ import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { canReadWorkspace } from '../../services/workspace-access.js';
-import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
+import { readPublishSpace, resolveSpaceNamespace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
 import { decideSuggestion, isMemberChangeAction, visibleApprovals } from '../../services/workspace-suggestions.js';
 import { logger } from '../../utils/logger.js';
@@ -216,14 +218,16 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    const { namespace, id: instance, ws, expected_version: expectedRaw } = req.body ?? {};
+    const { namespace: given, id: instance, ws, expected_version: expectedRaw } = req.body ?? {};
     const wsId = typeof ws === 'string' ? ws : undefined;
     // TARGET-009 S1: the publisher's optimistic lock (required by requires_expected_version spaces)
     const expectedVersion = typeof expectedRaw === 'number' && Number.isFinite(expectedRaw) ? expectedRaw : null;
-    if (!namespace || typeof namespace !== 'string' || !instance || typeof instance !== 'string') {
+    if (!given || typeof given !== 'string' || !instance || typeof instance !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace and id (instance) are required'));
       return;
     }
+    // A space's name is taken as well as its namespace, before the role check and the fence read it.
+    const namespace = await resolveSpaceNamespace(storage, id, wsId, given);
     if (!canWriteNamespace(role, namespace)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an admin or whoever created this space can publish here. Ask one of them, or publish somewhere you own.'));
       return;
@@ -364,12 +368,13 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism'));
       return;
     }
-    const { namespace, id: instance, ws } = req.body ?? {};
+    const { namespace: given, id: instance, ws } = req.body ?? {};
     const wsId = typeof ws === 'string' ? ws : undefined;
-    if (!namespace || typeof namespace !== 'string' || !instance || typeof instance !== 'string') {
+    if (!given || typeof given !== 'string' || !instance || typeof instance !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'namespace and id (instance) are required'));
       return;
     }
+    const namespace = await resolveSpaceNamespace(storage, id, wsId, given);
     if (!canWriteNamespace(role, namespace)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an admin or whoever created this space can change this. Ask one of them.'));
       return;
