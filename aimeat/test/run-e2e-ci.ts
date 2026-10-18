@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
  *   2026-10-18 -- e2e-exposure-conflicts.ts joins the list (not the guard tier): the conflicts in what others can see (plan doc-mvdipuyqraas, L4.1).
+ *   2026-10-18 -- e2e-classification-defaults.ts joins the list (not the guard tier): the default audience caps a new node takes and a running node is offered (plan doc-mvdipuyqraas, L5). Its own node on 40492.
  *   2026-10-18 -- e2e-classification-clearance.ts joins the list (not the guard tier): an agent's clearance (plan doc-mvdipuyqraas, L2).
  *   2026-10-18 -- e2e-classification-audience-cap.ts joins the list (not the guard tier): a label's audience cap (plan doc-mvdipuyqraas, L3).
  *   2026-10-18 -- e2e-classification-containers.ts joins the list (not the guard tier): the classification of containers and the effective label (plan doc-mvdipuyqraas, L1).
@@ -864,6 +865,10 @@ const ALL_SUITES = [
     // A label's audience cap: the refusal at every kind of place that sets who may read, the owner's
     // override with a reason, the publish request held to it again, a rise that lowers (plan doc-mvdipuyqraas, L3).
     'test/e2e-classification-audience-cap.ts',
+    // Owns its node on 40492 and boots one database three times: a new node takes the default audience
+    // caps, the same database made a pre-cap node is offered them on the Security page and takes each
+    // on the operator's decision, with no content level changed (plan doc-mvdipuyqraas, L5).
+    'test/e2e-classification-defaults.ts',
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',

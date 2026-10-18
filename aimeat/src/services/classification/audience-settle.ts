@@ -22,8 +22,9 @@
  *                                      access code (organism, private), as its settings would
  *     a workspace share                access account (link, signed-in) or organism; no share (private)
  *   Inside a container: an organism's and a workspace's memory records (their key prefix, every holder)
- *   and the shares of its workspaces; an app's records in its own namespace (containers.ts, AN APP'S
- *   DATA). A board's posts have no level of their own. A row has no level of its own.
+ *   and the shares of its workspaces; an app's records and stored files in its own namespace
+ *   (containers.ts, AN APP'S DATA). A board's posts have no level of their own. A row has no level of
+ *   its own.
  *
  *   THE OWNER'S EXCEPTION. An item with an 'audience' exception in force that still covers its label
  *   (audience-cap.ts) keeps its level.
@@ -35,6 +36,8 @@
  * @structure LoweredItem · settleAudienceAfterRise() · registerAudienceSettle()
  * @usage registerAudienceSettle(storage, config);   // once, at boot (server-bootstrap/routes-loader.ts)
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A rise on an app lowers the stored files in the app's own namespace too, with
+ *     the same audit row and the same one notification (plan doc-mvdipuyqraas, L3 gap closed in L5).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L3.4).
  */
 import type { Storage, ContentLabelTarget, MemoryRecord, StorageFileRecord, BoardRecord } from '../../storage/interface.js';
@@ -231,9 +234,12 @@ async function candidatesOf(ctx: Ctx, t: ContentLabelTarget): Promise<Candidate[
           },
         });
       }
-      // What the app keeps in its own namespace (containers.ts, AN APP'S DATA).
-      const meta = await storage.listMemoryMeta(`eco:${t.key}#${t.scope}`);
-      return [...out, ...meta.flatMap(r => one(memoryCandidate(ctx, r)))];
+      // What the app keeps in its own namespace (containers.ts, AN APP'S DATA): its memory records and
+      // its stored files, each lowered as content of its own is.
+      const ns = `eco:${t.key}#${t.scope}`;
+      const meta = await storage.listMemoryMeta(ns);
+      const files = await storage.listStorageFiles(ns);
+      return [...out, ...meta.flatMap(r => one(memoryCandidate(ctx, r))), ...files.flatMap(f => one(fileCandidate(ctx, ns, f)))];
     }
     case 'workspace': {
       const org = scopeOrganism(t.scope)!;

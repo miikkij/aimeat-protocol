@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.18.0 -- 2026-10-18 -- Classification: the default limits a new node takes, and the Security page
+ *     incident that offers them on a node that ran before (plan doc-mvdipuyqraas, L5.1).
  *   v1.17.0 -- 2026-10-18 -- Classification: a label's maxAudience and the owner's audience exception
  *     (plan doc-mvdipuyqraas, L3).
  *   v1.16.0 -- 2026-10-03 -- Faces for the themes: aimeat_theme_font_save, the licence the operator answers
@@ -137,7 +139,13 @@ refusing it. A person makes an exception in their own session, or an app does; n
 are refused (PERSON_REQUIRED). A label may carry \`maxAudience\` (public, link, signed-in, organism or
 private): content and containers under it are refused a wider level (LABEL_CAPS_AUDIENCE), and a
 label that rises lowers what is already wider and tells its owner; only the owner in person
-overrides it for one item, with an \`audience\` exception and a reason. The node level (\`policy_set\`, \`audit\` and \`exception_list\` at
+overrides it for one item, with an \`audience\` exception and a reason. A new node's default labels
+carry such limits from its first start (internal: signed-in; confidential and highly confidential:
+organism). A node that ran before keeps its labels as they were and gets one Security page incident,
+type \`classification_default_caps\`, that offers each limit: read it with
+\`aimeat_admin_security_overview\`, tell the operator what each limit does, and decide each with
+\`aimeat_admin_incident_resolve\` (\`name\`: the classification id, \`resolution\`: "apply" or "keep")
+only as the operator says. No content changes either way. The node level (\`policy_set\`, \`audit\` and \`exception_list\` at
 \`level: "node"\`) needs the operator in person, or you with the \`operator:admin\` permission the
 operator ticked for you. If this surface does not list
 \`aimeat_classification\`, it is on the agent surface and the full MCP endpoint.

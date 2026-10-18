@@ -1112,7 +1112,8 @@
           "workspace_schema_closed": "Workspace spaces that refuse every record",
           "headless_browser": "The server's own browser does not start",
           "scope_words_kept": "Permissions the update gave to existing agents and apps",
-          "config_setting": "A setting the server did not accept, so it runs the default"
+          "config_setting": "A setting the server did not accept, so it runs the default",
+          "classification_default_caps": "Limits on who may see classified content, waiting for your decision"
         },
         "source": {
           "workspace_import": "workspace import",

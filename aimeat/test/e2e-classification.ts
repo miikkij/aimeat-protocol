@@ -21,6 +21,8 @@
  *   review a label suggestion or a policy proposal, a non-operator does not move the switch.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification
  * @version-history
+ *   v1.5.1 — 2026-10-18 — The setup takes the default audience caps off, which a new node carries from
+ *     plan doc-mvdipuyqraas L5.1; the suite writes public records to test the reader, not the caps.
  *   v1.5.0 — 2026-09-30 — TARGET-082 test gaps: the operator's agent without operator:admin and the
  *     operator's personal access token do not loosen the switch on PUT /v1/admin/config; another owner
  *     reviews no suggestion on this owner's item; an outsider reads and writes no organism policy and
@@ -56,6 +58,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { takeOffAudienceCaps } from './helpers/classification-caps.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -226,6 +229,8 @@ await test('Setup: the operator (first owner), two owners, their agents, and the
   // Whatever the developer's .env says, the suite starts from off, set by the operator in person.
   const r = await setSwitchInPerson(op.token, 'off');
   assert(r.status === 200, `switch off: ${r.status} ${JSON.stringify(r.body?.error)}`);
+  // This suite writes public records to test the reader; a new node's default caps would refuse them.
+  await takeOffAudienceCaps(BASE, op.token);
 });
 
 // ─── 1. The switch ───

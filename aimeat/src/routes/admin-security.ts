@@ -12,9 +12,13 @@
  *   - GET    /v1/admin/auth-refusals
  *   - GET    /v1/admin/security/incidents
  *   - GET    /v1/admin/security/incidents/:id/quarantine   (download the quarantined bytes)
- *   - POST   /v1/admin/security/incidents/:id/resolve   (with { name, resolution }: decide one name)
+ *   - POST   /v1/admin/security/incidents/:id/resolve   (with { name, resolution }: decide one case)
  *   - DELETE /v1/admin/security/incidents/:id
  * @version-history
+ *   v1.5.0 -- 2026-10-18 -- The resolve endpoint decides one case of either kind through
+ *     services/incident-decisions.ts: a held name ("holder" / "previous") or an offered default
+ *     audience cap ("apply" / "keep", plan doc-mvdipuyqraas, L5.1). A refused close or delete says why
+ *     in the words of the incident's kind.
  *   v1.4.0 -- 2026-10-05 -- The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.3.1 -- 2026-09-26 -- The resolve endpoint's comment names the app grants and access tokens a
  *     decision on a name covers.
@@ -38,13 +42,15 @@ import {
 } from '../services/security-incident.js';
 import { buildSecurityOverview } from '../services/security-overview.js';
 import { readRecentAuthFailures } from '../services/auth-audit.js';
-import { resolveHeldName } from '../services/held-account-names.js';
+import { decideIncidentCase } from '../services/incident-decisions.js';
+import { callerOf } from '../middleware/caller.js';
+import { capByOf } from '../services/classification/audience-cap.js';
 
-/** The HTTP status of each refusal a decision on a held name can give. */
+/** The HTTP status of each refusal a decision on one case can give. */
 const STATUS_OF = { NOT_FOUND: 404, INVALID_INPUT: 400, CONFLICT: 409 } as const;
 
-/** Why an incident with names to decide is neither closed nor deleted yet. */
-const UNDECIDED = 'This incident closes when every name in it is decided. Decide each one with "name" and "resolution" ("holder" or "previous").';
+/** Why an incident with cases to decide is neither closed nor deleted yet, when the service gave no words. */
+const UNDECIDED = 'This incident closes when every case in it is decided. Decide each one with "name" and "resolution".';
 
 export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -81,29 +87,33 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── POST /v1/admin/security/incidents/:id/resolve ──
-   * Without a body, close the incident. With { name, resolution }, decide one name of the incident
-   * the move to the full identity and the start steps opened: 'holder' moves its rows to the account
-   * that holds the name and keeps its cortexes, ecosystem apps, app grants and access tokens,
-   * 'previous' settles them as a previous holder's (the older app grants and access tokens deleted).
-   * That incident closes with its last name. */
+   * Without a body, close the incident. With { name, resolution }, decide one case:
+   * - a name of the incident the move to the full identity and the start steps opened: 'holder' moves
+   *   its rows to the account that holds the name and keeps its cortexes, ecosystem apps, app grants
+   *   and access tokens, 'previous' settles them as a previous holder's (the older app grants and
+   *   access tokens deleted);
+   * - a default audience cap the start offered (classification_default_caps): 'apply' puts the cap
+   *   on that classification in the node's policy, 'keep' leaves it without one. No content changes.
+   * Such an incident closes with its last case. */
   router.post('/v1/admin/security/incidents/:id/resolve', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const body = (req.body ?? {}) as { name?: unknown; resolution?: unknown };
     if (body.name !== undefined || body.resolution !== undefined) {
       if (typeof body.name !== 'string' || body.name === '' || typeof body.resolution !== 'string') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a name takes "name" and "resolution": "holder" or "previous".'));
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap.'));
         return;
       }
-      const r = await resolveHeldName(config, storage, { incidentId: id, name: body.name, resolution: body.resolution });
+      // An agent or an ecosystem app decides as an AI, anyone else as a person (the policy history says which).
+      const caller = capByOf(callerOf(req, config.nodeId, storage));
+      const by = { principal: caller.principal, kind: caller.kind === 'ai' ? 'ai' as const : 'human' as const };
+      const r = await decideIncidentCase(config, storage, { incidentId: id, name: body.name, resolution: body.resolution, by });
       if (!r.ok) { res.status(STATUS_OF[r.code]).json(error(config.nodeId, r.code, r.message)); return; }
-      res.json(success(config.nodeId, {
-        id, name: r.name, resolution: r.resolution, done: r.done, bindings_moved: r.bindings_moved, incident_status: r.incident_status,
-      }));
+      res.json(success(config.nodeId, { id, ...r.data }));
       return;
     }
     const r = await resolveSecurityIncident(storage, config, id);
     if (!r.ok) {
-      if (r.code === 'CONFLICT') { res.status(409).json(error(config.nodeId, 'CONFLICT', UNDECIDED)); return; }
+      if (r.code === 'CONFLICT') { res.status(409).json(error(config.nodeId, 'CONFLICT', r.message ?? UNDECIDED)); return; }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Incident not found'));
       return;
     }
@@ -115,7 +125,7 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
     const id = req.params.id as string;
     const r = await deleteSecurityIncident(storage, config, id);
     if (!r.ok) {
-      if (r.code === 'CONFLICT') { res.status(409).json(error(config.nodeId, 'CONFLICT', UNDECIDED)); return; }
+      if (r.code === 'CONFLICT') { res.status(409).json(error(config.nodeId, 'CONFLICT', r.message ?? UNDECIDED)); return; }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Incident not found'));
       return;
     }

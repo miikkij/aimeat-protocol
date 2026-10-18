@@ -9,10 +9,12 @@
  *   their own (spec §4.1). Nothing in the node decides by a label's id; every behaviour comes from a
  *   label's fields.
  * @structure AiVisibility · LabelAudience · ClassificationLabel · RuleScope · ClassificationRule ·
- *   PolicyLimits · ClassificationPolicy · DEFAULT_LABELS · DEFAULT_RULES · DEFAULT_LIMITS ·
- *   defaultPolicy() · labelById()
+ *   PolicyLimits · ClassificationPolicy · DEFAULT_LABELS · DEFAULT_LABEL_CAPS · DEFAULT_RULES ·
+ *   DEFAULT_LIMITS · defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.7.0 — 2026-10-18 — DEFAULT_LABEL_CAPS, the default labels' audience caps of decision 10.1 (plan
+ *     doc-mvdipuyqraas, L5.1), which a new node takes and a running node takes on its operator's approval.
  *   v1.6.0 — 2026-10-18 — A label's maxAudience, the widest audience its content may be given (plan
  *     doc-mvdipuyqraas, L3.1). No default label carries one: the default caps are step L5.
  *   v1.5.0 — 2026-10-18 — RuleScope.kinds names the containers too (plan doc-mvdipuyqraas, L1.6).
@@ -168,6 +170,21 @@ export const DEFAULT_LABELS: readonly ClassificationLabel[] = [
     aiVisibility: 'warning', audit: true, mayLeaveOrganism: false, lowerNeedsJustification: true,
   },
 ];
+
+/**
+ * The audience cap of each default label (decision 10.1, plan doc-mvdipuyqraas, L5.1): Public none,
+ * Internal everyone signed in, Confidential and Highly confidential an organisation's members. Kept
+ * beside the labels rather than on them, because WHETHER a node takes them is decided per node: a
+ * new node does from its first start, a node that ran before only when its operator approves each one
+ * (default-caps.ts, default-caps-state.ts). defaultPolicy() is the code's starting point and carries
+ * none, so a node without that decision behaves as it did.
+ */
+export const DEFAULT_LABEL_CAPS: Readonly<Record<string, AudienceLevel | null>> = {
+  julkinen: null,
+  sisainen: 'signed-in',
+  luottamuksellinen: 'organism',
+  'erittain-luottamuksellinen': 'organism',
+};
 
 export const DEFAULT_RULES: readonly ClassificationRule[] = [
   {

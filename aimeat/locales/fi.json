@@ -1112,7 +1112,8 @@
           "workspace_schema_closed": "Työtilan tilat, jotka hylkäävät jokaisen tietueen",
           "headless_browser": "Palvelimen oma selain ei käynnisty",
           "scope_words_kept": "Oikeudet, jotka päivitys antoi olemassa oleville agenteille ja sovelluksille",
-          "config_setting": "Asetus, jota palvelin ei hyväksynyt, joten se käyttää oletusarvoa"
+          "config_setting": "Asetus, jota palvelin ei hyväksynyt, joten se käyttää oletusarvoa",
+          "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät, odottavat päätöstäsi"
         },
         "source": {
           "workspace_import": "työtilan tuonti",
