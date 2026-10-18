@@ -15,6 +15,8 @@
  * @structure companyTools: AimeatToolDefinition[]
  * @usage import { companyTools } from './definitions/companies.js';
  * @version-history
+ *   2026-10-18 — aimeat_company_front_page and aimeat_portfolio_publish take `access` (anyone, signed-in,
+ *     organism:<id>): who may open the page; `kind` and `html` may be left out to change only that (V3.10).
  *   2026-10-18 — aimeat_company_front_page, aimeat_company_portfolio_publish and aimeat_portfolio_publish
  *     say they answer with publish_request when the node asks the owner first (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-12 — The six tools declare all three interfaces (agentEverywhere): each has a CLI dispatch
@@ -107,7 +109,7 @@ export const companyTools = [
     },
     {
         name: 'aimeat_company_front_page',
-        description: "Choose what the company's address serves: 'app' serves one of the OWNER'S OWN published apps (target \"owner/file.html\"; someone else's answers FRONT_PAGE_NOT_YOURS), 'portfolio' serves the page published with aimeat_company_portfolio_publish, 'redirect' sends visitors to an absolute http(s) URL, and 'none' keeps the address reserved while serving nothing. Choosing 'portfolio' before a page exists answers NO_PORTFOLIO — publish first. When the node asks the owner before making something public, pointing an address that serves nothing at a page leaves it as it is and answers with publish_request.",
+        description: "Choose what the company's address serves, and who may open it: 'app' serves one of the OWNER'S OWN published apps (target \"owner/file.html\"; someone else's answers FRONT_PAGE_NOT_YOURS), 'portfolio' serves the page published with aimeat_company_portfolio_publish, 'redirect' sends visitors to an absolute http(s) URL, and 'none' keeps the address reserved while serving nothing. Choosing 'portfolio' before a page exists answers NO_PORTFOLIO — publish first. `access` says who may open the front page: 'anyone' (the default), 'signed-in' (people signed in to this node; others are asked to sign in first) or 'organism:<organism id>' (only that organism's members; the owner must be a member). Ask the person which one they want. Send `access` without `kind` to change only who may open it. When the node asks the owner before making something public, pointing an address that serves nothing at a page open to anyone, or opening a served front page to anyone, leaves that one change waiting and answers with publish_request.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Set Company Front Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -115,8 +117,9 @@ export const companyTools = [
         surfaces: ['agent'],
         input: {
             company_id: { type: 'string', required: true, description: 'Company id from aimeat_company_list.' },
-            kind: { type: 'string', required: true, enum: ['app', 'portfolio', 'redirect', 'none'], description: 'What the address serves.' },
+            kind: { type: 'string', required: false, enum: ['app', 'portfolio', 'redirect', 'none'], description: 'What the address serves. Omit it only to change `access` alone.' },
             target: { type: 'string', description: '"owner/file.html" for kind app; an absolute URL for kind redirect; omit for portfolio and none.' },
+            access: { type: 'string', required: false, description: 'Who may open the front page: "anyone", "signed-in" or "organism:<organism id>". Omit it to keep the current setting.' },
         },
     },
     {
@@ -134,7 +137,7 @@ export const companyTools = [
     },
     {
         name: 'aimeat_portfolio_publish',
-        description: "Publish this person's own welcome page — the page at their address, which is also their portfolio. Use it when they ask you to make their page, improve it, or change what it says: you write the HTML and publish it, they never copy or paste anything. Send the WHOLE document (doctype through </html>); it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode. Re-publishing replaces the previous page, so read what is there first if they asked for a change rather than a rewrite. This is the person's page; the company equivalent is aimeat_company_portfolio_publish. When the node asks the owner before making something public, enable: true on a page never switched on stores the page, leaves it off and answers with publish_request.",
+        description: "Publish this person's own welcome page — the page at their address, which is also their portfolio. Use it when they ask you to make their page, improve it, or change what it says: you write the HTML and publish it, they never copy or paste anything. Send the WHOLE document (doctype through </html>); it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode. Re-publishing replaces the previous page, so read what is there first if they asked for a change rather than a rewrite. This is the person's page; the company equivalent is aimeat_company_portfolio_publish. `access` says who may open the page: 'anyone' (the default), 'signed-in' (people signed in to this node; others are asked to sign in first) or 'organism:<organism id>' (only that organism's members; the person must be a member). Ask the person which one they want; send `access` without `html` to change only that. When the node asks the owner before making something public, enable: true on a page never switched on, or access 'anyone' on a page that is on, leaves that one change waiting and answers with publish_request.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Your Welcome Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -143,8 +146,9 @@ export const companyTools = [
         // On `agent`: The person's own welcome page, beside the company one: same act, different owner.
         surfaces: ['agent'],
         input: {
-            html: { type: 'string', required: true, description: "The complete HTML document to serve as this person's welcome page." },
+            html: { type: 'string', required: false, description: "The complete HTML document to serve as this person's welcome page. Omit it only to change `access` alone." },
             enable: { type: 'boolean', required: false, description: 'true when the person approved the page and wants it public now: switches their page on, unless they switched it off themselves. Without it the page is stored and stays as switched as it was.' },
+            access: { type: 'string', required: false, description: 'Who may open the page: "anyone", "signed-in" or "organism:<organism id>". Omit it to keep the current setting.' },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

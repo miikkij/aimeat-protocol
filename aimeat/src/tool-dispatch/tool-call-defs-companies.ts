@@ -16,6 +16,8 @@
  * @structure companyCliTools[] — the handler table, spread by index.ts
  * @usage import { companyCliTools } from './tool-call-defs-companies.js';
  * @version-history
+ *   v1.1.0 — 2026-10-18 — aimeat_company_front_page and aimeat_portfolio_publish forward `access` (who may
+ *     open the page); without `html` the welcome-page tool writes it through PUT /v1/portfolio/config (V3.10).
  *   v1.0.0 — 2026-10-12 — Moved from the connector MCP modules (wish: every MCP tool on aimeat connect serve).
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -94,8 +96,9 @@ export const companyCliTools: ConnectCliToolDefinition[] = [
         // → PUT /v1/companies/:id/front-page
         name: 'aimeat_company_front_page',
         handler: ({ client }, input) => client.put(`/v1/companies/${encodeURIComponent(requiredString(input, 'company_id'))}/front-page`, {
-            kind: requiredString(input, 'kind'),
+            ...(input.kind !== undefined ? { kind: input.kind } : {}),
             ...(input.target !== undefined ? { target: input.target } : {}),
+            ...(input.access !== undefined ? { access: input.access } : {}),
         }),
     },
     {
@@ -110,9 +113,12 @@ export const companyCliTools: ConnectCliToolDefinition[] = [
         //   document, stores it as the owner's portfolio.html and enables the page unless `enable`
         //   is false, so the page has one rule on every interface.
         name: 'aimeat_portfolio_publish',
+        //   Without `html` it changes only who may open the page: PUT /v1/portfolio/config with `access`.
         handler: ({ client }, input) => {
+            const access = input.access !== undefined ? { access: input.access } : {};
+            if (input.html === undefined && input.access !== undefined) return client.put('/v1/portfolio/config', access);
             const html = requiredString(input, 'html');
-            return client.put('/v1/portfolio/upload', input.enable === undefined ? { html } : { html, enable: input.enable });
+            return client.put('/v1/portfolio/upload', { html, ...(input.enable === undefined ? {} : { enable: input.enable }), ...access });
         },
     },
 ];

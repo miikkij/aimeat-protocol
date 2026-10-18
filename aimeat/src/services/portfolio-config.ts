@@ -11,6 +11,8 @@
  *   mergePortfolioConfig · portfolioSwitchState · switchPortfolioOnUnlessTurnedOff
  * @usage await mergePortfolioConfig(storage, await portfolioWriteGaii(storage, owner, nodeId), { enabled: true });
  * @version-history
+ *   v1.1.0 — 2026-10-18 — portfolioSwitchState also answers `access`, who may open the page (plan
+ *     doc-mvcn6c7e4e5q, V3.10; services/page-access.ts).
  *   v1.0.0 — 2026-10-18 — Extracted from routes/portfolio.ts (the keys, portfolioWriteGaii,
  *     portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff, and the PUT /v1/portfolio/config write as
  *     mergePortfolioConfig); portfolioSwitchState added for the publish gate (plan doc-mvcn6c7e4e5q, V4).
@@ -78,17 +80,21 @@ export async function mergePortfolioConfig(
 /**
  * The switch as the reader sees it (the first identity holding a config), and when the stored page
  * was written: `enabled` true (served), false (the owner switched it off) or null (never set).
+ * `access` is who may open the page as stored (null for anyone; services/page-access.ts).
  */
 export async function portfolioSwitchState(
   storage: Storage, ownerName: string, nodeId: string,
-): Promise<{ enabled: boolean | null; pageAt: string | null }> {
+): Promise<{ enabled: boolean | null; pageAt: string | null; access: string | null }> {
   const gaiis = await portfolioReadGaiis(storage, ownerName, nodeId);
   let enabled: boolean | null = null;
+  let access: string | null = null;
   for (const gaii of gaiis) {
     const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
     if (mem?.value && typeof mem.value === 'object') {
-      const v = (mem.value as Record<string, unknown>).enabled;
+      const value = mem.value as Record<string, unknown>;
+      const v = value.enabled;
       enabled = v === true ? true : v === false ? false : null;
+      access = typeof value.access === 'string' ? value.access : null;
       break;
     }
   }
@@ -97,7 +103,7 @@ export async function portfolioSwitchState(
     const meta = await storage.getStorageFileMeta(gaii, PORTFOLIO_HTML_KEY);
     if (meta) { pageAt = meta.createdAt; break; }
   }
-  return { enabled, pageAt };
+  return { enabled, pageAt, access };
 }
 
 /**

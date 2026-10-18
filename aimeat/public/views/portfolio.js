@@ -5,6 +5,8 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.7.1 — 2026-10-18 — The viewer reads the page with the visitor's session, so a page whose owner
+ *     opened it for signed-in people or one organism shows for them (plan doc-mvcn6c7e4e5q, V3.10).
  *   v1.7.0 — 2026-10-16 — The page shows the AI label its record says it owes above the frame; the
  *     read carried the record and nothing drew it (the portfolio's own address has its chip).
  *   v1.6.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and
@@ -131,7 +133,11 @@ function PortfolioViewer({ username, navigate }) {
   }, [data]);
 
   useEffect(() => {
-    fetch(`${NODE_URL}/v1/portfolio/data/${encodeURIComponent(username)}`)
+    // With the visitor's session when there is one: a page that opens only for signed-in people or
+    // one organism's members is read with it (GET /v1/portfolio/data answers 401/403 without).
+    const s = getSession();
+    fetch(`${NODE_URL}/v1/portfolio/data/${encodeURIComponent(username)}`,
+      s ? { headers: { Authorization: 'Bearer ' + s.jwt } } : undefined)
       .then(r => r.json())
       .then(result => {
         if (result.ok === false) {

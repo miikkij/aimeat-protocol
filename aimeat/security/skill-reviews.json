@@ -68,11 +68,11 @@
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/mcp/portfolio.ts"
       ],
-      "digest": "sha256:1648d9524247680b0d9c2f9f"
+      "digest": "sha256:712c01c04fb8ae2e1d51f23c"
     },
     "node:aimeat-activating-a-person": {
       "reviewedOn": "2026-09-19",
@@ -508,7 +508,7 @@
       "aimeat/src/services/model-recommendation.ts": "d81eaca4a619f479"
     },
     "node:aimeat-welcome-pages": {
-      "aimeat/src/mcp/portfolio.ts": "13d7b9967f6f77ab"
+      "aimeat/src/mcp/portfolio.ts": "43cb67af8e25abfc"
     },
     "node:aimeat-activating-a-person": {},
     "node:aimeat-offering-choices": {

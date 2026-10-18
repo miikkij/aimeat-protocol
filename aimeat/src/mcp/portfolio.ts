@@ -21,6 +21,8 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii, caller)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-10-18 — `access` (anyone, signed-in, organism:<id>) says who may open the page, and `html` may be
+ *     left out to change only that; opening a page that is on to anyone passes the publish gate (V3.10).
  *   2026-10-18 — `enable: true` asks the publish gate (services/portfolio-publish-gate.ts): an agent without
  *     publish:public stores the page, leaves it off and answers with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-08 — The page is written with the agent as its writer, so it carries an AI-provenance record.
@@ -51,6 +53,9 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
 import { publishAskedFields } from '../services/app-publish-gate.js';
+import { mergePortfolioConfig, portfolioSwitchState } from '../services/portfolio-config.js';
+import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
+import { toolError } from './tool-error.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -79,47 +84,60 @@ export function registerPortfolioTools(
         descriptionFor('aimeat_portfolio_publish'),
         zodShapeFor('aimeat_portfolio_publish'),
         annotationsFor('aimeat_portfolio_publish'),
-        async ({ html, enable }): Promise<TextResult> => {
+        async ({ html, enable, access: accessIn }): Promise<TextResult> => {
             const owner = parseGAII(getAgentGaii()) ? localAccountName(getAgentGaii()) : '';
             if (!owner) {
                 return out({ error: 'NO_OWNER', message: 'Could not resolve the owner from this session' }, true);
             }
+            if (html === undefined && accessIn === undefined) {
+                return toolError('INVALID_INPUT', 'Send html (the page), access (who may open it), or both.');
+            }
 
             const maxBytes = (config.portfolioMaxSizeKb ?? 512) * 1024;
-            const data = Buffer.from(html, 'utf8');
-            if (data.length > maxBytes) {
+            const data = html === undefined ? null : Buffer.from(html, 'utf8');
+            if (data && data.length > maxBytes) {
                 return out({
                     error: 'QUOTA_EXCEEDED',
                     message: `The page is ${Math.round(data.length / 1024)}KB and the limit is ${config.portfolioMaxSizeKb ?? 512}KB`,
                     size_kb: Math.round(data.length / 1024),
                 }, true);
             }
+            // Who may open the page (services/page-access.ts), checked for the agent's owner before any write.
+            const access = accessIn === undefined ? null : await parsePageAccessInput(storage, accessIn, { identity: getAgentGaii() });
+            if (access && 'refusal' in access) return toolError(access.refusal.code, access.refusal.message);
 
             // Same target the REST route writes, so the page an agent publishes is the same file the
             // browser reads. Resolving it anywhere else is how two "welcome pages" come to exist.
             const target = await portfolioWriteGaii(storage, owner, config.nodeId);
             // The publish gate, as PUT /v1/portfolio/upload asks it (services/portfolio-publish-gate.ts):
-            // switching on a page never switched makes it public. Asked before the page is written.
-            const gate = enable === true
-                ? await portfolioRaiseAsk({ storage, config }, caller(), undefined, owner, { overridesOff: false })
+            // switching on a page never switched, or opening a page that is on to anyone, makes it public.
+            // Asked before the page is written.
+            const gate = enable === true || access
+                ? await portfolioRaiseAsk({ storage, config }, caller(), undefined, owner,
+                    { overridesOff: false, ...(enable === true ? { enabled: true } : {}), ...(access ? { access: access.store } : {}) })
                 : { kind: 'go' as const };
             if (gate.kind === 'refused') return out({ error: gate.code, message: gate.message }, true);
-            await writePortfolioHtml(storage, target, data, { config, principal: getAgentGaii(), pipeline: 'mcp.portfolio_publish' });
-            const served = await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, owner, target, enable === true && gate.kind === 'go');
+            const held = gate.kind === 'ask' ? gate.change.field : null;
+            if (data) await writePortfolioHtml(storage, target, data, { config, principal: getAgentGaii(), pipeline: 'mcp.portfolio_publish' });
+            if (access && held !== 'access') await mergePortfolioConfig(storage, target, { access: access.store });
+            const served = await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, owner, target, enable === true && held !== 'enabled');
             const asked = gate.kind === 'ask' ? await filePortfolioAsk({ storage, config }, owner, gate) : undefined;
             emitChange('portfolio');
             // Both addresses the node actually serves, and none it does not: the person is told
             // to look, so the link has to open.
             return out({
-                published: true,
+                published: data !== null,
                 served,
-                size_kb: Math.round(data.length / 1024),
+                access: pageAccessOf((await portfolioSwitchState(storage, owner, config.nodeId)).access),
+                ...(data ? { size_kb: Math.round(data.length / 1024) } : {}),
                 url: `${config.baseUrl.replace(/\/+$/, '')}/v1/portfolio/${encodeURIComponent(owner)}`,
                 standalone_url: portfolioStandaloneUrl(config, owner),
-                note: served
-                    ? 'Tell the person the address and let them look. A page they have not seen is not finished.'
-                    : gate.kind === 'ask'
-                        ? 'The page is stored and not public yet: switching it on waits for the person\'s approval (publish_request says what to tell them).'
+                note: gate.kind === 'ask'
+                    ? held === 'access'
+                        ? 'The page is on, and opening it to anyone waits for the person\'s approval (publish_request says what to tell them). Until then it opens for whom it opened before.'
+                        : 'The page is stored and not public yet: making it public waits for the person\'s approval (publish_request says what to tell them).'
+                    : served
+                        ? 'Tell the person the address and let them look. A page they have not seen is not finished.'
                         : enable === true
                         ? 'The page is stored, and the person switched their page off, so the address shows nothing yet. Tell them they switch it on themselves on the Portfolio page (/v1/profile?tab=portfolio).'
                         : 'The page is stored and not public yet. When the person approves it and wants it public, publish again with enable: true, or they switch it on on the Portfolio page (/v1/profile?tab=portfolio).',

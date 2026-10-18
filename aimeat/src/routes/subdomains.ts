@@ -14,6 +14,10 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.31.0 — 2026-10-18 — The portfolio and company origins ask who may open the page (its `access`,
+ *     services/page-access.ts): a page that needs a sign-in is served only with a page grant, and a
+ *     browser without one goes to /v1/app-open (routes/page-open.ts pageOriginRefused; plan
+ *     doc-mvcn6c7e4e5q, V3.10).
  *   v1.30.0 — 2026-10-18 — A served app carries the app-info mark unless its owner switched it off: the
  *     version, the latest changes, and the live follow that reloads the open page on a new version.
  *   v1.29.1 — 2026-10-17 — resolveAppTarget, resolveServableApp, appIsRestricted and unlockRedirect
@@ -166,6 +170,7 @@ import { registerAppOriginWebmcp } from './subdomain-webmcp.js';
 import { registerAppOriginDocs, appOriginFor } from './subdomain-origin-docs.js';
 import { detectLocale, type Locale } from '../i18n.js';
 import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain-app-gate.js';
+import { pageOriginRefused } from './page-open.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -534,6 +539,9 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return portfolioNotFound();
       const resolved = await resolvePublishedPortfolio(storage, sub);
       if (!resolved.ok || !resolved.html) return portfolioNotFound();
+      // Who may open the page (routes/page-open.ts): a page that needs a sign-in is served only with
+      // a page grant for it, and a browser without one goes to the open page.
+      if (await pageOriginRefused(req, res, config, { kind: 'portfolio', owner: sub }, resolved.portfolioConfig.access, portfolioNotFound)) return;
       // The same decision the apex portfolio route makes, on the origin the person actually hands
       // out. Two switches, deliberately: publishing a portfolio puts it on this node's own member
       // showcase, and letting a search engine list a page carrying somebody's name is a separate
@@ -564,6 +572,9 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return companyNotFound();
       const company = await storage.getCompanyBySlug(sub);
       if (!company || company.status !== 'active') return companyNotFound();
+      // Who may open the front page, whatever it serves (routes/page-open.ts). 'none' stays the 404 below.
+      if (company.frontPage.kind !== 'none'
+        && await pageOriginRefused(req, res, config, { kind: 'company', id: company.id }, company.frontPageAccess, companyNotFound)) return;
 
       if (company.frontPage.kind === 'redirect' && company.frontPage.target) {
         res.redirect(301, company.frontPage.target);

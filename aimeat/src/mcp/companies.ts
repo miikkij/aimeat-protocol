@@ -14,6 +14,8 @@
  *   aimeat_company_list, _create, _update, _front_page, _portfolio_publish.
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
+ *   2026-10-18 — aimeat_company_front_page takes `access` (who may open the front page; `kind` may be left
+ *     out to change only that), and a company answers `front_page_access` (V3.10).
  *   2026-10-18 — aimeat_company_front_page and aimeat_company_portfolio_publish pass the publish gate
  *     (services/company/company-publish-gate.ts): an agent without publish:public pointing an address that serves
  *     nothing at a page gets `publish_request`, the page stored and the address left as it was (V4).
@@ -47,6 +49,8 @@ import { publishAskedFields } from '../services/app-publish-gate.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { IDENTITY_FIELDS } from '../tool-catalog/definitions/companies.js';
+import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
+import { toolError } from './tool-error.js';
 
 type IdentityInput = { [K in keyof typeof IDENTITY_FIELDS]?: string };
 
@@ -95,6 +99,7 @@ export function registerCompanyTools(
 
     const wire = (c: CompanyRecord): Record<string, unknown> => ({
         ...c, address: companyAddress(config, c), co_origin_enabled: config.coOriginEnabled,
+        front_page_access: pageAccessOf(c.frontPageAccess),
     });
 
     /** CompanyError carries the code the REST surface reports; keep the same words here. */
@@ -190,11 +195,15 @@ export function registerCompanyTools(
         descriptionFor('aimeat_company_front_page'),
         zodShapeFor('aimeat_company_front_page'),
         annotationsFor('aimeat_company_front_page'),
-        async ({ company_id, kind, target }) => {
+        async ({ company_id, kind, target, access: accessIn }) => {
             try {
+                if (kind === undefined && accessIn === undefined) return toolError('INVALID_FRONT_PAGE', 'Send kind, access, or both.');
+                // Who may open the front page (services/page-access.ts), checked for the owner before any write.
+                const access = accessIn === undefined ? undefined : await parsePageAccessInput(storage, accessIn, { identity: ownerGhii() });
+                if (access && 'refusal' in access) return toolError(access.refusal.code, access.refusal.message);
                 // Through the publish gate, as PUT /v1/companies/:id/front-page (services/company/company-publish-gate.ts).
                 const { company, asked } = await setCompanyFrontPageGated({ storage, config }, { caller: caller() },
-                    ownerGhii(), company_id, { kind, target: target ?? '' });
+                    ownerGhii(), company_id, kind ? { kind, target: target ?? '' } : null, access?.store);
                 return ok({ company: wire(company), ...publishAskedFields(asked) });
             } catch (e) { return fail(e); }
         },

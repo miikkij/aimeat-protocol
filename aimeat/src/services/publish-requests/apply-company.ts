@@ -10,22 +10,46 @@
  *   THE OWNER APPROVED WHAT THEY SAW. The request carries when the company's own page was written (a
  *   'portfolio' front page) or when the company record last changed. A replaced page, a changed
  *   company, or an address that serves something already makes the approval outdated.
- * @structure applyCompanyPublish(ctx, ownerGhii, request)
+ * @structure versionOf · applyAccess · applyCompanyPublish(ctx, ownerGhii, request)
  * @usage PUBLISH_APPLIERS.company (appliers.ts)
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A request about `access` (V3.10) opens the served front page to anyone, when
+ *     who may open it and the company are still what the request was made from.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: company front page).
  */
 import type { CompanyFrontPageKind, CompanyRecord } from '../../models/company-schemas.js';
 import { CompanyError, companyAddress, requireOwnCompany, setFrontPage } from '../company/company-service.js';
 import { companyPortfolioKey } from '../company/company-portfolio.js';
+import { pageAccessOf } from '../page-access.js';
 import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
 
 const KINDS: readonly CompanyFrontPageKind[] = ['app', 'portfolio', 'redirect'];
 
+/** When the page the owner saw was written: the company's own page for a 'portfolio' front page, else the record. */
+async function versionOf(ctx: PublishStoreCtx, company: CompanyRecord, kind: CompanyFrontPageKind): Promise<string> {
+  const page = kind === 'portfolio' ? await ctx.storage.getStorageFileMeta(company.ownerGhii, companyPortfolioKey(company.id)) : null;
+  return page?.createdAt ?? company.updatedAt;
+}
+
+/** A request to open a served front page to anyone (V3.10): applied when nothing it was made from moved. */
+async function applyAccess(
+  ctx: PublishStoreCtx, ownerGhii: string, company: CompanyRecord, request: PublishRequest, url: string | undefined,
+): Promise<PublishApplyResult> {
+  const done: PublishApplyResult = url ? { ok: true, url } : { ok: true };
+  if (pageAccessOf(company.frontPageAccess) === 'anyone') return done;
+  if (company.frontPageAccess !== (request.change.from ?? null)) return { ok: false, reason: 'who may open the front page changed after the request was made' };
+  if (await versionOf(ctx, company, company.frontPage.kind) !== String(request.target.version)) {
+    return { ok: false, reason: 'the company changed after the request was made' };
+  }
+  // The owner in person: they approved it.
+  await setFrontPage(ctx.storage, ownerGhii, company.id, null, null);
+  return done;
+}
+
 export async function applyCompanyPublish(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<PublishApplyResult> {
   const id = String(request.target.company ?? '');
   const kind = request.change.to as CompanyFrontPageKind;
-  if (!id || !KINDS.includes(kind)) return { ok: false, reason: 'the company is not on this account' };
+  if (!id || (request.change.field !== 'access' && !KINDS.includes(kind))) return { ok: false, reason: 'the company is not on this account' };
   let company: CompanyRecord;
   try {
     company = await requireOwnCompany(ctx.storage, ownerGhii, id);
@@ -35,12 +59,12 @@ export async function applyCompanyPublish(ctx: PublishStoreCtx, ownerGhii: strin
   }
   const frontTarget = String(request.target.front_target ?? '');
   const url = companyAddress(ctx.config, company) ?? undefined;
+  if (request.change.field === 'access') return applyAccess(ctx, ownerGhii, company, request, url);
   if (company.frontPage.kind === kind && (kind === 'portfolio' || company.frontPage.target === frontTarget)) {
     return url ? { ok: true, url } : { ok: true };
   }
   if (company.frontPage.kind !== 'none') return { ok: false, reason: 'the company\'s address was given a front page after the request was made' };
-  const page = kind === 'portfolio' ? await ctx.storage.getStorageFileMeta(company.ownerGhii, companyPortfolioKey(company.id)) : null;
-  if ((page?.createdAt ?? company.updatedAt) !== String(request.target.version)) {
+  if (await versionOf(ctx, company, kind) !== String(request.target.version)) {
     return { ok: false, reason: kind === 'portfolio' ? 'the company\'s page was replaced after the request was made' : 'the company changed after the request was made' };
   }
   try {

@@ -14,6 +14,7 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-10-18 — /v1/portfolio/:username gives a page that is not open to anyone the generic head (V3.10).
  *   2026-10-11 — GET /v1/build also says which commit runs, when the process started and whether
  *     the build is behind its source (utils/build-stamp.ts runningBuild).
  *   2026-10-11 — The page for a policy that cannot be shown yet moved to portal-policy-not-set.ts
@@ -106,6 +107,7 @@ import { appHiddenFromPublicSurfaces } from '../services/app-ai-use.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { livePageMarkdown } from '../services/page-body-live.js';
 import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
+import { pageAccessOf } from '../services/page-access.js';
 export { serveSpa, resolvePublicFile } from './portal-spa.js';
 import { LOCALES, type Locale } from '../i18n.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
@@ -507,7 +509,10 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     if (spaPath) {
       const username = String(req.params.username ?? '');
       const resolved = await resolvePublishedPortfolio(storage, username);
-      const cfg = resolved.ok ? (resolved.portfolioConfig as PortfolioSeoConfig) : null;
+      // A page that opens only for some people (its `access`, services/page-access.ts) gives the shell
+      // head none of its own words: the generic head, as for a page that does not exist.
+      const cfg = resolved.ok && pageAccessOf(resolved.portfolioConfig.access) === 'anyone'
+        ? (resolved.portfolioConfig as PortfolioSeoConfig) : null;
       // Search visibility is the person's own decision and it is off until they make it. The
       // header is the half that stops a LISTING: a name somebody else linked to is indexed from
       // the link text alone when only robots.txt refuses.

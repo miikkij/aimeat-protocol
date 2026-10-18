@@ -9,6 +9,12 @@
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  *   (both in services/portfolio-config.ts, re-exported here)
  * @version-history
+ *   v1.14.0 — 2026-10-18 — Who may open the page (plan doc-mvcn6c7e4e5q, V3.10): PUT /v1/portfolio/config
+ *     and the JSON PUT /v1/portfolio/upload take `access` (anyone, signed-in, organism:<id>; an organism
+ *     the setter is not an active member of is refused before any write); opening a page that is on to
+ *     anyone passes the publish gate; GET /v1/portfolio/config answers `access`; GET
+ *     /v1/portfolio/data/:username answers 401/403 to a caller the page does not open for; new
+ *     POST /v1/portfolio/:username/open answers the address with a page grant (routes/page-open.ts).
  *   v1.13.0 — 2026-10-18 — The publish gate (plan doc-mvcn6c7e4e5q, V4): PUT /v1/portfolio/config with
  *     `enabled: true` and PUT /v1/portfolio/upload with `enable: true`, by a caller the owner is asked
  *     about, store everything but the switch and answer 202 with `publish_request`
@@ -64,10 +70,10 @@
  *     can compose anonymous public-read URLs (/v1/memory/:gaii/:key) into the prompt.
  *   v1.0.0 — 2026-03-06 — Initial portfolio API.
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, AgentRecord, AiProvenanceRecordRow } from '../storage/interface.js';
-import { requireAuth, optionalAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, optionalAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { listPublishedMembers } from '../services/portfolio-members.js';
@@ -76,7 +82,10 @@ import { presentMemories } from '../services/classification/present-memory.js';
 import { fileTarget } from '../services/classification/labels.js';
 import { provenanceForWrite, storeHeldProvenance } from '../services/ai-provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
+import { isNodeAccount } from '../services/audience.js';
+import { parsePageAccessInput, pageAccessOf, pageNeedsSignIn, mayOpenPage } from '../services/page-access.js';
+import { answerPageOpen } from './page-open.js';
 import {
   PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY, portfolioWriteGaii, portfolioReadGaiis, switchPortfolioOnUnlessTurnedOff,
   mergePortfolioConfig,
@@ -205,6 +214,10 @@ export function portfolioStandaloneUrl(config: AimeatConfig, username: string): 
 
 export function portfolioRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  /** The `access` a write carries (services/page-access.ts), checked for its setter; null when absent. */
+  const accessInput = async (req: Request, body: Record<string, unknown>) => (!('access' in body) ? null
+    : parsePageAccessInput(storage, body.access, { identity: resolveIdentity(req.auth!, config.nodeId), federated: isForeignPrincipal(req.auth) }));
 
   /**
    * GET /v1/portfolio/catalog
@@ -356,6 +369,8 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     }
     res.json(success(config.nodeId, {
       config: value,
+      // Who may open the page: 'anyone', 'signed-in' or 'organism:<id>' (services/page-access.ts).
+      access: pageAccessOf((value as Record<string, unknown> | null)?.access),
       // Where the portfolio is (or would be) served standalone — null when the
       // portfolio origin is disabled or the username isn't a valid DNS label.
       standalone_url: portfolioStandaloneUrl(config, ownerName),
@@ -377,17 +392,26 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     const ownerName = req.auth!.owner;
     const target = await portfolioWriteGaii(storage, ownerName, config.nodeId);
     let body = (req.body ?? {}) as Record<string, unknown>;
-    // The publish gate (plan doc-mvcn6c7e4e5q, V4): switching the page on makes it public. A caller the
-    // node asks the owner about saves the rest of the config with the switch as it was, and the
-    // request to switch it on is filed after the write.
-    const gate = body.enabled === true
-      ? await portfolioRaiseAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, ownerName, { overridesOff: true })
+    // Who may open the page (plan doc-mvcn6c7e4e5q, V3.10): read and checked before the first write.
+    const access = await accessInput(req, body);
+    if (access && 'refusal' in access) {
+      res.status(access.refusal.status).json(error(config.nodeId, access.refusal.code, access.refusal.message));
+      return;
+    }
+    if (access) body = { ...body, access: access.store };
+    // The publish gate (plan doc-mvcn6c7e4e5q, V4): switching the page on, or opening a page that is on
+    // to anyone, makes it public. A caller the node asks the owner about saves the rest of the config
+    // without that one field, and the request for it is filed after the write.
+    const enabled = body.enabled === true ? true : body.enabled === false ? false : undefined;
+    const gate = enabled === true || access
+      ? await portfolioRaiseAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, ownerName,
+        { overridesOff: true, enabled, ...(access ? { access: access.store } : {}) })
       : { kind: 'go' as const };
     if (gate.kind === 'refused') {
       res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
       return;
     }
-    if (gate.kind === 'ask') body = Object.fromEntries(Object.entries(body).filter(([k]) => k !== 'enabled'));
+    if (gate.kind === 'ask') body = Object.fromEntries(Object.entries(body).filter(([k]) => k !== gate.change.field));
     await mergePortfolioConfig(storage, target, body);
     const asked = gate.kind === 'ask' ? await filePortfolioAsk({ storage, config }, ownerName, gate) : undefined;
     res.status(askedStatus(asked, 200)).json(success(config.nodeId, { saved: true, ...publishAskedFields(asked) }));
@@ -445,19 +469,28 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     // switches the page on, as the node's MCP tool does; without it the file and the switch stay two
     // acts. A browser upload keeps the Portfolio tab's own switch.
     const asksOn = isJson && (req.body as { enable?: unknown } | undefined)?.enable === true;
-    // The publish gate (V4): switching a page on that was never switched makes it public. Asked before
-    // the page is written, so a refusal stores nothing; on an ask the page is stored and stays off.
-    const gate = asksOn
-      ? await portfolioRaiseAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, ownerName, { overridesOff: false })
+    // Who may open the page, on the JSON body (V3.10): checked before the page is written.
+    const access = isJson ? await accessInput(req, (req.body ?? {}) as Record<string, unknown>) : null;
+    if (access && 'refusal' in access) {
+      res.status(access.refusal.status).json(error(config.nodeId, access.refusal.code, access.refusal.message));
+      return;
+    }
+    // The publish gate (V4): switching a page on that was never switched, or opening a page that is on to
+    // anyone, makes it public. Asked before the page is written, so a refusal stores nothing; on an ask
+    // the page is stored and the one change waits.
+    const gate = asksOn || access
+      ? await portfolioRaiseAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, ownerName,
+        { overridesOff: false, ...(asksOn ? { enabled: true } : {}), ...(access ? { access: access.store } : {}) })
       : { kind: 'go' as const };
     if (gate.kind === 'refused') {
       res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
       return;
     }
-    const enable = asksOn && gate.kind === 'go';
+    const enable = asksOn && !(gate.kind === 'ask' && gate.change.field === 'enabled');
 
     await writePortfolioHtml(storage, target, fileData,
       { config, principal: resolveIdentity(req.auth!, config.nodeId), pipeline: 'rest.portfolio.upload' });
+    if (access && !(gate.kind === 'ask' && gate.change.field === 'access')) await mergePortfolioConfig(storage, target, { access: access.store });
     const served = isJson ? await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, ownerName, target, enable) : undefined;
     const asked = gate.kind === 'ask' ? await filePortfolioAsk({ storage, config }, ownerName, gate) : undefined;
 
@@ -491,6 +524,17 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     const isAuthenticated = !!req.auth && req.auth.anonymous !== true;
     const isOwner = isAuthenticated && req.auth?.owner === username;
 
+    // Who may open the page (services/page-access.ts, V3.10): the same decision the portfolio origin
+    // makes, read here with the caller's own session. The owner always reads their page.
+    const access = resolved.portfolioConfig.access;
+    if (!isOwner && pageNeedsSignIn(config, access) && !(await mayOpenPage(storage, config, access, req.auth))) {
+      const account = isNodeAccount(req.auth);
+      res.status(account ? 403 : 401).json(error(config.nodeId, account ? 'ACCESS_DENIED' : 'SIGN_IN_REQUIRED', account
+        ? 'This page opens for the people its owner chose, and you are not among them.'
+        : 'This page opens for signed-in people only. Sign in and open it again.'));
+      return;
+    }
+
     res.json(success(config.nodeId, {
       username,
       display_name: resolved.ghii.displayName,
@@ -510,6 +554,27 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       // origin is enabled and the username is a usable DNS label; null otherwise.
       standalone_url: portfolioStandaloneUrl(config, username),
     }));
+  });
+
+  /**
+   * POST /v1/portfolio/:username/open
+   * The address that opens a welcome page needing a sign-in (V3.10), for the signed-in person: the
+   * portfolio origin with a one-hour page grant, or the apex page on a node without that origin
+   * (it reads the page with the person's session). routes/page-open.ts answerPageOpen decides.
+   */
+  router.post('/v1/portfolio/:username/open', requireAuth(), requireRole('owner'), async (req, res) => {
+    const username = req.params.username as string;
+    const resolved = await resolvePublishedPortfolio(storage, username);
+    if (!resolved.ok || !resolved.html) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No page here.'));
+      return;
+    }
+    const ownerName = resolved.ghii.username;
+    await answerPageOpen(req, res, config, storage, {
+      ref: { kind: 'portfolio', owner: ownerName }, access: resolved.portfolioConfig.access, ownerName,
+      url: portfolioStandaloneUrl(config, ownerName),
+      apexUrl: `${config.baseUrl.replace(/\/+$/, '')}/v1/portfolio/${encodeURIComponent(ownerName)}`,
+    });
   });
 
   return router;
