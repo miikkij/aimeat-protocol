@@ -47,6 +47,10 @@
  *   manifest they start from had already lost its list. The set-up, the owner's "Guard:" and the
  *   clean-up pass.
  * @version-history
+ *   v1.1.1 — 2026-10-18 — An MCP OAuth session minted before its grant held organism:direct is
+ *     answered with the refresh refusal (401 invalid_token, mcp/permission-ask-gate.ts since
+ *     2026-10-17), not the rule's ACCESS_DENIED; still nothing is written. The test's setup no
+ *     longer matched production: the nightly sweep went red on it.
  *   v1.1.0 — 2026-10-13 — The permission organism:direct, the route that names an extension on a
  *     space, and the protected list of a fenced space. The suite's agent is given its scope words
  *     by name (AGENT_SCOPES): the test node approves a new agent with `*`, which covers the new
@@ -691,7 +695,13 @@ await test('Refused: the same agent on a session minted before its grant held th
     await late.setScopes([...AGENT_SCOPES, DIRECT]);
     // The grant holds the word now and the session does not: the rule reads the session.
     assertRefused(await draft(auth(lateOld.token), WS, 'decision', 'd-late'), 'a session narrower than the grant (REST)');
-    assertToolRefused(toolResult(await lateOld.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'decision', id: 'd-late', value: { title: 'x' } }, rpcId++)), 'a session narrower than the grant (MCP)');
+    // The MCP session is an OAuth token, a copy of the grant at issue time. Since 2026-10-17 such a
+    // token is answered 401 invalid_token once its grant holds more, so the client refreshes it and
+    // the next call carries the word (mcp/permission-ask-gate.ts). Still refused, nothing written;
+    // this line expected the rule's ACCESS_DENIED and went red on the nightly sweep until updated.
+    const old = await lateOld.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'decision', id: 'd-late', value: { title: 'x' } }, rpcId++);
+    assert(old?.error?.code === -32001 && String(old.error.message).includes('Refresh the token'),
+        `a session narrower than the grant (MCP): expected the refresh answer, got ${JSON.stringify(old?.error ?? old?.result).slice(0, 300)}`);
     assert((await ownerOpens('decision', 'd-late')) === null, 'nothing was written');
     const fresh = await late.session();
     const w = await draft(auth(fresh.token), WS, 'decision', 'd-late');
