@@ -8,6 +8,7 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   2026-10-18 — `ctx.ai.result(jobId)` on the `__ai_result` host function, beside `ctx.ai.start`.
  *   2026-10-16 — Every run has a wall-clock deadline (extensionWallClockMs: limits.wallClockMs, or
  *     twelve times the CPU limit, at least a minute). The run rejects with EXTENSION_RUN_TIMED_OUT and
  *     the sandbox is torn down, also when the guest awaits a promise that never settles; the CPU
@@ -140,7 +141,7 @@ const GUEST_CALL_NAMES: Record<string, string> = {
     __cal_toInstant: 'ctx.calendar.toInstant', __cal_fromInstant: 'ctx.calendar.fromInstant',
     __cal_normalize: 'ctx.calendar.normalize', __cal_fromICS: 'ctx.calendar.fromICS', __cal_toICS: 'ctx.calendar.toICS',
     __wallet_consume: 'ctx.wallet.consume', __wallet_balance: 'ctx.wallet.getBalance',
-    __ext_buy: 'ctx.buy', __ai_start: 'ctx.ai.start',
+    __ext_buy: 'ctx.buy', __ai_start: 'ctx.ai.start', __ai_result: 'ctx.ai.result',
     __consent_check: 'ctx.consent.check', __consent_require: 'ctx.consent.require',
     __trust_getScore: 'ctx.trust.getScore', __notify: 'ctx.notify', __email: 'ctx.email',
 };
@@ -345,6 +346,7 @@ const __aimeatCtx = (() => {
         // script can handle instead of a failed run.
         ai: __ai_start ? {
             start: async (opts) => JSON.parse(await __call(__ai_start, [JSON.stringify(opts ?? {})])),
+            result: async (jobId) => JSON.parse(await __call(__ai_result, [String(jobId ?? '')])),
         } : undefined,
         consent: {
             check:   __consent_check   ? (async (gaii, scope) => __call(__consent_check, [gaii, scope]))   : undefined,
@@ -693,6 +695,9 @@ async function runInSandbox(
                 ? async (optsJson) =>
                     JSON.stringify(await ctx.ai!.start(JSON.parse(optsJson || '{}') as Parameters<NonNullable<ExtensionCtx['ai']>['start']>[0]))
                 : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__ai_result',
+            ctx.ai ? async (jobId) => JSON.stringify(await ctx.ai!.result(jobId)) : null,
             counter, limits.maxApiCalls, inflight);
 
         // ── Consent API ───────────────────────────────────────

@@ -2,7 +2,8 @@
  * @file src/services/ai-jobs/ext-capability.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description `ctx.ai.start` — the sandbox's door to a background model call.
+ * @description `ctx.ai.start` and `ctx.ai.result` — the sandbox's entry point to a background
+ *   model call, and the one way it reads the answer back from the owner's namespace.
  *
  *   WHAT MOVES OUT OF THE EXTENSION IS THE WAITING, NOT THE WORK. The sandbox is still the only
  *   place on this node that runs the owner's own branching server-side logic, and that does not
@@ -26,6 +27,8 @@
  *   const ctx = buildExtensionCtx({ …, ai: buildExtensionAi({ service, extName: ext.name,
  *       ownerGhii, nodeId }) });
  * @version-history
+ *   v1.5.0 — 2026-10-18 — `result(job_id)`: the answer of a job this extension started or is the
+ *     `on_done` of, for its installer. Never throws, like `start`.
  *   v1.4.1 — 2026-10-06 — Only the first start in an on_done callback is exempt; the rest are counted
  *     (secaudit 2026-10 last items, F1).
  *   v1.4.0 — 2026-10-06 — `start` draws on the installer's AI call limit; only a chain's continuation
@@ -162,6 +165,16 @@ export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCt
                 }
                 logger.warn(`[ext:${extName}] ctx.ai.start failed`, { error: String(err) });
                 return { ok: false, code: 'AI_JOB_START_FAILED', message: (err as Error).message };
+            }
+        },
+        // The installer's job only: `ownerGhii` is the installer, resolved server-side, and the
+        // service checks that this extension is named on the job.
+        result: async (jobId) => {
+            try {
+                return await service.readResult(ownerGhii, typeof jobId === 'string' ? jobId : '', extName);
+            } catch (err) {
+                logger.warn(`[ext:${extName}] ctx.ai.result failed`, { error: String(err) });
+                return { ok: false, code: 'AI_JOB_RESULT_FAILED', message: (err as Error).message };
             }
         },
     };

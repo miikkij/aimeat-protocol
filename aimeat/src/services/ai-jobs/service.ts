@@ -22,6 +22,10 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.10.0 — 2026-10-18 — `readResult`, the service side of `ctx.ai.result(job_id)`: an extension
+ *     reads the answer of a job it started, which `on_done` also receives in its input. The job keeps
+ *     the version of the record it wrote (`result_version`), and writes the answer on the version it
+ *     read, so that number names one value.
  *   v1.9.0 — 2026-10-08 — A failed job's error keeps the refusal's status and details (aiprov plan, A11).
  *   v1.8.1 — 2026-10-06 — ctx.ai.start is counted too; only a chain's continuation is exempt
  *     (secaudit 2026-10 follow-up, A5).
@@ -56,8 +60,9 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
+import { CAS_ATTEMPTS } from '../record-cas.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
 import { AiCompletionError } from '../ai/completion.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
@@ -78,6 +83,7 @@ import {
     AiJobError,
     type AiJobRecord, type AiJobState, type AiJobLogEntry, type AiJobClassificationWarnings,
     type StartAiJobInput, type StartAiJobContext, type StartAiJobResult, type AiJobStarter,
+    type AiJobResultRead,
 } from './types.js';
 
 /** How long a caller is asked to wait after a queue-full refusal. A guess would be worse than a
@@ -222,6 +228,30 @@ export class AiJobService implements AiJobStarter {
         return findInLogs(this.storage, ownerGhii, jobId);
     }
 
+    /**
+     * The answer of a job, for the extension that started it. The answer lands in the OWNER's
+     * namespace, which the sandbox cannot read, and making it public to reach it would publish
+     * private content. So the job itself is the permission: the extension named on it (as starter
+     * or as `on_done`) reads that one record, and only the version the job wrote.
+     *
+     * This opens nothing an extension could not already reach: it chose the prompt and the inputs
+     * the model saw, and it could always have asked for `result_visibility: 'public'`.
+     */
+    async readResult(ownerGhii: string, jobId: string, extension: string): Promise<AiJobResultRead> {
+        const notFound: AiJobResultRead = { ok: false, code: 'AI_JOB_NOT_FOUND', message: `No job "${jobId}" started by this extension.` };
+        if (!jobId) return notFound;
+        const job = await this.getJob(ownerGhii, jobId);
+        if (!job || (job.extension !== extension && job.on_done?.extension !== extension)) return notFound;
+
+        const base = { ok: true as const, job_id: job.id, state: job.state, result_key: job.result_key };
+        if (job.result_version === undefined) return base;
+        const record = await this.storage.getMemory(job.owner, job.result_key);
+        if (!record || record.version !== job.result_version) {
+            return { ok: false, code: 'AI_JOB_RESULT_GONE', message: `The record at "${job.result_key}" was deleted or written again after the job wrote it.` };
+        }
+        return { ...base, value: record.value };
+    }
+
     /** `state` defaults to the live ones, which is what "what am I waiting for" means. */
     async listJobs(
         ownerGhii: string, opts: { state?: AiJobState | 'live' | 'all'; limit?: number } = {},
@@ -337,13 +367,16 @@ export class AiJobService implements AiJobStarter {
                 return;
             }
 
-            await this.writeResult(entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
+            const written = await this.writeResult(entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
+            // Before the callback, so readResult already hands the answer to the on_done action.
+            entry.job = { ...entry.job, result_version: written.version };
 
             // The callback, and the reason a green job can still be a failure. See on-done.ts.
             if (entry.job.on_done) {
                 const outcome = await fireOnDone(
                     { storage: this.storage, config: this.config, service: this, emailService: this.emailService },
                     { ...entry.job, ...spend, state: 'done' },
+                    written.value,
                 );
                 if (!outcome.ok) {
                     await this.finish(jobId, {
@@ -379,8 +412,11 @@ export class AiJobService implements AiJobStarter {
     }
 
     /** Land the answer where the caller said it should go. `parseJson` is set for a text answer
-     *  the job asked JSON of; an image record and a transcription arrive in their final shape. */
-    private async writeResult(job: AiJobRecord, answer: unknown, parseJson: boolean, provenanceId?: string): Promise<void> {
+     *  the job asked JSON of; an image record and a transcription arrive in their final shape.
+     *  Answers with the value stored and the version it was stored at. */
+    private async writeResult(
+        job: AiJobRecord, answer: unknown, parseJson: boolean, provenanceId?: string,
+    ): Promise<{ value: unknown; version: number }> {
         let value: unknown = answer;
         if (parseJson) {
             // Parsed HERE when the job asked for JSON, so a malformed answer fails at the job rather
@@ -391,23 +427,38 @@ export class AiJobService implements AiJobStarter {
             value = JSON.parse(m[0]);
         }
 
-        const existing = await this.storage.getMemory(job.owner, job.result_key);
-        const now = new Date().toISOString();
-        await this.storage.setMemory({
-            key: job.result_key,
-            ownerGaii: job.owner,
-            value,
-            // TARGET-058: the completion already minted an observed record — the node watched the
-            // model produce these exact bytes — so it is CARRIED here rather than re-derived. Nobody
-            // read the substance on this path, so `humanInvolvement: 'none'` stands untouched.
-            ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
-            visibility: job.result_visibility,
-            tags: ['ai', 'ai-job-result'],
-            ttlHours: null,
-            version: existing ? existing.version + 1 : 1,
-            createdAt: existing?.createdAt ?? now,
-            updatedAt: now,
-        });
+        // Written on the version read, so the version the job records (result_version) is the one
+        // its answer holds: a concurrent writer makes this read again instead of being overwritten
+        // under a version number that then names two different values.
+        for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+            const existing = await this.storage.getMemory(job.owner, job.result_key);
+            const now = new Date().toISOString();
+            const version = existing ? existing.version + 1 : 1;
+            const record: MemoryRecord = {
+                key: job.result_key,
+                ownerGaii: job.owner,
+                value,
+                // TARGET-058: the completion already minted an observed record — the node watched the
+                // model produce these exact bytes — so it is CARRIED here rather than re-derived. Nobody
+                // read the substance on this path, so `humanInvolvement: 'none'` stands untouched.
+                ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
+                visibility: job.result_visibility,
+                tags: ['ai', 'ai-job-result'],
+                ttlHours: null,
+                version,
+                createdAt: existing?.createdAt ?? now,
+                updatedAt: now,
+            };
+            const written = existing
+                ? (this.storage.setMemoryIfVersion
+                    ? await this.storage.setMemoryIfVersion(record, existing.version)
+                    : await this.storage.setMemory(record))
+                : (this.storage.createMemoryIfAbsent
+                    ? await this.storage.createMemoryIfAbsent(record)
+                    : await this.storage.setMemory(record));
+            if (written) return { value, version };
+        }
+        throw new Error(`The record at "${job.result_key}" changed under every one of ${CAS_ATTEMPTS} attempts to write the answer.`);
     }
 
     /**

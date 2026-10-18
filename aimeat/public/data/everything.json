@@ -1840,10 +1840,10 @@
      "slug": "g-9-background-ai-jobs",
      "cells": [
       "<strong>Background AI jobs</strong>",
-      "Start a long AI job (a text answer, a picture or a transcription), get a job id at once, and read or cancel it later. The job runs on your own key and daily budget, writes its answer to a memory key you name, and can call one of your extension actions when it is done.",
+      "Start a long AI job (a text answer, a picture or a transcription), get a job id at once, and read or cancel it later. The job runs on your own key and daily budget, writes its answer to a memory key you name, and can call one of your extension actions when it is done. That action gets the answer with the call (up to 64 kB), and an extension reads the answer of a job it started at any later time with <code>ctx.ai.result</code>, so the answer stays private to you.",
       "<code>POST /v1/ai/jobs</code>, <code>GET /v1/ai/jobs</code>, <code>GET /v1/ai/jobs/:id</code>, <code>POST /v1/ai/jobs/:id/cancel</code>, <code>aimeat_ai_job_*</code>"
      ],
-     "plain": "Background AI jobs Start a long AI job (a text answer, a picture or a transcription), get a job id at once, and read or cancel it later. The job runs on your own key and daily budget, writes its answer to a memory key you name, and can call one of your extension actions when it is done. POST /v1/ai/jobs, GET /v1/ai/jobs, GET /v1/ai/jobs/:id, POST /v1/ai/jobs/:id/cancel, aimeat_ai_job_*"
+     "plain": "Background AI jobs Start a long AI job (a text answer, a picture or a transcription), get a job id at once, and read or cancel it later. The job runs on your own key and daily budget, writes its answer to a memory key you name, and can call one of your extension actions when it is done. That action gets the answer with the call (up to 64 kB), and an extension reads the answer of a job it started at any later time with ctx.ai.result, so the answer stays private to you. POST /v1/ai/jobs, GET /v1/ai/jobs, GET /v1/ai/jobs/:id, POST /v1/ai/jobs/:id/cancel, aimeat_ai_job_*"
     },
     {
      "slug": "g-9-decision-model",

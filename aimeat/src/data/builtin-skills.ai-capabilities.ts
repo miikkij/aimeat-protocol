@@ -18,6 +18,8 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.5.1 — 2026-10-18 — The extension paragraph: the on_done input carries the answer, and
+ *     `ctx.ai.result(job_id)` reads it back; the answer is never reached with ctx.memory.get.
  *   v1.5.0 — 2026-10-11 — Sections 0, 2c, 2d and 2e and the extension paragraph of section 3, from
  *     docs/app-developer-ai-guide.md, which the Boards page and llms-full.txt pointed at and no route
  *     served (docs audit 2026-10-11, D7). Corrected against the code on the way: an app may ask for
@@ -231,8 +233,12 @@ result.
   It never throws: \`{ ok: true, job_id }\` or \`{ ok: false, code }\` with AI_JOB_QUEUE_FULL,
   AI_JOB_LIMIT_REACHED (usually a loop), AI_JOB_CHAIN_TOO_DEEP, AI_JOB_PROMPT_TOO_LARGE or
   AI_JOB_START_FAILED. The extension's installer pays, counted as the app \`ext:<extension name>\`.
-  \`on_done: { extension, action }\` calls that action with \`{ job_id, state, result_key }\` when the job
-  ends. \`ctx.ai\` can be absent: check \`if (!ctx.ai)\` and go on without it.
+  \`on_done: { extension, action }\` calls that action with \`{ job_id, state, result_key, result }\` when
+  the job is done: \`result\` is the answer, or \`result_too_large: true\` when it is over 64 kB.
+  \`ctx.ai.result(job_id)\` reads the answer of a job the extension started, at any later time:
+  \`{ ok: true, state, value }\`, or AI_JOB_NOT_FOUND / AI_JOB_RESULT_GONE. The answer lands in the
+  owner's namespace, so \`ctx.memory.get(result_key)\` does not reach it; keep it private and read it
+  with these two. \`ctx.ai\` can be absent: check \`if (!ctx.ai)\` and go on without it.
 - A workflow's \`ai\` step takes the same \`op\`, \`audio_key\` and \`provider\`.
 - Something every morning: \`aimeat_schedule_create\` or a scheduled workflow.
 - A capability that goes off while a run is under way stops that step with its refusal, and the owner is
