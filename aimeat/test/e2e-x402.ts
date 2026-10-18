@@ -22,6 +22,9 @@
  *   e2e-x402-testnet.ts, opted into by setting AIMEAT_X402_TEST_FACILITATOR=false.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402
  * @version-history
+ *   v1.4.0 — 2026-10-18 — An agent of the seller is refused PUT and DELETE /v1/commerce/payout/x402
+ *     with 403 ACCESS_DENIED and the address stays as it was; red with requireRole('owner') removed
+ *     from either route (wish-kolme-puuttuvaa-kieltotesti-maksuosoite-ty-nkulun-ajo-ja-kyv).
  *   v1.3.0 — 2026-10-16 — 5a: a proof that pays less than the price, or pays another address, is
  *     refused with X402_VERIFY_FAILED and the session stays open (QA audit F14a-03).
  *   v1.2.0 — 2026-09-16 — Payout settings go through their routes; addresses compare without case.
@@ -48,6 +51,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 import { randomBytes } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
 async function setupOwner(label: string) {
     const name = `x4${label}${Date.now()}`;
     let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'X402', password: 'X402test1234' }) });
@@ -458,6 +462,31 @@ await test('A mistyped address is caught by its EIP-55 checksum', async () => {
   assert(lower.status === 200, `lowercase accepted: ${lower.status}/${JSON.stringify(lower.body?.error)}`);
   assert(lower.body.data.address === '0xf0A131F770018639DE3Da1D64F2C70aA295a685C',
     `stored in canonical EIP-55 form so it can be compared against a wallet: ${lower.body.data.address}`);
+});
+
+// The payout address is where settled money lands, and a settlement to the wrong address cannot be
+// undone, so setting or clearing it is the owner's in person (requireRole('owner')). Every call above
+// is the owner's, so removing that check left this suite green (quality round 2026-10-18). The agent
+// here holds commerce:sell and wallet:read, which is enough to READ the payout state: the refusal is
+// the role, not a missing word.
+await test('An agent of the seller cannot set or clear the payout address', async () => {
+  const agent = await makeAgent(BASE, seller, ['commerce:sell', 'wallet:read']);
+  const status = await json('/v1/commerce/payout', { headers: auth(agent.token) });
+  assert(status.status === 200, `the agent reads the payout state: ${status.status} ${JSON.stringify(status.body?.error)}`);
+  const before = String(status.body.data?.x402?.address ?? '').toLowerCase();
+  assert(before === '0xf0a131f770018639de3da1d64f2c70aa295a685c', `the owner's address is in place before the attempt: ${before}`);
+
+  const put = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(agent.token),
+    body: JSON.stringify({ address: '0x' + 'b2c3d4e5'.repeat(5) }) });
+  assert(put.status === 403 && put.body?.error?.code === 'ACCESS_DENIED',
+    `PUT by an agent: expected 403 ACCESS_DENIED, got ${put.status} ${JSON.stringify(put.body?.error)}`);
+  const del = await json('/v1/commerce/payout/x402', { method: 'DELETE', headers: auth(agent.token) });
+  assert(del.status === 403 && del.body?.error?.code === 'ACCESS_DENIED',
+    `DELETE by an agent: expected 403 ACCESS_DENIED, got ${del.status} ${JSON.stringify(del.body?.error)}`);
+
+  const after = await json('/v1/commerce/payout', { headers: auth(seller.token) });
+  assert(String(after.body.data?.x402?.address ?? '').toLowerCase() === before,
+    `the refused calls left the owner's address as it was: ${JSON.stringify(after.body.data?.x402)}`);
 });
 
 await test('Removing the payout address leaves the fiat rail intact', async () => {
