@@ -12,6 +12,7 @@
  * @structure meta · HistorySection({ d })
  * @usage loaded by the detail view: import('./sections/history.js')
  * @version-history
+ *   v1.2.0 — 2026-10-18 — Shown to the app's owner only.
  *   v1.1.0 — 2026-09-27 — Parity (sections-a): the chapter's lead, the rows as the old checkpoint rows
  *     (List tone "checkpoints"), the small quiet line while loading or empty.
  *   v1.0.0 — 2026-09-27 — Initial (appcat detail builder A): the old catalogue's detail.js historyHtml
@@ -28,7 +29,8 @@ import { checkpointPreview, checkpointRestore, checkpointDelete } from '/views/a
 
 const html = htm.bind(h);
 
-export const meta = { id: 'history', title: 'wc.history', show: (d) => !!(d && d.published) };
+// The checkpoints live in the owner's private memory (Jouni, 2026-10-18: a visitor saw them offered).
+export const meta = { id: 'history', title: 'wc.history', show: (d) => !!(d && d.published && d.isOwn) };
 
 export default function HistorySection({ d }) {
   const w = d.work;

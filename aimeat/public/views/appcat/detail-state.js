@@ -24,6 +24,7 @@
  *   checkpointDelete(id)
  * @usage const st = useDetailState(); if (st.hasWork) …
  * @version-history
+ *   v1.3.0 — 2026-10-18 — The working-copy checkpoints are read for the app's owner only.
  *   v1.0.0 — 2026-09-27 — Initial: the old catalogue's detail.js working-copy acts (detailAiKeep,
  *     detailWorkTry/Publish/Discard, detailCheckpoint*, stageDraftAndPreview, publishDraftBytes,
  *     openStagingPreview, detailLoadWorkingCopy) around one state object.
@@ -122,7 +123,8 @@ export function openApp(row, me) {
       closeDetail();
       return null;
     });
-  if (me) {
+  // The checkpoints are the owner's private records: nobody else has any to read here.
+  if (me && isOwn) {
     wc.loadCheckpoints(st.owner, st.filename).then((items) => { if (seq === st.seq) set({ checkpoints: items }); });
   }
   hasAiKey().then((on) => { if (seq === st.seq) set({ ai: on }); });

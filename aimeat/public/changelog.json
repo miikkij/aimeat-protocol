@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-10-18",
+      "kind": "feature",
+      "title": {
+        "en": "An app tells you what is new in it, and an open app updates itself",
+        "fi": "Sovellus kertoo, mitä siinä on uutta, ja avoin sovellus päivittyy itse"
+      },
+      "body": {
+        "en": "Every published app has a round info mark in its corner. Press it and you see which version runs, when it was last updated and what the latest versions changed, with a link to the app in the catalogue. When the owner publishes a new version, an app you have open reloads itself; you no longer press F5. If you build the app, as its owner or with a development right, the mark also shows the version being made and what it changes. Visitors do not see it. You can tuck the marks in the corner away until you move the pointer there; the AI label and the cookie mark stay in view. In the App Catalog, an app opens in the right list, and while it is open, signing in and out stays in reach.",
+        "fi": "Jokaisen julkaistun sovelluksen kulmassa on pyöreä tietomerkki. Kun painat sitä, näet, mikä versio on käytössä, milloin sovellus päivitettiin viimeksi ja mitä uusimmat versiot muuttivat, ja linkin sovellukseen luettelossa. Kun omistaja julkaisee uuden version, auki oleva sovellus latautuu itse. F5-näppäintä ei enää tarvita. Jos rakennat sovellusta omistajana tai kehitysoikeudella, merkki näyttää myös tekeillä olevan version ja sen, mitä se muuttaa. Kävijät eivät näe sitä. Voit piilottaa kulman merkit, kunnes viet osoittimen kulmaan. Tekoälymerkintä ja evästemerkki pysyvät näkyvissä. App Catalogissa sovellus avautuu oikeaan listaan, ja kirjautuminen sisään ja ulos onnistuu, vaikka sovelluksen tiedot ovat auki."
+      }
+    },
+    {
       "date": "2026-10-17",
       "kind": "feature",
       "title": {

@@ -22,6 +22,9 @@
  *     the app catalogue's page did; everything inside inherits it.
  *   - smallWords: the small action links inside (Action small) read a step smaller in the body face,
  *     the app catalogue's quiet word (.dtl-btn, .78rem).
+ *   - belowBar: the layer starts under the site's top bar instead of covering it, so signing in and
+ *     out, the notifications and the menu stay in reach while it is open; the bar's own dropdowns
+ *     open over the layer.
  *   With `fill` the bar is the app viewer's own: a thinner glass bar with a larger close button.
  *
  *   It holds no state of its own and moves no focus: the page decides when it is there (it draws the
@@ -34,6 +37,8 @@
  *          rail=${html`<${Rail} …/>`} bodyRef=${ref}>…<//>`
  *        html`<${Overlay} fill title=${name} onClose=${close} link=${{ href: '/', label: t('x.cta'), mark: '⚡' }}><iframe …></iframe><//>`
  * @version-history
+ *   v1.3.0 — 2026-10-18 — `belowBar`: the layer leaves the site's top bar in reach (the app catalogue's
+ *     detail view covered LOGOUT and SIGN IN until it was closed; Jouni, 2026-10-18). Additive.
  *   v1.2.0 — 2026-09-27 — `smallWords`: the small action links at the catalogue's .78rem in the body
  *     face (.dtl-btn); additive.
  *   v1.1.0 — 2026-09-27 — Parity with the app catalogue: `glyph`, `onEdit`/`editLabel`, `back`, `link` and
@@ -55,18 +60,18 @@ const cx = (...parts) => parts.filter(Boolean).join(' ');
  * @param {{ label?: string, title?: any, glyph?: any, onEdit?: () => void, editLabel?: string,
  *   back?: { label: any, onClick: () => void }, link?: { href: string, label: any, mark?: any, title?: string },
  *   tools?: any, onClose: () => void, closeLabel?: string, fill?: boolean, rail?: any, bodyRef?: any,
- *   normalLeading?: boolean, smallWords?: boolean, children?: any }} props
+ *   normalLeading?: boolean, smallWords?: boolean, belowBar?: boolean, children?: any }} props
  *   label: the layer's name for a screen reader (the title's words when it is plain text).
  *   tools: what stands at the bar's right end. fill: the body is one thing, edge to edge, that does
  *   not scroll (a frame). rail: the contents rail beside the page. bodyRef: the scrolling body.
  */
-export function Overlay({ label, title, glyph, onEdit, editLabel, back, link, tools, onClose, closeLabel, fill, rail, bodyRef, normalLeading, smallWords, children }) {
+export function Overlay({ label, title, glyph, onEdit, editLabel, back, link, tools, onClose, closeLabel, fill, rail, bodyRef, normalLeading, smallWords, belowBar, children }) {
   const name = label || (typeof title === 'string' ? title : undefined);
   const close = closeLabel || 'Close';
   const backLine = back ? html`<button type="button" class="overlay-back" onClick=${back.onClick}>${back.label}</button>` : null;
   const page = html`${backLine}${children}`;
   return html`
-    <div class=${cx('overlay', fill && 'overlay--fill', normalLeading && 'overlay--normal-leading', smallWords && 'overlay--small-words')} role="region" aria-label=${name}>
+    <div class=${cx('overlay', fill && 'overlay--fill', normalLeading && 'overlay--normal-leading', smallWords && 'overlay--small-words', belowBar && 'overlay--below-bar')} role="region" aria-label=${name}>
       <div class="overlay-bar">
         <button type="button" class="overlay-close" title=${close} aria-label=${close} onClick=${onClose}>✕</button>
         <span class="overlay-title">

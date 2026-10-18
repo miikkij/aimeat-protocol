@@ -10,6 +10,8 @@
  *   The catalogue's own names map to the site's tokens so: its --surface is --card-bg, its --border
  *   is --border, its --text-dim is --text-muted and its --text-muted is --text-dim.
  * @version-history
+ *   v1.3.0 — 2026-10-18 — .overlay--below-bar: the layer starts under the top bar and lifts the bar's
+ *     dropdowns over it.
  *   v1.2.1 — 2026-09-27 — The way back's literal corner 0 goes (nothing under it draws a corner, so
  *     AIMEAT is unchanged). check:shape-tokens.
  *   v1.2.0 — 2026-09-27 — .overlay--small-words (Overlay smallWords): the small action links at the
@@ -27,6 +29,11 @@
   display: flex; flex-direction: column;
   background: var(--bg); color: var(--text);
 }
+/* Under the site's top bar, not over it (Overlay belowBar): signing in and out stay in reach. The bar
+   is lifted over the layer while one is open, so its own dropdowns (notifications, the narrow
+   screen's menu) open on top of it rather than behind it. */
+.overlay--below-bar { top: var(--nav-height, 56px); }
+body:has(.overlay--below-bar) .topnav { z-index: 601; }
 /* The browser's own line height, which the app catalogue's page read at (Overlay normalLeading). */
 .overlay--normal-leading { line-height: normal; }
 /* The catalogue's quiet word (Overlay smallWords): a small action link a step smaller, in the body

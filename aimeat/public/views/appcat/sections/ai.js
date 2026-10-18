@@ -19,6 +19,7 @@
  * @structure meta · AiSection({ d })
  * @usage loaded by the detail view: import('./sections/ai.js')
  * @version-history
+ *   v1.2.0 — 2026-10-18 — Shown to the app's owner only.
  *   v1.1.0 — 2026-09-27 — Parity (sections-a): the old page's look (the chapter lead, the notice as a
  *     thin frame with a coral bar, the field underlined with its button beside it, the status line
  *     always in place, the proposal in the heavy frame, the door rows 24px apart) and its behaviour
@@ -44,7 +45,8 @@ import { whenBytes, setProposal, discardProposal, keepProposal, stageAndPreview,
 
 const html = htm.bind(h);
 
-export const meta = { id: 'ai', title: 'detail.editAi', show: () => true };
+// Writes the owner's working copy, so it is the owner's (Jouni, 2026-10-18).
+export const meta = { id: 'ai', title: 'detail.editAi', show: (d) => !!(d && d.isOwn) };
 
 /** The status line's tone: grey while it works or says a plain thing, green when done, coral on a failure (as the old page coloured it). */
 const REPORT_TONE = { ok: 'ok', err: 'refused' };
