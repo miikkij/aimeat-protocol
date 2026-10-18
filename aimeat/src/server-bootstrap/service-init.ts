@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-18 — Core handler subscription-renewals (commerce/subscriptions.ts; Comicland v3 A-5).
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.22.0 — 2026-10-13 — migrateRestScopeKeepWorkingOnce(), chained after migrateAgentReadGrantOnce: on the
  *     first start as 4.0.x, every word the 4.0.0 scope gates check goes to the agents and approved
@@ -483,6 +484,13 @@ export async function initializeServices(
     const { runAutoRenewals } = await import('../services/packages/sale/package-renewals.js');
     const outcomes = await runAutoRenewals({ storage, config, peers });
     if (outcomes.length > 0) logger.info(`Package renewals: ${outcomes.filter(o => o.result === 'renewed').length} renewed, ${outcomes.filter(o => o.result === 'failed').length} failed`);
+  });
+
+  // Subscriptions to an extension's plans renewed on the kept card (commerce/subscriptions.ts).
+  scheduler.registerCoreHandler('subscription-renewals', async () => {
+    const { runSubscriptionRenewals } = await import('../commerce/subscriptions.js');
+    const outcomes = await runSubscriptionRenewals(storage, config);
+    if (outcomes.length > 0) logger.info(`Subscription renewals: ${outcomes.filter(o => o.result === 'renewed').length} renewed, ${outcomes.filter(o => o.result === 'failed').length} failed`);
   });
 
   // Unused packages-only peers removed, on a package repository (services/packages/peer/package-peer-limits.ts).

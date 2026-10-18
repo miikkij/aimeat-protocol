@@ -7,6 +7,9 @@
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.18.0 — 2026-10-18 — A caller with no sign-in runs an action the manifest marks `public`, as a
+ *     visitor, counted per client address on the catalogue limit; every other unsigned call still
+ *     answers 401 (Comicland v3 A-7).
  *   v1.17.0 — 2026-10-16 — Both handlers call invokeExtensionAction (services/extension-invoke.ts), which
  *     holds the sequence that was written twice here and once more in mcp/extensions.ts. No change to
  *     what either route answers (QA audit D2-05).
@@ -47,7 +50,7 @@
  *   v1.2.0 — 2026-07-17 — Per-call paywall (enforcePaywall) before execute in both handlers +
  */
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
@@ -65,6 +68,8 @@ import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
 import type { EmailService } from '../../services/email.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { invokeExtensionAction } from '../../services/extension-invoke.js';
+import { resolveExtensionForCall } from '../../services/component-versions.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
 
 export function registerExtensionActionRoutes(router: Router, config: AimeatConfig, storage: Storage, emailService?: EmailService): void {
   // ── GET /v1/ext-hash — the node's published ctx.hash, as source ──
@@ -128,14 +133,47 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     ]));
   };
 
+  /**
+   * A caller with no sign-in, on an action the manifest marks `public` (Comicland v3 A-7): run it for
+   * nobody in particular, counted per client address. Anything else goes on to requireAuth, so an
+   * unknown extension, an unknown action and an action that is not public all answer 401 alike and a
+   * visitor learns nothing about what exists.
+   */
+  const visitorLimit = rateLimit(() => ({ ...config.rateLimits.catalogue, keyBy: 'ip' }));
+  const visitorOrSignIn = (instanced: boolean) => async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (req.auth && !req.auth.anonymous) { next(); return; }
+    const resolved = await resolveExtensionForCall(storage, req.params.extName as string);
+    const action = resolved.ok ? resolved.ext.actions.find(a => a.id === req.params.actionId) : undefined;
+    if (!action?.public) { next(); return; }
+    visitorLimit(req, res, () => { void runVisitor(req, res, instanced ? req.params.instanceId as string : undefined); });
+  };
+  const runVisitor = async (req: Request, res: Response, instanceId?: string): Promise<void> => {
+    const nobody = `anonymous@${config.nodeId}`;
+    const out = await invokeExtensionAction({
+      config, storage, enforcePaywall,
+      extRef: req.params.extName as string, instanceId, actionId: req.params.actionId as string,
+      method: req.method, input: (req.body ?? {}) as Record<string, unknown>,
+      caller: { gaii: nobody, metered: nobody, owner: '', kind: 'anonymous', roles: [], scopes: [], appGrantId: null },
+      paywall: { res },
+      correlationId: req.header('x-aimeat-correlation') ?? null,
+    });
+    if (out.kind === 'paywall') return;
+    if (out.kind === 'refused') {
+      const body = error(config.nodeId, out.code, out.message);
+      res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
+      return;
+    }
+    res.json(success(config.nodeId, out.result));
+  };
+
   // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
   // Runs against one instance: its own config, and the namespace `ext:{name}.{instanceId}`.
-  router.post('/v1/ext/:extName/:instanceId/:actionId', requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
+  router.post('/v1/ext/:extName/:instanceId/:actionId', visitorOrSignIn(true), requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
     await runAction(req, res, req.params.instanceId as string);
   });
 
   // ── POST /v1/ext/:extName/:actionId — Dynamic action execution ──
-  router.post('/v1/ext/:extName/:actionId', requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
+  router.post('/v1/ext/:extName/:actionId', visitorOrSignIn(false), requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
     await runAction(req, res);
   });
 }

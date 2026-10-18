@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-18 — callext-path: AIMEAT.data.action, and a `public: true` action answers a visitor (Comicland v3 A-7).
  *   2026-10-17 — +team-data-in-personal-memory (plan V7, the data map step in both build interviews).
  *     The two types moved verbatim to appdev-pitfall-types.ts and are re-exported here.
  *   2026-10-17 — Every entry re-read against node 4.0.3 (852e0eff6) by the pitfall-list watch and
@@ -415,11 +416,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'callext-path',
     title: 'Extension actions are called at POST /v1/ext/{name}/{action}',
     symptom: 'POST /v1/extensions/{name}/actions/{action} answers 404. That path exists only for GET and PATCH, which read and patch the action\'s script for its installer.',
-    fix: 'Call extension actions at POST /v1/ext/{name}/{actionId} (an instance: /v1/ext/{name}/{instanceId}/{actionId}) through the session or cortex fetch helper. Every action requires a signed-in caller.',
+    fix: 'Call extension actions at POST /v1/ext/{name}/{actionId} (an instance: /v1/ext/{name}/{instanceId}/{actionId}) with AIMEAT.data.action(name, actionId, input), which uses the session when someone is signed in. An action requires a signed-in caller unless its manifest says `public: true`; a public one also answers a visitor, read-only.',
     appliesTo: ['ext'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-10-18',
     ...CHECKED,
   }),
   E({

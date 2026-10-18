@@ -449,7 +449,7 @@ async function bookCheckoutBeneficiaries(
   // a morsel-priced checkout line books nothing here, exactly as a morsel-priced contract does not.
   if (!isMoneyCurrency(args.session.currency)) return;
   const coord = meteredCoordinateOf(args.sellable);
-  if (!coord) return;
+  if (!coord || args.sellable.sharesAtUse) return;   // split when the paid call names its payees
   try {
     const split = await readSplit(ctx.storage, args.sellable.sellerGhii, coord.ext, coord.action);
     const result = computeSplit(args.net, split, args.designations);

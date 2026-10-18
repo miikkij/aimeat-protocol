@@ -30,6 +30,8 @@
  *   import { toIptc, toEuIcon } from './ai-provenance-adapters.js';
  *   const uri = toIptc(record);              // undefined = emit nothing
  * @version-history
+ *   v1.1.0 — 2026-10-18 — iptcComposite(): the value for a work combined from several pieces, for
+ *     provenance written into exported files (services/provenance-embed/; Comicland v3 A-8).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1. Mapping is the truth table in
  *     docs/internal/EUAct/22-frozen-vocabulary.md Part C2, executed by
  *     test/unit/ai-provenance-adapters.test.ts.
@@ -87,6 +89,14 @@ export function toIptc(input: MaybeAiProvenance): string | undefined {
     case 'synthesized':
     case 'ai-generated': return `${IPTC_DIGITAL_SOURCE_TYPE}trainedAlgorithmicMedia`;
   }
+}
+
+/**
+ * The IPTC value for a work that combines several pieces of content, some made by a model and some by
+ * people (a comic page: AI pictures and human lettering), whatever each piece's own level.
+ */
+export function iptcComposite(): string {
+  return `${IPTC_DIGITAL_SOURCE_TYPE}compositeWithTrainedAlgorithmicMedia`;
 }
 
 // ── W3C ─────────────────────────────────────────────────────────────────────────────────────────

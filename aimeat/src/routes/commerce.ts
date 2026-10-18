@@ -17,6 +17,9 @@
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  *   - PUT    /v1/commerce/payout/invoice               invoice credit for items delivered at once
  * @version-history
+ *   2026-10-18 — POST /v1/commerce/checkout-sessions/:id/card: Stripe's own card page for a person,
+ *     on the seller's Stripe account; completion takes handler com.stripe.checkout (Comicland v3 A-4).
+ *     Line kind `subscription`; GET /v1/commerce/subscriptions and POST …/:ext/:plan/cancel (A-5).
  *   2026-10-16 — PUT /v1/commerce/payout/invoice admits the owner's agent holding commerce:sell and
  *     writes the owner's record through commerce/psp-record.ts, the function aimeat_commerce_invoice_set
  *     calls; readPsp and writePsp moved there unchanged (the chat path for the S8-03 setting).
@@ -79,9 +82,12 @@ import { pspSecretHint } from '../commerce/psp-secrets.js';
 import { readPsp, writePsp, setInvoiceAcceptImmediate, type PspRecord } from '../commerce/psp-record.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
+import { openStripeCheckout, STRIPE_CHECKOUT_HANDLER_ID } from '../commerce/stripe-checkout.js';
+import { appSpendRefusal } from '../services/metered-access.js';
+import { listSubscriptions, cancelSubscription } from '../commerce/subscriptions.js';
 
 const ItemsSchema = z.array(z.object({
-  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'pacing-pack']).optional(),
+  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'pacing-pack', 'subscription']).optional(),
   agent: z.string().min(1).max(300).optional(),
   offer_id: z.string().min(1).max(100).optional(),
   /** app-tool: the tool name (alias for offer_id) — from the app's apps.{appId}.tools manifest. */
@@ -487,6 +493,50 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/commerce/checkout-sessions/:id/complete — charge + fulfill.
+  // GET /v1/commerce/subscriptions — the buyer's subscriptions, running and ended (commerce/subscriptions.ts).
+  router.get('/v1/commerce/subscriptions', requireAuth(), requireScope('wallet:read'), async (req, res) => {
+    res.json(success(config.nodeId, { subscriptions: await listSubscriptions(storage, `${req.auth!.owner}@${config.nodeId}`) }));
+  });
+
+  // POST /v1/commerce/subscriptions/:ext/:plan/cancel — stop the renewal; the paid period runs to its end.
+  router.post('/v1/commerce/subscriptions/:ext/:plan/cancel', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
+    const out = await cancelSubscription(storage, `${req.auth!.owner}@${config.nodeId}`, req.params.ext as string, req.params.plan as string);
+    if (!out) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'You have no such subscription.')); return; }
+    res.json(success(config.nodeId, { subscription: out }));
+  });
+
+  // POST /v1/commerce/checkout-sessions/:id/card — Stripe's own card page for this checkout, on the
+  // seller's Stripe account (commerce/stripe-checkout.ts). A person pays there and comes back to
+  // `return_url` with stripe_session, and completing with handler com.stripe.checkout and that id as
+  // the instrument finishes the purchase; the Stripe webhook finishes it when they never come back.
+  // An agent has no card to type in and pays with a saved card or x402, so it is refused here; an
+  // app is asked the spend permission before any page is opened, as completion asks it.
+  router.post('/v1/commerce/checkout-sessions/:id/card', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
+    const returnUrl = typeof req.body?.return_url === 'string' ? req.body.return_url : '';
+    if (!/^https?:\/\//.test(returnUrl) || returnUrl.length > 2000) {
+      res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', 'The address to come back to after paying is missing or is not a web address. Send the address of the page the person pays from.'));
+      return;
+    }
+    const caller = callerOf(req, config.nodeId, storage);
+    if (caller.kind === 'agent') {
+      res.status(403).json(error(config.nodeId, 'PERSON_ONLY', 'The card page is for a person typing in a card. Ask your owner to pay there, or pay with a card your owner saved.'));
+      return;
+    }
+    try {
+      const session = await loadOwnSession(req);
+      const spend = await appSpendRefusal(storage, { roles: [...caller.roles], scopes: [...caller.scopes], appGrantId: req.auth!.app_grant ?? null });
+      if (spend) {
+        res.status(403).json(error(config.nodeId, 'SCOPE_REQUIRED', 'This app was not allowed to spend on your behalf.'));
+        return;
+      }
+      const page = await openStripeCheckout(config, session, await readPsp(storage, session.sellerGhii), returnUrl);
+      res.json(success(config.nodeId, { url: page.url, stripe_session: page.stripeSession, handler: STRIPE_CHECKOUT_HANDLER_ID }, [
+        { description: 'Send the person to the card page', method: 'GET', url: page.url },
+        { description: 'Then complete with the stripe_session they return with', method: 'POST', url: `/v1/commerce/checkout-sessions/${encodeURIComponent(session.id)}/complete` },
+      ]));
+    } catch (err) { sendCommerceError(res, config, err); }
+  });
+
   router.post('/v1/commerce/checkout-sessions/:id/complete', requireAuth(), requireRestScope('commerce:buy', { orScope: 'contract:spend' }), async (req, res) => {
     const parsed = CompleteSchema.safeParse(req.body ?? {});
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }

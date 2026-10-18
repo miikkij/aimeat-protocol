@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-10-18 — The money rails' registration moved to server-bootstrap/commerce-rails.ts (pure
+ *     extraction, past 800 lines), with the hosted card page handler and the `subscription` kind.
  *   2026-10-17 — exposureRouter (routes/exposure.ts): GET /v1/exposure/mine and GET /v1/admin/exposure.
  *   2026-10-16 — pageHostRouter (routes/page-host.ts), the page frame of HTML pages, ahead of the subdomain router.
  *   2026-10-15 — The extended-features guard is requireExtendedFeatures (middleware/extended-features-gate.ts),
@@ -77,14 +79,9 @@ import { success, error } from '../middleware/envelope.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { requireExtendedFeatures } from '../middleware/extended-features-gate.js';
 import { logger } from '../utils/logger.js';
-import { registerPaymentHandler, resetPaymentHandlers } from '../commerce/payment-handlers.js';
-import { stripePaymentHandler } from '../commerce/stripe-handler.js';
-import { invoicePaymentHandler } from '../commerce/invoice-handler.js';
 import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
 import { setOutboundRequestSigner } from '../utils/url-validator.js';
-import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
-import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver, pacingPackSellableResolver } from '../commerce/sellable-resolvers.js';
-import { packageSellableResolver } from '../services/packages/sale/package-sale-checkout.js';
+import { registerCommerceRails } from './commerce-rails.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
 import { commerceAcpRouter } from '../routes/commerce-acp.js';
@@ -424,30 +421,8 @@ export async function mountRoutes(
       }
     : null);
 
-  resetPaymentHandlers();
-  // Money rails. Neither carries a node-level credential: the Stripe handler charges on the
-  // seller's own key (commerce.psp) and the invoice handler books an obligation instead of
-  // capturing anything, so both are safe to register on every node.
-  registerPaymentHandler(stripePaymentHandler(config));
-  registerPaymentHandler(invoicePaymentHandler());
-  resetSellableResolvers();
-  registerSellableResolver(offerSellableResolver());
-  registerSellableResolver(appToolSellableResolver());
-  registerSellableResolver(extCallSellableResolver());   // priced raw-call money channel (rm-commercial-raw-calls)
-  registerSellableResolver(packageSellableResolver(peers));   // a package this node sells, priced from its catalogue
-  registerSellableResolver(pacingPackSellableResolver());   // pacing capacity the operator sells for money
-  // A fake EUR/USD rail with no real PSP, on any node while the flag is on; a public node warns (utils/test-money-guard.ts).
-  if (testMoneyHandlerActive(config)) registerPaymentHandler((await import('../commerce/test-money-handler.js')).testMoneyPaymentHandler());
-  // x402 stablecoin settlement (TARGET-042): the NON-CUSTODIAL USDC handler for money (USD) sessions.
-  // The facilitator is a parameter — an off-chain double in E2E (AIMEAT_X402_TEST_FACILITATOR), the
-  // real safeFetch client against config.x402FacilitatorUrl in prod. OFF unless AIMEAT_X402_ENABLED.
-  if (config.x402Enabled) {
-    const { x402PaymentHandler } = await import('../commerce/x402-handler.js');
-    const { httpFacilitator, testFacilitator } = await import('../commerce/x402-facilitator.js');
-    registerPaymentHandler(x402PaymentHandler(
-      config, config.x402TestFacilitator ? testFacilitator() : httpFacilitator(config.x402FacilitatorUrl),
-    ));
-  }
+  // The money rails and the sellable kinds the checkout knows (server-bootstrap/commerce-rails.ts).
+  await registerCommerceRails(config, peers);
   app.use(commerceRouter(config, storage));
   app.use(commerceUcpRouter(config, storage));
   app.use(commerceAcpRouter(config, storage));

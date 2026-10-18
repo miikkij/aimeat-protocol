@@ -36,6 +36,8 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   v1.6.0 — 2026-10-18 — POST /v1/provenance/embed: the provenance written into an exported PNG, JPEG,
+ *     PDF or CBZ, stored as a marked copy (services/provenance-embed/; Comicland v3 A-8).
  *   v1.5.0 — 2026-10-08 — The disclosure each read serves is decided for the record's content as it is
  *     now (servedDisclosure): `GET /v1/provenance/:id`, the by-hash lookup and the readable page no
  *     longer show the block minted for a surface the content has since left. A declaration may state
@@ -77,6 +79,7 @@ import { publiclyResolvableWithShares, findShareOpenedProvenanceByHash } from '.
 import { prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { provenancePage, provenanceNotFoundPage } from '../services/ai-provenance-page.js';
 import { detectLocale } from '../i18n.js';
+import { embedProvenance, EmbedError } from '../services/provenance-embed/index.js';
 import type { SurfaceContext } from '../services/ai-disclosure.js';
 
 /**
@@ -285,6 +288,34 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
       { description: 'How this node marks AI content', method: 'GET', url: '/v1/ai-transparency' },
     ]));
   });
+
+  // ── POST /v1/provenance/embed ──
+  // Write the provenance INTO an exported file in the caller's storage (PNG, JPEG, PDF, CBZ) and store
+  // the marked copy beside it (services/provenance-embed/; Comicland v3 A-8). The file carries the
+  // IPTC digital source type and the records' addresses wherever it goes.
+  router.post('/v1/provenance/embed',
+    requireAuth(), requireScope('storage:write'), declareRateLimit,
+    async (req: Request, res: Response) => {
+      const body = (req.body ?? {}) as { storage_key?: unknown; provenance_ids?: unknown; output_key?: unknown; composite?: unknown };
+      if (typeof body.storage_key !== 'string' || !body.storage_key || !Array.isArray(body.provenance_ids)) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'Name the file (storage_key) and the provenance records it was made from (provenance_ids).'));
+      }
+      try {
+        const r = await embedProvenance({ storage, config }, {
+          principal: resolveIdentity(req.auth!, config.nodeId), storageKey: body.storage_key,
+          provenanceIds: body.provenance_ids.filter((x): x is string => typeof x === 'string'),
+          ...(typeof body.output_key === 'string' && body.output_key ? { outputKey: body.output_key } : {}),
+          ...(typeof body.composite === 'boolean' ? { composite: body.composite } : {}),
+        });
+        return res.json(success(config.nodeId, {
+          storage_key: r.storageKey, mime_type: r.mime, size: r.size, format: r.format, visibility: r.visibility,
+          digital_source_type: r.digitalSourceType, records: r.records, ...(r.pages !== undefined ? { pages: r.pages } : {}),
+        }, [{ description: 'Download the marked file', method: 'GET', url: `/v1/storage/${r.storageKey.split('/').map(encodeURIComponent).join('/')}` }]));
+      } catch (e) {
+        if (e instanceof EmbedError) return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        throw e;
+      }
+    });
 
   // ── POST /v1/provenance ──
   // Declare provenance for content produced elsewhere. Scope-gated (owner sessions bypass scopes,

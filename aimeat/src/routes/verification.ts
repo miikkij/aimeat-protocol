@@ -5,6 +5,8 @@
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history
+ *   2026-10-18 — An EUDI wallet or a bank identification that shows 18 or older records the account
+ *     holder as a verified adult (services/adult-assurance.ts); the birth date is not kept (Comicland v3 A-3).
  *   2026-10-15 — GET /v1/consent/:id/receipt gives the receipt the consenting person's language
  *     (feature-list audit #161).
  *   v2.6.0 — 2026-10-15 — POST /v1/ghii/verify/ftn writes nothing: it answers 400 FTN_USE_AUTHORIZE and
@@ -48,6 +50,7 @@ import type { OidcClient } from '../services/oidc-client.js';
 import { requireAuth, requireOwnerPrincipal, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { isAdultByClaims, recordAdult } from '../services/adult-assurance.js';
 import { operatorOverride } from '../services/operator-override.js';
 
 export function verificationRouter(
@@ -158,6 +161,8 @@ export function verificationRouter(
         verificationMethod: 'eidas',
         updatedAt: new Date().toISOString(),
       });
+      // Adult or not, from the attested claims of this request; the birth date is not kept.
+      if (isAdultByClaims(result.attributes)) await recordAdult(storage, ghii.ghii, 'eudiw');
 
       res.json(success(config.nodeId, {
         ghii: ghii.ghii,
@@ -241,6 +246,8 @@ export function verificationRouter(
         verificationMethod: 'eidas',
         updatedAt: new Date().toISOString(),
       });
+      // Adult or not, from the attested claims of this request; the birth date is not kept.
+      if (isAdultByClaims(result.attributes)) await recordAdult(storage, ghii.ghii, 'eudiw');
 
       res.json(success(config.nodeId, {
         ghii: ghii.ghii,
@@ -353,6 +360,8 @@ export function verificationRouter(
         verificationCredentialHash: credentialHash,
         updatedAt: new Date().toISOString(),
       });
+      // Adult or not, from the bank's birth date or the identity code it carries; neither is kept.
+      if (isAdultByClaims({ ...tokenResult.claims, pid: pidValue })) await recordAdult(storage, ghii.ghii, 'ftn');
 
       if (req.accepts('html')) {
         res.redirect(`${config.baseUrl}/v1/profile`);

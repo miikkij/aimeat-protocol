@@ -21217,6 +21217,69 @@ paths:
               schema:
                 type: object
 
+  /v1/provenance/embed:
+    post:
+      x-aimeat-scope: { word: 'storage:write' }
+      operationId: embedProvenance
+      summary: Write AI provenance into an exported file
+      description: |
+        Marks a PNG, a JPEG, a PDF or a CBZ (a ZIP of pages) in the caller's storage with the
+        provenance records the content was made from, and stores the marked copy beside it
+        (`<key>.marked.<ext>`, or `output_key`); the original is left as it was. The file carries an
+        XMP packet with the IPTC `DigitalSourceType` (the one record's own value, or
+        `compositeWithTrainedAlgorithmicMedia` for several or with `composite: true`) and each record's
+        id and address; a PDF also carries them in its document information, as an incremental update;
+        a CBZ has every page marked and `AIMEAT-provenance.xmp` beside them. A signed C2PA manifest is
+        not written: it needs a signing certificate. A record must be the caller's account's own or
+        resolvable by anyone; any other id is 404 and nothing is written.
+      tags: [AI]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [storage_key, provenance_ids]
+              properties:
+                storage_key: { type: string }
+                provenance_ids: { type: array, maxItems: 500, items: { type: string } }
+                output_key: { type: string }
+                composite: { type: boolean, description: 'Mark as combined from AI and human work even with one record.' }
+      responses:
+        '200':
+          description: The marked copy.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          storage_key: { type: string }
+                          mime_type: { type: string }
+                          size: { type: integer }
+                          format: { type: string, enum: [png, jpeg, pdf, zip] }
+                          visibility: { type: string }
+                          digital_source_type: { type: string }
+                          records: { type: integer }
+                          pages: { type: integer }
+        '400':
+          description: INVALID_BODY
+        '403':
+          description: SCOPE_DENIED - storage:write is needed
+        '404':
+          description: NOT_FOUND - the file, or a record that is neither the caller's nor public
+        '413':
+          description: QUOTA_EXCEEDED - the marked copy does not fit the storage limits
+        '415':
+          description: UNSUPPORTED_FORMAT - not a PNG, JPEG, PDF or ZIP
+        '422':
+          description: UNREADABLE_FILE - the file's structure could not be read to mark it
   /v1/provenance:
     post:
       operationId: aiProvenanceDeclare
@@ -28928,6 +28991,127 @@ paths:
         '402': { description: Payment required (x402-style accepts block) }
         '422': { description: "PAYMENT_HANDLER_REQUIRED (neither payment_data.provider nor payment_data.handler; the message lists the handlers that settle the session's currency), or an unknown payment handler" }
 
+  /v1/commerce/checkout-sessions/{id}/card:
+    post:
+      x-aimeat-scope: { word: 'commerce:buy', enforcedIn: '4.0.0', orScope: 'contract:spend' }
+      operationId: openCheckoutCardPage
+      summary: Stripe's own card page for a checkout, on the seller's Stripe account
+      description: |
+        For a person paying by card. Opens a Stripe Checkout Session for exactly the session's total
+        and answers its `url`. The person pays there and comes back to `return_url` with
+        `aimeat_checkout` and `stripe_session` (or `cancelled=1`); completing the checkout with
+        `payment: { handler: 'com.stripe.checkout', instrument: <stripe_session> }` finishes the
+        purchase, and the seller's Stripe webhook finishes it when the person never comes back. The
+        node reads the payment back from Stripe before it takes it. A line with `auto_renew` keeps the
+        card for renewals. A credit card records the buyer as a verified adult. An agent is refused
+        (it pays with x402 or a saved card); an app needs the spend permission.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [return_url]
+              properties:
+                return_url: { type: string, maxLength: 2000, description: 'An http(s) address the person comes back to.' }
+      responses:
+        '200':
+          description: The card page.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          url: { type: string }
+                          stripe_session: { type: string }
+                          handler: { type: string, enum: [com.stripe.checkout] }
+        '400':
+          description: INVALID_CHECKOUT - return_url is not an http(s) address
+        '403':
+          description: PERSON_ONLY (an agent), SCOPE_REQUIRED (an app without the spend permission), PSP_NOT_CONFIGURED (the seller has no Stripe key)
+        '404':
+          description: SESSION_NOT_FOUND
+        '409':
+          description: SESSION_NOT_OPEN or NOTHING_TO_PAY
+  /v1/commerce/subscriptions:
+    get:
+      x-aimeat-scope: { word: 'wallet:read' }
+      operationId: listSubscriptions
+      summary: The buyer's subscriptions to extensions' plans
+      description: |
+        Every subscription the account bought (checkout line `{ kind: 'subscription', app: <extension>,
+        tool: <plan id> }`), running and ended, without the kept card's ids. A running one renews on
+        the kept card three days before `active_until` unless `auto_renew` is false.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The subscriptions.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          subscriptions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                ext: { type: string }
+                                plan: { type: string }
+                                title: { type: string }
+                                amount: { type: integer }
+                                currency: { type: string }
+                                period_days: { type: integer }
+                                started_at: { type: string, format: date-time }
+                                active_until: { type: string, format: date-time }
+                                active: { type: boolean }
+                                auto_renew: { type: boolean }
+                                last_failure: { type: object, additionalProperties: true }
+        '401':
+          description: Unauthorized
+  /v1/commerce/subscriptions/{ext}/{plan}/cancel:
+    post:
+      x-aimeat-scope: { word: 'commerce:buy', enforcedIn: '4.0.0', orScope: 'contract:spend' }
+      operationId: cancelSubscription
+      summary: Stop a subscription's renewal
+      description: The period already paid runs to its end; nothing is refunded.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: ext
+          in: path
+          required: true
+          schema: { type: string }
+        - name: plan
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The subscription, with auto_renew false.
+        '404':
+          description: NOT_FOUND - the account has no such subscription
   /v1/commerce/checkout-sessions/{id}/complete:
     post:
       x-aimeat-scope: { word: 'commerce:buy', enforcedIn: '4.0.0', orScope: 'contract:spend' }
@@ -37579,6 +37763,38 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/ghii/me/adult:
+    get:
+      x-aimeat-scope: { word: 'memory:read' }
+      operationId: ghiiMeAdult
+      summary: Whether the account holder is a verified adult
+      description: |
+        Yes or no, the method that showed it and when; never a birth date or any other personal data.
+        A bank identification or an EUDI wallet presentation that shows 18 or older writes it, and so
+        does a payment with a CREDIT card (a debit or prepaid card does not). Any principal acting for
+        the account may ask: the person, an app they opened, their agent, an ecosystem app. A visitor
+        from another node is answered not verified. Nobody writes it through the memory routes.
+      tags: [GHII]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The answer.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          verified: { type: boolean }
+                          method: { type: string, nullable: true, enum: [eudiw, ftn, credit-card, null] }
+                          verified_at: { type: string, format: date-time, nullable: true }
+        '401':
+          description: Unauthorized
   /v1/ghii/me:
     get:
       operationId: ghiiMe
@@ -47350,7 +47566,12 @@ paths:
       description: |
         Invoke a specific action provided by an installed and active extension.
         The request body is action-specific and defined by the extension manifest.
-        Requires authentication (Tier 1+).
+        Requires authentication (Tier 1+), except for an action the manifest marks `public: true`:
+        that one also answers a caller with no sign-in, as a visitor. A visitor's run reads the
+        extension's memory and may fetch; its writes are refused (VISITOR_READ_ONLY), the capabilities
+        that act for a person are absent, `ctx.caller.anonymous` is true, and calls are counted per
+        client address. A public action takes no price and no toll. Any other unsigned call answers
+        401, whether or not the extension or the action exists.
 
         Pacing and price (per action, optional; declared in the manifest): the extension owner always
         calls free. A non-owner owes (a) the pacing amount `tollMorsels` (else the node default),
@@ -47364,6 +47585,7 @@ paths:
       tags: [Extensions]
       security:
         - BearerAuth: []
+        - {}
       parameters:
         - name: extName
           in: path
@@ -47444,10 +47666,11 @@ paths:
       x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0' }
       operationId: executeExtensionInstanceAction
       summary: Execute extension action on specific instance
-      description: Invoke an action on a specific extension instance.
+      description: Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}.
       tags: [Extensions]
       security:
         - BearerAuth: []
+        - {}
       parameters:
         - name: extName
           in: path

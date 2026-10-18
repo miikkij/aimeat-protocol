@@ -27,6 +27,9 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A visitor (caller kind `anonymous`) runs an action the manifest marks public,
+ *     with no paywall, a read-only memory and none of the capabilities that act for a person;
+ *     ctx.caller says `anonymous` and, for everyone, `adult` and `subscriptions` (Comicland v3 A-7, A-3, A-5).
  *   v1.0.0 — 2026-10-16 — Moved out of routes/extensions/actions.ts and mcp/extensions.ts (QA audit D2-05).
  */
 import type { AimeatConfig } from '../config.js';
@@ -55,6 +58,8 @@ import { countCapabilityCall } from './capability-record.js';
 import { getEncryptionKey } from './encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
 import { resolveExtensionForCall } from './component-versions.js';
+import { readAdult, NOT_VERIFIED } from './adult-assurance.js';
+import { activeSubscriptions } from '../commerce/subscriptions.js';
 
 /** Who runs the action. Built by the surface from its own session, once. */
 export interface ExtensionInvokeCaller {
@@ -141,15 +146,28 @@ export async function invokeExtensionAction(args: {
   if (ext.status !== 'active') {
     return { kind: 'refused', status: 503, code: 'EXTENSION_INACTIVE', message: `Extension "${extName}" is not active` };
   }
+  // Nobody signed in: only an action the manifest marks public, priced at nothing, runs for them.
+  const visitor = caller.kind === 'anonymous';
+  if (visitor) {
+    const target = ext.actions.find(a => a.id === actionId);
+    if (!target?.public || (target.tollMorsels ?? 0) > 0 || target.commercial?.payMoney || target.commercial?.plans?.length) {
+      return { kind: 'refused', status: 401, code: 'UNAUTHORIZED', message: 'Sign in to use this action.' };
+    }
+  }
 
   // The caller's standing in the app this extension gates, resolved BEFORE the sandbox. A gate needs
   // the role, but the roster is private and must stay that way, so the node reads it here rather
   // than opening a lookup the sandbox could call. An extension declares which app it gates with
   // `config: { app: owner/file.html }`; without that it gets null and keeps its own membership model.
-  const gatedApp = resolveGatedApp(ext);
+  const gatedApp = visitor ? null : resolveGatedApp(ext);
   const callerAccount = accountOf(caller.gaii);
   const isAppOwner = !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
   const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, callerAccount) : null;
+  // Verified adult yes or no, for an extension that serves adult content (services/adult-assurance.ts):
+  // the account holder's, whichever of their principals called; never anything about a visitor.
+  const adult = visitor ? NOT_VERIFIED : await readAdult(storage, ownerGhiiOf(caller.gaii));
+  // The caller's running subscriptions to this extension's plans (commerce/subscriptions.ts).
+  const subscriptions = visitor ? [] : await activeSubscriptions(storage, ownerGhiiOf(caller.gaii), ext.name);
 
   let instanceConfig: Record<string, unknown> | undefined;
   if (instanceId) {
@@ -176,7 +194,8 @@ export async function invokeExtensionAction(args: {
   // Cross-owner invocation is intended (an extension is a sellable capability), so the paywall is
   // what makes it safe: the owner and their own principals are free, everyone else pays or holds an
   // entitlement.
-  const pay = await args.enforcePaywall({
+  // A visitor's action has no price and no toll (checked above and at install), so nothing is charged.
+  const pay = visitor ? { ok: true as const } : await args.enforcePaywall({
     config, storage, ext, action, callerGaii: caller.metered, res: args.paywall.res,
     payToken: args.paywall.payToken, internalPass: args.paywall.internalPass, namedAppTool: args.paywall.namedAppTool,
     session: { roles: caller.roles, scopes: caller.scopes, appGrantId: caller.appGrantId ?? null },
@@ -190,21 +209,42 @@ export async function invokeExtensionAction(args: {
     // The caller's organism workspace, as the caller, with the caller's own scopes deciding the
     // authority question the way requireScope would (services/extension-workspace.ts). Each consumer
     // gets its own copy of the lists, so nothing the script does to ctx.caller reaches them.
-    wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
-      caller: { gaii: caller.gaii, owner: caller.owner, roles: [...caller.roles], scopes: [...caller.scopes] } });
-    const ctx: ExtensionCtx = buildExtensionCtx({
+    if (!visitor) {
+      wsCap = attachExtensionWorkspace({ config, storage, ext, actionId: action.id,
+        caller: { gaii: caller.gaii, owner: caller.owner, roles: [...caller.roles], scopes: [...caller.scopes] } });
+    }
+    const callerView: ExtensionCtx['caller'] = {
+      gaii: caller.gaii, owner: caller.owner, roles: [...caller.roles],
+      // An extension action is one route for every action there will be, so a script that must
+      // hold a scope word can only do it from here.
+      scopes: [...caller.scopes],
+      member: appMember,
+      isAppOwner,
+      anonymous: visitor,
+      adult: { ...adult },
+      subscriptions,
+    };
+    // A visitor's run reads the extension's memory and may fetch. Everything that acts for a person
+    // (their wallet, files, data packages, workspace, notifications, mail, purchases, AI jobs billed
+    // to the installer) is left out, and the memory refuses writes (Comicland v3 A-7).
+    const ctx: ExtensionCtx = visitor ? buildExtensionCtx({
+      config, storage, extMemoryOwner,
+      extension: { name: ext.name, owner: ext.installedBy },
+      capabilities: capabilitiesOfRecord(ext),
+      caller: callerView,
+      extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config), { extension: ext.name }),
+      instance: instanceId ? {
+        id: instanceId,
+        config: decryptSecretFields(instanceConfig ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config), { extension: ext.name, instance: instanceId }),
+      } : undefined,
+      logPrefix: instanceId ? `[ext:${ext.name}:${instanceId}:visitor]` : `[ext:${ext.name}:visitor]`,
+      visitor: true,
+    }) : buildExtensionCtx({
       config, storage, extMemoryOwner,
       extension: { name: ext.name, owner: ext.installedBy },
       capabilities: capabilitiesOfRecord(ext),
       workspace: wsCap.workspace,
-      caller: {
-        gaii: caller.gaii, owner: caller.owner, roles: [...caller.roles],
-        // An extension action is one route for every action there will be, so a script that must
-        // hold a scope word can only do it from here.
-        scopes: [...caller.scopes],
-        member: appMember,
-        isAppOwner,
-      },
+      caller: callerView,
       // Secret config fields are decrypted for the field they are bound to, just before the VM.
       extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config), { extension: ext.name }),
       instance: instanceId ? {

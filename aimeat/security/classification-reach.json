@@ -835,6 +835,26 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI usage counters."
     },
+    "src/commerce/subscriptions.ts": {
+      "reads": {
+        "getMemory": 5,
+        "listMemory": 2,
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-18 (Comicland v3 A-5), the node's own read: an extension's own published offer (`subscription.plans` in ext:{name}), the buyer's service-owned subscription records (commerce.subscription.*) to extend, list, cancel and renew them, and the seller's payment setup (commerce.psp) for the renewal charge. What a buyer is shown is their own records' facts without the kept card's ids; no content is shown to anyone else."
+    },
+    "src/services/adult-assurance.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-18 (Comicland v3 A-3), the node's own read: the service-owned verified-adult record (identity.adult.status) of one account, read to update it and to answer yes or no. It holds no content and no personal data beyond the method and the time."
+    },
+    "src/services/provenance-embed/index.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-18 (Comicland v3 A-8), the node's own read: the caller's own file in the caller's own storage namespace, read to write a marked copy of it back into the same namespace with the same visibility. Its bytes go to no model and to nobody else."
+    },
     "src/services/ai/call-files.ts": {
       "reads": {
         "getStorageFile": 1

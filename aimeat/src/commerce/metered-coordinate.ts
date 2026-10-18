@@ -6,6 +6,7 @@
  *   commerce/session-service.ts, unchanged, when that file passed 800 lines.
  * @structure meteredCoordinateOf(sellable)
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A subscription line is sold under (extension, `subscription`) (Comicland v3 A-5).
  *   v1.0.0 — 2026-10-16 — Moved from session-service.ts.
  */
 import type { Sellable } from './types.js';
@@ -24,6 +25,10 @@ export function meteredCoordinateOf(sellable: Sellable): { ext: string; action: 
   }
   if (sellable.kind === 'ext-call') {
     return { ext: sellable.agentName, action: sellable.offerId };
+  }
+  // Every plan of one extension shares one coordinate; each plan names its own payees (subscriptions.ts).
+  if (sellable.kind === 'subscription') {
+    return { ext: sellable.agentName, action: 'subscription' };
   }
   return null;
 }

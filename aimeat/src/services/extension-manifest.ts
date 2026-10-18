@@ -5,6 +5,8 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-18 — An action may say `public: true`: it answers a caller without an account.
+ *     Refused with a price or a pacing toll (Comicland v3 A-7).
  *   v1.13.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). `commercial.payMorsels` is deprecated and read as pacing; accepted until
  *     4.0.0 and refused with MORSEL_PRICE_REMOVED from it. A `commercial` block may now hold only the
@@ -541,6 +543,16 @@ export function buildExtensionRecordFromManifest(
     // Two values (design: notes doc-r6tyr3o). tollMorsels = pacing per call; commercial.payMoney = the money price.
     const pricingErr = validateActionPricing(action, action.id as string, config);
     if (pricingErr) return pricingErr;
+    // A public action answers a visitor, who can neither pay a price nor be paced (Comicland v3 A-7).
+    if (action.public !== undefined && typeof action.public !== 'boolean') {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: `Action "${action.id as string}": public must be true or false` };
+    }
+    const commercial = action.commercial as Record<string, unknown> | undefined;
+    if (action.public === true && ((isNonNegInt(action.tollMorsels) && action.tollMorsels > 0)
+      || (commercial && (commercial.payMoney !== undefined || commercial.plans !== undefined || commercial.pricesMoney !== undefined)))) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+        message: `Action "${action.id as string}": a public action answers callers without an account, who cannot pay, so it takes no price and no tollMorsels` };
+    }
   }
 
   const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
@@ -677,6 +689,7 @@ export function buildExtensionRecordFromManifest(
         scriptContent: scripts[a.script as string],
         // Pricing (validated above; design notes doc-r6tyr3o).
         ...(a.tollMorsels !== undefined ? { tollMorsels: a.tollMorsels as number } : {}),
+        ...(a.public === true ? { public: true } : {}),
         ...(commercial ? {
           commercial: {
             payMorsels: (commercial.payMorsels as number | undefined) ?? 0,

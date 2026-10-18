@@ -90,6 +90,12 @@ export interface Sellable {
    * such flag is delivered while the checkout completes (commerce/session-claim.ts).
    */
   fulfillsAsTask?: boolean;
+  /**
+   * True when this line's revenue split names its payees per call (a dynamic split on an ext-call):
+   * the checkout books no shares, and the seller's net is split when the paid call runs, by the
+   * payees its result names (services/ext-pay-token.ts; Comicland v3 A-6).
+   */
+  sharesAtUse?: boolean;
 }
 
 /**

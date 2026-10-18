@@ -29,6 +29,8 @@
  * @structure verifyStripeSignature · event mapping · commerceWebhooksRouter
  * @usage app.use(commerceWebhooksRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-18 — checkout.session.completed for the node's hosted card page finishes the AIMEAT checkout
+ *     it was for (commerce/stripe-checkout-complete.ts; Comicland v3 A-4).
  *   2026-10-16 — A delivery with a wrong or missing Stripe signature writes a warn line naming the seller
  *     (never the signature); the refusal log gets it through middleware/refusal-recorder.ts (QA audit E2-08).
  *   v1.1.0 — 2026-10-08 — checkout.session.completed: agent orders from Stripe's Agentic Commerce Suite (AI visibility, layer E).
@@ -48,6 +50,7 @@ import { FinanceError } from '../services/finance/errors.js';
 import { bookVoucher } from '../services/finance/vouchers.js';
 import { markPaid } from '../services/finance/invoice-service.js';
 import { intakeAgentOrder } from '../commerce/agent-order-intake.js';
+import { completeFromStripeCheckout } from '../commerce/stripe-checkout-complete.js';
 
 const TOLERANCE_SECONDS = 300;
 
@@ -160,6 +163,12 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
             booked = { action: 'charge_booked', voucherId: voucher.id };
           }
         }
+      } else if (event.type === 'checkout.session.completed' && typeof (object.metadata as Record<string, unknown> | undefined)?.aimeat_session === 'string') {
+        // A person paid on the node's hosted card page and did not come back: finish the AIMEAT
+        // checkout the payment was for (commerce/stripe-checkout.ts). Completion reads the payment
+        // back from Stripe itself, so nothing in this delivery is taken as proof.
+        const r = await completeFromStripeCheckout(storage, config, ownerGhii, object);
+        booked = { action: r };
       } else if (event.type === 'checkout.session.completed') {
         // An AI shopping agent's order through Stripe's Agentic Commerce Suite becomes an order and
         // its fulfilment here (commerce/agent-order-intake.ts). Any other checkout is left alone;

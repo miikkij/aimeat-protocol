@@ -15,6 +15,9 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v2.2.0 — 2026-10-18 — Step 4: a spent pay token whose sale carries the seller's net (a dynamic
+ *     split) answers with `accrue`, so the payees the call's result names are paid out of it; they
+ *     were dropped on this path (Comicland v3 A-6).
  *   v2.1.0 — 2026-10-17 — Step 3.6: with no contract held, an action that only free app-tools sell (a
  *     pacing amount, no money price) is paced at the highest of their amounts and runs; only a money
  *     price answers 402. A contract the caller holds is still settled first. Every offered tool answered
@@ -62,7 +65,8 @@ import type { Storage } from '../../storage/interface.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
-import { consumeExtPayToken } from '../../services/ext-pay-token.js';
+import { consumeExtPayToken, accrueTokenShare } from '../../services/ext-pay-token.js';
+import type { DynamicDesignation } from '../../commerce/beneficiary-split.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
 import { getCarryPlan } from '../../services/app-members.js';
 import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
@@ -508,6 +512,12 @@ export async function enforcePaywall(args: {
       ...paymentChallenge(config) });
     return { ok: false };
   }
-  // Token valid and consumed: money settled. When the script throws, the pacing comes back.
-  return { ok: true, ...(paced.charge ? { refund: paced.charge.reverse } : {}) };
+  // Token valid and consumed: money settled. When the script throws, the pacing comes back. A sale
+  // whose split names its payees per call is split now, by the payees this call's result names.
+  const grant = consumed.grant;
+  const tokenUsed = payToken ?? '';
+  return {
+    ok: true, ...(paced.charge ? { refund: paced.charge.reverse } : {}),
+    ...(grant?.share ? { accrue: (designations?: DynamicDesignation[]) => accrueTokenShare(storage, grant, tokenUsed, designations) } : {}),
+  };
 }
