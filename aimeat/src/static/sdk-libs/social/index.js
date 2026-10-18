@@ -11,6 +11,8 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-social.js"></script>
  *   await AIMEAT.social.post('general', { title: 'Hi', body: 'Hello!' });
  * @version-history
+ *   v1.3.0 — 2026-10-18 — createBoard() sends a visibility only when the app names one; the node
+ *     applies its starting level otherwise (plan doc-mvcn6c7e4e5q, V5.3).
  *   v1.2.0 — 2026-09-06 — unreact(): take your own reaction back. Nothing in the platform could,
  *     so every app that drew a heart drew a one-way door and a mis-tap was permanent.
  *   v1.1.0 — 2026-08-30 — Boards are Core again (RFC §27): updatePost (resolve a notice or move its
@@ -31,9 +33,11 @@ async function publicFetch(path) {
 const social = {
   // ── Boards ──
 
-  // Create a new board
+  // Create a new board. opts.visibility is sent only when the app names one; without it the node
+  // applies its starting level for a board (visibility.board_default, public unless the operator
+  // chose otherwise).
   async createBoard(name, opts) {
-    const body = { name, visibility: 'public', ...opts };
+    const body = { name, ...opts };
     const res = await authFetch('/v1/boards', { method: 'POST', body: JSON.stringify(body) });
     if (!res.ok) throw new Error(res.error?.message || 'Failed to create board');
     return res.data;

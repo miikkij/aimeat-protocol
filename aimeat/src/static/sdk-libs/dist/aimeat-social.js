@@ -59,9 +59,11 @@
   }
   var social = {
     // ── Boards ──
-    // Create a new board
+    // Create a new board. opts.visibility is sent only when the app names one; without it the node
+    // applies its starting level for a board (visibility.board_default, public unless the operator
+    // chose otherwise).
     async createBoard(name, opts) {
-      const body = { name, visibility: "public", ...opts };
+      const body = { name, ...opts };
       const res = await authFetch2("/v1/boards", { method: "POST", body: JSON.stringify(body) });
       if (!res.ok) throw new Error(res.error?.message || "Failed to create board");
       return res.data;

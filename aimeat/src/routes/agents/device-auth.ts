@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-18 — A new agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   v1.11.3 — 2026-10-09 — A device-token poll on an expired row clears its credentials and deletes
  *     it, approved rows included (secrets audit 2026-10-09, 1.3).
  *   v1.11.2 — 2026-10-05 — The approving owner token must be the owner in person (isOwnerInPerson;
@@ -99,6 +100,7 @@ import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
 import { uncoveredScopes, scopeIsCovered, SCOPES_OUTSIDE_WILDCARD, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { recordAgentScopeRequest } from '../../services/agent-refusals.js';
+import { agentListingTags } from '../../services/content-defaults.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -205,6 +207,8 @@ async function approveDeviceAuth(
       createdAt: now,
       lastSeen: now,
       mode: request.mode ?? 'interactive',
+      // Tagged `unlisted` when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
+      ...agentListingTags(config),
       // Who asked for this agent: the owner's name when a person approved on the consent screen,
       // the approving sibling's GAII when same-owner auto-approval did. The same value goes on the
       // device-authorization record as `approvedBy`, and that record is swept when it expires — so

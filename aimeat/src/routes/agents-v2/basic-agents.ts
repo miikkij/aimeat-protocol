@@ -36,6 +36,7 @@
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   2026-10-18 — A basic agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   2026-10-15 — Each basic agent runs pre_agent_registration (a refused one is skipped and named) and post_agent_registration (feature-list audit 89).
  *   v1.5.0 — 2026-10-12 — The GET asks agent:read from 4.0.0, the word of the fleet list.
  *   v1.4.0 — 2026-10-02 — A created basic agent carries its template's `taskStart`.
@@ -66,6 +67,7 @@ import { executeHooks } from '../../services/hooks.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { recordAccountEvent } from '../../services/account-events.js';
 import { logger } from '../../utils/logger.js';
+import { agentListingTags } from '../../services/content-defaults.js';
 
 // The capability name and the wait live with the sequence that uses them
 // (services/agent-enrolment-offer.ts). Re-exported here because the migration route imported them
@@ -201,7 +203,8 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
         mode: template.mode,
         // Whether its tasks start on their own: the template's answer, the owner's to change later.
         taskStart: template.taskStart,
-        tags: template.tags,
+        // `unlisted` too when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
+        ...agentListingTags(config, template.tags),
         runMode: template.runMode,
         identityVersion: 2,
         // The creation ledger: a person pressed a button on their own account.

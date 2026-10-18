@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Board starting level — 2026-10-18 — BoardCreateSchema.visibility is optional; the service gives an
+ *     absent one the node's starting level (services/content-defaults.ts; plan doc-mvcn6c7e4e5q, V5.3).
  *   Organisation boards — 2026-10-17 — BoardCreateSchema.visibility also takes `organism:<id>`; the
  *     service decides membership (services/board-write.ts; plan doc-mvcn6c7e4e5q, V3.5).
  *   Organism visibility — 2026-10-17 — MemoryWriteSchema, MemoryUpdateSchema and ChunkedUploadInitSchema
@@ -283,11 +285,12 @@ export const BoardRulesSchema = z.object({
 
 export const BoardCreateSchema = z.object({
     name: z.string().min(1).max(128),
-    // `organism:<id>` is the form services/audience.ts parseAudience reads.
+    // `organism:<id>` is the form services/audience.ts parseAudience reads. Absent: the node's
+    // starting level for a board, visibility.board_default (plan doc-mvcn6c7e4e5q, V5.3).
     visibility: z.union([
         z.enum(['private', 'shared', 'public', 'system']),
         z.string().regex(/^organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
-    ]),
+    ]).optional(),
     description: z.string().max(10_000).optional(),
     allowed_gaiis: z.array(z.string()).optional(),
     federate: z.boolean().optional(),

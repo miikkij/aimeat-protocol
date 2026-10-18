@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-18 — aimeat_memory_write without a visibility takes visibility.memory_default (plan V5.1).
  *   2026-10-18 — aimeat_memory_write asks the publish gate: a public write without publish:public is
  *     stored at the level it had and answers with `publish_request` (plan doc-mvcn6c7e4e5q, V4.4).
  *   2026-10-16 — aimeat_action_execute says, on PEER_REFUSED, which node refused the work, the HTTP status it answered and its own answer (workErrorText), since the MCP result carries no details (decision 2026-10-16).
@@ -197,6 +198,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { presentWorkCost } from '../services/morsel.js';
 import { presentActionPricing } from '../services/action-pacing.js';
+import { memoryVisibilityDefault } from '../services/content-defaults.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -485,7 +487,8 @@ export function registerCoreTools(
         zodShapeFor('aimeat_memory_write'),
         annotationsFor('aimeat_memory_write'),
         async ({ key, value, visibility: givenVisibility, group_id, tags: givenTags, ttl_hours, owner_scope, expected_version, ai_provenance, ai_provenance_id }) => {
-            const visibility = givenVisibility ?? 'private';
+            // No visibility named: the node's starting level (plan V5.1), as POST /v1/memory.
+            const visibility = givenVisibility ?? memoryVisibilityDefault(config);
             const tags = givenTags ?? [];
             // ONE implementation, and it is not this one. services/memory-write.ts owns the scope
             // gate, the schema lock, the version check, the shadowing warning, the provenance stamp,

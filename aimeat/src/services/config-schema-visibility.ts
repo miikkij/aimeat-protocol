@@ -9,6 +9,7 @@
  * @structure VISIBILITY_CONFIG_FIELDS
  * @usage import { VISIBILITY_CONFIG_FIELDS } from './config-schema-visibility.js';
  * @version-history
+ *   v1.8.0 — 2026-10-18 — The content starting levels (config-schema-content-defaults.ts, plan V5) spread in.
  *   v1.7.0 — 2026-10-18 — visibility.publish_gate (off | agents | agents-and-apps), plan V4.
  *   v1.6.0 — 2026-10-17 — apps.default_listing, apps.default_access, apps.default_access_code (V2.4).
  *   v1.5.0 — 2026-10-17 — visibility.content_access (open | signed-in), plan doc-mvcn6c7e4e5q V1.
@@ -21,6 +22,7 @@
 import type { VisibilityConfig } from '../config-visibility.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf } from './config-schema-validators.js';
+import { CONTENT_DEFAULT_CONFIG_FIELDS } from './config-schema-content-defaults.js';
 
 export const VISIBILITY_CONFIG_FIELDS: ConfigFieldShape<keyof VisibilityConfig>[] = [
   { key: 'aiVisibilityEnabled', dotPath: 'visibility.ai', envVar: 'AIMEAT_AI_VISIBILITY', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Count, for every owner, where the people who open their pages and apps came from (an AI answer, search, social, another site), which AIs fetched what, who read the discovery files, and which purchases followed. Counts only: no address, cookie or visitor id, so no consent banner is needed. Each owner can switch it off for their own place; off here is off for everybody' },
@@ -33,4 +35,6 @@ export const VISIBILITY_CONFIG_FIELDS: ConfigFieldShape<keyof VisibilityConfig>[
   { key: 'appDefaultAccess', dotPath: 'apps.default_access', envVar: 'AIMEAT_APP_DEFAULT_ACCESS', type: 'string', ...oneOf('anyone', 'signed-in'), immutable: false, description: 'Who may OPEN a new app the first time it is published. anyone: the link opens it. signed-in: only people signed in to an account of this node (the app asks the others to sign in first). The owner can change it per app, also to the members of one organism. A later publish keeps what the owner chose', range: 'anyone|signed-in' },
   { key: 'appDefaultAccessCode', dotPath: 'apps.default_access_code', envVar: 'AIMEAT_APP_DEFAULT_ACCESS_CODE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'A NEW app gets an access code of its own the first time it is published, and the publish answer tells the publisher the code. Whoever opens the app types it first. Off by default. A later publish keeps what the owner chose' },
   { key: 'publishGate', dotPath: 'visibility.publish_gate', envVar: 'AIMEAT_PUBLISH_GATE', type: 'string', ...oneOf('off', 'agents', 'agents-and-apps'), immutable: false, description: 'Who must ask the owner before making something public to anyone: a record, a file, a workspace page anyone with the link reads, an app anyone may open, a board, a skill, a package. off: whoever may write it may make it public. agents: an agent needs the publish:public permission, which the owner ticks separately and full access does not include; without it the agent\'s attempt waits as a request the owner approves or declines, and the agent gets the address to pass on. agents-and-apps: an app needs the same permission on its consent screen. The owner in person is never asked', range: 'off|agents|agents-and-apps' },
+  // The level content gets when its caller names none (plan V5).
+  ...CONTENT_DEFAULT_CONFIG_FIELDS,
 ];

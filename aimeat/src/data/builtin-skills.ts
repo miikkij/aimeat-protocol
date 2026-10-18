@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-18 -- aimeat-node-guide: a write with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5).
  *   2026-10-18 -- use-app-bound-skills: a public app guide may wait for the owner's approval (publish_request; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 -- manage-my-profile-data: the visibility ladder names organism:<id> (one organism's members) and says members and organism never leave the node (plan V3.2).
  *   2026-10-16 -- aimeat-node-guide: the account that would become the operator of a node others can reach needs the one-time setup code while it has none (Jouni, 2026-10-16).
@@ -318,7 +319,8 @@ Everything is a memory record under an identity, keyed by namespaced paths
 (\`settings.\`, \`agents.{name}.\`, \`organism.{org}.w.{ws}.\`). Read/write via
 \`GET|POST /v1/memory\` or \`aimeat_memory_read|write|list|search\`. Visibility ladder:
 private < owner < group < workspace < members < public. Raise visibility only with the
-owner's explicit confirmation.
+owner's explicit confirmation. A write that names no visibility gets the level this node gives new
+content, which its operator sets (private for a record unless the operator chose otherwise).
 
 ## Skills — load expertise on demand
 

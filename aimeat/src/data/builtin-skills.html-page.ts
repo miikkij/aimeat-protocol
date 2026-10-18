@@ -14,6 +14,7 @@
  * @structure HTML_PAGE_SKILL_ENTRY
  * @usage import { HTML_PAGE_SKILL_ENTRY } from './builtin-skills.html-page.js';
  * @version-history
+ *   v1.5.0 — 2026-10-18 — A first share without `access` gets the node's starting level; `share.access` says which (plan doc-mvcn6c7e4e5q, V5.5).
  *   v1.4.0 — 2026-10-18 — Sharing names `publish_request`: when the node asks the person first, the link
  *     opens on their approval and the agent hands over the `approve_url` (plan doc-mvcn6c7e4e5q, V4).
  *   v1.3.0 — 2026-10-17 — A share can be for the organisation's members only (access `organism`, plan V3.4).
@@ -67,7 +68,10 @@ chart, a page with pictures. Choose something else when:
    published pages are ever shown outside. A page keeps its last five versions.
 3. **Share it**: \`aimeat_workspace_share\` with \`space\`, \`id\` and \`shared: true\` (and \`access\` when the
    person wants a password, signed-in readers only (\`account\`), or the organisation's members only
-   (\`organism\`)). Give the person the \`viewer_url\` from the
+   (\`organism\`)). A workspace shared for the first time without \`access\` gets the level this node
+   gives a first share: anyone with the link unless the operator chose otherwise. The answer's
+   \`share.access\` says which, so pass \`access: "open"\` when the person wants anyone to read it.
+   Give the person the \`viewer_url\` from the
    answer. A link to an HTML page ends after 90 days unless you pass \`until\` (an ISO date, or "none");
    say so, and when it ends (\`ends_at\`). The answer also carries \`window_url\`: the same page alone
    in the whole browser window, with only its AI label at the bottom-left. Give that one when the

@@ -14,6 +14,7 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   v1.8.0 -- 2026-10-18 -- The first account's app agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   v1.7.2 -- 2026-10-16 -- ALREADY_CONFIGURED no longer clears the setup code: while the node has no
  *     operator the self-heal paths still need it (Jouni, 2026-10-16).
  *   v1.7.1 -- 2026-10-16 -- The code refusal is setupCodeRefusal (services/setup-code.ts), the one the
@@ -59,6 +60,7 @@ import { errorFields } from '../utils/error-fields.js';
 import { writePrivateFile } from '../utils/private-file.js';
 import { parseSetupNodeSettings, buildSetupEnv, setupSettingOutcomes, setupMessage, type SetupEnvWrite } from '../services/setup-env.js';
 import { setupCodeGateFor, setupCodeRequired, setupCodeRefusal, SETUP_CODE_USED_MESSAGE } from '../services/setup-code.js';
+import { agentListingTags } from '../services/content-defaults.js';
 
 const __dirname_setup = dirname(fileURLToPath(import.meta.url));
 
@@ -280,6 +282,8 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
                 morselBalance: config.welcomeBonus,
                 createdAt: now,
                 lastSeen: now,
+                // Tagged `unlisted` when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
+                ...agentListingTags(config),
             });
 
             // 5. Write .env file with config values (best effort), at mode 0600: it is the file the

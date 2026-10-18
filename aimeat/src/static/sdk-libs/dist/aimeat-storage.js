@@ -53,6 +53,10 @@
 
   // src/static/sdk-libs/storage/index.js
   var { getSession: getSession2, authFetch: authFetch2 } = makeSession("aimeat-storage.js");
+  function levelOf(opts) {
+    if (opts && opts.visibility) return opts.visibility;
+    return opts && opts.nodeDefault === true ? void 0 : "private";
+  }
   function binding(opts) {
     const o = opts || {};
     const refs = o.workspaceRefs || o.workspace_refs;
@@ -75,7 +79,7 @@
         );
         key = opts?.key || file.name || "file-" + Date.now();
         mime_type = opts?.mime_type || file.type || "application/octet-stream";
-        visibility = opts?.visibility || "private";
+        visibility = levelOf(opts);
         const buf = await file.arrayBuffer();
         const bytes = new Uint8Array(buf);
         let binary = "";
@@ -87,7 +91,7 @@
         key = opts?.key || "file-" + Date.now();
         data = fileOrData;
         mime_type = opts?.mime_type || "application/octet-stream";
-        visibility = opts?.visibility || "private";
+        visibility = levelOf(opts);
       } else {
         throw new Error("upload() expects a File, Blob, or base64 string");
       }
@@ -196,7 +200,7 @@
       const chunkSize = opts?.chunkSize || 1024 * 1024;
       const key = opts?.key || file.name || "file-" + Date.now();
       const mime_type = opts?.mime_type || file.type || "application/octet-stream";
-      const visibility = opts?.visibility || "private";
+      const visibility = levelOf(opts);
       const totalChunks = Math.ceil(file.size / chunkSize);
       const initRes = await authFetch2("/v1/storage/upload/init", {
         method: "POST",

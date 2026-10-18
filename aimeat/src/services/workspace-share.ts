@@ -25,6 +25,8 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.5.0 — 2026-10-18 — A share made for the first time without `access` takes
+ *     visibility.share_access_default (code default open; plan doc-mvcn6c7e4e5q, V5.5), before the gate.
  *   v1.4.0 — 2026-10-18 — setWorkspaceShareOp takes `publishGate`, the door's caller (plan
  *     doc-mvcn6c7e4e5q, V4): a change that lets anyone with the link read what they could not (access
  *     set to open, or a target shared under open access), by an agent without publish:public, is
@@ -46,6 +48,7 @@ import type { ShareAccess, ShareMeta, ResolvedShare } from '../routes/organisms/
 import { readWorkspaceMetaRecord, findWorkspaceRegistration } from './workspace-meta-read.js';
 import { findWorkspaceRecord } from './workspace-write.js';
 import { hashPassword } from './password.js';
+import { shareAccessDefault } from './content-defaults.js';
 import { newIcsKey } from './calendar-feed.js';
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
@@ -218,7 +221,8 @@ export async function setWorkspaceShareOp(
         }
     }
 
-    const prev = await readShareMetaOf(storage, config, orgId, ws);
+    const stored = await readWorkspaceMetaRecord(storage, orgId, ws, 'meta.share', config.nodeId);
+    const prev = resolveShare(stored?.value as ShareMeta | undefined);
     const nextHash = typeof body.password === 'string' ? await hashPassword(body.password)
         : body.password === null ? null : prev.passwordHash;
     const feedKey = body.ics_key === true ? newIcsKey() : null;
@@ -240,7 +244,9 @@ export async function setWorkspaceShareOp(
         public: typeof body.public === 'boolean' ? body.public : prev.public,
         spaces: { ...prev.spaces, ...((body.spaces as Record<string, boolean> | undefined) ?? {}) },
         docs: { ...prev.docs, ...docsIn },
-        access: (body.access as ShareAccess | undefined) ?? prev.access,
+        // A share made for the first time without `access` takes the node's starting level (plan
+        // V5.5), decided here so the publish gate below sees it; a later change keeps the stored one.
+        access: (body.access as ShareAccess | undefined) ?? (stored ? prev.access : shareAccessDefault(config)),
         passwordHash: nextHash,
         icsKeyHash: feedKey ? feedKey.hash : body.ics_key === null ? null : prev.icsKeyHash,
         until,
@@ -262,8 +268,8 @@ export async function setWorkspaceShareOp(
     if (next.access === 'password' && !next.passwordHash) return refuse(400, 'INVALID_INPUT', "access 'password' requires a password to be set; the share stays password-protected until the owner approves opening it");
 
     const key = `organism.${orgId}.w.${ws}.meta.share`;
-    const existing = await readWorkspaceMetaRecord(storage, orgId, ws, 'meta.share', config.nodeId);
-    const now = new Date(nowMs).toISOString();
+    const existing = stored;
+    const now =new Date(nowMs).toISOString();
     const version = existing ? existing.version + 1 : 1;
     await storage.setMemory({
         key, ownerGaii: existing?.ownerGaii ?? reg.record.ownerGaii, value: next, visibility: 'private', tags: ['share'], ttlHours: null,

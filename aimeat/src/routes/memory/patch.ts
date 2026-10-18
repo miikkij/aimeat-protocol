@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-18 — A PATCH that creates the record without a visibility takes visibility.memory_default
+ *     (code default private; plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — visibility 'public' asks the publish gate: an agent without publish:public patches
  *     the record at the level it had and gets 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4.4).
  *   2026-10-17 — visibility 'organism:<id>' naming an organism the writer's account is not an active
@@ -66,6 +68,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { resolveIdentity, isForeignPrincipal, ownerGhiiOf } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
+import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from '../../services/publish-requests/ask.js';
 import { callerOf } from '../../middleware/caller.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
@@ -235,6 +238,10 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       priorVisibility = existing?.visibility;
       askedToPublish = publishAsk.kind === 'ask' && isRaiseToPublic(existing?.visibility, visibility);
       const wantVisibility = askedToPublish ? undefined : visibility;
+      // The level the patched record ends at: the one named, else the one it had, else (a new record)
+      // the node's starting level (plan V5.1); a new record held back by the publish gate is private.
+      const levelAfter = (wantVisibility ?? existing?.visibility
+        ?? (askedToPublish ? 'private' : memoryVisibilityDefault(config))) as MemoryRecord['visibility'];
 
       if (if_version !== undefined && (existing?.version ?? 0) !== if_version) {
         res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT',
@@ -312,7 +319,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         mediaKind: mediaKindOfValue(merged),
         pipeline: 'memory.patch',
         surface: {
-          visibility: (wantVisibility ?? existing?.visibility ?? 'private') as MemoryRecord['visibility'],
+          visibility: levelAfter,
           humanAudience: true,
         },
         labelPolicy: config.aiLabelPublic,
@@ -329,7 +336,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         ownerGaii: gaii,
         value: merged,
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
-        visibility: (wantVisibility ?? existing?.visibility ?? 'private') as MemoryRecord['visibility'],
+        visibility: levelAfter,
         tags: Array.isArray(tags) ? tags : (existing?.tags ?? []),
         ttlHours: ttl_hours ?? existing?.ttlHours ?? null,
         version: existing ? existing.version + 1 : 1,

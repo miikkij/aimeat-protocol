@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
  *   2026-10-18 -- e2e-page-access.ts joins the list (not the guard tier): who may open a welcome page and a company front page (V3.10).
+ *   2026-10-18 -- e2e-content-defaults.ts joins the list (not the guard tier): the node's starting levels for content.
  *   2026-10-18 -- e2e-publish-gate-files.ts joins the list (not the guard tier): the publish gate on stored files and on memory bulk, import and copy.
  *   2026-10-18 -- e2e-publish-gate-packages.ts joins the list (not the guard tier): the publish gate on packages, knowledge packages and data packages.
  *   2026-10-18 -- e2e-publish-gate-shared.ts joins the list (not the guard tier): the publish gate on organisms, boards, skills, cortex libraries and workspace shares.
@@ -968,6 +969,8 @@ const ALL_SUITES = [
     'test/e2e-publish-gate-shared.ts',
     // The same gate on apps (listing, open_to, access code, first publish, fork), the welcome page and a company's front page (V4).
     'test/e2e-publish-gate-apps.ts',
+    // The level content gets when its writer names none, set by the operator (plan doc-mvcn6c7e4e5q, V5).
+    'test/e2e-content-defaults.ts',
     'test/e2e-anonymous-identity-leaks.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-organism-dangling-refs.ts',

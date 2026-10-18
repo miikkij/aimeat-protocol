@@ -12,6 +12,7 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.8.0 — 2026-10-18 — The content starting levels (config-content-defaults.ts, plan V5) ride along: VisibilityConfig extends ContentDefaultsConfig.
  *   v1.7.0 — 2026-10-18 — publishGate: who asks the owner before making something public (V4).
  *   v1.6.0 — 2026-10-17 — appDefaultListing, appDefaultAccess, appDefaultAccessCode: how a new app starts.
  *   v1.5.0 — 2026-10-17 — contentAccess: 'signed-in' serves the node's content to its own accounts only.
@@ -22,8 +23,13 @@
  *   v1.0.0 — 2026-10-08 — Initial: aiVisibilityEnabled (layer A).
  */
 
-/** Declared here, not picked from AimeatConfig, so this file imports nothing (config-decide.ts gives the reason). */
-export interface VisibilityConfig {
+import { contentDefaults, type ContentDefaultsConfig } from './config-content-defaults.js';
+
+/**
+ * Declared here, not picked from AimeatConfig, so this file imports nothing but
+ * config-content-defaults.ts, which imports nothing either (config-decide.ts gives the reason).
+ */
+export interface VisibilityConfig extends ContentDefaultsConfig {
   /**
    * Layer A: count page loads by channel, AI fetches by family and target, discovery-file fetches and
    * purchases by channel, for every owner on this node unless the owner switches it off. On by
@@ -105,5 +111,6 @@ export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): Visibi
     appDefaultAccessCode: env.AIMEAT_APP_DEFAULT_ACCESS_CODE === 'true',
     publishGate: env.AIMEAT_PUBLISH_GATE === 'agents' || env.AIMEAT_PUBLISH_GATE === 'agents-and-apps'
       ? env.AIMEAT_PUBLISH_GATE : 'off',
+    ...contentDefaults(env),
   };
 }
