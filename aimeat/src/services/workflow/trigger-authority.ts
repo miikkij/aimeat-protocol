@@ -25,6 +25,8 @@
  *   const refused = await refuseTriggerStart({ storage, config }, ownerGhii, def);
  *   if (refused) return { runId: refused.runId, skipped: true, refused: refused.reason };
  * @version-history
+ *   v1.2.0 — 2026-10-18 — The open-refusal list is written on its version (editOpen over record-cas.ts
+ *     updateRecord), since the lock holds within one process only (atomic-write round).
  *   v1.1.1 — 2026-09-26 — An agent saver's account comes from localAccountOf, so a saver of another
  *     node never has its tokens looked up under the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-26 — "Run as me" and "Approve again" carry their own locale keys, so the bell and
@@ -39,6 +41,7 @@ import { logger } from '../../utils/logger.js';
 import { notify, type NotifAction } from '../notify.js';
 import { emitChange } from '../event-bus.js';
 import { runKey } from './store.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { loc } from './engine-util.js';
 import { missingStepScopes } from './step-authority.js';
 import type { WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowSaver } from '../../models/workflow-schemas.js';
@@ -122,19 +125,17 @@ async function readOpen(storage: Storage, nodeId: string): Promise<OpenRefusal[]
   return Array.isArray(value) ? value as OpenRefusal[] : [];
 }
 
-/** Rewrite the list of open refusals, one read-modify-write at a time across every workflow. */
+/**
+ * Rewrite the list of open refusals, one read-modify-write at a time across every workflow. The lock
+ * holds within one process; the write is on the list's version (record-cas.ts updateRecord), so an
+ * edit from another node process at the same moment is applied to rather than written over.
+ */
 async function editOpen(storage: Storage, nodeId: string, edit: (entries: OpenRefusal[]) => OpenRefusal[] | null): Promise<void> {
   await withLock(OPEN_KEY, async () => {
-    const owner = `system@${nodeId}`;
-    const existing = await storage.getMemory(owner, OPEN_KEY);
-    const entries = Array.isArray(existing?.value) ? existing!.value as OpenRefusal[] : [];
-    const next = edit(entries);
-    if (!next) return;
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key: OPEN_KEY, ownerGaii: owner, value: next, visibility: 'private', tags: ['workflow-index'], ttlHours: null,
-      version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-    });
+    await updateRecord<OpenRefusal[]>(storage, `system@${nodeId}`, OPEN_KEY,
+      (v) => (Array.isArray(v) ? v as OpenRefusal[] : []),
+      (entries) => edit(entries) ?? UNCHANGED,
+      { tag: 'workflow-index' });
   });
 }
 

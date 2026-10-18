@@ -759,7 +759,7 @@
     },
     "src/services/agent-refusals.ts": {
       "reads": {
-        "getMemory": 5,
+        "getMemory": 3,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-30, the node's own read: the node's refusal notes and approval records for an owner's agents (audit.agents.*, a reserved prefix only this service writes), read to update them and to show them to that owner and the agent itself; no content anybody authored."
@@ -951,7 +951,7 @@
     },
     "src/services/app-dev-grant.ts": {
       "reads": {
-        "getMemory": 3
+        "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App-dev grant records in a system namespace."
     },
@@ -1132,7 +1132,7 @@
     },
     "src/services/classification/default-caps.ts": {
       "reads": {
-        "getMemory": 3
+        "getMemory": 2
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L5.1), the node's own read: the start step's record and the node's stored classification policy under system@<node>, to decide once whether the node is new and to write an approved cap into the policy. No content."
     },
@@ -1350,7 +1350,7 @@
     },
     "src/services/decide/gate.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The decide gate-settings record."
     },
@@ -1595,7 +1595,7 @@
     },
     "src/services/finance/accountant-access.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Accountant and client access lists."
     },
@@ -1652,15 +1652,20 @@
     },
     "src/services/install-set-apply.ts": {
       "reads": {
-        "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records."
     },
+    "src/services/install-set-run.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-18 (atomic-write round), the node's own read: the applied install-set record in the install-sets system namespace, read to claim one run of a set and to write its end on the version read. The record reads moved here from install-set-apply.ts. No content."
+    },
     "src/services/install-set-trust.ts": {
       "reads": {
         "listMemory": 1,
-        "getMemory": 2
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records, read for repository node ids. 2026-10-02 (package sale design, phase 3): the claimed-repositories record in the same install-sets system namespace, a list of repository node ids the operator redeemed a claim at."
     },
@@ -2033,7 +2038,7 @@
     },
     "src/services/portfolio-config.ts": {
       "reads": {
-        "getMemory": 4,
+        "getMemory": 2,
         "getStorageFileMeta": 1
       },
       "why": "Reviewed 2026-10-18, moved from src/routes/portfolio.ts by pure extraction: the owner's own portfolio config record (portfolio.config), read to merge a settings write and to tell whether the page is switched on, and when the stored page was written (metadata only), for the publish gate. No content is shown to anyone."
@@ -2242,7 +2247,7 @@
     },
     "src/services/skills.ts": {
       "reads": {
-        "getMemory": 10,
+        "getMemory": 9,
         "listMemory": 8
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Skill bodies and manifests pass the reader (skill-reader.ts) in listing, resolve and pinned reads; publish, delete, visibility, version lists and links are the node's own."
@@ -2433,7 +2438,7 @@
     },
     "src/services/workflow/trigger-authority.ts": {
       "reads": {
-        "getMemory": 4
+        "getMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The system open-refusals index and refused-run state."
     },

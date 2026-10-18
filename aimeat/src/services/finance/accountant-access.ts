@@ -19,30 +19,40 @@
  *   resolveFinanceOwner
  * @usage const owner = await resolveFinanceOwner(config, storage, req);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Both lists are written on the version that was read (updateRecord), so a
+ *     grant and a revoke at the same moment each apply to what the other wrote.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 6.
  */
 import type { Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { FinanceError } from './errors.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 
 const ACCOUNTANTS_KEY = 'finance.accountants';
 const CLIENTS_KEY = 'finance.clients';
 const NAME_RE = /^[a-z0-9_-]{1,60}$/i;
 
 async function readList(storage: Storage, ownerGhii: string, key: string): Promise<string[]> {
-  const rec = await storage.getMemory(ownerGhii, key);
-  const value = rec?.value as { list?: unknown } | undefined;
-  return Array.isArray(value?.list) ? (value!.list as string[]).filter((s) => typeof s === 'string') : [];
+  return listOf((await storage.getMemory(ownerGhii, key))?.value);
 }
 
-async function writeList(storage: Storage, ownerGhii: string, key: string, list: string[]): Promise<void> {
-  const existing = await storage.getMemory(ownerGhii, key);
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key, ownerGaii: ownerGhii, value: { list }, visibility: 'private', tags: ['finance'], ttlHours: null,
-    version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-  });
+const listOf = (v: unknown): string[] => {
+  const value = v as { list?: unknown } | undefined;
+  return Array.isArray(value?.list) ? (value!.list as string[]).filter((s) => typeof s === 'string') : [];
+};
+
+/**
+ * Change one list on the version that was read (record-cas.ts updateRecord): two grants, or a grant
+ * and a revoke, at the same moment each apply to the list the other wrote. `edit` answers the new
+ * list, or null to write nothing. Answers the list as stored.
+ */
+async function editList(storage: Storage, ownerGhii: string, key: string, edit: (list: string[]) => string[] | null): Promise<string[]> {
+  const stored = await updateRecord(storage, ownerGhii, key, (v) => ({ list: listOf(v) }), (cur) => {
+    const next = edit([...cur.list]);
+    return next ? { list: next } : UNCHANGED;
+  }, { tag: 'finance' });
+  return stored.list;
 }
 
 /** Grants the accountant role to a local owner. Both sides of the pair are written. */
@@ -53,26 +63,18 @@ export async function grantAccountant(config: AimeatConfig, storage: Storage, gr
   const accountantGhii = `${accountantName}@${config.nodeId}`;
   if (accountantGhii === granterGhii) throw new FinanceError('INVALID_ACCOUNTANT', 422, 'You already read your own books');
 
-  const accountants = await readList(storage, granterGhii, ACCOUNTANTS_KEY);
-  if (!accountants.includes(accountantGhii)) {
-    accountants.push(accountantGhii);
-    await writeList(storage, granterGhii, ACCOUNTANTS_KEY, accountants);
-  }
-  const clients = await readList(storage, accountantGhii, CLIENTS_KEY);
-  if (!clients.includes(granterGhii)) {
-    clients.push(granterGhii);
-    await writeList(storage, accountantGhii, CLIENTS_KEY, clients);
-  }
+  const accountants = await editList(storage, granterGhii, ACCOUNTANTS_KEY,
+    (list) => (list.includes(accountantGhii) ? null : [...list, accountantGhii]));
+  await editList(storage, accountantGhii, CLIENTS_KEY,
+    (list) => (list.includes(granterGhii) ? null : [...list, granterGhii]));
   return accountants;
 }
 
 /** Revokes the role; the authoritative list is what enforces, the mirror just follows. */
 export async function revokeAccountant(config: AimeatConfig, storage: Storage, granterGhii: string, accountantName: string): Promise<string[]> {
   const accountantGhii = `${accountantName}@${config.nodeId}`;
-  const accountants = (await readList(storage, granterGhii, ACCOUNTANTS_KEY)).filter((g) => g !== accountantGhii);
-  await writeList(storage, granterGhii, ACCOUNTANTS_KEY, accountants);
-  const clients = (await readList(storage, accountantGhii, CLIENTS_KEY)).filter((g) => g !== granterGhii);
-  await writeList(storage, accountantGhii, CLIENTS_KEY, clients);
+  const accountants = await editList(storage, granterGhii, ACCOUNTANTS_KEY, (list) => list.filter((g) => g !== accountantGhii));
+  await editList(storage, accountantGhii, CLIENTS_KEY, (list) => list.filter((g) => g !== granterGhii));
   return accountants;
 }
 

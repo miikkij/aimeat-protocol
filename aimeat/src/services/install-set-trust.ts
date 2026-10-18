@@ -18,6 +18,7 @@
  *   install set on this node names that repository (the records in the system namespace below).
  * @structure NS_INSTALL_SETS · installSetRepositories() · rememberClaimedRepository()
  * @version-history
+ *   v1.4.0 — 2026-10-18 — rememberClaimedRepository writes on the record's version (record-cas.ts).
  *   v1.3.0 — 2026-10-10 — The start-up apply's record is recognised by `via: 'startup'`, not by
  *     `applied_by`, which an owner account named "startup" could write (secaudit 2026-10-10, I18).
  *   v1.2.1 — 2026-10-05 — The applying account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
@@ -30,6 +31,7 @@
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 /** The system namespace of the applied install set records (install-set-apply.ts). */
 export const NS_INSTALL_SETS = 'install-sets';
@@ -73,14 +75,9 @@ export async function installSetRepositories(storage: Storage): Promise<Set<stri
  * does: redeeming a code for this node is the same deliberate decision to take packages from it.
  */
 export async function rememberClaimedRepository(storage: Storage, nodeId: string): Promise<void> {
-    const prev = await storage.getMemory(NS_INSTALL_SETS, CLAIMED_KEY);
-    const nodes = new Set(((prev?.value as { nodes?: string[] } | undefined)?.nodes) ?? []);
-    if (nodes.has(nodeId)) return;
-    nodes.add(nodeId);
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: CLAIMED_KEY, ownerGaii: NS_INSTALL_SETS, value: { nodes: [...nodes] },
-        visibility: 'private', tags: ['claimed-repositories'], ttlHours: null,
-        version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
-    });
+    // On the record's version: two repositories trusted at the same moment are both kept.
+    await updateRecord(storage, NS_INSTALL_SETS, CLAIMED_KEY,
+        (v) => ({ nodes: [...new Set(((v as { nodes?: string[] } | undefined)?.nodes) ?? [])] }),
+        (cur) => (cur.nodes.includes(nodeId) ? UNCHANGED : { nodes: [...cur.nodes, nodeId] }),
+        { tag: 'claimed-repositories' });
 }

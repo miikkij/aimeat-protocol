@@ -34,6 +34,10 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   2026-10-18 — A real apply claims the set's record before it makes anything (install-set-run.ts
+ *     claimRun) and its last write removes the claim (finishRun): a second apply of the same set at
+ *     the same moment answers 409 APPLY_IN_PROGRESS. readRecord and writeRecord are gone; appliedValue
+ *     reads a stored value (atomic-write round).
  *   2026-10-15 — deployAgents gives the owner as the proposer: a bundled agent with no runner becomes a proposal on the owner's open items (result proposed, proposal_id) instead of pending with nothing to approve (feature-list audit #90).
  *   v1.10.0 — 2026-10-10 — A real apply runs the plan first and links the repository and pulls only
  *     when the plan found nothing to refuse (I17); the plan checks a package's expects before it is
@@ -92,6 +96,7 @@ import { deriveTierFlags } from './federation-tiers.js';
 import { proveNodeCard } from './packages/peer/package-peer-register.js';
 import { recordPeerOrigin } from './peer-origin.js';
 import { NS_INSTALL_SETS } from './install-set-trust.js';
+import { claimRun, finishRun, type RunClaim } from './install-set-run.js';
 import { writeAppWorkspaceLinks, type AppWorkspaceLink } from './app-workspaces.js';
 import { grantInstalledApps, landingPath, type AppGrantStep } from './install-set-grants.js';
 import { recordOperatorAction } from './operator-access-audit.js';
@@ -155,6 +160,8 @@ export interface AppliedRecord {
     created_at: string;
     applied_at: string;
     runs: number;
+    /** The run that holds the record while it applies (install-set-run.ts); absent between runs. */
+    running?: RunClaim;
 }
 
 export type ApplyResult =
@@ -171,19 +178,15 @@ export function newAppliedRecord(owner: string, bundle: AppliedRecord['bundle'],
     return { spec: RECORD_SPEC, owner, bundle, organisms: {}, packages: {}, members: {}, agents: {}, secrets_given: [], applied_by: appliedBy, created_at: now, applied_at: now, runs: 0 };
 }
 
-export async function readRecord(storage: Storage, key: string): Promise<AppliedRecord | null> {
-    const rec = await storage.getMemory(NS_INSTALL_SETS, key);
-    const value = rec?.value as AppliedRecord | undefined;
-    return value?.spec === RECORD_SPEC ? value : null;
-}
+/** The applied record a stored value holds, or null. */
+export const appliedValue = (v: unknown): AppliedRecord | null =>
+    ((v as AppliedRecord | undefined)?.spec === RECORD_SPEC ? v as AppliedRecord : null);
 
-export async function writeRecord(storage: Storage, key: string, value: AppliedRecord): Promise<void> {
-    const existing = await storage.getMemory(NS_INSTALL_SETS, key);
-    await storage.setMemory({
-        key, ownerGaii: NS_INSTALL_SETS, value, visibility: 'private', tags: ['install-set'], ttlHours: null,
-        version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? value.created_at, updatedAt: value.applied_at,
-    });
-}
+/** The answer to an apply that met another run of the same set (install-set-run.ts claimRun). */
+const APPLY_IN_PROGRESS: ApplyResult = {
+    ok: false, status: 409, code: 'APPLY_IN_PROGRESS',
+    message: 'This set is being applied by another request right now, and this request made nothing of it. Wait for that one to end, then read the applied sets or apply the set again.',
+};
 
 /** Every install set applied on this node, newest first. */
 export async function listAppliedSets(storage: Storage): Promise<AppliedRecord[]> {
@@ -416,10 +419,14 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     const localBundle = prep.bundleLocalGroup;
     const key = appliedRecordKey(ownerName, localBundle);
     const now = new Date().toISOString();
-    const prev = await readRecord(storage, key);
-    const record: AppliedRecord = prev ?? newAppliedRecord(ownerName,
+    // One run at a time across node processes (install-set-run.ts): the record is claimed before
+    // anything is made, and a second apply at the same moment is refused here.
+    const claimed = await claimRun(storage, key, appliedValue, () => newAppliedRecord(ownerName,
         { group_id: set.bundle.groupId, local_group_id: localBundle, node_id: set.bundle.nodeId ?? null, version: bundleVersion, name: bundle.name },
-        input.appliedBy);
+        input.appliedBy));
+    if (!claimed) return APPLY_IN_PROGRESS;
+    const record: AppliedRecord = claimed.record;
+    const finish = () => finishRun(storage, key, appliedValue, record, claimed.claim);
     record.bundle.version = bundleVersion;
     record.applied_by = input.appliedBy;
     if (input.startup === true) record.via = 'startup';
@@ -460,20 +467,26 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
         await deployAgents(deps, bundle, record);
     } catch (err) {
         record.accounts_created = [...created];
-        await writeRecord(storage, key, record);
+        await finish();
         await trail();
         return { ok: false, status: 500, code: 'APPLY_FAILED', message: `The set was applied in part: ${String(err instanceof Error ? err.message : err)}. What was made is recorded, and applying the set again continues from there.` };
     }
     // The welcome goes out once everything the person was given exists.
     record.accounts_created = [...created];
     const toWelcome = ownerWelcome ? [...created, set.owner.email.toLowerCase()] : [...created];
-    // The owner's link opens the set's landing app, signed in, when the set names one.
-    const landing = await landingPath(storage, ownerName, set.landing, record.packages);
-    const landingByEmail: Record<string, string> = landing ? { [set.owner.email.toLowerCase()]: landing } : {};
-    // Where the owner's link opens, without the token, so the landing can be checked with no mailbox.
-    record.landing_path = landing;
-    record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, toWelcome, record.welcomed ?? [], landingByEmail)];
-    await writeRecord(storage, key, record);
+    try {
+        // The owner's link opens the set's landing app, signed in, when the set names one.
+        const landing = await landingPath(storage, ownerName, set.landing, record.packages);
+        const landingByEmail: Record<string, string> = landing ? { [set.owner.email.toLowerCase()]: landing } : {};
+        // Where the owner's link opens, without the token, so the landing can be checked with no mailbox.
+        record.landing_path = landing;
+        record.welcomed = [...(record.welcomed ?? []), ...await welcomeCreated(storage, config, toWelcome, record.welcomed ?? [], landingByEmail)];
+    } catch (err) {
+        // What was made is recorded and the claim ends, so the next apply is not refused.
+        await finish();
+        throw err;
+    }
+    await finish();
     await trail();
     return { ok: true, dry_run: false, record, owner_created: owner.created, warnings: setWarnings(record) };
 }

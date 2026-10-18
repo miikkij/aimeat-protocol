@@ -11,6 +11,9 @@
  *   mergePortfolioConfig · portfolioSwitchState · switchPortfolioOnUnlessTurnedOff
  * @usage await mergePortfolioConfig(storage, await portfolioWriteGaii(storage, owner, nodeId), { enabled: true });
  * @version-history
+ *   v1.2.0 — 2026-10-18 — mergePortfolioConfig and switchPortfolioOnUnlessTurnedOff write the config
+ *     on its version (record-cas.ts updateRecord); the switch decides again on the stored record, so
+ *     an owner's switch-off at the same moment stays off (atomic-write round).
  *   v1.1.0 — 2026-10-18 — portfolioSwitchState also answers `access`, who may open the page (plan
  *     doc-mvcn6c7e4e5q, V3.10; services/page-access.ts).
  *   v1.0.0 — 2026-10-18 — Extracted from routes/portfolio.ts (the keys, portfolioWriteGaii,
@@ -18,6 +21,7 @@
  *     mergePortfolioConfig); portfolioSwitchState added for the publish gate (plan doc-mvcn6c7e4e5q, V4).
  */
 import type { Storage } from '../storage/interface.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 /** Where this owner's portfolio file and config live. */
 export const PORTFOLIO_HTML_KEY = 'portfolio/index.html';
@@ -54,6 +58,9 @@ export async function portfolioReadGaiis(
   return [...agents.map(a => a.gaii), `${ownerName}@${nodeId}`];
 }
 
+/** The stored config as an object to merge onto; nothing stored reads as empty. */
+const configOf = (v: unknown): Record<string, unknown> => ((v ?? {}) as Record<string, unknown>);
+
 /**
  * The PUT /v1/portfolio/config write: MERGES `patch` onto what is stored under `target`. A caller
  * that wants a field gone sends it as null rather than omitting it.
@@ -61,20 +68,9 @@ export async function portfolioReadGaiis(
 export async function mergePortfolioConfig(
   storage: Storage, target: string, patch: Record<string, unknown>,
 ): Promise<void> {
-  const now = new Date().toISOString();
-  const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
-  const prev = (existing?.value ?? {}) as Record<string, unknown>;
-  await storage.setMemory({
-    key: PORTFOLIO_CONFIG_KEY,
-    ownerGaii: target,
-    value: { ...prev, ...patch },
-    visibility: 'owner',
-    tags: (patch.tags as string[] | undefined) || ['portfolio'],
-    ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
+  // On the record's version: two saves at the same moment each merge onto what the other wrote.
+  await updateRecord(storage, target, PORTFOLIO_CONFIG_KEY, configOf, (prev) => ({ ...prev, ...patch }),
+    { tag: 'portfolio', tags: (patch.tags as string[] | undefined) || ['portfolio'], visibility: 'owner' });
 }
 
 /**
@@ -128,19 +124,16 @@ export async function switchPortfolioOnUnlessTurnedOff(
   if (current?.enabled === false) return false;
   if (current?.enabled === true) return true;
   if (!enable) return false;
-  const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
-  const prev = (existing?.value && typeof existing.value === 'object' ? existing.value : current ?? {}) as Record<string, unknown>;
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key: PORTFOLIO_CONFIG_KEY,
-    ownerGaii: target,
-    value: { ...prev, enabled: true, source: prev.source ?? 'ai' },
-    visibility: 'owner',
-    tags: ['portfolio'],
-    ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
-  return true;
+  // Decided again on the target's record as it is stored, and written on its version: an owner who
+  // switches the page off at the same moment keeps it off, and this caller is told so.
+  let on = true;
+  await updateRecord<Record<string, unknown> | null>(storage, target, PORTFOLIO_CONFIG_KEY,
+    (v) => (v && typeof v === 'object' ? v as Record<string, unknown> : null),
+    (stored) => {
+      on = stored?.enabled !== false;
+      if (stored?.enabled === false || stored?.enabled === true) return UNCHANGED;
+      const prev = stored ?? current ?? {};
+      return { ...prev, enabled: true, source: prev.source ?? 'ai' };
+    }, { tag: 'portfolio', visibility: 'owner' });
+  return on;
 }

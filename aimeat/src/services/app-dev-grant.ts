@@ -41,6 +41,9 @@
  *   const t = await resolveAppTarget(storage, config, { callerOwner, requestedOwner, filename, act: 'publish' });
  *   if (!t.ok) return res.status(t.status).json(error(config.nodeId, t.code, t.message));
  * @version-history
+ *   v1.2.0 — 2026-10-18 — putDevGrant, removeDevGrant and putBlanketGrant read and write their record
+ *     on its version (app-members.ts updateAppRecord), so a change to the same row or grant at the
+ *     same moment is applied to rather than written over (atomic-write round).
  *   v1.1.1 — 2026-10-01 — removeDevGrant asks removeMember to delete the builder-only row, which now
  *     keeps a development right by default when a membership is removed.
  *   v1.1.0 — 2026-09-24 — removeDevGrant deletes a roster row that carried nothing but the right
@@ -56,9 +59,10 @@ import { canonicalAppId, listAppRecords } from './app-record-keys.js';
 import type { Storage } from '../storage/interface.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import {
-  accountOf, getMemberRow, isLive, memberKey, removeMember, sameApp, writePrivateRecord,
+  accountOf, getMemberRow, isLive, memberKey, removeMember, sameApp, updateAppRecord,
   type AppMemberRecord,
 } from './app-members.js';
+import { UNCHANGED } from './record-cas.js';
 
 /** The roster's own namespace, because the per-app right lives on the roster row. */
 const NS_MEMBER = 'app-member';
@@ -151,28 +155,27 @@ export async function putDevGrant(
   input: { appId: string; account: string; level: number; grantedBy: string; note?: string },
 ): Promise<AppMemberRecord> {
   const account = accountOf(input.account);
-  const prev = await getMemberRow(storage, input.appId, account);
-  const now = new Date().toISOString();
-  const rec: AppMemberRecord = {
-    appId: input.appId,
-    owner: account,
-    role: prev?.role ?? '',
-    level: prev?.level ?? null,
-    since: prev?.since ?? now,
-    updatedAt: now,
-    note: input.note ?? prev?.note ?? '',
-    approvedBy: prev?.approvedBy ?? input.grantedBy,
-    offerings: prev?.offerings ?? [],
-    expiresAt: prev?.expiresAt ?? null,
-    renewal: prev?.renewal ?? null,
-    dev: input.level,
-    devSince: prev?.devSince ?? now,
-    devBy: input.grantedBy,
-  };
-  await writePrivateRecord(storage, NS_MEMBER, memberKey(input.appId, account), rec, {
-    createdAt: prev ? undefined : now,
+  // On the row's version, so a member removal or a role change at the same moment is applied to.
+  const stored = await updateAppRecord<AppMemberRecord>(storage, NS_MEMBER, memberKey(input.appId, account), input.appId, (prev) => {
+    const now = new Date().toISOString();
+    return {
+      appId: input.appId,
+      owner: account,
+      role: prev?.role ?? '',
+      level: prev?.level ?? null,
+      since: prev?.since ?? now,
+      updatedAt: now,
+      note: input.note ?? prev?.note ?? '',
+      approvedBy: prev?.approvedBy ?? input.grantedBy,
+      offerings: prev?.offerings ?? [],
+      expiresAt: prev?.expiresAt ?? null,
+      renewal: prev?.renewal ?? null,
+      dev: input.level,
+      devSince: prev?.devSince ?? now,
+      devBy: input.grantedBy,
+    };
   });
-  return rec;
+  return stored!;
 }
 
 /** The right this person holds on this app, or null. A lapsed membership holds none. */
@@ -208,19 +211,24 @@ function onlyCarriesTheRight(row: AppMemberRecord): boolean {
  */
 export async function removeDevGrant(storage: Storage, appId: string, principal: string): Promise<boolean> {
   const account = accountOf(principal);
-  const prev = await getMemberRow(storage, appId, account);
-  if (!prev || typeof prev.dev !== 'number') return false;
-  if (onlyCarriesTheRight(prev)) {
-    // The right is what is being taken, so the row goes with it (removeMember keeps it otherwise).
-    await removeMember(storage, appId, account, { keepDevRight: false });
-    return true;
-  }
-  const rec: AppMemberRecord = { ...prev, updatedAt: new Date().toISOString() };
-  delete rec.dev;
-  delete rec.devSince;
-  delete rec.devBy;
-  await writePrivateRecord(storage, NS_MEMBER, memberKey(appId, account), rec);
-  return true;
+  // Decided on the row as it is stored and written on its version, so a member removal at the same
+  // moment is not written back.
+  let had = false;
+  let drop = false;
+  await updateAppRecord<AppMemberRecord>(storage, NS_MEMBER, memberKey(appId, account), appId, (prev) => {
+    had = !!prev && typeof prev.dev === 'number';
+    drop = false;
+    if (!prev || !had) return UNCHANGED;
+    if (onlyCarriesTheRight(prev)) { drop = true; return UNCHANGED; }
+    const rec: AppMemberRecord = { ...prev, updatedAt: new Date().toISOString() };
+    delete rec.dev;
+    delete rec.devSince;
+    delete rec.devBy;
+    return rec;
+  });
+  // The right is what is being taken, so the row goes with it (removeMember keeps it otherwise).
+  if (drop) await removeMember(storage, appId, account, { keepDevRight: false });
+  return had;
 }
 
 /** Everybody who holds a development right on one app, with the rung each one holds. */
@@ -287,23 +295,21 @@ export async function putBlanketGrant(
   const owner = accountOf(input.owner);
   const grantee = accountOf(input.grantee);
   const key = blanketKey(owner, grantee);
-  const prev = (await storage.getMemory(NS_BLANKET, key))?.value as AppDevBlanketGrant | undefined;
-  const now = new Date().toISOString();
-  const rec: AppDevBlanketGrant = {
-    owner,
-    grantee,
-    level: input.level,
-    since: prev?.since ?? now,
-    updatedAt: now,
-    grantedBy: input.grantedBy,
-    note: input.note ?? prev?.note ?? '',
-    expiresAt: input.expiresAt !== undefined ? input.expiresAt : (prev?.expiresAt ?? null),
-  };
-  await writePrivateRecord(storage, NS_BLANKET, key, rec, {
-    tags: ['app-dev-grant'],
-    createdAt: prev ? undefined : now,
-  });
-  return rec;
+  // On the record's version: two changes at the same moment each keep what the other changed.
+  const stored = await updateAppRecord<AppDevBlanketGrant>(storage, NS_BLANKET, key, null, (prev) => {
+    const now = new Date().toISOString();
+    return {
+      owner,
+      grantee,
+      level: input.level,
+      since: prev?.since ?? now,
+      updatedAt: now,
+      grantedBy: input.grantedBy,
+      note: input.note ?? prev?.note ?? '',
+      expiresAt: input.expiresAt !== undefined ? input.expiresAt : (prev?.expiresAt ?? null),
+    };
+  }, { tags: ['app-dev-grant'] });
+  return stored!;
 }
 
 /** Every blanket right one owner has given. The page that answers "who can touch my apps". */

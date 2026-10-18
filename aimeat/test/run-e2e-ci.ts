@@ -517,6 +517,9 @@ const ALL_SUITES = [
     // Two writers of one record at once on the commerce books, the UCP checkout, the package sales
     // catalogue and the AI settings record, on an own in-process node (40473) with a stand-in platform.
     'test/e2e-atomic-money.ts',
+    // Two writes of one permission record at the same moment, on an own in-process node (40419):
+    // the first operation is held after its read while the second runs (atomic-write round, G2).
+    'test/e2e-atomic-access.ts',
     // Starts a REAL OAuth provider on a fixed loopback port (agreed with the server env above) that
     // rotates its refresh token, so the concurrency assertions test the guard rather than a stub.
     'test/e2e-connections.ts',
