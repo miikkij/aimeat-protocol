@@ -13130,6 +13130,7 @@
     },
     "agents": {
       "title": "Agenttisi",
+      "signInDesc": "Kirjaudu sisään, niin näet agenttisi.",
       "lead": "Kerro yhdellä lauseella, mitä haluat. AIMEAT tekee agentin, näyttää sen sinulle ja käynnistää sen, kun hyväksyt.",
       "newLabel": "Uusi agentti",
       "askLabel": "Mitä haluat agentin tekevän?",
@@ -15242,6 +15243,8 @@
     "devView": "Kehittäjille",
     "signIn": "Kirjaudu",
     "home": "Koti",
+    "messages": "Viestit",
+    "agents": "Agentit",
     "apps": "Sovellukset",
     "profile": "Asetukset ja hallinta",
     "logout": "Kirjaudu ulos",
