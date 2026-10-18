@@ -7,6 +7,7 @@
  *   same way (matching the Mongo/SQLite backends: byteSize = utf8 bytes of the JSON value; searchBlob =
  *   key + tags + recursively-collected scalar values, which the DB turns into the ranked tsvector).
  * @version-history
+ *   2026-10-18 — scopeListIs: the condition of the scope-list compare-and-swap (check:atomic-writes, boot migrations).
  *   2026-10-15 — buildSearchBlob moved to storage/search-text.ts and is re-exported here, so SQLite indexes the same text (feature-list audit #52).
  *   v1.0.0 — 2026-07-15 — Phase 5: memory-domain mappers + jsonb param helper.
  */
@@ -76,6 +77,17 @@ export function rowToMeta(r: Pick<Selectable<Memory>, 'key' | 'ownerGaii' | 'vis
     aiProvenanceId: r.aiProvenanceId ?? null,
     archived: !!r.archived,
   };
+}
+
+/**
+ * The condition of a scope-list compare-and-swap (setAgentScopesIf and its twins): the text[] column
+ * still holds exactly the list the caller read. An empty list also matches NULL, because the readers
+ * map both to "no words". One UPDATE carries it, so two writers cannot both pass it.
+ */
+export function scopeListIs(column: string, expected: readonly string[]) {
+  return expected.length === 0
+    ? sql<boolean>`(${sql.ref(column)} IS NULL OR ${sql.ref(column)} = '{}'::text[])`
+    : sql<boolean>`${sql.ref(column)} = ${sql.val([...expected])}::text[]`;
 }
 
 /** Whether a TTL'd row is still live (matches the other backends' expiry check). */

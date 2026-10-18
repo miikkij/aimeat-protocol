@@ -15,14 +15,18 @@
  *   identity, private) keeps the digest of the body that was reported, so the next round and the
  *   next boot say nothing more about it, and a new body that fails after a later deploy is a new
  *   thing to say. It goes when the part is deleted (service.ts delete). A retired part, and a part
- *   the node itself holds, is nobody's to be told about.
+ *   the node itself holds, is nobody's to be told about. The record is written before the proposer
+ *   is told, on the version that was read, so two rounds at the same moment (two node processes
+ *   booting, or a boot beside the nightly round) tell once; a notice that is not delivered puts the
+ *   earlier record back, so the next round tries again.
  * @structure COMPONENT_FAILING_NOTICE · noticeFailingComponents(storage, config)
  * @usage await noticeFailingComponents(storage, config);   // lifecycle.ts: the nightly round; service-init.ts: boot
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The notice record is a claim written on its version before the notice (check:atomic-writes).
  *   v1.0.0 — 2026-09-26 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { notify } from '../notify.js';
@@ -37,6 +41,14 @@ function valueOf<T>(value: unknown): T | null {
   if (typeof value !== 'string') return (value ?? null) as T | null;
   // eslint-disable-next-line aimeat/no-silent-catch -- an unreadable record reads as none: a part has no body to bench, a notice was not given
   try { return JSON.parse(value) as T; } catch { return null; }
+}
+
+/** Undo a notice record this round wrote and did not deliver: the earlier record back, or none. */
+async function putBack(storage: Storage, notice: MemoryRecord, prior: MemoryRecord | null): Promise<void> {
+  if (!prior) { await storage.deleteMemory(notice.ownerGaii, notice.key, notice.ownerGaii); return; }
+  const back: MemoryRecord = { ...prior, version: notice.version + 1, updatedAt: new Date().toISOString() };
+  if (storage.setMemoryIfVersion) await storage.setMemoryIfVersion(back, notice.version);
+  else await storage.setMemory(back);
 }
 
 /**
@@ -63,18 +75,11 @@ export async function noticeFailingComponents(storage: Storage, config: AimeatCo
     const prior = await storage.getMemory(systemGhiiFor(config.nodeId), key);
     if (valueOf<{ digest?: string }>(prior?.value)?.digest === digest) continue;
 
-    const sent = await notify(storage, owner, {
-      type: COMPONENT_FAILING_NOTICE,
-      title: `Your Design Book component "${part.id}" no longer passes the bench`,
-      body: `The bench says: ${bench.why}\n\nUntil it passes, nobody can take it, and the search and the map leave it out. `
-        + 'Fix it as the bench says and propose it again under the same id (aimeat_designbook_propose). '
-        + 'aimeat_designbook_get shows you its markup and stylesheet as stored.',
-      link: `/v1/designbook/${encodeURIComponent(part.id)}/preview`,
-    });
-    // A notice neither stored nor muted by the owner is tried again on the next round.
-    if (!sent.stored && !sent.muted) continue;
+    // The notice record is written BEFORE the proposer is told, on the version that was read, so of
+    // two rounds at the same moment (two node processes booting, or a boot beside the nightly job)
+    // exactly one tells. A notice that is not delivered puts back what was there.
     const now = new Date().toISOString();
-    await storage.setMemory({
+    const notice: MemoryRecord = {
       key,
       ownerGaii: system,
       value: { spec: 'aimeat.designbook.notice/v1', id: part.id, owner, digest, why: bench.why, noticed_at: now },
@@ -84,7 +89,28 @@ export async function noticeFailingComponents(storage: Storage, config: AimeatCo
       version: prior ? prior.version + 1 : 1,
       createdAt: prior?.createdAt ?? now,
       updatedAt: now,
-    });
+    };
+    const claimed = prior
+      ? (storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(notice, prior.version) : (await storage.setMemory(notice), true))
+      : (storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(notice) : (await storage.setMemory(notice), true));
+    if (!claimed) continue;
+
+    let sent: Awaited<ReturnType<typeof notify>>;
+    try {
+      sent = await notify(storage, owner, {
+        type: COMPONENT_FAILING_NOTICE,
+        title: `Your Design Book component "${part.id}" no longer passes the bench`,
+        body: `The bench says: ${bench.why}\n\nUntil it passes, nobody can take it, and the search and the map leave it out. `
+          + 'Fix it as the bench says and propose it again under the same id (aimeat_designbook_propose). '
+          + 'aimeat_designbook_get shows you its markup and stylesheet as stored.',
+        link: `/v1/designbook/${encodeURIComponent(part.id)}/preview`,
+      });
+    } catch (err) {
+      await putBack(storage, notice, prior);
+      throw err;
+    }
+    // A notice neither stored nor muted by the owner is tried again on the next round.
+    if (!sent.stored && !sent.muted) { await putBack(storage, notice, prior); continue; }
     out.noticed++;
   }
   if (out.failing > 0) logger.info(`design-book: ${out.failing} stored component(s) no longer pass the bench; ${out.noticed} proposer(s) told now`);

@@ -35,6 +35,8 @@
  *   const words = await appAllowanceWords(storage, 'alice/notes.html');
  *   const asked = withAllowance(requested, words);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — keepWorkingAppsOnce writes each grant's words on the list that was read
+ *     (services/scope-list-swap.ts), so a refresh or an owner's edit meanwhile is kept (check:atomic-writes).
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -43,6 +45,7 @@ import { localAccountName, resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { equalAppId } from './app-record-keys.js';
 import { resolveAppTarget } from './app-dev-grant.js';
+import { changeScopeList } from './scope-list-swap.js';
 import { recordAppAudit } from './app-audit.js';
 import { resolveCortexLib } from './component-versions.js';
 import { cortexLibRefs, undeclaredScopeNeeds } from './app-scope-needs.js';
@@ -112,10 +115,12 @@ export async function keepWorkingAppsOnce(storage: Storage, config: Pick<AimeatC
       });
       let grants = 0;
       for (const grant of await liveGrantsOf(storage, appId)) {
-        const add = missing.filter(w => !grant.scopes.includes(w));
-        if (!add.length) continue;
-        await storage.updateAppGrant(grant.grantId, { scopes: [...grant.scopes, ...add] });
-        grants++;
+        // Written on the list that was read, so a refresh or the owner's edit meanwhile is kept.
+        const changed = await changeScopeList(storage, { kind: 'app-grant', id: grant.grantId }, grant.scopes, held => {
+          const add = missing.filter(w => !held.includes(w));
+          return add.length ? [...held, ...add] : null;
+        });
+        if (changed) grants++;
       }
       await recordAppAudit(storage, {
         ownerGhii: app.ownerGaii, filename: app.filename, by: `system@${config.nodeId}`, action: 'scope_allowance.kept',

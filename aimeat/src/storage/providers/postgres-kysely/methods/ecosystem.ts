@@ -8,13 +8,14 @@
  *   Prisma implementation. jsonb columns (dataAreas/capabilities/automation/setup/validationResult/
  *   appCredentials/trigger/agents) go through the `jsonb()` helper on write and cast back on read.
  * @version-history
+ *   v1.1.0 — 2026-10-18 — setEcosystemAppScopesIf: one UPDATE conditional on the scope list that was read (check:atomic-writes, boot migrations).
  *   v1.0.0 — 2026-07-15 — Phase 5: ecosystem-apps on Postgres+Kysely.
  */
 import { sql, type Selectable } from 'kysely';
 import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe } from '../../../interface.js';
 import type { EcosystemApp, EcoAuth, EcoAutomationRecipe as EcoAutomationRecipeTable } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb, dbError } from '../helpers.js';
+import { jsonb, dbError, scopeListIs } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -104,6 +105,13 @@ export const ecosystemMethods = {
       const rows = await this.db.updateTable('EcosystemApp').set(data as never).where('geai', '=', geai).returningAll().execute();
       return rows[0] ? toEcosystemApp(rows[0]) : null;
     } catch (err) { throw dbError('updateEcosystemApp', err); }
+  },
+  async setEcosystemAppScopesIf(this: PostgresKyselyStorage, geai: string, expected: readonly string[], next: string[]): Promise<boolean> {
+    try {
+      const r = await this.db.updateTable('EcosystemApp').set({ scopes: next } as never)
+        .where('geai', '=', geai).where(scopeListIs('scopes', expected)).executeTakeFirst();
+      return Number(r.numUpdatedRows ?? 0) > 0;
+    } catch (err) { throw dbError('setEcosystemAppScopesIf', err); }
   },
   async deleteEcosystemApp(this: PostgresKyselyStorage, geai: string): Promise<boolean> {
     const r = await this.db.deleteFrom('EcosystemApp').where('geai', '=', geai).executeTakeFirst();

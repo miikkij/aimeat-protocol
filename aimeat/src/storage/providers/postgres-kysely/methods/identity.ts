@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-10-18 — setAgentScopesIf: one UPDATE conditional on the scope list that was read (check:atomic-writes, boot migrations).
  *   2026-10-18 — clearance on create and read (migration 0107, plan doc-mvdipuyqraas L2). updateAgent passes it through.
  *   2026-10-16 — operatorAccountState({ claim: true }) takes a transaction-scoped advisory lock first, the
  *     single claim to the first operator (Jouni, 2026-10-16).
@@ -40,7 +41,7 @@ import type { Selectable } from 'kysely';
 import type { AgentRecord, GHIIRecord, GHIIPatch, OwnerRecord } from '../../../interface.js';
 import type { Agent, Ghii, Owner } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb, dbError } from '../helpers.js';
+import { jsonb, dbError, scopeListIs } from '../helpers.js';
 import { deleteOwnerCascade, cascadeDeleteIdentityData, settleDeletedAgentWorkDb } from './owner-cascade.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
@@ -235,6 +236,13 @@ export const identityMethods = {
       const rows = await this.db.updateTable('Agent').set(data as never).where('gaii', '=', gaii).returningAll().execute();
       return rows[0] ? toAgentRecord(rows[0]) : null;
     } catch (err) { throw dbError('updateAgent', err); }
+  },
+  async setAgentScopesIf(this: PostgresKyselyStorage, gaii: string, expected: readonly string[], next: string[]): Promise<boolean> {
+    try {
+      const r = await this.db.updateTable('Agent').set({ defaultScopes: next } as never)
+        .where('gaii', '=', gaii).where(scopeListIs('defaultScopes', expected)).executeTakeFirst();
+      return Number(r.numUpdatedRows ?? 0) > 0;
+    } catch (err) { throw dbError('setAgentScopesIf', err); }
   },
   /** Same cascade as deleteOwner, for one agent — matching SQLite, which has always run the full
    *  cascade here. This cleared only Memory until 2026-08-11, so disconnecting an agent left its
