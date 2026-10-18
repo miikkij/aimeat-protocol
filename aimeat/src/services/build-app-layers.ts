@@ -34,6 +34,9 @@
  *   import { buildAppPiece } from './build-app-layers.js';
  *   const first = buildAppPiece(buildAppPrompt(config).full, 'start', config.baseUrl);
  * @version-history
+ *   2026-10-19 — The section "Calling the node" is served in part `data`, not `start`. Part `start`
+ *     had grown to 24 008 characters on the E2E node's address and failed MAX_PART_CHARS in the
+ *     nightly sweep; on a node address longer than 27 characters it failed in production too.
  *   2026-10-17 — The section "How the data map answers steer the build" (build-data-map-step.ts) is
  *     core, in part `data`.
  *   2026-10-17 — CLASSIC_TRACK_NOTICE names the `aimeat-track` classic declaration and the one use of
@@ -58,9 +61,9 @@ export const MAX_PART_CHARS = 24_000;
 
 /** The core in reading order. `what` is the line the index shows for the part. */
 export const SPEC_PARTS: Array<{ id: SpecPartId; what: string }> = [
-  { id: 'start', what: 'How to go about it, the shape of the app, signing in, calling the node, language, permissions, the rules, and how to publish.' },
+  { id: 'start', what: 'How to go about it, the shape of the app, signing in, language, permissions, the rules, and how to publish.' },
   { id: 'libraries', what: 'Every script and style address an app may load, and what each library is for. An address that is not in it does not exist.' },
-  { id: 'data', what: 'Where the app keeps its data and in what shape, the data map every app writes, and the one call that says an AI made it.' },
+  { id: 'data', what: 'How to call the node and read its answer, where the app keeps its data and in what shape, the data map every app writes, and the one call that says an AI made it.' },
   { id: 'look', what: 'Design, mobile safety and input, and how to check what the app looks like before you call it done.' },
 ];
 
@@ -94,7 +97,9 @@ export const SECTION_TABLE: Record<string, SectionRule> = {
   'AIMEAT Platform Instructions': { id: 'build', layer: 'core', part: 'start' },
   "Choose the app's shape (T1/T2/T3)": { id: 'shape', layer: 'core', part: 'start' },
   'Auth Pattern': { id: 'auth', layer: 'core', part: 'start' },
-  'Calling the node: read `ok` before `data`': { id: 'calling-the-node', layer: 'core', part: 'start' },
+  // Part `data` since 2026-10-19: with the interview's data map step (2026-10-17) part `start` was
+  // 23 994 characters on a 20-character node address and past MAX_PART_CHARS on a longer one.
+  'Calling the node: read `ok` before `data`': { id: 'calling-the-node', layer: 'core', part: 'data' },
   'Language: declare it, never build the switch': { id: 'language', layer: 'core', part: 'start' },
   'App permissions (scopes)': { id: 'scopes', layer: 'core', part: 'start' },
   'Data Storage': { id: 'data-storage', layer: 'core', part: 'data' },

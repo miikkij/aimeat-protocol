@@ -9,6 +9,7 @@
  *   layer by a person (a new one fails here until somebody decides); an id names one section; and
  *   the core plus the on-demand sections cover the whole specification between them.
  * @version-history
+ *   v1.0.1 — 2026-10-19 — The part sizes are measured on a long node address as well.
  *   v1.0.0 — 2026-09-18 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -69,6 +70,14 @@ describe('the layered build specification', () => {
           const piece = buildAppPiece(full, p.id, 'https://node.example');
           expect(piece?.kind, p.id).toBe('part');
           expect(piece!.text.length, p.id).toBeLessThan(MAX_PART_CHARS);
+        }
+        // The node's address is written into the parts many times, so a part measured on this
+        // 20-character address passed here while the E2E node's 24 008 characters failed the
+        // nightly sweep (2026-10-18). Measured again on an address of 48 characters.
+        const longUrl = 'https://aimeat.a-long-organisation-name.example.org';
+        const longFull = buildAppPrompt({ baseUrl: longUrl, nodeId: 'node-example' } as never, { mode, lang: 'en' }).full;
+        for (const p of SPEC_PARTS) {
+          expect(buildAppPiece(longFull, p.id, longUrl)!.text.length, p.id + ' on ' + longUrl).toBeLessThan(MAX_PART_CHARS);
         }
       });
 

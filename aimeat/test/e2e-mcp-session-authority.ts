@@ -9,6 +9,9 @@
  *   v1.1.0 -- 2026-10-12 -- The two REST writes (the setup record and the live-scope 403) use the
  *     agent's own token from POST /v1/auth/token; node 4.0.0 refuses the MCP OAuth token on a REST
  *     route (401 INVALID_TOKEN, MCP_TOKEN_ON_REST_REMOVED_IN), which hid the 403 the test names.
+ *   v1.1.1 -- 2026-10-19 -- A removed one-press word leaves its tool on tools/list (askableTool,
+ *     mcp/permission-ask-gate.ts since 2026-10-17); the test asserts the call answers SCOPE_DENIED
+ *     and stores nothing. Its setup no longer matched production: the nightly sweep went red on it.
  */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -162,9 +165,12 @@ await test('An open session loses a removed scope, in discovery and execution', 
   assert.equal((await rest('/v1/memory', 'POST', actor.restToken, { key: key + '.rest', value: 'denied' })).status, 403);
   const after = await rpc(session, 'tools/list');
   assert.equal(after.status, 200, 'session remains usable after permission removal');
-  assert.ok(!after.body.result.tools.some((tool: { name: string }) => tool.name === 'aimeat_memory_write'));
+  // Since 2026-10-17 a tool whose missing words the person may allow with one press stays on the
+  // list (mcp/permission-ask-gate.ts askableTool), and memory:write is such a word. The removal is
+  // still live in the open session: the call answers SCOPE_DENIED instead of writing.
   const write = await rpc(session, 'tools/call', { name: 'aimeat_memory_write', arguments: { key: key + '.denied', value: 'denied' } });
   assert.ok(write.body?.error || write.body?.result?.isError, 'removed permission cannot execute by name');
+  assert.match(JSON.stringify(write.body), /SCOPE_DENIED/, 'the open session refuses with the removed word');
   const stored = await rest(`/v1/memory/${encodeURIComponent(actor.gaii)}/${key}.denied`, 'GET', first.token);
   assert.equal(stored.status, 404, 'the rejected call did not store a record');
 });
