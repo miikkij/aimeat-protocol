@@ -211,6 +211,10 @@
           { "id": "ac-groups", "num": "06", "labelKey": "accesspage.secGroups" },
           { "id": "ac-addresses", "num": "07", "labelKey": "accesspage.secAddresses" },
           { "id": "ac-roads", "num": "08", "labelKey": "accesspage.secRoads" }
+        ] },
+        { "id": "exposure", "labelKey": "profile.tabs.exposure", "sections": [
+          { "id": "ex-items", "num": "01", "labelKey": "exposure.itemsTitle" },
+          { "id": "ex-notes", "num": "02", "labelKey": "exposure.notesTitle" }
         ] }
       ] },
       { "titleKey": "profile.landing.menuInfra", "operator": true, "items": [
