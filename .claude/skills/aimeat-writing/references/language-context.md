@@ -185,6 +185,9 @@ everywhere at once, and say so in the Changes section.
 | the app version the weekly helper writes from what people did on the app | the owner's own AI writes it as the app's draft; nothing publishes it but the owner, and the live app stays as it was | corrected draft | korjattu luonnos | borrador corregido |
 | the mark that tells a person AI made something | the chip on a served app and the words beside it; the operator's setting decides whether it also marks what the law does not require | visible AI label | näkyvä tekoälymerkintä | etiqueta visible de IA |
 | the statement of how one piece of content was made | which model, how much a person did, the hash of the exact bytes; a file, a message or an app carries it, and it answers anyone once the content is public. To a person, say what it tells: how this was made | provenance record (to a person: how this was made) | tietue (henkilölle: miten tämä on tehty) | registro (para una persona: cómo se hizo esto) |
+| an earlier picture the image model works from | a character sheet, a setting, the previous page, a style sample; the model sees it as a picture, so a look stays the same from picture to picture | reference image | mallikuva | imagen de referencia |
+| the answer an app gets about a person's age | yes or no, the method and the time, never a birth date; a bank identification or a credit card payment gives it | verified adult | täysi-ikäiseksi vahvistettu | adulto verificado |
+| paying a creator or a studio for a period | the card is kept and charged again before the end until the person cancels; the period already paid runs to its end | subscription (monthly: monthly subscription) | tilaus (kuukausitilaus) | suscripción (suscripción mensual) |
 | a chain of steps one trigger runs | agents, the owner's own model, extensions and questions to the person, each step checked for whether it produced | workflow | työnkulku | flujo de trabajo (flujo in a title that names it) |
 | the most one workflow run may spend on AI | US dollars per run; what its AI steps cost and what the node's model costs judging its worded signals both count, and an AI step starts only while its expected cost still fits, except that a step expected to cost more than the whole limit starts once, alone | spending limit | kulukatto | límite de gasto |
 | an app's own address | `<name>.apps.<domain>`, where the sign-in of the person who opens the app does not exist | an address of its own | oma osoite | su propia dirección / dirección propia |
@@ -392,6 +395,11 @@ service, the directory, the token, the identifier and the username: the test nam
   the workspace page already shipped; *ehdotus* is the word the decision rules' page already uses for
   what an agent proposes, and *sugerencia* matches the developer's own word, "members suggest". The
   decline button keeps the bell's *Kieltäydy* / *Rechazar*.
+- **2026-10-18** — reference image, verified adult and subscription, with the change log entry for the
+  Comicland v3 platform needs. *Mallikuva* is the ordinary Finnish word for a picture one copies a look
+  from; *referenssikuva* is an anglicism. *Täysi-ikäiseksi vahvistettu* says what the app learns and
+  nothing more. *Tilaus* is the everyday word for a subscription; in Finnish it also means an order,
+  so a sentence about one says *kuukausitilaus* or names the period. No cold reader has read them yet.
 - **2026-09-25** — an app's own address and the isolated frame, with the admin Security page's line
   about how apps are kept apart (audit A7-1). *Eristetty* is the word Finnish IT text already uses
   for isolated (*eristetty ympäristö*); *kehys* is the ordinary word for a frame, and *marco* the
