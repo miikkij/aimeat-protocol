@@ -325,6 +325,45 @@ components:
         by_kind:
           type: object
           additionalProperties: { $ref: '#/components/schemas/ExposureLevelCounts' }
+    ExposureConflictCounts:
+      type: object
+      description: >-
+        How many things are readable wider than their classification allows (plan doc-mvdipuyqraas,
+        L4.1). Present only where classification is on. Nothing is changed by the report: content that
+        was already wider when a cap was set is reported, not lowered.
+      properties:
+        conflicts: { type: integer, description: 'Items whose level is wider than their effective classification''s max_audience, with no exception.' }
+        excepted: { type: integer, description: 'Items over the cap that the owner''s ''audience'' exception lets stay.' }
+    ExposureItemClassification:
+      type: object
+      description: >-
+        An exposed item's classification, where classification is on for it: its effective label (its
+        own, or the workspace, organism, board or app whose label raised it), the label's audience cap,
+        and whether the item's level is over it.
+      required: [label, name, color, from, max_audience, conflict]
+      properties:
+        label: { type: string, description: The effective label's id. }
+        name:
+          type: object
+          properties:
+            fi: { type: string }
+            en: { type: string }
+            es: { type: string }
+        color: { type: string, description: '#rrggbb, as the policy holds it.' }
+        from: { type: string, enum: [own, workspace, organism, board, app] }
+        max_audience:
+          type: string
+          nullable: true
+          enum: [private, organism, signed-in, link, public]
+          description: The widest level the label allows; null is no cap.
+        conflict: { type: boolean, description: The level is wider than max_audience and no exception covers it. }
+        excepted: { type: boolean, description: 'Present and true when the level is wider than max_audience and the owner''s ''audience'' exception lets it stay.' }
+        lower_to:
+          type: object
+          description: On a conflict, the widest level the item's own setting can take within the cap; absent when it is lowered on its own page (an app that needs an access code).
+          properties:
+            level: { type: string, enum: [private, organism, signed-in, link] }
+            organism_id: { type: string }
     RestoreCounts:
       type: object
       description: Rows per kind, as POST /v1/admin/restore counts them.
@@ -31071,7 +31110,9 @@ paths:
         signed-in, organism) and by kind, and the accounts with the most exposed (numbers only).
         No item, title or address leaves this route. At most 5000 accounts are read; `owners_capped`
         says whether there were more. `failed` names the kinds that could not be read, with how
-        many accounts.
+        many accounts. Where classification is on, `classification` counts the things readable wider
+        than their classification allows (`conflicts`) and those an owner's exception lets stay
+        (`excepted`), each thing once.
 
         Reserved to the node operator. An operator's agent also needs the scope `operator:admin`.
       tags: [Admin]
@@ -31105,6 +31146,7 @@ paths:
                           failed:
                             type: object
                             additionalProperties: { type: integer }
+                          classification: { $ref: '#/components/schemas/ExposureConflictCounts' }
                           notes:
                             type: array
                             items: { type: string }
@@ -73819,6 +73861,12 @@ paths:
         listed as `signed-in`, and the first note says why. A record or file whose classification
         hides it from the caller is counted and not listed (`hidden_by_classification`).
 
+        Where classification is on, an item with a classification address carries `classification`:
+        its effective label, the label's `max_audience`, and `conflict` when its level is wider than
+        that cap. Conflicts are listed first, each with `lower_to`; an item the owner's 'audience'
+        exception lets stay is `excepted`. The report's `classification` counts both. The report
+        changes nothing: an item over its cap is lowered by the route that changes that item.
+
         The person in person, or their own agent holding `memory:read`. An app grant and an
         ecosystem app are refused (403), and so is a session from another node. The MCP tool
         aimeat_exposure_report returns the same object.
@@ -73854,6 +73902,8 @@ paths:
                                 organism_id: { type: string, description: Present when level is organism. }
                                 url: { type: string, description: The address it is read at, when a stranger can open one. }
                                 how_to_close: { type: string }
+                                classification: { $ref: '#/components/schemas/ExposureItemClassification' }
+                          classification: { $ref: '#/components/schemas/ExposureConflictCounts' }
                           capped:
                             type: array
                             items: { type: string }

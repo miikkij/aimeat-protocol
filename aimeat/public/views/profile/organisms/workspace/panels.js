@@ -10,6 +10,8 @@
  * @structure renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
+ *   v2.26.0 -- 2026-10-18 -- The settings show the workspace's classification, and the organism's creator
+ *     or an admin changes it there, while classification is on (ContainerLabel; plan doc-mvdipuyqraas, L4.4).
  *   v2.25.1 -- 2026-10-18 -- The share panel: a space's page count is words at the hint's size in the language's plural form ("2 documents"), whether a password is set is a sentence at the hint's size (both were under 11px), and its strings lose their emoji and em-dashes ("🔗", "🔒", "📣", "🔑").
  *   v2.25.0 -- 2026-10-18 -- A shared page says who can open it, in words (AudienceBadge from the share's access: anyone with the link, with the password, signed-in, or the organism's members) (plan doc-mvcn6c7e4e5q, V6.4).
  *   v2.24.0 -- 2026-10-16 -- A shared page with an end date says when its link ends, with "Extend 90 days" beside it.
@@ -73,6 +75,7 @@ import { Action, Loud, Actions } from '/components/Action.js';
 import { Mark, Label } from '/components/Mark.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
 import { shareAudienceOf } from '/js/audience.js';
+import { ContainerLabel } from '/views/profile/classification/container-label.js';
 import { Note } from '/components/Note.js';
 import { SubHeading, HeadDesc } from '/components/SubHeading.js';
 import { TextField, TextArea } from '/components/TextField.js';
@@ -107,7 +110,7 @@ export function renderSettingsPanel(ctx) {
     ws, sName, setSName, sSummary, setSSummary, sAutonomy, setSAutonomy, saveSettings, busy, wsDirty,
     resetSettingsForm, setShowSettings, isDocSpace, removeSpaceHandler, newSpaceName, setNewSpaceName,
     addSpaceHandler, gateOn, showFlow, setShowFlow, showRegenerate, setShowRegenerate, delConfirm,
-    setDelConfirm, delWorkspace, orgId, wsId, showToast, load, genBusy, setGenBusy, setMemberChanges,
+    setDelConfirm, delWorkspace, orgId, wsId, showToast, load, genBusy, setGenBusy, setMemberChanges, wsCanEdit,
   } = ctx;
   const spaceWords = t('organisms.docSpaceNamePlaceholder') || 'New document space name';
   return html`
@@ -161,6 +164,10 @@ export function renderSettingsPanel(ctx) {
             ['suggest', t('organisms.memberChanges.suggest') || 'waits until the creator or an admin approves it'],
             ['direct', t('organisms.memberChanges.direct') || 'is made at once, with their name on it'],
           ]} />
+      <//>
+
+      <${Split}>
+        <${ContainerLabel} kind="workspace" organismId=${orgId} ws=${wsId} canSet=${!!wsCanEdit} showToast=${showToast} />
       <//>
 
       <${Split}>

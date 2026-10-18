@@ -17,6 +17,8 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.11.0 -- 2026-10-18 -- "Who sees" shows the organism's classification, and its creator or an admin
+ *     changes it there, while classification is on (ContainerLabel; plan doc-mvdipuyqraas, L4.4).
  *   v1.10.0 -- 2026-10-02 -- The question mark that explains the Agents choice: organism.agent_access (components/HelpTip.js).
  *   2026-09-28 — "Who gets in" has the Agents choice: every member's agents, or only the agents in the Agents
  *     section (agent_access). Sent only when changed.
@@ -55,6 +57,8 @@ import { Choice } from '/components/Choice.js';
 import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { SettingBox, SettingRow, SettingConfirm } from '/components/Box.js';
+import { Space } from '/components/Layout.js';
+import { ContainerLabel } from '/views/profile/classification/container-label.js';
 import * as orgService from '/js/services/organisms.js';
 import { copyToClipboard } from '/js/utils.js';
 import { fmtDate } from '/views/profile/organisms/helpers.js';
@@ -261,6 +265,9 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
             <${Choice} label=${label('memberVisLabel', 'Member list')} value=${form.member_visibility} onChange=${(id) => setForm(f => ({ ...f, member_visibility: id }))}
               hint=${t('organisms.memberVisHint') || 'Who can see who belongs here. Hides the member list only; content authorship stays visible.'}
               options=${MEMBER_VIS.map(id => ({ value: id, label: t(`organisms.memberVis.${id}`) || id }))} />
+          <//>
+          <${Space} above="large">
+            <${ContainerLabel} kind="organism" organismId=${org.id} canSet=${canEdit} showToast=${showToast} />
           <//>
         <//>
 

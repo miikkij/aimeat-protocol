@@ -12,6 +12,7 @@
  *   import BoardsTab from './boards-tab.js';
  *   html`<${BoardsTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v2.1.1 — 2026-10-18 — The render bag carries showToast, for a board's classification line (plan doc-mvdipuyqraas, L4.4).
  *   v2.1.0 — 2026-09-25 — The Settings & Controls frame and its side menu are library components (SettingsFrame, SideMenu; settings-frame.css, side-menu.css); the old .pf-shell, .pf-side- and .pf-content names are gone (UI consolidation phase 5, a move).
  *   v2.0.0 — 2026-08-30 — The poster face (design canvas "AIMEAT Taulujen sivu", direction A): the
  *     cover with followed boards, the newest notices, public boards, a board of one's own and a
@@ -268,7 +269,7 @@ export default function BoardsTab({ session, showToast }) {
     folds, setFold, form, setForm, creating, notice, setNotice, posting, rules, setRules, savingRules, memberInput, setMemberInput,
     openNotice, replyText, setReplyText, replying, thanking, updating, onlyNew, setOnlyNew, recentFilter, setRecentFilter, recentAll, setRecentAll, publicAll, setPublicAll, catFilter, setCatFilter,
     startNotice, handleCreate, handleFollow, handleUnfollow, handlePost, handleThank, handleReply, handleResolve, handleExtend, handleDeletePost, handleReport,
-    handleSaveRules, handleAddMember, handleRemoveMember, handleDeleteBoard, loadMore, copy, agentPrompt, ConfirmUI,
+    handleSaveRules, handleAddMember, handleRemoveMember, handleDeleteBoard, loadMore, copy, agentPrompt, ConfirmUI, showToast,
   };
   return renderBoardsView(ctx);
 }

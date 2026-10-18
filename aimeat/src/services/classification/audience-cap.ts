@@ -29,11 +29,13 @@
  *
  *   ON A CLOSED NODE public and link compare as signed-in (audience-levels.ts storedLevel).
  * @structure CapSubject · AudienceCapAnswer · LABEL_CAPS_AUDIENCE · audienceCapOf() · capMessage() ·
- *   capByOf() · capRefusalOf() · audienceOfVisibility() · audienceOfShareAccess() · audienceOfOrganism()
+ *   capByOf() · capRefusalOf() · audienceExceptionCovers() · audienceOfVisibility() · audienceOfShareAccess() · audienceOfOrganism()
  * @usage
  *   const cap = await audienceCapOf({ storage, config }, memoryTarget(owner, key), 'public', { from: 'private' });
  *   if (cap.kind === 'refused') return { ok: false, status: cap.status, code: cap.code, message: cap.message };
  * @version-history
+ *   v1.1.0 — 2026-10-18 — audienceExceptionCovers is exported: the exposure report marks an item an
+ *     exception covers as excepted, not as a conflict, with this same test (plan doc-mvdipuyqraas, L4.1).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L3.2, L3.3, L3.5).
  */
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
@@ -90,7 +92,7 @@ export function capMessage(label: ClassificationLabel, from: string, cap: Audien
 }
 
 /** Does this exception still cover the item: made for a label no lower than the one it carries now? */
-function stillCovers(e: ClassificationException, label: ClassificationLabel, rankOf: (id: string) => number): boolean {
+export function audienceExceptionCovers(e: ClassificationException, label: ClassificationLabel, rankOf: (id: string) => number): boolean {
   return e.action === 'audience' && (!e.label || e.label === label.id || rankOf(e.label) >= label.rank);
 }
 
@@ -115,7 +117,7 @@ export async function audienceCapOf(ctx: CapCtx, subject: CapSubject, to: Audien
   if (hasAddress(subject)) {
     const rankOf = (id: string) => labelById(policy, id)?.rank ?? -1;
     const found = (await activeExceptionsFor({ storage, config }, subject.scope, [subject])).get(`${subject.kind}\u0000${subject.key}`) ?? [];
-    const exception = found.find(e => stillCovers(e, label, rankOf));
+    const exception = found.find(e => audienceExceptionCovers(e, label, rankOf));
     if (exception) {
       recordExceptionUse(exception, by.principal, by.kind, `audience ${level}${opts.where ? ` at ${opts.where}` : ''}`);
       return { kind: 'allowed', exception };

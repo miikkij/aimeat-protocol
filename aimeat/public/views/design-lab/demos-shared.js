@@ -9,6 +9,8 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.17.0 — 2026-10-18 — ClassificationBadge's demo: the four default classifications, one from a
+ *     workspace, a conflict and an exception beside the AudienceBadge.
  *   v1.16.0 — 2026-10-18 — AudienceBadge's demo: every level in a row, an organism not named yet, the button.
  *   v1.15.0 — 2026-10-16 — HtmlPageFrame's demo: framed with Report, the text without a page host, loading.
  *   v1.14.0 — 2026-09-27 — The own-aimeat demo moves to demos-operator.js, drawn by calling OwnAimeat;
@@ -36,6 +38,7 @@ import { CardMenu } from '/components/CardMenu.js';
 import { Markdown } from '/components/Markdown.js';
 import { AiLabel, AiInteractionNotice } from '/components/ai-label.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
+import { ClassificationBadge } from '/components/ClassificationBadge.js';
 import { Marks } from '/components/Mark.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { ImageView } from '/components/ImageDeliverable.js';
@@ -52,6 +55,13 @@ const noop = () => {};
 
 const MARKDOWN = '## A heading\n\nA paragraph with **bold**, *italic*, `code` and [a link](https://aimeat.io).\n\n- one\n- two\n\n> A quote.\n\n| Name | Value |\n|---|---|\n| a | 1 |\n\n```\nconst x = 1;\n```';
 const AI_RECORD = { level: 'ai-generated', disclosure: { required: true, strength: 'full' } };
+/** The node's default classifications as the policy hands them (services/classification/defaults.ts): their colours are data. */
+const DEMO_LABELS = [
+  { id: 'julkinen', name: { fi: 'Julkinen', en: 'Public', es: 'Público' }, color: '#3f9d6b' },
+  { id: 'sisainen', name: { fi: 'Sisäinen', en: 'Internal', es: 'Interno' }, color: '#4a7bd0' },
+  { id: 'luottamuksellinen', name: { fi: 'Luottamuksellinen', en: 'Confidential', es: 'Confidencial' }, color: '#d08a2e' },
+  { id: 'erittain-luottamuksellinen', name: { fi: 'Erittäin luottamuksellinen', en: 'Highly confidential', es: 'Altamente confidencial' }, color: '#c8453b' },
+];
 
 /** The sandbox overlay opens itself when this demo is drawn, so its look can be seen. */
 function SandboxOpen() {
@@ -91,6 +101,20 @@ export const SHARED_DEMOS = {
     <//>` },
     { name: 'organism not named yet', render: () => html`<${AudienceBadge} value="organism:not-a-member" />` },
     { name: 'a button that changes it', render: () => html`<${AudienceBadge} value="public" onClick=${noop} />` },
+  ] },
+  'classification-badge': { variants: [
+    { name: 'the default classifications', render: () => html`<${Marks}>
+      ${DEMO_LABELS.map((l) => html`<${ClassificationBadge} key=${l.id} label=${l} from="own" />`)}
+    <//>` },
+    { name: 'from its workspace', render: (ex) => html`<${ClassificationBadge} label=${ex.label} from="workspace" />` },
+    { name: 'a conflict beside who can read it', render: (ex) => html`<${Marks}>
+      <${AudienceBadge} value="public" />
+      <${ClassificationBadge} label=${ex.label} from="own" conflict conflictTitle="Classified Confidential, which allows at most: Members only. Now: Open to everyone." />
+    <//>` },
+    { name: 'an exception', render: (ex) => html`<${Marks}>
+      <${AudienceBadge} value="members" />
+      <${ClassificationBadge} label=${ex.label} from="own" excepted exceptedTitle="Your exception keeps it open more widely." />
+    <//>` },
   ] },
   'voice-recorder': { variants: [
     { name: 'default', render: (ex) => html`<${VoiceRecorder} maxSeconds=${ex.maxSeconds} className=${ex.className} onRecorded=${noop} />` },

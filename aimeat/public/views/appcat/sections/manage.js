@@ -14,6 +14,8 @@
  * @structure meta · ManageSection({ d }) · AccessCode({ d, onSaved, onCancel }) · OpenTo({ d, raw, onSet, busy })
  * @usage const mod = await import('./sections/manage.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.4.0 — 2026-10-18 — The app's classification under who can open it, which the owner changes there
+ *     while classification is on (ContainerLabel; plan doc-mvdipuyqraas, L4.4).
  *   v1.3.0 — 2026-10-18 — Who can open it, under the listing: anyone with the link, people signed in
  *     here, or the members of one shared place the owner belongs to (`open_to` on PATCH
  *     /v1/apps/:filename), and the sentence that says it (plan doc-mvcn6c7e4e5q, V2.5).
@@ -43,6 +45,8 @@ import { apiGet } from '/js/api.js';
 import { signedInOnly } from '/js/site.js';
 import { x } from '/views/appcat/i18n.js';
 import { patchApp, errorText, isOperator, noticeKind } from '/views/appcat/sections/app-write.js';
+import { ContainerLabel } from '/views/profile/classification/container-label.js';
+import { Space } from '/components/Layout.js';
 
 const html = htm.bind(h);
 
@@ -186,6 +190,11 @@ export default function ManageSection({ d }) {
     <//>
     <${Note} kind="quiet" chapter>${x('manage.listingHint.' + listing)}<//>
     <${OpenTo} d=${d} raw=${openTo} busy=${busy} onSet=${(v) => flip('open_to', v)} />
+    <${Fields} plain chapter>
+      <${Space} below="medium">
+        <${ContainerLabel} kind="app" app=${d.filename} canSet chapter showToast=${(m, kind) => d.notice(m, kind === 'success' || kind === 'error' ? kind : noticeKind(m))} />
+      <//>
+    <//>
     <${Actions} chapter>
       <${Action} small title=${x(forkable ? 'card.forkableOnHint' : 'card.forkableOffHint')}
         onClick=${() => flip('forkable', !forkable)}>${x(forkable ? 'card.forkableOn' : 'card.forkableOff')}<//>

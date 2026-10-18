@@ -9,6 +9,8 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.10.0 — 2026-10-18 — ClassificationBadge (components/ClassificationBadge.js): how sensitive one thing
+ *     is, beside the AudienceBadge, with a conflict as its own mark (plan doc-mvdipuyqraas, L4.2).
  *   v1.9.1 — 2026-10-18 — AudienceBadge has its own sheet (audience-badge.css): it sizes to its words, and a link or a code is the attention tone.
  *   v1.9.0 — 2026-10-18 — AudienceBadge (components/AudienceBadge.js): who can read one thing of the
  *     person's, in words, on the Tag (plan doc-mvcn6c7e4e5q, V6.4).
@@ -104,6 +106,28 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
             { name: 'private', prop: "value='private'", when: 'only the person, their agents or people they named: dim' },
         ],
         example: { value: 'organism:demo', organismName: 'Innokas Medical' },
+    },
+    {
+        id: 'classification-badge', name: 'ClassificationBadge', kind: 'component', status: 'active',
+        summary: 'How sensitive one thing of the person\'s is, beside the AudienceBadge: the classification\'s name in the reader\'s language on the Tag, after a square in the classification\'s own colour (data from the policy, an SVG fill; the words stay ink). The tooltip says where the classification came from when a workspace, a shared place, a board or an app raised it. A conflict (open to more people than the classification allows) is the danger Status after it, an owner\'s exception the plain Status.',
+        module: '/components/ClassificationBadge.js', sheet: '/css/components/classification-badge.css',
+        data: {
+            shape: 'ClassificationBadge({ label, from, conflict, conflictTitle, excepted, exceptedTitle })',
+            fields: {
+                label: 'a classification as the policy or the exposure report hands it: { id, name: { fi, en, es }, color }',
+                from: "where it came from: 'own', or 'workspace' | 'organism' | 'board' | 'app' when a container raised it",
+                conflict: 'the thing is open to more people than its classification allows: the danger Status after the tag',
+                excepted: 'the owner\'s exception keeps it open more widely: the plain Status after the tag',
+            },
+        },
+        useFor: ['Where classification is on: an item of the What others can see page beside its AudienceBadge, and the classification of an organism, a workspace, a board or an app on its own page.'],
+        variants: [
+            { name: 'own', prop: "from='own'", when: 'the item carries the classification itself' },
+            { name: 'from a container', prop: "from='workspace' | 'organism' | 'board' | 'app'", when: 'a container raised it; the tooltip names which' },
+            { name: 'conflict', prop: 'conflict', when: 'open to more people than the classification allows: the danger Status (poster.css) after the tag' },
+            { name: 'exception', prop: 'excepted', when: 'the owner\'s exception keeps it open more widely: the plain Status (poster.css) after the tag' },
+        ],
+        example: { label: { id: 'luottamuksellinen', name: { fi: 'Luottamuksellinen', en: 'Confidential', es: 'Confidencial' }, color: '#d08a2e' }, from: 'own' },
     },
     {
         id: 'voice-recorder', name: 'VoiceRecorder', kind: 'component', status: 'active',

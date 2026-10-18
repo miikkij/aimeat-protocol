@@ -26,11 +26,21 @@
  *   many.
  *   A report with every source failed is no report: exposureUnreadable() says so, and the doors
  *   answer it as a failure.
- * @structure ExposureReport · NodeExposureReport · buildExposureReport · buildNodeExposureReport ·
- *   exposureUnreadable · EXPOSURE_UNREADABLE_MESSAGE
+ *
+ *   CONFLICTS FIRST (plan doc-mvdipuyqraas, L4.1). Where classification is on, each item that has a
+ *   classification address carries `classification`: its effective label (name, colour, where it came
+ *   from), the label's audience cap, and whether the item's level is wider than the cap. Such an item
+ *   is a CONFLICT unless the owner's 'audience' exception covers it (then `excepted`), and conflicts
+ *   are listed before everything else. `classification` on the report counts them; the node-wide
+ *   report counts them for the operator. The report changes nothing (decision 10.3):
+ *   exposure-classification.ts decides, and the person or their AI lowers the level.
+ * @structure ExposureReport · ReportedItem · NodeExposureReport · buildExposureReport ·
+ *   buildNodeExposureReport · exposureUnreadable · EXPOSURE_UNREADABLE_MESSAGE
  * @usage
  *   const report = await buildExposureReport(createExposureContext(storage, config), 'alice', reader);
  * @version-history
+ *   v1.4.0 — 2026-10-18 — Each item's effective classification and audience cap, the conflicts listed
+ *     first, and their number on the report and on the node-wide report (plan doc-mvdipuyqraas, L4.1).
  *   v1.3.0 — 2026-10-18 — The places carry a classification address too, and the reader decides on
  *     the effective label (plan doc-mvdipuyqraas, L1.3).
  *   v1.2.0 — 2026-10-18 — NODE_SIGNED_IN_NOTE says that what is made public now is saved for signed-in accounts (plan V1.6).
@@ -47,6 +57,18 @@ import {
   KINDS, LEVELS, EXPOSURE_ITEM_CAP,
 } from './exposure-types.js';
 import { EXPOSURE_SOURCES } from './exposure-sources.js';
+import { classifyExposure, type ItemClassification } from './exposure-classification.js';
+
+/** An item as the report lists it: with its classification where classification is on. */
+export type ReportedItem = ExposureItem & { classification?: ItemClassification };
+
+/** How many items are over their classification's audience cap; present only where classification is on. */
+export interface ExposureConflictCounts {
+  /** Items whose level is wider than their effective classification allows, with no exception. */
+  conflicts: number;
+  /** Items over the cap that the owner's 'audience' exception lets stay. */
+  excepted: number;
+}
 
 /** How many things, at which level, overall and per kind. */
 export interface ExposureCounts {
@@ -61,8 +83,10 @@ export interface ExposureReport {
   owner: string;
   generated_at: string;
   counts: ExposureCounts;
-  /** Widest level first, then by kind. At most EXPOSURE_ITEM_CAP per kind. */
-  items: ExposureItem[];
+  /** Conflicts first, then the widest level first, then by kind. At most EXPOSURE_ITEM_CAP per kind. */
+  items: ReportedItem[];
+  /** Present when classification is on for the account or any item: the conflicts, counted. */
+  classification?: ExposureConflictCounts;
   /** The kinds whose item list was cut at EXPOSURE_ITEM_CAP. Their counts are complete. */
   capped: ExposureKind[];
   /** The kinds that could not be read this time. Their counts are missing, not zero. */
@@ -88,6 +112,8 @@ export interface NodeExposureReport {
   top_owners: Array<{ owner: string; total: number; by_level: Record<ExposureLevel, number> }>;
   /** The kinds that could not be read for at least one account, with how many accounts. */
   failed: Partial<Record<ExposureKind, number>>;
+  /** Present when classification is on for any account: each conflicting thing counted once. */
+  classification?: ExposureConflictCounts;
   notes: string[];
 }
 
@@ -127,13 +153,17 @@ function notesFor(ctx: ExposureContext): string[] {
 
 export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in, and what is made public now is saved for signed-in accounts.';
 
-/** An item as the report hands it out: the content address a source attached stays behind. */
-function outward(f: ExposureFound): ExposureItem {
+/**
+ * An item as the report hands it out: the content address a source attached stays behind, and the
+ * classification exposure-classification.ts decided for it comes along.
+ */
+function outward(f: ExposureFound, cls?: ItemClassification): ReportedItem {
   return {
     kind: f.kind, id: f.id, title: f.title, level: f.level,
     ...(f.organism_id ? { organism_id: f.organism_id } : {}),
     ...(f.url ? { url: f.url } : {}),
     how_to_close: f.how_to_close,
+    ...(cls ? { classification: cls } : {}),
   };
 }
 
@@ -181,9 +211,10 @@ export function exposureUnreadable(report: { failed: readonly unknown[] }): bool
 /** The sentence both doors answer an unreadable report with. */
 export const EXPOSURE_UNREADABLE_MESSAGE = 'None of the places your content lives could be read just now, so no report was made. Try again in a moment.';
 
-/** Widest level first, then the order of KINDS, then the title. */
-function byExposure(a: ExposureItem, b: ExposureItem): number {
-  return LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level)
+/** Conflicts first, then the widest level, then the order of KINDS, then the title. */
+function byExposure(a: ReportedItem, b: ReportedItem): number {
+  return Number(!!b.classification?.conflict) - Number(!!a.classification?.conflict)
+    || LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level)
     || KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind)
     || a.title.localeCompare(b.title);
 }
@@ -196,15 +227,16 @@ function byExposure(a: ExposureItem, b: ExposureItem): number {
 export async function buildExposureReport(ctx: ExposureContext, ownerName: string, reader: ContentReader): Promise<ExposureReport> {
   const ownerGhii = `${ownerName}@${ctx.config.nodeId}`;
   const { found, failed } = await readAll(ctx, ownerName, ownerGhii);
-  const all: ExposureItem[] = [];
-  const shown: ExposureItem[] = [];
+  const all: ExposureFound[] = [...found.values()].flat();
+  // Every item found, hidden ones included: the conflict counts are of everything, as the counts are.
+  const cls = await classifyExposure(ctx, ownerGhii, all);
+  const shown: ReportedItem[] = [];
   const capped: ExposureKind[] = [];
   let hidden = 0;
   for (const [kind, items] of found) {
-    all.push(...items);
     const visible = await reader.show(items, f => f.content ?? null);
     hidden += items.length - visible.length;
-    const ordered = visible.map(outward).sort(byExposure);
+    const ordered = visible.map(f => outward(f, cls.items.get(f))).sort(byExposure);
     if (ordered.length > EXPOSURE_ITEM_CAP) capped.push(kind);
     shown.push(...ordered.slice(0, EXPOSURE_ITEM_CAP));
   }
@@ -213,6 +245,7 @@ export async function buildExposureReport(ctx: ExposureContext, ownerName: strin
     generated_at: new Date(ctx.nowMs).toISOString(),
     counts: countItems(all),
     items: shown.sort(byExposure),
+    ...(cls.on ? { classification: { conflicts: cls.conflicts, excepted: cls.excepted } } : {}),
     capped,
     failed,
     hidden_by_classification: hidden,
@@ -229,16 +262,25 @@ export async function buildNodeExposureReport(ctx: ExposureContext): Promise<Nod
   const owners = await ctx.storage.listOwners();
   const read = owners.slice(0, NODE_OWNER_CAP);
   const unique = new Map<string, ExposureItem>();
+  // The things over their cap, each once, keyed as `unique` is: true a conflict, false excepted.
+  const overCap = new Map<string, boolean>();
+  let classificationOn = false;
   const perOwner: NodeExposureReport['top_owners'] = [];
   const failed: Partial<Record<ExposureKind, number>> = {};
   for (const o of read) {
-    const { found, failed: f } = await readAll(ctx, o.name, `${o.name}@${ctx.config.nodeId}`);
+    const ghii = `${o.name}@${ctx.config.nodeId}`;
+    const { found, failed: f } = await readAll(ctx, o.name, ghii);
     for (const k of f) failed[k] = (failed[k] ?? 0) + 1;
     const mine: ExposureItem[] = [];
+    const cls = await classifyExposure(ctx, ghii, [...found.values()].flat());
+    classificationOn ||= cls.on;
     for (const items of found.values()) {
       for (const it of items) {
         mine.push(it);
-        unique.set(`${it.kind}|${ACCOUNT_SCOPED_IDS.has(it.kind) ? o.name : ''}|${it.id}|${it.level}`, it);
+        const key = `${it.kind}|${ACCOUNT_SCOPED_IDS.has(it.kind) ? o.name : ''}|${it.id}|${it.level}`;
+        unique.set(key, it);
+        const c = cls.items.get(it);
+        if (c?.conflict || c?.excepted) overCap.set(key, c.conflict);
       }
     }
     if (mine.length) {
@@ -254,6 +296,10 @@ export async function buildNodeExposureReport(ctx: ExposureContext): Promise<Nod
     counts: countItems(unique.values()),
     top_owners: perOwner.slice(0, TOP_OWNERS),
     failed,
+    ...(classificationOn ? { classification: {
+      conflicts: [...overCap.values()].filter(Boolean).length,
+      excepted: [...overCap.values()].filter(v => !v).length,
+    } } : {}),
     notes: notesFor(ctx),
   };
 }
