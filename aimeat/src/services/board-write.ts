@@ -47,6 +47,8 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.9.0 -- 2026-10-18 -- createBoard refuses a level wider than the owner's default label allows
+ *     with 409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   v1.8.0 -- 2026-10-18 -- A new board's name and description meet the detection rules written for
  *     boards (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   v1.7.0 -- 2026-10-18 -- createBoard without a visibility takes visibility.board_default (code
@@ -90,6 +92,7 @@ import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-r
 import { boardVisibilityDefault } from './content-defaults.js';
 import { classifyContainerAfterWrite } from './classify-on-write.js';
 import { boardTarget } from './classification/containers.js';
+import { audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf } from './classification/audience-cap.js';
 
 /** The bounds BoardRulesSchema applies on the HTTP door. */
 export const BOARD_RULE_LIMITS = {
@@ -348,6 +351,13 @@ export async function createBoard(
     const level = await boardVisibilityRefusal(storage, input.visibility ?? boardVisibilityDefault(deps.config), caller);
     if (!level.ok) return level;
     let visibility = level.visibility;
+    // A new board carries its owner's default label, whose cap holds its level (plan doc-mvdipuyqraas, L3.5).
+    if (input.publishGate) {
+        const capped = capRefusalOf(await audienceCapOf(deps, { scope: caller.gaii }, audienceOfVisibility(visibility), {
+            by: capByOf(input.publishGate.caller), where: 'board create',
+        }));
+        if (capped) return capped;
+    }
     // The publish gate (plan doc-mvcn6c7e4e5q, V4), before the first write: asked by a caller the
     // node asks the owner about, the board is made private and the request is filed once it exists.
     let ask: Extract<PublishAsk, { kind: 'ask' }> | null = null;

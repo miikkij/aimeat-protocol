@@ -29,6 +29,8 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-18 — Create and update refuse a visibility wider than the organism's label allows with
+ *     409 LABEL_CAPS_AUDIENCE, before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   2026-10-18 — A created or renamed organism's name and description meet the detection rules
  *     written for organisms (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   2026-10-18 — The organism's board is at `organism:<id>` for a listed or private organism (was
@@ -83,6 +85,7 @@ import { organismVisibilityDefault } from './content-defaults.js';
 import { organismBoardVisibility, followOrganismVisibility } from './organism-board.js';
 import { classifyContainerAfterWrite } from './classify-on-write.js';
 import { organismTarget } from './classification/containers.js';
+import { audienceCapOf, audienceOfOrganism, capByOf, capRefusalOf } from './classification/audience-cap.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -151,6 +154,19 @@ function organismPublishAsk(
   return ask.kind === 'allowed' ? null : ask;
 }
 
+/**
+ * The organism's label caps its own level (plan doc-mvdipuyqraas, L3.5): null, or the 409 to answer.
+ * Asked at the doors (a `gate`), before the publish gate and before the first write.
+ */
+async function organismCapRefusal(
+  deps: OrganismDeps, gate: PublishGateInput | undefined, id: string, from: string | undefined, to: string | undefined,
+): Promise<OrganismRefusal | null> {
+  if (!gate) return null;
+  return capRefusalOf(await audienceCapOf(deps, organismTarget(id), audienceOfOrganism(to), {
+    from: from === undefined ? null : audienceOfOrganism(from), by: capByOf(gate.caller), where: 'organism visibility',
+  }));
+}
+
 /** File the request to make the organism public, once it exists at `from` (plan doc-mvcn6c7e4e5q, V4). */
 async function fileOrganismAsk(
   deps: OrganismDeps, gate: PublishGateInput, ask: Extract<PublishAsk, { kind: 'ask' }>, id: string, from: string,
@@ -194,6 +210,10 @@ export async function createOrganismRecord(
   // The publish gate (plan doc-mvcn6c7e4e5q, V4): the default may be public, so a create that names no
   // visibility asks too. Asked by a caller the node asks the owner about, the organism and its board
   // are made private, and the request is filed once the organism exists.
+  const id = uuidv4();
+  // A new organism carries the default label, whose cap holds its level (plan doc-mvdipuyqraas, L3.5).
+  const capped = await organismCapRefusal(deps, input.publishGate, id, undefined, visibility);
+  if (capped) return capped;
   const ask = organismPublishAsk(deps, input.publishGate, undefined, visibility);
   if (ask?.kind === 'refused') return refuse(ask.status, ask.code, ask.message);
   if (ask) visibility = 'private';
@@ -203,7 +223,6 @@ export async function createOrganismRecord(
     : undefined;
   const maxMembers = Number(input.maxMembers) > 0 ? Number(input.maxMembers) : 500;
 
-  const id = uuidv4();
   const now = new Date().toISOString();
   const boardId = `org-${id}`;
 
@@ -390,6 +409,16 @@ export async function updateOrganismRecord(
   }
   // The publish gate (plan doc-mvcn6c7e4e5q, V4), before the first write: asked by a caller the node
   // asks the owner about, the rest of the change applies and the organism keeps the level it had.
+  // The organism's label caps its level (plan doc-mvdipuyqraas, L3.5), before the publish gate.
+  if (updates.visibility !== undefined) {
+    const capped = await organismCapRefusal(deps, input.publishGate, organism.id, organism.visibility, updates.visibility);
+    if (capped) return capped;
+  }
+  // A member list shown to anyone is the organism shown to anyone, as the exposure report counts it.
+  if (updates.memberVisibility === 'public' && organism.memberVisibility !== 'public') {
+    const capped = await organismCapRefusal(deps, input.publishGate, organism.id, undefined, 'public');
+    if (capped) return capped;
+  }
   const ask = organismPublishAsk(deps, input.publishGate, organism.visibility, updates.visibility);
   if (ask?.kind === 'refused') return refuse(ask.status, ask.code, ask.message);
   if (ask) delete updates.visibility;

@@ -17566,6 +17566,16 @@ paths:
         (POLICY_DILUTES) names each node rule it would have loosened. A person's change applies at
         once. An AI's change applies at once when it only tightens; one that gives anything away is
         kept as a proposal (`pending: PERSON_APPROVES`) for a person to review.
+
+        A label may carry `maxAudience` (plan doc-mvdipuyqraas, L3.1): public, link, signed-in,
+        organism or private, the widest audience its content may be given; absent or null is no cap.
+        A lower level may narrow a node label's cap and never widen it (POLICY_DILUTES). Every place
+        that sets who may read content or a container (a memory record, a stored file, a workspace
+        share, a board, an app, an organism) refuses a level wider than the content's effective
+        label allows with 409 LABEL_CAPS_AUDIENCE, before the publish gate; an approved publish
+        request is held to it again. A label that rises over content already wider lowers that
+        content to the cap at once and notifies its owner. Content over a cap when the cap is set is
+        not changed.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -17667,7 +17677,8 @@ paths:
         Every act against a classification, with who did it, the item, the classification and the
         reason, newest first (decided 2026-09-30). A person's exception (auto false) lets one item
         leave (`leave`, any destination) or lets an AI send it out (`ai-send`) despite its
-        classification; an app's act against a classification is not refused but recorded here
+        classification, or lets one item be shown wider than its classification's audience cap
+        (`audience`); an app's act against a classification is not refused but recorded here
         automatically (auto true: `lower`, `policy`, `review`, `leave`). The same authorization as the
         audit log: level owner is the caller's owner's content, organism needs its creator or an
         admin, node needs the operator in person or an operator's agent or app with the
@@ -17677,7 +17688,7 @@ paths:
       parameters:
         - { name: level, in: query, schema: { type: string, enum: [node, owner, organism], default: owner } }
         - { name: organism_id, in: query, schema: { type: string } }
-        - { name: action, in: query, schema: { type: string, enum: [leave, ai-send, lower, policy, review] } }
+        - { name: action, in: query, schema: { type: string, enum: [leave, ai-send, audience, lower, policy, review] } }
         - { name: since, in: query, schema: { type: string, format: date-time } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
       responses:
@@ -17692,7 +17703,13 @@ paths:
         share link, another node, an outside service) or lets an AI send it out (`ai-send`) despite its
         classification, with a written reason and an optional expiry. An app may make one too. An AI
         credential (an agent, an ecosystem app, a personal access token) is refused with
-        PERSON_REQUIRED. The caller must be allowed to change the item's classification. The
+        PERSON_REQUIRED. The caller must be allowed to change the item's classification.
+
+        `audience` (plan doc-mvdipuyqraas, L3.3): the owner, signed in themselves and never through an
+        app, lets one item, or one container (kind organism, workspace, board or app), be given a level
+        wider than its classification's `maxAudience`. It is made for the item's effective
+        classification and lapses when that rises. Without a reason it is refused with
+        JUSTIFICATION_REQUIRED; from an app or an AI credential with PERSON_REQUIRED. The
         exception, its reason and every use of it are kept on the list and in the audit log.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
@@ -17704,20 +17721,22 @@ paths:
               type: object
               required: [action, reason]
               properties:
-                kind: { type: string, enum: [memory, file, row] }
+                kind: { type: string, enum: [memory, file, row, organism, workspace, board, app], description: 'A container (organism, workspace, board, app) only with action audience.' }
                 key: { type: string }
                 organism_id: { type: string }
                 ws: { type: string }
                 space: { type: string }
                 row_id: { type: string }
+                board_id: { type: string, description: 'kind board: the board id.' }
+                app: { type: string, description: 'kind app: the filename of your hosted app or the name of your ecosystem app.' }
                 owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
-                action: { type: string, enum: [leave, ai-send] }
+                action: { type: string, enum: [leave, ai-send, audience] }
                 reason: { type: string, maxLength: 1000 }
                 until: { type: string, format: date-time, description: When the exception ends. Absent, until it is withdrawn. }
       responses:
         '201': { description: The exception. }
-        '400': { description: 'INVALID_INPUT: no reason, an unknown action, or until not in the future.' }
-        '403': { description: PERSON_REQUIRED for an AI credential. }
+        '400': { description: 'INVALID_INPUT: no reason, an unknown action, or until not in the future. JUSTIFICATION_REQUIRED: an audience exception without a reason.' }
+        '403': { description: PERSON_REQUIRED for an AI credential, and for an app making an audience exception. }
         '404': { description: No such content, or not the caller's to change. }
         '409': { description: EXCEPTION_LIMIT, the month's list is full. }
 
@@ -73900,7 +73919,9 @@ paths:
         (403 OWN_REQUEST, 403 SCOPE_DENIED), and may decline any request it did not file. An app
         grant, an ecosystem app and a visitor from another node decide nothing (403 ACCESS_DENIED).
         A target that changed since the request (deleted, written again without asking, its level
-        changed) is not made public: 409 OUTDATED, and the request is settled outdated. A settled
+        changed) is not made public: 409 OUTDATED, and the request is settled outdated. A target whose
+        classification no longer allows the level (its label's maxAudience) is not made public either:
+        409 LABEL_CAPS_AUDIENCE, settled outdated with the reason; no approval passes the cap. A settled
         request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED. Requires memory:write.
       security: [{ BearerAuth: [] }]
       parameters:

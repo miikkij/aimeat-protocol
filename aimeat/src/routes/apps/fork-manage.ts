@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — A PATCH that would give the app a level wider than its label allows is refused with
+ *     409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   2026-10-18 — The publish gate (services/app-publish-gate.ts): a PATCH that makes the app public
  *     (listed, no code, open to anyone), and a fork the node's defaults would make public, by a caller
  *     the owner is asked about, apply everything but that one change and answer 202 with
@@ -84,7 +86,7 @@ import { appIsPaced, appToll } from '../../services/app-pacing.js';
 import { currentAppRow } from '../../services/app-served-protection.js';
 import { callerOf } from '../../middleware/caller.js';
 import { fileAppPublishAsk, appAskedNote, publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
-import { appSettingsGate } from '../../services/app-settings-gate.js';
+import { appSettingsGate, appSettingsCapRefusal } from '../../services/app-settings-gate.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
 
 /** What PATCH /v1/apps/:filename answers when the body cannot be carried out, before it writes. */
@@ -363,6 +365,12 @@ export function registerForkManageRoutes(
         // The publish gate (plan doc-mvcn6c7e4e5q, V4): a change that makes the app public (listed,
         // no code, open to anyone), by a caller the node asks the owner about, is applied without
         // that one field, and the request for it is filed after the writes. Before the first write.
+        // Before it, the app's label caps its level (plan doc-mvdipuyqraas, L3.5).
+        const capped = await appSettingsCapRefusal({ storage, config }, callerOf(req, config.nodeId, storage), app, body);
+        if (capped) {
+            res.status(capped.status).json(error(config.nodeId, capped.code, capped.message));
+            return;
+        }
         const gate = appSettingsGate({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, app, body);
         if (gate.kind === 'refused') {
             res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));

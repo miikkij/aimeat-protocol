@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.8.0 — 2026-10-18 — A fork's default exposure is narrowed to its label's audience cap before the
+ *     publish gate (capFirstPublishExposure; plan doc-mvdipuyqraas, L3.5).
  *   v1.7.0 — 2026-10-18 — A fork is announced on the public feed only when the new app is really public
  *     (listed, open to anyone, no access code; services/app-announce.ts, Jouni's ruling).
  *   v1.6.0 — 2026-10-18 — The publish gate (services/app-publish-gate.ts): a fork the node's defaults
@@ -111,7 +113,7 @@ export function appFilenameRefusal(filename: string): PublishAppRefusal | null {
 // so the services that only need them do not depend on publishing. Re-exported for every importer.
 import type { AppOwnerScope } from './app-owner-scope.js';
 import { publishExposure } from './app-publish-exposure.js';
-import { gateFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
+import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
 import type { PublishAsk } from './publish-requests/ask.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 
@@ -492,7 +494,9 @@ export async function forkApp(
   // A fork is a new app of the forker's, so it is listed and opened the way a first publish is: the
   // node's new-app defaults (services/app-publish-exposure.ts). No code: the fork answer has no place
   // to tell the forker one, and the source's code is never copied.
-  const gated = gateFirstPublishExposure(publishExposure(config, null, { mode: 'explicit', value: undefined }), true, input.publishGate);
+  // Narrowed first to the fork's label's audience cap (plan doc-mvdipuyqraas, L3.5).
+  const capped = await capFirstPublishExposure({ storage, config }, callerGhii, newFilename, publishExposure(config, null, { mode: 'explicit', value: undefined }), true);
+  const gated = gateFirstPublishExposure(capped, true, input.publishGate);
   if ('refusal' in gated) return gated;
   const { exposure } = gated;
   await storage.createApp({

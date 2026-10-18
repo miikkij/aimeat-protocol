@@ -19,6 +19,9 @@
  * @structure PublishViewer · listPublishRequestsFor · readPublishRequestFor · decidePublishRequest
  * @usage const out = await decidePublishRequest({ storage, config }, viewer, id, 'approve');
  * @version-history
+ *   v1.1.0 — 2026-10-18 — An approval is held to the label's audience cap again before the applier
+ *     runs; a refused one is settled outdated and answered 409 LABEL_CAPS_AUDIENCE (cap-recheck.ts;
+ *     plan doc-mvdipuyqraas, L3.3).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import { callerPrincipal } from '../../utils/gaii.js';
@@ -31,6 +34,7 @@ import {
 import { publishDecisionRefusal, publishRequestExpired } from './policy.js';
 import { PUBLISH_APPLIERS } from './appliers.js';
 import { accountGhii } from './ask.js';
+import { requestCapRefusal } from './cap-recheck.js';
 
 const fail = (status: number, code: string, message: string): PublishRequestFail => ({ ok: false, status, code, message });
 
@@ -93,6 +97,13 @@ export async function decidePublishRequest(ctx: PublishStoreCtx, decider: Publis
     if (decision === 'decline') {
       const settled = await settlePublishRequest(ctx, ownerGhii, request, 'declined', { by });
       return { ok: true as const, decision, request: summarizePublishRequest(settled) };
+    }
+    // The label's audience cap is asked again before anything is applied (plan doc-mvdipuyqraas,
+    // L3.3): a request never carries content past it, whoever approves.
+    const capped = await requestCapRefusal(ctx, ownerGhii, request, { principal: by, kind: decider.caller.kind === 'agent' ? 'ai' : 'human' });
+    if (capped) {
+      await settlePublishRequest(ctx, ownerGhii, request, 'outdated', { by, outcome: { reason: capped.message } });
+      return fail(409, 'LABEL_CAPS_AUDIENCE', `${capped.message} The request is closed; nothing was made public.`);
     }
     const applier = PUBLISH_APPLIERS[request.kind];
     const applied = applier

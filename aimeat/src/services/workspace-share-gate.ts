@@ -13,11 +13,13 @@
  *   level it had, or the newly opened targets stay as they were. The request carries the held-back
  *   part as `change.to`, and the applier (apply-workspace-share.ts) hands exactly that body to
  *   setWorkspaceShareOp as the owner.
- * @structure ShareTarget · openTargets · newlyOpened · withholdOpening · fileShareAsk
+ * @structure ShareTarget · openTargets · newlyOpened · withholdOpening · fileShareAsk · shareCapRefusal
  * @usage
  *   const opened = newlyOpened(prev, next);
  *   if (opened.length && ask) { const held = withholdOpening(prev, next, opened, untilIn); ... }
  * @version-history
+ *   v1.1.0 — 2026-10-18 — shareCapRefusal(): the workspace's label and each newly shared page's label
+ *     cap the share's level (plan doc-mvdipuyqraas, L3.5).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
 import type { AimeatConfig } from '../config.js';
@@ -25,6 +27,10 @@ import type { Storage } from '../storage/interface.js';
 import type { ResolvedShare } from '../routes/organisms/share-types.js';
 import type { PublishAsk } from './publish-requests/ask.js';
 import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
+import { readWorkspaceMetaRecord } from './workspace-meta-read.js';
+import { audienceCapOf, audienceOfShareAccess, capRefusalOf, type CapOptions } from './classification/audience-cap.js';
+import { workspaceTarget } from './classification/containers.js';
+import { memoryTarget } from './classification/label-rows.js';
 
 /** A target as `until` names it: `*` (the workspace), `space:<name>`, or `<space>/<id>` (a page). */
 type ShareTarget = string;
@@ -92,4 +98,44 @@ export function fileShareAsk(
     title, name: page ?? where.wsName,
     change: { field: 'share', from: where.from, to: body },
   }, 'it was');
+}
+
+/** Does this share hand anything out: the workspace, a space or a page? */
+function sharesAny(share: Pick<ResolvedShare, 'public' | 'spaces' | 'docs'>): boolean {
+  return share.public || Object.values(share.spaces).some(Boolean) || Object.values(share.docs).some(Boolean);
+}
+
+/**
+ * The labels' audience cap on a share (plan doc-mvdipuyqraas, L3.5): null when `next` may be stored,
+ * or the 409 to answer. Two things are held to it: the workspace itself, whose effective label (its
+ * own, raised to its organism's) caps the level the share opens it at; and each page this call shares
+ * that was not handed out before, held to its own effective label. Asked before the publish gate and
+ * before the share is stored. `wasStored` is false for a workspace never shared, which counts as
+ * private before. A whole space shared at once is held to the workspace's label only: its pages are
+ * not read one by one.
+ */
+export async function shareCapRefusal(
+  ctx: { storage: Storage; config: AimeatConfig }, orgId: string, ws: string,
+  prev: ResolvedShare, next: ResolvedShare, wasStored: boolean, by: CapOptions['by'],
+): Promise<{ ok: false; status: 409; code: string; message: string } | null> {
+  const to = audienceOfShareAccess(next.access);
+  if (!sharesAny(next) || to === 'private') return null;
+  const before = wasStored && sharesAny(prev) ? audienceOfShareAccess(prev.access) : null;
+  const whole = capRefusalOf(await audienceCapOf(ctx, workspaceTarget(orgId, ws), to, { from: before, by, where: 'workspace share' }));
+  if (whole) return whole;
+  const pages = Object.entries(next.docs).filter(([k, v]) => v && prev.docs[k] !== true).map(([k]) => k);
+  if (!pages.length) return null;
+  const manifest = (await readWorkspaceMetaRecord(ctx.storage, orgId, ws, 'meta.manifest', ctx.config.nodeId))?.value as
+    { objectTypes?: Array<{ name?: unknown; namespace?: unknown }> } | undefined;
+  for (const page of pages) {
+    const [space, id] = page.split('/');
+    const ns = (manifest?.objectTypes ?? []).find(o => o && o.name === space)?.namespace;
+    if (typeof ns !== 'string' || !space || !id) continue;
+    // A page already handed out with its whole space or the workspace was at the old level.
+    const from = wasStored && (prev.public || prev.spaces[space] === true) ? audienceOfShareAccess(prev.access) : null;
+    const target = memoryTarget(`organism:${orgId}`, `organism.${orgId}.w.${ws}.${ns}.${id}`);
+    const refused = capRefusalOf(await audienceCapOf(ctx, target, to, { from, by, where: 'workspace share' }));
+    if (refused) return refused;
+  }
+  return null;
 }

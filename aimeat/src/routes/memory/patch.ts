@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-18 — A patch that would raise the record past its label's audience cap is refused with 409
+ *     LABEL_CAPS_AUDIENCE before the publish gate and the write (plan doc-mvdipuyqraas, L3.2).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, visibility 'public' on
  *     a record not public now is stored as 'members' with the warning PUBLIC_IS_SIGNED_IN_HERE, and
  *     the publish gate is not asked (services/closed-node-level.ts, plan V1.6).
@@ -76,6 +78,8 @@ import { closedNodeLevel, type ClosedNodeWarning } from '../../services/closed-n
 import { signedInOnly } from '../../config-visibility.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from '../../services/publish-requests/ask.js';
 import { callerOf } from '../../middleware/caller.js';
+import { memoryCapRefusal } from '../../services/memory-publish-gate.js';
+import { memoryTarget } from '../../services/classification/label-rows.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
@@ -188,6 +192,16 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     });
     if (audience) {
       res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
+      return;
+    }
+    // The label's audience cap (plan doc-mvdipuyqraas, L3.2), as POST asks it inside writeMemoryRecord:
+    // before the publish gate and the write. A patch that names no visibility keeps the stored one.
+    const capCaller = callerOf(req, config.nodeId, storage);
+    const before = await storage.getMemory(gaii, key);
+    const capped = await memoryCapRefusal({ storage, config }, capCaller, [memoryTarget(gaii, key)],
+      visibility ?? before?.visibility ?? memoryVisibilityDefault(config), before?.visibility, 'PATCH /v1/memory');
+    if (capped) {
+      res.status(capped.status).json(error(config.nodeId, capped.code, capped.message));
       return;
     }
     // Making the record public asks the node's publish gate, as POST does inside writeMemoryRecord

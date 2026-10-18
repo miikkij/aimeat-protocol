@@ -38,6 +38,9 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.8.0 — 2026-10-18 — The write, the presigned mint and the visibility change refuse a level wider
+ *     than the file's label allows with 409 LABEL_CAPS_AUDIENCE, before the publish gate (plan
+ *     doc-mvdipuyqraas, L3.2; storage-file-publish.ts fileCapRefusal).
  *   v1.7.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, the write, the
  *     presigned mint and the visibility change store a file asked as public at 'members' (with an
  *     app grant's public upload default too) and answer `warnings` with PUBLIC_IS_SIGNED_IN_HERE,
@@ -91,7 +94,7 @@ import { organismVisibilityRefusal } from './organism-visibility.js';
 import { emitChange } from './event-bus.js';
 import type { CallerContext } from './caller-context.js';
 import {
-    fileRaiseAsk, keptFileLevel, mintPublishCarry, fileFilePublishRequest, closedFileLevel,
+    fileRaiseAsk, keptFileLevel, mintPublishCarry, fileFilePublishRequest, closedFileLevel, fileCapRefusal,
     type StoragePublishGate, type FilePublishFiled,
 } from './storage-file-publish.js';
 import type { ClosedNodeWarning } from './closed-node-level.js';
@@ -122,7 +125,7 @@ export interface StorageWriteDeps {
 export interface StorageWriteRefusal {
     ok: false;
     status: number;
-    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'QUOTA_EXCEEDED' | 'NOT_ORGANISM_MEMBER' | 'PUBLISH_NOT_ALLOWED' | ProvenanceRefusalCode;
+    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'QUOTA_EXCEEDED' | 'NOT_ORGANISM_MEMBER' | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | ProvenanceRefusalCode;
     message: string;
     /**
      * Which ceiling refused, when the code is QUOTA_EXCEEDED. The per-file one has an answer the
@@ -369,6 +372,9 @@ export async function writeStorageFile(
     // 'organism:<id>' names an organism the account owning this namespace is an active member of.
     const audience = await organismVisibilityRefusal(storage, visibility, { identity: ownerGaii });
     if (audience) return { ok: false, ...audience };
+    // The label's audience cap (plan doc-mvdipuyqraas, L3.2), before the publish gate.
+    const capped = await fileCapRefusal({ storage, config }, ownerGaii, input.key, visibility, input.workspaceRef, input.publishGate);
+    if (capped) return capped;
 
     // The publish gate (plan doc-mvcn6c7e4e5q, V4). A write that makes the file public, by a caller
     // the node asks the owner about, stores the file at the level it had (a new one: private) and
@@ -572,6 +578,9 @@ export async function mintStorageUploadUrl(
         const refused = await storageProvenanceMintRefusal(deps, input.provenance);
         if (refused) return refused;
     }
+    // The label's audience cap (plan doc-mvdipuyqraas, L3.2): no URL for a file that could not land.
+    const capped = await fileCapRefusal({ storage: deps.storage, config }, ownerGaii, input.key, input.visibility, input.workspaceRef, input.publishGate);
+    if (capped) return capped;
     const carry = await mintPublishCarry({ storage: deps.storage, config }, ownerGaii, input.key, input.visibility, input.publishGate);
     if (!carry.ok) return carry;
 
@@ -610,7 +619,7 @@ export async function mintStorageUploadUrl(
 
 export type StorageVisibilityResult =
     | ({ ok: true; file: StorageFileRecord } & StoragePublishOutcome)
-    | { ok: false; status: number; code: 'INVALID_INPUT' | 'NOT_FOUND' | 'NOT_ORGANISM_MEMBER' | 'PUBLISH_NOT_ALLOWED'; message: string };
+    | { ok: false; status: number; code: 'INVALID_INPUT' | 'NOT_FOUND' | 'NOT_ORGANISM_MEMBER' | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE'; message: string };
 
 /**
  * Change who may read one stored file: PATCH /v1/storage/{key}/visibility,
@@ -639,6 +648,9 @@ export async function changeStorageFileVisibility(
         ? await closedFileLevel({ storage, config }, ownerGaii, key, requested)
         : { visibility: requested, warning: null };
     const visibility = closed.visibility;
+    // The label's audience cap (plan doc-mvdipuyqraas, L3.2), before the publish gate.
+    const capped = await fileCapRefusal({ storage, config }, ownerGaii, key, visibility, visibility === 'workspace' ? opts.workspaceRef : undefined, opts.publishGate);
+    if (capped) return capped;
     const raise = await fileRaiseAsk({ storage, config }, ownerGaii, key, visibility, opts.publishGate);
     if (raise.kind === 'refused') return { ok: false, status: raise.status, code: raise.code, message: raise.message };
     if (raise.kind === 'ask') {

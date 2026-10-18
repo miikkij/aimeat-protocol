@@ -20,6 +20,8 @@
  *   const ex = useExceptions({ level: 'owner', off: federated, confirm, ok: toast, fail: (m) => toast(m, true) });
  *   html`${exceptionsGroup(ex)}${exceptionDialog(ex)}`; ex.open(item) opens the dialog for an explorer item.
  * @version-history
+ *   v1.3.0 — 2026-10-18 — The dialog offers the third act a person makes: the item may be shown more
+ *     widely than its classification allows ('audience'; plan doc-mvdipuyqraas, L3.3).
  *   v1.2.0 — 2026-10-02 — The question mark that explains an exception: classification.exception (components/HelpTip.js).
  *   v1.1.0 — 2026-09-30 — A withdrawn or ended row is no longer faded as a whole (its reason fell to
  *     about 2.3:1 in light): a grey status mark says "withdrawn" or "ended" with the act in grey
@@ -225,7 +227,8 @@ export function exceptionsGroup(ex, { admin = false } = {}) {
 
 /**
  * The dialog that makes an exception for one classified item: what it lets happen (the item may
- * leave, or an AI may send it), the reason (required), and an optional last day. The server's
+ * leave, an AI may send it, or it may be shown more widely), the reason (required), and an optional
+ * last day. The server's
  * refusal is shown under the fields.
  * @param {ReturnType<typeof useExceptions>} ex
  */
@@ -234,7 +237,8 @@ export function exceptionDialog(ex) {
   if (!m) return null;
   const said = m.reason.trim();
   const label = m.item.labelDetail ? labelName(m.item.labelDetail) : m.item.label;
-  const options = ['leave', 'ai-send'].map((a) => ({ value: a, label: sentence(exceptionActWord({ action: a })), hint: W(a === 'leave' ? 'make.leaveHint' : 'make.aiSendHint') }));
+  const hints = { leave: 'make.leaveHint', 'ai-send': 'make.aiSendHint', audience: 'make.audienceHint' };
+  const options = ['leave', 'ai-send', 'audience'].map((a) => ({ value: a, label: sentence(exceptionActWord({ action: a })), hint: W(hints[a]) }));
   return html`
     <${Modal} open onClose=${() => ex.cancel()} size="md" title=${W('make.title')}
       footer=${html`

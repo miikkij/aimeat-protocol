@@ -40,6 +40,8 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-18 — A first publish's default exposure is narrowed to the app's label's audience cap
+ *     before the publish gate (capFirstPublishExposure; plan doc-mvdipuyqraas, L3.5).
  *   2026-10-18 — A published app's name and description meet the detection rules written for apps (plan doc-mvdipuyqraas, L1.6).
  *   2026-10-18 — The board post and the public feed announce a version only when the app is really public (listed, open to anyone, no access code); the board post moved to services/app-announce.ts (Jouni's ruling, plan doc-mvcn6c7e4e5q).
  *   2026-10-18 — `publishGate`: a first publish the node's defaults make public, by a caller the owner is asked about, is stored unlisted and files a request to list it (`publishAsked`; services/app-publish-gate.ts, plan doc-mvcn6c7e4e5q V4). provenanceModelFindings moved to app-ai-model-hints.ts.
@@ -156,7 +158,7 @@ import { parseAppConfigSchema } from './app-config.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
 import { parseFormatMdMeta, formatMdRefusal } from './app-format-md.js';
 import { publishExposure } from './app-publish-exposure.js';
-import { gateFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
+import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
 import type { PublishAsk } from './publish-requests/ask.js';
 
 /**
@@ -560,7 +562,9 @@ export async function publishApp(
   // Carry the moderation and exposure state forward, so an update never silently re-exposes a
   // parked app, opens forking, or escapes an operator hide by re-uploading.
   // A first publish the node's defaults make public waits for the owner when the gate asks (V4).
-  const gated = gateFirstPublishExposure(publishExposure(config, live, input.accessCode), !live, input.publishGate);
+  // Before it, the defaults are narrowed to the app's label's audience cap (plan doc-mvdipuyqraas, L3.5).
+  const capped = await capFirstPublishExposure({ storage, config }, ownerGhii, filename, publishExposure(config, live, input.accessCode), !live);
+  const gated = gateFirstPublishExposure(capped, !live, input.publishGate);
   if ('refusal' in gated) return gated;
   const { parked, community, forkable, accessCode, access } = gated.exposure;
 

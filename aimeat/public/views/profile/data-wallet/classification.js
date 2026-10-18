@@ -16,6 +16,8 @@
  * @structure acceptStep(policy, item, decision) · useClassification() → cls · secClassification(ctx, num)
  * @usage const cls = useClassification({ federated, confirm, toast }); … secClassification({ ...ctx, cls }, '05')
  * @version-history
+ *   v1.9.0 — 2026-10-18 — protectsLess counts a wider audience cap (maxAudience) as protecting less,
+ *     as levels.ts weakerFields does now (plan doc-mvdipuyqraas, L3.1).
  *   v1.8.0 — 2026-10-02 — The question mark that explains the classification switch: classification.switch (components/HelpTip.js).
  *   v1.7.0 — 2026-09-30 — acceptStep counts a label of higher rank that protects less as a lowering,
  *     as the server does (protectsLess, a copy of levels.ts weakerFields), so the reason is asked for
@@ -104,7 +106,17 @@ export function protectsLess(next, base) {
     || (!!base.audit && !next.audit)
     || (!base.mayLeaveOrganism && !!next.mayLeaveOrganism)
     || (!!base.lowerNeedsJustification && !next.lowerNeedsJustification)
-    || !audienceWithin(next.audience, base.audience);
+    || !audienceWithin(next.audience, base.audience)
+    || capWider(next.maxAudience, base.maxAudience);
+}
+
+/** The audience levels from the narrowest to the widest (services/classification/audience-levels.ts). */
+const AUDIENCE_ORDER = ['private', 'organism', 'signed-in', 'link', 'public'];
+
+/** Is cap `next` wider than cap `base`? No cap is wider than any cap. levels.ts capWider. */
+function capWider(next, base) {
+  if (!base) return false;
+  return !next || AUDIENCE_ORDER.indexOf(next) > AUDIENCE_ORDER.indexOf(base);
 }
 
 /**

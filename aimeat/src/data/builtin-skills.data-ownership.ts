@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-18 — An imported entry wider than its classification allows fails with LABEL_CAPS_AUDIENCE (plan doc-mvdipuyqraas, L3.2).
  *   2026-10-18 — A copy keeps the source's effective classification, its workspace's or organism's when higher (plan doc-mvdipuyqraas, L1.3).
  *   2026-10-18 — The rule underneath: on a node closed to strangers a public write is saved for the signed-in accounts (plan V1.6).
  *   2026-10-18 — Section 2: an imported entry with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5.1).
@@ -121,7 +122,9 @@ What an export leaves out, and why:
   happens when a key already exists: \`skip\` (the default), \`overwrite\`, or \`rename\` (the incoming
   record gets a new key). The answer counts created, updated, skipped and failed, with the reason
   for each failure. The person's limits on keys and value size apply. An entry with no visibility
-  gets the level this node gives a new entry: private unless the operator chose otherwise.
+  gets the level this node gives a new entry: private unless the operator chose otherwise. An entry
+  whose classification limits who may see it more narrowly than its visibility fails with
+  \`LABEL_CAPS_AUDIENCE\`.
 - **An organism or a workspace:** \`aimeat_organism_import\` or \`aimeat_workspace_transfer\` with
   \`direction: "import"\`. Both create a NEW organism or workspace; members and the board are not
   restored. A ZIP that fails the safety checks is refused and kept aside for the operator.

@@ -482,9 +482,10 @@
     },
     "src/routes/memory/batch-guards.ts": {
       "reads": {
+        "getMemory": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only that a referenced file exists."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only that a referenced file exists. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): getMemory reads the visibility a batch entry's record has now, for the audience cap; nothing is returned to anyone."
     },
     "src/routes/memory/bulk.ts": {
       "reads": {
@@ -533,9 +534,9 @@
     },
     "src/routes/memory/patch.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): the second reads the record's visibility now, for the audience cap before the write."
     },
     "src/routes/memory/public-read.ts": {
       "reads": {
@@ -1112,6 +1113,16 @@
         "getMemory": 1
       },
       "why": "The node's own read (TARGET-082 V3): the hourly queue job loads a queued personal item's current value so the node's own classifier can judge it; the classifier checks useForAi before any model reads the text, and nothing is shown to a caller."
+    },
+    "src/services/classification/audience-settle.ts": {
+      "reads": {
+        "getMemory": 2,
+        "getMemoryByKeysAnyOwner": 1,
+        "getStorageFileMeta": 1,
+        "listAllMemoryMeta": 1,
+        "listMemoryMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.4), the node's own read: after a label rises, the levels of the records and files it covers are read (metadata, and a record's value only to write it back unchanged with the lower level) so that what is over its label's audience cap is lowered; nothing is returned to anyone."
     },
     "src/services/classification/exceptions.ts": {
       "reads": {
@@ -1969,6 +1980,13 @@
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the approved file's metadata (no bytes) is read only to compare its created_at, size and visibility with the request before making it public; nothing is returned to anyone."
     },
+    "src/services/publish-requests/cap-recheck.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.3), the node's own read: an approved request's record or file is read for its current level and workspace binding, to hold the approval to the label's audience cap before the applier runs; nothing is returned to anyone."
+    },
     "src/services/publish-requests/apply-memory.ts": {
       "reads": {
         "getMemory": 1
@@ -2249,9 +2267,9 @@
     },
     "src/services/storage-file-publish.ts": {
       "reads": {
-        "getStorageFileMeta": 3
+        "getStorageFileMeta": 4
       },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4 and V1.6), the node's own read: a file's metadata (no bytes) is read to know whether a write raises it to public, which level it keeps, and on a node closed to strangers whether it is public already (closedFileLevel); nothing is returned to anyone."
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4 and V1.6), the node's own read: a file's metadata (no bytes) is read to know whether a write raises it to public, which level it keeps, and on a node closed to strangers whether it is public already (closedFileLevel); nothing is returned to anyone. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): fileCapRefusal reads the level and the workspace binding the file has now, for the audience cap."
     },
     "src/services/storage-file-write.ts": {
       "reads": {

@@ -7,8 +7,10 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
- *   v1.36.0 -- 2026-10-18 -- Classified content: an agent's clearance hides what is classified above
+ *   v1.37.0 -- 2026-10-18 -- Classified content: an agent's clearance hides what is classified above
  *     it, and only the owner raises it (plan doc-mvdipuyqraas, L2).
+ *   v1.36.0 -- 2026-10-18 -- Classified content: a classification's audience cap, LABEL_CAPS_AUDIENCE,
+ *     and the owner's override (plan doc-mvdipuyqraas, L3).
  *   v1.35.0 -- 2026-10-18 -- Classified content: an organism, a workspace, a board and an app carry a
  *     classification, and `get` answers the effective one (plan doc-mvdipuyqraas, L1).
  *   v1.34.0 -- 2026-10-18 -- Adult status, subscriptions, provenance in exported files (Comicland v3).
@@ -141,7 +143,12 @@ words, verbatim, in \`human_said\`. A classification at least as strict then app
 theirs, also over one a person set. One that lowers it waits as a suggestion (\`PERSON_APPROVES\`)
 with their words on it: your owner accepts it signed in themselves, and you cannot accept it for them
 (\`PERSON_REQUIRED\`). A policy change that gives anything away waits until your owner accepts it,
-signed in themselves.
+signed in themselves. A classification may also limit how widely its content is shown (its
+\`maxAudience\`): making a record, a file, a workspace share, a board, an app or an organism readable
+wider than that is refused with \`LABEL_CAPS_AUDIENCE\` (409), also when a publish request is approved.
+Choose a narrower level, or tell your owner: only they can allow it for one item, signed in
+themselves, with a written reason. When a classification rises over something already shown wider,
+the node narrows it at once and tells your owner.
 
 **Tasks — structured work for the owner.** \`aimeat_task_create\` · \`aimeat_task_list\` ·
 \`aimeat_task_get\` · \`aimeat_task_propose_todos\` · \`aimeat_task_event\` · \`aimeat_task_todo\` ·

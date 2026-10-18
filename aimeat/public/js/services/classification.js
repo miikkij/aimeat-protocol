@@ -21,6 +21,8 @@
  *   import { readPolicy, reviewPolicy, labelName } from '/js/services/classification.js';
  *   const view = await readPolicy('owner');
  * @version-history
+ *   v1.7.0 — 2026-10-18 — exceptionActWord says the owner's 'audience' exception ("may be shown more
+ *     widely"; plan doc-mvdipuyqraas, L3.3).
  *   v1.6.0 — 2026-09-30 — The exceptions list (Jouni's decisions of 2026-09-30): readExceptions,
  *     makeException and withdrawException, the words for an exception (exceptionActWord,
  *     exceptionState), and the log's filter and words for an exception row (ACTIONS 'exception',
@@ -267,7 +269,9 @@ export function purposeWords(policy, row) {
 /* ── The exceptions list ──────────────────────────────────────────────────────────────────────── */
 
 /** The locale key of each act an exception records (services/classification/exceptions.ts). */
-const EXCEPTION_ACTS = { leave: 'leave', 'ai-send': 'aiSend', lower: 'lower', policy: 'policy', review: 'review' };
+const EXCEPTION_ACTS = { leave: 'leave', 'ai-send': 'aiSend', audience: 'audience', lower: 'lower', policy: 'policy', review: 'review' };
+/** The acts a person makes themselves; the rest are an app's, recorded by the node. */
+const PERSON_ACTS = ['leave', 'aiSend', 'audience'];
 
 /**
  * What an exception let happen, in words: a person's "may leave" or "an AI may send it", or an app's
@@ -279,7 +283,7 @@ const EXCEPTION_ACTS = { leave: 'leave', 'ai-send': 'aiSend', lower: 'lower', po
 export function exceptionActWord(e) {
   const act = EXCEPTION_ACTS[e?.action];
   if (!act) return String(e?.action ?? '');
-  return W((e.auto || (act !== 'leave' && act !== 'aiSend') ? 'exc.auto.' : 'exc.act.') + act);
+  return W((e.auto || !PERSON_ACTS.includes(act) ? 'exc.auto.' : 'exc.act.') + act);
 }
 
 /**

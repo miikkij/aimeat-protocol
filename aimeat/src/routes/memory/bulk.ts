@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — An entry that would raise its record past its label's audience cap fails with
+ *     LABEL_CAPS_AUDIENCE before the batch stores anything (plan doc-mvdipuyqraas, L3.2).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, an entry of POST
  *     /v1/memory/bulk or POST /v1/memory/import asked public is stored at 'members' with a
  *     PUBLIC_IS_SIGNED_IN_HERE warning naming its key, and is never refused by the publish gate
@@ -105,6 +107,7 @@ import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
 import {
   batchKeyRefusal, storageReferenceRefusal, visibilityRefusal, organismWriteRefusalFor, routePublishAsk, batchPublishAnswer,
+  batchCapRefusalFor,
 } from './batch-guards.js';
 import { registerCopyRoute } from './copy.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
@@ -171,6 +174,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // The publish gate, asked once for the caller (batch-guards.ts routePublishAsk): which entries
     // raise their record to public is decided by the batch write, which reads what each key holds.
     const publishAsk = routePublishAsk({ storage, config }, req);
+    const capRefusal = batchCapRefusalFor({ storage, config }, req, 'POST /v1/memory/bulk');
     for (const e of rawEntries) {
       const key = e?.key;
       if (typeof key !== 'string' || !key) { preFailed.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
@@ -204,6 +208,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (publishAsk.kind === 'refused' && e.visibility === 'public' && !signedInOnly(config) && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
         preFailed.push({ key, status: 'failed', reason: `${publishAsk.code}: ${publishAsk.message}` }); continue;
       }
+      // A level wider than the record's label allows: that entry is refused (plan doc-mvdipuyqraas, L3.2).
+      const capped = await capRefusal(gaii, key, e.visibility ?? memoryVisibilityDefault(config));
+      if (capped) { preFailed.push({ key, status: 'failed', reason: capped }); continue; }
       items.push({
         key,
         value: e.value,
@@ -357,6 +364,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const archiveChecks = new Map<string, ReturnType<typeof isKeyArchived>>();
     // The publish gate, asked once for the caller, as on POST /v1/memory/bulk.
     const publishAsk = routePublishAsk({ storage, config }, req);
+    const capRefusal = batchCapRefusalFor({ storage, config }, req, 'POST /v1/memory/import');
     for (const entry of entries) {
       const key = entry?.key;
       if (typeof key !== 'string' || !key) { failed.push({ key: String(key), reason: 'missing key' }); continue; }
@@ -391,6 +399,9 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (publishAsk.kind === 'refused' && entry.visibility === 'public' && !signedInOnly(config) && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
         failed.push({ key, reason: `${publishAsk.code}: ${publishAsk.message}` }); continue;
       }
+      // A level wider than the record's label allows: that entry is refused (plan doc-mvdipuyqraas, L3.2).
+      const capped = await capRefusal(gaii, key, entry.visibility === undefined ? memoryVisibilityDefault(config) : entry.visibility);
+      if (capped) { failed.push({ key, reason: capped }); continue; }
       survivors.push({ key, entry });
     }
 

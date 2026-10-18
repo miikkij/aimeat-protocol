@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.20.0 — 2026-10-18 — A `gatePublic` write that would raise the record past its label's audience
+ *     cap is refused with 409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.2).
  *   v1.19.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a `gatePublic`
  *     write that raises a record to public is stored at 'members' and carries the warning
  *     PUBLIC_IS_SIGNED_IN_HERE, before the publish gate (services/closed-node-level.ts, plan V1.6).
@@ -146,7 +148,8 @@ import { classifyAfterWrite } from './classify-on-write.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import type { PublishAsk, publishRequestedBody } from './publish-requests/ask.js';
-import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest } from './memory-publish-gate.js';
+import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from './memory-publish-gate.js';
+import { memoryTarget } from './classification/label-rows.js';
 import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
@@ -304,7 +307,9 @@ export type MemoryWriteResult =
             // member of (services/organism-visibility.ts).
             | 'NOT_ORGANISM_MEMBER'
             // Making it public, by a caller with nobody on this node to ask (services/publish-gate.ts).
-            | 'PUBLISH_NOT_ALLOWED';
+            | 'PUBLISH_NOT_ALLOWED'
+            // A level wider than the record's label allows (services/classification/audience-cap.ts).
+            | 'LABEL_CAPS_AUDIENCE';
         message: string;
         details?: unknown;
     };
@@ -471,6 +476,9 @@ export async function writeMemoryRecord(
         const closed = closedNodeLevel(config, input.visibility, 'members' as const, { from: existing?.visibility });
         if (closed.warning) { input = { ...input, visibility: closed.level, groupId: undefined, workspaceRef: undefined }; closedNode = closed.warning; }
     }
+    // The label's audience cap (plan doc-mvdipuyqraas, L3.2), before the publish gate: refused, nothing stored.
+    const capped = input.gatePublic ? await memoryCapRefusal({ storage, config }, caller, [memoryTarget(caller.targetGaii, input.key)], input.visibility, existing?.visibility, input.pipeline) : null;
+    if (capped) return capped;
     let publishAsk: Extract<PublishAsk, { kind: 'ask' }> | null = null;
     if (input.gatePublic && isRaiseToPublic(existing?.visibility, input.visibility)) {
         // The writer's caller object, from the facts every door hands this service.

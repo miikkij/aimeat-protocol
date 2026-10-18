@@ -20,21 +20,27 @@
  *   defaults (services/app-publish-exposure.ts). When those make the app public and the caller is asked
  *   about, the app is published unlisted (still opened by its address when the default is anyone) and
  *   the request is to list it. A republish carries what the owner chose and asks nothing.
- * @structure appIsPublic · AppPublishChange · gateFirstPublishExposure · AppPublishAsked · askedOf ·
+ * @structure appIsPublic · appAudienceOf · AppPublishChange · gateFirstPublishExposure · capFirstPublishExposure · AppPublishAsked · askedOf ·
  *   PageGate · publishAskedFields · askedStatus · appAskedNote · fileAppPublishAsk · publishAskFromMeta
  * @usage
  *   const gated = gateFirstPublishExposure(publishExposure(config, live, code), !live, input.publishGate);
  *   ... store with gated.exposure ...; if (gated.asked) asked = await fileAppPublishAsk(ctx, app, gated.asked);
  *   res.status(askedStatus(asked, 201)).json(success(nodeId, { ...publishAskedFields(asked), ... }));
  * @version-history
+ *   v1.1.0 — 2026-10-18 — appAudienceOf(): the level an app's facts give, for its label's audience cap;
+ *     capFirstPublishExposure(): a first publish's defaults narrowed to that cap (plan
+ *     doc-mvdipuyqraas, L3.5).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: apps).
  */
 import type { AppListing } from '../storage/interface.js';
 import { appListingOf } from '../storage/interface.js';
 import { appAccessOf } from './app-access.js';
-import type { PublishExposure } from './app-publish-exposure.js';
+import { generateAccessCode, type PublishExposure } from './app-publish-exposure.js';
 import { fileAsk, publishRequestedBody, type PublishAsk } from './publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
+import type { AudienceLevel } from './classification/audience-levels.js';
+import { audienceCapOf } from './classification/audience-cap.js';
+import { appTarget } from './classification/containers.js';
 
 /** The facts that decide whether anyone opens and finds an app. */
 export interface AppExposureFacts {
@@ -49,6 +55,20 @@ export function appIsPublic(app: AppExposureFacts): boolean {
   return !app.accessCode
     && appAccessOf({ access: app.access ?? undefined }) === 'anyone'
     && appListingOf({ parked: !!app.parked, community: !!app.community }) === 'listed';
+}
+
+/**
+ * Who reads an app, as the exposure report counts it (services/exposure/sources-places.ts appSource):
+ * private behind an access code, the level `open_to` names when it is not anyone, and otherwise public
+ * when it is listed and link when it is found only by its address. The level its label's audience cap
+ * is held against (plan doc-mvdipuyqraas, L3.5).
+ */
+export function appAudienceOf(app: AppExposureFacts): AudienceLevel {
+  if (app.accessCode) return 'private';
+  const own = appAccessOf({ access: app.access ?? undefined });
+  if (own === 'signed-in') return 'signed-in';
+  if (own !== 'anyone') return 'organism';
+  return appListingOf({ parked: !!app.parked, community: !!app.community }) === 'listed' ? 'public' : 'link';
 }
 
 /** The one field a publish request about an app changes. `access_code: 'set'` never names the code. */
@@ -72,6 +92,25 @@ export function gateFirstPublishExposure(
     exposure: { ...exposure, parked: true, community: false },
     asked: { requester: ask.requester, change: { field: 'listing', from: 'unlisted', to: 'listed' } },
   };
+}
+
+/**
+ * The exposure of a first publish (or a fork), held to the app's label's audience cap (plan
+ * doc-mvdipuyqraas, L3.5). A first publish takes the node's new-app defaults, which the caller did not
+ * choose, so a default wider than the cap is narrowed to it rather than refused: unlisted for link,
+ * open to signed-in accounts for signed-in, and an access code (the node's own default for a code,
+ * app-publish-exposure.ts) for organism or private. A republish carries what the owner chose and is
+ * not a raise, so it is returned as it came.
+ */
+export async function capFirstPublishExposure(
+  ctx: PublishStoreCtx, owner: string, filename: string, exposure: PublishExposure, isFirst: boolean,
+): Promise<PublishExposure> {
+  if (!isFirst) return exposure;
+  const answer = await audienceCapOf(ctx, appTarget(owner, filename), appAudienceOf(exposure), { where: 'app first publish' });
+  if (answer.kind === 'allowed') return exposure;
+  if (answer.cap === 'link') return { ...exposure, parked: true, community: false };
+  if (answer.cap === 'signed-in') return { ...exposure, access: 'signed-in' };
+  return { ...exposure, accessCode: generateAccessCode() };
 }
 
 /** What a door adds to its answer: the filed request, or a warning when it could not be filed. */

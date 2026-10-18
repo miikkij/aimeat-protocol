@@ -22,6 +22,9 @@
  *   removeException()
  * @usage const e = await makeException(deps, actor, { key, action: 'leave', reason });
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Action 'audience' (plan doc-mvdipuyqraas, L3.3): the owner in person only,
+ *     never an app (PERSON_REQUIRED), with a reason (JUSTIFICATION_REQUIRED without one); it may name
+ *     a container, and it records the item's effective label.
  *   v1.0.0 — 2026-09-30 — Initial (Jouni's decisions of 2026-09-30).
  */
 import {
@@ -61,10 +64,17 @@ export async function makeException(deps: ClassificationDeps, actor: LabelActor,
   if (!app && !isOwnerPerson(actor)) throw new ClassificationError('PERSON_REQUIRED', 403, PERSON_MAKES_EXCEPTION);
   const action = input.action as ClassificationException['action'];
   if (!PERSON_EXCEPTION_ACTIONS.includes(action)) {
-    throw new ClassificationError('INVALID_INPUT', 400, 'action is leave (the item may leave despite its classification) or ai-send (an AI may send it out).');
+    throw new ClassificationError('INVALID_INPUT', 400, 'action is leave (the item may leave despite its classification), ai-send (an AI may send it out) or audience (it may be shown wider than its classification allows).');
   }
+  // Showing content wider than its classification allows is the owner's own decision, signed in
+  // themselves (plan doc-mvdipuyqraas, L3.3): an app's screen does not make it.
+  if (action === 'audience' && !isOwnerPerson(actor)) throw new ClassificationError('PERSON_REQUIRED', 403, PERSON_MAKES_EXCEPTION);
   const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
-  if (!reason) throw new ClassificationError('INVALID_INPUT', 400, 'reason is required: why this item may go out despite its classification.');
+  if (!reason) {
+    // An audience exception is the override of a cap, and says so as a lowering does (labels.ts setLabel).
+    if (action === 'audience') throw new ClassificationError('JUSTIFICATION_REQUIRED', 400, 'reason is required: why this item may be shown wider than its classification allows.');
+    throw new ClassificationError('INVALID_INPUT', 400, 'reason is required: why this item may go out despite its classification.');
+  }
   if (reason.length > 1000) throw new ClassificationError('INVALID_INPUT', 400, 'reason is at most 1000 characters.');
   let until: string | null = null;
   if (input.until !== undefined && input.until !== null && input.until !== '') {
@@ -74,7 +84,7 @@ export async function makeException(deps: ClassificationDeps, actor: LabelActor,
     if (until <= nowOf(deps)) throw new ClassificationError('INVALID_INPUT', 400, 'until is in the future.');
   }
   // Refuse before writing: the target is named and checked first.
-  const { target, label } = await labelForException(deps, actor, targetOf(actor, input));
+  const { target, label } = await labelForException(deps, actor, targetOf(actor, input), { audience: action === 'audience' });
   return mapped(() => addException(deps, {
     by: actor.principal, byKind: app ? 'app' : 'human', app: actor.app ?? null, scope: target.scope,
     target: { kind: target.kind, key: target.key }, label, action, reason, auto: false, until,
