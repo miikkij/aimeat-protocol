@@ -29,12 +29,12 @@
       "date": "2026-10-18",
       "kind": "feature",
       "title": {
-        "en": "Ask your AI what others can see of yours",
-        "fi": "Kysy tekoälyltäsi, mitä sinusta näkyy muille"
+        "en": "See what others can see of yours, and close it",
+        "fi": "Näe, mitä sinusta näkyy muille, ja sulje se"
       },
       "body": {
-        "en": "Your AI can now list everything of yours that someone else can read: open to anyone, to anyone holding the link, to everyone signed in here, or to one organisation's members. For each one it tells you how to close it, and it closes nothing without asking you. The person running the service sees the same as numbers for the whole service.",
-        "fi": "Tekoälysi voi nyt luetella kaiken sinun sisällöstäsi, jota joku muu voi lukea: kaikille avoimen, linkin haltijoille avoimen, kaikille täällä kirjautuneille avoimen ja yhden organisaation jäsenille avoimen. Jokaisesta se kertoo, miten sen saa suljettua, eikä se sulje mitään kysymättä sinulta. Palvelun ylläpitäjä näkee saman lukuina koko palvelusta."
+        "en": "A new page in your settings, What others can see, lists everything of yours that someone else can read: open to anyone, to anyone holding the link, to everyone signed in here, or to one organisation's members. Each row shows its level and a Close button. Your AI can list the same and tells you how to close each one; it closes nothing without asking you. Every list of your records, files, boards, apps, packages and skills now shows who can read each item. The person running the service sees the same as numbers for the whole service.",
+        "fi": "Asetuksissa on uusi sivu, Mitä muut näkevät. Siinä on kaikki sinun sisältösi, jota joku muu voi lukea: kaikille avoin, linkin haltijoille avoin, kaikille täällä kirjautuneille avoin ja yhden organisaation jäsenille avoin. Jokaisella rivillä näkyy taso ja Sulje-painike. Tekoälysi voi luetella saman ja kertoo, miten kunkin saa suljettua. Se ei sulje mitään kysymättä sinulta. Jokainen tietueidesi, tiedostojesi, taulujesi, sovellustesi, pakettiesi ja skilliesi lista näyttää nyt, kuka kunkin voi lukea. Palvelun ylläpitäjä näkee saman lukuina koko palvelusta."
       }
     },
     {
