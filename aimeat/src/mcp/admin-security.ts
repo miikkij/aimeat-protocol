@@ -5,12 +5,16 @@
  * @description The operator's Security page over MCP: one read that says what is happening at the
  *   door, who was turned away, what was refused and kept, who holds the keys and what the doors are
  *   set to, plus the one action the page has that a chat could not do before (resolve an incident,
- *   or decide one name of the incident the move to the full identity opened). Both tools check the
- *   operator role at call time and call the ONE implementation in services/security-overview.ts,
- *   services/security-incident.ts and services/held-account-names.ts; neither reads storage here.
+ *   or decide one case of it: a name the move to the full identity held, or a default audience cap
+ *   the start offered). Both tools check the operator role at call time and call the ONE
+ *   implementation in services/security-overview.ts, services/security-incident.ts and
+ *   services/incident-decisions.ts; neither reads storage here.
  * @structure registerAdminSecurityTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminSecurityTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.3.0 — 2026-10-18 — aimeat_admin_incident_resolve decides one case of either kind through
+ *     services/incident-decisions.ts: a held name or an offered default audience cap ("apply" or
+ *     "keep", plan doc-mvdipuyqraas, L5.1). A refused close says why in the words of the incident's kind.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.2 — 2026-09-26 — The `resolution` description names the app grants and access tokens too.
  *   v1.2.1 — 2026-09-26 — The `resolution` description names the cortexes and ecosystem apps a
@@ -31,7 +35,7 @@ import { toolError } from './tool-error.js';
 import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/owner-lifecycle.js';
 import { buildSecurityOverview } from '../services/security-overview.js';
 import { resolveSecurityIncident } from '../services/security-incident.js';
-import { resolveHeldName } from '../services/held-account-names.js';
+import { decideIncidentCase } from '../services/incident-decisions.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
@@ -61,18 +65,15 @@ export function registerAdminSecurityTools(
     async ({ id, name, resolution }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       if (name !== undefined || resolution !== undefined) {
-        if (!name || !resolution) return toolError('INVALID_INPUT', 'Deciding a name takes "name" and "resolution": "holder" or "previous".');
-        const decided = await resolveHeldName(config, storage, { incidentId: id, name, resolution });
+        if (!name || !resolution) return toolError('INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap.');
+        const decided = await decideIncidentCase(config, storage, { incidentId: id, name, resolution, by: { principal: agentGaii, kind: 'ai' } });
         if (!decided.ok) return toolError(decided.code, decided.message);
-        return text({
-          id, name: decided.name, resolution: decided.resolution, done: decided.done,
-          bindings_moved: decided.bindings_moved, incident_status: decided.incident_status,
-        });
+        return text({ id, ...decided.data });
       }
       const r = await resolveSecurityIncident(storage, config, id);
       if (r.ok) return text({ resolved: true, id, resolved_at: r.resolvedAt });
       if (r.code === 'CONFLICT') {
-        return toolError('CONFLICT', 'This incident closes when every name in it is decided. Decide each one with "name" and "resolution" ("holder" or "previous").');
+        return toolError('CONFLICT', r.message ?? 'This incident closes when every case in it is decided. Decide each one with "name" and "resolution".');
       }
       return refuse('NOT_FOUND: Incident not found');
     });

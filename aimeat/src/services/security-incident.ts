@@ -20,9 +20,12 @@
  *   deleted while a name is still open (CONFLICT).
  * @structure recordSecurityIncident(storage, config, input) · listSecurityIncidents · findSecurityIncident ·
  *   resolveSecurityIncident · deleteSecurityIncident · saveSecurityIncident · undecidedNames ·
- *   SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
+ *   undecidedCases · undecidedMessage · SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.5.0 -- 2026-10-18 -- An incident can offer default audience caps (`caps`), one decision each
+ *     (classification/default-caps.ts, plan doc-mvdipuyqraas, L5.1). Resolving or deleting it is
+ *     refused with CONFLICT while a cap is undecided, as for a held name; the refusal carries its words.
  *   v1.4.0 -- 2026-10-16 -- An incident can name the setting it is about (`setting`: the variable and
  *     the value the node did not accept), for the start-up incident of config-setting-incidents.ts.
  *   v1.3.2 -- 2026-10-01 -- recordSecurityIncident asks only for the node id of the config, the one
@@ -96,6 +99,26 @@ export interface SecurityIncidentInput {
   sources?: string[];
   /** The setting the incident is about: its variable and the value the node did not accept. */
   setting?: IncidentSetting;
+  /** Default audience caps offered to the operator, one decision each (classification/default-caps.ts). */
+  caps?: IncidentCapOffer[];
+}
+
+/**
+ * One default audience cap an incident offers (plan doc-mvdipuyqraas, L5.1): the label, the cap, and
+ * the operator's decision once made. 'apply' puts the cap on the label, 'keep' leaves the label as it is.
+ */
+export interface IncidentCapOffer {
+  /** The label's id. */
+  label: string;
+  /** The label's English name, for the page. */
+  name: string;
+  /** The cap offered: the widest audience content with this label may be given. */
+  max_audience: string;
+  status: 'open' | 'apply' | 'keep';
+  decidedAt?: string;
+  decidedBy?: string;
+  /** What the decision did: the cap put on, the label kept, the label had a cap of its own, or the label is gone. */
+  done?: 'applied' | 'kept' | 'own-cap' | 'no-label';
 }
 
 /** A setting an incident is about. */
@@ -130,6 +153,8 @@ export interface SecurityIncidentValue {
   sources?: string[];
   /** The setting this incident is about, with the value the node did not accept. */
   setting?: IncidentSetting;
+  /** Default audience caps offered to the operator, decided one by one; the incident closes with the last. */
+  caps?: IncidentCapOffer[];
 }
 
 type IncidentRecord = Awaited<ReturnType<Storage['listAllMemory']>>['items'][number];
@@ -173,6 +198,7 @@ export async function recordSecurityIncident(
         ...(input.moveAt ? { move_at: input.moveAt } : {}),
         ...(input.sources ? { sources: input.sources } : {}),
         ...(input.setting ? { setting: input.setting } : {}),
+        ...(input.caps ? { caps: input.caps } : {}),
       },
       visibility: 'private', tags: ['security'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
@@ -206,6 +232,19 @@ export function undecidedNames(value: SecurityIncidentValue): string[] {
   return (value.names ?? []).filter(n => n.status === 'open').map(n => n.name);
 }
 
+/** Every case of an incident that is not decided yet: its held names and its offered caps. */
+export function undecidedCases(value: SecurityIncidentValue): string[] {
+  return [...undecidedNames(value), ...(value.caps ?? []).filter(c => c.status === 'open').map(c => c.label)];
+}
+
+/** Why an incident with cases to decide is neither closed nor deleted yet, in the words of its kind. */
+export function undecidedMessage(value: SecurityIncidentValue): string {
+  if ((value.caps ?? []).some(c => c.status === 'open')) {
+    return 'This incident closes when every offered cap in it is decided. Decide each one with "name" (the classification id) and "resolution" ("apply" or "keep").';
+  }
+  return 'This incident closes when every name in it is decided. Decide each one with "name" and "resolution" ("holder" or "previous").';
+}
+
 /** Write a changed incident back under its own key, and tell the open pages. */
 export async function saveSecurityIncident(storage: Storage, rec: IncidentRecord, value: SecurityIncidentValue): Promise<void> {
   const now = new Date().toISOString();
@@ -220,11 +259,11 @@ export async function saveSecurityIncident(storage: Storage, rec: IncidentRecord
  * Mark an incident resolved. The quarantined bytes stay until the incident is deleted. An incident
  * with names to decide closes when the last one is decided, so it is refused while one is open.
  */
-export async function resolveSecurityIncident(storage: Storage, config: AimeatConfig, id: string): Promise<{ ok: true; resolvedAt: string } | { ok: false; code: 'NOT_FOUND' | 'CONFLICT' }> {
+export async function resolveSecurityIncident(storage: Storage, config: AimeatConfig, id: string): Promise<{ ok: true; resolvedAt: string } | { ok: false; code: 'NOT_FOUND' | 'CONFLICT'; message?: string }> {
   const rec = await findSecurityIncident(storage, config, id);
   if (!rec) return { ok: false, code: 'NOT_FOUND' };
   const value = rec.value as SecurityIncidentValue;
-  if (undecidedNames(value).length > 0) return { ok: false, code: 'CONFLICT' };
+  if (undecidedCases(value).length > 0) return { ok: false, code: 'CONFLICT', message: undecidedMessage(value) };
   const now = new Date().toISOString();
   await saveSecurityIncident(storage, rec, { ...value, status: 'resolved', resolvedAt: now });
   return { ok: true, resolvedAt: now };
@@ -234,10 +273,11 @@ export async function resolveSecurityIncident(storage: Storage, config: AimeatCo
  * Remove an incident together with its quarantined blob (the blob's removal is best-effort). An
  * incident with names to decide is kept while one is open, so its record of them is not lost.
  */
-export async function deleteSecurityIncident(storage: Storage, config: AimeatConfig, id: string): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'CONFLICT' }> {
+export async function deleteSecurityIncident(storage: Storage, config: AimeatConfig, id: string): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'CONFLICT'; message?: string }> {
   const rec = await findSecurityIncident(storage, config, id);
   if (!rec) return { ok: false, code: 'NOT_FOUND' };
-  if (undecidedNames(rec.value as SecurityIncidentValue).length > 0) return { ok: false, code: 'CONFLICT' };
+  const value = rec.value as SecurityIncidentValue;
+  if (undecidedCases(value).length > 0) return { ok: false, code: 'CONFLICT', message: undecidedMessage(value) };
   const qk = (rec.value as SecurityIncidentValue).quarantine_key;
   if (qk) { try { await storage.deleteStorageFile(rec.ownerGaii, qk); } catch (err) { logger.warn('deleteSecurityIncident: dropping the quarantined blob is best-effort', { error: String(err) }); } }
   await storage.deleteMemory(rec.ownerGaii, rec.key);

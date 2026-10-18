@@ -240,6 +240,50 @@ node-wide numbers) and each person reads their own "What others can see" list
 (`GET /v1/exposure/mine`, `aimeat_exposure_report`). Close what was not meant for everyone who can
 sign in.
 
+**8. Classification: how sensitive content is, and who may see it.** A classification says how
+sensitive a piece of content is. On a company node it also limits who may see the content.
+
+1. *Switch it on for everyone.* `AIMEAT_CLASSIFICATION=all` (Config tab: `classification.mode`).
+   With `all`, every owner's content is classified and no owner can switch it off. `owner` lets each
+   owner decide, and `off` (the default) changes nothing.
+2. *Know the four classifications.* Public (`julkinen`), Internal (`sisainen`), Confidential
+   (`luottamuksellinen`) and Highly confidential (`erittain-luottamuksellinen`). Content that nobody
+   classified is Internal. Detection rules raise a record that holds a personal identity code, a key,
+   a password, an IBAN or an e-mail address. You change the classifications and the rules on the
+   admin Security page, with `GET` and `PUT /v1/classification/policy` and `level: "node"`, or with
+   `aimeat_classification` (`policy_get`, `policy_set`).
+3. *Classify the containers.* An organism, a workspace, a board and an app can carry a
+   classification, and everything inside it is classified at least that high. The organism's creator
+   or an admin sets it on an organism or a workspace, and the owner sets it on a board or an app:
+   `PUT /v1/classification/label` with `kind` `organism`, `workspace`, `board` or `app` (and
+   `organism_id`, `ws`, `board_id` or `app`), or `aimeat_classification`. For example, classify the
+   company organism Confidential, and every document in its workspaces is Confidential or higher.
+4. *Know what the limits refuse.* Each classification has a limit, `maxAudience`: the widest
+   audience its content may be given (`public`, `link`, `signed-in`, `organism` or `private`). A new
+   node starts with these limits: Public none, Internal `signed-in`, Confidential and Highly
+   confidential `organism`. A change that would show content wider than its limit is refused with
+   409 `LABEL_CAPS_AUDIENCE`, and nothing is stored: a record or a file made public, a workspace
+   shared by link (each published page of a space shared whole is checked too), a board made public,
+   an app listed or opened to anyone, an organism made public. When the classification of content
+   rises, content already shown wider is narrowed at once, and the owner gets a notification.
+   Content that was already wider when a limit was first set is not changed: each person's "What
+   others can see" list shows it, and the owner narrows it.
+5. *A node that ran before.* It keeps its classifications as they were. Its Security page holds one
+   incident, type `classification_default_caps`, that offers each limit. Decide each one with
+   `POST /v1/admin/security/incidents/{id}/resolve` and `{ "name": "<classification id>",
+   "resolution": "apply" }` (or `"keep"`), or with `aimeat_admin_incident_resolve`. A decision
+   changes the policy only; no content changes.
+6. *The owner's written exception.* The owner, signed in themselves, may allow a wider audience for
+   one item, with a written reason: `POST /v1/classification/exceptions` with `action: "audience"`,
+   or Make an exception in the Data Wallet. An agent or an app cannot make it. The exception is on
+   the exceptions list and in the audit log.
+7. *Agents' clearance.* `AIMEAT_AGENT_CLEARANCE_DEFAULT=sisainen` (Config tab:
+   `classification.agent_clearance_default`) gives each new agent a clearance: the highest
+   classification it may read. Content classified higher is hidden from the agent and counted.
+   Agents that exist keep what they have. The owner changes it on the agent's card ("May read at
+   most") or with `PATCH /v1/agents/{name}/clearance`; another agent may only lower it
+   (`aimeat_operator_agent_configure` with `clearance`). Empty means no limit.
+
 ## 7. SAML and SCIM: the organisation's own identity provider (BR-04)
 
 Entra OIDC above answers "our staff sign in with Microsoft". SAML and SCIM answer the two questions

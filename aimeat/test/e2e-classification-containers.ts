@@ -21,10 +21,13 @@
  *   The operator (the suite's first account) turns classification on for every owner and off at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification-containers
  * @version-history
+ *   v1.0.1 — 2026-10-18 — The setup takes the default audience caps off, which a new node carries from
+ *     plan doc-mvdipuyqraas L5.1; the suite tests the containers' labels, not the caps.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L1.1-L1.6).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpAgent, type McpSession } from './helpers/mcp-session.js';
+import { takeOffAudienceCaps } from './helpers/classification-caps.js';
 import { genesisReadHeaders } from './helpers/genesis-read-headers.js';
 import { generateKeyPair } from '../src/auth/keypair.js';
 import * as ed from '@noble/ed25519';
@@ -85,6 +88,8 @@ await test('Setup: the operator turns classification on for every owner; alice k
     bob = await registerOwner(BASE, `clcbob${stamp}`);
     const on = await setSwitch('all');
     assert(on.status === 200, `switch all: ${on.status} ${JSON.stringify(on.body?.error)}`);
+    // The suite keeps a public organism and public records; a new node's default caps would refuse them.
+    await takeOffAudienceCaps(BASE, op.token);
     const o = await call('POST', '/v1/organisms', alice.token, { name: `Cls Containers ${stamp}`, type: 'project', join_policy: 'open', visibility: 'public' });
     assert(o.status === 201, `organism: ${o.status} ${JSON.stringify(o.body?.error)}`);
     orgId = o.body.data.organism.id;

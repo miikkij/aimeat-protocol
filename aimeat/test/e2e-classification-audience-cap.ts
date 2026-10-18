@@ -22,10 +22,15 @@
  *   on for every owner, and turns it off and restores the policy at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=classification-audience-cap
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A whole space shared is held to each published page's label, naming the page
+ *     (the space, then the whole workspace widened); a rise on an app lowers the files in the app's own
+ *     namespace, with the audit row and the notification. The setup takes Internal's own cap off,
+ *     which a new node carries from L5.1 (plan doc-mvdipuyqraas, L3 gaps closed in L5).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L3).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpAgent, type McpSession } from './helpers/mcp-session.js';
+import { generateKeyPair } from '../src/auth/keypair.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40252';
 const stamp = Date.now();
@@ -81,7 +86,9 @@ await test('Setup: the operator caps Confidential at signed-in and Highly confid
     const now = await call('GET', `/v1/classification/policy?${q({ level: 'node' })}`, op.token);
     assert(now.status === 200, `node policy: ${now.status} ${JSON.stringify(now.body?.error)}`);
     nodePolicyBefore = now.body.data.effective;
-    const labels = (nodePolicyBefore!.labels as Body[]).map(l => (l.id === CONF ? { ...l, maxAudience: 'signed-in' } : l.id === HIGH ? { ...l, maxAudience: 'organism' } : l));
+    // Only these two caps: a new node's Internal carries a cap of its own (L5.1), which this suite
+    // takes off so that unlabelled content (Internal by default) is not capped here.
+    const labels = (nodePolicyBefore!.labels as Body[]).map(l => (l.id === CONF ? { ...l, maxAudience: 'signed-in' } : l.id === HIGH ? { ...l, maxAudience: 'organism' } : { ...l, maxAudience: null }));
     const put = await call('PUT', '/v1/classification/policy', op.token, { level: 'node', policy: { ...nodePolicyBefore, labels } });
     assert(put.status === 200 && put.body.data.applied === true, `node caps: ${put.status} ${JSON.stringify(put.body?.error ?? put.body?.data)}`);
     const on = await setSwitch('all');
@@ -160,6 +167,33 @@ await test('WORKSPACE SHARE: a Confidential workspace cannot be opened to the li
     capped(await call('PUT', `/v1/organisms/${orgId}/workspace/share?${q({ ws })}`, alice.token, { public: true, access: 'open' }), 'share open');
     const acct = await call('PUT', `/v1/organisms/${orgId}/workspace/share?${q({ ws })}`, alice.token, { public: true, access: 'account' });
     assert(acct.status === 200, `share to signed-in accounts: ${acct.status} ${JSON.stringify(acct.body?.error)}`);
+});
+
+await test('WHOLE SPACE: sharing a space whole is refused (409) when one of its published pages is Confidential, naming that page; nothing is stored', async () => {
+    const w = await call('POST', `/v1/organisms/${orgId}/workspaces`, alice.token, { name: 'Spaces', manifest: {
+        manifestVersion: '1', name: 'Spaces', kind: 'project',
+        objectTypes: [{ name: 'item', namespace: 'shared.items', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:item@1' }],
+    } });
+    assert(w.status === 201 && typeof w.body?.data?.ws === 'string', `workspace: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    const sws = w.body.data.ws as string;
+    const p = await call('POST', `/v1/organisms/${orgId}/workspace/records/publish`, alice.token, { ws: sws, namespace: 'shared.items', records: [{ id: 'r1', value: { name: 'secret' } }, { id: 'r2', value: { name: 'plain' } }] });
+    assert(p.status === 200 && p.body.data.published === 2, `publish: ${p.status} ${JSON.stringify(p.body?.data ?? p.body?.error)}`);
+    const l = await setLabel(alice.token, { kind: 'memory', key: `organism.${orgId}.w.${sws}.shared.items.r1` }, CONF);
+    assert(l.status === 200 && l.body.data.applied === true, `label: ${l.status} ${JSON.stringify(l.body?.error ?? l.body?.data)}`);
+    const space = await call('PUT', `/v1/organisms/${orgId}/workspace/share?${q({ ws: sws })}`, alice.token, { spaces: { item: true }, access: 'open' });
+    capped(space, 'share the space open');
+    assert(String(space.body.error.message).includes('item/r1') && !String(space.body.error.message).includes('item/r2'), `the refusal names the page: ${space.body.error.message}`);
+    const share = await call('GET', `/v1/organisms/${orgId}/workspace/share?${q({ ws: sws })}`, alice.token);
+    assert(share.status === 200 && share.body.data.share.spaces?.item !== true, `the space was shared: ${JSON.stringify(share.body?.data?.share ?? share.body?.error)}`);
+    // The whole workspace for the organism's members is within alice's cap (organism); widening it to
+    // the link afterwards is refused for the same page, and the access stays.
+    const members = await call('PUT', `/v1/organisms/${orgId}/workspace/share?${q({ ws: sws })}`, alice.token, { public: true, access: 'organism' });
+    assert(members.status === 200, `POSITIVE CONTROL, the whole workspace for the organism: ${members.status} ${JSON.stringify(members.body?.error)}`);
+    const wider = await call('PUT', `/v1/organisms/${orgId}/workspace/share?${q({ ws: sws })}`, alice.token, { access: 'open' });
+    capped(wider, 'widen the whole workspace to the link');
+    assert(String(wider.body.error.message).includes('item/r1'), `the refusal names the page: ${wider.body.error.message}`);
+    const after = await call('GET', `/v1/organisms/${orgId}/workspace/share?${q({ ws: sws })}`, alice.token);
+    assert(after.body?.data?.share?.access === 'organism', `the access changed: ${JSON.stringify(after.body?.data?.share)}`);
 });
 
 await test('BOARD: a Highly confidential board cannot be made public (409); it stays shared', async () => {
@@ -278,6 +312,47 @@ await test('RISE on a container: a public board labelled Highly confidential is 
     const l = await setLabel(alice.token, { kind: 'board', board_id: id }, HIGH);
     assert(l.status === 200 && l.body.data.applied === true, `label: ${l.status} ${JSON.stringify(l.body?.error ?? l.body?.data)}`);
     assert(!(await listed()), 'a stranger still lists the board');
+});
+
+await test('RISE on an app: the public files the app keeps in its own namespace are made private, audited, and alice is notified', async () => {
+    const appName = `cacfiles${stamp % 1000000}`;
+    const keys = await generateKeyPair();
+    const hello = await call('POST', '/v1/ecosystem-apps/hello', undefined, {
+        owner: alice.name, app: appName, display_name: 'Cap files app', public_key: keys.publicKey,
+        scopes: ['storage:read', 'storage:write'], data_areas: [],
+    });
+    assert(hello.status === 200, `hello: ${hello.status} ${JSON.stringify(hello.body)}`);
+    const approve = await call('POST', `/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, alice.token, { action: 'approve', scopes: ['storage:read', 'storage:write'] });
+    assert(approve.status === 200, `approve: ${approve.status} ${JSON.stringify(approve.body)}`);
+    const geai = approve.body.data.geai as string;
+    const tok = await call('POST', '/v1/ecosystem-apps/token', undefined, { device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' });
+    assert(tok.status === 200 && typeof tok.body.access_token === 'string', `token: ${tok.status} ${JSON.stringify(tok.body)}`);
+    const key = `cacappfile${stamp}.txt`;
+    const up = await call('POST', '/v1/storage', tok.body.access_token, { key, data: b64('app file'), mime_type: 'text/plain', visibility: 'public' });
+    assert(up.status === 201 || up.status === 200, `the app uploads: ${up.status} ${JSON.stringify(up.body?.error)}`);
+    const pub = `/v1/pub/${encodeURIComponent(geai)}/${encodeURIComponent(key)}`;
+    const before = await call('GET', pub);
+    assert(before.status === 200, `POSITIVE CONTROL: a stranger reads the app's public file before: ${before.status}`);
+    const l = await setLabel(alice.token, { kind: 'app', app: appName }, HIGH);
+    assert(l.status === 200 && l.body.data.applied === true, `app label: ${l.status} ${JSON.stringify(l.body?.error ?? l.body?.data)}`);
+    let after = await call('GET', pub);
+    for (let i = 0; i < 30 && after.status === 200; i++) { await new Promise(r => setTimeout(r, 100)); after = await call('GET', pub); }
+    assert(after.status !== 200, `a stranger still reads the app's file: ${after.status}`);
+    let note: Body | undefined;
+    for (let i = 0; i < 30 && !note; i++) {
+        const n = await call('GET', '/v1/notifications', alice.token);
+        note = (n.body?.data?.notifications as Body[] | undefined)?.find(x => x.type === 'classification_audience_lowered' && String(x.title).includes(key));
+        if (!note) await new Promise(r => setTimeout(r, 100));
+    }
+    assert(note, 'no classification_audience_lowered notification names the file');
+    let rows: Body[] = [];
+    for (let i = 0; i < 30; i++) {
+        const audit = await call('GET', `/v1/classification/audit?${q({ level: 'owner', action: 'changed' })}`, alice.token);
+        rows = (audit.body?.data?.rows as Body[] | undefined) ?? [];
+        if (rows.some(r => r.kind === 'file' && r.key === key)) break;
+        await new Promise(r => setTimeout(r, 200));
+    }
+    assert(rows.some(r => r.kind === 'file' && r.key === key && String(r.purpose).startsWith('audience public')), `the audit row: ${JSON.stringify(rows.map(r => [r.kind, r.key, r.purpose]))}`);
 });
 
 await test('Cleanup: the operator turns classification off and restores the node policy', async () => {

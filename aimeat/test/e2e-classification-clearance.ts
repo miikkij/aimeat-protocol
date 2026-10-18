@@ -20,10 +20,13 @@
  *   start value back and the switch off at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=classification-clearance
  * @version-history
+ *   v1.0.1 — 2026-10-18 — The setup takes the default audience caps off, which a new node carries from
+ *     plan doc-mvdipuyqraas L5.1; the suite tests the clearance, not the caps.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L2.1-L2.4).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpAgent, type McpSession } from './helpers/mcp-session.js';
+import { takeOffAudienceCaps } from './helpers/classification-caps.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now();
@@ -99,6 +102,8 @@ await test('Setup: classification on for everyone; alice\'s agent keeps a Confid
     bob = await registerOwner(BASE, `clrbob${stamp}`);
     const on = await setSwitch('all');
     assert(on.status === 200, `switch all: ${on.status} ${JSON.stringify(on.body?.error)}`);
+    // The suite keeps public content in classified containers; a new node's default caps would refuse it.
+    await takeOffAudienceCaps(BASE, op.token);
     bot = await makeAgent(BASE, alice, ['*'], `clrbot${stamp % 100000}`);
     helper = await makeAgent(BASE, alice, ['*', 'agent:permissions'], `clrhelp${stamp % 100000}`);
     plain = await makeAgent(BASE, alice, ['*'], `clrplain${stamp % 100000}`);

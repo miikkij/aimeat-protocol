@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-18 — The aimeat_admin_incident_resolve comment names the offered default audience caps too
+ *     (plan doc-mvdipuyqraas, L5.1); the handler is unchanged.
  *   2026-10-12 — aimeat_consent_grant sends `scope` only when given, as the catalog now marks it
  *     optional (the node's default reach, Core 2026-11 AUTHZ-18).
  *   2026-10-11 — aimeat_datamap_get and aimeat_datamap_set move unchanged to
@@ -463,7 +465,8 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }) => client.get('/v1/admin/security/overview'),
     },
     {
-        // With `name` and `resolution`: one name of the held-names incident (rows, installs, app grants, access tokens).
+        // With `name` and `resolution`: one case of an incident, a held name (rows, installs, app grants,
+        // access tokens) or an offered default audience cap ("apply" / "keep"); the route decides which.
         name: 'aimeat_admin_incident_resolve',
         handler: ({ client }, input) => client.post(`/v1/admin/security/incidents/${encodeURIComponent(requiredString(input, 'id'))}/resolve`,
             input.name !== undefined || input.resolution !== undefined

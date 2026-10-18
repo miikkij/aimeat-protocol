@@ -1120,9 +1120,22 @@
         "getMemoryByKeysAnyOwner": 1,
         "getStorageFileMeta": 1,
         "listAllMemoryMeta": 1,
-        "listMemoryMeta": 1
+        "listMemoryMeta": 1,
+        "listStorageFiles": 1
       },
-      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.4), the node's own read: after a label rises, the levels of the records and files it covers are read (metadata, and a record's value only to write it back unchanged with the lower level) so that what is over its label's audience cap is lowered; nothing is returned to anyone."
+      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.4), the node's own read: after a label rises, the levels of the records and files it covers are read (metadata, and a record's value only to write it back unchanged with the lower level) so that what is over its label's audience cap is lowered; nothing is returned to anyone. listStorageFiles (2026-10-18, L5): the metadata of the files in an app's own namespace when the app's label rises, no bytes."
+    },
+    "src/services/classification/default-caps-state.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L5.1), the node's own read: the start step's record under system@<node> that says whether the node takes the default audience caps. No content."
+    },
+    "src/services/classification/default-caps.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L5.1), the node's own read: the start step's record and the node's stored classification policy under system@<node>, to decide once whether the node is new and to write an approved cap into the policy. No content."
     },
     "src/services/classification/exceptions.ts": {
       "reads": {
@@ -2538,6 +2551,12 @@
         "getWorkspaceRow": 1
       },
       "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
+    },
+    "src/services/workspace-share-gate.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3 gap closed in L5), the node's own read: the keys of the published pages of a space a share is about to show wider, no value, so that each page is held to its own label's audience cap before the share is stored. Nothing is returned to the caller but the refusal naming the page."
     },
     "src/services/workspace-tool-ops.ts": {
       "reads": {

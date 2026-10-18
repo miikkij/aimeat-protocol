@@ -12,6 +12,9 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.10.0 — 2026-10-18 — The default audience caps are settled once per node at start: a new node
+ *     takes them, a node that ran before gets them offered on the Security page
+ *     (services/classification/default-caps.ts, plan doc-mvdipuyqraas, L5.1).
  *   v1.9.0 — 2026-10-16 — The settings loadConfig() set aside become Security page incidents, and the
  *     incident of a setting accepted now closes (services/config-setting-incidents.ts; Jouni, decision
  *     2026-10-16).
@@ -56,6 +59,7 @@ import { settleStoredHookBindings, moveAccountNameHookBindings } from '../servic
 import { openHeldNamesIncident, settleInstallsAtStart, settleCredentialsAtStart } from '../services/held-account-names.js';
 import { settleWorkspaceSchemasAtStart } from '../services/workspace-schema-relock.js';
 import { settleSettingIncidentsAtStart } from '../services/config-setting-incidents.js';
+import { settleDefaultCapsAtStart } from '../services/classification/default-caps.js';
 import { bindAppAuditConfig } from '../services/app-audit-archive.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -204,6 +208,11 @@ export async function initializeConfig(
   // A setting whose value loadConfig() did not accept runs its default and gets one incident on the
   // Security page; the incident of a setting accepted now closes. Every start; never stops it.
   if (configSources?.settingFallbacks) await settleSettingIncidentsAtStart(storage, config, configSources.settingFallbacks);
+  // The default audience caps of the classifications (plan doc-mvdipuyqraas, L5.1), once per node and
+  // before any request: a node with no stored policy and no account is new and takes them; a node that
+  // ran before keeps what it has, and each cap waits for the operator on the Security page. Before the
+  // anonymous identity is made (service-init.ts), so that account is not taken as evidence. Never throws.
+  await settleDefaultCapsAtStart(config, storage);
   // The app audit log reads the operator's default limit from this config object, live.
   bindAppAuditConfig(config);
 

@@ -33,6 +33,8 @@
  *   classificationActiveFor() · policyFor()
  * @usage if (await classificationActiveFor(storage, config, scope)) { const p = await policyFor(...); }
  * @version-history
+ *   v1.3.0 — 2026-10-18 — readNodePolicy: a node with no stored policy whose start found it new reads
+ *     the default labels with the default audience caps of decision 10.1 (plan doc-mvdipuyqraas, L5.1).
  *   v1.2.0 — 2026-09-29 — TARGET-082 review. Personal content of an owner's agents and ecosystem apps
  *     reads the owner's level (ownerOfScope, finding 1). readLevel normalises and validates what it
  *     reads and reports what the normalising dropped (findings 2 and 4).
@@ -44,6 +46,7 @@ import type { AimeatConfig } from '../../config.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { defaultPolicy, type ClassificationPolicy } from './defaults.js';
+import { labelsWithDefaultCaps, readDefaultCapsState } from './default-caps-state.js';
 import {
   mergePolicy, normaliseLayer, normaliseStoredLabels, validateLayer, validateNodePolicy, type PolicyLayer,
 } from './levels.js';
@@ -125,7 +128,10 @@ async function readStored(storage: Storage, nodeId: string, level: PolicyLevel, 
   };
 }
 
-/** The stored node policy over the defaults, validated; the defaults when it does not pass. */
+/**
+ * The stored node policy over the defaults, validated; the defaults when it does not pass. A stored
+ * policy is the operator's, so its labels' own caps stand and the default caps are never added to it.
+ */
 function checkedNode(stored: unknown, nodeId: string): ClassificationPolicy | null {
   if (stored === null || stored === undefined) return null;
   try {
@@ -175,9 +181,17 @@ export async function readLevel<P = PolicyLayer>(
   return { ...rec, policy: layer as P | null, proposal: rec.proposal as StoredLevel<P>['proposal'], dropped };
 }
 
-/** The node's policy: the stored one over the defaults, so a field added later reads its default. */
+/**
+ * The node's policy: the stored one over the defaults, so a field added later reads its default.
+ * A node with no stored policy reads the defaults, with the default audience caps on its labels when
+ * its start found it new (default-caps-state.ts, plan doc-mvdipuyqraas, L5.1).
+ */
 export async function readNodePolicy(storage: Storage, nodeId: string): Promise<ClassificationPolicy> {
-  return checkedNode((await readStored(storage, nodeId, 'node', nodeId)).policy, nodeId) ?? defaultPolicy();
+  const stored = checkedNode((await readStored(storage, nodeId, 'node', nodeId)).policy, nodeId);
+  if (stored) return stored;
+  const policy = defaultPolicy();
+  if ((await readDefaultCapsState(storage, nodeId))?.node === 'new') policy.labels = labelsWithDefaultCaps(policy.labels);
+  return policy;
 }
 
 type Cfg = Pick<AimeatConfig, 'classificationMode' | 'nodeId'>;
