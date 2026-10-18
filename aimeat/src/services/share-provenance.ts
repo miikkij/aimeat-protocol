@@ -30,6 +30,9 @@
  * @usage
  *   const visible = await publiclyResolvableWithShares(storage, config, [row.id]);
  * @version-history
+ *   v1.3.0 — 2026-10-18 — publiclyResolvableWithShares also counts a welcome page or a company front
+ *     page served while it is on (services/served-page-provenance.ts): their files are owner-only
+ *     since plan doc-mvcn6c7e4e5q V0.3, and the record of a served page answered 404.
  *   v1.2.0 — 2026-10-16 — Moved from routes/organisms/share-provenance.ts, asking the public collectors
  *     (services/workspace-public-collectors.ts, moved with it) and readShareMetaOf directly instead of
  *     the route helpers, which are the same functions: the compliance counts and the MCP tool ask it
@@ -48,6 +51,7 @@ import { loadServedProvenanceMany, provenanceItemBlock, type AiProvenanceItemBlo
 import { createPublicCollectors } from './workspace-public-collectors.js';
 import { readerFor } from './classification/reader.js';
 import { shareIsOpen, isDocPublicAt, readShareMetaOf } from './workspace-share.js';
+import { servedPageProvenanceIds } from './served-page-provenance.js';
 import type { ResolvedShare } from '../routes/organisms/share-types.js';
 
 /** `organism.{org}.w.{ws}.` — the workspace a published record key belongs to. */
@@ -117,6 +121,9 @@ export async function publiclyResolvableWithShares(storage: Storage, config: Aim
   const visible = await publiclyResolvable(storage, ids);
   const rest = ids.filter(id => !visible.has(id));
   for (const id of await shareOpenedProvenanceIds(storage, config, rest)) visible.add(id);
+  // A welcome page or a company front page served while it is on (its file is owner-only).
+  const pages = rest.filter(id => !visible.has(id));
+  for (const id of await servedPageProvenanceIds(storage, config, pages)) visible.add(id);
   return visible;
 }
 
