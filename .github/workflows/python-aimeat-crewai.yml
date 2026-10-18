@@ -12,6 +12,8 @@ on:
       # reads the shape allowlist (2026-10-18).
       - 'aimeat/src/models/offer-schemas.ts'
       - 'aimeat/src/models/workflow-signals.ts'
+      - 'aimeat/src/models/odps-schemas.ts'
+      - 'aimeat/src/commerce/money.ts'
       - 'aimeat/security/python-shape-parity.json'
       - '.github/workflows/python-aimeat-crewai.yml'
   pull_request:
@@ -21,6 +23,8 @@ on:
       - 'aimeat/src/cli/connect/**'
       - 'aimeat/src/models/offer-schemas.ts'
       - 'aimeat/src/models/workflow-signals.ts'
+      - 'aimeat/src/models/odps-schemas.ts'
+      - 'aimeat/src/commerce/money.ts'
       - 'aimeat/security/python-shape-parity.json'
       - '.github/workflows/python-aimeat-crewai.yml'
 

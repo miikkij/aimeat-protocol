@@ -17,7 +17,8 @@
  *     generates; the Python side is read from the source text, because the gate has no Python. It
  *     compares NAMES: every top-level offer field, which of them are required, the offers document's
  *     fields, every deterministic signal op and the fields each leaf carries, the composites, and
- *     the two constants both sides spell out (the pacing ceiling and the "no input" literal).
+ *     the three constants both sides spell out (the pacing ceiling, the "no input" literal and the
+ *     deliverable formats build_offer accepts).
  *   - python/aimeat-crewai/tests/test_node_schema_parity.py (pytest, in the package's CI workflow):
  *     builds offers and signals with the Python builders and validates them against the same JSON
  *     Schema, read from the committed fixture this module writes. That half checks VALUES.
@@ -38,6 +39,8 @@
  *   - SHAPE_CEILING, readShapeAllowlist()
  * @usage import { nodeShapes, readPythonShapes, shapeFindings } from './inventory/python-shapes.js';
  * @version-history
+ *   v1.1.0 — 2026-10-18 — build_offer requires `deliverable` (aimeat-crewai 0.36.0, Jouni's yes), so
+ *     its allowlist entry is gone; offers.py DELIVERABLE_FORMATS is held to the node's format enum.
  *   v1.0.0 — 2026-10-18 — Initial (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille).
  */
 import { readFileSync } from 'node:fs';
@@ -47,7 +50,7 @@ import { OffersDocSchema, TOLL_MORSELS_MAX } from '../../src/models/offer-schema
 import { SignalSchema } from '../../src/models/workflow-signals.js';
 
 /** The number of allowlisted differences. Deleting an entry lowers it in the same change; raising it is the developer's decision. */
-export const SHAPE_CEILING = 17;
+export const SHAPE_CEILING = 16;
 
 type Json = Record<string, unknown>;
 
@@ -116,7 +119,7 @@ export interface PythonShapes {
     offer: ObjectShape;
     offersDoc: ObjectShape;
     signal: SignalShapes;
-    constants: { TOLL_MORSELS_MAX: number | null; NONE: string | null };
+    constants: { TOLL_MORSELS_MAX: number | null; NONE: string | null; DELIVERABLE_FORMATS: string[] | null };
     /** What could not be read; any entry fails the gate. */
     unreadable: string[];
 }
@@ -179,12 +182,17 @@ export function readPythonShapes(src: string): PythonShapes {
 
     const toll = /^TOLL_MORSELS_MAX\s*=\s*(\d+)/m.exec(offersPy);
     const none = /^NONE\s*=\s*["']([^"']*)["']/m.exec(specPy);
+    const formats = /^DELIVERABLE_FORMATS\s*=\s*\(([^)]*)\)/m.exec(offersPy);
 
     return {
         offer: { properties: [...new Set([...(base ?? []), ...(optional ?? [])])], required },
         offersDoc: { properties: [...new Set([...(docBase ?? []), ...docExtra])], required: docBase ?? [] },
         signal: readPythonSignals(specPy, unreadable),
-        constants: { TOLL_MORSELS_MAX: toll ? Number(toll[1]) : null, NONE: none ? none[1] : null },
+        constants: {
+            TOLL_MORSELS_MAX: toll ? Number(toll[1]) : null,
+            NONE: none ? none[1] : null,
+            DELIVERABLE_FORMATS: formats ? [...formats[1].matchAll(/["']([^"']+)["']/g)].map(m => m[1]) : null,
+        },
         unreadable,
     };
 }
@@ -269,6 +277,10 @@ export function shapeFindings(node: NodeShapes, py: PythonShapes): string[] {
     out.push(...minus(py.signal.composites, ns.composites).map(k => `signal.composite.python-only:${k}`));
     if (py.constants.TOLL_MORSELS_MAX !== node.constants.TOLL_MORSELS_MAX) out.push('constant:TOLL_MORSELS_MAX');
     if (py.constants.NONE !== node.constants.REQUIRED_TO_FUNCTION_NONE) out.push('constant:NONE');
+    // build_offer refuses a deliverable whose format is not in its list (0.36.0), so the list is the node's enum.
+    const offerProps = (offerOf(node.offersDoc).properties ?? {}) as Record<string, Json>;
+    const nodeFormats = (((offerProps.deliverable?.properties ?? {}) as Record<string, Json>).format?.enum ?? []) as string[];
+    if ([...(py.constants.DELIVERABLE_FORMATS ?? [])].sort().join(',') !== [...nodeFormats].sort().join(',')) out.push('constant:DELIVERABLE_FORMATS');
     return out;
 }
 

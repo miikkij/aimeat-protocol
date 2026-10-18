@@ -765,6 +765,7 @@ environment variable it lives in (`agent.key_env`) and never the key itself.
 | 0.32.x | `{kind: "node"}` crew choices and the `llm` field of the runtime report need the node release after 3.23.0; an older node refuses the choice with `INVALID_CHOICE`. `unsafe_choice_reason` needs no node. The agent needs `ai:use` for `/v1/llm`. | 0.80+ |
 | 0.33.x | The stopped-agent handling needs the node release after 3.26.1, which sends `agent_stopped`. Against an older node the flag never arrives and nothing changes. Declaring `ai_provenance` needs the `provenance:write` scope. | 0.80+ |
 | 0.34.x | `build_offer(price_money=..., toll_morsels=...)` needs the node release after 3.26.1, which stores the two values. The deprecated `price={"morsels": n}` still works and is written as a pacing amount; the node accepts the old field until 4.0.0 and refuses it after. | 0.80+ |
+| 0.36.x | `build_offer()` requires `deliverable` with a `format` the node accepts, as every node's offer schema does; works with any node. | 0.80+ |
 
 ## License
 

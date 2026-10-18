@@ -6,6 +6,8 @@
  * must retain changed suites, shared security code must select the guard tier, and a storage,
  * identity, door or runner change must select the PostgreSQL legs without being asked.
  * @version-history
+ *   2026-10-18 -- aimeat-crewai, the offer and signal schemas and the shape allowlist select the Python
+ *     parity tests; an unrelated change does not.
  *   2026-10-17 -- A changed suite or test/version-aware-suites.txt selects the version-aware suite list check.
  *   2026-10-16 -- Each case may take 30 s, above the child process's own 20 s limit: under load the
  *     first case timed out at vitest's 5 s default while the planner was still compiling.
@@ -92,6 +94,14 @@ describe('the gate selects what the change can affect', { timeout: 30_000 }, () 
     });
     it('runs the unit tests a runner change reaches', () => {
         expect(plan('aimeat/test/run-e2e-server.ts')).toContain('unit tests reaching');
+    });
+    it.each(['python/aimeat-crewai/src/aimeat_crewai/offers.py', 'aimeat/src/models/offer-schemas.ts',
+        'aimeat/src/models/workflow-signals.ts', 'aimeat/security/python-shape-parity.json'])(
+        'runs the Python parity tests for %s', path => { expect(plan(path)).toContain('Python parity tests'); });
+    it('keeps the Python parity tests off for an unrelated change, and says so', () => {
+        const output = plan('aimeat/src/services/board-ttl.ts');
+        expect(output).not.toContain('• Python parity tests');
+        expect(output).toContain('skipped: Python parity tests');
     });
 });
 

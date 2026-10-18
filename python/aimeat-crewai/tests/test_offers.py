@@ -54,6 +54,11 @@ def test_unknown_op_rejected() -> None:
 
 # ── offer level assessment ────────────────────────────────────────────────────
 
+# The smallest deliverable the node accepts; build_offer requires one (0.36.0). No location, so an
+# offer with only this is still not workflow-compatible.
+DOC = {"format": "document"}
+
+
 def _level3_offer() -> dict:
     return build_offer(
         id="research",
@@ -82,7 +87,7 @@ def test_none_is_valid_required_to_function() -> None:
 
 
 def test_level1_only_offer_flags_missing_workflow_bits() -> None:
-    offer = build_offer(id="hello", title="Hello", ask="Ask me anything. I won't do X.")
+    offer = build_offer(id="hello", title="Hello", ask="Ask me anything. I won't do X.", deliverable=DOC)
     v = assess_offer(offer)
     assert v["offering"] is True
     assert v["workflow_compatible"] is False
@@ -94,7 +99,7 @@ def test_level1_only_offer_flags_missing_workflow_bits() -> None:
 
 def test_priced_requires_public_and_callable() -> None:
     offer = build_offer(
-        id="x", title="X", ask="do x; not y",
+        id="x", title="X", ask="do x; not y", deliverable=DOC,
         toll_morsels=5, visibility="unlisted", callable={"action_id": "x"},
     )
     v = assess_offer(offer)
@@ -103,7 +108,7 @@ def test_priced_requires_public_and_callable() -> None:
 
 
 def test_priced_reads_money_price_or_pacing() -> None:
-    base = {"visibility": "public", "callable": {"action_id": "x"}}
+    base = {"visibility": "public", "callable": {"action_id": "x"}, "deliverable": DOC}
     money = build_offer(id="m", title="M", ask="do m; not n",
                         price_money={"amount": 1_500_000, "currency": "EUR"}, **base)
     assert money["priceMoney"] == {"amount": 1_500_000, "currency": "EUR"}
@@ -121,7 +126,7 @@ def test_deprecated_morsel_price_becomes_pacing() -> None:
     # A morsel is pacing, never a price: the 3.x price={"morsels": n} is written as tollMorsels,
     # added to any toll_morsels, and the document carries no `price`.
     with pytest.warns(DeprecationWarning, match="toll_morsels"):
-        offer = build_offer(id="x", title="X", ask="do x; not y", price={"morsels": 7}, toll_morsels=2)
+        offer = build_offer(id="x", title="X", ask="do x; not y", deliverable=DOC, price={"morsels": 7}, toll_morsels=2)
     assert "price" not in offer
     assert offer["tollMorsels"] == 9
     # A stored 3.x offer that still carries price.morsels counts as offered to other owners.
@@ -131,16 +136,16 @@ def test_deprecated_morsel_price_becomes_pacing() -> None:
 
 
 def test_build_offer_drops_none() -> None:
-    offer = build_offer(id="x", title="X", ask="do x; not y")
+    offer = build_offer(id="x", title="X", ask="do x; not y", deliverable=DOC)
     assert "price" not in offer and "success_signal" not in offer
     assert "priceMoney" not in offer and "tollMorsels" not in offer
-    assert offer == {"id": "x", "title": "X", "ask": "do x; not y"}
+    assert offer == {"id": "x", "title": "X", "ask": "do x; not y", "deliverable": DOC}
 
 
 # ── document validation ───────────────────────────────────────────────────────
 
 def test_validate_offers_doc_require_gate() -> None:
-    doc = build_offers_doc([build_offer(id="x", title="X", ask="do x; not y")])
+    doc = build_offers_doc([build_offer(id="x", title="X", ask="do x; not y", deliverable=DOC)])
     # offering passes
     validate_offers_doc(doc, require="offering")
     # but workflow_compatible should raise

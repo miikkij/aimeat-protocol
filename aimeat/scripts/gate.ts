@@ -16,6 +16,9 @@
  *     guard tier    when a change touches server source (anything under src/ but src/static), the
  *                   dependency manifests or the E2E machinery (runner, helpers, fixtures); on
  *                   SQLite, and on PostgreSQL too when the Postgres legs run; --full forces it
+ *     Python parity the aimeat-crewai offer and signal tests (tests/test_node_schema_parity.py,
+ *                   tests/test_offers.py) through uv on Python 3.12, when the package, the offer and
+ *                   signal schemas or the shape allowlist changed; --full forces it. No uv fails.
  *     own suites    a registered E2E suite file that itself changed is run, including under --full;
  *                   SQLite always, PostgreSQL when the Postgres legs run
  *     Postgres legs the guard tier, the changed suites and the unit files with a Postgres half run
@@ -35,6 +38,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-10-18 -- The Python parity tests run when aimeat-crewai, the offer or signal schemas or the
+ *     shape allowlist changed (scripts/python-parity-test.ts; Jouni's yes to the pytest in the gate).
  *   2026-10-17 -- A changed suite (or the list itself) runs test/unit/version-aware-suites.test.ts, which
  *     `vitest --changed` cannot select because it reads suite text, not imports.
  *   v1.3.0 -- 2026-10-16 -- The plan prints main's CI state and the nightly sweep's state (QA audit
@@ -100,6 +105,13 @@ const GUARDED = /^aimeat\/(?:src\/(?!static\/)|package\.json$|pnpm-lock\.yaml$|t
  * kind that differs between the two providers or decides who may do what (QA audit P2-04).
  */
 const POSTGRES_TRIGGER = /^aimeat\/(?:src\/(?:storage|auth|routes|mcp|tool-catalog)\/|src\/(?:services|utils)\/[^/]*(?:identity|gaii|ghii|owner|principal)[^/]*\.ts$|test\/run-e2e-[^/]+\.ts$|test\/helpers\/server-db\.ts$)/;
+/**
+ * Paths that move the Python half of the offer-shape comparison: the aimeat-crewai package, the zod
+ * schemas its fixture is generated from (and the two modules they import), the shape allowlist the
+ * pytest reads, and the scripts that write the fixture and run the step. The same set as the
+ * package's CI workflow paths for these files (Jouni, 2026-10-18: the parity pytest runs in pnpm gate).
+ */
+const PYTHON_PARITY = /^(?:python\/aimeat-crewai\/|aimeat\/src\/models\/(?:offer-schemas|workflow-signals|odps-schemas)\.ts$|aimeat\/src\/commerce\/money\.ts$|aimeat\/security\/python-shape-parity\.json$|aimeat\/scripts\/(?:check-python-shapes|python-parity-test|inventory\/python-shapes)\.ts$)/;
 /** Paths a unit test can reach at all. The whole test tree: the runner has unit tests of its own (QA audit P2-06). */
 const UNIT_REACH = /^aimeat\/(src\/|test\/|public\/|scripts\/|package\.json|vitest\.config|tsconfig|eslint\.config|locales\/)/;
 
@@ -170,6 +182,14 @@ function plan(files: string[], mergeBase: string): Step[] {
         steps.push({ name: 'version-aware suite list', cmd: ['pnpm', '-s', 'exec', 'vitest', 'run', 'test/unit/version-aware-suites.test.ts'], why: 'a suite changed: test/version-aware-suites.txt must name every suite that branches on the release' });
     }
 
+    // The gate has run check:python-shapes (names, from the Python source) in check:fast since
+    // 2026-10-18; this runs the pytest half (values) through uv, and fails with its reason when uv is
+    // missing rather than passing without having checked.
+    const pythonParity = files.filter(f => PYTHON_PARITY.test(f));
+    if (FULL || pythonParity.length > 0) {
+        steps.push({ name: 'Python parity tests (uv, Python 3.12)', cmd: ['pnpm', '-s', 'test:python-parity'], why: FULL ? '--full' : pythonParity.slice(0, 3).join(', ') + (pythonParity.length > 3 ? ', …' : '') });
+    }
+
     if (ownSuites.length > 0) {
         // Past a few dozen suites the names go in a file: one `--test=` each made a command line of
         // about 13000 characters for 404 suites, and Windows refused it ("The command line is too
@@ -236,6 +256,7 @@ async function main(): Promise<void> {
     for (const s of steps) console.log(`  • ${s.name.padEnd(44)} ${s.why}`);
     const skipped: string[] = [];
     if (!FULL && !files.some(f => UNIT_REACH.test(f))) skipped.push('unit tests (nothing a test can reach changed)');
+    if (!FULL && !files.some(f => PYTHON_PARITY.test(f))) skipped.push('Python parity tests (no aimeat-crewai, offer schema or shape-allowlist change)');
     if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard tier (no server source, dependency or E2E machinery changed)');
     if (postgresWhy(files) === null) skipped.push('PostgreSQL legs (no storage, identity, door or runner change; --postgres forces them)');
     for (const s of skipped) console.log(`  · skipped: ${s}`);

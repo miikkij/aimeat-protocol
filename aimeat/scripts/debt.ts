@@ -179,10 +179,10 @@ const RATCHETS: Ratchet[] = [
     { file: 'aimeat/security/connect-serve-parity-exemptions.json', label: 'MCP tools not on connect serve', check: 'check:mcp-tools', count: exemptMap },
     { file: 'aimeat/security/mcp-uncalled-tools.json', label: 'MCP tools no E2E suite calls', check: 'check:mcp-test-calls', count: exemptMap },
     // Wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille (2026-10-18): the pairs
-    // written twice. The browser libraries' row is a report (audit:browser-libs), never a gate.
+    // written twice; the browser libraries' list is a shrink-only gate too since Jouni's yes the same day.
     { file: 'aimeat/security/python-shape-parity.json', label: 'Offer and signal fields Python lacks', check: 'check:python-shapes', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/python-daemon-parity.json', label: 'Python daemon vs connector', check: 'check:python-daemon', count: exemptMap, open: exemptOpen },
-    { file: 'aimeat/security/browser-lib-routes.json', label: 'Browser libs, parameters differ', check: 'audit:browser-libs', count: raw => Object.keys((parse(raw).differences ?? {}) as Json).length },
+    { file: 'aimeat/security/browser-lib-routes.json', label: 'Browser libs, parameters differ', check: 'check:browser-libs', count: raw => Object.keys((parse(raw).differences ?? {}) as Json).length },
     {
         file: 'aimeat/security/storage-owner-relations.json',
         label: 'Identity columns, policy open',

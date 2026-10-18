@@ -77,7 +77,7 @@ function main(): void {
     if (count > DAEMON_CEILING) problems.push(`${DAEMON_ALLOWLIST} holds ${count} entries and the ceiling is ${DAEMON_CEILING}: the list only shrinks, and a new entry is the developer's decision`);
 
     // Differences a name comparison cannot see, printed on every run so they stay in sight.
-    for (const [id, what] of Object.entries(file.known ?? {})) console.log(`  known, not detected by this check: ${id}: ${what.split('. ')[0]}.`);
+    for (const [id, what] of Object.entries(file.known ?? {})) console.log(`  known, not detected by this check: ${id}: ${what}`);
 
     if (problems.length > 0) {
         console.error(`✗ check:python-daemon: ${problems.length} problem(s)`);

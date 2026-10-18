@@ -34,6 +34,7 @@ from .credentials import (
 from .workflow_spec import NONE, assess_offers_doc
 
 __all__ = [
+    "DELIVERABLE_FORMATS",
     "NONE",
     "OfferValidationError",
     "build_offer",
@@ -46,6 +47,27 @@ __all__ = [
 
 TOLL_MORSELS_MAX = 100
 """The highest pacing amount an offer may declare (the node's TOLL_MORSELS_MAX; its own ceiling applies too)."""
+
+
+DELIVERABLE_FORMATS = ("document", "record", "board-post", "file", "app", "image", "json")
+"""What an offer's ``deliverable.format`` may be (the node's DeliverableSchema; the node gate
+``pnpm check:python-shapes`` holds this list to it)."""
+
+
+def _check_deliverable(deliverable: Any) -> None:
+    """Raise naming the field when ``deliverable`` is not one the node accepts: TypeError when it
+    is not a dict (None included), ValueError when its format is not one the node knows."""
+    if not isinstance(deliverable, dict):
+        raise TypeError(
+            "build_offer: `deliverable` is required, as a dict such as "
+            '{"format": "document", "location": {"key": "<memory key>"}}; '
+            f"got {type(deliverable).__name__}. The node refuses an offer without one."
+        )
+    if deliverable.get("format") not in DELIVERABLE_FORMATS:
+        raise ValueError(
+            f"build_offer: `deliverable.format` must be one of {', '.join(DELIVERABLE_FORMATS)}; "
+            f"got {deliverable.get('format')!r}."
+        )
 
 
 class OfferValidationError(ValueError):
@@ -61,13 +83,13 @@ def build_offer(
     id: str,
     title: str,
     ask: str,
+    deliverable: dict[str, Any],
     example: str | None = None,
     tags: list[str] | None = None,
     cost: str | None = None,
     latency: str | None = None,
     verification: str | None = None,
     data_handling: str | None = None,
-    deliverable: dict[str, Any] | None = None,
     success_signal: dict[str, Any] | None = None,
     required_to_function: dict[str, Any] | str | None = None,
     price_money: dict[str, Any] | None = None,
@@ -91,7 +113,13 @@ def build_offer(
     ``price`` is the deprecated 3.x morsel price (``{"morsels": n}``). The node
     reads it as pacing until 4.0.0 and refuses it after; here it is turned into
     ``tollMorsels`` (added to ``toll_morsels``) with a DeprecationWarning, so the
-    document never carries it."""
+    document never carries it.
+
+    ``deliverable`` is required (0.36.0), as the node's OfferSchema requires it:
+    ``{"format": <one of DELIVERABLE_FORMATS>, "location": {...}?, "sample": ...?}``.
+    The node's catalogue leaves out an agent's whole offers document when one
+    offer in it has none, so a missing or malformed one raises here instead."""
+    _check_deliverable(deliverable)
     if price is not None:
         warnings.warn(
             "build_offer(price={'morsels': n}) is deprecated: a morsel is pacing, not a price. "
@@ -103,7 +131,7 @@ def build_offer(
         legacy = price.get("morsels") if isinstance(price, dict) else None
         if isinstance(legacy, (int, float)) and legacy > 0:
             toll_morsels = min(int(toll_morsels or 0) + int(legacy), TOLL_MORSELS_MAX)
-    offer: dict[str, Any] = {"id": id, "title": title, "ask": ask}
+    offer: dict[str, Any] = {"id": id, "title": title, "ask": ask, "deliverable": deliverable}
     optional = {
         "example": example,
         "tags": tags,
@@ -111,7 +139,6 @@ def build_offer(
         "latency": latency,
         "verification": verification,
         "dataHandling": data_handling,
-        "deliverable": deliverable,
         "success_signal": success_signal,
         "required_to_function": required_to_function,
         "priceMoney": price_money,

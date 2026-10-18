@@ -35,11 +35,9 @@
  *   `fetch(`...\/v1/...`)` under src/cli/connect/. Its documented limit: a path held in a variable and
  *   passed to the call later is not seen (skill-bundle.ts builds its url first, tui/index.ts a base).
  *
- *   NOT SEEN, by design: what a field MEANS. The record event's `space` carries the space's
- *   namespace while daemon.py keys its manifest map by the object type's name; both are strings
- *   named `space`, so no name comparison can tell. That is incident
- *   incident-aimeat-crewai-the-contract-engagement-gate-never-finds-a-spa-mv5fhg3s, and the
- *   allowlist file carries it under `known` so every run prints it.
+ *   NOT SEEN, by design: what a field MEANS, only that both sides name it. The open incident
+ *   incident-aimeat-crewai-the-contract-engagement-gate-never-finds-a-spa-mv5fhg3s is of that kind;
+ *   the allowlist file carries it under `known` so every run prints it.
  * @structure
  *   - pythonCalls(src), connectorRoutes(dir), connectorCalls(dir), pythonToolNames(src)
  *   - openapiRoutes(yamlText)
