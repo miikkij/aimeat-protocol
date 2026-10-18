@@ -5,6 +5,66 @@
       "date": "2026-10-18",
       "kind": "feature",
       "title": {
+        "en": "Nothing becomes public without you",
+        "fi": "Mitään ei tule julkiseksi ilman sinua"
+      },
+      "body": {
+        "en": "When your agent or an app tries to make something public to anyone, such as a record, a file, an app, a page, a board, a skill or a package, the change is saved as it was, and you get a notification with Approve and Decline. Your agent gives you the same link in the chat. If you want an agent to publish on its own, you give it a separate permission; full access does not include it. If the content changes after the request, approving it publishes nothing: only what you were asked about can become public. The person running the service decides whether it asks for agents only or for apps too.",
+        "fi": "Kun agenttisi tai sovellus yrittää tehdä jostain julkisen kaikille, esimerkiksi tietueesta, tiedostosta, sovelluksesta, sivusta, taulusta, skillistä tai paketista, muutos tallentuu ennallaan ja saat ilmoituksen, jossa on Hyväksy ja Hylkää. Agenttisi antaa saman linkin myös keskustelussa. Jos haluat, että agentti saa julkaista itse, annat sille erillisen luvan. Täydet oikeudet eivät sisällä sitä. Jos sisältö muuttuu pyynnön jälkeen, hyväksyntä ei julkaise mitään: julkiseksi voi tulla vain se, mistä sinulta kysyttiin. Palvelun ylläpitäjä päättää, kysytäänkö vain agenteilta vai myös sovelluksilta."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "feature",
+      "title": {
+        "en": "Share with one organisation, or run AIMEAT for your company only",
+        "fi": "Jaa yhdelle organisaatiolle tai pidä AIMEAT vain oman yrityksesi käytössä"
+      },
+      "body": {
+        "en": "A record, a file, a board, a skill, a package, a workspace link, an app and your welcome page can now be open to the members of one organisation only. There are four levels: private, the members of one organisation, everyone signed in here, and public. For an app you choose who may open it: anyone, people signed in here, or one organisation's members; a visitor is asked to sign in and the app opens right after. The person running the service can also show everything to signed-in accounts only, so that someone who is not signed in sees nothing, and together with a Microsoft sign-in limited to chosen organisations it becomes your company's own AIMEAT. They also choose the level new things start at when nobody names one.",
+        "fi": "Tietueen, tiedoston, taulun, skillin, paketin, työtilan linkin, sovelluksen ja oman tervetulosivusi voi nyt avata vain yhden organisaation jäsenille. Tasoja on neljä: yksityinen, yhden organisaation jäsenet, kaikki täällä kirjautuneet ja julkinen. Sovellukselle valitset, kuka saa avata sen: kuka tahansa, täällä kirjautuneet tai yhden organisaation jäsenet. Kävijää pyydetään kirjautumaan, ja sovellus aukeaa heti sen jälkeen. Palvelun ylläpitäjä voi myös näyttää kaiken vain kirjautuneille, jolloin kirjautumaton ei näe mitään. Kun Microsoft-kirjautuminen rajataan valittuihin organisaatioihin, tästä tulee yrityksesi oma AIMEAT. Ylläpitäjä valitsee myös tason, jolta uudet asiat alkavat, kun kukaan ei nimeä tasoa."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "feature",
+      "title": {
+        "en": "Ask your AI what others can see of yours",
+        "fi": "Kysy tekoälyltäsi, mitä sinusta näkyy muille"
+      },
+      "body": {
+        "en": "Your AI can now list everything of yours that someone else can read: open to anyone, to anyone holding the link, to everyone signed in here, or to one organisation's members. For each one it tells you how to close it, and it closes nothing without asking you. The person running the service sees the same as numbers for the whole service.",
+        "fi": "Tekoälysi voi nyt luetella kaiken sinun sisällöstäsi, jota joku muu voi lukea: kaikille avoimen, linkin haltijoille avoimen, kaikille täällä kirjautuneille avoimen ja yhden organisaation jäsenille avoimen. Jokaisesta se kertoo, miten sen saa suljettua, eikä se sulje mitään kysymättä sinulta. Palvelun ylläpitäjä näkee saman lukuina koko palvelusta."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "feature",
+      "title": {
+        "en": "Your AI asks whose data is whose before it builds an app",
+        "fi": "Tekoälysi kysyy ennen sovelluksen rakentamista, kenen data on kenenkin"
+      },
+      "body": {
+        "en": "When your AI builds an app with you, it first asks who opens the app and, for each kind of data, whether it is each person's own, shared by the whole team, or public. Then it tells you in two or three sentences, with names from your own idea, how it understood you, and it builds only after you say yes. A team app then keeps one shared list for everybody, instead of giving each person an empty copy of their own.",
+        "fi": "Kun tekoälysi rakentaa kanssasi sovellusta, se kysyy ensin, kuka sovelluksen avaa, ja jokaisesta tiedosta, onko se kunkin oma, koko tiimin yhteinen vai julkinen. Sitten se kertoo kahdella tai kolmella lauseella ja oman ideasi nimillä, miten ymmärsi sinut, ja rakentaa vasta, kun vastaat kyllä. Tiimin sovelluksessa on silloin yksi yhteinen lista kaikille, eikä jokainen saa omaa tyhjää kopiotaan."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "security",
+      "title": {
+        "en": "Private organisations, app links and organisation boards fixed",
+        "fi": "Yksityiset organisaatiot, sovelluslinkit ja organisaatioiden taulut korjattu"
+      },
+      "body": {
+        "en": "The names of private organisations could be listed by someone who was not signed in; now they cannot. When an app or a page opened only for signed-in people, its permission stayed in the browser's address bar for an hour, so a copied link opened it without signing in; now the permission leaves the address at once. An organisation's own discussion board did not open for its members; a new or changed organisation's board now does.",
+        "fi": "Yksityisten organisaatioiden nimiä pystyi listaamaan kirjautumatta. Nyt ei pysty. Kun sovellus tai sivu aukesi vain kirjautuneille, sen lupa jäi tunniksi selaimen osoiteriville, joten kopioitu linkki avasi sen ilman kirjautumista. Nyt lupa poistuu osoitteesta heti. Organisaation oma keskustelutaulu ei auennut sen jäsenille. Uuden tai muutetun organisaation taulu aukeaa nyt."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "feature",
+      "title": {
         "en": "An app tells you what is new in it, and an open app updates itself",
         "fi": "Sovellus kertoo, mitä siinä on uutta, ja avoin sovellus päivittyy itse"
       },
