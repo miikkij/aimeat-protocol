@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.29.0 -- 2026-10-18 -- Who can read a key or a file is the AudienceBadge (Private, "<organism> members", Signed-in, Public), on the key lists, the search, the record page and each file's row, where it was the stored word (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.28.0 -- 2026-10-16 -- Until the records have loaded the cover says so: a failed load shows the
  *     could-not-load note with Retry in "Mine" and the other parts stay blank, a failed file load the
  *     same in Files; "Nothing here yet" is only said of a list that loaded (QA audit F6-05).
@@ -80,6 +81,7 @@ import { Tabs, Tab } from '/components/Tabs.js';
 import { List, Row as ListRow, Name, Cell, When, Num, Doors, Lead, More, SearchLine } from '/components/List.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { Note } from '/components/Note.js';
 import { SettingBox } from '/components/Box.js';
 import { Field, Fields, FormActions } from '/components/Field.js';
@@ -134,8 +136,8 @@ export function classify(memories, orgNames) {
   return { spaces, own: all.filter(s => s.bucket === 'own'), org: all.filter(s => s.bucket === 'org'), sys: all.filter(s => s.bucket === 'sys') };
 }
 
-/* A key's visibility as a tag: public on the sun, private dim (it reaches nobody), members plain. */
-const visMark = (v) => html`<${Mark} tone=${v === 'public' ? 'sun' : v === 'private' ? 'dim' : undefined}>${t('knowledge.visibility.' + (v || 'private')) || v}<//>`;
+/* Who can read a key, in words (components/AudienceBadge.js): public on the sun, private dim, the rest plain. */
+const visMark = (v) => html`<${AudienceBadge} value=${v || 'private'} />`;
 const nothingYet = () => t('profile.memory.empty') || 'Nothing here yet.';
 
 /* ── The crumb and the page frame ──────────────────────────────────────────────────────────── */
@@ -213,8 +215,8 @@ function fileRows(ctx, files) {
         ${isImage
           ? html`<${Lead} size="large" picture=${html`<${AuthImage} src=${fileBytesUrl(f, NODE_URL)} alt=${key} />`} />`
           : html`<${Lead} size="large" text=${kind} label=${kind} />`}
-        <${Name}>${key}<//>
-        <${Cell} meta>${f.size ? formatBytes(f.size) : ''} · ${t('knowledge.visibility.' + (f.visibility || 'private')) || f.visibility}<//>
+        <${Name} tag=${html`<${AudienceBadge} value=${f.visibility || 'private'} />`}>${key}<//>
+        <${Cell} meta>${f.size ? formatBytes(f.size) : ''}<//>
         <${Doors}>
           <${Action} small row soft onClick=${() => setPreviewFile(f)}>${t('profile.files.preview') || 'Preview'}<//>
           <${Action} small row soft copy=${url} onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied')}>${t('common.copyUrl') || 'Copy URL'}<//>

@@ -9,6 +9,7 @@
  * @structure c · words · who · leftWords · standingWords · followedOf · boardRows · noticeRow · crumb · renderPage
  * @usage import { renderPage, boardRows, noticeRow } from './frame.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-18 -- A board's row says who can read it with the AudienceBadge (Private for a board of chosen members too, "<organism> members", Public) (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.12.0 -- 2026-10-08 -- A notice's row hands its ai_provenance block to BoardNotice, which shows
  *     the AI label when one is owed (aiprov D10).
  *   v1.11.0 -- 2026-09-26 -- On the component kit (page group G7): the boards table is the List (the name's line cut to one line, the empty counts faint), the crumb and the sibling pages are data, and a board's or a notice's page is the SettingsPage in its page cut with the rail as data. The file writes no class.
@@ -33,6 +34,7 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { List, Row, Name, Desc, Doors } from '/components/List.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { date as fmtDate } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 
@@ -112,7 +114,7 @@ export function boardRows(ctx, list, door, { head = false } = {}) {
     return html`
       <${Row} key=${id}>
         <${Name} onOpen=${open} meta=${boardSub(ctx, b)} clip>${b.name}<//>
-        <${Desc}>${visWord(b.visibility)}<//>
+        <${Desc}><${AudienceBadge} value=${b.visibility} /><//>
         <${Desc} faint=${!n}>${n === null ? html`<${Note} kind="loading" inline>${t('common.loading')}<//>` : n ? html`<b>${n}${page.cursor ? '+' : ''}</b> ${c('noticesWord', { n })}` : c('noNotices')}<//>
         <${Desc} faint=${!latest}>${latest ? html`${rel(latest.created_at)}<br />${who(latest.author_gaii).label}` : '·'}<//>
         <${Doors}>${door(b)}<//>

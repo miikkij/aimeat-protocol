@@ -10,6 +10,7 @@
  * @structure c · words · pkgId · statsOf · groupOf · packageHead · packageRow · crumb · pageLinks · renderPage · entryText
  * @usage import { renderPage, packageRow, packageHead, statsOf } from './frame.js';
  * @version-history
+ *   v1.11.0 -- 2026-10-18 -- A package's row says who can read it, with the AudienceBadge beside its name (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.10.0 -- 2026-09-26 -- On the component kit (page group G7): a packages row is the List's Row
  *     (Name that opens the package, Desc, When, Doors with the Action); the crumb returns its steps
  *     and pageLinks its items as data; a package's page is the SettingsPage (page, the rail as data:
@@ -37,6 +38,7 @@ import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Action, Actions } from '/components/Action.js';
 import { Row, Name, Desc, When, Doors } from '/components/List.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 
 export const c = (key, vars) => t('knowledge.cover.' + key, vars);
 // The loc() helper here derived the FORMAT from the LANGUAGE. /js/format.js reads the
@@ -110,7 +112,7 @@ export function packageRow(ctx, pkg) {
   const open = () => ctx.pickView({ kind: 'package', id });
   return html`
     <${Row} key=${id}>
-      <${Name} onOpen=${open} meta=${subOf(m)}>${m.name || c('untitled')}<//>
+      <${Name} onOpen=${open} tag=${html`<${AudienceBadge} value=${pkg.visibility} />`} meta=${subOf(m)}>${m.name || c('untitled')}<//>
       <${Desc}><b>${s.entries}</b> ${c('entriesWord', { n: s.entries })}${s.refs ? html`<br />${c('refsVerified', { v: s.verified, n: s.refs })}` : null}<//>
       <${Desc}>${sharingWords(m, !!ctx.fedConsents?.[id]).join(' · ')}<//>
       <${When}>${rel(m.updated || pkg.updated_at || pkg.updatedAt)}<//>

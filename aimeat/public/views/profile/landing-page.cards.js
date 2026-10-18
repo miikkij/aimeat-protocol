@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.25.0 -- 2026-10-18 -- "What others can see" (the exposure tab) under Account, after Access, and in the basic menu: what of the person's own a stranger can read is a question a newcomer asks before anything goes in (plan doc-mvcn6c7e4e5q, V6.2).
  *   v1.24.0 -- 2026-10-11 -- The Commerce card totals money per currency and the pacing apart ("15,00 € · pacing 10 morsels"), from a checkout session's total / receipt and its pacing (receipt.pacing, pacingMorsels); a 3.x session in currency 'morsel' counts as pacing. A morsel is never a currency.
  *   v1.23.0 -- 2026-10-09 -- Visibility under Business, after Usage.
  *   v1.22.0 -- 2026-10-03 -- The overview's next steps come from the person's path (journey.next first, then the open stages after it; views/home/journey-steps.js), with no emoji; the extensions promo shows once the apps stage is done or the person has three apps, and its cards lose their emoji marks (guidance A2).
@@ -658,6 +659,7 @@ export const SIDEBAR_GROUPS = [
     { id: 'wallet', labelKey: 'profile.tabs.wallet' },
     { id: 'dataWallet', labelKey: 'profile.tabs.dataWallet' },
     { id: 'access', labelKey: 'profile.tabs.access' },
+    { id: 'exposure', labelKey: 'profile.tabs.exposure' },
   ] },
   /* Operator-only: the group AND its routes are gated on the operator role (open()
    * refuses these ids for non-operators; the underlying APIs enforce server-side).
@@ -682,7 +684,7 @@ export const BASIC_TAB_IDS = new Set([
   'agents', 'mcp',                              // the chat/agent connection
   'notifications', 'contacts',                  // what happened, who with
   'apps', 'packages', 'portfolio',              // what you made, and the apps you get
-  'wallet', 'access',                           // account
+  'wallet', 'access', 'exposure',               // account
 ]);
 
 // Flat item lookup (pinned section renders items by id).

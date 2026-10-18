@@ -11,6 +11,7 @@
  * @structure skillRow · skillOpen · loadingRow
  * @usage import { skillRow } from './rows.js';
  * @version-history
+ *   v1.19.0 -- 2026-10-18 -- Who can read a skill is the AudienceBadge beside its name (Private, Signed-in, "<organism> members", Public); the word left the line under the name (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.18.0 -- 2026-09-26 -- On the component kit (page group G7): the opened panel's facts are the Facts (the copies and the links inside a value are the Action's link tone, main's coral crumb link), the agent picker is the Select, the Check and the Action, who may see it the Tabs, the SKILL.md the Box's folded tone with its "show all", the loading lines the Note and the List. The file writes no class.
  *   v1.17.0 -- 2026-09-26 -- A skill's row, its opened panel with the doors at its foot, and the file list are the List component (components/List.js: Row, Name, Desc, Who, Doors, Panel, List); the doors are the Action, the copy door its copy (component plan C1).
  *   v1.16.0 -- 2026-09-26 -- "Pin to this version" is the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -43,6 +44,7 @@ import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { Action } from '/components/Action.js';
 import { Code, Label } from '/components/Mark.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { Note } from '/components/Note.js';
 import { Box } from '/components/Box.js';
 import { Facts } from '/components/Facts.js';
@@ -52,8 +54,9 @@ import { Tabs } from '/components/Tabs.js';
 import { List, Row, Name, Desc, Who, Num, Cell, Doors, Panel } from '/components/List.js';
 import { x, splitSkillMd, isOwn, whoOf, visibilityWord, sizeWord, dateWord, installLine, openTab } from './frame.js';
 
+/** The line under a skill's name: its files, size and date. Who can read it is the AudienceBadge beside the name. */
 function subLine(s) {
-  const parts = [visibilityWord(s.visibility)];
+  const parts = [];
   if ((s.files || []).length > 1) parts.push(x('filesN', { n: s.files.length }));
   parts.push(sizeWord(s.files));
   const d = dateWord(s.updatedAt);
@@ -66,7 +69,7 @@ export function skillRow(ctx, s) {
   const who = whoOf(s, ctx);
   return html`
     <${Row} key=${s.ref} open=${open}>
-      <${Name} tag=${'v' + s.version} warn=${!!s.supersededBy} meta=${s.supersededBy ? `${x('who.replaced').toLowerCase()} · ${subLine(s)}` : subLine(s)}>${s.name}<//>
+      <${Name} tag=${['v' + s.version, html`<${AudienceBadge} value=${s.visibility} />`]} warn=${!!s.supersededBy} meta=${s.supersededBy ? `${x('who.replaced').toLowerCase()} · ${subLine(s)}` : subLine(s)}>${s.name}<//>
       <${Desc}>${s.description || ''}<//>
       <${Who} sub=${who.sub}>${who.kind === 'app' ? html`<${Action} tone="more" onClick=${() => openTab('apps')}>${who.label}<//>` : who.label}<//>
       <${Doors}>

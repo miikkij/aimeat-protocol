@@ -9,6 +9,7 @@
  * @structure SHARED_DEMOS · SHAPE_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHARED_DEMOS, SHAPE_DEMOS } from './demos-shared.js';
  * @version-history
+ *   v1.16.0 — 2026-10-18 — AudienceBadge's demo: every level in a row, an organism not named yet, the button.
  *   v1.15.0 — 2026-10-16 — HtmlPageFrame's demo: framed with Report, the text without a page host, loading.
  *   v1.14.0 — 2026-09-27 — The own-aimeat demo moves to demos-operator.js, drawn by calling OwnAimeat;
  *     OwnAimeatDemo and its OwnAimeatBlock import go.
@@ -34,6 +35,8 @@ import htm from 'htm';
 import { CardMenu } from '/components/CardMenu.js';
 import { Markdown } from '/components/Markdown.js';
 import { AiLabel, AiInteractionNotice } from '/components/ai-label.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
+import { Marks } from '/components/Mark.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { ImageView } from '/components/ImageDeliverable.js';
 import { InstallCta } from '/components/InstallCta.js';
@@ -75,6 +78,19 @@ export const SHARED_DEMOS = {
     { name: 'inline label', render: () => html`<${AiLabel} record=${AI_RECORD} recordUrl="#" variant="inline" />` },
     { name: 'block label', render: () => html`<${AiLabel} record=${AI_RECORD} recordUrl="#" variant="block" />` },
     { name: 'talking to an AI', render: () => html`<${AiInteractionNotice} recordUrl="#" />` },
+  ] },
+  'audience-badge': { variants: [
+    { name: 'every level', render: (ex) => html`<${Marks}>
+      <${AudienceBadge} value="private" />
+      <${AudienceBadge} value=${ex.value} organismName=${ex.organismName} />
+      <${AudienceBadge} value="members" />
+      <${AudienceBadge} value="code" />
+      <${AudienceBadge} value="password" />
+      <${AudienceBadge} value="link" />
+      <${AudienceBadge} value="public" />
+    <//>` },
+    { name: 'organism not named yet', render: () => html`<${AudienceBadge} value="organism:not-a-member" />` },
+    { name: 'a button that changes it', render: () => html`<${AudienceBadge} value="public" onClick=${noop} />` },
   ] },
   'voice-recorder': { variants: [
     { name: 'default', render: (ex) => html`<${VoiceRecorder} maxSeconds=${ex.maxSeconds} className=${ex.className} onRecorded=${noop} />` },
