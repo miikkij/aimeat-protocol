@@ -1196,6 +1196,10 @@
       if (pathname === '/v1/home' && /[?&]new-agent=/.test(search)) {
         return () => import('/views/home/agent-new.js' + B);
       }
+      // Every agent on a page of its own, the header's Agents link: /v1/home?agents=1.
+      if (pathname === '/v1/home' && /[?&]agents=/.test(search)) {
+        return () => import('/views/home/agents-page.js' + B);
+      }
       // One piece of an agent's work and what it produced: /v1/home?agent=<name>&work=<task id>.
       // Before the agent's own page, whose address it extends.
       if (pathname === '/v1/home' && /[?&]agent=/.test(search) && /[?&]new-app=/.test(search)) {
@@ -1555,7 +1559,14 @@
           raf = 0;
           const wasCompact = nav.classList.contains('topnav--compact');
           if (wasCompact) nav.classList.remove('topnav--compact');
-          const overflows = nav.scrollWidth > nav.clientWidth + 1;
+          // scrollWidth alone misses a row that runs into the bar's own right padding, and a
+          // group (.topnav-right) that shrank with its content spilling out of it; both are
+          // overflow a person sees (Finnish at 1440 px put the pill 12 px from the window edge).
+          const group = nav.lastElementChild;
+          const contentRight = nav.getBoundingClientRect().right - (parseFloat(getComputedStyle(nav).paddingRight) || 0);
+          const overflows = nav.scrollWidth > nav.clientWidth + 1
+            || (group && (group.scrollWidth > group.clientWidth + 1
+              || group.getBoundingClientRect().right > contentRight + 1));
           nav.classList.toggle('topnav--compact', overflows);
           if (overflows !== wasCompact && !overflows) setMenuOpen(false);
         };
@@ -1566,8 +1577,10 @@
         window.addEventListener('resize', schedule);
         return () => { ro.disconnect(); window.removeEventListener('resize', schedule); if (raf) cancelAnimationFrame(raf); };
         // Re-measures whenever the bar's contents change: signing in, the operator's Admin
-        // link appearing, a different nav config arriving, or the language switching.
-      }, [session, locale, navConfig, morsels, updateShown]);
+        // link appearing, a different nav config arriving, or the language switching. And when
+        // the burger menu closes: a language switched from inside the open menu was measured
+        // with the menu's own rows in the bar, which kept the bar compact after a row that fits.
+      }, [session, locale, navConfig, morsels, updateShown, menuOpen]);
 
       // Load operator-configured header nav (public endpoint, no auth needed).
       useEffect(() => {
@@ -1606,6 +1619,9 @@
       };
 
       const currentPath = location.pathname;
+      // The home's agent pages (the list, one agent, a new agent, the computers) light Agents, not
+      // Home. Messages has no lit state: it opens a tab of /v1/profile, whose address keeps no tab.
+      const onAgentPage = currentPath === '/v1/home' && /[?&](agents|agent|new-agent|computers|machines)=/.test(location.search);
 
       // The brand goes to ONE place per session state: signed in, the home; signed out, the front
       // page. It used to go to the front page for everyone and leave a per-tab flag behind so the
@@ -1661,10 +1677,20 @@
 
                    Two layers of one thing: the home in front (what is going on, with a door to
                    each control) and settings and controls behind it (the whole machine room).
-                   Both are on the row, so neither is reachable only through the other. -->
+                   Both are on the row, so neither is reachable only through the other.
+
+                   Messages and Agents sit between Home and Chat (Jouni, 2026-10-18): the two
+                   places a person opens most, one click from anywhere. Messages opens the
+                   Messages tab of /v1/profile the way a notification does (openNotificationLink),
+                   so it switches the tab when the profile is already open; Agents opens the
+                   home's agents band on a page of its own (views/home/agents-page.js). -->
               ${session && html`
-                <a href="/v1/home" class="${currentPath === '/v1/home' ? 'active' : ''}"
+                <a href="/v1/home" class="${currentPath === '/v1/home' && !onAgentPage ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>${t('nav.home') || 'Home'}</a>
+                <a href="/v1/profile?tab=messages"
+                  onClick=${(e) => { e.preventDefault(); openNotificationLink('/v1/profile?tab=messages', navigate); setMenuOpen(false); }}>${t('nav.messages') || 'Messages'}</a>
+                <a href="/v1/home?agents=1" class="${onAgentPage ? 'active' : ''}"
+                  onClick=${(e) => { handleNav(e, '/v1/home?agents=1'); setMenuOpen(false); }}>${t('nav.agents') || 'Agents'}</a>
                 <a href="/v1/chat" class="${currentPath === '/v1/chat' ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/chat'); setMenuOpen(false); }}>${t('nav.chat') || 'Chat'}</a>
                 <a href="/v1/appcat" class="${currentPath === '/v1/appcat' ? 'active' : ''}"

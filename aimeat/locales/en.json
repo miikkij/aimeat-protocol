@@ -13131,6 +13131,7 @@
     },
     "agents": {
       "title": "Your agents",
+      "signInDesc": "Sign in to see your agents.",
       "lead": "Say in one sentence what you want. AIMEAT makes the agent, shows it to you, and starts it when you approve.",
       "newLabel": "A new agent",
       "askLabel": "What should the agent do?",
@@ -15243,6 +15244,8 @@
     "devView": "For Developers",
     "signIn": "Sign In",
     "home": "Home",
+    "messages": "Messages",
+    "agents": "Agents",
     "apps": "Apps",
     "profile": "Settings & Controls",
     "logout": "Log Out",

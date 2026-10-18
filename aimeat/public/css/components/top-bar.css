@@ -7,6 +7,9 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.5.0 — 2026-10-18 — On the full row the login pill does not shrink (.header-auth-slot flex
+ *     none), so a full bar goes compact instead of squeezing the pill; 1rem gap between the brand
+ *     side and the links on the full row.
  *   v1.4.0 — 2026-09-30 — A tag in the bar keeps one line (.topnav-right > .mark-button): the new-version notice.
  *   v1.3.0 — 2026-09-24 — The rule, the corners and the menu's frame and shadow read the theme's shape
  *     values (a move).
@@ -36,6 +39,11 @@
   background: var(--bg-card);
   border-bottom: 1px solid var(--border);
 }
+
+/* The least room between the brand side and the links on the full row. Without it a row that fit
+   exactly put the morsel chip against the first link before the bar went compact. The compact bar
+   has none: on a signed-out phone the sign-in button needs those pixels. */
+.topnav:not(.topnav--compact) { column-gap: 1rem; }
 
 .topnav-brand {
   font-weight: var(--weight-heavy);
@@ -177,6 +185,12 @@
   display: inline-flex;
   align-items: center;
 }
+/* On the full row the pill keeps its width. When it shrank, a bar one link too full squeezed the
+   pill (the name cut to three letters, its labels on two lines) instead of overflowing, so the
+   overflow measure in spa.html never saw it and the bar did not go compact (Spanish at 1440 px,
+   2026-10-18). The compact bar keeps the old behaviour: a signed-out phone bar has no burger
+   room to spare, and there the pill's labels may take two lines. */
+.topnav:not(.topnav--compact) .header-auth-slot { flex: none; }
 
 /* ── Header nav: desktop inline; mobile = hamburger + dropdown (see @media) ── */
 /* .topnav is a FIXED-height row, so the menu must never wrap: a second row does not make

@@ -11438,6 +11438,7 @@
     },
     "agents": {
       "title": "Tus agentes",
+      "signInDesc": "Inicia sesión para ver tus agentes.",
       "lead": "Di en una frase qué quieres. AIMEAT crea el agente, te lo muestra y lo pone a trabajar cuando lo apruebas.",
       "newLabel": "Un agente nuevo",
       "askLabel": "¿Qué quieres que haga el agente?",
@@ -13479,6 +13480,8 @@
     "devView": "Para desarrolladores",
     "signIn": "Iniciar sesión",
     "home": "Hogar",
+    "messages": "Mensajes",
+    "agents": "Agentes",
     "apps": "Aplicaciones",
     "profile": "Configuración y controles",
     "logout": "Cerrar sesión",
