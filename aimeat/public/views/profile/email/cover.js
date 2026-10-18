@@ -10,6 +10,7 @@
  * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold · chatFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.19.0 -- 2026-10-18 -- The letters open with the language they come in: a choice of English, Suomi or Español that sets the account language (PUT /v1/ghii locale), which every email the node sends the owner already followed but which only the profile dialog could set.
  *   v1.18.0 -- 2026-10-17 -- A letters row for the email an agent's permission request sends (email.agentAsks, on unless switched off).
  *   v1.17.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip with the address in its long tone; the change form as Fields; the uses, mailboxes, their delegations, the sent log and the letters as the List with Tick, Lead, When and Mark; Tabs in the fold tone; More; CardGrid; Roads; Note; Action): the page passes data and writes no class. Put back from main: no letter sent in 30 days is a dim tag (page group G8).
  *   v1.16.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -220,6 +221,8 @@ function lettersFold(ctx) {
   const setDigest = (patch) => ctx.saveSettings({ ...s, emailDigest: { ...digest, ...patch } });
   return html`
     <${List} cols="mark-name-desc-doors" keepCols>
+      ${row('language', html`<${Select} fit ariaLabel=${c('letter.languageT')} value=${ctx.me?.locale || 'en'} disabled=${ctx.busy || !ctx.me}
+        onChange=${(v) => ctx.saveLanguage(v)} options=${[['en', 'English'], ['fi', 'Suomi'], ['es', 'Español']]} />`)}
       ${row('security', html`<${Switch} on locked label=${c('always')} />`)}
       ${row('invites', html`<${Switch} on locked label=${c('always')} />`)}
       ${row('workflow', html`<${Switch} on=${em.workflowEnd !== false} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, workflowEnd: em.workflowEnd === false } })} />`)}

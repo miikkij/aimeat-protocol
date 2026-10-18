@@ -11,6 +11,8 @@
  * @structure EmailTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'email'.
  * @version-history
+ *   v2.2.0 — 2026-10-18 — saveLanguage: the letters' language choice sets the account language
+ *     (PUT /v1/ghii locale), which decides the language of every email the node sends the owner.
  *   v2.1.0 — 2026-09-13 — The letters' switches save nothing while the notification settings are not
  *     loaded: the save is the whole record, and one built from defaults erased the owner's muted
  *     senders and quiet hours (docs/pitfalls.md §84).
@@ -29,6 +31,7 @@ import { useConfirm } from '/components/Modal.js';
 import * as email from '/js/services/email.js';
 import * as notif from '/js/services/notifications.js';
 import * as contactsService from '/js/services/contacts.js';
+import { updateProfile } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
 import { c, providerWord } from './email/frame.js';
 import { renderCover } from './email/cover.js';
@@ -172,6 +175,18 @@ export default function EmailTab({ showToast }) {
     finally { setBusy(false); }
   }
 
+  /** The account language, which every email the node sends the owner is written in. */
+  async function saveLanguage(locale) {
+    setBusy(true);
+    try {
+      const r = await updateProfile({ locale });
+      if (!r?.data) throw new Error(c('saveFailed'));
+      setMe(m => ({ ...m, locale: r.data.locale }));
+      showToast?.(c('saved'));
+    } catch (e) { fail(e, c('saveFailed')); }
+    finally { setBusy(false); }
+  }
+
   /* ── the prompt ── */
   async function copyPrompt() {
     try {
@@ -185,7 +200,7 @@ export default function EmailTab({ showToast }) {
   const ctx = {
     me, providers, connections, delegations, aliases, outbound, outboundTotal, mailLog, settings, busy, connecting, changing, form, sentFilter, showAll, folds, ConfirmUI,
     providerOf, contactName, openContact, setForm, setSentFilter, setShowAll, setFold,
-    startChange, cancelChange, sendCode, confirmCode, connect, remove, stopDelegation, saveSettings, copyPrompt,
+    startChange, cancelChange, sendCode, confirmCode, connect, remove, stopDelegation, saveSettings, saveLanguage, copyPrompt,
   };
   return renderCover(ctx);
 }
