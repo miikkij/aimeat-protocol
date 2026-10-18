@@ -65,6 +65,18 @@
       "date": "2026-10-18",
       "kind": "feature",
       "title": {
+        "en": "A character keeps its look from picture to picture, and people can read without an account, subscribe and pay by card",
+        "fi": "Hahmo pysyy samana kuvasta toiseen, lukea voi ilman tiliä, ja tilaus ja korttimaksu toimivat"
+      },
+      "body": {
+        "en": "When an app or your AI makes a picture, it can give the model earlier pictures to work from, so a character, a place or a style stays the same from one picture to the next. It can also redraw one part of a picture and keep the rest. An app can let people read without an account: a stranger browses its catalogue or opens a free episode, and cannot change anything. You can pay by card on Stripe's own payment page, and a creator or a studio can offer a monthly subscription that renews by itself until you cancel it. A credit card payment or a bank identification tells apps that you are an adult. An app gets only yes or no, never your date of birth. When many people make one thing together, each of them gets their own share of every sale. A picture, a PDF or a comic book file you export says inside itself how it was made, wherever it goes.",
+        "fi": "Kun sovellus tai tekoälysi tekee kuvan, se voi antaa mallille aiempia kuvia mallikuviksi. Silloin hahmo, paikka tai tyyli pysyy samana kuvasta toiseen. Kuvasta voi myös piirtää uudelleen yhden kohdan ja jättää muun ennalleen. Sovellus voi päästää lukijan sisään ilman tiliä: vieras selaa sen luetteloa tai avaa ilmaisen jakson, mutta ei voi muuttaa mitään. Voit maksaa kortilla Stripen omalla maksusivulla. Tekijä tai studio voi tarjota kuukausitilauksen, joka uusiutuu itse, kunnes peruutat sen. Luottokorttimaksu tai pankkitunnistus kertoo sovelluksille, että olet täysi-ikäinen. Sovellus saa vain vastauksen kyllä tai ei, ei koskaan syntymäaikaasi. Kun moni tekee yhden asian yhdessä, jokainen saa oman osuutensa jokaisesta myynnistä. Kuva, PDF tai sarjakuvatiedosto, jonka viet ulos, kertoo itse, miten se on tehty, kulkipa se minne tahansa."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "feature",
+      "title": {
         "en": "An app tells you what is new in it, and an open app updates itself",
         "fi": "Sovellus kertoo, mitä siinä on uutta, ja avoin sovellus päivittyy itse"
       },
