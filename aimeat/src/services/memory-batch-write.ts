@@ -5,6 +5,9 @@
  * @description Commit accepted batch rows with their provenance; restores retain source attribution.
  * @structure writeMemoryBatch · BatchPublishRequest
  * @version-history
+ *   1.4.0 2026-10-18 On a node that shows its content to signed-in accounts only, a row raising a
+ *     record to public is stored at 'members', before the publish gate, and `warnings` names its key
+ *     with PUBLIC_IS_SIGNED_IN_HERE (services/closed-node-level.ts, plan V1.6).
  *   1.3.0 2026-10-18 `publishRequester`: a row that raises a record to public, written by a caller the
  *     node asks the owner about, is stored at the level the record had (a new one: private), and a
  *     request of kind 'memory' is filed for it after the commit (services/memory-publish-gate.ts; plan
@@ -29,6 +32,7 @@ import { classifyAfterWrite } from './classify-on-write.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import type { PublishRequester } from './publish-requests/store.js';
 import { keptMemoryLevel, fileMemoryPublishRequest, type MemoryPublishFiled } from './memory-publish-gate.js';
+import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 
 /** One request the batch filed: the key it is about, and the body a door answers for it. */
 export type BatchPublishRequest = { key: string } & Extract<MemoryPublishFiled, { ok: true }>['publishRequest'];
@@ -51,6 +55,8 @@ export async function writeMemoryBatch(
   const held: AiProvenanceRecordRow[] = [];
   // The rows the publish gate kept below public, as staged (the same objects the batch stores).
   const keptBelowPublic: MemoryRecord[] = [];
+  // The rows a closed node stored at 'members' instead of public (closed-node-level.ts).
+  const lowered: Array<{ key: string } & ClosedNodeWarning> = [];
   // The principal is constant for the request. Do not repeat its model lookup for each row.
   let agent: ReturnType<Storage['getAgent']> | undefined;
   const provenanceStorage = new Proxy(storage, {
@@ -66,7 +72,17 @@ export async function writeMemoryBatch(
     const result = await memoryDb.writeMany(caller.targetGaii, items, {
       ...opts,
       prepare: async (records, existing) => {
-        // The publish gate first, so the provenance surface below describes the level that is stored.
+        // The closed node first (plan V1.6): a row raising a record to public on a node that shows its
+        // content to signed-in accounts only is stored at 'members', so the gate below sees no raise.
+        for (const record of records) {
+          const closed = closedNodeLevel(config, record.visibility, 'members' as const, { from: existing.get(record.key)?.visibility });
+          if (!closed.warning) continue;
+          record.visibility = closed.level;
+          delete record.groupId;
+          delete record.workspaceRef;
+          lowered.push({ key: record.key, ...closed.warning });
+        }
+        // The publish gate next, so the provenance surface below describes the level that is stored.
         if (caller.publishRequester) {
           for (const record of records) {
             const before = existing.get(record.key);
@@ -123,7 +139,10 @@ export async function writeMemoryBatch(
   }
   // The requests the publish gate asked for, now that the records they name are committed.
   const publishRequests: BatchPublishRequest[] = [];
-  const warnings: Array<{ key: string; code: 'PUBLISH_NOT_ASKED'; message: string }> = [];
+  const warnings: Array<{ key: string; code: 'PUBLISH_NOT_ASKED' | 'PUBLIC_IS_SIGNED_IN_HERE'; message: string }> = [];
+  // Only the rows that landed: a row the batch skipped or refused stored nothing at any level.
+  const landed = new Set(result.items.filter(r => r.status === 'created' || r.status === 'updated').map(r => r.key));
+  warnings.push(...lowered.filter(w => landed.has(w.key)));
   if (caller.publishRequester) {
     for (const record of keptBelowPublic) {
       const filed = await fileMemoryPublishRequest({ storage, config }, caller.publishRequester, record);

@@ -38,6 +38,11 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.7.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, the write, the
+ *     presigned mint and the visibility change store a file asked as public at 'members' (with an
+ *     app grant's public upload default too) and answer `warnings` with PUBLIC_IS_SIGNED_IN_HERE,
+ *     before the publish gate, at the doors that pass `publishGate` (storage-file-publish.ts
+ *     closedFileLevel, plan V1.6).
  *   v1.6.0 — 2026-10-18 — A file stored or minted without a visibility takes visibility.file_default;
  *     `visibility: 'default'` takes visibility.app_upload_default for an app grant and the file default
  *     for anyone else (plan doc-mvcn6c7e4e5q, V5.2), before the gate.
@@ -86,9 +91,10 @@ import { organismVisibilityRefusal } from './organism-visibility.js';
 import { emitChange } from './event-bus.js';
 import type { CallerContext } from './caller-context.js';
 import {
-    fileRaiseAsk, keptFileLevel, mintPublishCarry, fileFilePublishRequest,
+    fileRaiseAsk, keptFileLevel, mintPublishCarry, fileFilePublishRequest, closedFileLevel,
     type StoragePublishGate, type FilePublishFiled,
 } from './storage-file-publish.js';
+import type { ClosedNodeWarning } from './closed-node-level.js';
 import { uploadVisibilityOf } from './content-defaults.js';
 
 /**
@@ -178,16 +184,19 @@ export type ProvenanceRefusalCode = 'SCOPE_DENIED' | 'NOT_FOUND' | 'PROVENANCE_H
 export type StoragePublishOutcome = {
     /** The file was stored at the level it had and making it public waits for the owner: a door answers 202. */
     publishRequest?: Extract<FilePublishFiled, { ok: true }>['publishRequest'];
-    warnings?: Array<Extract<FilePublishFiled, { ok: false }>['warning']>;
+    warnings?: Array<Extract<FilePublishFiled, { ok: false }>['warning'] | ClosedNodeWarning>;
 };
 
 export type StorageFileWriteResult =
     | ({ ok: true; file: StorageFileRecord; overageMorsels: number } & StoragePublishOutcome)
     | StorageWriteRefusal;
 
-/** The outcome fields of a filed (or unfiled) request, spread into a write's or a change's result. */
-function publishOutcome(filed: FilePublishFiled | null): StoragePublishOutcome {
-    if (!filed) return {};
+/**
+ * The outcome fields of a filed (or unfiled) request, spread into a write's or a change's result,
+ * and the closed node's warning when the file was stored at 'members' instead of public.
+ */
+function publishOutcome(filed: FilePublishFiled | null, closed: ClosedNodeWarning | null = null): StoragePublishOutcome {
+    if (!filed) return closed ? { warnings: [closed] } : {};
     return filed.ok ? { publishRequest: filed.publishRequest } : { warnings: [filed.warning] };
 }
 
@@ -343,8 +352,12 @@ export async function writeStorageFile(
     const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
     if (fenced) return fenced;
 
-    // No visibility named: the node's starting level (plan V5.2), before the publish gate below.
-    const visibility = levelOf(config, input.visibility, input.publishGate);
+    // No visibility named: the node's starting level (plan V5.2), before the publish gate below. A
+    // closed node then stores public at 'members' (plan V1.6), at the doors that ask the gate.
+    const closed = input.publishGate
+        ? await closedFileLevel({ storage, config }, ownerGaii, input.key, levelOf(config, input.visibility, input.publishGate))
+        : { visibility: levelOf(config, input.visibility, input.publishGate), warning: null };
+    const visibility = closed.visibility;
     // A workspace-visible file that names no workspace is readable by nobody, so it is refused here
     // rather than stored and puzzled over later.
     if (visibility === 'workspace' && !input.workspaceRef) {
@@ -427,7 +440,7 @@ export async function writeStorageFile(
 
     // The request the publish gate asked for, now that the file it names exists.
     const filed = raise.kind === 'ask' ? await fileFilePublishRequest({ storage, config }, raise.requester, file) : null;
-    return { ok: true, file, overageMorsels: quota.overageMorsels, ...publishOutcome(filed) };
+    return { ok: true, file, overageMorsels: quota.overageMorsels, ...publishOutcome(filed, closed.warning) };
 }
 
 export interface StorageDeleteRefusal {
@@ -525,6 +538,8 @@ export type StorageUploadUrlResult =
         contentType: string;
         maxBytes: number;
         expiresInSeconds: number;
+        /** The file will land at 'members' instead of public: the node is closed (plan V1.6). */
+        warnings?: ClosedNodeWarning[];
     }
     | StorageWriteRefusal;
 
@@ -541,7 +556,12 @@ export async function mintStorageUploadUrl(
     const { config } = deps;
     // No visibility named: the node's starting level (plan V5.2), decided before the publish gate's
     // carry so a default of public asks the owner as an explicit one does.
-    const input = { ...given, visibility: levelOf(config, given.visibility, given.publishGate) };
+    // A closed node then mints public at 'members' (plan V1.6), at the doors that ask the gate.
+    const named = levelOf(config, given.visibility, given.publishGate);
+    const closed = given.publishGate
+        ? await closedFileLevel({ storage: deps.storage, config }, ownerGaii, given.key, named)
+        : { visibility: named, warning: null };
+    const input = { ...given, visibility: closed.visibility };
 
     const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
     if (fenced) return fenced;
@@ -584,6 +604,7 @@ export async function mintStorageUploadUrl(
         contentType,
         maxBytes,
         expiresInSeconds: STORAGE_UPLOAD_URL_TTL_SECONDS,
+        ...(closed.warning ? { warnings: [closed.warning] } : {}),
     };
 }
 
@@ -605,14 +626,19 @@ export async function changeStorageFileVisibility(
     deps: StorageWriteDeps,
     ownerGaii: string,
     key: string,
-    visibility: StorageFileRecord['visibility'],
+    requested: StorageFileRecord['visibility'],
     opts: { workspaceRef?: string; federated?: boolean; publishGate?: StoragePublishGate } = {},
 ): Promise<StorageVisibilityResult> {
     const { storage, config } = deps;
     // 'organism:<id>' names an organism the file owner's account is an active member of.
-    const audience = await organismVisibilityRefusal(storage, visibility, { identity: ownerGaii, ...(opts.federated !== undefined ? { federated: opts.federated } : {}) });
+    const audience = await organismVisibilityRefusal(storage, requested, { identity: ownerGaii, ...(opts.federated !== undefined ? { federated: opts.federated } : {}) });
     if (audience) return { ok: false, ...audience };
 
+    // A closed node changes a file to 'members' instead of public (plan V1.6), at the doors that ask the gate.
+    const closed = opts.publishGate
+        ? await closedFileLevel({ storage, config }, ownerGaii, key, requested)
+        : { visibility: requested, warning: null };
+    const visibility = closed.visibility;
     const raise = await fileRaiseAsk({ storage, config }, ownerGaii, key, visibility, opts.publishGate);
     if (raise.kind === 'refused') return { ok: false, status: raise.status, code: raise.code, message: raise.message };
     if (raise.kind === 'ask') {
@@ -627,5 +653,5 @@ export async function changeStorageFileVisibility(
     // Global on purpose: the file's visibility is what changed, and this path does not read what it
     // was, so those who could read the file until now are told as well.
     emitChange('memory');
-    return { ok: true, file: updated };
+    return { ok: true, file: updated, ...publishOutcome(null, closed.warning) };
 }

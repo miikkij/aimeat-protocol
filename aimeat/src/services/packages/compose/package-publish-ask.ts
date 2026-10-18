@@ -15,18 +15,22 @@
  *   group and its newest version, so an approval of a group that has a newer version since is settled
  *   outdated (services/publish-requests/apply-package.ts). A filing that fails (too many waiting) is
  *   a warning on the success answer, never a failure of the write.
- * @structure PackageGate · packagePublishGate · filePackageAsks · composeWithPublishGate ·
- *   composeSetWithPublishGate
+ * @structure PackageGate · packagePublishGate · filePackageAsks · packageGateWarnings ·
+ *   composeWithPublishGate · composeSetWithPublishGate
  * @usage
  *   const gate = packagePublishGate(ctx, caller, req.auth?.app, visibility, undefined);
  *   if (gate.kind === 'refused') return res.status(gate.status).json(error(...));
  *   const out = await createPackageGroup(..., { ..., visibility: gate.visibility });
  *   const asked = gate.requester ? await filePackageAsks(ctx, owner, gate.requester, [groupId], gate.from) : {};
  * @version-history
+ *   v1.1.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a group raised
+ *     to public is stored at 'members' and the answer carries PUBLIC_IS_SIGNED_IN_HERE
+ *     (packageGateWarnings; services/closed-node-level.ts, plan V1.6).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: packages).
  */
 import type { CallerContext } from '../../caller-context.js';
 import { isRaiseToPublic } from '../../publish-gate.js';
+import { closedNodeLevel, type ClosedNodeWarning } from '../../closed-node-level.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from '../../publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from '../../publish-requests/store.js';
 import {
@@ -37,17 +41,23 @@ import { composeSet, type ComposeSetInput, type ComposeSetResult } from './packa
 
 export type PackageGate =
   | { kind: 'refused'; status: 403; code: string; message: string }
-  /** `visibility` is what to store; `requester` is set when a request is to be filed after the write. */
-  | { kind: 'go'; visibility: unknown; requester: PublishRequester | null; from: string };
+  /**
+   * `visibility` is what to store; `requester` is set when a request is to be filed after the write;
+   * `warning` when a closed node stores 'members' instead of public (plan V1.6).
+   */
+  | { kind: 'go'; visibility: unknown; requester: PublishRequester | null; from: string; warning?: ClosedNodeWarning };
 
 /**
  * May this caller give the group the requested visibility? `from` is the group's visibility now,
- * undefined for a group that does not exist yet.
+ * undefined for a group that does not exist yet. On a node that shows its content to signed-in
+ * accounts only, a raise to public is 'members' with a warning and asks nothing (closed-node-level.ts).
  */
 export function packagePublishGate(
   ctx: PublishStoreCtx, caller: CallerContext, app: string | undefined, requested: unknown, from: string | undefined,
 ): PackageGate {
   const kept = from ?? 'private';
+  const closed = closedNodeLevel(ctx.config, requested, 'members' as const, { from });
+  if (closed.warning) return { kind: 'go', visibility: closed.level, requester: null, from: kept, warning: closed.warning };
   if (!isRaiseToPublic(from, requested)) return { kind: 'go', visibility: requested, requester: null, from: kept };
   const ask = publishAskOf(ctx, caller, app);
   if (ask.kind === 'refused') return ask;
@@ -60,7 +70,12 @@ export interface PackageAsked {
   publish_request?: PublishRequestBody;
   /** Every request filed, when one write kept more than one group back (a composed set). */
   publish_requests?: PublishRequestBody[];
-  warnings?: Array<{ code: 'PUBLISH_NOT_ASKED'; message: string; group_id: string }>;
+  warnings?: Array<{ code: 'PUBLISH_NOT_ASKED'; message: string; group_id: string } | ClosedNodeWarning>;
+}
+
+/** The answer fields of a gate that went ahead without a request: the closed node's warning, or nothing. */
+export function packageGateWarnings(gate: PackageGate | null | undefined): PackageAsked {
+  return gate?.kind === 'go' && gate.warning ? { warnings: [gate.warning] } : {};
 }
 
 /**
@@ -110,7 +125,7 @@ export async function composeWithPublishGate(
   if (!out.ok) return out;
   const asked = gate?.requester && !out.newVersion
     ? await filePackageAsks(deps, who.owner, gate.requester, [out.package.packageGroupId], gate.from)
-    : {};
+    : out.newVersion ? {} : packageGateWarnings(gate);
   return { ...out, asked };
 }
 
@@ -125,7 +140,7 @@ export async function composeSetWithPublishGate(
   const gate = input.dryRun === true ? null : packagePublishGate(deps, caller, app, input.visibility ?? 'private', undefined);
   if (gate?.kind === 'refused') return refusalOf(gate);
   const out = await composeSet(deps, who, gate ? { ...input, visibility: gate.visibility as string } : input);
-  if (!out.ok || !gate?.requester) return out.ok ? { ...out, asked: {} } : out;
+  if (!out.ok || !gate?.requester) return out.ok ? { ...out, asked: packageGateWarnings(gate) } : out;
   const created = [
     ...(out.set.new_version ? [] : [out.set.group_id]),
     ...out.packages.filter(p => !p.new_version).map(p => p.group_id),

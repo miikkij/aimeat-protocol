@@ -28,6 +28,9 @@
  *   v1.2.0 — 2026-10-17 — `access` (anyone, signed-in, organism:<id>) sets who may open the app; an
  *     organism the owner is not a member of is refused. The answer carries `access` (plan
  *     doc-mvcn6c7e4e5q V2.1).
+ *   v1.3.0 — 2026-10-18 — A change that makes the app really public (listed, open to anyone, no access
+ *     code) announces it on the public feed and the board, once (services/app-announce.ts); an app
+ *     that was not public at its publish was not announced then (Jouni's ruling, plan doc-mvcn6c7e4e5q).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppProtection, AppRecord, AppListing } from '../storage/interface.js';
@@ -37,6 +40,7 @@ import { recordAppAudit, type AppAuditAction } from './app-audit.js';
 import { emitChange } from './event-bus.js';
 import { parseAppAccessInput, appAccessOf, type AppAccess } from './app-access.js';
 import { parseAudience } from './audience.js';
+import { announceAppBecamePublic } from './app-announce.js';
 
 /** How an app presents itself: a rung that stops at `presentation` may write these. */
 export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions'] as const;
@@ -216,7 +220,7 @@ export async function appAccessMembershipRefusal(
  */
 export async function applyOwnerSettingsUpdate(
     storage: Storage,
-    _config: AimeatConfig,
+    config: AimeatConfig,
     target: AppSettingsTarget,
     body: AppSettingsInput,
 ): Promise<{ notes: string[] } | { refusal: AppSettingsRefusal }> {
@@ -229,7 +233,8 @@ export async function applyOwnerSettingsUpdate(
     const { settings } = parsed;
     const { ownerGaii, ownerName, filename, callerGaii } = target;
 
-    if (!await storage.getApp(ownerGaii, filename)) {
+    const before = await storage.getApp(ownerGaii, filename);
+    if (!before) {
         return { refusal: { status: 404, code: 'NOT_FOUND', message: `App "${filename}" not found in your uploads` } };
     }
 
@@ -309,6 +314,12 @@ export async function applyOwnerSettingsUpdate(
     // The catalogue card shows name, parked and forkable, so the views watching 'apps' hear about
     // it here, where the write is, and not at each caller.
     emitChange('apps');
+    // A change that makes the app really public (listed, open to anyone, no access code) announces it
+    // on the public feed and the board, once (services/app-announce.ts). Only the three offering
+    // fields can do that, so any other change reads nothing more.
+    if (settings.listing !== undefined || settings.access || settings.accessCode) {
+        await announceAppBecamePublic(storage, config, before, await storage.getApp(ownerGaii, filename), callerGaii);
+    }
     return { notes };
 }
 

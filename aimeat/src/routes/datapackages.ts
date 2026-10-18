@@ -25,6 +25,9 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.3.0 -- 2026-10-18 -- On a node that shows its content to signed-in accounts only, a publish that
+ *     would make the package public lands at 'members' and the answer carries `warnings`
+ *     PUBLIC_IS_SIGNED_IN_HERE (services/datapackage/publish-ask.ts, plan V1.6).
  *   v1.2.0 -- 2026-10-18 -- POST asks the publish gate when the version would make the package public
  *     (the default): an agent without publish:public publishes at the audience the package had (a
  *     first version private) and gets 202 with `publish_request` (services/datapackage/publish-ask.ts;
@@ -47,6 +50,7 @@ import { inferSchema, validateRows, type ValidationIssue } from '../services/dat
 import type { PublishInput, TableSchema } from '../services/datapackage/contract.js';
 import { publishPackage, openPackage, readRows, listPackages, listVersions, parseRef } from '../services/datapackage/store.js';
 import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
+import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { callerOf } from '../middleware/caller.js';
 
 /** The request body a publish takes, loosely typed here and checked by the service. `schema` is
@@ -136,7 +140,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
         emitChange('files');
         const asked = gate.requester
             ? await fileDatapackageAsk(store, req.auth!.owner, gate.requester, ownerGhii, input.name, out.contentHash, gate.from)
-            : {};
+            : closedNodeWarnings(gate.warning);
         // 202 when the version was published at the audience the package had and making it public waits for the owner.
         res.status(asked.publish_request ? 202 : out.unchanged ? 200 : 201).json(success(config.nodeId, {
             ...asked,

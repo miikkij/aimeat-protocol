@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-18 — The upload-mode answer carries the shared mint's `warnings` (PUBLIC_IS_SIGNED_IN_HERE:
+ *     a closed node lands a public file at 'members'; plan V1.6).
  *   2026-10-18 — aimeat_storage_upload asks the publish gate through the shared write and the mint
  *     (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q, V4): a file made public without
  *     publish:public is stored at the level it had and the answer carries `publish_request`, as
@@ -125,6 +127,8 @@ export function registerCoreStorageTools(
                             content_type: minted.contentType,
                             max_size_bytes: minted.maxBytes,
                             expires_in_seconds: minted.expiresInSeconds,
+                            // A closed node lands the file at 'members' instead of public (plan V1.6).
+                            ...(minted.warnings ? { warnings: minted.warnings } : {}),
                             note: 'PUT the raw file to upload_url. The response contains the result as JSON.',
                         }, null, 2),
                     }],

@@ -8,6 +8,9 @@
  * @structure registerCopyRoute(router, ctx)
  * @usage registerCopyRoute(router, ctx)   // from registerBulkRoutes, at the position the route had
  * @version-history
+ *   v1.2.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a copy asked
+ *     public lands at 'members' with the warning PUBLIC_IS_SIGNED_IN_HERE, before the publish gate
+ *     (services/closed-node-level.ts, plan V1.6).
  *   v1.1.0 — 2026-10-18 — The copy asks the publish gate (services/memory-publish-gate.ts, the gate
  *     POST /v1/memory asks): a copy made public by a caller the node asks the owner about lands at the
  *     level the caller's record had (a new one: private) and answers 202 with `publish_request`; a
@@ -41,6 +44,7 @@ import { organismVisibilityRefusal } from '../../services/organism-visibility.js
 import { isRaiseToPublic } from '../../services/publish-gate.js';
 import { keptMemoryLevel, fileMemoryPublishRequest } from '../../services/memory-publish-gate.js';
 import { organismWriteRefusalFor, routePublishAsk } from './batch-guards.js';
+import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { type MemoryRouteCtx } from './shared.js';
 
 export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
@@ -138,7 +142,9 @@ export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
     // The publish gate (plan doc-mvcn6c7e4e5q, V4), as POST /v1/memory asks it: a copy that makes the
     // caller's record public, by a caller the node asks the owner about, lands at the level the record
     // had (a new one: private) and the request is filed after the write.
-    let level: Pick<MemoryRecord, 'visibility' | 'groupId' | 'workspaceRef'> = { visibility: (targetVis as MemoryRecord['visibility']) || 'private' };
+    // Before it, the closed node (plan V1.6): a copy made public there lands at 'members' and says so.
+    const closed = closedNodeLevel(config, (targetVis as MemoryRecord['visibility']) || 'private', 'members' as const, { from: existing?.visibility });
+    let level: Pick<MemoryRecord, 'visibility' | 'groupId' | 'workspaceRef'> = { visibility: closed.level };
     let requester: Extract<ReturnType<typeof routePublishAsk>, { kind: 'ask' }>['requester'] | null = null;
     if (isRaiseToPublic(existing?.visibility, level.visibility)) {
       const ask = routePublishAsk({ storage, config }, req);
@@ -195,7 +201,7 @@ export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
       version: newVersion,
       visibility: level.visibility,
       ...(carried ? { classification: carried } : {}),
-      ...(filed && !filed.ok ? { warnings: [filed.warning] } : {}),
+      ...(filed && !filed.ok ? { warnings: [filed.warning] } : closedNodeWarnings(closed.warning)),
     }));
     emitRecordChange('memory', callerGaii, level.visibility, ...(existing ? [existing.visibility] : []));
   });

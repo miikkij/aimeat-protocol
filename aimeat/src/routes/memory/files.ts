@@ -5,6 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 -- 2026-10-18 -- On a node that shows its content to signed-in accounts only, a file asked as
+ *     public (inline, presigned, or the visibility change) lands at 'members' and the answer carries
+ *     `warnings` with PUBLIC_IS_SIGNED_IN_HERE (services/closed-node-level.ts, plan V1.6).
  *   v1.10.0 -- 2026-10-18 -- POST without a visibility takes visibility.file_default; `visibility: 'default'`
  *     takes visibility.app_upload_default for an app grant and the file default for anyone else (plan
  *     doc-mvcn6c7e4e5q, V5.2), before validation and the publish gate.
@@ -60,7 +63,8 @@ import { generateUploadToken, buildUploadMeta } from '../../services/upload-toke
 import {
   removeStorageFile, appOwnedKeyRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
 } from '../../services/storage-file-write.js';
-import { mintPublishCarry } from '../../services/storage-file-publish.js';
+import { mintPublishCarry, closedFileLevel } from '../../services/storage-file-publish.js';
+import { closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-provenance-input.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
@@ -129,8 +133,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (mode === 'presigned') {
       const refused = await storageProvenanceMintRefusal({ storage, config }, stated.provenance);
       if (refused) { res.status(refused.status).json(error(config.nodeId, refused.code, refused.message)); return; }
+      // A closed node mints public at 'members' (plan V1.6), before the gate, as the shared mint does.
+      const closed = await closedFileLevel({ storage, config }, gaii, String(key), (visibility as string | undefined) ?? 'private');
       // The requester rides in the token, so the upload files the request when the bytes land.
-      const carry = await mintPublishCarry({ storage, config }, gaii, String(key), visibility, publishGate);
+      const carry = await mintPublishCarry({ storage, config }, gaii, String(key), closed.visibility, publishGate);
       if (!carry.ok) { res.status(carry.status).json(error(config.nodeId, carry.code, carry.message)); return; }
       const contentType = (mime_type as string) ?? 'application/octet-stream';
       const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
@@ -139,7 +145,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
         actor: gaii,
         utype: 'storage',
         meta: buildUploadMeta('storage', {
-          key, mime_type: contentType, visibility: visibility ?? 'private',
+          key, mime_type: contentType, visibility: closed.visibility,
           group_id, tags, workspace_refs: wsRefStr,
           ai_provenance: stated.provenance.wireBlock, ai_provenance_id: stated.provenance.declaredId,
           publish_ask: carry.requester,
@@ -153,6 +159,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
         content_type: contentType,
         max_size_bytes: maxBytes,
         expires_in_seconds: 3600,
+        ...closedNodeWarnings(closed.warning),
       }, [{ description: 'PUT the raw file bytes here', method: 'PUT', url: `/v1/upload/${token}` }]));
       return;
     }

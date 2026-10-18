@@ -18,6 +18,9 @@
  *   const out = await publishPackage(deps, ownerGhii, { ...input, visibility: gate.visibility }, producedBy);
  *   const asked = gate.requester && out.ok ? await fileDatapackageAsk(deps, owner, gate.requester, ownerGhii, name, out.contentHash, gate.from) : {};
  * @version-history
+ *   v1.2.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a publish that
+ *     raises the package to public (named, or visibility.datapackage_default) is stored at 'members'
+ *     and the gate answers `warning` PUBLIC_IS_SIGNED_IN_HERE (services/closed-node-level.ts, plan V1.6).
  *   v1.1.0 — 2026-10-18 — A publish that names no visibility asks about visibility.datapackage_default
  *     (code default public; plan V5.6), and the gate answers the level it decided.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: data packages).
@@ -28,10 +31,12 @@ import { publishAskOf, fileAsk, publishRequestedBody } from '../publish-requests
 import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
 import { readPointer } from './version-audience.js';
 import { datapackageVisibilityDefault } from '../content-defaults.js';
+import { closedNodeLevel, type ClosedNodeWarning } from '../closed-node-level.js';
 
 export type DatapackageGate =
   | { kind: 'refused'; status: 403; code: string; message: string }
-  | { kind: 'go'; visibility: string | undefined; requester: PublishRequester | null; from: string };
+  /** `warning`: a closed node stores 'members' instead of public (closed-node-level.ts, plan V1.6). */
+  | { kind: 'go'; visibility: string | undefined; requester: PublishRequester | null; from: string; warning?: ClosedNodeWarning };
 
 /** May this caller publish the package at the requested visibility (visibility.datapackage_default when not named)? */
 export async function datapackagePublishGate(
@@ -43,6 +48,9 @@ export async function datapackagePublishGate(
   const kept = from ?? 'private';
   // No visibility named: the node's starting level (plan V5.6), decided before the gate is asked.
   const level = requested ?? datapackageVisibilityDefault(ctx.config);
+  // A closed node publishes a raise to public (named or the default) at 'members', and asks nothing.
+  const closed = closedNodeLevel(ctx.config, level, 'members' as const, { from });
+  if (closed.warning) return { kind: 'go', visibility: closed.level, requester: null, from: kept, warning: closed.warning };
   if (!isRaiseToPublic(from, level)) return { kind: 'go', visibility: level, requester: null, from: kept };
   const ask = publishAskOf(ctx, caller, app);
   if (ask.kind === 'refused') return ask;

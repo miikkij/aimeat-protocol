@@ -21,6 +21,9 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-18 — On a node that shows its content to signed-in accounts only, a package group asked
+ *     public on POST /v1/packages, compose, compose-set or PATCH /v1/packages/:groupId is stored at
+ *     'members' with the warning PUBLIC_IS_SIGNED_IN_HERE (package-publish-ask.ts, plan V1.6).
  *   2026-10-18 — POST /v1/packages, POST /v1/packages/compose, POST /v1/packages/compose-set and PATCH
  *     /v1/packages/:groupId ask the publish gate when they would make a group public: an agent without
  *     publish:public gets the group at the visibility it had (a new one private) and 202 with
@@ -78,7 +81,7 @@ import {
   createPackageGroup, addPackageVersion, setPackageVersionStatus, updatePackageGroup,
 } from '../services/packages/compose/package-create.js';
 import {
-  packagePublishGate, filePackageAsks, composeWithPublishGate, composeSetWithPublishGate,
+  packagePublishGate, filePackageAsks, composeWithPublishGate, composeSetWithPublishGate, packageGateWarnings,
 } from '../services/packages/compose/package-publish-ask.js';
 import { callerOf } from '../middleware/caller.js';
 import {
@@ -368,7 +371,7 @@ export function packagesRouter(
     }
 
     const packageGroupId = out.package.packageGroupId;
-    const asked = gate.requester ? await filePackageAsks({ storage, config }, owner, gate.requester, [packageGroupId], gate.from) : {};
+    const asked = gate.requester ? await filePackageAsks({ storage, config }, owner, gate.requester, [packageGroupId], gate.from) : packageGateWarnings(gate);
     res.status(asked.publish_request ? 202 : 201).json(success(config.nodeId, { ...out.package, ...asked }, [
       { description: 'Publish new version', method: 'POST', url: `/v1/packages/${encodeURIComponent(packageGroupId)}/versions` },
       { description: 'View package', method: 'GET', url: `/v1/packages/${encodeURIComponent(packageGroupId)}` },
@@ -660,13 +663,14 @@ export function packagesRouter(
 
     // The author check, the visibility check and the write on every version: services/packages/compose/package-create.ts.
     const out = await updatePackageGroup({ storage, config }, { owner }, {
-      groupId, description, tags, visibility: gate.requester ? undefined : visibility,
+      // gate.visibility: the one asked, or 'members' on a node closed to strangers (plan V1.6).
+      groupId, description, tags, visibility: gate.requester ? undefined : gate.visibility as string | undefined,
     });
     if (!out.ok) {
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    const asked = gate.requester ? await filePackageAsks({ storage, config }, owner, gate.requester, [groupId], gate.from) : {};
+    const asked = gate.requester ? await filePackageAsks({ storage, config }, owner, gate.requester, [groupId], gate.from) : packageGateWarnings(gate);
     // 202 when the group kept its visibility and making it public waits for the owner.
     res.status(asked.publish_request ? 202 : 200).json(success(config.nodeId, { ...out.package, ...asked }));
   });

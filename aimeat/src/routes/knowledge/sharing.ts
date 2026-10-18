@@ -6,6 +6,10 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, the sharing PATCH
+ *     asked to list the package stores the audience 'members' (unlisted) and the entry PATCH asked
+ *     public stores 'members', each with the warning PUBLIC_IS_SIGNED_IN_HERE, before the publish
+ *     gate (services/closed-node-level.ts, plan V1.6).
  *   v1.6.0 — 2026-10-18 — PATCH /v1/knowledge/:id/sharing (to audience public / catalog_listed) and the
  *     entry PATCH (to public) ask the publish gate: an agent without publish:public keeps the package's
  *     audience or the entry's visibility and gets 202 with `publish_request`. The two writes moved to
@@ -54,6 +58,7 @@ import {
 } from '../../services/knowledge-audience.js';
 import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry } from '../../services/knowledge-sharing.js';
 import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
+import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
 import { callerOf } from '../../middleware/caller.js';
 
@@ -105,7 +110,11 @@ export function registerSharingRoutes(
     const before = typeof existing.value === 'string' ? JSON.parse(existing.value as string) : existing.value;
     const audienceNow = packageAudienceOf(before);
     const wantsPublic = audience === 'public' || (audience === undefined && catalog_listed === true);
-    const ask = knowledgePublishAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, wantsPublic && audienceNow !== 'public');
+    // A closed node keeps the package unlisted at the audience 'members' and says so (plan V1.6),
+    // before the gate, so the lowered change asks nothing.
+    const closed = closedNodeLevel(config, wantsPublic ? 'public' : undefined, 'members' as const, { from: audienceNow });
+    const ask = knowledgePublishAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app,
+      wantsPublic && audienceNow !== 'public' && !closed.warning);
     if (ask.kind === 'refused') {
       res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
       return;
@@ -113,12 +122,14 @@ export function registerSharingRoutes(
 
     // The write: services/knowledge-sharing.ts, which an approved publish request calls too.
     const { manifest } = await setKnowledgeSharing({ storage, config }, found, packageId,
-      ask.kind === 'ask' ? { allow_clone } : { audience, catalog_listed, allow_clone });
+      ask.kind === 'ask' ? { allow_clone }
+        : closed.warning ? { audience: closed.level, allow_clone }
+          : { audience, catalog_listed, allow_clone });
     const asked = ask.kind === 'ask'
       ? await fileKnowledgeAsk({ storage, config }, req.auth!.owner, ask.requester, {
         ownerGaii, packageId, name: String(manifest.name ?? packageId), field: 'audience', from: audienceNow, entries: [],
       })
-      : {};
+      : closedNodeWarnings(closed.warning);
 
     res.status(asked.publish_request ? 202 : 200).json(success(config.nodeId, {
       package_id: packageId,
@@ -164,10 +175,12 @@ export function registerSharingRoutes(
       return;
     }
 
+    // A closed node keeps the entry at 'members' and says so (plan V1.6), before the gate.
+    const closed = closedNodeLevel(config, visibility as string, 'members' as const, { from: entry.visibility });
     // Making the entry public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4). On an ask
     // nothing is written (the visibility was the whole change) and the request is filed.
     const ask = knowledgePublishAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app,
-      isRaiseToPublic(entry.visibility, visibility));
+      isRaiseToPublic(entry.visibility, closed.level));
     if (ask.kind === 'refused') {
       res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
       return;
@@ -184,11 +197,12 @@ export function registerSharingRoutes(
     }
 
     // The write: services/knowledge-sharing.ts, which an approved publish request calls too.
-    await setKnowledgeEntryVisibility({ storage, config }, found, packageId, entryKey, visibility, groupId);
+    await setKnowledgeEntryVisibility({ storage, config }, found, packageId, entryKey, closed.level, groupId);
     res.json(success(config.nodeId, {
       package_id: packageId,
       entry_key: entryKey,
-      visibility,
+      visibility: closed.level,
+      ...closedNodeWarnings(closed.warning),
     }));
   });
 

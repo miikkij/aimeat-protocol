@@ -13,13 +13,16 @@
  *   skill is always read by its workspace.
  *
  *   Kept apart from skills.ts, which is close to the 800-line limit.
- * @structure SkillGateAsk · skillPublishAsk · userSkillState · fileSkillAsk
+ * @structure SkillGateAsk · skillPublishAsk · closedSkillLevel · userSkillState · fileSkillAsk
  * @usage
- *   const ask = skillPublishAsk(ctx, gate, scope, visibility);         // before the first write
+ *   const closed = await closedSkillLevel(ctx, scope, visibility, owner, { skillMd });  // closed node first
+ *   const ask = skillPublishAsk(ctx, gate, scope, closed.visibility);  // before the first write
  *   if (ask?.kind === 'refused') → 403
  *   const summary = await publishSkill(..., { visibility: ask ? undefined : visibility });
  *   const asked = ask ? await fileSkillAsk(ctx, gate, ask, summary) : {};
  * @version-history
+ *   v1.1.0 — 2026-10-18 — closedSkillLevel: on a node that shows its content to signed-in accounts
+ *     only, a user skill asked as public is stored at 'members' with PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
 import type { AimeatConfig } from '../config.js';
@@ -28,7 +31,9 @@ import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
 import { resolveSkillRef, formatSkillRef, SkillAccessError } from './skills.js';
-import { SkillValidationError } from './skill-md.js';
+import { SkillValidationError, parseSkillMd } from './skill-md.js';
+import { signedInOnly } from '../config-visibility.js';
+import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 
 export type SkillGateAsk = Extract<PublishAsk, { kind: 'ask' | 'refused' }>;
 type Ctx = { storage: Storage; config: AimeatConfig };
@@ -43,6 +48,36 @@ export function skillPublishAsk(
   if (!gate || scope !== 'user' || !isRaiseToPublic(current, requested)) return null;
   const ask = publishAskOf(ctx, gate.caller, gate.app);
   return ask.kind === 'allowed' ? null : ask;
+}
+
+/** The name SKILL.md declares, or undefined when it does not parse (the publish answers that itself). */
+function declaredSkillName(skillMd: unknown): string | undefined {
+  if (typeof skillMd !== 'string') return undefined;
+  try {
+    return parseSkillMd(skillMd).frontmatter.name;
+  } catch (err) {
+    // An invalid SKILL.md names no skill here; the publish that follows refuses it with its own 422.
+    if (err instanceof SkillValidationError) return undefined;
+    throw err;
+  }
+}
+
+/**
+ * The level of a user skill asked as public on a node that shows its content to signed-in accounts
+ * only (services/closed-node-level.ts, plan V1.6): 'members' with the warning, unless the skill is
+ * public already. `current` is the level now when the door knows it (a visibility change); a publish
+ * names the skill by its SKILL.md and the level is read here. Asked before skillPublishAsk.
+ */
+export async function closedSkillLevel<V>(
+  ctx: Ctx, scope: string, requested: V, owner: string | null | undefined,
+  skill: { current?: string; name?: string; skillMd?: unknown },
+): Promise<{ visibility: V | 'members'; warning: ClosedNodeWarning | null }> {
+  if (scope !== 'user' || requested !== 'public' || !signedInOnly(ctx.config)) return { visibility: requested, warning: null };
+  let from = skill.current;
+  const name = skill.name ?? declaredSkillName(skill.skillMd);
+  if (from === undefined && owner && name) from = (await userSkillState(ctx, owner, name))?.visibility;
+  const closed = closedNodeLevel(ctx.config, requested, 'members' as const, { from });
+  return { visibility: closed.level, warning: closed.warning };
 }
 
 /**

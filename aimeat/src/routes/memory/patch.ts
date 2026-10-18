@@ -25,6 +25,9 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-18 — On a node that shows its content to signed-in accounts only, visibility 'public' on
+ *     a record not public now is stored as 'members' with the warning PUBLIC_IS_SIGNED_IN_HERE, and
+ *     the publish gate is not asked (services/closed-node-level.ts, plan V1.6).
  *   2026-10-18 — A PATCH that creates the record without a visibility takes visibility.memory_default
  *     (code default private; plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — visibility 'public' asks the publish gate: an agent without publish:public patches
@@ -69,6 +72,8 @@ import { resolveIdentity, isForeignPrincipal, ownerGhiiOf } from '../../utils/ga
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
+import { closedNodeLevel, type ClosedNodeWarning } from '../../services/closed-node-level.js';
+import { signedInOnly } from '../../config-visibility.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from '../../services/publish-requests/ask.js';
 import { callerOf } from '../../middleware/caller.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
@@ -188,7 +193,9 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Making the record public asks the node's publish gate, as POST does inside writeMemoryRecord
     // (plan doc-mvcn6c7e4e5q, V4.4). On an ask the patch lands at the level the record had, and the
     // request is filed after it.
-    const publishAsk = visibility === 'public'
+    // On a node that shows its content to signed-in accounts only no patch raises a record to public
+    // (closed-node-level.ts), so the gate is not asked there.
+    const publishAsk = visibility === 'public' && !signedInOnly(config)
       ? publishAskOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth!.app)
       : { kind: 'allowed' as const };
     if (publishAsk.kind === 'refused') {
@@ -196,6 +203,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
     let askedToPublish = false;
+    let closedWarning: ClosedNodeWarning | null = null;
 
     if (key.startsWith('organism.')) {
       const guard = await isKeyArchived(storage, key);
@@ -236,8 +244,11 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // subtree onto what the winner actually stored, not onto the stale copy it started from.
       const existing = await storage.getMemory(gaii, key);
       priorVisibility = existing?.visibility;
-      askedToPublish = publishAsk.kind === 'ask' && isRaiseToPublic(existing?.visibility, visibility);
-      const wantVisibility = askedToPublish ? undefined : visibility;
+      // A closed node stores a raise to public at 'members' and says so (plan V1.6), before the gate.
+      const closed = closedNodeLevel(config, visibility, 'members' as const, { from: existing?.visibility });
+      closedWarning = closed.warning;
+      askedToPublish = publishAsk.kind === 'ask' && isRaiseToPublic(existing?.visibility, closed.level);
+      const wantVisibility = askedToPublish ? undefined : closed.level;
       // The level the patched record ends at: the one named, else the one it had, else (a new record)
       // the node's starting level (plan V5.1); a new record held back by the publish gate is private.
       const levelAfter = (wantVisibility ?? existing?.visibility
@@ -416,7 +427,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     res.status(publishRequest ? 202 : created ? 201 : 200).json(success(config.nodeId, {
       ...(publishRequest ? { publish_request: publishRequest } : {}),
-      ...(publishWarning ? { warnings: [publishWarning] } : {}),
+      ...(publishWarning || closedWarning ? { warnings: [publishWarning, closedWarning].filter(w => !!w) } : {}),
       key: record.key,
       owner_gaii: record.ownerGaii,
       // Echoed through the one presentation of a memory value; null when this caller may not see it.

@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-18 — The rule underneath: on a node closed to strangers a public write is saved for the signed-in accounts (plan V1.6).
  *   2026-10-18 — Section 2: an imported entry with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — The same wait for a file made public, an import, a bulk write and a copy
  *     (publish_requests per record; plan doc-mvcn6c7e4e5q, V4).
@@ -237,5 +238,10 @@ a cortex library or a shared workspace link public answers with \`publish_reques
 you publish:public; an import or a bulk write lists one per record under \`publish_requests\`, and a
 copy made public answers the same way. It is stored as it was. Give them the \`approve_url\` from the
 answer; they approve on their Notifications page.
+
+On a node that shows its content to its signed-in accounts only, nothing new becomes public: a
+record, a file, a skill, a package, a knowledge package, a data package or a workspace link asked
+as public is saved for the signed-in accounts, and the answer's \`warnings\` say so
+(PUBLIC_IS_SIGNED_IN_HERE). Tell the person who can read it now: everyone signed in to this node.
 `,
 };

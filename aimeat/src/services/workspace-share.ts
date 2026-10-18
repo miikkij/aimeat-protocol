@@ -25,6 +25,9 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.6.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a share asked to
+ *     open to anyone (access 'open', named or the starting level) is stored at 'account' and the answer
+ *     carries `warnings` PUBLIC_IS_SIGNED_IN_HERE; a share open already stays open (plan V1.6).
  *   v1.5.0 — 2026-10-18 — A share made for the first time without `access` takes
  *     visibility.share_access_default (code default open; plan doc-mvcn6c7e4e5q, V5.5), before the gate.
  *   v1.4.0 — 2026-10-18 — setWorkspaceShareOp takes `publishGate`, the door's caller (plan
@@ -57,6 +60,7 @@ import { logger } from '../utils/logger.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import type { PublishGateInput } from './publish-requests/door.js';
 import { newlyOpened, withholdOpening, fileShareAsk } from './workspace-share-gate.js';
+import { closedNodeLevel, closedNodeWarnings } from './closed-node-level.js';
 
 /** The share as the node decides with it: every field present. */
 export function resolveShare(v: ShareMeta | null | undefined): ResolvedShare {
@@ -253,6 +257,14 @@ export async function setWorkspaceShareOp(
     };
     if (next.access === 'password' && !next.passwordHash) return refuse(400, 'INVALID_INPUT', "access 'password' requires a password to be set");
 
+    // A node that shows its content to signed-in accounts only stores a share asked to open to anyone
+    // (named, or the starting level) at 'account', and says so (services/closed-node-level.ts, plan
+    // V1.6). A share that is open already keeps it. Before the gate, so a lowered share asks nothing.
+    const closed = publishGate
+        ? closedNodeLevel(config, next.access, 'account' as const, { from: stored ? prev.access : undefined, publicValue: 'open' })
+        : { level: next.access, warning: null };
+    next.access = closed.level;
+
     // The publish gate (plan doc-mvcn6c7e4e5q, V4), before anything is stored: a change that lets
     // anyone with the link read what they could not, by a caller the node asks the owner about, is
     // stored with that part held back (services/workspace-share-gate.ts).
@@ -312,7 +324,7 @@ export async function setWorkspaceShareOp(
             ...(page && until[sharedNow[0]] ? { ends_at: until[sharedNow[0]] } : {}),
             ...(feedKey ? { ics_key: feedKey.key, ics_url: `/v1/organisms/${orgId}/workspace/public/records?ws=${encodeURIComponent(ws)}&space=<space>&format=ics&key=${feedKey.key}` } : {}),
             ...(requested.publishRequest ? { publish_request: requested.publishRequest } : {}),
-            ...(requested.warnings ? { warnings: requested.warnings } : {}),
+            ...(requested.warnings ? { warnings: requested.warnings } : closedNodeWarnings(closed.warning)),
         },
         ...(requested.publishRequest ? { asked: true } : {}),
     };

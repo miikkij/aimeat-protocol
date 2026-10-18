@@ -28,6 +28,8 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-10-18 — On a node that shows its content to signed-in accounts only, a version that would make
+ *     the package public (named or by the default) is published at 'members' (plan V1.6).
  *   2026-10-18 — A version published without a visibility takes visibility.datapackage_default (code
  *     default public; plan doc-mvcn6c7e4e5q, V5.6). A pointer stored with no visibility still reads public.
  *   2026-10-18 — writeLatest and upsertCatalogueEntry moved to ./version-audience.ts. A publish of bytes
@@ -72,7 +74,9 @@ import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
 import type { AudienceAuth } from '../audience.js';
 import { checkAudienceWrite } from '../audience-write.js';
 import { DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable } from './audience.js';
-import { writeLatest, upsertCatalogueEntry, setVersionAudience } from './version-audience.js';
+import { writeLatest, upsertCatalogueEntry, setVersionAudience, readPointer } from './version-audience.js';
+import { signedInOnly } from '../../config-visibility.js';
+import { closedNodeLevel } from '../closed-node-level.js';
 import { datapackageVisibilityDefault } from '../content-defaults.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
@@ -139,7 +143,16 @@ export async function publishPackage(
     // Who reads it, checked before anything is written: an organism the publisher is not in is
     // refused (services/audience-write.ts). When not named, the node's starting level (plan V5.6),
     // public unless the operator chose otherwise, as every package was before.
-    const visibility = input.visibility ?? datapackageVisibilityDefault(config);
+    let visibility = input.visibility ?? datapackageVisibilityDefault(config);
+    // A closed node publishes a raise to public at 'members' (services/closed-node-level.ts, plan
+    // V1.6). POST /v1/datapackages and the MCP tool lowered it already at the gate and say so; this
+    // covers the extension capability and the workflow step, which call here directly.
+    if (visibility === 'public' && signedInOnly(config)) {
+        const pointer = await readPointer(deps, ownerGhii, input.name);
+        visibility = closedNodeLevel(config, visibility, 'members' as const, {
+            from: pointer?.contentHash ? (pointer.visibility ?? 'public') : undefined,
+        }).level;
+    }
     const audience = await checkAudienceWrite(storage, visibility, { sub: producedBy.gaii, owner: ownerName }, DATAPACKAGE_LEVELS);
     if (!audience.ok) return { ok: false, code: audience.code, message: audience.message, issues: [] };
     const fileVisibility = fileVisibilityOf(visibility);

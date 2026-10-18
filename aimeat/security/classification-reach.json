@@ -2249,9 +2249,9 @@
     },
     "src/services/storage-file-publish.ts": {
       "reads": {
-        "getStorageFileMeta": 2
+        "getStorageFileMeta": 3
       },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: a file's metadata (no bytes) is read to know whether a write raises it to public and which level it keeps; nothing is returned to anyone."
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4 and V1.6), the node's own read: a file's metadata (no bytes) is read to know whether a write raises it to public, which level it keeps, and on a node closed to strangers whether it is public already (closedFileLevel); nothing is returned to anyone."
     },
     "src/services/storage-file-write.ts": {
       "reads": {

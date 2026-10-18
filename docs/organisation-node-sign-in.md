@@ -166,8 +166,20 @@ the node serve nothing to anyone who is not signed in to one of its own accounts
 - Portfolio and company addresses answer 404, robots.txt disallows everything, the sitemaps and
   the public feeds answer 401, and an anonymous visitor to a realtime room is refused.
 - A visitor signed in on another node is not an account here and gets the same 401.
-- Nothing stored changes. Content keeps its own setting underneath, so switching back to `open`
-  restores what was public.
+- Something made public from now on is saved for the signed-in accounts instead. A memory record,
+  a stored file, a user skill, a package, a knowledge package or one of its entries and a data
+  package are saved at `members`, and a workspace link at `account`. The answer carries one
+  warning, `PUBLIC_IS_SIGNED_IN_HERE`, in `warnings` (on MCP in the result text, not as an error).
+  This also applies to a starting level of public (`AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY`,
+  `AIMEAT_DEFAULT_SHARE_ACCESS`, `AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY`). No publish request is
+  filed for it, because nothing became public. The stored value then says what the node really
+  serves, apps that read at that level keep working, and opening the node later exposes nothing new
+  by accident.
+- An organism, a board, an app's listing, a cortex library, a welcome page and a company front page
+  have no signed-in level of their own and keep the value they are given. The gate above hides them
+  from everyone without an account.
+- Content that was public before the node was closed keeps its own setting underneath, so switching
+  back to `open` restores what was public.
 
 For a company node, use it together with `AIMEAT_REGISTRATION_MODE=oauth` (or `invite`) and the
 tenant allowlist: then the people who can sign in are your staff and the partners you approved,

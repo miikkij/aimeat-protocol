@@ -29,6 +29,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.19.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a `gatePublic`
+ *     write that raises a record to public is stored at 'members' and carries the warning
+ *     PUBLIC_IS_SIGNED_IN_HERE, before the publish gate (services/closed-node-level.ts, plan V1.6).
  *   v1.18.1 — 2026-10-18 — The gate's caller, the kept level and the filing moved to
  *     services/memory-publish-gate.ts, which the batch write and the copy call too. No behaviour change.
  *   v1.18.0 — 2026-10-18 — `gatePublic`: a write the generic memory doors make public asks the node's
@@ -144,6 +147,7 @@ import { organismVisibilityRefusal } from './organism-visibility.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import type { PublishAsk, publishRequestedBody } from './publish-requests/ask.js';
 import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest } from './memory-publish-gate.js';
+import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -240,8 +244,9 @@ export type ExchangeReconcileReport =
 /** A warning a successful write carries: the record was stored, and something about it needs a person. */
 export interface MemoryWriteWarning {
     // PUBLISH_NOT_ASKED: stored at the level it had, and the request to make it public could not be
-    // filed (too many already wait for the owner).
-    code: 'SHADOWED_BY_OWNER_COPY' | 'PUBLISH_NOT_ASKED';
+    // filed (too many already wait for the owner). PUBLIC_IS_SIGNED_IN_HERE: asked public on a node
+    // that shows its content to signed-in accounts only, stored at 'members' (closed-node-level.ts).
+    code: 'SHADOWED_BY_OWNER_COPY' | 'PUBLISH_NOT_ASKED' | 'PUBLIC_IS_SIGNED_IN_HERE';
     message: string;
     [detail: string]: unknown;
 }
@@ -458,6 +463,14 @@ export async function writeMemoryRecord(
     //     caller the node asks the owner about (an agent without publish:public; an app grant too when
     //     the gate covers apps), stores the record at the level it had (a new one: private) and files
     //     a request after the write. Keeping a public record public asks nothing.
+    //     Before it, the closed node (plan V1.6): on a node that shows its content to its signed-in
+    //     accounts only, a raise to public is stored at 'members' and the answer says so, so the
+    //     gate below no longer sees a raise and files no request.
+    let closedNode: ClosedNodeWarning | null = null;
+    if (input.gatePublic) {
+        const closed = closedNodeLevel(config, input.visibility, 'members' as const, { from: existing?.visibility });
+        if (closed.warning) { input = { ...input, visibility: closed.level, groupId: undefined, workspaceRef: undefined }; closedNode = closed.warning; }
+    }
     let publishAsk: Extract<PublishAsk, { kind: 'ask' }> | null = null;
     if (input.gatePublic && isRaiseToPublic(existing?.visibility, input.visibility)) {
         // The writer's caller object, from the facts every door hands this service.
@@ -639,6 +652,7 @@ export async function writeMemoryRecord(
 
     const warnings: MemoryWriteWarning[] = [];
     if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));
+    if (closedNode) warnings.push({ ...closedNode });
 
     // 8. The request the publish gate asked for (step 3a), now that the record it names exists.
     let publishRequest: ReturnType<typeof publishRequestedBody> | undefined;

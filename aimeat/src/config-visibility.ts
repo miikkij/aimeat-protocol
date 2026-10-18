@@ -12,6 +12,7 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.8.1 — 2026-10-18 — Comment: contentAccess 'signed-in' stores a new public write at the signed-in level (V1.6).
  *   v1.8.0 — 2026-10-18 — The content starting levels (config-content-defaults.ts, plan V5) ride along: VisibilityConfig extends ContentDefaultsConfig.
  *   v1.7.0 — 2026-10-18 — publishGate: who asks the owner before making something public (V4).
  *   v1.6.0 — 2026-10-17 — appDefaultListing, appDefaultAccess, appDefaultAccessCode: how a new app starts.
@@ -61,8 +62,10 @@ export interface VisibilityConfig extends ContentDefaultsConfig {
    * Who this node shows its content to. 'open' (the default) serves public content to anyone.
    * 'signed-in' serves nothing to a caller who is not an account of this node: every route outside
    * the short list sign-in and machine connections need answers 401, the app, portfolio and company
-   * origins ask for a sign-in, and nothing can be made public (middleware/content-access-gate.ts,
-   * plan doc-mvcn6c7e4e5q V1). Stored values are untouched, so switching back restores them.
+   * origins ask for a sign-in (middleware/content-access-gate.ts, plan doc-mvcn6c7e4e5q V1), and a
+   * new write asking for public is stored at the kind's signed-in level with a warning
+   * (services/closed-node-level.ts, V1.6). Values stored before are untouched, so switching back
+   * restores them.
    */
   contentAccess: ContentAccess;
   /**

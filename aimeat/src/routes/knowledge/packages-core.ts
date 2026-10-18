@@ -6,6 +6,9 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-18 — On a node that shows its content to signed-in accounts only, POST /v1/knowledge/import
+ *     stores a listed package at the audience 'members' (unlisted) and a public entry at 'members', with
+ *     the warning PUBLIC_IS_SIGNED_IN_HERE, before the publish gate (plan V1.6).
  *   2026-10-18 — POST /v1/knowledge/import asks the publish gate for a listed package or a public
  *     entry: an agent without publish:public stores the package unlisted and those entries private,
  *     and gets 202 with `publish_request` (services/knowledge-publish-ask.ts; plan doc-mvcn6c7e4e5q, V4).
@@ -64,6 +67,7 @@ import { classificationWarningOf } from '../../services/classification/present-m
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
 import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
+import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
 
 // The validator is shared with the operator's import, which used to write a manifest nothing
@@ -177,6 +181,20 @@ export function registerPackagesCoreRoutes(
     for (const value of named) {
       const checked = await checkAudienceWrite(storage, value, req.auth, KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING);
       if (!checked.ok) { res.status(checked.status).json(error(config.nodeId, checked.code, checked.message)); return; }
+    }
+
+    // A node that shows its content to signed-in accounts only stores a listed package and its public
+    // entries at 'members' instead, and says so (services/closed-node-level.ts, plan V1.6). Before the
+    // gate, so a lowered package asks nothing.
+    const pkgClosed = closedNodeLevel(config, manifest.sharing.catalog_listed === true ? 'public' : undefined, 'members' as const);
+    let closedWarning = pkgClosed.warning;
+    if (pkgClosed.warning) {
+      manifest.sharing.catalog_listed = false;
+      manifest.sharing.audience = 'members';
+    }
+    for (const e of manifest.entries) {
+      const entryClosed = closedNodeLevel(config, e.visibility, 'members' as const);
+      if (entryClosed.warning) { e.visibility = entryClosed.level; closedWarning = entryClosed.warning; }
     }
 
     // A listed package or a public entry asks the node's publish gate before anything is stored (plan
@@ -328,7 +346,7 @@ export function registerPackagesCoreRoutes(
         field: listed ? 'audience' : 'entries', from: listed ? packageAudienceOf(manifest) : 'private',
         entries: keptEntries.map(e => e.key),
       })
-      : {};
+      : closedNodeWarnings(closedWarning);
 
     res.status(asked.publish_request ? 202 : 201).json(success(config.nodeId, {
       package_id: packageId,

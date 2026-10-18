@@ -2149,11 +2149,19 @@ components:
 
     MemoryWriteWarning:
       type: object
-      description: The record was stored, and something about it needs a person.
+      description: >
+        The record was stored, and something about it needs a person. PUBLISH_NOT_ASKED: stored at the
+        level it had, and the request to make it public could not be filed. PUBLIC_IS_SIGNED_IN_HERE:
+        the node shows its content to its signed-in accounts only (visibility.content_access
+        signed-in), so a write asking for public was stored at the signed-in level (`members`)
+        instead; content that was public already keeps its level. The same warning, with the same
+        code and one-sentence message, is in `warnings` of every write that can ask for public on
+        such a node: stored files and their presigned mint, user skills, packages, knowledge packages
+        and their entries, data packages, and workspace shares (access open is stored as account).
       required: [code, message]
       additionalProperties: true
       properties:
-        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY] }
+        code: { type: string, enum: [SHADOWED_BY_OWNER_COPY, PUBLISH_NOT_ASKED, PUBLIC_IS_SIGNED_IN_HERE] }
         message: { type: string }
         how_to_fix: { type: string }
         shadowed_by: { type: string, description: 'SHADOWED_BY_OWNER_COPY: the owner GHII whose copy owner-scope reads resolve to' }
@@ -7207,7 +7215,9 @@ components:
         an app grant without it when the gate covers apps. Everything else in the change is stored, at
         the level the target had (a new one: private). `data.publish_request` is the request: its
         `request_id`, `expires_at`, `approve_url` (the owner's Notifications page) and `next_step`, the
-        sentence to pass on to the owner. Read and decide it at /v1/publish-requests.
+        sentence to pass on to the owner. Read and decide it at /v1/publish-requests. On a node that
+        shows its content to signed-in accounts only, no request is filed: the change is stored at the
+        signed-in level with the warning PUBLIC_IS_SIGNED_IN_HERE (MemoryWriteWarning).
       content:
         application/json:
           schema:
