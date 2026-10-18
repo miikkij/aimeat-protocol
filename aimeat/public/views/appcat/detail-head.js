@@ -19,7 +19,8 @@
  * @version-history
  *   v1.3.0 — 2026-10-18 — One sentence under Launch says who can open the app: anyone with the link,
  *     people signed in here, or the members of one shared place (the row's `open_to`, plan
- *     doc-mvcn6c7e4e5q V2.5).
+ *     doc-mvcn6c7e4e5q V2.5). The line under it says "everyone sees" only for an app anyone may
+ *     open (detail.heroHint*Limited otherwise).
  *   v1.2.0 — 2026-10-12 — The state chip says Community for an own app listed to signed-in members only.
  *   v1.1.0 — 2026-09-27 — Parity pass: the toolbar title and the back link moved to Overlay's options
  *     (DetailTitle goes); no category in the mono line; the chips without tones, as the old page
@@ -81,11 +82,15 @@ export function DetailHead({ d }) {
   // Who can open it, in one sentence, under the way to open it (the row's open_to; none for an app
   // from another node, whose row does not say).
   const openKey = openToSentenceKey(app, signedInOnly());
+  // The line under it says "everyone sees" only for an app anyone may open: for one that asks for a
+  // sign-in or a shared place's membership it names the published version alone.
+  const limited = !!openKey && openKey !== 'openTo.anyone';
+  const heroKey = (hasDraft ? 'detail.heroHint' : 'detail.heroHintClean') + (limited ? 'Limited' : '');
   const actions = html`
     <${Loud} large onClick=${d.launch}>${x('detail.launch')}<//>
     ${hasDraft ? html`<${Action} title=${x('card.openStagingHint')} onClick=${d.openDraft}>${x('detail.openDraft')}<//>` : null}
     ${openKey ? html`<${Note} kind="hint">${x(openKey)}<//>` : null}
-    <${Note} kind="hint">${x(hasDraft ? 'detail.heroHint' : 'detail.heroHintClean')}<//>`;
+    <${Note} kind="hint">${x(heroKey)}<//>`;
 
   return html`<${PageHead} thing title=${meta.name} line=${line} desc=${desc} marks=${marks} actions=${actions}
     picture=${{ glyph: meta.icon, src: d.shotUrl }} />`;

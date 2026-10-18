@@ -22923,6 +22923,8 @@
     "detail.favBadge": "Favourite",
     "detail.heroHint": "Launch opens the published version everyone sees. Open draft opens the working copy only you can see.",
     "detail.heroHintClean": "Launch opens the published version everyone sees.",
+    "detail.heroHintLimited": "Launch opens the published version. Open draft opens the working copy only you can see.",
+    "detail.heroHintCleanLimited": "Launch opens the published version.",
     "nav.home": "Home",
     "nav.chat": "Chat",
     "nav.apps": "Apps",
