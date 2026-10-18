@@ -10,6 +10,11 @@
  *   projection-aware delist guard.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange-projection.ts
  * @version-history
+ *   v1.6.0 — 2026-10-18 — BYPASS: the raw route's 402 to a stranger names only the money-priced
+ *     product (`paid`), not the pacing-only `brief`. The test was stale, not the paywall: da1fc12cc
+ *     (2026-10-17) made a pacing-only tool a free product on the raw route, and the assertion kept the
+ *     list from before it. The stranger is still refused with 402 (wish
+ *     wish-y-ajon-maksun-ohitus-oikea-vika-vai-vanhentunut-testi).
  *   v1.5.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
  *     fixtures use the 4.0.0 form, which 3.x accepts too: tools and offers state `tollMorsels`, extension
  *     actions `tollMorsels` beside a `commercial` block that keeps only the listing fields. Morsel-rail
@@ -412,11 +417,13 @@ await test('BYPASS: calling the backing extension action directly is NOT free on
   assert(direct.status === 402, `a stranger must be charged, got ${direct.status}: ${JSON.stringify(direct.body).slice(0, 200)}`);
   assert(direct.body?.error?.code === 'PAYMENT_REQUIRED', `402 says why: ${JSON.stringify(direct.body?.error)}`);
   // The refusal must NAME the product, or the caller has no way to become a customer.
-  // Both `brief` and `paid` bind this one capability, which is exactly the ambiguity a first-match
-  // lookup would resolve by accident — the refusal names every product it is sold as.
+  // Both `brief` and `paid` bind this one capability. Since da1fc12cc (2026-10-17) only a money price
+  // asks for a contract: `brief` carries only pacing (11 morsels), so it is a free product and the 402
+  // names `paid` alone. Until 2026-10-18 this asserted ['brief', 'paid'], the rule before that commit,
+  // and the nightly read the shorter list as a bypass. The stranger is still refused: `paid` sells it.
   const named = (direct.body?.app_tools ?? []).map((a: any) => a.tool).sort();
-  assert(JSON.stringify(named) === JSON.stringify(['brief', 'paid']),
-    `the 402 names every listing that sells it: ${JSON.stringify(direct.body?.app_tools)}`);
+  assert(JSON.stringify(named) === JSON.stringify(['paid']),
+    `the 402 names every money-priced listing that sells it, and no free one: ${JSON.stringify(direct.body?.app_tools)}`);
 });
 
 await test('BYPASS: the provider still calls their own extension free', async () => {

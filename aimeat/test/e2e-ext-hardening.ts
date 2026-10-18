@@ -26,6 +26,13 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   v1.5.0 — 2026-10-18 — 3f: the test was stale, not the paywall. da1fc12cc (2026-10-17) made a tool
+ *     with a pacing amount and no money price a free product on the raw route as well (served at its
+ *     pacing, 402 only for a money price), and `paid` carried only `tollMorsels: 3`, so the forged-pass
+ *     call answered 200 and the nightly read it as a bypass. `paid` now carries a money price, and the
+ *     forged pass still gets 402. A new test sends the same forged pass at a pacing-only capability:
+ *     it is served, and ownerB pays the full pacing, so the pass excuses nothing (wish
+ *     wish-y-ajon-maksun-ohitus-oikea-vika-vai-vanhentunut-testi).
  *   v1.4.0 — 2026-10-12 — 3e on node 4.0.0: `commercial.payMorsels` is refused outright with 400
  *     MORSEL_PRICE_REMOVED (asserted there in place of its ceiling), and the ordinary-price install is a
  *     money price with a toll; on 3.x the morsel-price ceiling and its ordinary install are asserted as before.
@@ -543,14 +550,16 @@ async function run() {
   const victimExt = `h17victim${h17}`;      // ownerA's extension: the capability everyone else points at
   const sellerExt = `h17seller${h17}`;      // ownerC's extension: a capability ownerC genuinely owns
   const buyerExt = `h17buyer${h17}`;        // ownerB's extension: hands ctx.buy whatever it is told
+  const pacedExt = `h17paced${h17}`;        // ownerA's extension sold only by a free tool with a pacing amount
   const victimCap = `ext:${victimExt}:ping`;
   const sellerCap = `ext:${sellerExt}:ping`;
+  const pacedCap = `ext:${pacedExt}:ping`;
   const appA = `h17a${h17}.html`;           // ownerA's own app, the legitimate seller of victimCap
   const appB = `h17b${h17}.html`;           // ownerB's forgery, aimed at the paywall
   const appC = `h17c${h17}.html`;           // ownerC's forgery, aimed at ctx.buy
 
-  await test('Setup: two capabilities, and three manifests pointing at them', async () => {
-    for (const [token, name] of [[ownerA.token, victimExt], [ownerC.token, sellerExt]] as const) {
+  await test('Setup: three capabilities, and three manifests pointing at them', async () => {
+    for (const [token, name] of [[ownerA.token, victimExt], [ownerA.token, pacedExt], [ownerC.token, sellerExt]] as const) {
       const res = await install(token, name, {});
       assert(res.status === 201, `install ${name}: ${res.status} ${JSON.stringify(res.body?.error)}`);
       const act = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(token), body: '{}' });
@@ -571,7 +580,7 @@ async function run() {
     const agg = await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(seed.token), body: '{}' });
     assert(agg.status === 200,
       `aggregate ${agg.status}: ${JSON.stringify(agg.body?.error)} — the seed owner must hold the operator role`);
-    for (const capId of [victimCap, sellerCap]) {
+    for (const capId of [victimCap, pacedCap, sellerCap]) {
       const cap = await json(`/v1/capabilities/${encodeURIComponent(capId)}`);
       assert(cap.status === 200 && cap.body.data?.callable === true,
         `capability ${capId} is not callable: ${cap.status} ${JSON.stringify(cap.body?.data ?? cap.body?.error)}`);
@@ -585,12 +594,20 @@ async function run() {
       assert(w.status === 200 || w.status === 201, `manifest ${appId}: ${w.status} ${JSON.stringify(w.body?.error)}`);
     };
     // ownerA sells their own capability, and publishes a free tool onto the same action. Both legitimate.
+    // `paid` carries a MONEY price: since da1fc12cc (2026-10-17) only a money price makes the paywall
+    // ask for a contract, and a tool with a pacing amount alone is a free product that anyone may call
+    // at its pacing. With `tollMorsels: 3` alone, as here until 2026-10-18, the next test saw 200 and
+    // read it as a bypass. `paced` on its own capability carries the pacing-only case.
     await manifest(ownerA.token, appA, [
-      { name: 'paid', action_id: victimCap, tollMorsels: 3 },
+      { name: 'paid', action_id: victimCap, tollMorsels: 3, pricesMoney: [{ amount: 1000, currency: 'EUR' }] },
       { name: 'look', action_id: victimCap },
+      { name: 'paced', action_id: pacedCap, tollMorsels: 3 },
     ]);
     // ownerB and ownerC each name a capability they do not own.
-    await manifest(ownerB.token, appB, [{ name: 'freebie', action_id: victimCap }]);
+    await manifest(ownerB.token, appB, [
+      { name: 'freebie', action_id: victimCap },
+      { name: 'freebie-paced', action_id: pacedCap },
+    ]);
     await manifest(ownerC.token, appC, [
       { name: 'steal', action_id: victimCap },
       { name: 'own', action_id: sellerCap },
@@ -608,6 +625,25 @@ async function run() {
     assert(forged.status === 402,
       `ownerB reached ownerA's priced capability through a pass minted for ownerB's own app: got ${forged.status} `
       + `${JSON.stringify(forged.body?.data ?? forged.body?.error)}`);
+  });
+
+  await test('an internal pass for another product does not excuse a free tool\'s pacing either', async () => {
+    // The same forged pass onto an action ownerA sells only through a free tool with a pacing amount.
+    // Since da1fc12cc (2026-10-17) such an action is served to any caller at that pacing, so 200 is the
+    // intended answer here. The pass must excuse nothing: ownerB pays the 3 morsels any caller pays.
+    const wallet = async () => {
+      const r = await json('/v1/wallet', { headers: auth(ownerB.token) });
+      assert(r.status === 200, `wallet ${r.status}: ${JSON.stringify(r.body?.error)}`);
+      return Number(r.body.data.balance ?? r.body.data.total ?? 0);
+    };
+    const before = await wallet();
+    const forged = await json(`/v1/apps/${ownerB.name}/${appB}/webmcp/tools/freebie-paced`, {
+      method: 'POST', headers: auth(ownerB.token), body: JSON.stringify({ input: {} }),
+    });
+    assert(forged.status === 200,
+      `a free paced product is served to any caller: got ${forged.status} ${JSON.stringify(forged.body?.data ?? forged.body?.error)}`);
+    const paid = before - await wallet();
+    assert(paid === 3, `the pass minted for ownerB's own app excused the pacing: ownerB paid ${paid}, expected 3`);
   });
 
   await test('a pass that IS about this call still stands the paywall down', async () => {
