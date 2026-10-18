@@ -3,23 +3,36 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The person hears it from the node, not only from their AI: when one of their agents
- *   is refused something they can allow with one press, a notice with an Allow button lands in the
- *   bell, and the same question goes to their own email address with a button to the allow page.
+ *   is refused a permission, a notice lands in the bell and the same question goes to their own email
+ *   address. A permission one press may give carries an Allow button and the allow page; any other
+ *   carries the agent's page, where the person decides on it with its own tick.
  *
  *   WHY. The agent is told what to say (services/permission-ask.ts), and an agent does not always
  *   say it: a person's ChatGPT passed her the name of a permission and no address (2026-10-17). The
- *   node knows the refusal at the moment it answers it, so it asks the person itself.
+ *   node knows the refusal at the moment it answers it, so it asks the person itself. Until
+ *   2026-10-18 only the one-press words were told; a refusal of a powerful word (ai:use,
+ *   memory:purge) or of one outside every wildcard (messages:send-as-owner) reached nobody, and Jouni
+ *   asked for it: "näkyykö tämä myös mulla jotenkin notifikaatioissa sitten että agentti tarvii lisää
+ *   lupia? että osaan reagoida ja ne tulee myös mailiin".
  *
  *   WHEN. Once per newly opened refusal of a set of permissions, never per call: agent-refusals.ts
  *   calls the listener only when a refusal is new, not declined, and no other open refusal of the
  *   agent already needs the same permissions. A permission the person declined is not asked again
- *   while that refusal stays open. Only words one press may give: the rest stay on the agent's page.
+ *   while that refusal stays open.
+ *
+ *   NOT THE OPERATOR'S WORDS. A word only an operator's own agent can use (OPERATOR_WORDS) gives
+ *   nothing on an account that does not run the node, so such a person is not told about it; when
+ *   nothing else is left, nothing is sent.
  *
  *   EMAIL. Only to a verified notification address, only while the switch `email.agentAsks` on the
  *   Email page is on (it is unless switched off), and logged in the mail log as `agent_ask`.
- * @structure permissionAskNotice(agent, words, baseUrl) · sendPermissionAsk(deps, ownerGhii, agent, words)
+ * @structure PERMISSION_ASK_TYPE · permissionAskNotice(agent, words, baseUrl) ·
+ *   permissionPageNotice(agent, words, baseUrl) · sendPermissionAsk(deps, ownerGhii, agent, words)
  * @usage initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A refusal that one press cannot answer reaches the bell and the email too,
+ *     with no Allow button and the agent's page; the operator's words are left out on an account that
+ *     does not run the node.
  *   v1.0.0 — 2026-10-17 — Initial (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  */
 import type { AimeatConfig } from '../config.js';
@@ -29,12 +42,16 @@ import { notify, type NotifyInput } from './notify.js';
 import { readNotificationSettings, appendMailLog } from './notification-settings.js';
 import { getActiveEmailService } from './email.js';
 import { wrapHtml } from './email-templates.js';
-import { allowUrl, plainPermission, oneClickWords } from './permission-ask.js';
+import { allowUrl, agentPageUrl, plainPermission, oneClickWords, OPERATOR_WORDS } from './permission-ask.js';
 import { createT, toLocale, type Locale } from '../i18n.js';
+import { localAccountName } from '../utils/gaii.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 import { escapeHtml as esc } from '../utils/html-escape.js';
 import { logger } from '../utils/logger.js';
 
 export const PERMISSION_ASK_TYPE = 'agent_permission_ask';
+/** The i18n key of the notice whose permission is given on the agent's page, not with one press. */
+const PAGE_KEY = 'agent_permission_ask_page';
 
 const agentLabel = (agent: AgentRecord) => agent.displayName || agent.name;
 
@@ -43,10 +60,12 @@ function asks(words: readonly string[], locale: Locale): string {
   return words.map((w) => plainPermission(w, locale) ?? w).join(' ');
 }
 
+/** The path of an absolute address on this node, for a notice's link. */
+const pathOf = (url: string) => url.slice(url.indexOf('/v1/'));
+
 /** The bell notice: the question, the page to open, and Allow on the notice itself. */
 export function permissionAskNotice(agent: AgentRecord, words: readonly string[], baseUrl: string): NotifyInput {
-  const page = allowUrl(baseUrl, agent.name, words);
-  const path = page.slice(page.indexOf('/v1/'));
+  const path = pathOf(allowUrl(baseUrl, agent.name, words));
   const name = agentLabel(agent);
   const what = asks(words, 'en');
   return {
@@ -68,16 +87,33 @@ export function permissionAskNotice(agent: AgentRecord, words: readonly string[]
   };
 }
 
-/** The email: the same question in the person's language, and a button to the allow page. */
-function permissionAskEmail(agent: AgentRecord, words: readonly string[], baseUrl: string, locale: Locale) {
+/** The bell notice for a permission one press does not give: no Allow button, the agent's page instead. */
+export function permissionPageNotice(agent: AgentRecord, words: readonly string[], baseUrl: string): NotifyInput {
+  const path = pathOf(agentPageUrl(baseUrl, agent.name));
+  const name = agentLabel(agent);
+  const what = asks(words, 'en');
+  return {
+    type: PERMISSION_ASK_TYPE,
+    title: `${name} needs a permission you give on its page`,
+    body: `${name} tried to do this for you and could not, because you have not allowed it: ${what} `
+      + "You give this permission on the agent's page, if you want to.",
+    link: path,
+    i18n: { key: PAGE_KEY, vars: { agent: name, what } },
+    actions: [{ id: 'open', label: "Open the agent's page", kind: 'navigate', link: path, i18n: { key: `${PAGE_KEY}.open` } }],
+  };
+}
+
+/** The email: the same question in the person's language, and a button to the page where they decide. */
+function permissionAskEmail(agent: AgentRecord, words: readonly string[], baseUrl: string, locale: Locale, onePress: boolean) {
   const t = createT(locale);
-  const page = allowUrl(baseUrl, agent.name, words);
+  const page = onePress ? allowUrl(baseUrl, agent.name, words) : agentPageUrl(baseUrl, agent.name);
+  const prefix = onePress ? 'agentAllow.email' : 'agentAllowPage.email';
   const vars = { agent: agentLabel(agent) };
-  const subject = t('agentAllow.email.subject', vars);
-  const lead = t('agentAllow.email.lead', vars);
+  const subject = t(`${prefix}.subject`, vars);
+  const lead = t(`${prefix}.lead`, vars);
   const what = words.map((w) => plainPermission(w, locale) ?? w);
-  const button = t('agentAllow.email.button');
-  const after = t('agentAllow.email.after');
+  const button = t(`${prefix}.button`);
+  const after = t(`${prefix}.after`);
   const html = wrapHtml(subject, `
     <p>${esc(lead)}</p>
     <ul>${what.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
@@ -89,23 +125,35 @@ function permissionAskEmail(agent: AgentRecord, words: readonly string[], baseUr
   return { subject, html, text };
 }
 
+/** The words this person is told about: an operator's word only when their account runs the node. */
+async function wordsToTell(storage: Storage, ownerGhii: string, words: readonly string[]): Promise<string[]> {
+  if (!words.some((w) => OPERATOR_WORDS.includes(w))) return [...words];
+  const operator = isOperatorAccount(await storage.getOwner(localAccountName(ownerGhii)));
+  return operator ? [...words] : words.filter((w) => !OPERATOR_WORDS.includes(w));
+}
+
 /** Tell the person, in the bell and by email. Never throws: the refusal already stands. */
 export async function sendPermissionAsk(
   deps: { storage: Storage; config: AimeatConfig },
   ownerGhii: string,
   agent: AgentRecord,
-  words: readonly string[],
+  refused: readonly string[],
 ): Promise<void> {
-  if (!oneClickWords(words)) return;
   try {
-    await notify(deps.storage, ownerGhii, permissionAskNotice(agent, words, deps.config.baseUrl));
+    const onePress = oneClickWords(refused);
+    const words = onePress ? [...refused] : await wordsToTell(deps.storage, ownerGhii, refused);
+    if (words.length === 0) return;
+    const notice = onePress
+      ? permissionAskNotice(agent, words, deps.config.baseUrl)
+      : permissionPageNotice(agent, words, deps.config.baseUrl);
+    await notify(deps.storage, ownerGhii, notice);
     const email = getActiveEmailService();
     if (!email?.enabled) return;
     const ghii = await deps.storage.getGHII(ownerGhii);
     if (!ghii?.notificationEmail || !ghii.emailVerifiedAt) return;
     const prefs = await readNotificationSettings(deps.storage, ownerGhii);
     if (prefs.email.agentAsks === false) return;
-    const mail = permissionAskEmail(agent, words, deps.config.baseUrl, toLocale(ghii.locale));
+    const mail = permissionAskEmail(agent, words, deps.config.baseUrl, toLocale(ghii.locale), onePress);
     const sent = await email.sendRaw(ghii.notificationEmail, mail.subject, mail.html, mail.text);
     if (sent) await appendMailLog(deps.storage, ownerGhii, { kind: 'agent_ask', subject: mail.subject });
   } catch (err) {

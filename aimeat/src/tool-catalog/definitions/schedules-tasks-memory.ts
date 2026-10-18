@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-18 — aimeat_agent_scope_narrow says the node narrows a ready `*` agent by itself at its next task.
  *   2026-10-17 — aimeat_memory_write takes visibility "organism:<organism id>" (plan doc-mvcn6c7e4e5q, V3.2).
  *   2026-10-15 — aimeat_task_request_changes leaves the catalog: no surface offers it any more (feature-list audit #79).
  *   2026-10-15 — aimeat_memory_read and aimeat_memory_list say a private record of the owner or a sibling needs memory:read-as-owner (feature-list audit #42).
@@ -325,7 +326,7 @@ export const schedulesTasksMemoryTools = [
     },
     {
         name: 'aimeat_agent_scope_narrow',
-        description: "Replace one of the owner's agents' \"all permissions\" (*) with the named permissions it actually used, as the node recorded them. Use it when the person agrees after you showed them the list (aimeat_agents_list: task_start_wildcard.proposal). An agent with * has every task wait for the owner's OK once two weeks of its use are on record; narrowed, it starts on its own again if its setting says so. Refused when nothing it used is on record yet. Needs agent:permissions.",
+        description: "Replace one of the owner's agents' \"all permissions\" (*) with the named permissions it actually used, as the node recorded them. Use it when the person agrees after you showed them the list (aimeat_agents_list: task_start_wildcard.proposal). Once two weeks of its use are on record, the node makes this same narrowing by itself at the agent's next task and tells the owner, so call this only when the person wants it done now. Refused when nothing it used is on record yet. Needs agent:permissions.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Narrow an Agent to What It Used', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

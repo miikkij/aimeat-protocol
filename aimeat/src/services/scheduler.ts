@@ -7,6 +7,8 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   2026-10-18 — taskWake() passes the node's config, for the narrowing of a `*` agent a scheduled
+ *     task's start decision may make (services/scope-auto-narrow.ts).
  *   2026-10-16 — A failed core job sends the operator the deduplicated fault message; a failed user
  *     schedule tells its owner in the bell and is paused after five failures in a row
  *     (scheduler-failures.ts); a core job whose handler is not registered is skipped with one log
@@ -628,7 +630,7 @@ export class Scheduler {
 
   /** The wake channels of a created task (scheduler-agent-task.ts). */
   private taskWake(): TaskWake {
-    return { webhookDispatcher: this.webhookDispatcher, emitResourceUpdated };
+    return { webhookDispatcher: this.webhookDispatcher, emitResourceUpdated, config: this.config };
   }
 
   /**

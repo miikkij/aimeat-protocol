@@ -7,6 +7,7 @@
  * @structure c · rel · day · providerWord · kindWord · channelWord · Switch · crumb · pageLinks
  * @usage import { c, rel, Switch, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.4.0 — 2026-10-18 — The mail log kind `agent_narrowed`.
  *   v1.3.0 — 2026-10-17 — The mail log kind `agent_ask`.
  *   v1.2.0 — 2026-09-26 — The crumb and the rail's sibling pages are data for SettingsPage (component plan C9); this file writes no markup (page group G8).
  *   v1.1.0 — 2026-09-25 — A setting that is on or off is the library's Switch (components/Switch.js), the look most Settings tabs draw (UI consolidation phase 5, a unification).
@@ -27,7 +28,7 @@ export const rel = (iso) => { if (!iso) return ''; const d = new Date(iso); retu
 export const providerWord = (p) => { if (!p) return ''; const k = 'emailpage.provider.' + p.id; const s = t(k); return s && s !== k ? s : (p.label || p.id); };
 export const isSender = (p) => (p?.capabilities || []).includes('send-mail');
 export const stateWord = (conn) => (conn ? c('state.' + (conn.status === 'active' ? 'active' : conn.status === 'expired' || conn.status === 'needs-reauth' ? 'expired' : 'other')) : c('state.none'));
-const MAIL_KINDS = ['verification', 'password_reset', 'username', 'magic_link', 'workflow_end', 'digest', 'nudge', 'invitation', 'agent_ask'];
+const MAIL_KINDS = ['verification', 'password_reset', 'username', 'magic_link', 'workflow_end', 'digest', 'nudge', 'invitation', 'agent_ask', 'agent_narrowed'];
 export const kindWord = (kind) => (MAIL_KINDS.includes(kind) ? c('kind.' + kind) : kind);
 /** Where it went: to an email address, or into a person's AIMEAT inbox. */
 export const channelWord = (m) => c(m?.channel === 'inbox' ? 'via.inbox' : 'via.email');

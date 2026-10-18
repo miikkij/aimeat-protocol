@@ -17,6 +17,9 @@
  * @usage const s = await readNotificationSettings(storage, ghii); const p = prefsFor(s, source, type);
  *   await updateNotificationSettings(storage, ghii, cur => ({ ...cur, lastDigestAt }));
  * @version-history
+ *   v1.3.0 — 2026-10-18 — EmailPrefs.agentNarrowed (on unless switched off) and the mail log kind
+ *     `agent_narrowed`: the email when the node narrows an agent that held all permissions
+ *     (services/scope-auto-narrow.ts).
  *   v1.2.0 — 2026-10-17 — EmailPrefs.agentAsks (on unless switched off) and the mail log kind
  *     `agent_ask`: the email when an agent asks to be allowed something (services/permission-ask-notice.ts).
  *   v1.1.0 — 2026-09-13 — Three ways a real record could be replaced with an older or a default one
@@ -53,6 +56,8 @@ export interface EmailPrefs {
   nudge?: boolean;
   /** One of the person's agents asks to be allowed something it was refused (services/permission-ask-notice.ts). On unless switched off. */
   agentAsks: boolean;
+  /** The node narrowed an agent holding all permissions to the ones it used (services/scope-auto-narrow.ts). On unless switched off. */
+  agentNarrowed: boolean;
 }
 export interface NotificationSettings {
   /** The node's own notifications, by group. */
@@ -68,12 +73,12 @@ export interface NotificationSettings {
 }
 
 export function defaultSettings(): NotificationSettings {
-  return { groups: {}, senders: {}, quiet: null, throttleMinutes: 10, emailDigest: { enabled: false, afterHours: 8 }, email: { workflowEnd: true, agentAsks: true }, lastDigestAt: null };
+  return { groups: {}, senders: {}, quiet: null, throttleMinutes: 10, emailDigest: { enabled: false, afterHours: 8 }, email: { workflowEnd: true, agentAsks: true, agentNarrowed: true }, lastDigestAt: null };
 }
 
 /** The last emails the node sent to the owner's own address: what and when, never the content. */
 export const MAIL_LOG_KEY = 'notifications.mail-log';
-export type MailLogKind = 'verification' | 'password_reset' | 'username' | 'magic_link' | 'workflow_end' | 'digest' | 'nudge' | 'invitation' | 'agent_ask';
+export type MailLogKind = 'verification' | 'password_reset' | 'username' | 'magic_link' | 'workflow_end' | 'digest' | 'nudge' | 'invitation' | 'agent_ask' | 'agent_narrowed';
 export interface MailLogEntry { kind: MailLogKind; subject: string; at: string }
 const MAIL_LOG_MAX = 50;
 
@@ -131,7 +136,10 @@ export function normalizeSettings(raw: unknown): NotificationSettings {
     afterHours: typeof e.afterHours === 'number' && Number.isFinite(e.afterHours) ? Math.min(168, Math.max(1, Math.round(e.afterHours))) : d.emailDigest.afterHours,
   };
   const em = (o.email && typeof o.email === 'object' ? o.email : {}) as Record<string, unknown>;
-  const email: EmailPrefs = { workflowEnd: em.workflowEnd !== false, agentAsks: em.agentAsks !== false, ...(typeof em.nudge === 'boolean' ? { nudge: em.nudge } : {}) };
+  const email: EmailPrefs = {
+    workflowEnd: em.workflowEnd !== false, agentAsks: em.agentAsks !== false, agentNarrowed: em.agentNarrowed !== false,
+    ...(typeof em.nudge === 'boolean' ? { nudge: em.nudge } : {}),
+  };
   const lastDigestAt = typeof o.lastDigestAt === 'string' ? o.lastDigestAt : null;
   return { groups, senders, quiet, throttleMinutes, emailDigest, email, lastDigestAt };
 }

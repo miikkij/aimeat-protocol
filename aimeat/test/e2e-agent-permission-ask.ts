@@ -18,10 +18,13 @@
  *     6. The page reads the request; Allow adds the permission and only it; a second press adds nothing.
  *     7. The token issued before the Allow answers 401 invalid_token; the refreshed one sends the
  *        message in the same MCP session.
+ *     8. A refused permission one press does not give (AI use) reaches the owner's bell once, with the
+ *        agent's page and no Allow button, and reaches nobody else (2026-10-18).
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=agent-permission-ask
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Phase 5: a refusal one press cannot answer reaches the bell too.
  *   v1.0.0 — 2026-10-17 — Initial, with the feature.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -233,6 +236,41 @@ await test('The refreshed token sends the message in the same MCP session', asyn
     const r = await mcp(t.body.access_token, session, 'tools/call', SEND);
     const text: string = r.msg?.result?.content?.[0]?.text ?? '';
     assert(r.status === 200 && r.msg?.result?.isError !== true && /delivered|pending|message_id/.test(text), `not sent: ${r.status} ${text.slice(0, 200)}`);
+});
+
+console.log('\nPhase 5: a permission one press does not give still reaches the person (2026-10-18)');
+
+async function pageNotices(token: string): Promise<any[]> {
+    const n = await json('/v1/notifications', auth(token));
+    return (n.body?.data?.notifications ?? []).filter((x: any) => x.type === 'agent_permission_ask' && x.i18n?.key === 'agent_permission_ask_page');
+}
+
+await test('A refused powerful permission (AI use) answers with the agent\'s page, not one press', async () => {
+    const r = await json('/v1/ai/models', auth(agentRestToken));
+    assert(r.status === 403 && r.body?.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const d = r.body.error.details ?? {};
+    assert(d.one_press === false && String(d.allow_url).includes(`/v1/profile?tab=agents&agent=${AGENT}`), `details ${JSON.stringify(d)}`);
+});
+
+await test('The owner\'s bell gets one notice with the agent\'s page and no Allow button', async () => {
+    let found: any[] = [];
+    for (let i = 0; i < 40 && found.length === 0; i++) {
+        found = await pageNotices(ownerToken);
+        if (found.length === 0) await new Promise(r => setTimeout(r, 100));
+    }
+    assert(found.length === 1, `expected one notice, got ${found.length}`);
+    const n = found[0];
+    assert(n.link === `/v1/profile?tab=agents&agent=${AGENT}`, `link ${n.link}`);
+    assert(!(n.actions ?? []).some((a: any) => a.kind === 'api'), `an Allow button: ${JSON.stringify(n.actions)}`);
+    assert((n.actions ?? []).some((a: any) => a.kind === 'navigate' && a.link === n.link), `no way to the agent's page: ${JSON.stringify(n.actions)}`);
+});
+
+await test('A second refusal of the same permission asks nothing new; the other owner hears none of it', async () => {
+    const r = await json('/v1/ai/models', auth(agentRestToken));
+    assert(r.status === 403, `expected 403, got ${r.status}`);
+    await new Promise(res => setTimeout(res, 300));
+    assert((await pageNotices(ownerToken)).length === 1, 'asked twice');
+    assert((await pageNotices(strangerToken)).length === 0, 'the other owner was told');
 });
 
 console.log(`\n=== Agent permission ask: ${passed} passed, ${failed} failed ===\n`);

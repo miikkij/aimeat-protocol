@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: MIT
  * @description Which permissions an agent holding `*` actually uses, and the narrowing built from it.
  *
- *   WHY (ruling C, Jouni 2026-10-02). "All permissions" must never read as "nothing dangerous", so `*`
- *   puts an agent on the task-start floor (services/agent-task-rules.ts): its tasks wait for the
- *   owner. Not by surprise: first the owner gets a narrowing they accept with one press, the named
- *   permissions the agent actually used. The node recorded no such history before this file: the
- *   usage stream keeps MCP tool calls by name and no REST call at all, and the fleet crews reach the
- *   node through REST. So the record starts the day this ships, and `*` holds an agent only once its
- *   record is OBSERVE_DAYS old and names at least one permission. Until then nothing changes for it.
+ *   WHY (ruling C, Jouni 2026-10-02, and its follow-up of 2026-10-18). "All permissions" must never
+ *   read as "nothing dangerous", so an agent holding `*` does not keep it: once its record is
+ *   OBSERVE_DAYS old and names at least one permission, the next start decision narrows it to the
+ *   named permissions it actually used and tells the owner (services/scope-auto-narrow.ts). Until
+ *   2026-10-18 the record being ready put `*` on the task-start floor instead, and every task waited
+ *   for the owner in person; on aimeat.io that held 14 scheduled agents at once. The owner may still
+ *   narrow earlier with one press. The node recorded no such history before this file: the usage
+ *   stream keeps MCP tool calls by name and no REST call at all, and the fleet crews reach the node
+ *   through REST. So the record starts the day this ships. Until it is ready nothing changes for the
+ *   agent.
  *
  *   HOW IT IS FED. requireScope (auth/middleware.ts) notes the words it admitted a `*` agent for, and
  *   the MCP tool wrapper (mcp/tool-usage-wrap.ts) notes the word each tool needs. Both are synchronous
@@ -24,13 +27,16 @@
  *   (utils/reserved-keys.ts): no memory route writes, restores or deletes it, so no agent can forge
  *   its own history.
  * @structure SCOPE_USE_KEY · OBSERVE_DAYS · noteScopeUse() · flushScopeUse() · initScopeUse() ·
- *   shutdownScopeUse() · readScopeUse() · writeScopeUse() · wildcardStatus() · withWildcardFacts()
- *   (the narrowing itself is services/scope-narrowing.ts: this file is imported by the auth
- *   middleware and must not reach the connector, which reaches the middleware back)
+ *   shutdownScopeUse() · readScopeUse() · writeScopeUse() · wildcardStatus()
+ *   (the narrowing itself is services/scope-narrowing.ts, and the node's own narrowing at a start
+ *   decision services/scope-auto-narrow.ts: this file is imported by the auth middleware and must
+ *   not reach the connector, which reaches the middleware back)
  * @usage
  *   noteScopeUse(req.auth.sub, ['memory:read']);
  *   const status = wildcardStatus(agent, (await readScopeUse(storage, ownerGhii)).agents[agent.name]);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A ready record no longer holds the agent's tasks: the next start decision
+ *     narrows the agent (services/scope-auto-narrow.ts startFactsOf, which replaces withWildcardFacts).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { Storage, AgentRecord } from '../storage/interface.js';
@@ -39,7 +45,7 @@ import { isOutsideWildcard } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 
 export const SCOPE_USE_KEY = 'scope-use.agents';
-/** How long the record must run before `*` holds an agent's tasks: two weeks catches a weekly job twice. */
+/** How long the record must run before the node narrows the agent: two weeks catches a weekly job twice. */
 export const OBSERVE_DAYS = 14;
 const FLUSH_INTERVAL_MS = 60_000;
 /** A word already on record is rewritten only when its last use is older than this. */
@@ -138,9 +144,12 @@ export interface WildcardStatus {
     /** When the record of this agent started; null when nothing is on record. */
     since: string | null;
     daysObserved: number;
-    /** Days until `*` holds its tasks; 0 once ready. */
+    /** Days until the node narrows it; 0 once ready. */
     daysLeft: number;
-    /** The record is OBSERVE_DAYS old and names a permission: `*` holds its tasks, and a narrowing is offered. */
+    /**
+     * The record is OBSERVE_DAYS old and names a permission: the next start decision narrows the agent
+     * to `proposal` (services/scope-auto-narrow.ts), and the owner may narrow it now.
+     */
     ready: boolean;
     /** The permissions it used, newest knowledge first. */
     used: string[];
@@ -166,11 +175,3 @@ export function wildcardStatus(
     };
 }
 
-/** The agent as the start rules read it: with `wildcardReady` when it holds `*`. */
-export async function withWildcardFacts<T extends Partial<Pick<AgentRecord, 'defaultScopes' | 'name' | 'gaii'>>>(
-    storage: Storage, agent: T | null | undefined,
-): Promise<(T & { wildcardReady?: boolean }) | null | undefined> {
-    if (!agent || !(agent.defaultScopes ?? []).includes('*') || !agent.name || !agent.gaii) return agent;
-    const use = (await readScopeUse(storage, ownerGhiiOf(agent.gaii))).agents[agent.name];
-    return { ...agent, wildcardReady: wildcardStatus(agent, use).ready };
-}

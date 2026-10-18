@@ -39,6 +39,8 @@
  * @usage
  *   const out = await setAgentStopped({ storage, config }, req.auth!.owner, principal, name, true);
  * @version-history
+ *   v1.2.0 — 2026-10-18 — releaseWaitingTasks reads the agent through startFactsOf
+ *     (services/scope-auto-narrow.ts): a `*` agent whose record is ready is narrowed first.
  *   v1.1.0 — 2026-10-11 — Two defects a live fleet measured the day this shipped. A direct message
  *     that arrived during the stop was never delivered after the start: it is sent now. A start
  *     woke a runtime twice, by a frame per released task and then by the backlog: the backlog alone
@@ -51,7 +53,7 @@ import { resolveAgentTarget, type AgentWriteDeps, type AgentWriteRefusal } from 
 import { decideTaskStart, autoStartEvent } from './agent-task-rules.js';
 import { readAgentDmInbox } from './agent-dm-reads.js';
 import { messagePreview } from '../utils/messaging.js';
-import { withWildcardFacts } from './scope-use.js';
+import { startFactsOf } from './scope-auto-narrow.js';
 import { recordTaskStarted } from './activity-recorder.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { emitChange, emitDelivery } from './event-bus.js';
@@ -80,7 +82,7 @@ export type AgentStopOutcome =
  */
 export async function releaseWaitingTasks(deps: AgentWriteDeps, agent: AgentRecord): Promise<AgentTaskRecord[]> {
   const { storage } = deps;
-  const startAgent = await withWildcardFacts(storage, agent);
+  const startAgent = await startFactsOf(deps, agent);
   const { tasks } = await storage.listAgentTasks(agent.gaii, { status: 'queued' });
   const started: AgentTaskRecord[] = [];
   for (const task of tasks) {

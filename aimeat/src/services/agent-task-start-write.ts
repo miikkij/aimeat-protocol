@@ -14,6 +14,8 @@
  *   const out = await setAgentTaskStart({ storage, config }, req.auth!.owner, resolve(req), name, req.body?.task_start);
  *   res.json(success(nodeId, { name: out.agent.name, ...taskStartView(out.agent) }));
  * @version-history
+ *   v1.2.0 — 2026-10-18 — `'*'` leaves task_start_held_by: a ready `*` agent is narrowed at its next
+ *     start decision instead of being held (services/scope-auto-narrow.ts).
  *   v1.1.0 — 2026-10-02 — The view carries the `*` narrowing status (task_start_wildcard), and `'*'`
  *     joins task_start_held_by once it holds the agent.
  *   v1.0.0 — 2026-10-02 — Initial.
@@ -32,11 +34,13 @@ import { ownerGhiiOf } from '../utils/gaii.js';
  *   task_start          what the owner set: 'automatic', 'confirm', or null (nobody has said)
  *   task_start_effective what applies: the setting, or the one the agent's mode gives
  *   task_start_held_by  the permissions that make every task wait whatever the setting; empty when
- *                       none do, `'*'` among them once the agent's `*` holds it. The switch on the
- *                       agent card reads this to say why it has no effect.
+ *                       none do. Read from the words the agent holds by name: `*` is never among
+ *                       them, because a ready `*` agent is narrowed at its next start decision
+ *                       (services/scope-auto-narrow.ts). The switch on the agent card reads this to
+ *                       say why it has no effect.
  *   task_start_wildcard for an agent holding `*`: how far its usage record is, what it used, and the
- *                       narrowing its owner can accept with one press (services/scope-use.ts); null
- *                       for every other agent.
+ *                       narrowing the node makes when the record is ready, which the owner can also
+ *                       accept now with one press (services/scope-use.ts); null for every other agent.
  */
 export function taskStartView(
     agent: Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes'>>,
@@ -51,7 +55,7 @@ export function taskStartView(
     return {
         task_start: agent.taskStart ?? null,
         task_start_effective: agentStartDefault(agent),
-        task_start_held_by: floorScopesOf({ ...agent, wildcardReady: w.ready }),
+        task_start_held_by: floorScopesOf(agent),
         task_start_wildcard: w.holds ? { ready: w.ready, days_left: w.daysLeft, since: w.since, used: w.used, proposal: w.proposal } : null,
     };
 }

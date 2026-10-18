@@ -10,6 +10,7 @@
  * @structure renderCover · secAddress · secMailboxes · secSent · lettersFold · chatFold
  * @usage import { renderCover } from './email/cover.js';
  * @version-history
+ *   v1.20.0 -- 2026-10-18 -- A letters row for the email the node sends when it narrows an agent that held all permissions (email.agentNarrowed, on unless switched off).
  *   v1.19.0 -- 2026-10-18 -- The letters open with the language they come in: a choice of English, Suomi or Español that sets the account language (PUT /v1/ghii locale), which every email the node sends the owner already followed but which only the profile dialog could set.
  *   v1.18.0 -- 2026-10-17 -- A letters row for the email an agent's permission request sends (email.agentAsks, on unless switched off).
  *   v1.17.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip with the address in its long tone; the change form as Fields; the uses, mailboxes, their delegations, the sent log and the letters as the List with Tick, Lead, When and Mark; Tabs in the fold tone; More; CardGrid; Roads; Note; Action): the page passes data and writes no class. Put back from main: no letter sent in 30 days is a dim tag (page group G8).
@@ -232,6 +233,7 @@ function lettersFold(ctx) {
         <${Switch} on=${digest.enabled} label=${c('emailWord')} disabled=${off} onToggle=${() => setDigest({ enabled: !digest.enabled })} />`)}
       ${row('nudge', html`<${Switch} on=${em.nudge === true} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, nudge: em.nudge !== true } })} />`)}
       ${row('agentAsks', html`<${Switch} on=${em.agentAsks !== false} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, agentAsks: em.agentAsks === false } })} />`)}
+      ${row('agentNarrowed', html`<${Switch} on=${em.agentNarrowed !== false} label=${c('emailWord')} disabled=${off} onToggle=${() => ctx.saveSettings({ ...s, email: { ...em, agentNarrowed: em.agentNarrowed === false } })} />`)}
     <//>
     <${Hint}>${verified ? c('lettersHint') : c('lettersNeedVerified')}<//>
     ${ctx.mailLog.length ? html`

@@ -17,6 +17,8 @@
  *   AutonomyLine({ agent, showToast }) · StoppedLine({ agent, showToast }) · WildcardLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.7.0 — 2026-10-18 — WildcardLine says the node narrows a ready `*` agent at its next task; its
+ *     tasks no longer wait for the owner (the texts are in the locales, the code is unchanged).
  *   v1.6.0 — 2026-10-11 — StoppedLine: "Takes new work", the switch that stops an agent and starts
  *     it again, with its explanation (agent.stopped).
  *   v1.5.0 — 2026-10-02 — The question marks that explain "Starts work by itself" (agent.self_start)
@@ -241,8 +243,9 @@ export function StoppedLine({ agent, showToast }) {
 /**
  * "All permissions" (`*`), for an agent that holds it (`task_start_wildcard` on the agent list,
  * services/scope-use.ts). While the node is still noting what it uses, the line says how many days
- * are left; once the record is ready the agent's tasks wait for the owner, and the line offers the
- * narrowing to the permissions it used with one press (POST /v1/agents/:name/scope-narrowing).
+ * are left; once the record is ready the node narrows the agent at its next task and tells the owner
+ * (services/scope-auto-narrow.ts), and the line offers the same narrowing now with one press
+ * (POST /v1/agents/:name/scope-narrowing).
  */
 export function WildcardLine({ agent, showToast }) {
   const w = agent.task_start_wildcard;

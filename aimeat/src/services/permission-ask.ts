@@ -22,19 +22,34 @@
  *   (config-posture.ts POWERFUL_AGENT_SCOPES). A word outside every wildcard (utils/scope-coverage.ts)
  *   is a decision the person makes on its own tick on the agent's page, so for those the AI hands the
  *   agent's page instead; the operator's words never reach a person's page at all.
- * @structure isOneClickWord · oneClickWords · allowUrl · agentPageUrl · plainPermission ·
+ * @structure OPERATOR_WORDS · isOneClickWord · oneClickWords · allowUrl · agentPageUrl · plainPermission ·
  *   scopesBehindRecord · permissionAskText
  * @usage
  *   const text = permissionAskText({ baseUrl: config.baseUrl, agentGaii, tool: 'aimeat_dm_send', words: ['messages:send'] });
  * @version-history
+ *   v1.1.0 — 2026-10-18 — OPERATOR_WORDS, the words the refusal notice for the agent's page leaves out
+ *     on an account that does not run the node (services/permission-ask-notice.ts).
  *   v1.0.0 — 2026-10-17 — Initial (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  */
 import type { Storage } from '../storage/interface.js';
-import { isOutsideWildcard, uncoveredScopes } from '../utils/scope-coverage.js';
+import {
+  isOutsideWildcard, uncoveredScopes, OPERATOR_ADMIN_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, COMPLIANCE_READ_SCOPE,
+  COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE,
+} from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { POWERFUL_AGENT_SCOPES } from '../config-posture.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { createT, type Locale } from '../i18n.js';
+
+/**
+ * The words only an operator's own agent can use: each guards a route behind requireOperatorPrincipal
+ * (auth/operator-gate.ts), which asks first whether the ACCOUNT runs the node. On any other account
+ * ticking one gives nothing, so a person who does not run the node is never told about one.
+ */
+export const OPERATOR_WORDS: readonly string[] = [
+  OPERATOR_ADMIN_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE,
+  SURFACE_LAYOUT_WRITE_SCOPE, THEME_WRITE_SCOPE,
+];
 
 /** A permission the person may give with one press on the allow page. */
 export function isOneClickWord(word: string): boolean {
