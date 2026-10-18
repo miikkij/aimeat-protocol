@@ -2585,9 +2585,9 @@
     },
     "src/services/workspace-write-items.ts": {
       "reads": {
-        "listAllMemory": 1
+        "listAllMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest object types for a write."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest object types for a write. 2026-10-18: resolveSpaceNamespace reads the same manifest copies to turn a space's name into its namespace; nothing from it reaches a reader."
     },
     "src/services/workspace-write.ts": {
       "reads": {
