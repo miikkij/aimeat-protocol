@@ -13,6 +13,8 @@
  *   defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.6.0 — 2026-10-18 — A label's maxAudience, the widest audience its content may be given (plan
+ *     doc-mvdipuyqraas, L3.1). No default label carries one: the default caps are step L5.
  *   v1.5.0 — 2026-10-18 — RuleScope.kinds names the containers too (plan doc-mvdipuyqraas, L1.6).
  *   v1.4.0 — 2026-09-30 — Option B, decided by Jouni: no default label hides content from AI. Highly
  *     confidential is a warning to an AI (and audited); 'hidden' stays a label an owner, an organism
@@ -25,6 +27,7 @@
  *     the per-level limits.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
+import type { AudienceLevel } from './audience-levels.js';
 
 /**
  * What an AI reader sees of content with this label (spec §5, decided 2026-09-29: three states).
@@ -60,6 +63,13 @@ export interface ClassificationLabel {
   /** Moving content from this label to a lower one needs a written reason. */
   lowerNeedsJustification: boolean;
   audience?: LabelAudience | null;
+  /**
+   * The widest audience content with this label may be given (plan doc-mvdipuyqraas, L3): public,
+   * link, signed-in, organism or private. Absent or null: no cap. A change that would make content
+   * readable wider than this is refused (LABEL_CAPS_AUDIENCE), and a label that rises over content
+   * already wider lowers it to the cap (services/classification/audience-settle.ts).
+   */
+  maxAudience?: AudienceLevel | null;
 }
 
 /**

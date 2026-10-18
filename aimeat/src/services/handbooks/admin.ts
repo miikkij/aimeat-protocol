@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.17.0 -- 2026-10-18 -- Classification: a label's maxAudience and the owner's audience exception
+ *     (plan doc-mvdipuyqraas, L3).
  *   v1.16.0 -- 2026-10-03 -- Faces for the themes: aimeat_theme_font_save, the licence the operator answers
  *     for, "licence unknown" at an audit, and the owners' fonts as an inventory (the font manager).
  *   v1.15.0 -- 2026-10-02 -- When the person asks for a new agent (new-agent.ts), after agent
@@ -132,7 +134,10 @@ organism or the operator makes for a label. \`exception_list\` at \`level: "node
 exceptions list: each act against a classification with its reason, a person's own exception (an
 item that may leave, or that an AI may send out) and an app's act the node recorded instead of
 refusing it. A person makes an exception in their own session, or an app does; never an AI, so you
-are refused (PERSON_REQUIRED). The node level (\`policy_set\`, \`audit\` and \`exception_list\` at
+are refused (PERSON_REQUIRED). A label may carry \`maxAudience\` (public, link, signed-in, organism or
+private): content and containers under it are refused a wider level (LABEL_CAPS_AUDIENCE), and a
+label that rises lowers what is already wider and tells its owner; only the owner in person
+overrides it for one item, with an \`audience\` exception and a reason. The node level (\`policy_set\`, \`audit\` and \`exception_list\` at
 \`level: "node"\`) needs the operator in person, or you with the \`operator:admin\` permission the
 operator ticked for you. If this surface does not list
 \`aimeat_classification\`, it is on the agent surface and the full MCP endpoint.

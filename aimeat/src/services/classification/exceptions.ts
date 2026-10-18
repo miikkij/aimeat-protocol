@@ -13,7 +13,9 @@
  *     (action 'leave', any destination) or lets an AI send it out (action 'ai-send') despite its
  *     label, with a written reason and an optional expiry. While it is active, reader.leave() keeps
  *     that item and records the use; an 'ai-send' exception also lets reader.show() show the item to
- *     an AI reader, which cannot send what it cannot see. An app may make one the same way.
+ *     an AI reader, which cannot send what it cannot see. An app may make one the same way. The
+ *     owner in person (never an app) may also let one item or container be shown wider than its
+ *     label's audience cap (action 'audience'), which audience-cap.ts reads at every level change.
  *   - An app's automatic exception (auto true): an app does what it was built for ("applikaation
  *     täytyy pystyä tekemään sitä mihinkä se on tehty ja jos se tekee jotain classificationin
  *     'vastaisesti' niin siitä vain merkataan exception"), so a lowering, a policy change that gives
@@ -46,6 +48,8 @@
  *   await recordAutoException(deps, { by, byKind: 'app', app, scope, target, label, action: 'lower', reason });
  *   const active = await activeExceptionsFor(deps, scope, targets);
  * @version-history
+ *   v1.2.0 — 2026-10-18 — Action 'audience': the owner, in person, lets one item be shown wider than
+ *     its label's audience cap, with a reason (plan doc-mvdipuyqraas, L3.3; audience-cap.ts reads it).
  *   v1.1.0 — 2026-09-30 — activeExceptionsFor() reads every month with no cap (past 1000 in force the
  *     oldest stopped working without a word); MAX_PER_MONTH 500, which a record of full-length
  *     reasons holds below the value limit (TARGET-082 second review).
@@ -62,13 +66,14 @@ import { readSystem, UNCHANGED, updateSystem } from './system-record.js';
 
 /**
  * What the exception let happen. leave: the item left despite its label (any destination).
- * ai-send: an AI sent it out. lower: an app lowered a label. policy: an app changed a policy in a way
+ * ai-send: an AI sent it out. audience: the owner let the item be shown wider than its label's
+ * audience cap (plan doc-mvdipuyqraas, L3.3). lower: an app lowered a label. policy: an app changed a policy in a way
  * that gives something away. review: an app accepted a suggestion or a proposal that does.
  */
-export type ExceptionAction = 'leave' | 'ai-send' | 'lower' | 'policy' | 'review';
-export const EXCEPTION_ACTIONS: readonly ExceptionAction[] = ['leave', 'ai-send', 'lower', 'policy', 'review'];
-/** The two a person makes themselves. */
-export const PERSON_EXCEPTION_ACTIONS: readonly ExceptionAction[] = ['leave', 'ai-send'];
+export type ExceptionAction = 'leave' | 'ai-send' | 'audience' | 'lower' | 'policy' | 'review';
+export const EXCEPTION_ACTIONS: readonly ExceptionAction[] = ['leave', 'ai-send', 'audience', 'lower', 'policy', 'review'];
+/** The three a person makes themselves. 'audience' only the owner in person, never an app (audience-cap.ts). */
+export const PERSON_EXCEPTION_ACTIONS: readonly ExceptionAction[] = ['leave', 'ai-send', 'audience'];
 
 export type ExceptionLevel = 'owner' | 'organism' | 'node';
 

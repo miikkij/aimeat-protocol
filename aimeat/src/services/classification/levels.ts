@@ -28,6 +28,10 @@
  *   const effective = mergePolicy(node, layer);
  *   const given = loosenings(before, after);         // [] when the change only tightens
  * @version-history
+ *   v1.4.0 — 2026-10-18 — A label's maxAudience (plan doc-mvdipuyqraas, L3.1): read, inherited by an
+ *     own label, narrowed by a lower level and never widened (POLICY_DILUTES), merged as the narrower
+ *     cap, and a wider cap counts as a loosening and a weaker field. The reader-audience helpers moved
+ *     unchanged to label-audience-fields.ts for the 800-line limit.
  *   v1.3.0 — 2026-10-18 — A rule's appliesTo.kinds may name the containers (plan doc-mvdipuyqraas, L1.6).
  *   v1.2.1 — 2026-10-02 — readRule() leaves the syntax check to unsafeRegexReason(), which already
  *     refuses an invalid pattern with the engine's message; an invalid pattern was reported twice.
@@ -44,9 +48,13 @@
  */
 import {
   DEFAULT_CLASSIFIER, DEFAULT_LIMITS, type AiVisibility, type ClassificationLabel, type ClassificationPolicy,
-  type ClassificationRule, type ClassifierSettings, type LabelAudience, type RuleScope,
+  type ClassificationRule, type ClassifierSettings, type RuleScope,
 } from './defaults.js';
 import { unsafeRegexReason } from './regex-safety.js';
+import {
+  GROUP_ID, readAudience, audienceEmpty, intersectAudience, audienceWithin, storedAudience,
+} from './label-audience-fields.js';
+import { AUDIENCE_LEVELS, isAudienceLevel, isWiderAudience, narrowerCap, type AudienceLevel } from './audience-levels.js';
 
 /** Thrown for a policy that cannot be stored. `problems` lists every one, so a caller fixes all at once. */
 export class PolicyError extends Error {
@@ -71,7 +79,6 @@ export interface PolicyLayer {
 const VIS: Record<AiVisibility, number> = { allowed: 0, warning: 1, hidden: 2 };
 const AI_MODE: Record<ClassificationPolicy['aiMode'], number> = { auto: 0, suggest: 1, off: 2 };
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
-const MAX_LIST = 50;
 
 // ── Reading input ────────────────────────────────────────────────────────────────────────────────
 
@@ -81,40 +88,15 @@ function str(v: unknown, max: number): string | undefined {
   return typeof v === 'string' && v.trim() && v.trim().length <= max ? v.trim() : undefined;
 }
 
-function strList(v: unknown, field: string, problems: string[]): string[] | undefined {
-  if (v === undefined || v === null) return undefined;
-  if (!Array.isArray(v) || v.length > MAX_LIST || v.some(x => typeof x !== 'string' || !x.trim() || x.length > 200)) {
-    problems.push(`${field} is a list of at most ${MAX_LIST} names.`);
-    return undefined;
-  }
-  return [...new Set(v.map(x => (x as string).trim()))];
-}
-
-/** A sharing group's id (services/sharing-group-members.ts mints a v4 UUID). */
-const GROUP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function readAudience(v: unknown, where: string, problems: string[]): LabelAudience | null | undefined {
+/**
+ * A label's audience cap from input (L3.1): undefined when the input leaves it out, null for no cap,
+ * or one of the levels.
+ */
+function readCap(v: unknown, where: string, problems: string[]): AudienceLevel | null | undefined {
   if (v === undefined) return undefined;
-  if (v === null) return null;
-  if (!isObj(v)) { problems.push(`${where}.audience is an object with roles, groups and people.`); return undefined; }
-  const a: LabelAudience = {};
-  const roles = strList(v.roles, `${where}.audience.roles`, problems);
-  let groups = strList(v.groups, `${where}.audience.groups`, problems);
-  // A group is named by its id only. Anyone may create a group and call it anything, so a name
-  // in the audience let whoever chose that name in (TARGET-082 review finding 6).
-  if (groups?.some(g => !GROUP_ID.test(g))) {
-    problems.push(`${where}.audience.groups lists sharing group ids, not names: anyone may give a group any name.`);
-    groups = undefined;
-  }
-  const people = strList(v.people, `${where}.audience.people`, problems);
-  if (roles?.length) a.roles = roles;
-  if (groups?.length) a.groups = groups;
-  if (people?.length) a.people = people;
-  return audienceEmpty(a) ? null : a;
-}
-
-function audienceEmpty(a: LabelAudience | null | undefined): boolean {
-  return !a || (!a.roles?.length && !a.groups?.length && !a.people?.length);
+  if (v === null || isAudienceLevel(v)) return v;
+  problems.push(`${where}.maxAudience is one of ${AUDIENCE_LEVELS.join(', ')}, or null for no cap.`);
+  return undefined;
 }
 
 /** A label from input. `base` fills what the input leaves out (a layer's own label inherits). */
@@ -143,12 +125,14 @@ function readLabel(v: unknown, i: number, problems: string[], base?: Classificat
     return x;
   };
   const audience = readAudience(v.audience, `${where} (${id})`, problems);
+  const cap = readCap(v.maxAudience, `${where} (${id})`, problems);
   return {
     id, name, rank, color, status: status as ClassificationLabel['status'],
     description: str(v.description, 500) ?? base?.description ?? '',
     aiVisibility, audit: bool('audit', false), mayLeaveOrganism: bool('mayLeaveOrganism', true),
     lowerNeedsJustification: bool('lowerNeedsJustification', false),
     audience: audience === undefined ? (base?.audience ?? null) : audience,
+    maxAudience: cap === undefined ? (base?.maxAudience ?? null) : cap,
   };
 }
 
@@ -316,31 +300,10 @@ function inheritFrom(node: ClassificationPolicy, rank: number): ClassificationLa
   return [...sorted].reverse().find(l => l.rank <= rank) ?? sorted[0];
 }
 
-/**
- * The readers both audiences admit, list by list, so the answer is never wider than either. An empty
- * audience admits everyone. When the lists share nothing, `base` stands: the node's list is the one
- * a lower level may not widen, and an empty result would read as "everyone".
- */
-function intersectAudience(base: LabelAudience | null | undefined, over: LabelAudience | null | undefined): LabelAudience | null {
-  if (audienceEmpty(over)) return audienceEmpty(base) ? null : base!;
-  if (audienceEmpty(base)) return over!;
-  const both = (a?: string[], b?: string[]) => (a ?? []).filter(x => (b ?? []).includes(x));
-  const out: LabelAudience = {};
-  const roles = both(over!.roles, base!.roles);
-  const groups = both(over!.groups, base!.groups);
-  const people = both(over!.people, base!.people);
-  if (roles.length) out.roles = roles;
-  if (groups.length) out.groups = groups;
-  if (people.length) out.people = people;
-  return audienceEmpty(out) ? base! : out;
-}
-
-/** Is `inner` no wider than `outer`? An empty outer admits everyone, so anything is within it. */
-function audienceWithin(inner: LabelAudience | null | undefined, outer: LabelAudience | null | undefined): boolean {
-  if (audienceEmpty(outer)) return true;
-  if (audienceEmpty(inner)) return false;
-  const sub = (a?: string[], b?: string[]) => (a ?? []).every(x => (b ?? []).includes(x));
-  return sub(inner!.roles, outer!.roles) && sub(inner!.groups, outer!.groups) && sub(inner!.people, outer!.people);
+/** Is cap `next` wider than cap `base`? No cap is wider than any cap. */
+function capWider(next: AudienceLevel | null | undefined, base: AudienceLevel | null | undefined): boolean {
+  if (!base) return false;
+  return !next || isWiderAudience(next, base);
 }
 
 /** `base` with every rule field of `over` that is stricter; names and rank stay the base's. */
@@ -353,6 +316,7 @@ function stricterLabel(base: ClassificationLabel, over: ClassificationLabel): Cl
     mayLeaveOrganism: base.mayLeaveOrganism && over.mayLeaveOrganism,
     lowerNeedsJustification: base.lowerNeedsJustification || over.lowerNeedsJustification,
     audience: narrower ?? null,
+    maxAudience: narrowerCap(base.maxAudience, over.maxAudience),
   };
 }
 
@@ -364,6 +328,7 @@ function labelLoosenings(next: ClassificationLabel, base: ClassificationLabel, b
   if (!base.mayLeaveOrganism && next.mayLeaveOrganism) out.push(`${baseName} may not leave the organism, which cannot be allowed.`);
   if (base.lowerNeedsJustification && !next.lowerNeedsJustification) out.push(`${baseName} needs a reason for lowering, which cannot be dropped.`);
   if (!audienceWithin(next.audience, base.audience)) out.push(`${baseName} limits its readers, and a lower level may only narrow that list.`);
+  if (capWider(next.maxAudience, base.maxAudience)) out.push(`${baseName} may be shown to at most "${base.maxAudience}", and a lower level may only narrow that.`);
   return out;
 }
 
@@ -484,11 +449,6 @@ export function normaliseStoredLabels(labels: unknown): { labels: unknown; notes
   return { labels: Array.isArray(labels) ? labels.map(l => groupIdsOnly(l, notes)) : labels, notes };
 }
 
-/** A stored audience, read leniently: what does not parse admits no one extra. */
-function storedAudience(v: unknown): LabelAudience | null {
-  return readAudience(v, '', []) ?? null;
-}
-
 /** The node label's rule fields that `raw` makes stricter, as an override; null when none. */
 function tighterThan(n: ClassificationLabel, raw: Record<string, unknown>): Record<string, unknown> | null {
   const o: Record<string, unknown> = { id: n.id };
@@ -499,13 +459,15 @@ function tighterThan(n: ClassificationLabel, raw: Record<string, unknown>): Reco
   if (raw.lowerNeedsJustification === true && !n.lowerNeedsJustification) o.lowerNeedsJustification = true;
   const narrowed = intersectAudience(n.audience, storedAudience(raw.audience));
   if (!audienceEmpty(narrowed) && JSON.stringify(narrowed) !== JSON.stringify(n.audience ?? null)) o.audience = narrowed;
+  if (isAudienceLevel(raw.maxAudience) && capWider(n.maxAudience, raw.maxAudience)) o.maxAudience = raw.maxAudience;
   return Object.keys(o).length > 1 ? o : null;
 }
 
 /** Does the stored override `raw` say anything about node label `n` beyond repeating it? */
 function saysMore(n: ClassificationLabel, raw: Record<string, unknown>): boolean {
   return (['aiVisibility', 'audit', 'mayLeaveOrganism', 'lowerNeedsJustification'] as const).some(f => raw[f] !== undefined && raw[f] !== n[f])
-    || (raw.audience !== undefined && JSON.stringify(storedAudience(raw.audience)) !== JSON.stringify(n.audience ?? null));
+    || (raw.audience !== undefined && JSON.stringify(storedAudience(raw.audience)) !== JSON.stringify(n.audience ?? null))
+    || (raw.maxAudience !== undefined && (raw.maxAudience ?? null) !== (n.maxAudience ?? null));
 }
 
 /** An own label with every rule field that is now looser than its base raised to the base's. */
@@ -519,6 +481,8 @@ function raiseToBase(base: ClassificationLabel, raw: Record<string, unknown>): {
   if (raw.lowerNeedsJustification === false && base.lowerNeedsJustification) { o.lowerNeedsJustification = true; raised.push('lowerNeedsJustification'); }
   const aud = storedAudience(raw.audience);
   if (!audienceWithin(aud, base.audience)) { o.audience = intersectAudience(base.audience, aud); raised.push('audience'); }
+  const cap = raw.maxAudience;
+  if (cap !== undefined && capWider(isAudienceLevel(cap) ? cap : null, base.maxAudience)) { o.maxAudience = base.maxAudience; raised.push('maxAudience'); }
   return { label: o, raised };
 }
 
@@ -690,13 +654,14 @@ export function mergePolicy(node: ClassificationPolicy, layer?: PolicyLayer | nu
 /** What each rule field of a label is called in a sentence. */
 const FIELD_NAMES = {
   aiVisibility: 'what an AI sees', audit: 'the audit trail', mayLeaveOrganism: 'staying in the organism',
-  lowerNeedsJustification: 'a reason for lowering', audience: 'the reader list',
+  lowerNeedsJustification: 'a reason for lowering', audience: 'the reader list', maxAudience: 'the widest audience',
 } as const;
 export type LabelField = keyof typeof FIELD_NAMES;
 
 /**
  * The rule fields in which `next` protects content less than `base`: an AI sees more, no audit
- * trail, it may leave the organism, no reason needed to lower it, or a wider reader list. [] when
+ * trail, it may leave the organism, no reason needed to lower it, a wider reader list, or a wider
+ * audience cap (or none where `base` has one). [] when
  * `next` is at least as strict as `base` on every field. The rank plays no part: two labels are
  * compared by what they DO to content (TARGET-082 review finding 3).
  */
@@ -707,6 +672,7 @@ export function weakerFields(next: ClassificationLabel, base: ClassificationLabe
   if (!base.mayLeaveOrganism && next.mayLeaveOrganism) out.push('mayLeaveOrganism');
   if (base.lowerNeedsJustification && !next.lowerNeedsJustification) out.push('lowerNeedsJustification');
   if (!audienceWithin(next.audience, base.audience)) out.push('audience');
+  if (capWider(next.maxAudience, base.maxAudience)) out.push('maxAudience');
   return out;
 }
 

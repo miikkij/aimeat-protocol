@@ -52,6 +52,9 @@
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.10.0 — 2026-10-18 — The audience cap (plan doc-mvdipuyqraas, L3): setLabel tells the label-raise
+ *     listener (label-core.ts labelRaised) of every applied raise, so content over the new label's cap
+ *     is lowered; labelForException({ audience }) takes a container and records the effective label.
  *   v1.9.0 — 2026-10-18 — Container labels (plan doc-mvdipuyqraas, L1.1-L1.3): targetOf takes kind
  *     organism, workspace, board and app; assertMayLabel hands a container to containers.ts; the
  *     label read carries `effective` ({ label, from }); an exception is refused for a container. The
@@ -107,7 +110,7 @@ import { recordClassificationAudit } from './audit.js';
 import { emitChange } from '../event-bus.js';
 import { recordAutoException } from './exceptions.js';
 import {
-  ClassificationError, isAppActor, isOwnerPerson, appNameOf, rolesOf, type ClassificationDeps, type LabelActor,
+  ClassificationError, isAppActor, isOwnerPerson, appNameOf, rolesOf, labelRaised, type ClassificationDeps, type LabelActor,
 } from './label-core.js';
 import { currentRow, labelAddressOf, memoryTarget, targetId } from './label-rows.js';
 import {
@@ -404,6 +407,8 @@ export async function setLabel(
     pushHistory(row, { at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, justification, humanSaid });
     await putLabel(deps.storage, row, stale);
     if (next.id !== fromId) changed(source);
+    // A raise lowers content now over its label's audience cap (L3.4, audience-settle.ts).
+    if (next.id !== fromId && !lowering) await labelRaised({ target, from: fromId, to: next.id, by: actor.principal });
     if (app && lowering && next.id !== fromId) {
       const act = opts.via === 'review' ? `accepted the suggestion lowering ${fromId} → ${next.id}` : `lowered ${fromId} → ${next.id}`;
       await recordAutoException(deps, {
@@ -435,6 +440,8 @@ export async function setLabel(
     pushHistory(row, { at, by: actor.principal, source, action: 'set', from: fromId, to: next.id, confidence, reason: reason ?? undefined });
     await putLabel(deps.storage, row, stale);
     changed(source);
+    // An AI or a rule only ever raises here (a lowering waits as CANNOT_LOWER).
+    await labelRaised({ target, from: fromId, to: next.id, by: actor.principal });
     return { applied: true, label: next.id, from: fromId, source, locked: false };
   }
   // The same suggestion from the same kind of source already waits: nothing new to say, so nothing
@@ -589,17 +596,22 @@ export async function readContentLabel(deps: ClassificationDeps, actor: LabelAct
  * the content carries now: an exception moves content past its label, as a lowering would.
  */
 export async function labelForException(
-  deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget,
+  deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget, opts: { audience?: boolean } = {},
 ): Promise<{ target: ContentLabelTarget; label: string; labelDetail: ClassificationLabel | null }> {
-  // An exception lets one item through; a container is no item. Its label is changed with set.
-  if (isContainerKind(named.kind)) {
+  // An exception lets one item through; a container is no item. Its label is changed with set. An
+  // audience exception is the one a container takes too: the container's own level has a cap (L3.5).
+  if (isContainerKind(named.kind) && !opts.audience) {
     throw new ClassificationError('INVALID_INPUT', 400, `An exception is made for one item of content. The classification of a ${named.kind} is changed with set, by its owner or, for an organism, its creator or an admin.`);
   }
   const target = await addressOf(deps.storage, named);
   await assertMayLabel(deps, actor, target, 'write');
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const { row } = await currentRow(deps.storage, policy, target);
-  const label = row?.label ?? policy.defaultLabel;
+  let label = row?.label ?? policy.defaultLabel;
+  // The cap is the EFFECTIVE label's, so an audience exception is made for that label: a later rise
+  // above it lapses the exception (audience-cap.ts).
+  const eff = opts.audience ? (await effectiveLabels(deps.storage, policy, [target])).get(targetId(target)) : undefined;
+  if (eff && (labelById(policy, eff.label)?.rank ?? -1) > (labelById(policy, label)?.rank ?? -1)) label = eff.label;
   const labelDetail = labelById(policy, label) ?? null;
   await assertInsideCurrent(deps, actor, target, labelDetail ?? undefined);
   return { target, label, labelDetail };

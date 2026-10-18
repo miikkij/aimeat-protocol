@@ -4083,7 +4083,9 @@
     "- An organism's classification (its policy, audit log and exceptions list) has no web page yet. Its creator or an admin uses the MCP tool or the REST endpoints below.",
     "- The MCP tool cannot withdraw an exception. You withdraw one in the Data Wallet, and the operator on the Security page; an app uses <code>AIMEAT.labels.withdrawException()</code>.",
     "- An app's classification covers what the app keeps in its own namespace. What a hosted app saves in your own memory through its sign-in, and files it uploads there, cannot be told apart from your own content, so they keep their own classification.",
-    "- A container's classification has no web page yet: you set it with your AI or the REST endpoint."
+    "- A container's classification has no web page yet: you set it with your AI or the REST endpoint.",
+    "- No level comes with a limit on who can see it yet: the operator, an owner or an organism sets one in the policy. Content already shown wider than a newly set limit is not changed.",
+    "- Packages, knowledge packages and data packages are not limited by a classification yet. A whole space shared from a workspace is held to the workspace's classification, not to each page's."
    ],
    "columns": [
     "Feature",
@@ -4156,6 +4158,15 @@
      "plain": "What an agent may read at most off Give one agent the highest classification it may read, such as Internal for a customer service agent. Content classified higher, its own classification or its place's, is hidden from that agent on every read (memory lists, search and reads, files, workspace documents and rows, board posts, over MCP and REST) and counted in your audit log as refused, not listed; the agent also cannot give it to an AI or send it out. No limit is the default, and the operator can give new agents a start value. You set it on the agent's card. Another of your agents with the permission to change agents' permissions can only lower it; raising it or removing the limit needs you signed in yourself (403 PERSON_REQUIRED), and an agent never changes its own (403). Limits: an unattended run, a personal access token and an ecosystem app have no agent record here, so no limit applies to them on this axis. agent card (\"May read at most\"), PATCH /v1/agents/:name/clearance, aimeat_operator_agent_configure (clearance), GET /v1/agents (clearance), classification.agent_clearance_default (AIMEAT_AGENT_CLEARANCE_DEFAULT)"
     },
     {
+     "slug": "g-24-a-classification-limits-who-can-see",
+     "cells": [
+      "<strong>A classification limits who can see</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "A classification can name the widest audience its content may have: anyone, anyone with the link, everyone signed in to the node, the members of an organisation, or only you. Making a record, a file, a workspace share, a board, an app or an organism readable wider than its classification allows is refused (<code>409 LABEL_CAPS_AUDIENCE</code>), for you, your agents and your apps, and also when you approve a publish request. A workspace's or an organism's classification limits what is in it. When a classification rises over something already shown wider, the node narrows it at once and tells you. Only you, signed in yourself, can let one item be shown wider, with a written reason that goes on the exceptions list. An owner or an organism can narrow a node level's limit, never widen it.",
+      "Data Wallet (the exception), <code>aimeat_classification</code> (<code>policy_set</code>, a label's <code>maxAudience</code>), <code>PUT /v1/classification/policy</code>, <code>POST /v1/classification/exceptions</code> (<code>action: audience</code>), every memory, file, share, board, app and organism route that sets who may read"
+     ],
+     "plain": "A classification limits who can see off A classification can name the widest audience its content may have: anyone, anyone with the link, everyone signed in to the node, the members of an organisation, or only you. Making a record, a file, a workspace share, a board, an app or an organism readable wider than its classification allows is refused (409 LABEL_CAPS_AUDIENCE), for you, your agents and your apps, and also when you approve a publish request. A workspace's or an organism's classification limits what is in it. When a classification rises over something already shown wider, the node narrows it at once and tells you. Only you, signed in yourself, can let one item be shown wider, with a written reason that goes on the exceptions list. An owner or an organism can narrow a node level's limit, never widen it. Data Wallet (the exception), aimeat_classification (policy_set, a label's maxAudience), PUT /v1/classification/policy, POST /v1/classification/exceptions (action: audience), every memory, file, share, board, app and organism route that sets who may read"
+    },
+    {
      "slug": "g-24-content-that-stays-in-its-organism",
      "cells": [
       "<strong>Content that stays in its organism</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
@@ -4224,6 +4235,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 426
+  "rows": 427
  }
 }

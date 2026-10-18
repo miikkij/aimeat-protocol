@@ -13,6 +13,7 @@
  * @structure ORGANISMS_SKILL_ENTRY
  * @usage import { ORGANISMS_SKILL_ENTRY } from './builtin-skills.organisms.js';
  * @version-history
+ *   2026-10-18 — An organism's classification may cap its visibility: LABEL_CAPS_AUDIENCE (plan doc-mvdipuyqraas, L3.5).
  *   2026-10-18 — The discussion board follows the organism's visibility (plan doc-mvcn6c7e4e5q, V3.5).
  *   2026-10-18 — An organism with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5.4).
  *   2026-10-18 — What public means, and that it may wait for the person (publish_request; plan doc-mvcn6c7e4e5q, V4).
@@ -103,7 +104,10 @@ it connects to this node and finds it with \`aimeat_discover { scope: "shared" }
 - **Public** means anyone can find and read the organism without joining. An organism made with no
   visibility and no shape gets the level this node gives a new organism: public unless its operator
   chose private, so name the level when it matters. When the node asks the person before making something public, it is
-  made private instead and the answer carries \`publish_request\`: give them its \`approve_url\`.
+  made private instead and the answer carries \`publish_request\`: give them its \`approve_url\`. An
+  organism whose classification limits who may see it cannot be made public past that limit
+  (\`LABEL_CAPS_AUDIENCE\`, 409): keep it private, or tell the person; only they can allow it, with a
+  written reason.
 - **The discussion board** (\`board_id\` in the organism's answer) follows the organism: anyone reads
   a public organism's board, and only the members and their AIs read and post on the board of a
   listed or private one. When the organism's visibility changes, the board changes with it, unless

@@ -15,6 +15,8 @@
  *   const out = await setBoardVisibility({ storage, config }, { gaii, roles }, board, { visibility, federate, publishGate });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A level wider than the board's label allows is refused with 409
+ *     LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   v1.0.0 — 2026-10-18 — Moved out of routes/boards.ts unchanged, with the publish gate added (plan doc-mvcn6c7e4e5q, V4).
  */
 import type { BoardRecord } from '../storage/interface.js';
@@ -27,6 +29,8 @@ import {
 import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf } from './publish-requests/ask.js';
 import type { DoorAsk, PublishGateInput } from './publish-requests/door.js';
+import { audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf } from './classification/audience-cap.js';
+import { boardTarget } from './classification/containers.js';
 
 export type BoardVisibilityResult = ({ ok: true; board: BoardRecord } & DoorAsk) | BoardWriteRefusal;
 
@@ -56,6 +60,13 @@ export async function setBoardVisibility(
     // An organisation's board is never federated: its readers are the organism's members here.
     if (boardOrganismAudience(visibility ?? board.visibility) && federate === true) {
         return bad('A board shared with an organisation stays on this node, so it cannot be federated.');
+    }
+    // The board's label caps its level (plan doc-mvdipuyqraas, L3.5), before the publish gate.
+    if (input.publishGate && visibility !== undefined) {
+        const capped = capRefusalOf(await audienceCapOf(deps, boardTarget(board), audienceOfVisibility(visibility), {
+            from: audienceOfVisibility(board.visibility), by: capByOf(input.publishGate.caller), where: 'board visibility',
+        }));
+        if (capped) return capped;
     }
     // The publish gate (plan doc-mvcn6c7e4e5q, V4): asked by a caller the node asks the owner about,
     // the board keeps its level, the federation flag still applies, and the request is filed.

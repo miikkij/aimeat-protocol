@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-10-18 — registerAudienceSettle(): a label that rises lowers content over its audience cap
+ *     (plan doc-mvdipuyqraas, L3.4).
  *   2026-10-18 — The money rails' registration moved to server-bootstrap/commerce-rails.ts (pure
  *     extraction, past 800 lines), with the hosted card page handler and the `subscription` kind.
  *   2026-10-17 — exposureRouter (routes/exposure.ts): GET /v1/exposure/mine and GET /v1/admin/exposure.
@@ -266,6 +268,7 @@ import { appsBackupRouter } from '../routes/apps-backup.js';
 // Services needed during route mounting
 import { createPushService } from '../services/push.js';
 import { setNotifyPushService } from '../services/notify.js';
+import { registerAudienceSettle } from '../services/classification/audience-settle.js';
 import { createEudiwService } from '../services/eudiw.js';
 import { createSdJwtVerifier } from '../services/sd-jwt.js';
 import { createOidcClient, type OidcClient } from '../services/oidc-client.js';
@@ -620,6 +623,8 @@ export async function mountRoutes(
   // Push notification service — Phase 3.1
   const pushService = createPushService(config, storage);
   setNotifyPushService(pushService);   // bell notifications (services/notify.ts) mirror to web push
+  // A label that rises lowers content now over its audience cap, and tells the owner (plan doc-mvdipuyqraas, L3.4).
+  registerAudienceSettle(storage, config);
   app.use(pushRouter(config, storage, pushService));
 
   // EUDIW / VC / MyData services — Phase 3.3

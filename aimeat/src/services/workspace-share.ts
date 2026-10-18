@@ -25,6 +25,9 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.7.0 — 2026-10-18 — A share wider than the workspace's label, or a newly shared page's label,
+ *     allows is refused with 409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas,
+ *     L3.5; workspace-share-gate.ts shareCapRefusal).
  *   v1.6.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a share asked to
  *     open to anyone (access 'open', named or the starting level) is stored at 'account' and the answer
  *     carries `warnings` PUBLIC_IS_SIGNED_IN_HERE; a share open already stays open (plan V1.6).
@@ -59,7 +62,8 @@ import { isHtmlPageValue, HTML_PAGE_SHARE_DAYS } from './html-page.js';
 import { logger } from '../utils/logger.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import type { PublishGateInput } from './publish-requests/door.js';
-import { newlyOpened, withholdOpening, fileShareAsk } from './workspace-share-gate.js';
+import { newlyOpened, withholdOpening, fileShareAsk, shareCapRefusal } from './workspace-share-gate.js';
+import { capByOf } from './classification/audience-cap.js';
 import { closedNodeLevel, closedNodeWarnings } from './closed-node-level.js';
 
 /** The share as the node decides with it: every field present. */
@@ -264,6 +268,13 @@ export async function setWorkspaceShareOp(
         ? closedNodeLevel(config, next.access, 'account' as const, { from: stored ? prev.access : undefined, publicValue: 'open' })
         : { level: next.access, warning: null };
     next.access = closed.level;
+
+    // The labels' audience cap (plan doc-mvdipuyqraas, L3.5): the workspace's label and each newly
+    // shared page's cap the level, before the publish gate and before anything is stored.
+    if (publishGate) {
+        const capped = await shareCapRefusal(deps, orgId, ws, prev, next, !!stored, capByOf(publishGate.caller));
+        if (capped) return refuse(capped.status, capped.code, capped.message);
+    }
 
     // The publish gate (plan doc-mvcn6c7e4e5q, V4), before anything is stored: a change that lets
     // anyone with the link read what they could not, by a caller the node asks the owner about, is

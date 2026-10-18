@@ -15,13 +15,15 @@
  *   THE VERSION OF A FILE. A stored file has no version number; its `createdAt` is rewritten on every
  *   write to the key (both providers upsert it), so `created_at` and `size` in the request's target
  *   say which bytes the owner was asked about.
- * @structure StoragePublishGate · FileRaise · fileRaiseAsk · closedFileLevel · keptFileLevel ·
+ * @structure StoragePublishGate · FileRaise · fileRaiseAsk · fileCapRefusal · closedFileLevel · keptFileLevel ·
  *   mintPublishCarry · fileFilePublishRequest · requesterFromMeta
  * @usage
  *   const closed = await closedFileLevel(ctx, ownerGaii, key, visibility);
  *   const raise = await fileRaiseAsk(ctx, ownerGaii, key, closed.visibility, gate);
  *   if (raise.kind === 'ask') { ...store at keptFileLevel(raise.existing)..., then fileFilePublishRequest(...) }
  * @version-history
+ *   v1.2.0 — 2026-10-18 — fileCapRefusal: a file given a level wider than its label allows is refused
+ *     with 409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.2).
  *   v1.1.0 — 2026-10-18 — closedFileLevel: on a node that shows its content to signed-in accounts
  *     only, a file asked as public is stored at 'members' with PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: stored files).
@@ -34,6 +36,10 @@ import type { PublishRequester, PublishStoreCtx } from './publish-requests/store
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { signedInOnly } from '../config-visibility.js';
 import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
+import {
+    audienceCapOf, audienceOfVisibility, capByOf, capRefusalOf, type LABEL_CAPS_AUDIENCE,
+} from './classification/audience-cap.js';
+import { fileTarget } from './classification/labels.js';
 
 /**
  * Who makes the file public: a caller the gate asks now (a route's callerOf, an MCP tool's caller()),
@@ -63,6 +69,25 @@ export async function fileRaiseAsk(
     if (ask.kind === 'allowed') return { kind: 'none' };
     if (ask.kind === 'refused') return { kind: 'refused', status: 403, code: 'PUBLISH_NOT_ALLOWED', message: ask.message };
     return { kind: 'ask', requester: ask.requester, existing };
+}
+
+/**
+ * The label's audience cap for a stored file (plan doc-mvdipuyqraas, L3.2): null when the file may be
+ * given `visibility`, or the 409 to answer. Asked at the doors that ask the publish gate, before it and
+ * before anything is stored. The file's label address follows its workspace binding (labels.ts
+ * fileTarget), so a file shared into a classified workspace is held to that workspace's label.
+ */
+export async function fileCapRefusal(
+    ctx: PublishStoreCtx, ownerGaii: string, key: string, visibility: unknown, workspaceRef: string | undefined,
+    gate: StoragePublishGate | undefined,
+): Promise<{ ok: false; status: 409; code: typeof LABEL_CAPS_AUDIENCE; message: string } | null> {
+    const level = audienceOfVisibility(visibility);
+    if (!gate || level === 'private') return null;
+    const existing = await ctx.storage.getStorageFileMeta(ownerGaii, key);
+    return capRefusalOf(await audienceCapOf(ctx, fileTarget(ownerGaii, key, workspaceRef ?? existing?.workspaceRef), level, {
+        from: existing ? audienceOfVisibility(existing.visibility) : null,
+        ...('caller' in gate ? { by: capByOf(gate.caller) } : {}), where: 'stored file',
+    }));
 }
 
 /**

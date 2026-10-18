@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
  *   2026-10-18 -- e2e-classification-clearance.ts joins the list (not the guard tier): an agent's clearance (plan doc-mvdipuyqraas, L2).
+ *   2026-10-18 -- e2e-classification-audience-cap.ts joins the list (not the guard tier): a label's audience cap (plan doc-mvdipuyqraas, L3).
  *   2026-10-18 -- e2e-classification-containers.ts joins the list (not the guard tier): the classification of containers and the effective label (plan doc-mvdipuyqraas, L1).
  *   2026-10-18 -- e2e-closed-node-levels.ts joins the list (not the guard tier): a public write on a node closed to strangers lands at the signed-in level, and the new-app feed.
  *   2026-10-18 -- e2e-page-access.ts joins the list (not the guard tier): who may open a welcome page and a company front page (V3.10).
@@ -859,6 +860,9 @@ const ALL_SUITES = [
     'test/e2e-classification-containers.ts',
     // An agent's clearance: what ranks above it is hidden on every read, and who may set it (plan doc-mvdipuyqraas, L2).
     'test/e2e-classification-clearance.ts',
+    // A label's audience cap: the refusal at every kind of place that sets who may read, the owner's
+    // override with a reason, the publish request held to it again, a rise that lowers (plan doc-mvdipuyqraas, L3).
+    'test/e2e-classification-audience-cap.ts',
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',

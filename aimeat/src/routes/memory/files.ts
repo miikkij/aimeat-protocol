@@ -5,6 +5,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 -- 2026-10-18 -- The presigned mint refuses a level wider than the file's label allows with
+ *     409 LABEL_CAPS_AUDIENCE, as the shared mint does (plan doc-mvdipuyqraas, L3.2).
  *   v1.11.0 -- 2026-10-18 -- On a node that shows its content to signed-in accounts only, a file asked as
  *     public (inline, presigned, or the visibility change) lands at 'members' and the answer carries
  *     `warnings` with PUBLIC_IS_SIGNED_IN_HERE (services/closed-node-level.ts, plan V1.6).
@@ -63,7 +65,7 @@ import { generateUploadToken, buildUploadMeta } from '../../services/upload-toke
 import {
   removeStorageFile, appOwnedKeyRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
 } from '../../services/storage-file-write.js';
-import { mintPublishCarry, closedFileLevel } from '../../services/storage-file-publish.js';
+import { mintPublishCarry, closedFileLevel, fileCapRefusal } from '../../services/storage-file-publish.js';
 import { closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from '../storage-provenance-input.js';
@@ -135,6 +137,9 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       if (refused) { res.status(refused.status).json(error(config.nodeId, refused.code, refused.message)); return; }
       // A closed node mints public at 'members' (plan V1.6), before the gate, as the shared mint does.
       const closed = await closedFileLevel({ storage, config }, gaii, String(key), (visibility as string | undefined) ?? 'private');
+      // The label's audience cap (plan doc-mvdipuyqraas, L3.2): no URL for a file that could not land.
+      const capped = await fileCapRefusal({ storage, config }, gaii, String(key), closed.visibility, wsRefStr || undefined, publishGate);
+      if (capped) { res.status(capped.status).json(error(config.nodeId, capped.code, capped.message)); return; }
       // The requester rides in the token, so the upload files the request when the bytes land.
       const carry = await mintPublishCarry({ storage, config }, gaii, String(key), closed.visibility, publishGate);
       if (!carry.ok) { res.status(carry.status).json(error(config.nodeId, carry.code, carry.message)); return; }

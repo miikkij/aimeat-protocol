@@ -8,6 +8,9 @@
  * @structure registerCopyRoute(router, ctx)
  * @usage registerCopyRoute(router, ctx)   // from registerBulkRoutes, at the position the route had
  * @version-history
+ *   v1.3.0 — 2026-10-18 — A copy that would be readable wider than its source's label or its own
+ *     place allows is refused with 409 LABEL_CAPS_AUDIENCE before anything is written (plan
+ *     doc-mvdipuyqraas, L3.2).
  *   v1.2.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a copy asked
  *     public lands at 'members' with the warning PUBLIC_IS_SIGNED_IN_HERE, before the publish gate
  *     (services/closed-node-level.ts, plan V1.6).
@@ -42,7 +45,8 @@ import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
 import { isRaiseToPublic } from '../../services/publish-gate.js';
-import { keptMemoryLevel, fileMemoryPublishRequest } from '../../services/memory-publish-gate.js';
+import { keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from '../../services/memory-publish-gate.js';
+import { callerOf } from '../../middleware/caller.js';
 import { organismWriteRefusalFor, routePublishAsk } from './batch-guards.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { type MemoryRouteCtx } from './shared.js';
@@ -144,6 +148,14 @@ export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
     // had (a new one: private) and the request is filed after the write.
     // Before it, the closed node (plan V1.6): a copy made public there lands at 'members' and says so.
     const closed = closedNodeLevel(config, (targetVis as MemoryRecord['visibility']) || 'private', 'members' as const, { from: existing?.visibility });
+    // The label's audience cap (plan doc-mvdipuyqraas, L3.2), before the publish gate and before the
+    // label is carried: the source's label (which the copy takes) and the copy's own place both count.
+    const capped = await memoryCapRefusal({ storage, config }, callerOf(req, config.nodeId, storage),
+      [memoryTarget(stored.ownerGaii, key), memoryTarget(callerGaii, key)], closed.level, existing?.visibility, 'POST /v1/memory/copy');
+    if (capped) {
+      res.status(capped.status).json(error(config.nodeId, capped.code, capped.message));
+      return;
+    }
     let level: Pick<MemoryRecord, 'visibility' | 'groupId' | 'workspaceRef'> = { visibility: closed.level };
     let requester: Extract<ReturnType<typeof routePublishAsk>, { kind: 'ask' }>['requester'] | null = null;
     if (isRaiseToPublic(existing?.visibility, level.visibility)) {

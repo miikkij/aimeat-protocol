@@ -11,13 +11,15 @@
  *   ONE GATE, SEVERAL WRITE PATHS. A write that raises a record to public, by a caller the node asks
  *   the owner about, stores the record at the level it had (a new one: private) and then files a
  *   request of kind 'memory' that services/publish-requests/apply-memory.ts applies on approval.
- * @structure MemoryPublishWriter · memoryWriterAsk · keptMemoryLevel · fileMemoryPublishRequest ·
- *   MemoryPublishFiled
+ * @structure MemoryPublishWriter · memoryWriterAsk · keptMemoryLevel · MemoryCapRefusal ·
+ *   memoryCapRefusal · fileMemoryPublishRequest · MemoryPublishFiled
  * @usage
  *   const ask = memoryWriterAsk({ storage, config }, writer);
  *   if (ask.kind === 'ask' && isRaiseToPublic(existing?.visibility, visibility)) { ...keptMemoryLevel(existing)... }
  *   const filed = await fileMemoryPublishRequest({ storage, config }, ask.requester, record);
  * @version-history
+ *   v1.1.0 — 2026-10-18 — memoryCapRefusal(): the label's audience cap for every memory write path,
+ *     asked before the publish gate (plan doc-mvdipuyqraas, L3.2).
  *   v1.0.0 — 2026-10-18 — Initial: extracted from services/memory-write.ts so the batch write and the
  *     copy ask the same gate (plan doc-mvcn6c7e4e5q, V4).
  */
@@ -26,6 +28,8 @@ import type { PublishRequester, PublishStoreCtx } from './publish-requests/store
 import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from './publish-requests/ask.js';
 import { callerFromAuth } from './caller-context.js';
 import { localAccountName, ownerGhiiOf } from '../utils/gaii.js';
+import type { ContentLabelTarget } from '../storage/types/content-labels.js';
+import { audienceCapOf, audienceOfVisibility, type LABEL_CAPS_AUDIENCE } from './classification/audience-cap.js';
 
 /** The token facts a memory write path has about its writer. */
 export interface MemoryPublishWriter {
@@ -63,6 +67,28 @@ export function keptMemoryLevel(existing: Pick<MemoryRecord, 'visibility' | 'gro
         groupId: visibility === 'group' ? existing?.groupId : undefined,
         workspaceRef: visibility === 'workspace' ? existing?.workspaceRef : undefined,
     };
+}
+
+/** A memory write path's refusal for a level over a label's audience cap. */
+export type MemoryCapRefusal = { ok: false; status: 409; code: typeof LABEL_CAPS_AUDIENCE; message: string };
+
+/**
+ * The label's audience cap for a memory write (plan doc-mvdipuyqraas, L3.2): null when the record may
+ * have `to`, or the 409 to answer. Asked before the publish gate and before anything is stored. Each
+ * target is held to its own effective label: a copy names its source too, whose label it carries.
+ */
+export async function memoryCapRefusal(
+    ctx: PublishStoreCtx, writer: { principal: string; roles: readonly string[] },
+    targets: readonly ContentLabelTarget[], to: unknown, from: unknown, where: string,
+): Promise<MemoryCapRefusal | null> {
+    const level = audienceOfVisibility(to);
+    if (level === 'private') return null;
+    const by = { principal: writer.principal, kind: writer.roles.some(r => r === 'agent' || r === 'ecosystem') ? 'ai' as const : 'human' as const };
+    for (const target of targets) {
+        const cap = await audienceCapOf(ctx, target, level, { from: from === undefined || from === null ? null : audienceOfVisibility(from), by, where });
+        if (cap.kind === 'refused') return { ok: false, status: cap.status, code: cap.code, message: cap.message };
+    }
+    return null;
 }
 
 /** What filing answers: the request body for the caller, or the warning a write carries instead. */

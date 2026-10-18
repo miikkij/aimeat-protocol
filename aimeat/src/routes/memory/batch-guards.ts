@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Identical entry guards used by the memory batch routes (bulk, import) and the copy.
  * @structure batchKeyRefusal; storageReferenceRefusal; visibilityRefusal; organismWriteRefusalFor;
- *   routePublishAsk; batchPublishAnswer
+ *   routePublishAsk; batchCapRefusalFor; batchPublishAnswer
  * @version-history
+ *   2026-10-18 — batchCapRefusalFor: an entry of POST /v1/memory/bulk or POST /v1/memory/import that
+ *     would raise its record past its label's audience cap fails with LABEL_CAPS_AUDIENCE before the
+ *     batch stores anything (plan doc-mvdipuyqraas, L3.2).
  *   2026-10-18 — routePublishAsk and batchPublishAnswer: POST /v1/memory/bulk, POST /v1/memory/import
  *     and POST /v1/memory/copy ask the publish gate the single write asks (publishAskOf with the
  *     request's callerOf; plan doc-mvcn6c7e4e5q, V4). organismWriteRefusalFor moved here from bulk.ts,
@@ -30,6 +33,9 @@ import { isSecretRecordKey, secretRecordWriteRefusal } from '../../services/secr
 import { isAnonymousGaii } from './shared.js';
 import { MemoryWriteSchema } from '../../models/schemas.js';
 import { MEMORY_WRITE_VISIBILITIES } from '../../utils/visibility-words.js';
+import { memoryCapRefusal } from '../../services/memory-publish-gate.js';
+import { memoryTarget } from '../../services/classification/label-rows.js';
+import { audienceOfVisibility } from '../../services/classification/audience-cap.js';
 
 export function batchKeyRefusal(roles: string[], gaii: string, key: string): string | null {
   if (isServerWrittenKey(key)) return serverWrittenKeyRefusal(key).message;
@@ -91,6 +97,22 @@ export function organismWriteRefusalFor(ctx: { storage: Storage; config: AimeatC
  */
 export function routePublishAsk(ctx: { storage: Storage; config: AimeatConfig }, req: Request): PublishAsk {
   return publishAskOf(ctx, callerOf(req, ctx.config.nodeId, ctx.storage), req.auth?.app);
+}
+
+/**
+ * The label's audience cap for one entry of a batch route (plan doc-mvdipuyqraas, L3.2), as the single
+ * write asks it: the failure reason for an entry that would raise its record past its label's cap
+ * (`LABEL_CAPS_AUDIENCE: …`), or null. Asked before the batch stores anything; an entry at private
+ * reads nothing.
+ */
+export function batchCapRefusalFor(ctx: { storage: Storage; config: AimeatConfig }, req: Request, where: string) {
+  const caller = callerOf(req, ctx.config.nodeId, ctx.storage);
+  return async (gaii: string, key: string, visibility: unknown): Promise<string | null> => {
+    if (audienceOfVisibility(visibility) === 'private') return null;
+    const before = await ctx.storage.getMemory(gaii, key);
+    const refused = await memoryCapRefusal(ctx, caller, [memoryTarget(gaii, key)], visibility, before?.visibility, where);
+    return refused ? `${refused.code}: ${refused.message}` : null;
+  };
 }
 
 /**
