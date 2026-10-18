@@ -325,7 +325,7 @@
         "aimeat/src/services/workspace-opened.ts",
         "aimeat/src/routes/page-host.ts"
       ],
-      "digest": "sha256:36554cbbc4814719e4b6932d",
+      "digest": "sha256:78f5b05095541e62f25e8d25",
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
@@ -353,7 +353,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:ddd980e66b8e22f5ae982858",
+      "digest": "sha256:c83fe7ce0ab8e1f95e0d7384",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -400,11 +400,11 @@
       "digest": "sha256:d69beca32c17c758bd59892c"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:f07160b89b1161a3942cee5d"
+      "digest": "sha256:e14f303f62e0a244d72b10c6"
     },
     "node:install-skills-locally": {
       "reviewedOn": "2026-09-19",
@@ -626,7 +626,7 @@
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "80d0f3485c289c8e"
+      "aimeat/src/routes/skills.ts": "cc78cfdb2317cc17"
     },
     "node:install-skills-locally": {
       "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
@@ -729,7 +729,7 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "67d9a0b3a77be500",
+      "aimeat/src/routes/memory/bulk.ts": "eeebb7810837f2fa",
       "aimeat/src/routes/memory/key.ts": "9916b9c14e7a3846",
       "aimeat/src/services/memory-bin.ts": "337c889faa2e6b75",
       "aimeat/src/routes/memory-hands.ts": "7c9bde91c26c70cc",
@@ -769,7 +769,7 @@
     "node:aimeat-html-page": {
       "aimeat/src/services/html-page.ts": "4017c2f005e63477",
       "aimeat/src/services/page-frame.ts": "96108b74f3403752",
-      "aimeat/src/services/workspace-share.ts": "478b6a235a0d36a9",
+      "aimeat/src/services/workspace-share.ts": "ff70e10eb11c85be",
       "aimeat/src/services/workspace-opened.ts": "5a9837a77b3b4530",
       "aimeat/src/routes/page-host.ts": "fed8aae26b7b9e02"
     }

@@ -11,6 +11,7 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-18 — The presigned answer carries the shared mint's `warnings` (PUBLIC_IS_SIGNED_IN_HERE, plan V1.6).
  *   2026-10-18 — POST /v1/storage (inline, raw body, presigned) without a visibility takes
  *     visibility.file_default; `visibility: 'default'` (the SDK's word) takes visibility.app_upload_default
  *     for an app grant and the file default for anyone else (plan V5.2), before validation and the gate.
@@ -307,6 +308,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                     content_type: minted.contentType,
                     max_size_bytes: minted.maxBytes,
                     expires_in_seconds: minted.expiresInSeconds,
+                    // A closed node lands the file at 'members' instead of public (plan V1.6).
+                    ...(minted.warnings ? { warnings: minted.warnings } : {}),
                 }));
                 return;
             }

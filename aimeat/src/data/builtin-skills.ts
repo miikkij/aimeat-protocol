@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-18 -- use-app-bound-skills: on a node closed to strangers a public skill is saved at members, with a warning (plan V1.6).
  *   2026-10-18 -- aimeat-node-guide: a write with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5).
  *   2026-10-18 -- use-app-bound-skills: a public app guide may wait for the owner's approval (publish_request; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 -- manage-my-profile-data: the visibility ladder names organism:<id> (one organism's members) and says members and organism never leave the node (plan V3.2).
@@ -505,6 +506,8 @@ Put the binding in the SKILL.md frontmatter so it travels with the skill:
 Publish with \`aimeat_skill_publish\`. A guide the app's public pages list needs
 \`visibility: "public"\`; when the node asks the owner before making something public, the answer
 carries \`publish_request\` and the skill becomes public once they approve at its \`approve_url\`.
+On a node that shows its content to its signed-in accounts only, the skill is saved for the
+signed-in accounts (\`members\`) and the answer's \`warnings\` say so (PUBLIC_IS_SIGNED_IN_HERE).
 Owners can also attach/detach an existing skill from the profile Apps tab. The app catalog shows bound skills on the app's detail page.
 A skill under your owner's name binds only to an app of that same owner: the node refuses a
 binding to another account's app (422 BAD_FIELD), because the app's public pages list a bound

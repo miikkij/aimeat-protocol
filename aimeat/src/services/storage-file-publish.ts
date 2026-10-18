@@ -15,12 +15,15 @@
  *   THE VERSION OF A FILE. A stored file has no version number; its `createdAt` is rewritten on every
  *   write to the key (both providers upsert it), so `created_at` and `size` in the request's target
  *   say which bytes the owner was asked about.
- * @structure StoragePublishGate · FileRaise · fileRaiseAsk · keptFileLevel · mintPublishCarry ·
- *   fileFilePublishRequest · requesterFromMeta
+ * @structure StoragePublishGate · FileRaise · fileRaiseAsk · closedFileLevel · keptFileLevel ·
+ *   mintPublishCarry · fileFilePublishRequest · requesterFromMeta
  * @usage
- *   const raise = await fileRaiseAsk(ctx, ownerGaii, key, visibility, gate);
+ *   const closed = await closedFileLevel(ctx, ownerGaii, key, visibility);
+ *   const raise = await fileRaiseAsk(ctx, ownerGaii, key, closed.visibility, gate);
  *   if (raise.kind === 'ask') { ...store at keptFileLevel(raise.existing)..., then fileFilePublishRequest(...) }
  * @version-history
+ *   v1.1.0 — 2026-10-18 — closedFileLevel: on a node that shows its content to signed-in accounts
+ *     only, a file asked as public is stored at 'members' with PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: stored files).
  */
 import type { StorageFileRecord } from '../storage/interface.js';
@@ -29,6 +32,8 @@ import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from './publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from './publish-requests/store.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
+import { signedInOnly } from '../config-visibility.js';
+import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 
 /**
  * Who makes the file public: a caller the gate asks now (a route's callerOf, an MCP tool's caller()),
@@ -58,6 +63,20 @@ export async function fileRaiseAsk(
     if (ask.kind === 'allowed') return { kind: 'none' };
     if (ask.kind === 'refused') return { kind: 'refused', status: 403, code: 'PUBLISH_NOT_ALLOWED', message: ask.message };
     return { kind: 'ask', requester: ask.requester, existing };
+}
+
+/**
+ * The level of a file asked as public on a node that shows its content to signed-in accounts only
+ * (services/closed-node-level.ts, plan V1.6): 'members' with the warning, unless the file is public
+ * already. Asked before fileRaiseAsk / mintPublishCarry, so a lowered file asks nothing.
+ */
+export async function closedFileLevel<V>(
+    ctx: PublishStoreCtx, ownerGaii: string, key: string, visibility: V,
+): Promise<{ visibility: V | 'members'; warning: ClosedNodeWarning | null }> {
+    if (visibility !== 'public' || !signedInOnly(ctx.config)) return { visibility, warning: null };
+    const existing = await ctx.storage.getStorageFileMeta(ownerGaii, key);
+    const closed = closedNodeLevel(ctx.config, visibility, 'members' as const, { from: existing?.visibility });
+    return { visibility: closed.level, warning: closed.warning };
 }
 
 /** The level a file keeps while making it public waits for the owner: what it had, or private. */

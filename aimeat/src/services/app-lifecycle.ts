@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.7.0 — 2026-10-18 — A fork is announced on the public feed only when the new app is really public
+ *     (listed, open to anyone, no access code; services/app-announce.ts, Jouni's ruling).
  *   v1.6.0 — 2026-10-18 — The publish gate (services/app-publish-gate.ts): a fork the node's defaults
  *     would make public, by a caller the owner is asked about, lands unlisted and files a request to
  *     list it (`publishAsked`); the draft promotion passes the gate's answer to publishApp.
@@ -79,7 +81,7 @@ import { resolveAppTarget, type AppDevAct } from './app-dev-grant.js';
 import { DesignBookReasons } from './design-book/reasons.js';
 import { logger } from '../utils/logger.js';
 import { emitChange, emitAppChange } from './event-bus.js';
-import { recordPublicActivity } from './public-activity.js';
+import { isAnnounceable, recordAppActivity } from './app-announce.js';
 import { appQuotaRefusal } from './install-quotas.js';
 import { lintAppAiDisclosure } from './app-ai-posture.js';
 import { stripServedMarks, type ServedMarkRemoval } from './app-serve-marks-strip.js';
@@ -560,13 +562,17 @@ export async function forkApp(
   });
 
   emitChange('apps');
-  void recordPublicActivity(storage, config, {
-    category: 'apps',
-    actor: callerGaii,
-    summary: `App ${forkedManifest.name} forked from ${source.ownerName}/${sourceFilename}`,
-    detail: forkedManifest.description || '',
-    link: `${downloadUrl}?mode=inline`,
-  }).catch(err => { logger.warn('forkApp: feed is best-effort', { error: String(err) }); });
+  // The feed announces the fork only when the new app is really public: listed, open to anyone and
+  // with no access code (services/app-announce.ts). A settings change that makes it public later
+  // announces it then.
+  if (isAnnounceable(await storage.getApp(callerGhii, newFilename))) {
+    recordAppActivity(storage, config, {
+      actor: callerGaii,
+      summary: `App ${forkedManifest.name} forked from ${source.ownerName}/${sourceFilename}`,
+      detail: forkedManifest.description || '',
+      link: `${downloadUrl}?mode=inline`,
+    });
+  }
 
   const publishAsked = gated.asked
     ? await fileAppPublishAsk({ storage, config }, { ownerName: callerOwner, filename: newFilename, versionNumber: 1 }, gated.asked)

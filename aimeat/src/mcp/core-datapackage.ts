@@ -25,6 +25,8 @@
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-10-18 — On a node that shows its content to signed-in accounts only, a publish that would make
+ *     the package public lands at 'members' and the answer carries `warnings` PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   2026-10-18 — aimeat_datapackage_publish asks the publish gate as POST /v1/datapackages does: a
  *     public publish (the default) by an agent without publish:public lands at the audience the
  *     package had (a first version private) and answers with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
@@ -41,6 +43,7 @@ import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
+import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { annotationsFor } from './annotations.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
@@ -148,7 +151,7 @@ export function registerCoreDataPackageTools(
             emitChange('files');
             const asked = gate.requester
                 ? await fileDatapackageAsk(store, caller().owner, gate.requester, ownerGhii, name, out.contentHash, gate.from)
-                : {};
+                : closedNodeWarnings(gate.warning);
             return jsonContent({
                 ...(await writeProvenanceEcho(storage, config, out.descriptor.aimeat.aiProvenanceId)),
                 // Published, not public yet: the owner approves (its next_step says what to tell them).

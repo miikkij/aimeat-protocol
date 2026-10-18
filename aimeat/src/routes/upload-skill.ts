@@ -9,6 +9,8 @@
  * @structure SKILL_ZIP_LIMITS · handleSkillUpload(res, config, storage, sub, meta, data)
  * @usage await handleSkillUpload(res, config, storage, verified.sub, verified.meta, data);
  * @version-history
+ *   v1.4.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a user skill
+ *     asked as public is stored at 'members' with the warning PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   v1.3.0 — 2026-10-18 — A user skill made public asks the publish gate with the uploader's grant:
  *     on an ask it keeps its level and the answer is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   v1.2.0 — 2026-10-17 — The token's visibility may be `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.9);
@@ -32,7 +34,8 @@ import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
-import { skillPublishAsk, fileSkillAsk } from '../services/skill-publish-gate.js';
+import { skillPublishAsk, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';
+import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 
 /** Skill-directory ZIP layout: SKILL.md (+ scripts/references/assets), optionally inside ONE wrapping dir. */
@@ -94,7 +97,10 @@ export async function handleSkillUpload(
     // Making a user skill public asks the node's publish gate, as POST /v1/skills does (plan
     // doc-mvcn6c7e4e5q, V4): the uploader's grant as it is now, since the token carries none.
     const gate = await uploadPublishGate(storage, config.nodeId, sub);
-    const ask = skillPublishAsk({ storage, config }, gate, scope, visibility);
+    // Before it, a closed node keeps a user skill asked as public at 'members' (plan V1.6).
+    const skillMd = files.get('SKILL.md');
+    const closed = await closedSkillLevel({ storage, config }, scope, visibility, ownerName, { skillMd: skillMd === undefined ? undefined : String(skillMd) });
+    const ask = skillPublishAsk({ storage, config }, gate, scope, closed.visibility);
     if (ask?.kind === 'refused') {
         res.status(ask.status).json({ success: false, error: ask.code, message: ask.message });
         return;
@@ -106,7 +112,7 @@ export async function handleSkillUpload(
             owner: ownerName,
             publisher: sub,
             files,
-            visibility: ask ? undefined : visibility,
+            visibility: ask ? undefined : closed.visibility,
             expectedName: wrapper,
             ...(scope === 'workspace' ? {
                 organismId: meta.organism as string,
@@ -125,7 +131,7 @@ export async function handleSkillUpload(
         res.status(asked.publishRequest ? 202 : 200).json({
             success: true, type: 'skill', skill: summary, ai_provenance_id: summary.aiProvenanceId ?? null,
             ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
-            ...(asked.warnings ? { warnings: asked.warnings } : {}),
+            ...(asked.warnings ? { warnings: asked.warnings } : closedNodeWarnings(closed.warning)),
         });
     } catch (err) {
         if (err instanceof SkillValidationError) {

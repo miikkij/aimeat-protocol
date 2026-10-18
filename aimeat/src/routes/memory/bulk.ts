@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — On a node that shows its content to signed-in accounts only, an entry of POST
+ *     /v1/memory/bulk or POST /v1/memory/import asked public is stored at 'members' with a
+ *     PUBLIC_IS_SIGNED_IN_HERE warning naming its key, and is never refused by the publish gate
+ *     (services/memory-batch-write.ts, services/closed-node-level.ts; plan V1.6).
  *   2026-10-18 — An entry of POST /v1/memory/bulk or POST /v1/memory/import without a visibility takes
  *     visibility.memory_default (code default private; plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — POST /v1/memory/bulk and POST /v1/memory/import ask the publish gate, the gate
@@ -110,6 +114,7 @@ import { organismVisibilityRefusal } from '../../services/organism-visibility.js
 import { discoverMemory } from '../../services/memory-discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
+import { signedInOnly } from '../../config-visibility.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -195,7 +200,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const audience = await organismVisibilityRefusal(storage, e.visibility, { identity: resolve(req), federated: isForeignPrincipal(req.auth) });
       if (audience) { preFailed.push({ key, status: 'failed', reason: `${audience.code}: ${audience.message}` }); continue; }
       // Making a record public, by a caller with nobody on this node to ask: that entry is refused.
-      if (publishAsk.kind === 'refused' && e.visibility === 'public' && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
+      // A closed node stores it at 'members' instead (services/memory-batch-write.ts), so it asks nothing.
+      if (publishAsk.kind === 'refused' && e.visibility === 'public' && !signedInOnly(config) && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
         preFailed.push({ key, status: 'failed', reason: `${publishAsk.code}: ${publishAsk.message}` }); continue;
       }
       items.push({
@@ -382,7 +388,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       const refRefusal = await storageReferenceRefusal(storage, gaii, entry.value);
       if (refRefusal) { failed.push({ key, reason: refRefusal }); continue; }
       // Making a record public, by a caller with nobody on this node to ask: that entry is refused.
-      if (publishAsk.kind === 'refused' && entry.visibility === 'public' && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
+      if (publishAsk.kind === 'refused' && entry.visibility === 'public' && !signedInOnly(config) && (await storage.getMemory(gaii, key))?.visibility !== 'public') {
         failed.push({ key, reason: `${publishAsk.code}: ${publishAsk.message}` }); continue;
       }
       survivors.push({ key, entry });

@@ -14,6 +14,9 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-18 — On a node that shows its content to signed-in accounts only, aimeat_skill_publish and
+ *     aimeat_skill_update store a user skill asked as public at 'members', with `warnings`
+ *     PUBLIC_IS_SIGNED_IN_HERE in the answer (closedSkillLevel, plan V1.6).
  *   2026-10-18 — aimeat_skill_publish and aimeat_skill_update ask the publish gate for a user skill
  *     made public, with the session's caller (services/skill-publish-gate.ts), and render
  *     `publish_request` (plan doc-mvcn6c7e4e5q, V4). The register function takes the caller.
@@ -63,7 +66,8 @@ import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
-import { skillPublishAsk, userSkillState, fileSkillAsk } from '../services/skill-publish-gate.js';
+import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';
+import { closedNodeWarnings } from '../services/closed-node-level.js';
 
 export function registerSkillsTools(
     mcp: McpServer,
@@ -144,7 +148,9 @@ export function registerSkillsTools(
 
             // Making a user skill public asks the node's publish gate, as POST /v1/skills does.
             const gate = publishGate();
-            const ask = skillPublishAsk({ storage, config }, gate, targetScope, visibility);
+            // Before it, a closed node keeps a user skill asked as public at 'members' (plan V1.6).
+            const closed = await closedSkillLevel({ storage, config }, targetScope, visibility, ownerName, { skillMd: skill_md });
+            const ask = skillPublishAsk({ storage, config }, gate, targetScope, closed.visibility);
             if (ask?.kind === 'refused') return toolError(ask.code, ask.message);
 
             try {
@@ -155,7 +161,7 @@ export function registerSkillsTools(
                     owner: ownerName,
                     publisher: agentGaii,
                     files: fileMap,
-                    visibility: ask ? undefined : visibility as SkillVisibility | undefined,
+                    visibility: ask ? undefined : closed.visibility as SkillVisibility | undefined,
                     // The accessor is the membership gate of a workspace and of an organisation level.
                     accessor: acc,
                     ...(targetScope === 'workspace' ? { organismId: organism_id, workspaceId: workspace_id } : {}),
@@ -175,7 +181,7 @@ export function registerSkillsTools(
                 return ok({
                     published: true, skill: summary, ...(await writeProvenanceEcho(storage, config, summary.aiProvenanceId)),
                     ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
-                    ...(asked.warnings ? { warnings: asked.warnings } : {}),
+                    ...(asked.warnings ? { warnings: asked.warnings } : closedNodeWarnings(closed.warning)),
                 });
             } catch (e) {
                 return withCaughtError(err(`Skill publish failed: ${(e as Error).message}`), e);
@@ -303,7 +309,11 @@ export function registerSkillsTools(
             // Making a user skill public asks the node's publish gate, as PATCH /v1/skills/:name does.
             const gate = publishGate();
             const state = targetScope === 'user' ? await userSkillState({ storage, config }, ownerName, name) : null;
-            const ask = state ? skillPublishAsk({ storage, config }, gate, targetScope, visibility, state.visibility) : null;
+            // A closed node keeps a user skill asked as public at 'members' (plan V1.6), before the gate.
+            const closed = state
+                ? await closedSkillLevel({ storage, config }, targetScope, visibility, ownerName, { current: state.visibility })
+                : { visibility, warning: null };
+            const ask = state ? skillPublishAsk({ storage, config }, gate, targetScope, closed.visibility, state.visibility) : null;
             if (ask?.kind === 'refused') return toolError(ask.code, ask.message);
             if (ask && state) {
                 const asked = await fileSkillAsk({ storage, config }, gate, ask, { owner: ownerName, name, ...state });
@@ -315,14 +325,14 @@ export function registerSkillsTools(
             }
             let summary;
             try {
-                summary = await setSkillVisibility(storage, config, targetScope, name, visibility as SkillVisibility, targetScope === 'user' ? ownerName : undefined, acc);
+                summary = await setSkillVisibility(storage, config, targetScope, name, closed.visibility as SkillVisibility, targetScope === 'user' ? ownerName : undefined, acc);
             } catch (e) {
                 // An organisation level the agent's owner is not in, refused before any write.
                 return withCaughtError(err(`Visibility change failed: ${(e as Error).message}`), e);
             }
             if (!summary) return err(`Skill not found: ${name}`);
             emitChange('skills');
-            return ok({ updated: true, skill: summary });
+            return ok({ updated: true, skill: summary, ...closedNodeWarnings(closed.warning) });
         },
     );
 }

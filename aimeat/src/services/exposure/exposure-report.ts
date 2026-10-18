@@ -29,6 +29,7 @@
  * @usage
  *   const report = await buildExposureReport(createExposureContext(storage, config), 'alice', reader);
  * @version-history
+ *   v1.2.0 — 2026-10-18 — NODE_SIGNED_IN_NOTE says that what is made public now is saved for signed-in accounts (plan V1.6).
  *   v1.1.0 — 2026-10-18 — exposureUnreadable: every source failed is answered as a failure, not as an
  *     empty report (test/unit/node-mcp-error-flag.test.ts).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.2).
@@ -120,7 +121,7 @@ function notesFor(ctx: ExposureContext): string[] {
     : [...EXPOSURE_NOTES];
 }
 
-export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in.';
+export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in, and what is made public now is saved for signed-in accounts.';
 
 /** An item as the report hands it out: the content address a source attached stays behind. */
 function outward(f: ExposureFound): ExposureItem {

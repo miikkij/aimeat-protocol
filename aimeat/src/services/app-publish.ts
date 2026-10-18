@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-18 — The board post and the public feed announce a version only when the app is really public (listed, open to anyone, no access code); the board post moved to services/app-announce.ts (Jouni's ruling, plan doc-mvcn6c7e4e5q).
  *   2026-10-18 — `publishGate`: a first publish the node's defaults make public, by a caller the owner is asked about, is stored unlisted and files a request to list it (`publishAsked`; services/app-publish-gate.ts, plan doc-mvcn6c7e4e5q V4). provenanceModelFindings moved to app-ai-model-hints.ts.
  *   2026-10-18 — The live channel hears which app got which version (emitAppVersion), so an open page of it reloads.
  *   2026-10-18 — sanitizeDescriptions moved to app-publish-helpers.ts unchanged (line limit).
@@ -120,7 +121,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../storage/interface.js';
 import { emitAppVersion } from './event-bus.js';
-import { recordPublicActivity } from './public-activity.js';
+import { isAnnounceable, postAppBoardAnnouncement, recordAppActivity } from './app-announce.js';
 import { recordAccountEvent } from './account-events.js';
 import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai-provenance.js';
 import { sanitizeDescriptions } from './app-publish-helpers.js';
@@ -656,17 +657,17 @@ export async function publishApp(
   // The three blocks gated on `announces` below say "something new is public here" to three
   // different audiences: search engines, the announcement board and the node's public feed. A
   // package install is not that event, and the owner's own change log and account event (which are
-  // NOT gated) still record it, so nothing is lost from the record.
-  const announces = input.source !== 'package-install';
-  if (announces) {
-    const published = await storage.getApp(ownerGhii, filename);
-    if (published && appSeoIndexable(published, config)) {
-      const site = /\.html?$/i.test(filename)
-        ? (await storage.listSubdomainSites())
-          .find(s => s.enabled && s.kind === 'app' && s.target === `${ownerName}/${filename}`)
-        : undefined;
-      await announceApp(config, storage, { ownerGaii: ownerGhii, ownerName, filename }, site?.subdomain);
-    }
+  // NOT gated) still record it, so nothing is lost from the record. The board and the feed also need
+  // the app to be really public: listed, open to anyone and with no access code
+  // (services/app-announce.ts). A settings change that makes it public announces it then.
+  const published = input.source !== 'package-install' ? await storage.getApp(ownerGhii, filename) : null;
+  const announces = isAnnounceable(published);
+  if (published && appSeoIndexable(published, config)) {
+    const site = /\.html?$/i.test(filename)
+      ? (await storage.listSubdomainSites())
+        .find(s => s.enabled && s.kind === 'app' && s.target === `${ownerName}/${filename}`)
+      : undefined;
+    await announceApp(config, storage, { ownerGaii: ownerGhii, ownerName, filename }, site?.subdomain);
   }
 
   await storage.addSiteChangeLog({
@@ -683,32 +684,22 @@ export async function publishApp(
     changedAt: now,
   });
 
-  // Board announcement — best-effort, never fails the publish.
-  if (announces && config.appAnnouncementBoardId) {
-    try {
-      const title = `${isUpdate ? '🔄' : '🚀'} ${manifest.name || filename} v${newVersion}`;
-      const body = `${manifest.description || 'A new app has been published.'}\n\nDownload: ${downloadUrl}`;
-      // aiprov D13: the post carries the record of its own words, stamped from the publisher (an agent's is model-written).
-      const postProvenanceId = await provenanceForWrite(storage, { principal: callerGaii, content: `${title}\n\n${body}`,
-        pipeline: 'app.announce', surface: { visibility: 'public', humanAudience: true }, labelPolicy: config.aiLabelPublic,
-        nodeId: config.nodeId, baseUrl: config.baseUrl, enabled: config.aiProvenance });
-      await storage.createPost({
-        id: `post-${Date.now()}-${randomBytes(4).toString('hex')}`, boardId: config.appAnnouncementBoardId,
-        authorGaii: callerGaii, title, body, tags: manifest.tags, reactions: {}, createdAt: now,
-        ...(postProvenanceId ? { aiProvenanceId: postProvenanceId } : {}),
-      });
-    } catch (err) { logger.warn('publishApp: board announcement is best-effort', { error: String(err) }); }
+  // Board announcement — best-effort, never fails the publish (services/app-announce.ts).
+  if (announces) {
+    await postAppBoardAnnouncement(storage, config, {
+      callerGaii, name: manifest.name || filename, description: manifest.description, tags: manifest.tags,
+      version: newVersion, isUpdate, downloadUrl,
+    });
   }
 
   emitAppVersion(ownerName, filename, newVersion);
   if (announces) {
-    void recordPublicActivity(storage, config, {
-      category: 'apps',
+    recordAppActivity(storage, config, {
       actor: callerGaii,
       summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
       detail: manifest.description || '',
       link: `${downloadUrl}?mode=inline`,
-    }).catch(err => { logger.warn('publishApp: feed is best-effort', { error: String(err) }); });
+    });
   }
 
   // The owner's own "what has happened". The public feed above tells the NODE; this tells the

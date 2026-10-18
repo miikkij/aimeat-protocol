@@ -635,10 +635,10 @@
      "slug": "g-4-a-node-for-its-own-people-only",
      "cells": [
       "<strong>A node for its own people only</strong>",
-      "The operator can set the node to show its content to its own signed-in accounts only. Then nobody who is not signed in sees anything: every address outside sign-in, registration and the machine connections asks for a sign-in, pages load without content until the person signs in, apps open only after a sign-in, portfolio and company addresses do not answer, search engines are told to stay out, and a visitor signed in on another node is treated as a stranger. Nothing stored changes, so switching back restores what was public. With a sign-in limited to your company (registration mode and the Microsoft tenant list) it is a company node.",
+      "The operator can set the node to show its content to its own signed-in accounts only. Then nobody who is not signed in sees anything: every address outside sign-in, registration and the machine connections asks for a sign-in, pages load without content until the person signs in, apps open only after a sign-in, portfolio and company addresses do not answer, search engines are told to stay out, and a visitor signed in on another node is treated as a stranger. Something made public while the node is closed (a record, a file, a skill, a package, a knowledge package, a data package, a workspace link) is saved for the signed-in accounts instead, and the answer says so in one sentence, so opening the node later exposes nothing new by accident. What was public before keeps its setting, so switching back restores it. With a sign-in limited to your company (registration mode and the Microsoft tenant list) it is a company node.",
       "<code>visibility.content_access</code> (<code>AIMEAT_CONTENT_ACCESS=signed-in</code>), admin Config, <code>content_access</code> in <code>GET /?format=json</code>"
      ],
-     "plain": "A node for its own people only The operator can set the node to show its content to its own signed-in accounts only. Then nobody who is not signed in sees anything: every address outside sign-in, registration and the machine connections asks for a sign-in, pages load without content until the person signs in, apps open only after a sign-in, portfolio and company addresses do not answer, search engines are told to stay out, and a visitor signed in on another node is treated as a stranger. Nothing stored changes, so switching back restores what was public. With a sign-in limited to your company (registration mode and the Microsoft tenant list) it is a company node. visibility.content_access (AIMEAT_CONTENT_ACCESS=signed-in), admin Config, content_access in GET /?format=json"
+     "plain": "A node for its own people only The operator can set the node to show its content to its own signed-in accounts only. Then nobody who is not signed in sees anything: every address outside sign-in, registration and the machine connections asks for a sign-in, pages load without content until the person signs in, apps open only after a sign-in, portfolio and company addresses do not answer, search engines are told to stay out, and a visitor signed in on another node is treated as a stranger. Something made public while the node is closed (a record, a file, a skill, a package, a knowledge package, a data package, a workspace link) is saved for the signed-in accounts instead, and the answer says so in one sentence, so opening the node later exposes nothing new by accident. What was public before keeps its setting, so switching back restores it. With a sign-in limited to your company (registration mode and the Microsoft tenant list) it is a company node. visibility.content_access (AIMEAT_CONTENT_ACCESS=signed-in), admin Config, content_access in GET /?format=json"
     },
     {
      "slug": "g-4-nothing-goes-public-without-you",
@@ -2692,10 +2692,10 @@
      "slug": "g-13-public-activity",
      "cells": [
       "<strong>Public activity</strong>",
-      "An unauthenticated activity feed and counters for the front page.",
+      "An unauthenticated activity feed and counters for the front page. An app appears there only while anyone finds and opens it (listed, open to anyone, no access code); an app made public later appears then, once.",
       "<code>/v1/public/activity-feed</code>, <code>/v1/public/events</code>"
      ],
-     "plain": "Public activity An unauthenticated activity feed and counters for the front page. /v1/public/activity-feed, /v1/public/events"
+     "plain": "Public activity An unauthenticated activity feed and counters for the front page. An app appears there only while anyone finds and opens it (listed, open to anyone, no access code); an app made public later appears then, once. /v1/public/activity-feed, /v1/public/events"
     },
     {
      "slug": "g-13-presence",

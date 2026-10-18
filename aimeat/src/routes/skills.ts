@@ -19,6 +19,9 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-10-18 — On a node that shows its content to signed-in accounts only, POST /v1/skills and PATCH
+ *     /v1/skills/:name store a user skill asked as public at 'members' with the warning
+ *     PUBLIC_IS_SIGNED_IN_HERE, before the publish gate (services/skill-publish-gate.ts closedSkillLevel, plan V1.6).
  *   2026-10-18 — POST /v1/skills and PATCH /v1/skills/:name ask the publish gate for a user skill made
  *     public: an agent without publish:public keeps the skill's level (`owner` when new) and the answer
  *     is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4; services/skill-publish-gate.ts).
@@ -75,7 +78,8 @@ import {
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { requireScopeUnlessSelf } from '../auth/self-or-scope.js';
 import { callerOf } from '../middleware/caller.js';
-import { skillPublishAsk, userSkillState, fileSkillAsk } from '../services/skill-publish-gate.js';
+import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';
+import { closedNodeWarnings } from '../services/closed-node-level.js';
 import type { PublishGateInput } from '../services/publish-requests/door.js';
 
 export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -195,7 +199,9 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       // Making a user skill public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4): on an ask
       // the skill keeps its level (`owner` when new) and the owner gets a request.
       const gate = publishGateOf(req);
-      const ask = skillPublishAsk({ storage, config }, gate, scope, level);
+      // Before it, a closed node keeps a user skill asked as public at 'members' (plan V1.6).
+      const closed = await closedSkillLevel({ storage, config }, scope, level, accessor.ownerName, { skillMd: skill_md });
+      const ask = skillPublishAsk({ storage, config }, gate, scope, closed.visibility);
       if (ask?.kind === 'refused') {
         res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
         return;
@@ -223,7 +229,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         owner: accessor.ownerName,
         publisher: req.auth!.sub as string,
         files,
-        visibility: ask ? undefined : level,
+        visibility: ask ? undefined : closed.visibility,
         // The accessor is the membership gate of a workspace and of an organisation level.
         accessor,
         ...(scope === 'workspace' ? { organismId: organism, workspaceId: ws } : {}),
@@ -239,7 +245,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(asked.publishRequest ? 202 : 201).json(success(config.nodeId, {
         skill: summary, ai_provenance_id: summary.aiProvenanceId ?? null,
         ...(asked.publishRequest ? { publish_request: asked.publishRequest } : {}),
-        ...(asked.warnings ? { warnings: asked.warnings } : {}),
+        ...(asked.warnings ? { warnings: asked.warnings } : closedNodeWarnings(closed.warning)),
         ...(await provenanceWriteEcho(storage, config, {
           storedId: summary.aiProvenanceId, declared: declaration.declared,
           declaredId: typeof provenanceIdIn === 'string' && provenanceIdIn ? provenanceIdIn : undefined,
@@ -389,7 +395,11 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       // the skill keeps its level and the owner gets a request.
       const gate = publishGateOf(req);
       const state = scope === 'user' ? await userSkillState({ storage, config }, accessor.ownerName, name) : null;
-      const ask = state ? skillPublishAsk({ storage, config }, gate, scope, visibility, state.visibility) : null;
+      // A closed node keeps a user skill asked as public at 'members' (plan V1.6), before the gate.
+      const closed = state
+        ? await closedSkillLevel({ storage, config }, scope, visibility, accessor.ownerName, { current: state.visibility })
+        : { visibility, warning: null };
+      const ask = state ? skillPublishAsk({ storage, config }, gate, scope, closed.visibility, state.visibility) : null;
       if (ask?.kind === 'refused') {
         res.status(ask.status).json(error(config.nodeId, ask.code, ask.message));
         return;
@@ -405,13 +415,13 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       }
       // The owner comes from the session, never from the request: a user-scope skill under
       // another name is not this principal's to change, whatever the query says.
-      const summary = await setSkillVisibility(storage, config, scope, name, visibility, scope === 'user' ? accessor.ownerName : undefined, accessor);
+      const summary = await setSkillVisibility(storage, config, scope, name, closed.visibility, scope === 'user' ? accessor.ownerName : undefined, accessor);
       if (!summary) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Skill not found: ${name}`));
         return;
       }
       emitChange('skills');
-      res.json(success(config.nodeId, { skill: summary }));
+      res.json(success(config.nodeId, { skill: summary, ...closedNodeWarnings(closed.warning) }));
     } catch (err) {
       sendSkillError(res, err);
     }
