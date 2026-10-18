@@ -45,6 +45,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-mailbox-push.ts
  * @version-history
+ *   v1.2.0 -- 2026-10-18 -- A third, older notification of type direct_message: the digest prints it first under "Messages", said from its locale key, before the two held ones under "Everything else".
  *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 -- 2026-09-25 -- The two held notifications are written into the node's own database. The
  *     suite wrote them through POST /v1/memory, which refuses a `notif.` key to every principal now:
@@ -369,6 +370,19 @@ async function run(): Promise<void> {
                     tags: ['notif'], ttlHours: 24, version: 1, createdAt: old, updatedAt: old,
                 });
             }
+            // A direct message of the same age, OLDER than the two above so that newest-first alone
+            // would print it last: the digest must still print it first, under its own heading. Not
+            // held, so the held-push sweep above is not changed by it.
+            const older = new Date(Date.now() - 3 * 3_600_000).toISOString();
+            await store.setMemory({
+                key: `notif.${older}.cccccccc`, ownerGaii: `${sweepOwner}@${NODE_ID}`, visibility: 'private',
+                value: {
+                    id: `cccccccc-${STAMP}`, type: 'direct_message', title: 'New message from Bea (stored words)',
+                    body: 'Lunch at noon?', link: '', actions: [], read: false, createdAt: older,
+                    i18n: { key: 'direct_message', vars: { who: 'Bea', preview: 'Lunch at noon?' } },
+                },
+                tags: ['notif'], ttlHours: 24, version: 1, createdAt: older, updatedAt: older,
+            });
         } finally { await store.close?.(); }
         const list = await json('/v1/notifications', { headers: bearer(sweepToken) });
         assert(list.status === 200, `list ${list.status}`);
@@ -695,10 +709,18 @@ async function run(): Promise<void> {
     await test('sweepNotificationDigests mails the unread notifications older than the owner asked for', async () => {
         const remaining = Math.max(30_000, 170_000 - sinceBoot());
         const mail = await smtp!.waitForMail(sweepEmail, /notifications waiting for you/, remaining);
-        assert(/^2 notifications waiting for you on AIMEAT$/.test(mail.subject),
-            `only the two past the one-hour cutoff belong in it: ${mail.subject}`);
+        assert(/^3 notifications waiting for you on AIMEAT$/.test(mail.subject),
+            `only the three past the one-hour cutoff belong in it: ${mail.subject}`);
         assert(mail.text.includes('Held while quiet (aaaaaaaa)'), `the first held entry: ${mail.text.slice(0, 400)}`);
         assert(mail.text.includes('Held while quiet (bbbbbbbb)'), `the second held entry: ${mail.text.slice(0, 400)}`);
+        // Messages first, under their own heading, then the rest; the message line is said from its
+        // locale key (notiftext.direct_message.title), not from the words it was stored with.
+        const msgHead = mail.text.indexOf('Messages (1)');
+        const restHead = mail.text.indexOf('Everything else (2)');
+        const msgLine = mail.text.indexOf('New message from Bea');
+        assert(msgHead >= 0 && restHead > msgHead, `the messages section comes before the rest: ${mail.text.slice(0, 600)}`);
+        assert(msgLine > msgHead && msgLine < restHead, `the message is printed under its heading: ${mail.text.slice(0, 600)}`);
+        assert(!mail.text.includes('(stored words)'), `the line is said from its locale key: ${mail.text.slice(0, 600)}`);
         assert(!mail.text.includes('too young for the digest'),
             'a notification younger than the cutoff must not be in the digest');
         assert(mail.text.includes('/v1/profile?tab=notifications'), `the digest links to the page: ${mail.text.slice(0, 400)}`);

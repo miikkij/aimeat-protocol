@@ -9,10 +9,15 @@
  *   stayed unread for longer than they chose, sent to the verified address on their account, at most
  *   once per new batch. Neither pass ever creates a notification; neither runs when the owner has
  *   not asked.
- * @structure sweepHeldPushes · sweepNotificationDigests · listOwnerNotificationRecords and
- *   listOwnerNotifications (the shared owner-exact reads)
+ * @structure sweepHeldPushes · sweepNotificationDigests · digestSectionOf · digestText ·
+ *   listOwnerNotificationRecords and listOwnerNotifications (the shared owner-exact reads)
  * @usage setInterval(() => sweepHeldPushes(storage, config, push), 5 * 60_000)
  * @version-history
+ *   v1.3.0 — 2026-10-18 — The digest puts messages first, then what the owner's apps sent, then the
+ *     rest (digestSectionOf), and the 20 lines it has room for are taken in that order, so a message
+ *     is never the one left out. Each line is said in the recipient's email language when the
+ *     notification carries its words as a locale key (digestText); until now only the frame around
+ *     the lines was translated and every line stayed in the English it was stored in.
  *   2026-10-16 — The owner's notifications are read with listMemory on the owner's own identity, every row,
  *     newest first; the 1000-row window in key order hid an owner's newest rows past 1000. The settings
  *     scan reads every owner's record instead of the first 5000 (QA audit F13-01).
@@ -28,14 +33,48 @@ import type { AimeatConfig } from '../config.js';
 import type { MemoryRecord, Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
 import { NOTIF_PREFIX, notifLinkToUrl } from './notify.js';
-import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, type NotificationSettings } from './notification-settings.js';
+import { NOTIF_SETTINGS_KEY, normalizeSettings, quietJustEnded, updateNotificationSettings, appendMailLog, groupOfType, sourceOf, type NotificationSettings } from './notification-settings.js';
 import { getActiveEmailService } from './email.js';
-import { notificationDigestEmail } from './email-templates-digest.js';
+import { notificationDigestEmail, DIGEST_SECTIONS, type DigestSection } from './email-templates-digest.js';
 import { formatForPerson, type DisplayPrefs } from './display-prefs.js';
+import { createT, toLocale } from '../i18n.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import type { NotifText } from './notify.js';
 
-export interface StoredNotif { id: string; type: string; title: string; body: string; link: string; read: boolean; held?: boolean; createdAt: string }
+export interface StoredNotif { id: string; type: string; title: string; body: string; link: string; read: boolean; held?: boolean; createdAt: string; source?: unknown; i18n?: NotifText }
+
+/**
+ * Which section of the digest a notification is printed in. A direct message or a message request is
+ * a message whoever sent it; an app's own notification, or the node's notice about an app, is the
+ * apps section; everything else (agents, workflows, organisms, the account) is the rest.
+ */
+export function digestSectionOf(n: Pick<StoredNotif, 'type' | 'title' | 'source'>): DigestSection {
+  const group = groupOfType(n.type);
+  if (group === 'messages') return 'messages';
+  if (group === 'apps' || sourceOf(n).kind === 'app') return 'apps';
+  return 'other';
+}
+
+/**
+ * A notification's title and body in `locale`, read from the same `notiftext.<key>.title|body`
+ * strings the bell uses (public/js/services/notifications.js titleOf, bodyOf), with the same
+ * single-brace variables. A notification without a key, or a key with no text, keeps the words it
+ * was stored with.
+ */
+export function digestText(n: Pick<StoredNotif, 'title' | 'body' | 'i18n'>, locale: string | undefined): { title: string; body: string } {
+  const key = n.i18n?.key;
+  if (!key) return { title: n.title, body: n.body };
+  const t = createT(toLocale((locale ?? '').slice(0, 2).toLowerCase()));
+  const vars = n.i18n?.vars ?? {};
+  const say = (part: 'title' | 'body', fallback: string): string => {
+    const k = `notiftext.${key}.${part}`;
+    const tpl = t(k);
+    if (tpl === k) return fallback;
+    return tpl.replace(/\{(\w+)\}/g, (whole, name: string) => (name in vars ? String(vars[name]) : whole));
+  };
+  return { title: say('title', n.title), body: say('body', n.body) };
+}
 
 /** Every settings record on the node, by owner: the owners who decided something. */
 async function ownersWithSettings(storage: Storage): Promise<Array<{ ghii: string; settings: NotificationSettings }>> {
@@ -126,10 +165,16 @@ export async function sweepNotificationDigests(storage: Storage, config: AimeatC
       // The recipient's own format and clock. `g` is the whole record, so this costs no second
       // read; the digest went out with no time at all until 2026-09-12 for want of these two lines.
       const prefs: DisplayPrefs = { locale: g.locale ?? null, region: g.region ?? null, timezone: g.timezone ?? null };
+      // Messages first, then apps, then the rest; newest first inside each, as `due` already is.
+      // The cut to 20 comes after this order, so what is left out is never a message.
+      const rank = (sec: DigestSection) => DIGEST_SECTIONS.indexOf(sec);
+      const ordered = due
+        .map(n => ({ n, section: digestSectionOf(n) }))
+        .sort((a, b) => rank(a.section) - rank(b.section));
       const { subject, html, text } = notificationDigestEmail({
         count: due.length,
-        items: due.slice(0, 20).map(n => ({
-          title: n.title, body: n.body, at: n.createdAt,
+        items: ordered.slice(0, 20).map(({ n, section }) => ({
+          ...digestText(n, prefs.locale ?? undefined), at: n.createdAt, section,
           atLabel: formatForPerson(prefs, n.createdAt, { dateStyle: 'short', timeStyle: 'short' }),
         })),
         pageUrl: `${config.baseUrl}/v1/profile?tab=notifications`,

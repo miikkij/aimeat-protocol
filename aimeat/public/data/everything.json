@@ -2683,10 +2683,10 @@
      "slug": "g-13-email-digest",
      "cells": [
       "<strong>Email digest</strong>",
-      "What stayed unread arrives as a digest instead of nothing.",
-      "notification settings"
+      "What stayed unread arrives as a digest instead of nothing: messages first, then what your apps sent, then the rest, each under its own heading. It comes in the language you pick on the Email page, which every email from the node follows.",
+      "notification settings, <code>PUT /v1/ghii</code> (<code>locale</code>)"
      ],
-     "plain": "Email digest What stayed unread arrives as a digest instead of nothing. notification settings"
+     "plain": "Email digest What stayed unread arrives as a digest instead of nothing: messages first, then what your apps sent, then the rest, each under its own heading. It comes in the language you pick on the Email page, which every email from the node follows. notification settings, PUT /v1/ghii (locale)"
     },
     {
      "slug": "g-13-boards",
