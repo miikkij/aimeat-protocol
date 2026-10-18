@@ -18,6 +18,7 @@
  *   v1.0.0 — 2026-06-14 — Created for ecosystem events & triggers (chunk 2).
  *   v1.0.1 — 2026-09-26 — emitEcosystemMemoryWrite names the writer's account with localAccountOf, so a
  *     visitor's write is never announced to the local namesake's apps (secaudit 2026-09, F-1).
+ *   v1.0.2 — 2026-10-18 — appendInboundEcosystemLog appends with updateRecord, on the version it read.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
@@ -27,6 +28,7 @@ import { buildEcosystemEnvelope } from '../models/ecosystem-event-schemas.js';
 import { globToRegExp } from './workflow/signal-eval.js';
 import { localAccountOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { updateRecord } from './record-cas.js';
 
 const SUBSCRIPTIONS_KEY = 'ecosystem.subscriptions';
 const INBOUND_LOG_KEY = 'ecosystem.inbound.log';
@@ -137,17 +139,12 @@ export async function emitEcosystemBindingRevoked(storage: Storage, config: Aime
 // ── inbound audit log (per-GEAI, capped) ──
 export async function appendInboundEcosystemLog(storage: Storage, geai: string, entry: { event: string; version: number; timestamp: string; data: Record<string, unknown> }): Promise<void> {
   try {
-    const existing = await storage.getMemory(geai, INBOUND_LOG_KEY);
-    const arr = Array.isArray(existing?.value) ? (existing!.value as unknown[]) : [];
-    arr.push({ id: randomUUID(), ...entry, receivedAt: new Date().toISOString() });
-    const trimmed = arr.slice(-INBOUND_LOG_KEEP);
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key: INBOUND_LOG_KEY, ownerGaii: geai, value: trimmed,
-      visibility: 'private', tags: ['ecosystem-inbound'], ttlHours: null,
-      version: existing ? existing.version + 1 : 1,
-      createdAt: existing?.createdAt ?? now, updatedAt: now,
-    });
+    const line = { id: randomUUID(), ...entry, receivedAt: new Date().toISOString() };
+    // Appended to the log as stored, on its version (updateRecord): two events at once both land.
+    await updateRecord(storage, geai, INBOUND_LOG_KEY,
+      v => (Array.isArray(v) ? v as unknown[] : []),
+      arr => [...arr, line].slice(-INBOUND_LOG_KEEP),
+      { tag: 'ecosystem-inbound' });
   } catch (err) {
     logger.error('appendInboundEcosystemLog failed', { geai, error: String(err) });
   }

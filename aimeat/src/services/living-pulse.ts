@@ -19,6 +19,9 @@
  *   strictest label of the items it was copied from (living-source-labels.ts). A source whose label
  *   rises later does not raise its copies yet: a background pass raises copies when a source rises (V4, later).
  * @version-history
+ *   2026-10-18 — A section's history is prepended with updateRecord, and an agent section's task state
+ *     changes only on the version the pulse read (swapTaskState): the dispatch is claimed before the
+ *     task is made, and a finished task is taken off the state before it is folded.
  *   v1.5.1 — 2026-10-04 — A declined agent task frees the section as a failed one does.
  *   v1.5.0 — 2026-09-29 — A source copy inherits the strictest classification of its sources, set as a
  *     rule label after the copy is written; a labelling failure logs a warning (TARGET-082 V4).
@@ -51,6 +54,7 @@ import type { PushService } from './push.js';
 import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
+import { updateRecord } from './record-cas.js';
 
 /** Optional notify services for stop/retire alerts (web-push + email). The in-UI retired badge + ledger
  *  are written regardless; these are the extra out-of-app nudges. */
@@ -72,10 +76,30 @@ const HIST_CAP = 20;
 /** Append a version to a slot's capped history (newest first). Best-effort. */
 async function appendHistory(storage: Storage, ownerGaii: string, loc: Loc, slot: string, entry: Record<string, unknown>): Promise<void> {
   try {
-    const cur = await storage.getMemory(ownerGaii, histKey(loc, slot));
-    const prev = ((cur?.value as { versions?: unknown[] })?.versions) || [];
-    await upsert(storage, ownerGaii, histKey(loc, slot), { slot, versions: [entry, ...prev].slice(0, HIST_CAP) });
+    // Prepended to the history as stored, on its version (updateRecord): two writers at once both land.
+    await updateRecord(storage, ownerGaii, histKey(loc, slot),
+      v => ({ slot, versions: ((v as { versions?: unknown[] } | undefined)?.versions) || [] }),
+      cur => ({ slot, versions: [entry, ...cur.versions].slice(0, HIST_CAP) }),
+      { tag: 'living-hist', tags: [] });
   } catch (err) { logger.warn('prev: history best-effort', { error: String(err) }); }
+}
+/** How long a dispatch claim on an agent section stands before a later pulse may take it over. */
+const DISPATCH_CLAIM_MS = 10 * 60 * 1000;
+
+/**
+ * Write an agent section's task state only if it is still at `prev`'s version (or still absent when
+ * `prev` is null). True when this write landed.
+ */
+async function swapTaskState(
+  storage: Storage, ownerGaii: string, key: string, prev: { version: number; createdAt?: string } | null | undefined, value: Record<string, unknown>,
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  const record: MemoryRecord = {
+    key, ownerGaii, value, visibility: 'private', tags: [], ttlHours: null,
+    version: (prev?.version ?? 0) + 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
+  };
+  if (!prev) return storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(record) : (await storage.setMemory(record), true);
+  return storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(record, prev.version) : (await storage.setMemory(record), true);
 }
 const srcKey = (l: Loc, id: string) => `${wsRoot(l)}.living-src.${l.docId}__${id}.latest`;
 const ledgerKey = (l: Loc) => `${wsRoot(l)}.living-ledger.${l.docId}__${Date.now()}-${Math.random().toString(36).slice(2, 6)}.latest`;
@@ -230,31 +254,58 @@ async function handleAgentSection(
   sec: Record<string, unknown>, slot: string, charter: { scope?: string },
 ): Promise<'dispatched' | 'waiting' | 'failed' | 'folded'> {
   const [agentName, offerId] = String(sec.agent).split('/');
-  const stateRec = await storage.getMemory(ownerGaii, taskStateKey(loc, slot));
-  const taskId = (stateRec?.value as { taskId?: string } | undefined)?.taskId;
-  const clear = () => upsert(storage, ownerGaii, taskStateKey(loc, slot), { taskId: null });
+  const stateKey = taskStateKey(loc, slot);
+  const stateRec = await storage.getMemory(ownerGaii, stateKey);
+  const state = stateRec?.value as { taskId?: string; claimedAt?: string } | undefined;
+  const taskId = state?.taskId;
+  // Every change of the task state is written on the version this pulse read (swapTaskState), so of
+  // two pulses at once one takes the step (fold, end or dispatch) and the other answers 'waiting'.
+  const written = { version: (stateRec?.version ?? 0) + 1, createdAt: stateRec?.createdAt };
+  const clear = () => swapTaskState(storage, ownerGaii, stateKey, stateRec, { taskId: null });
 
   if (taskId) {
     const task = await storage.getAgentTask(taskId);
     if (!task) { await clear(); return 'failed'; }
     if (task.status === 'done') {
-      const content = await readDeliverable(storage, task);
-      if (content) {
-        const key = await addSrc(storage, ownerGaii, loc, slot, { text: content.text, origin: task.deliverableKey || `task:${task.id}`, producer: task.agentGaii });
-        await inheritSourceLabels({ storage, config }, ownerGaii, [{ key, sources: [memoryTarget(task.agentGaii, content.key)] }]);
+      if (!await clear()) return 'waiting';
+      try {
+        const content = await readDeliverable(storage, task);
+        if (content) {
+          const key = await addSrc(storage, ownerGaii, loc, slot, { text: content.text, origin: task.deliverableKey || `task:${task.id}`, producer: task.agentGaii });
+          await inheritSourceLabels({ storage, config }, ownerGaii, [{ key, sources: [memoryTarget(task.agentGaii, content.key)] }]);
+        }
+        await addLedger(storage, ownerGaii, loc, { event: 'agent-folded', slot });
+        return content ? 'folded' : 'failed';
+      } catch (err) {
+        // The fold did not finish: the task goes back on the state, so a later pulse folds it.
+        await swapTaskState(storage, ownerGaii, stateKey, written, state as Record<string, unknown>);
+        throw err;
       }
-      await addLedger(storage, ownerGaii, loc, { event: 'agent-folded', slot });
-      await clear();
-      return content ? 'folded' : 'failed';
     }
     // A declined task wrote nothing, so for this section it ends like a failed one.
-    if (task.status === 'failed' || task.status === 'declined' || task.status === 'stalled') { await addLedger(storage, ownerGaii, loc, { event: 'agent-failed', slot }); await clear(); return 'failed'; }
+    if (task.status === 'failed' || task.status === 'declined' || task.status === 'stalled') {
+      if (!await clear()) return 'waiting';
+      await addLedger(storage, ownerGaii, loc, { event: 'agent-failed', slot });
+      return 'failed';
+    }
     return 'waiting';   // queued / active
   }
 
+  // The dispatch is claimed before the task is made. A claim younger than DISPATCH_CLAIM_MS is
+  // another pulse dispatching; an older one is left from a dispatch that stopped, and is taken over.
+  if (state?.claimedAt && Date.now() - Date.parse(state.claimedAt) < DISPATCH_CLAIM_MS) return 'waiting';
+  if (!await swapTaskState(storage, ownerGaii, stateKey, stateRec, { taskId: null, claimedAt: new Date().toISOString() })) return 'waiting';
   const query = `${sec.section}. ${sec.desc || ''} Context: ${charter.scope || ''}`.trim();
-  const newId = await dispatchAgentTask(storage, config, ownerGaii, agentName, offerId, query);
-  await upsert(storage, ownerGaii, taskStateKey(loc, slot), { taskId: newId, agent: agentName, offerId, createdAt: new Date().toISOString() });
+  let newId: string;
+  try {
+    newId = await dispatchAgentTask(storage, config, ownerGaii, agentName, offerId, query);
+  } catch (err) {
+    await swapTaskState(storage, ownerGaii, stateKey, written, { taskId: null });
+    throw err;
+  }
+  if (!await swapTaskState(storage, ownerGaii, stateKey, written, { taskId: newId, agent: agentName, offerId, createdAt: new Date().toISOString() })) {
+    logger.warn('living-pulse: the dispatch claim was taken over before the task id was written', { slot, taskId: newId });
+  }
   await addLedger(storage, ownerGaii, loc, { event: 'agent-dispatched', slot, agent: agentName });
   return 'dispatched';
 }

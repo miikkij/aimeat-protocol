@@ -40,6 +40,8 @@
  *   const { provider, chosenBy } = await selectProvider(storage, config, { ownerGhii, agent, named });
  *   const problems = providerViolations(provider, state, questions);
  * @version-history
+ *   2026-10-18 — putOwnerProvider claims a new id with createMemoryIfAbsent and counts the account's
+ *     providers after the claim, so MAX_OWNER_PROVIDERS is held on what is stored.
  *   v1.5.0 — 2026-10-09 — An operator's `env` auth names only a provider key variable
  *     (ai-provider-common.ts isProviderKeyEnvName); any upper-case name was taken (secrets audit 2026-10-09, S1).
  *   v1.4.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
@@ -553,27 +555,48 @@ export async function putOwnerProvider(
   }
   const key = `${PROVIDER_PREFIX}${id}`;
   const existing = await storage.getMemory(ownerGhii, key);
-  if (!existing && (await storage.listMemoryMeta(ownerGhii, { prefix: PROVIDER_PREFIX })).length >= MAX_OWNER_PROVIDERS) {
-    throw new DecideError('TOO_MANY_PROVIDERS', 409, `An account holds at most ${MAX_OWNER_PROVIDERS} decision providers of its own.`);
+  const tooMany = () => new DecideError('TOO_MANY_PROVIDERS', 409, `An account holds at most ${MAX_OWNER_PROVIDERS} decision providers of its own.`);
+  const held = async () => (await storage.listMemoryMeta(ownerGhii, { prefix: PROVIDER_PREFIX })).length;
+  if (!existing && await held() >= MAX_OWNER_PROVIDERS) {
+    throw tooMany();
   }
   const apiKey = (body as Record<string, unknown>).api_key;
   if (p.provider.auth.type === 'key') {
     const hasKey = typeof apiKey === 'string' || !!(await storage.getMemory(ownerGhii, `${PROVIDER_KEY_PREFIX}${id}`));
     if (!hasKey) throw new DecideError('INVALID_PROVIDER', 400, "auth is 'key', so send the provider's key as api_key.");
   }
+  let encKey: ReturnType<typeof getEncryptionKey> = null;
   if (apiKey !== undefined) {
     if (typeof apiKey !== 'string' || apiKey.trim().length < 4 || apiKey.length > 512 || /\s/.test(apiKey.trim())) {
       throw new DecideError('INVALID_PROVIDER', 400, 'api_key: one token as the provider issued it, no spaces.');
     }
-    const encKey = getEncryptionKey(config);
+    encKey = getEncryptionKey(config);
     if (!encKey) throw new DecideError('ENCRYPTION_NOT_CONFIGURED', 503, 'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY or AIMEAT_TOTP_ENCRYPTION_KEY.');
-    await upsertPrivateRecord(storage, ownerGhii, `${PROVIDER_KEY_PREFIX}${id}`,
-      { encrypted: encrypt(apiKey.trim(), encKey), set_at: new Date().toISOString() }, ['decide', 'secret']);
   }
   const { source: _s, dataStatement: _d, ...stored } = p.provider;
   void _s; void _d;
-  await upsertPrivateRecord(storage, ownerGhii, key,
-    { spec: 'aimeat.decision-provider/v1', ...stored, updatedAt: new Date().toISOString() }, ['decide', 'provider']);
+  const providerValue = () => ({ spec: 'aimeat.decision-provider/v1', ...stored, updatedAt: new Date().toISOString() });
+  let created = false;
+  if (!existing && storage.createMemoryIfAbsent) {
+    // A new id is claimed (createMemoryIfAbsent) and the account's providers are counted after the
+    // claim, the new one included, so the limit holds on what is stored when two adds run at once:
+    // a claim past the limit is removed again and refused. A claim that finds the id taken meanwhile
+    // goes on as a replace, as a request that read it would have.
+    const now = new Date().toISOString();
+    created = !!await storage.createMemoryIfAbsent({
+      key, ownerGaii: ownerGhii, value: providerValue() as Record<string, unknown>, visibility: 'private', tags: ['decide', 'provider'],
+      ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    });
+    if (created && await held() > MAX_OWNER_PROVIDERS) {
+      await storage.deleteMemory(ownerGhii, key);
+      throw tooMany();
+    }
+  }
+  if (typeof apiKey === 'string' && encKey) {
+    await upsertPrivateRecord(storage, ownerGhii, `${PROVIDER_KEY_PREFIX}${id}`,
+      { encrypted: encrypt(apiKey.trim(), encKey), set_at: new Date().toISOString() }, ['decide', 'secret']);
+  }
+  if (!created) await upsertPrivateRecord(storage, ownerGhii, key, providerValue(), ['decide', 'provider']);
   emitChange('ai-decisions', ownerGhii);
   return p.provider;
 }

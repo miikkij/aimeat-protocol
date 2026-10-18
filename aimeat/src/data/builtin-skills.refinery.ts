@@ -16,6 +16,8 @@
  * @structure REFINERY_SKILL_ENTRY
  * @usage import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
  * @version-history
+ *   v1.2.2 — 2026-10-18 — "Running": a second batch on the same page of mail at the same moment stops
+ *     with BATCH_BUSY (the cursor is now moved before the page is processed).
  *   v1.2.1 — 2026-10-13 — "Running": a message that has a row is skipped also after the cursor is
  *     deleted, so a kind added later needs `message_ids` for the mail already filed.
  *   v1.2.0 — 2026-10-13 — The definition's `keepText`, and what a row then holds: `text`, `textKept`
@@ -130,7 +132,9 @@ The next batch starts where the last stopped (\`<prefix>.cursor\`); \`<prefix>.r
 that has a row is skipped by an ordinary batch** (\`counts.skipped_seen\`), also after the cursor is
 deleted: a kind added to the definition later sorts new mail only, and the mail already filed is
 sorted again only with \`message_ids\`. One batch per
-definition at a time: a second start answers with the one running. **A batch where every message
+definition at a time: a second start answers with the one running, and a second batch that takes the
+same page of mail at the same moment (a schedule beside a manual run) stops with \`BATCH_BUSY\` before
+it reads any message. **A batch where every message
 fails files nothing and leaves the cursor where it was**: fix what the error names (usually a missing
 key or a reconnect), then run again.
 

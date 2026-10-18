@@ -5,6 +5,8 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.1 — 2026-10-18 — A peer's trust notice is stored on the version read (setMemoryIfVersion), and
+ *     a new one is claimed with createMemoryIfAbsent and MAX_RECEIVED_PER_PEER counted after the claim.
  *   v1.5.0 — 2026-10-16 — POST /v1/federation/trust-advisory takes a signed notice from a peer (gatePeer,
  *     the peer's signature, the audience proof, once) and stores it for the operator without acting on
  *     it; the operator's own advisory is stored too (a warning answered 201 and stored nothing), and its
@@ -39,6 +41,7 @@ import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { emitChange } from '../../services/event-bus.js';
 import { actionPricingFromPeer } from '../../services/action-pacing.js';
+import { CAS_ATTEMPTS } from '../../services/record-cas.js';
 
 export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // POST /v1/federation/catalogue-sync — Receive catalogue updates from peer
@@ -190,28 +193,48 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
 
         // One stored notice per sending peer, target and kind: a repeat replaces it, and one peer holds at
         // most MAX_RECEIVED_PER_PEER, so a peer cannot fill this node's system namespace.
+        //
+        // Written on the version that was read: a repeat replaces the stored notice only if it is
+        // still the one read, and a new notice is claimed (createMemoryIfAbsent) and the peer's
+        // notices counted after the claim, so the bound holds on what is stored when several arrive
+        // at once; a claim past it is removed again and refused.
         const systemGaii = `system@${config.nodeId}`;
         const key = `trust_advisory:recv:${source_node}:${target_node}:${advisory_type}`;
-        const existing = await storage.getMemory(systemGaii, key);
-        if (!existing) {
+        const tooMany = () => res.status(429).json(error(config.nodeId, 'RATE_LIMITED', `This node already holds ${MAX_RECEIVED_PER_PEER} trust notices from your node. Its operator reads them before more are stored.`));
+        let record: Record<string, unknown> | null = null;
+        for (let attempt = 0; attempt < CAS_ATTEMPTS && !record; attempt++) {
+            const existing = await storage.getMemory(systemGaii, key);
+            const now = new Date().toISOString();
+            const value = {
+                id: (existing?.value as { id?: string } | undefined)?.id ?? `adv-${randomBytes(8).toString('hex')}`,
+                target_node, advisory_type, reason, evidence_hash: evidence_hash ?? null,
+                issued_by: source_node, received_from: source_node, direction: 'received', status: 'received',
+                acted: false, created_at: now,
+            };
+            const next = {
+                key, ownerGaii: systemGaii, value, visibility: 'private' as const,
+                tags: ['trust_advisory', 'received', `target:${target_node}`, `type:${advisory_type}`, `from:${source_node}`],
+                ttlHours: null, version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+            };
+            if (existing) {
+                if (!storage.setMemoryIfVersion) { await storage.setMemory(next); record = value; }
+                else if (await storage.setMemoryIfVersion(next, existing.version)) record = value;
+                continue;
+            }
+            if (!storage.createMemoryIfAbsent) { await storage.setMemory(next); record = value; continue; }
+            if (!await storage.createMemoryIfAbsent(next)) continue;
             const held = await storage.listMemory(systemGaii, { prefix: `trust_advisory:recv:${source_node}:` });
-            if (held.length >= MAX_RECEIVED_PER_PEER) {
-                res.status(429).json(error(config.nodeId, 'RATE_LIMITED', `This node already holds ${MAX_RECEIVED_PER_PEER} trust notices from your node. Its operator reads them before more are stored.`));
+            if (held.length > MAX_RECEIVED_PER_PEER) {
+                await storage.deleteMemory(systemGaii, key);
+                tooMany();
                 return;
             }
+            record = value;
         }
-        const now = new Date().toISOString();
-        const record = {
-            id: (existing?.value as { id?: string } | undefined)?.id ?? `adv-${randomBytes(8).toString('hex')}`,
-            target_node, advisory_type, reason, evidence_hash: evidence_hash ?? null,
-            issued_by: source_node, received_from: source_node, direction: 'received', status: 'received',
-            acted: false, created_at: now,
-        };
-        await storage.setMemory({
-            key, ownerGaii: systemGaii, value: record, visibility: 'private',
-            tags: ['trust_advisory', 'received', `target:${target_node}`, `type:${advisory_type}`, `from:${source_node}`],
-            ttlHours: null, version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-        });
+        if (!record) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', 'This trust notice changed under every attempt to store it. Send it again.'));
+            return;
+        }
         logger.warn('Trust notice received from a peer and stored for the operator', { from: source_node, target: target_node, type: advisory_type });
 
         res.status(201).json(success(config.nodeId, { '@type': 'aimeat:TrustAdvisory', ...record, stored: true }));

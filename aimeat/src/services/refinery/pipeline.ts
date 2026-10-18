@@ -37,6 +37,9 @@
  *     (the October agents plan, brief 08; found by the aimeat-apps session).
  *   v1.1.1 — 2026-10-13 — The row caller carries the caller's scopes, which the fenced-space rule
  *     reads through the row service's access rule (services/fenced-space.ts, ruled 2026-10-13).
+ *   v1.2.0 — 2026-10-18 — runBatch moves the cursor on the version it read before processing the page
+ *     (409 BATCH_BUSY to a second batch on the same cursor), puts it back when every message failed or
+ *     the batch threw, and prepends to the runs list on its version (writeMemoryRecord expectedVersion).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -54,6 +57,7 @@ import { appendRows, readRow, type RowCaller } from '../workspace-rows/row-servi
 import { WorkspaceRowError } from '../workspace-rows/row-space.js';
 import { logger } from '../../utils/logger.js';
 import { writeMemoryRecord } from '../memory-write.js';
+import { CAS_ATTEMPTS } from '../record-cas.js';
 import { systemReader, readerForCaller } from '../classification/reader.js';
 import { ClassificationError } from '../classification/labels.js';
 import { readAiFile } from '../ai-inputs.js';
@@ -166,11 +170,18 @@ export async function loadDefinition(storage: Storage, ownerGhii: string, prefix
   return def;
 }
 
-async function writeOwn(deps: RefineryDeps, caller: RefineryCaller, key: string, value: unknown): Promise<void> {
+/**
+ * Write one of the definition's own records. With `expectedVersion` (0: the record must not exist
+ * yet) the write lands only on that version, and a conflict answers null; otherwise the stored
+ * version is answered.
+ */
+async function writeOwn(deps: RefineryDeps, caller: RefineryCaller, key: string, value: unknown, expectedVersion?: number): Promise<number | null> {
   const r = await writeMemoryRecord({ storage: deps.storage, config: deps.config },
     { principal: caller.principal, targetGaii: caller.ownerGhii, scopes: caller.scopes, roles: caller.roles },
-    { key, value, visibility: 'private', pipeline: 'refinery.run' });
+    { key, value, visibility: 'private', pipeline: 'refinery.run', ...(expectedVersion !== undefined ? { expectedVersion } : {}) });
+  if (!r.ok && r.code === 'VERSION_CONFLICT' && expectedVersion !== undefined) return null;
   if (!r.ok) throw new RefineryError(r.code, r.status, r.message);
+  return r.record.version;
 }
 
 /** The row's id: the provider and the mailbox's own message id, so the same mail is one row. */
@@ -364,52 +375,73 @@ export async function runBatch(
   const ctx: Ctx = { deps, caller, def, conn: { config: deps.config, storage: deps.storage, providers: buildOutboundProviders(deps.config), key } };
 
   let ids: string[];
-  let cursor: Json = {};
+  let cursorClaim: { prior: Json; version: number } | null = null;
   run.step = 'list'; tick();
   if (opts.messageIds?.length) {
     ids = opts.messageIds.slice(0, 50);
   } else {
     const rec = await deps.storage.getMemory(caller.ownerGhii, `${prefix}.cursor`);
     const c = (rec?.value && typeof rec.value === 'object' ? rec.value : {}) as Json;
-    cursor = c.since === def.since && c.query === def.query ? c : { since: def.since, query: def.query, page: '' };
+    const cursor: Json = c.since === def.since && c.query === def.query ? c : { since: def.since, query: def.query, page: '' };
     const p: Json = { limit: def.batchSize };
     if (cursor.page) p.page_token = cursor.page;
     if (isGraph(def.provider)) { if (def.query) p.query = def.query; else p.filter = `receivedDateTime ge ${def.since}T00:00:00Z`; }
     else p.query = `after:${def.since.replace(/-/g, '/')} ${def.query}`.trim();
     const page = listPage(def.provider, await read(ctx, 'messages', p));
     ids = page.ids;
-    cursor = { ...cursor, page: page.next };
+    // THE PAGE IS CLAIMED before any of its messages is processed: the cursor moves on the version
+    // that was read, so of two batches that read the same cursor one goes on and the other stops here.
+    const claimed = await writeOwn(deps, caller, `${prefix}.cursor`, { ...cursor, page: page.next }, rec?.version ?? 0);
+    if (claimed === null) {
+      throw new RefineryError('BATCH_BUSY', 409, 'Another batch of this definition took the same page of mail at the same moment and is working through it. Run the next batch when it has finished.');
+    }
+    cursorClaim = { prior: cursor, version: claimed };
   }
+  // Puts the cursor back where it was, on the claim's version, so the same page is read again.
+  const giveBackPage = async (): Promise<void> => {
+    if (cursorClaim) await writeOwn(deps, caller, `${prefix}.cursor`, cursorClaim.prior, cursorClaim.version);
+  };
   run.n = ids.length; tick();
   const failed: Array<{ id: string; message: string }> = [];
-  for (const id of ids) {
-    run.i += 1; run.subject = ''; tick();
-    if (!opts.messageIds?.length && await alreadyDone(ctx, id)) { run.counts.skipped_seen += 1; continue; }
-    try {
-      const row = await processOne(ctx, run, id, tick);
-      run.counts.seen += 1;
-      const k = ({ selkea: 'clear', epaselva: 'unclear', kelvoton: 'bad', ohitettu: 'skip' } as Record<string, keyof RunState['counts']>)[String(row.queue)];
-      if (k) run.counts[k] += 1;
-      run.rows.unshift({ rowId: rowIdOf(def, String(row.messageId)), queue: row.queue as Queue, subject: String(row.subject), klass: String(row.klass) });
-    } catch (err) {
-      failed.push({ id, message: err instanceof RefineryError ? `${err.code}: ${err.message}` : String((err as Error)?.message ?? err) });
+  try {
+    for (const id of ids) {
+      run.i += 1; run.subject = ''; tick();
+      if (!opts.messageIds?.length && await alreadyDone(ctx, id)) { run.counts.skipped_seen += 1; continue; }
+      try {
+        const row = await processOne(ctx, run, id, tick);
+        run.counts.seen += 1;
+        const k = ({ selkea: 'clear', epaselva: 'unclear', kelvoton: 'bad', ohitettu: 'skip' } as Record<string, keyof RunState['counts']>)[String(row.queue)];
+        if (k) run.counts[k] += 1;
+        run.rows.unshift({ rowId: rowIdOf(def, String(row.messageId)), queue: row.queue as Queue, subject: String(row.subject), klass: String(row.klass) });
+      } catch (err) {
+        failed.push({ id, message: err instanceof RefineryError ? `${err.code}: ${err.message}` : String((err as Error)?.message ?? err) });
+      }
+      tick();
     }
-    tick();
+  } catch (err) {
+    await giveBackPage();
+    throw err;
   }
   // EVERY MESSAGE FAILED: the cause is the batch's (no model key, the mailbox refusing), not the
-  // mail's. Nothing is filed and the cursor stays, so the same page is read again once it is fixed.
+  // mail's. Nothing is filed and the cursor goes back, so the same page is read again once it is fixed.
   const allFailed = failed.length > 0 && run.counts.seen === 0;
   if (!allFailed) {
     // Some failed among ones that worked: each is filed as Unclear with its error, so a person sees
-    // it and can run it again, and the cursor moves on past it.
+    // it and can run it again, and the cursor stays past it.
     for (const f of failed) await fileFailure(ctx, run, f.id, f.message);
-    if (!opts.messageIds?.length) await writeOwn(deps, caller, `${prefix}.cursor`, cursor);
+  } else {
+    await giveBackPage();
   }
-  const runsRec = await deps.storage.getMemory(caller.ownerGhii, `${prefix}.runs`);
-  const runs = Array.isArray(runsRec?.value) ? runsRec!.value as Json[] : [];
-  runs.unshift({ id: run.id, at: run.startedAt, count: run.counts.seen, counts: run.counts, failed: failed.length,
-    ...(allFailed ? { error: failed[0].message } : {}), textModel: def.models.text || 'default', by: run.by });
-  await writeOwn(deps, caller, `${prefix}.runs`, runs.slice(0, 50));
+  const entry = { id: run.id, at: run.startedAt, count: run.counts.seen, counts: run.counts, failed: failed.length,
+    ...(allFailed ? { error: failed[0].message } : {}), textModel: def.models.text || 'default', by: run.by };
+  // Prepended to the runs list as stored, on its version; read again when another batch wrote first.
+  for (let attempt = 0; ; attempt++) {
+    const runsRec = await deps.storage.getMemory(caller.ownerGhii, `${prefix}.runs`);
+    const runs = Array.isArray(runsRec?.value) ? runsRec!.value as Json[] : [];
+    runs.unshift(entry);
+    if (await writeOwn(deps, caller, `${prefix}.runs`, runs.slice(0, 50), runsRec?.version ?? 0) !== null) break;
+    if (attempt >= CAS_ATTEMPTS - 1) throw new RefineryError('VERSION_CONFLICT', 409, 'The run history changed under every attempt to add this run to it.');
+  }
   if (allFailed) throw new RefineryError('BATCH_FAILED', 502, `All ${failed.length} messages failed, so nothing was filed and the next batch starts from the same place. The first error: ${failed[0].message}`);
   return run;
 }

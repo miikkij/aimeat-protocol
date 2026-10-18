@@ -34,6 +34,7 @@
  *   // ... later, on introduce:
  *   const claimed = await consumeLinkInvite(storage, token, nodeId);
  * @version-history
+ *   2026-10-18 — consumeLinkInvite writes the consumed invite on the version it read (setMemoryIfVersion).
  *   v1.0.0 — 2026-08-23 — Initial, for the contact tier.
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -148,12 +149,19 @@ export async function consumeLinkInvite(storage: Storage, token: unknown, nodeId
       consumedAt: new Date().toISOString(),
       consumedByNodeId: nodeId,
     };
-    await storage.setMemory({
+    const next = {
       ...record,
+      key,
       value: consumed as unknown as Record<string, unknown>,
       version: (record.version ?? 1) + 1,
       updatedAt: consumed.consumedAt!,
-    });
+    };
+    // Written on the version that was read: of two introductions with one token, one write lands and
+    // the other is answered as a consumed invite.
+    const landed = storage.setMemoryIfVersion
+      ? !!await storage.setMemoryIfVersion(next, record.version)
+      : (await storage.setMemory(next), true);
+    if (!landed) return { ok: false, reason: 'consumed' };
 
     return { ok: true, tier: consumed.tier, invite: consumed };
   } catch (err) {

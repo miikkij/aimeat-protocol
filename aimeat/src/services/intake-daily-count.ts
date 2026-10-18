@@ -13,19 +13,26 @@
  *
  *   ONE RECORD PER FORM, in the node's own namespace, holding the day and the count; a new day
  *   starts the count again in the same record, so the key count does not grow with time. The day is
- *   the UTC date. The read, the compare and the write run one after another per node, so two
- *   submissions that arrive together cannot both take the last slot.
+ *   the UTC date. The read, the compare and the write run one after another per node, and the write
+ *   is made on the version that was read (record-cas.ts updateRecord), so two submissions that
+ *   arrive together cannot both take the last slot, in one process or in two.
  * @structure takeDailySlot(storage, nodeId, form, max) · releaseDailySlot(storage, nodeId, form) ·
  *   forgetDailyCount(storage, nodeId, form)
  * @usage if (cfg.maxPerDay && !(await takeDailySlot(storage, nodeId, { org, ws, formId }, cfg.maxPerDay))) refuse 429
  * @version-history
+ *   2026-10-18 — takeDailySlot and releaseDailySlot write the count with updateRecord (on the
+ *     version read); the per-process chain stays and orders this process's own calls.
  *   2026-10-15 — releaseDailySlot(): a submission whose write failed gives its slot back
  *     (feature-list audit #63).
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import type { Storage } from '../storage/interface.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 export interface IntakeFormRef { org: string; ws: string; formId: string }
+
+type DailyCount = { day?: string; n?: number } | undefined;
+const asCount = (v: unknown): DailyCount => (v && typeof v === 'object' ? v as DailyCount : undefined);
 
 const systemGhiiFor = (nodeId: string): string => `system@${nodeId}`;
 const countKey = (f: IntakeFormRef): string => `intake.count.${f.org}.${f.ws}.${f.formId}`;
@@ -47,21 +54,16 @@ function inOrder<T>(nodeId: string, fn: () => Promise<T>): Promise<T> {
  */
 export function takeDailySlot(storage: Storage, nodeId: string, form: IntakeFormRef, max: number): Promise<boolean> {
   return inOrder(nodeId, async () => {
-    const systemGhii = systemGhiiFor(nodeId);
-    const key = countKey(form);
-    const existing = await storage.getMemory(systemGhii, key);
-    const held = existing?.value as { day?: string; n?: number } | undefined;
-    const day = today();
-    const taken = held?.day === day && typeof held.n === 'number' ? held.n : 0;
-    if (taken >= max) return false;
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key, ownerGaii: systemGhii, value: { day, n: taken + 1 },
-      visibility: 'private', tags: ['intake-count'], ttlHours: null,
-      version: existing ? existing.version + 1 : 1,
-      createdAt: existing?.createdAt ?? now, updatedAt: now,
-    });
-    return true;
+    // The count is compared and raised on the version that was read (updateRecord), so the limit
+    // holds on the value written, also across node processes that share one database.
+    let took = false;
+    await updateRecord(storage, systemGhiiFor(nodeId), countKey(form), asCount, held => {
+      const day = today();
+      const taken = held?.day === day && typeof held.n === 'number' ? held.n : 0;
+      took = taken < max;
+      return took ? { day, n: taken + 1 } : UNCHANGED;
+    }, { tag: 'intake-count' });
+    return took;
   });
 }
 
@@ -72,15 +74,10 @@ export function takeDailySlot(storage: Storage, nodeId: string, form: IntakeForm
  */
 export function releaseDailySlot(storage: Storage, nodeId: string, form: IntakeFormRef): Promise<void> {
   return inOrder(nodeId, async () => {
-    const systemGhii = systemGhiiFor(nodeId);
-    const key = countKey(form);
-    const existing = await storage.getMemory(systemGhii, key);
-    const held = existing?.value as { day?: string; n?: number } | undefined;
-    if (!existing || held?.day !== today() || typeof held.n !== 'number' || held.n <= 0) return;
-    await storage.setMemory({
-      ...existing, value: { day: held.day, n: held.n - 1 },
-      version: existing.version + 1, updatedAt: new Date().toISOString(),
-    });
+    await updateRecord(storage, systemGhiiFor(nodeId), countKey(form), asCount, held => {
+      if (!held || held.day !== today() || typeof held.n !== 'number' || held.n <= 0) return UNCHANGED;
+      return { day: held.day, n: held.n - 1 };
+    }, { tag: 'intake-count' });
   });
 }
 
