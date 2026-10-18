@@ -11,6 +11,8 @@
  *   caller holding only the read word can call a tool, and whether a tool saying no is told apart
  *   from the proxy failing. Each of those has a named test below.
  * @version-history
+ *   v1.1.1 — 2026-10-18 — The upstream and the refusing server listen on ports the system picks, not
+ *     the fixed 40691 and 40684.
  *   v1.1.0 — 2026-09-24 — A server the node offers: an owner it admits may call it, and gets 404 on
  *     every door that changes or removes it (secaudit 2026-09 A2-1).
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
@@ -18,6 +20,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -31,7 +34,9 @@ import type { Storage } from '../../src/storage/interface.js';
 
 process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
 
-const UPSTREAM_PORT = 40691;
+// The upstream listens on a port the system picks (see beforeAll): a fixed one inside Linux's
+// ephemeral range can be taken by another file's socket on CI.
+let UPSTREAM_PORT = 0;
 const KEY = 'b'.repeat(64);
 const NODE_ID = 'test-node-001';
 
@@ -115,7 +120,9 @@ beforeAll(async () => {
     }
     await transport.handleRequest(req, res, body);
   });
-  await new Promise<void>((r) => upstream.listen(UPSTREAM_PORT, '127.0.0.1', () => r()));
+  await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', () => r()));
+  UPSTREAM_PORT = (upstream.address() as AddressInfo).port;
+  UPSTREAM_URL = `http://127.0.0.1:${UPSTREAM_PORT}/mcp`;
 });
 
 afterAll(async () => {
@@ -126,7 +133,7 @@ afterAll(async () => {
 
 const ALICE: Caller = { sub: 'alice', owner: 'alice', roles: ['owner'], scopes: ['mcp:read', 'mcp:use', 'mcp:manage'] };
 const BOB: Caller = { sub: 'bob', owner: 'bob', roles: ['owner'], scopes: ['mcp:read', 'mcp:use', 'mcp:manage'] };
-const UPSTREAM_URL = `http://127.0.0.1:${UPSTREAM_PORT}/mcp`;
+let UPSTREAM_URL = '';
 
 async function attachAs(app: express.Express, name = 'jira') {
   return call(app, 'POST', '/v1/mcp-servers', {
@@ -218,13 +225,14 @@ describe('attaching a server', () => {
         jsonrpc: '2.0', id: 0, error: { code: -32001, message: 'Authentication required.' },
       }));
     });
-    await new Promise<void>((r) => refuser.listen(40684, '127.0.0.1', () => r()));
+    await new Promise<void>((r) => refuser.listen(0, '127.0.0.1', () => r()));
+    const refuserPort = (refuser.address() as AddressInfo).port;
     try {
       const storage = new SqliteStorage(':memory:');
       const app = appFor(storage, () => ALICE);
 
       const res = await call(app, 'POST', '/v1/mcp-servers', {
-        name: 'wantstoken', url: 'http://127.0.0.1:40684/mcp',
+        name: 'wantstoken', url: `http://127.0.0.1:${refuserPort}/mcp`,
       });
       // Found on 2026-09-16 by attaching a sandbox node to itself: this answered 502 UNREACHABLE,
       // twice over. The probe misread the 401, and even once it read it right, all three attach

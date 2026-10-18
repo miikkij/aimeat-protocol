@@ -14,10 +14,13 @@
  *   v1.0.0 — 2026-09-17 — Initial.
  *   v1.1.0 — 2026-09-24 — Alice's calls say she is the owner in person (`ownerInPerson`), as the door
  *     now tells the chokepoint. Setup only: the assertions are unchanged.
+ *   v1.1.1 — 2026-10-18 — The upstream and the looping server listen on ports the system picks, not
+ *     the fixed 40681 and 40682.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -35,8 +38,10 @@ import { mcpServersRouter } from '../../src/routes/mcp-servers.js';
 process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
 
 const NODE_ID = 'node-a';
-const UPSTREAM_PORT = 40681;
-const LOOPING_PORT = 40682;
+// Both servers listen on ports the system picks (see beforeAll): a fixed one inside Linux's
+// ephemeral range can be taken by another file's socket on CI.
+let UPSTREAM_PORT = 0;
+let LOOPING_PORT = 0;
 const OWN_BASE = 'http://127.0.0.1:40683';
 
 const config = {
@@ -155,8 +160,10 @@ beforeAll(async () => {
     }));
   });
 
-  await new Promise<void>((r) => upstream.listen(UPSTREAM_PORT, '127.0.0.1', () => r()));
-  await new Promise<void>((r) => looping.listen(LOOPING_PORT, '127.0.0.1', () => r()));
+  await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', () => r()));
+  await new Promise<void>((r) => looping.listen(0, '127.0.0.1', () => r()));
+  UPSTREAM_PORT = (upstream.address() as AddressInfo).port;
+  LOOPING_PORT = (looping.address() as AddressInfo).port;
 });
 
 afterAll(async () => {

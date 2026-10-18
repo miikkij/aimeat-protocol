@@ -17,11 +17,18 @@
  *   answer 302 and point at cloud metadata, and a guard that validated only the first URL would
  *   follow it. Measured 2026-09-16: refused at the hop with "Link-local / cloud-metadata address".
  * @version-history
+ *   v1.1.1 — 2026-10-18 — The redirectors and the landing server listen on ports the system picks, not
+ *     the fixed 40692 to 40694.
  *   v1.1.0 — 2026-09-17 — A credential in a header of its own name is dropped on a cross-origin redirect.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { describe, it, expect } from 'vitest';
+import type { AddressInfo, Server } from 'node:net';
 import { guardedFetch, guardedFetchNaming } from '../../src/services/mcp-client/transport.js';
+
+// The servers below listen on ports the system picks: fixed ones inside Linux's ephemeral range
+// collided on CI, and 40693 and 40694 were also mcp-client-invoke's.
+const portOf = (s: Server): number => (s.address() as AddressInfo).port;
 
 /** Addresses that must be refused however this node is configured. */
 const ALWAYS_BLOCKED: Array<{ what: string; url: string; because: RegExp }> = [
@@ -55,13 +62,13 @@ describe('the proxy\'s outbound fetch', () => {
       res.writeHead(302, { location: 'http://169.254.169.254/latest/meta-data/' });
       res.end();
     });
-    await new Promise<void>((r) => redirector.listen(40692, '127.0.0.1', () => r()));
+    await new Promise<void>((r) => redirector.listen(0, '127.0.0.1', () => r()));
     // Loopback has to be permitted for the FIRST hop to be reached at all; the point of the test
     // is what happens at the SECOND. Restored afterwards so no other suite inherits it.
     const before = process.env.AIMEAT_ALLOW_PRIVATE_EGRESS;
     process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
     try {
-      await expect(guardedFetch('http://127.0.0.1:40692/mcp'))
+      await expect(guardedFetch(`http://127.0.0.1:${portOf(redirector)}/mcp`))
         .rejects.toThrow(/Fetch blocked.*(link-local|metadata)/i);
     } finally {
       if (before === undefined) delete process.env.AIMEAT_ALLOW_PRIVATE_EGRESS;
@@ -77,15 +84,15 @@ describe('the proxy\'s outbound fetch', () => {
     const seen: Array<string | undefined> = [];
     const landing = http.createServer((req, res) => { seen.push(req.headers['x-api-key'] as string | undefined); res.end('{}'); });
     const redirector = http.createServer((_req, res) => {
-      res.writeHead(302, { location: 'http://localhost:40694/landing' });
+      res.writeHead(302, { location: `http://localhost:${portOf(landing)}/landing` });
       res.end();
     });
-    await new Promise<void>((r) => landing.listen(40694, () => r()));
-    await new Promise<void>((r) => redirector.listen(40693, '127.0.0.1', () => r()));
+    await new Promise<void>((r) => landing.listen(0, () => r()));
+    await new Promise<void>((r) => redirector.listen(0, '127.0.0.1', () => r()));
     const before = process.env.AIMEAT_ALLOW_PRIVATE_EGRESS;
     process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
     try {
-      await guardedFetchNaming(['X-API-Key'])('http://127.0.0.1:40693/mcp', { headers: { 'X-API-Key': 'static-key' } });
+      await guardedFetchNaming(['X-API-Key'])(`http://127.0.0.1:${portOf(redirector)}/mcp`, { headers: { 'X-API-Key': 'static-key' } });
       expect(seen.length).toBe(1);
       expect(seen[0]).toBeUndefined();
     } finally {

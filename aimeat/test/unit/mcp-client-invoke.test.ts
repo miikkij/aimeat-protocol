@@ -12,6 +12,9 @@
  *   The upstream server is built with the SDK's own server half, so the protocol on the wire is the
  *   protocol, and the test moves when the SDK does.
  * @version-history
+ *   v1.4.1 — 2026-10-18 — Every server listens on a port the system picks, and the unreachable case
+ *     uses a port just closed; the fixed 40687 and 40693 to 40697 collided on CI (40693 and 40694 are
+ *     also mcp-client-ssrf's).
  *   v1.4.0 — 2026-09-26 — The tool-list ceiling is 2 MB: a list refused past it drops the list stored
  *     before, a 600 KB list (past the old 512 KB) is kept, and an answer past the 16 MB read ceiling
  *     is cut and refused by the same name (secaudit 2026-09 A2-2). The three failed on the old code
@@ -27,6 +30,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
+import net, { type AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -46,7 +50,18 @@ import type { CapabilityRecord } from '../../src/storage/interface.js';
 // link-local stay blocked regardless of this flag, which is what the SSRF suite relies on.
 process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
 
-const PORT = 40694;
+// Every server here listens on a port the system picks: fixed ones inside Linux's ephemeral range
+// collided on CI, and 40694 was also mcp-client-ssrf's landing port.
+let PORT = 0;
+const portOf = (s: net.Server): number => (s.address() as AddressInfo).port;
+/** A port nothing listens on: the system hands one out and it is closed again at once. */
+async function closedPort(): Promise<number> {
+  const s = net.createServer();
+  await new Promise<void>((r) => s.listen(0, '127.0.0.1', () => r()));
+  const port = portOf(s);
+  await new Promise<void>((r) => s.close(() => r()));
+  return port;
+}
 // 32 bytes of hex: a real key, so the sealer runs for real rather than being bypassed.
 const KEY = 'a'.repeat(64);
 const config = { encryptionKey: KEY, totpSecretEncryptionKey: null } as never;
@@ -81,7 +96,8 @@ beforeAll(async () => {
     }
     await transport.handleRequest(req, res, body);
   });
-  await new Promise<void>((r) => httpServer.listen(PORT, '127.0.0.1', () => r()));
+  await new Promise<void>((r) => httpServer.listen(0, '127.0.0.1', () => r()));
+  PORT = portOf(httpServer);
 });
 
 afterAll(async () => {
@@ -195,7 +211,8 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     const storage = new SqliteStorage(':memory:');
     // A port nothing listens on. Loopback is permitted here, so this is a genuine refused
     // connection and not the SSRF guard answering.
-    const row = makeRow({ transport: { kind: 'http', url: 'http://127.0.0.1:40693/mcp' } });
+    const dead = await closedPort();
+    const row = makeRow({ transport: { kind: 'http', url: `http://127.0.0.1:${dead}/mcp` } });
     await storage.createMcpServer(row);
 
     const r = await callRemoteTool({
@@ -205,7 +222,7 @@ describe('the MCP proxy chokepoint, against a real server', () => {
     if (r.ok) return;
     expect(r.code).toBe('UNREACHABLE');
     // The endpoint must not leak into what a caller is told.
-    expect(r.message).not.toContain('40693');
+    expect(r.message).not.toContain(String(dead));
 
     const stored = await storage.getMcpServer(row.id);
     expect(stored?.status).toBe('unreachable');
@@ -223,10 +240,10 @@ describe('the MCP proxy chokepoint, against a real server', () => {
         error: { code: -32001, message: 'Authentication required. MCP requires a GHII account.' },
       }));
     });
-    await new Promise<void>((r) => refuser.listen(40687, '127.0.0.1', () => r()));
+    await new Promise<void>((r) => refuser.listen(0, '127.0.0.1', () => r()));
     try {
       const storage = new SqliteStorage(':memory:');
-      const row = makeRow({ transport: { kind: 'http', url: 'http://127.0.0.1:40687/mcp' } });
+      const row = makeRow({ transport: { kind: 'http', url: `http://127.0.0.1:${portOf(refuser)}/mcp` } });
       await storage.createMcpServer(row);
 
       const r = await callRemoteTool({
@@ -365,14 +382,14 @@ describe('a tool list larger than this node keeps', () => {
   // Servers of their own, because the size is the whole point: one tool whose description alone
   // sets the size of the list. Real servers list a hundred tools in 100 to 200 KB, and this node's
   // own list for an agent holding every word measured 436,530 bytes on 2026-09-26.
-  const BIG_PORT = 40695;
-  const MID_PORT = 40696;
-  const HUGE_PORT = 40697;
+  let BIG_PORT = 0;
+  let MID_PORT = 0;
+  let HUGE_PORT = 0;
   const servers: http.Server[] = [];
   const transports: StreamableHTTPServerTransport[] = [];
 
-  /** A server listing one tool with a description of `bytes` bytes; `json` answers without a stream. */
-  async function serveOneTool(port: number, bytes: number, json = false): Promise<void> {
+  /** A server listing one tool with a description of `bytes` bytes; `json` answers without a stream. Answers its port. */
+  async function serveOneTool(bytes: number, json = false): Promise<number> {
     const sessions = new Map<string, StreamableHTTPServerTransport>();
     const server = http.createServer(async (req, res) => {
       const sid = req.headers['mcp-session-id'] as string | undefined;
@@ -398,15 +415,16 @@ describe('a tool list larger than this node keeps', () => {
       await transport.handleRequest(req, res, body);
     });
     servers.push(server);
-    await new Promise<void>((r) => server.listen(port, '127.0.0.1', () => r()));
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+    return portOf(server);
   }
 
   beforeAll(async () => {
-    await serveOneTool(BIG_PORT, 2200 * 1024);
-    await serveOneTool(MID_PORT, 600 * 1024);
+    BIG_PORT = await serveOneTool(2200 * 1024);
+    MID_PORT = await serveOneTool(600 * 1024);
     // Past what this node reads of one answer at all, and answered as plain JSON, which the SDK
     // reads with response.json().
-    await serveOneTool(HUGE_PORT, 17 * 1024 * 1024, true);
+    HUGE_PORT = await serveOneTool(17 * 1024 * 1024, true);
   });
 
   afterAll(async () => {
