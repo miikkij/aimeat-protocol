@@ -20,6 +20,9 @@
  *   v1.x, findings()).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-gates-fail.test.ts
  * @version-history
+ *   2026-10-18 — check:python-shapes and check:python-daemon each refuse a planted copy of the Python
+ *     package and an allowlist missing an entry, and audit:browser-libs reports a planted difference
+ *     (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille).
  *   2026-10-16 — Merged beside W17 and W29: check:federation-signatures follows a helper of its own
  *     file (its limit is now another file's function), and check:denial-coverage runs its suite
  *     question alone on the fixture tree (AIMEAT_DENIAL_ROUTES=off), which has no openapi.yaml.
@@ -28,7 +31,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +42,7 @@ import { collectDoors, openWriteDoors, toRows } from '../../scripts/inventory/do
 import { staleTriage } from '../../scripts/inventory/triage-clock.js';
 import { scopeParityFindings, scopeParitySources } from '../../scripts/check-scope-parity.js';
 import { readVocabulary } from '../../scripts/inventory/scope-vocabulary.js';
+import { callsInText, routeDifferences } from '../../scripts/inventory/browser-lib-routes.js';
 
 const AIMEAT = fileURLToPath(new URL('../..', import.meta.url));
 const TSX = import.meta.resolve('tsx');
@@ -285,5 +289,83 @@ describe('the triage clock refuses an undated or stale clearance', () => {
     it('passes a fresh stamp, and does not age a SEEDED question', () => {
         const r = staleTriage({ a: `right because X [triaged ${today}]`, b: 'SEEDED 2026-09-04, NOT TRIAGED' }, 90);
         expect(r).toMatchObject({ undated: [], stale: [], watched: 1 });
+    });
+});
+
+// ── The pairs written twice: the Python package against the node and the connector ──
+// Wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille. The real scripts run on a
+// copy of the Python package's source (and of the allowlists), planted, through the environment
+// variables the scripts read for exactly this.
+describe('check:python-shapes and check:python-daemon refuse a difference nobody listed', { timeout: 180_000 }, () => {
+    const PY = join(AIMEAT, '..', 'python', 'aimeat-crewai', 'src', 'aimeat_crewai');
+    const FIXTURE = join(AIMEAT, '..', 'python', 'aimeat-crewai', 'tests', 'fixtures', 'node-offer-schema.json');
+    /** The package's source, with `edit` applied to one file, in a temp directory. */
+    function pythonCopy(edit?: { file: string; from: string; to: string }): string {
+        const files: Record<string, string> = {};
+        for (const name of readdirSync(PY).filter(n => n.endsWith('.py'))) files[name] = readFileSync(join(PY, name), 'utf8');
+        if (edit) {
+            expect(files[edit.file]).toContain(edit.from);
+            files[edit.file] = files[edit.file].replace(edit.from, edit.to);
+        }
+        return tree(files);
+    }
+    /** An allowlist copy without the entry `drop`. */
+    function allowlistWithout(file: string, drop: string): string {
+        const j = JSON.parse(readFileSync(join(AIMEAT, 'security', file), 'utf8')) as { exempt: Record<string, string> };
+        expect(j.exempt).toHaveProperty([drop]);
+        delete j.exempt[drop];
+        return join(tree({ 'allow.json': JSON.stringify(j) }), 'allow.json');
+    }
+    const run = (script: string, env: Record<string, string>) => runGate(script, AIMEAT, env);
+
+    it('check:python-shapes passes the package as it is', () => {
+        expect(run('check-python-shapes.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy() }).code).toBe(0);
+    });
+    it('check:python-shapes refuses a node field the Python builder does not name', () => {
+        // The same finding a field added to OfferSchema makes: the node has `exchange`, build_offer does not.
+        const r = run('check-python-shapes.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy(), AIMEAT_PARITY_SHAPE_ALLOWLIST: allowlistWithout('python-shape-parity.json', 'offer.field.node-only:exchange') });
+        expect(r.code).toBe(1);
+        expect(r.out).toContain('offer.field.node-only:exchange');
+    });
+    it('check:python-shapes refuses a field build_offer stops writing, and a signal op Python drops', () => {
+        expect(run('check-python-shapes.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'offers.py', from: '"tags": tags,', to: '' }) }).out).toContain('offer.field.node-only:tags');
+        expect(run('check-python-shapes.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'workflow_spec.py', from: '"json_valid", ', to: '' }) }).code).toBe(1);
+    });
+    it('check:python-shapes refuses a fixture that no longer matches the zod schemas', () => {
+        const stale = join(tree({ 'f.json': readFileSync(FIXTURE, 'utf8').replace('"TOLL_MORSELS_MAX": 100', '"TOLL_MORSELS_MAX": 99') }), 'f.json');
+        const r = run('check-python-shapes.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy(), AIMEAT_PARITY_FIXTURE: stale });
+        expect(r.code).toBe(1);
+        expect(r.out).toContain('no longer matches');
+    });
+    it('check:python-daemon passes the package as it is', () => {
+        expect(run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy() }).code).toBe(0);
+    });
+    it('check:python-daemon refuses a loopback route the serve daemon does not register, and a tool the connector lacks', () => {
+        const route = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'daemon.py', from: '"/local/invoke/next"', to: '"/local/invoke/upcoming"' }) });
+        expect(route.code).toBe(1);
+        expect(route.out).toContain('local.python-only:GET /local/invoke/upcoming');
+        const tool = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'daemon.py', from: '"aimeat_task_complete",', to: '"aimeat_task_finish",' }) });
+        expect(tool.code).toBe(1);
+        expect(tool.out).toContain('tool.not-on-connector:aimeat_task_finish');
+    });
+    it('check:python-daemon refuses an endpoint the connector calls and the daemon does not, once it is not listed', () => {
+        const r = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy(), AIMEAT_PARITY_DAEMON_ALLOWLIST: allowlistWithout('python-daemon-parity.json', 'rest.connector-only:POST /v1/agents/{}/tasks/{}/complete') });
+        expect(r.code).toBe(1);
+        expect(r.out).toContain('rest.connector-only:POST /v1/agents/{}/tasks/{}/complete');
+    });
+    it('stays blind to what a field means (its documented limit): the namespace-versus-name defect of the open incident passes', () => {
+        // daemon.py keys its manifest map by objectType.name; keying it by namespace changes no name the check reads.
+        const r = run('check-python-daemon.ts', { AIMEAT_PARITY_PYTHON_SRC: pythonCopy({ file: 'daemon.py', from: 'ot["name"]: ot["contract"]', to: 'ot["namespace"]: ot["contract"]' }) });
+        expect(r.code).toBe(0);
+    });
+});
+
+describe('audit:browser-libs finds a route both libraries call with different parameters', () => {
+    it('reports the planted difference and follows a concatenated path', () => {
+        const portal = callsInText("apiGet('/v1/memory/' + encodeURIComponent(k) + '?soft=1');\nfetch(`/v1/organisms/${id}/search?q=${q}`);");
+        const apps = callsInText("authFetch('/v1/memory/' + encodeURIComponent(k) + '?soft=1&owner_scope=true');\n// fetch('/v1/organisms/x/search?q=1')\nfetch('/v1/organisms/' + id + '/search?q=' + q);");
+        const { shared, differences } = routeDifferences(portal, apps);
+        expect(shared).toEqual(['/v1/memory/{}', '/v1/organisms/{}/search']);
+        expect(differences).toEqual({ '/v1/memory/{}': { portal: ['soft'], apps: ['owner_scope', 'soft'] } });
     });
 });
