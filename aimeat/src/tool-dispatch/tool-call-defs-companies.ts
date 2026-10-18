@@ -16,6 +16,7 @@
  * @structure companyCliTools[] — the handler table, spread by index.ts
  * @usage import { companyCliTools } from './tool-call-defs-companies.js';
  * @version-history
+ *   v1.1.1 — 2026-10-18 — aimeat_portfolio_publish without `html` lets the node answer the missing page.
  *   v1.1.0 — 2026-10-18 — aimeat_company_front_page and aimeat_portfolio_publish forward `access` (who may
  *     open the page); without `html` the welcome-page tool writes it through PUT /v1/portfolio/config (V3.10).
  *   v1.0.0 — 2026-10-12 — Moved from the connector MCP modules (wish: every MCP tool on aimeat connect serve).
@@ -117,8 +118,9 @@ export const companyCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const access = input.access !== undefined ? { access: input.access } : {};
             if (input.html === undefined && input.access !== undefined) return client.put('/v1/portfolio/config', access);
-            const html = requiredString(input, 'html');
-            return client.put('/v1/portfolio/upload', { html, ...(input.enable === undefined ? {} : { enable: input.enable }), ...access });
+            // Without html the node answers the missing page itself (400), as it does on the node MCP.
+            const html = input.html === undefined ? {} : { html: requiredString(input, 'html') };
+            return client.put('/v1/portfolio/upload', { ...html, ...(input.enable === undefined ? {} : { enable: input.enable }), ...access });
         },
     },
 ];

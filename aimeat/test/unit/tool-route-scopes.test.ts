@@ -16,6 +16,7 @@
  *   entry that no longer differs.
  * @usage pnpm test -- tool-route-scopes
  * @version-history
+ *   v1.3.0 — 2026-10-18 — aimeat_portfolio_publish is listed: `access` alone goes to the config route (V3.10).
  *   v1.2.0 — 2026-10-12 — Thirty tools got a dispatch definition and are paired for the first time.
  *     Three pairs differed: aimeat_organism_invitations_email now asks organism:invite as its route
  *     does, and aimeat_company_update (a read before the write) and aimeat_commerce_beneficiary_payout
@@ -137,6 +138,11 @@ function pairs(): { tool: string; route: string; tool_words: string[]; route_wor
 const KNOWN: Record<string, string> = {
   aimeat_workspace_object_delete: 'LOOKUP: lists the memory keys of the object before it deletes them.',
   aimeat_offer_price_set: 'LOOKUP: reads the agent\'s offers before it sets the price.',
+  // 2026-10-18 (plan doc-mvcn6c7e4e5q, V3.10): `access` alone changes the page's config record.
+  aimeat_portfolio_publish: 'TWO ROUTES, DECIDED: the page itself is a stored file (PUT /v1/portfolio/upload, storage:write, the '
+    + 'word the tool asks); a call with `access` and no `html` changes only who may open the page, which is the portfolio.config '
+    + 'memory record (PUT /v1/portfolio/config, memory:write). An agent holding storage:write and not memory:write is refused '
+    + 'that change by the route, with SCOPE_DENIED naming memory:write.',
   // Two pairs that the 2026-10-12 dispatch definitions made visible: the tools had a handler on the
   // connector MCP only, which this test does not read.
   aimeat_company_update: 'LOOKUP: reads the company (GET, company:read) before the PUT that replaces it (company:write, '
