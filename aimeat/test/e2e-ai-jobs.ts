@@ -20,6 +20,8 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.7.0 — 2026-10-18 — 15b: a restart while on_done runs keeps the answer readable with
+ *     ctx.ai.result, and the job's error does not say the answer was lost.
  *   v1.6.0 — 2026-10-18 — 7c and 7d: an on_done action gets the private answer in its input and reads
  *     it with ctx.ai.result, later too; a job of the owner's that the extension did not start, another
  *     owner's job and a key written again after the job are refused.
@@ -109,6 +111,7 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 let stub: Server | null = null;
 let holding = false;
 const held: ServerResponse[] = [];
+const callbackHeld: ServerResponse[] = [];
 let completionsSeen = 0;
 
 function answer(res: ServerResponse): void {
@@ -129,6 +132,12 @@ async function startStub(): Promise<void> {
                 completionsSeen++;
                 if (holding) { held.push(res); return; }
                 answer(res);
+                return;
+            }
+            // An on_done action's ctx.fetch lands here and is held, so the node can be killed while
+            // the action is certainly still running (case 15b).
+            if ((req.url ?? '').includes('/hold-callback')) {
+                callbackHeld.push(res);
                 return;
             }
             res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -319,6 +328,12 @@ const SCRIPT_READ = `export default async function(ctx, input) {
     if (input.peek) return await ctx.ai.result(input.peek);
     const read = await ctx.ai.result(input.job_id);
     await ctx.memory.set('read.ran', { result: input.result, too_large: input.result_too_large === true, read: read });
+    return { ok: true };
+}`;
+// An on_done action that stays running: its ctx.fetch is held by the stub until the test lets go.
+const SCRIPT_SLOW = `export default async function(ctx, input) {
+    if (input.peek) return await ctx.ai.result(input.peek);
+    await ctx.fetch('${STUB_BASE}/hold-callback', { method: 'POST', body: '{}' });
     return { ok: true };
 }`;
 const SCRIPT_THROW = `export default async function(ctx, input) {
@@ -706,6 +721,36 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         const after = await waitForState(a, id, ['failed', 'done', 'cancelled'], 20_000);
         assert(after.state === 'failed', `expected failed, got ${after.state}`);
         assert(after.error?.code === 'node_restarted', `code ${after.error?.code}`);
+    });
+
+    await installExtension(a, 'aijobslow', 'slow', SCRIPT_SLOW);
+    await test('15b. A restart during on_done keeps the answer readable with ctx.ai.result', async () => {
+        const r = await startJob(a, {
+            prompt: 'answered, then cut off in the callback', result_key: 'aijob.slow.result', result_visibility: 'private',
+            on_done: { extension: 'aijobslow', action: 'slow' },
+        });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const id = r.body.data.job_id;
+        // The callback's fetch reaching the stub is the proof the answer is written and on_done runs.
+        const began = Date.now();
+        while (callbackHeld.length === 0) {
+            assert(Date.now() - began < 15_000, 'the on_done action never reached the stub');
+            await sleep(50);
+        }
+
+        await stopServer(server, true);          // SIGKILL in the middle of the callback
+        while (callbackHeld.length) { try { callbackHeld.shift()!.end('{}'); } catch { /* socket gone */ } }
+        server = await startServer();
+
+        const after = await waitForState(a, id, ['failed', 'done', 'cancelled'], 20_000);
+        assert(after.state === 'failed' && after.error?.code === 'node_restarted', `end ${after.state} ${after.error?.code}`);
+        assert(!/lost/.test(after.error?.message ?? ''), `the message must not say the answer was lost: ${after.error?.message}`);
+        const peek = await json('/v1/ext/aijobslow/slow', {
+            method: 'POST', headers: auth(a.token), body: JSON.stringify({ peek: id }),
+        });
+        assert(peek.status === 200, `peek ${peek.status}: ${JSON.stringify(peek.body?.error)}`);
+        assert(peek.body.data.ok === true && peek.body.data.value === STUB_CONTENT,
+            `ctx.ai.result after the restart: ${JSON.stringify(peek.body.data)}`);
     });
 
 
