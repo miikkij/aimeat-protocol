@@ -225,12 +225,12 @@
       "digest": "sha256:daa32ca557873a1eca9d5bd5"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/mcp/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:0092723e2fe67ae43fa2e2a3"
+      "digest": "sha256:0f8ab65ca51570d1234f367b"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-10-15",
@@ -597,7 +597,7 @@
     },
     "node:ai-transparency": {
       "aimeat/src/mcp/ai-provenance-input.ts": "d2c8dbd9f1ff0642",
-      "aimeat/src/services/ai-provenance.ts": "1166828aaa1e9308"
+      "aimeat/src/services/ai-provenance.ts": "24021ea9d834c23b"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "a2a0d28e157ccf1c"
