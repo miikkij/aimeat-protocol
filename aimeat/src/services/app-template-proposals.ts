@@ -19,12 +19,16 @@
  *     node has none here and never reaches the local namesake's proposals (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-10-06 — proposeTemplate answers to the memory ceilings (memory-ceilings.ts) before it
  *     writes, and a refusal carries its status and code (secaudit 2026-10 last items, F3).
+ *   v1.1.1 — 2026-10-19 — proposeTemplate writes on the version that was read (record-cas.ts
+ *     updateMemoryRecord) and builds the proposal again on a fresh read after a conflict, so the
+ *     proofs it carries over are the stored ones (check:atomic-writes).
  */
 
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { memoryCeilings } from './memory-ceilings.js';
+import { updateMemoryRecord, UNCHANGED } from './record-cas.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 
 const ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -103,54 +107,56 @@ export async function proposeTemplate(
     if (!app) return { error: `derived_from app not found: ${input.derived_from.owner}/${input.derived_from.filename}` };
 
     const key = templateProposalKey(input.id);
-    const existing = await storage.getMemory(who.ownerGhii, key);
-    const existingValue = existing?.value as TemplateProposalManifest | null;
-    const now = new Date().toISOString();
+    // Written on the version that was read (record-cas.ts): a proof attached meanwhile is read again
+    // and carried over, not written over with the copy read before it.
+    let refusal = null as { error: string; status?: number; code?: string } | null;
+    const written = await updateMemoryRecord(storage, who.ownerGhii, key, async (existing) => {
+        const existingValue = existing?.value as TemplateProposalManifest | null;
+        const now = new Date().toISOString();
 
-    const manifest: TemplateProposalManifest = {
-        id: input.id,
-        title: input.title,
-        description: input.description,
-        derivedFrom: {
-            owner: input.derived_from.owner,
-            filename: input.derived_from.filename,
-            version: app.versionNumber,
-            node: config.nodeId,
-        },
-        tier: input.tier,
-        tags: (input.tags ?? []).slice(0, 12),
-        reuseNotes: input.reuse_notes,
-        startMode: input.start_mode ?? 'either',
-        ...(input.start_mode_rationale ? { startModeRationale: input.start_mode_rationale } : {}),
-        model: input.model.trim().toLowerCase(),
-        ...(input.model_notes ? { modelNotes: input.model_notes } : {}),
-        // Proofs survive an upsert — they attach to the proposal id, not one wording of it.
-        ...(existingValue?.proofs ? { proofs: existingValue.proofs } : {}),
-        ...(input.packs ? { packs: input.packs } : {}),
-        ...(input.composes ? { composes: input.composes } : {}),
-        proposedBy: callerGaii,
-        createdAt: existingValue?.createdAt ?? now,
-        updatedAt: now,
-    };
+        const manifest: TemplateProposalManifest = {
+            id: input.id,
+            title: input.title,
+            description: input.description,
+            derivedFrom: {
+                owner: input.derived_from.owner,
+                filename: input.derived_from.filename,
+                version: app.versionNumber,
+                node: config.nodeId,
+            },
+            tier: input.tier,
+            tags: (input.tags ?? []).slice(0, 12),
+            reuseNotes: input.reuse_notes,
+            startMode: input.start_mode ?? 'either',
+            ...(input.start_mode_rationale ? { startModeRationale: input.start_mode_rationale } : {}),
+            model: input.model.trim().toLowerCase(),
+            ...(input.model_notes ? { modelNotes: input.model_notes } : {}),
+            // Proofs survive an upsert — they attach to the proposal id, not one wording of it.
+            ...(existingValue?.proofs ? { proofs: existingValue.proofs } : {}),
+            ...(input.packs ? { packs: input.packs } : {}),
+            ...(input.composes ? { composes: input.composes } : {}),
+            proposedBy: callerGaii,
+            createdAt: existingValue?.createdAt ?? now,
+            updatedAt: now,
+        };
 
-    // A proposal is a memory record of the owner's, so it answers to the value size, the key count
-    // and the byte budget every memory write answers to, and is refused before it is written
-    // (secaudit 2026-10 last items, F3).
-    const ceilings = await memoryCeilings({ storage, config }, who.ownerGhii, [{ key, value: manifest }]);
-    if (!ceilings.ok) return { error: ceilings.refusal.message, status: ceilings.refusal.status, code: ceilings.refusal.code };
+        // A proposal is a memory record of the owner's, so it answers to the value size, the key count
+        // and the byte budget every memory write answers to, and is refused before it is written
+        // (secaudit 2026-10 last items, F3).
+        const ceilings = await memoryCeilings({ storage, config }, who.ownerGhii, [{ key, value: manifest }]);
+        refusal = ceilings.ok ? null : { error: ceilings.refusal.message, status: ceilings.refusal.status, code: ceilings.refusal.code };
+        if (refusal) return UNCHANGED;
 
-    await storage.setMemory({
-        key,
-        ownerGaii: who.ownerGhii,
-        value: manifest,
-        visibility: existing?.visibility ?? 'private',
-        tags: ['template', 'template-proposal', `model:${manifest.model}`, `tier:${manifest.tier}`],
-        ttlHours: null,
-        version: (existing?.version ?? 0) + 1,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
+        return {
+            value: manifest,
+            visibility: existing?.visibility ?? 'private',
+            tags: ['template', 'template-proposal', `model:${manifest.model}`, `tier:${manifest.tier}`],
+            ttlHours: null,
+        };
     });
-    return { manifest, updated: !!existing };
+    if (!written) return refusal ?? { error: 'The proposal was not written' };
+    // A first write is version 1; a write over an existing proposal is a later one.
+    return { manifest: written.value as TemplateProposalManifest, updated: written.version > 1 };
 }
 
 export async function listTemplateProposals(

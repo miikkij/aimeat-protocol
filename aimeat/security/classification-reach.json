@@ -320,7 +320,7 @@
     "src/routes/calibrator.ts": {
       "reads": {
         "listMemory": 5,
-        "getMemory": 11
+        "getMemory": 7
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Projects, dimensions, versions and batches pass presentMemories/presentMemory; the rest are read-to-update, delete cascades and existence checks."
     },
@@ -1020,7 +1020,7 @@
     },
     "src/services/app-template-proposals.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 1,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Template proposal manifests, listed to and read by their owner."
@@ -1417,14 +1417,14 @@
     },
     "src/services/design-book/reasons.ts": {
       "reads": {
-        "getMemory": 13,
+        "getMemory": 4,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Design Book reasons, published to the node's shared Design Book by their writers."
     },
     "src/services/design-book/service.ts": {
       "reads": {
-        "getMemory": 3,
+        "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Design Book parts, published to the node's shared Design Book by design."
@@ -2010,12 +2010,6 @@
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: an approved knowledge request reads the owner's manifest and the named entries only to compare their versions and visibilities with the request before making them public, then re-reads the manifest between its own writes. Nothing read is returned to anyone."
     },
-    "src/services/knowledge-sharing.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), checked: read-to-update. The entry's own record is read to write it back at the new visibility, as the entry PATCH route did before the write moved here; nothing read is returned."
-    },
     "src/services/knowledge-publish-ask.ts": {
       "reads": {
         "getMemory": 2
@@ -2166,9 +2160,9 @@
     },
     "src/services/record-cas.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "The node's own read (secaudit 2026-10, PKG-7): updateRecord reads a service record and its version to rewrite it with compare-and-swap (the classification service's records, package entitlements and claims, an agent's daily spend); its callers decide what reaches a caller, and nothing is shown from here."
+      "why": "The node's own read (secaudit 2026-10, PKG-7): updateRecord reads a service record and its version to rewrite it with compare-and-swap (the classification service's records, package entitlements and claims, an agent's daily spend); its callers decide what reaches a caller, and nothing is shown from here. 2026-10-19: updateMemoryRecord is the same read for a caller that also sets tags or visibility; the reads it replaced left calibrator.ts, design-book/reasons.ts, design-book/service.ts, knowledge-sharing.ts and app-template-proposals.ts (check:atomic-writes)."
     },
     "src/services/refinery/pipeline.ts": {
       "reads": {

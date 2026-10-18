@@ -34,6 +34,7 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.12.1 — 2026-10-19 — countUse() counts on the usage record's version (record-cas.ts) (check:atomic-writes).
  *   v1.12.0 — 2026-10-19 — The AVATAR kind (avatar.ts): adopt() answers the SVG and writes nothing,
  *     as for a component. proposeChecksFor moved to propose-checks.ts (pure extraction, 800 lines).
  *   v1.11.0 — 2026-10-17 — A part in proposal is stored for signed-in members, published parts public (V0.4).
@@ -90,6 +91,7 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { resolveAppOwnerScope } from '../app-owner-scope.js';
 import { systemGhiiFor } from '../compliance-register.js';
+import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 import { provenanceForWrite } from '../ai-provenance.js';
 import { AppUiService, type WriteProvenance } from '../app-ui/service.js';
 import {
@@ -606,29 +608,22 @@ export class DesignBookService {
    * however often it is republished. An adopt counts every time, as it always has (`always`).
    */
   private async countUse(id: string, app: string, always: boolean): Promise<boolean> {
-    const now = new Date().toISOString();
-    const usageRec = await this.storage.getMemory(this.bookOwner(), usageKey(id));
-    let prev: { count?: number; apps?: string[] };
-    // eslint-disable-next-line aimeat/no-silent-catch -- an unreadable counter starts again from zero; it is a counter
-    try { prev = (usageRec ? (typeof usageRec.value === 'string' ? JSON.parse(usageRec.value) : usageRec.value) : {}) ?? {}; } catch { prev = {}; }
-    const apps = Array.isArray(prev.apps) ? prev.apps.filter(a => typeof a === 'string') : [];
-    const known = apps.includes(app);
-    if (known && !always) return false;
-    await this.storage.setMemory({
-      key: usageKey(id),
-      ownerGaii: this.bookOwner(),
-      value: JSON.stringify({
-        spec: 'aimeat.designbook.usage/v1', id, count: (typeof prev.count === 'number' ? prev.count : 0) + 1,
-        last_adopted_at: now, apps: [...apps.filter(a => a !== app), app].slice(-USAGE_APPS_KEPT),
-      }),
-      visibility: 'public',
-      tags: ['designbook', 'usage'],
-      ttlHours: null,
-      version: usageRec ? usageRec.version + 1 : 1,
-      createdAt: usageRec?.createdAt ?? now,
-      updatedAt: now,
+    // Counted on the record's version, again on a fresh read after a conflict (record-cas.ts).
+    const written = await updateMemoryRecord(this.storage, this.bookOwner(), usageKey(id), (usageRec) => {
+      let prev: { count?: number; apps?: string[] };
+      // eslint-disable-next-line aimeat/no-silent-catch -- an unreadable counter starts again from zero; it is a counter
+      try { prev = (usageRec ? (typeof usageRec.value === 'string' ? JSON.parse(usageRec.value) : usageRec.value) : {}) ?? {}; } catch { prev = {}; }
+      const apps = Array.isArray(prev.apps) ? prev.apps.filter(a => typeof a === 'string') : [];
+      if (apps.includes(app) && !always) return UNCHANGED;
+      return {
+        value: JSON.stringify({
+          spec: 'aimeat.designbook.usage/v1', id, count: (typeof prev.count === 'number' ? prev.count : 0) + 1,
+          last_adopted_at: new Date().toISOString(), apps: [...apps.filter(a => a !== app), app].slice(-USAGE_APPS_KEPT),
+        }),
+        visibility: 'public', tags: ['designbook', 'usage'], ttlHours: null,
+      };
     });
-    return true;
+    return written !== null;
   }
 
   /**

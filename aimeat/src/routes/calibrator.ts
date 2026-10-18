@@ -20,6 +20,11 @@
  *   - PUT  /v1/calibrator/:id/batches/:batchId — update batch
  *   - DELETE /v1/calibrator/:id/batches/:batchId — delete batch
  * @version-history
+ *   2026-10-19 — PUT /:id, POST /:id/versions, PUT /:id/batches/:batchId, the dimensions list and the
+ *     template backfill of GET /:id and GET /:id/detail write on the version that was read
+ *     (record-cas.ts updateMemoryRecord), and set their change on a fresh read after a conflict.
+ *     POST versions takes its number on the project before it writes the version record
+ *     (check:atomic-writes).
  *   2026-10-11 — The `memory` change of a calibrator record, which is always private, goes to its
  *     owner's streams only (event-bus.ts emitRecordChange). It was a global event.
  *   v1.0.0 — 2026-03-29 — Initial implementation
@@ -47,6 +52,7 @@ import { emitRecordChange } from '../services/event-bus.js';
 import { createCalibratorDetailService } from '../services/db/calibrator-detail-db-service.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories, presentMemory } from '../services/classification/present-memory.js';
+import { updateMemoryRecord, UNCHANGED } from '../services/record-cas.js';
 
 const DEFAULT_ANALYSIS_TEMPLATE = `You are evaluating whether a candidate AI model's output is STRUCTURALLY CORRECT compared to a reference output.
 
@@ -237,6 +243,22 @@ interface CalibratorCandidateModel {
   [key: string]: unknown;
 }
 
+const PROJECT_TAGS = ['calibrator', 'project'];
+
+/** Fill in a missing or outdated template field of a stored project. Answers whether one changed. */
+function fillTemplates(project: Record<string, unknown>): boolean {
+  let changed = false;
+  // Update analysis template if it contains old versions (line-by-line or verbose structural)
+  const analysisStr = (project.analysisPromptTemplate as string) || '';
+  if (!analysisStr || analysisStr.includes('For each difference between A and B') || analysisStr.includes('Do NOT create dimensions for')) {
+    project.analysisPromptTemplate = DEFAULT_ANALYSIS_TEMPLATE; changed = true;
+  }
+  if (!project.reflectionPromptTemplate) { project.reflectionPromptTemplate = DEFAULT_REFLECTION_TEMPLATE; changed = true; }
+  if (!project.selfReflectionPromptTemplate) { project.selfReflectionPromptTemplate = DEFAULT_SELF_REFLECTION_TEMPLATE; changed = true; }
+  if (!project.synthesisPromptTemplate) { project.synthesisPromptTemplate = DEFAULT_SYNTHESIS_TEMPLATE; changed = true; }
+  return changed;
+}
+
 export function calibratorRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
@@ -257,6 +279,25 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       createdAt: now,
       updatedAt: now,
     });
+  }
+
+  /**
+   * Change a stored calibrator record on the version that was read (record-cas.ts), and again on a
+   * fresh read when another request wrote it meanwhile. `mutate` gets its own copy (null when the
+   * record is absent) and answers UNCHANGED to write nothing. Answers the value as written, or null.
+   */
+  async function changeCalMemory<T>(gaii: string, key: string, tags: string[], mutate: (cur: T | null) => T | typeof UNCHANGED): Promise<T | null> {
+    const written = await updateMemoryRecord(storage, gaii, key, (rec) => {
+      const next = mutate(rec ? structuredClone(rec.value) as T : null);
+      return next === UNCHANGED ? UNCHANGED : { value: next, visibility: 'private', tags };
+    });
+    return written ? written.value as T : null;
+  }
+
+  /** The lazy template backfill of a project read, written onto the stored project, not the copy read. */
+  async function saveFilledTemplates(gaii: string, id: string): Promise<void> {
+    await changeCalMemory<Record<string, unknown>>(gaii, `calibrator.${id}.project`, PROJECT_TAGS,
+      cur => (cur && fillTemplates(cur) ? cur : UNCHANGED));
   }
 
   // ── Template defaults (MUST be before /:id to avoid Express matching "templates" as :id) ──
@@ -363,18 +404,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       }
       // Backfill missing or outdated template fields
       const project = record.value as Record<string, unknown>;
-      let needsSave = false;
-      // Update analysis template if it contains old versions (line-by-line or verbose structural)
-      const analysisStr = (project.analysisPromptTemplate as string) || '';
-      if (!analysisStr || analysisStr.includes('For each difference between A and B') || analysisStr.includes('Do NOT create dimensions for')) {
-        project.analysisPromptTemplate = DEFAULT_ANALYSIS_TEMPLATE; needsSave = true;
-      }
-      if (!project.reflectionPromptTemplate) { project.reflectionPromptTemplate = DEFAULT_REFLECTION_TEMPLATE; needsSave = true; }
-      if (!project.selfReflectionPromptTemplate) { project.selfReflectionPromptTemplate = DEFAULT_SELF_REFLECTION_TEMPLATE; needsSave = true; }
-      if (!project.synthesisPromptTemplate) { project.synthesisPromptTemplate = DEFAULT_SYNTHESIS_TEMPLATE; needsSave = true; }
-      if (needsSave) {
-        await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
-      }
+      if (fillTemplates(project)) await saveFilledTemplates(gaii, id);
       const dimStored = await storage.getMemory(gaii, `calibrator.${id}.dimensions`);
       const dimRecord = dimStored ? await presentMemory(reader, dimStored) : null;
       res.json(success(config.nodeId, {
@@ -401,18 +431,7 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
       }
       // Lazy template backfill — identical to GET /v1/calibrator/:id, kept behavior-compatible.
-      const project = data.project;
-      let needsSave = false;
-      const analysisStr = (project.analysisPromptTemplate as string) || '';
-      if (!analysisStr || analysisStr.includes('For each difference between A and B') || analysisStr.includes('Do NOT create dimensions for')) {
-        project.analysisPromptTemplate = DEFAULT_ANALYSIS_TEMPLATE; needsSave = true;
-      }
-      if (!project.reflectionPromptTemplate) { project.reflectionPromptTemplate = DEFAULT_REFLECTION_TEMPLATE; needsSave = true; }
-      if (!project.selfReflectionPromptTemplate) { project.selfReflectionPromptTemplate = DEFAULT_SELF_REFLECTION_TEMPLATE; needsSave = true; }
-      if (!project.synthesisPromptTemplate) { project.synthesisPromptTemplate = DEFAULT_SYNTHESIS_TEMPLATE; needsSave = true; }
-      if (needsSave) {
-        await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
-      }
+      if (fillTemplates(data.project)) await saveFilledTemplates(gaii, id);
       res.json(success(config.nodeId, data));
     }
   );
@@ -423,24 +442,27 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const id = req.params.id as string;
-      const record = await storage.getMemory(gaii, `calibrator.${id}.project`);
-      if (!record) {
-        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
-      }
-      const project = record.value as Record<string, unknown>;
       const {
         name, reasoningLlm, analysisPromptTemplate, reflectionPromptTemplate,
         selfReflectionPromptTemplate, synthesisPromptTemplate, candidateModels, status,
       } = req.body ?? {};
-      if (name !== undefined) project.name = name;
-      if (reasoningLlm !== undefined) project.reasoningLlm = reasoningLlm;
-      if (analysisPromptTemplate !== undefined) project.analysisPromptTemplate = analysisPromptTemplate;
-      if (reflectionPromptTemplate !== undefined) project.reflectionPromptTemplate = reflectionPromptTemplate;
-      if (selfReflectionPromptTemplate !== undefined) project.selfReflectionPromptTemplate = selfReflectionPromptTemplate;
-      if (synthesisPromptTemplate !== undefined) project.synthesisPromptTemplate = synthesisPromptTemplate;
-      if (candidateModels !== undefined) project.candidateModels = candidateModels;
-      if (status !== undefined) project.status = status;
-      await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
+      // The fields this request names are set on the stored project, so another request's change
+      // to the others stays.
+      const project = await changeCalMemory<Record<string, unknown>>(gaii, `calibrator.${id}.project`, PROJECT_TAGS, (cur) => {
+        if (!cur) return UNCHANGED;
+        if (name !== undefined) cur.name = name;
+        if (reasoningLlm !== undefined) cur.reasoningLlm = reasoningLlm;
+        if (analysisPromptTemplate !== undefined) cur.analysisPromptTemplate = analysisPromptTemplate;
+        if (reflectionPromptTemplate !== undefined) cur.reflectionPromptTemplate = reflectionPromptTemplate;
+        if (selfReflectionPromptTemplate !== undefined) cur.selfReflectionPromptTemplate = selfReflectionPromptTemplate;
+        if (synthesisPromptTemplate !== undefined) cur.synthesisPromptTemplate = synthesisPromptTemplate;
+        if (candidateModels !== undefined) cur.candidateModels = candidateModels;
+        if (status !== undefined) cur.status = status;
+        return cur;
+      });
+      if (!project) {
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
+      }
       res.json(success(config.nodeId, { project }));
       emitRecordChange('memory', gaii, 'private');
     }
@@ -467,16 +489,25 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       const id = req.params.id as string;
-      const projectRecord = await storage.getMemory(gaii, `calibrator.${id}.project`);
-      if (!projectRecord) {
+      const { prompt, targetOutput, changelog } = req.body ?? {};
+      const validPrompt = !!prompt && typeof prompt === 'string';
+      // The version number is taken on the project's version first, so two requests at the same
+      // moment get two numbers and neither version record overwrites the other.
+      let found = false;
+      let newVersion = 0;
+      await changeCalMemory<Record<string, unknown>>(gaii, `calibrator.${id}.project`, PROJECT_TAGS, (cur) => {
+        found = !!cur;
+        if (!cur || !validPrompt) return UNCHANGED;
+        newVersion = ((cur.currentVersion as number) || 0) + 1;
+        cur.currentVersion = newVersion;
+        return cur;
+      });
+      if (!found) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Calibration project not found.'));
       }
-      const { prompt, targetOutput, changelog } = req.body ?? {};
-      if (!prompt || typeof prompt !== 'string') {
+      if (!validPrompt) {
         return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'prompt is required.'));
       }
-      const project = projectRecord.value as Record<string, unknown>;
-      const newVersion = ((project.currentVersion as number) || 0) + 1;
       const version = {
         version: newVersion,
         prompt,
@@ -485,8 +516,6 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
         createdAt: new Date().toISOString(),
       };
       await setCalMemory(gaii, `calibrator.${id}.version.${newVersion}`, version, ['calibrator', 'version']);
-      project.currentVersion = newVersion;
-      await setCalMemory(gaii, `calibrator.${id}.project`, project, ['calibrator', 'project']);
       res.status(201).json(success(config.nodeId, { version }));
       emitRecordChange('memory', gaii, 'private');
     }
@@ -635,16 +664,18 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       const gaii = resolve(req);
       const id = req.params.id as string;
       const batchId = req.params.batchId as string;
-      const record = await storage.getMemory(gaii, `calibrator.${id}.batch.${batchId}`);
-      if (!record) {
+      const { models, status, step4_synthesis } = req.body ?? {};
+      // Set on the stored batch, so a concurrent update of its other fields stays.
+      const batch = await changeCalMemory<Record<string, unknown>>(gaii, `calibrator.${id}.batch.${batchId}`, ['calibrator', 'batch'], (cur) => {
+        if (!cur) return UNCHANGED;
+        if (models !== undefined) cur.models = models;
+        if (status !== undefined) cur.status = status;
+        if (step4_synthesis !== undefined) cur.step4_synthesis = step4_synthesis;
+        return cur;
+      });
+      if (!batch) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Batch not found.'));
       }
-      const batch = record.value as Record<string, unknown>;
-      const { models, status, step4_synthesis } = req.body ?? {};
-      if (models !== undefined) batch.models = models;
-      if (status !== undefined) batch.status = status;
-      if (step4_synthesis !== undefined) batch.step4_synthesis = step4_synthesis;
-      await setCalMemory(gaii, `calibrator.${id}.batch.${batchId}`, batch, ['calibrator', 'batch']);
 
       // Auto-discover dimensions from Step 2 results
       const batchModels = (batch.models as CalibratorBatchModel[]) || [];
@@ -657,25 +688,25 @@ export function calibratorRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       if (allDimensions.length > 0) {
-        const dimRecord = await storage.getMemory(gaii, `calibrator.${id}.dimensions`);
-        const existingDims = (dimRecord?.value as CalibratorDimension[]) || [];
-        const existingNames = new Set(existingDims.map((d) => d.name));
-        let added = false;
-        for (const dim of allDimensions) {
-          if (dim.name && !existingNames.has(dim.name)) {
-            existingDims.push({
-              name: dim.name,
-              description: dim.description,
-              category: dim.category,
-              discoveredInBatch: batchId,
-            });
-            existingNames.add(dim.name);
-            added = true;
+        // Appended to the stored list, so the dimensions a concurrent batch update added stay.
+        await changeCalMemory<CalibratorDimension[]>(gaii, `calibrator.${id}.dimensions`, ['calibrator', 'dimensions'], (cur) => {
+          const existingDims = cur || [];
+          const existingNames = new Set(existingDims.map((d) => d.name));
+          let added = false;
+          for (const dim of allDimensions) {
+            if (dim.name && !existingNames.has(dim.name)) {
+              existingDims.push({
+                name: dim.name,
+                description: dim.description,
+                category: dim.category,
+                discoveredInBatch: batchId,
+              });
+              existingNames.add(dim.name);
+              added = true;
+            }
           }
-        }
-        if (added) {
-          await setCalMemory(gaii, `calibrator.${id}.dimensions`, existingDims, ['calibrator', 'dimensions']);
-        }
+          return added ? existingDims : UNCHANGED;
+        });
       }
 
       res.json(success(config.nodeId, { batch }));
