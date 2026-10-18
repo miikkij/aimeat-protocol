@@ -9,13 +9,17 @@
  * @structure One describe block; setup imports the node keypair the service signs with.
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-access-token.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The `viewer` claim and grantExpiresAt() (plan doc-mvcn6c7e4e5q, V2).
  *   v1.0.0 — 2026-08-11 — Initial (audit H-19).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
 import { initNodeKeys, getNodeCryptoKeys } from '../../src/auth/jwt.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { initDraftTokenKeys, generateDraftToken } from '../../src/services/draft-token.js';
-import { generateAppAccessToken, appAccessGranted } from '../../src/services/app-access-token.js';
+import { decodeJwt } from 'jose';
+import {
+    generateAppAccessToken, appAccessGranted, generatePageAccessToken, grantExpiresAt,
+} from '../../src/services/app-access-token.js';
 
 const NODE = 'aimeat-local-001-dev';
 const FILE = 'gated-demo.html';
@@ -69,6 +73,24 @@ describe('app-access grant', () => {
         expect(await appAccessGranted('', 'alice', FILE)).toBe(false);
         // Express hands back an array for `?access=a&access=b`; it must not reach jwtVerify as one.
         expect(await appAccessGranted(['a', 'b'], 'alice', FILE)).toBe(false);
+    });
+
+    it('names its viewer when it has one, and still opens on owner and filename alone', async () => {
+        const grant = await generateAppAccessToken({ sub: `alice@${NODE}`, filename: FILE, viewer: `bob@${NODE}` });
+        expect(decodeJwt(grant).viewer).toBe(`bob@${NODE}`);
+        expect(decodeJwt(grant).sub).toBe(`alice@${NODE}`);
+        expect(await appAccessGranted(grant, 'alice', FILE)).toBe(true);
+        const codeGrant = await generateAppAccessToken({ sub: `alice@${NODE}`, filename: FILE });
+        expect(decodeJwt(codeGrant).viewer).toBeUndefined();
+        const page = await generatePageAccessToken({ kind: 'portfolio', owner: 'alice' }, 3600, `bob@${NODE}`);
+        expect(decodeJwt(page).viewer).toBe(`bob@${NODE}`);
+    });
+
+    it('reads the expiry of a grant for the cookie lifetime', async () => {
+        const grant = await generateAppAccessToken({ sub: `alice@${NODE}`, filename: FILE });
+        const exp = grantExpiresAt(grant)!;
+        expect(exp - Math.floor(Date.now() / 1000)).toBeGreaterThan(3590);
+        expect(grantExpiresAt('not-a-jwt')).toBeNull();
     });
 
     it('refuses a grant signed by a key that is not this node\'s', async () => {

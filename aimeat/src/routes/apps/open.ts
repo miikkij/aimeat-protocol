@@ -18,6 +18,8 @@
  * @structure signInGateRefused() · registerAppOpenRoutes()
  * @usage registerAppOpenRoutes(router, config, storage, canonicalOwner)   // from appsRouter
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The grant carries `viewer`, the GHII of the signed-in person it was minted
+ *     for; `sub` keeps naming the app owner (plan doc-mvcn6c7e4e5q, V2).
  *   v1.0.0 — 2026-10-17 — Initial.
  */
 import type { Router, Request, Response } from 'express';
@@ -31,6 +33,7 @@ import { appIsPaced } from '../../services/app-pacing.js';
 import { appAccessGranted, generateAppAccessToken } from '../../services/app-access-token.js';
 import { operatorOverride } from '../../services/operator-override.js';
 import { isSameAccount } from '../../utils/same-account.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 import { resolveAppTarget } from '../subdomain-app-gate.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 
@@ -100,7 +103,9 @@ export function registerAppOpenRoutes(router: Router, config: AimeatConfig, stor
     const target = config.appOriginEnabled && config.appHost
       ? await appOriginUrl(config, storage, app.ownerName, app.filename)
       : `${config.baseUrl}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`;
-    const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename });
+    // `sub` stays the app owner, which the origin checks; `viewer` names the person the grant was
+    // handed to. The app origin moves the grant from the address to a cookie (routes/origin-grant-cookie.ts).
+    const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename, viewer: resolveIdentity(req.auth!, config.nodeId) });
     const sep = target.includes('?') ? '&' : '?';
     res.setHeader('Cache-Control', 'no-store');
     res.json(success(config.nodeId, { url: `${target}${sep}access=${encodeURIComponent(grant)}`, expires_in: 3600 }));

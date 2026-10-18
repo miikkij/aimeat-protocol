@@ -20,6 +20,8 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   v1.0.1 — 2026-10-18 — The granted origin answers the grant with a 302 and the grant cookie, and
+ *     serves on the cookie (plan doc-mvcn6c7e4e5q, V2).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V1.7).
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -218,7 +220,12 @@ async function main() {
                 const open = await json(`/v1/apps/${owner}/${filename}/open`, { method: 'POST', headers: { Authorization: `Bearer ${tk}` }, body: '{}' });
                 assert(open.status === 200 && typeof open.body.data?.url === 'string', `open ${open.status} ${JSON.stringify(open.body)}`);
                 const u = new URL(open.body.data.url);
-                const page = await hostRequest(BASE, `${u.pathname}${u.search}`, `${u.hostname}:${PORT}`, { headers: { 'x-app-origin': '1', 'x-subdomain': u.hostname.split('.')[0], Accept: 'text/html' } });
+                const originHeaders = { 'x-app-origin': '1', 'x-subdomain': u.hostname.split('.')[0], Accept: 'text/html' };
+                // The origin moves the grant from the address to a cookie (302), and serves on the cookie.
+                const hop = await hostRequest(BASE, `${u.pathname}${u.search}`, `${u.hostname}:${PORT}`, { headers: originHeaders });
+                const cookie = (hop.header('set-cookie') ?? '').split(';')[0];
+                assert(hop.status === 302 && cookie.startsWith('aimeat_app_access='), `the grant hop: ${hop.status}`);
+                const page = await hostRequest(BASE, hop.header('location')!, `${u.hostname}:${PORT}`, { headers: { ...originHeaders, Cookie: cookie } });
                 assert(page.status === 200 && page.body.includes(APP_TEXT), `the granted origin: ${page.status}`);
             }
             const anonOpen = await json(`/v1/apps/${owner}/${filename}/open`, { method: 'POST', body: '{}' });

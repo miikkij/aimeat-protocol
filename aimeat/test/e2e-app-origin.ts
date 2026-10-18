@@ -10,6 +10,9 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-10-18 — Phase 7: the origin answers the first request with a grant by a 302 to the address
+ *     without it and sets the grant cookie; the app serves on the cookie. The access-code round trip
+ *     ends on `/?unlock=1`, and its grant carries no viewer (plan doc-mvcn6c7e4e5q, V2).
  *   2026-10-17 — Phase 12: an operator-hidden app answers 404 on its subdomain, the path form and
  *     the markdown face, and its documents no longer describe it (plan doc-mvcn6c7e4e5q, V0.2). It
  *     failed before the fix: the subdomain served the hidden app with 200.
@@ -94,6 +97,14 @@ function onAppOrigin(
     const headers: Record<string, string> = { 'x-app-origin': '1', ...extra };
     if (sub && label === 'header') headers['x-subdomain'] = sub;
     return hostRequest(BASE, path, host, { headers });
+}
+
+/** The `name=value` of the grant cookie a response set, or '' when it set none. */
+function grantCookie(res: HostResponse): string {
+    for (let i = 0; i < res.rawHeaders.length; i += 2) {
+        if (res.rawHeaders[i].toLowerCase() === 'set-cookie' && res.rawHeaders[i + 1].startsWith('aimeat_app_access=')) return res.rawHeaders[i + 1].split(';')[0];
+    }
+    return '';
 }
 
 function cleanupDb() {
@@ -760,8 +771,14 @@ async function main() {
             grantQuery = loc.slice(loc.indexOf('?'));
         });
 
-        await test('the app origin serves the gated app WITH the grant', async () => {
-            const res = await onAppOrigin(`/${grantQuery}`, GATED_SUB);
+        await test('the app origin serves the gated app WITH the grant, moved from the address to a cookie', async () => {
+            const hop = await onAppOrigin(`/${grantQuery}`, GATED_SUB);
+            assert(hop.status === 302, `the first request with the grant answers 302, got ${hop.status}`);
+            assert(!(hop.header('location') ?? '').includes('access='), `the grant stays in the address: ${hop.header('location')}`);
+            assert(!hop.body.includes('gated secret body'), 'the hop carries none of the app');
+            const cookie = grantCookie(hop);
+            assert(cookie.startsWith('aimeat_app_access='), `no grant cookie: ${hop.header('set-cookie')}`);
+            const res = await onAppOrigin(hop.header('location')!, GATED_SUB, 'header', { Cookie: cookie });
             assert(res.status === 200, `expected 200, got ${res.status}`);
             assert(res.body.includes('gated secret body'), 'the app bytes belong on the app origin');
         });
@@ -805,7 +822,13 @@ async function main() {
             const back = submitted.headers.get('location') ?? '';
             assert(back.includes('access='), `no grant on the way back: ${back}`);
             assert(back.includes('unlock=1'), `the bounce mark must survive the hop: ${back}`);
-            const served = await onAppOrigin(`/${back.slice(back.indexOf('?'))}`, GATED_SUB, 'header', asBrowser);
+            const grant = new URL(back).searchParams.get('access') ?? '';
+            const claims = JSON.parse(Buffer.from(grant.split('.')[1] ?? '', 'base64url').toString('utf8'));
+            assert(claims.typ === 'app-access' && claims.viewer === undefined, `the access-code grant knows no person: ${JSON.stringify(claims)}`);
+            // The origin takes the grant out of the address: the page ends on a clean URL.
+            const hop = await onAppOrigin(`/${back.slice(back.indexOf('?'))}`, GATED_SUB, 'header', asBrowser);
+            assert(hop.status === 302 && hop.header('location') === '/?unlock=1', `the grant hop: ${hop.status} ${hop.header('location')}`);
+            const served = await onAppOrigin(hop.header('location')!, GATED_SUB, 'header', { ...asBrowser, Cookie: grantCookie(hop) });
             assert(served.status === 200, `the unlocked app must serve, got ${served.status}`);
             assert(served.body.includes('gated secret body'), 'and it must be the app');
         });
