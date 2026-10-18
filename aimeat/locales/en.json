@@ -22239,7 +22239,29 @@
       }
     }
   },
+  "news": {
+    "titleSince": "New since you last looked",
+    "titleWindow": "The most important changes of the last {n} days",
+    "highlights": "Important",
+    "others": "Other changes",
+    "moreOne": "One more change is in the history.",
+    "moreN": "{n} more changes are in the history.",
+    "read": "Read",
+    "history": "Everything that has changed →",
+    "for": "For: {who}",
+    "countTitle": "{n} new changes on your home",
+    "who": {
+      "user": "You",
+      "agent": "Your AI and agents",
+      "operator": "Operator",
+      "developer": "App builders"
+    }
+  },
   "changelog": {
+    "whoLabel": "For whom",
+    "everyone": "Everyone",
+    "onlyHighlights": "Only the important ones",
+    "impact": "For you:",
     "kicker": "Built with itself, every day",
     "title": "What shipped here",
     "position": "Newest first. Every entry says what a person gets, not what the code does.",

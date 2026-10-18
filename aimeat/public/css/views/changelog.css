@@ -7,6 +7,8 @@
  *   offset shadows, the sticker yellow), a month rail that sticks while the list scrolls, and a
  *   card per entry. Colour carries one meaning only: what KIND of change an entry was.
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The news fields: the highlight entry's heavier frame, whom an entry is for,
+ *     the summary line and a fix's impact line.
  *   v1.0.0 — 2026-08-28 — Initial.
  */
 .chg-head { display: flex; flex-direction: column; align-items: flex-start; gap: 1.1rem; padding: 2.5rem 0 1.75rem; }
@@ -58,6 +60,13 @@
 .chg-kind-security { border-color: var(--danger); color: var(--danger); }
 .chg-kind-fix { background: var(--text); color: var(--bg); }
 .chg-version { font-family: var(--font-mono); font-size: .75rem; color: var(--text-muted); }
+/* An entry most of its audience should notice carries the library's sun tag (Mark tone="sun") and a
+   heavier frame. */
+.chg-entry.is-highlight { border-width: 4px; }
+.chg-who { font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 700; color: var(--text-dim); }
+.chg-entry-summary { margin: 0; font-family: var(--font-showroom-body); font-size: 1.1rem; line-height: 1.45; font-weight: 700; }
+.chg-entry-impact { margin: 0; font-family: var(--font-showroom-body); font-size: .95rem; line-height: 1.5; }
+.chg-entry-impact b { font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: .75rem; letter-spacing: .04em; }
 .chg-anchor { margin-left: auto; font-family: var(--font-showroom-body); font-size: .8rem; font-weight: 800; color: var(--text-dim); text-decoration: none; }
 .chg-anchor:hover { color: var(--accent); }
 .chg-entry-title { margin: 0; font-family: var(--font-showroom-body); font-size: 1.5rem; line-height: 1.2; font-weight: 800; }

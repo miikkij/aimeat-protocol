@@ -3168,10 +3168,19 @@
      "slug": "g-16-what-shipped",
      "cells": [
       "<strong>What shipped</strong>",
-      "The full change log by month, filterable, with a link per entry.",
-      "<code>/v1/changelog</code>"
+      "The full change log by month, filterable by kind and by whom a change is for (you, your AI and agents, the operator, app builders) or to the important ones only, with a link per entry. Every entry has a one-sentence summary of what you get, and a fix or a security entry says whether your use changes and whether you need to do anything.",
+      "<code>/v1/changelog</code>, <code>/changelog.json</code>"
      ],
-     "plain": "What shipped The full change log by month, filterable, with a link per entry. /v1/changelog"
+     "plain": "What shipped The full change log by month, filterable by kind and by whom a change is for (you, your AI and agents, the operator, app builders) or to the important ones only, with a link per entry. Every entry has a one-sentence summary of what you get, and a fix or a security entry says whether your use changes and whether you need to do anything. /v1/changelog, /changelog.json"
+    },
+    {
+     "slug": "g-16-new-since-you-last-looked",
+     "cells": [
+      "<strong>New since you last looked</strong>",
+      "The top of your home lists what changed on the node since you last pressed Read: the important changes first and marked, then up to five more, each one sentence with whom it is for; the rest is one line pointing at the history. The Home link in the header shows how many. You see the entries for you and your AI, an operator also sees the operator's, and a person with an app of their own also sees the app builders'. If you have not looked for 30 days, or never, you see only the important changes of the last 30 days. What you have read is a private record in your own memory (<code>home.news</code>). Limitation: the web only; your AI does not report these changes in chat.",
+      "<code>/v1/home</code>"
+     ],
+     "plain": "New since you last looked The top of your home lists what changed on the node since you last pressed Read: the important changes first and marked, then up to five more, each one sentence with whom it is for; the rest is one line pointing at the history. The Home link in the header shows how many. You see the entries for you and your AI, an operator also sees the operator's, and a person with an app of their own also sees the app builders'. If you have not looked for 30 days, or never, you see only the important changes of the last 30 days. What you have read is a private record in your own memory (home.news). Limitation: the web only; your AI does not report these changes in chat. /v1/home"
     }
    ]
   },
@@ -4244,6 +4253,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 428
+  "rows": 429
  }
 }

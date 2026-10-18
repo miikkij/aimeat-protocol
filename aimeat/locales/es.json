@@ -13480,6 +13480,24 @@
     "insufficient": "Este uso necesita más morsels de ritmo de los que tiene tu saldo. Tu saldo crece cada día con la asignación diaria: pide los morsels de hoy en la página Cartera.",
     "insufficientPack": "También puedes comprarle más capacidad de ritmo a quien gestiona este servicio: {n} morsels por {price}."
   },
+  "news": {
+    "titleSince": "Novedades desde tu última visita",
+    "titleWindow": "Los cambios más importantes de los últimos {n} días",
+    "highlights": "Importante",
+    "others": "Otros cambios",
+    "moreOne": "Hay un cambio más en el historial.",
+    "moreN": "Hay {n} cambios más en el historial.",
+    "read": "Leído",
+    "history": "Todo lo que ha cambiado →",
+    "for": "Para: {who}",
+    "countTitle": "{n} cambios nuevos en tu inicio",
+    "who": {
+      "user": "Tú",
+      "agent": "Tu IA y tus agentes",
+      "operator": "Operador",
+      "developer": "Quienes crean aplicaciones"
+    }
+  },
   "nav": {
     "devView": "Para desarrolladores",
     "signIn": "Iniciar sesión",

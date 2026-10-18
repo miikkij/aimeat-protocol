@@ -22219,7 +22219,29 @@
       }
     }
   },
+  "news": {
+    "titleSince": "Uutta sitten viime käyntisi",
+    "titleWindow": "Tärkeimmät muutokset viimeisen {n} päivän ajalta",
+    "highlights": "Tärkeä",
+    "others": "Muut muutokset",
+    "moreOne": "Yksi muutos lisää on historiassa.",
+    "moreN": "{n} muutosta lisää on historiassa.",
+    "read": "Luettu",
+    "history": "Kaikki muutokset →",
+    "for": "Kenelle: {who}",
+    "countTitle": "{n} uutta muutosta Kodissasi",
+    "who": {
+      "user": "Sinä",
+      "agent": "Tekoälysi ja agenttisi",
+      "operator": "Operaattori",
+      "developer": "Sovellusten tekijät"
+    }
+  },
   "changelog": {
+    "whoLabel": "Kenelle",
+    "everyone": "Kaikille",
+    "onlyHighlights": "Vain tärkeät",
+    "impact": "Sinulle:",
     "kicker": "Rakennettu itsellään, joka päivä",
     "title": "Mitä täällä on julkaistu",
     "position": "Uusin ensin. Jokainen merkintä kertoo, mitä ihminen saa, ei mitä koodi tekee.",
