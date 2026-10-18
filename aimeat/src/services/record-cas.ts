@@ -12,6 +12,9 @@
  * @structure CAS_ATTEMPTS · UNCHANGED · updateRecord()
  * @usage await updateRecord(storage, 'package-entitlements', key, parse, cur => ({ ...cur, n: 1 }), { tag: 'x' });
  * @version-history
+ *   v1.1.0 — 2026-10-18 — `opts.tags`: the whole tag list, or a function of the stored record, for a
+ *     caller whose blind write kept more than one tag or the stored record's own tags (wish
+ *     wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-10-05 — Moved from classification/system-record.ts (secaudit 2026-10, PKG-7).
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
@@ -29,7 +32,11 @@ export const UNCHANGED = Symbol('unchanged');
 export async function updateRecord<T>(
   storage: Storage, owner: string, key: string, parse: (v: unknown) => T,
   mutate: (cur: T) => T | typeof UNCHANGED | Promise<T | typeof UNCHANGED>,
-  opts: { tag: string; ttlHours?: number | null; visibility?: MemoryRecord['visibility'] },
+  opts: {
+    tag: string; ttlHours?: number | null; visibility?: MemoryRecord['visibility'];
+    /** The tags to write in place of `[tag]`, or a function of the stored record (null when absent). */
+    tags?: string[] | ((stored: MemoryRecord | null) => string[]);
+  },
 ): Promise<T> {
   for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
     const rec = await storage.getMemory(owner, key);
@@ -37,8 +44,9 @@ export async function updateRecord<T>(
     const next = await mutate(cur);
     if (next === UNCHANGED) return cur;
     const now = new Date().toISOString();
+    const tags = typeof opts.tags === 'function' ? opts.tags(rec ?? null) : opts.tags ?? [opts.tag];
     const record: MemoryRecord = {
-      key, ownerGaii: owner, value: next, visibility: opts.visibility ?? 'private', tags: [opts.tag], ttlHours: opts.ttlHours ?? null,
+      key, ownerGaii: owner, value: next, visibility: opts.visibility ?? 'private', tags, ttlHours: opts.ttlHours ?? null,
       version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
     };
     if (!rec) {

@@ -22,6 +22,9 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-10-18 — POST /v1/ai/settings merges into `openrouter.settings` on the record's version
+ *     (updatePrivateRecord), so an agent cap or an MCP AI config change written at the same moment
+ *     persists (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-18 — POST /v1/ai/image takes `reference_images` (up to 16 stored pictures or data: URLs the
  *     model works from) and `mask` (a PNG that marks the area of the first reference to redraw), and
  *     answers `reference_count` and `mask_mode` (Comicland v3 A-1, A-2).
@@ -123,7 +126,7 @@ import { generateDownloadToken } from '../services/download-token.js';
 /** How long the signed address of a private picture loads without a sign-in. */
 const IMAGE_DOWNLOAD_TTL_SECONDS = 3600;
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
-import { upsertPrivateRecord } from '../services/private-record.js';
+import { updatePrivateRecord } from '../services/private-record.js';
 import { readerFor, warningsNote } from '../services/classification/reader.js';
 import { ClassificationError } from '../services/classification/labels.js';
 import { isOperatorCaller } from '../services/operator-override.js';
@@ -156,9 +159,6 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
     setAiRetryAfter(res, f);
     return res.status(f.status).json(error(config.nodeId, f.code, f.message, f.status, f.details));
   };
-
-  const upsertMemory = (gaii: string, key: string, value: unknown, tags: string[]): Promise<void> =>
-    upsertPrivateRecord(storage, gaii, key, value, tags);
 
   /**
    * Either the caller is an owner JWT (role=owner) OR any scoped principal
@@ -575,17 +575,18 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         app_quotas?: Record<string, { daily_usd?: number }>;
         app_allowlist?: string[] | null;
       };
-      const prefsRecord = await storage.getMemory(gaii, 'openrouter.settings');
-      const prefs = { ...(prefsRecord?.value as Record<string, unknown> ?? {}) };
-      if (typeof daily_budget_usd === 'number') {
-        if (daily_budget_usd < 0 || daily_budget_usd > 1000) {
-          return res.status(400).json(error(config.nodeId, 'INVALID_BUDGET', 'daily_budget_usd must be between 0 and 1000.'));
-        }
-        prefs.daily_budget_usd = daily_budget_usd;
+      if (typeof daily_budget_usd === 'number' && (daily_budget_usd < 0 || daily_budget_usd > 1000)) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_BUDGET', 'daily_budget_usd must be between 0 and 1000.'));
       }
-      if (app_quotas !== undefined) prefs.app_quotas = app_quotas;
-      if (app_allowlist !== undefined) prefs.app_allowlist = app_allowlist;
-      await upsertMemory(gaii, 'openrouter.settings', prefs, ['openrouter', 'settings']);
+      // Merged into the record as stored, on its version (services/private-record.ts), because the
+      // MCP tool aimeat_operator_ai_config and an agent's daily cap write other fields of it.
+      await updatePrivateRecord(storage, gaii, 'openrouter.settings', (cur) => {
+        const prefs = { ...(cur ?? {}) };
+        if (typeof daily_budget_usd === 'number') prefs.daily_budget_usd = daily_budget_usd;
+        if (app_quotas !== undefined) prefs.app_quotas = app_quotas;
+        if (app_allowlist !== undefined) prefs.app_allowlist = app_allowlist;
+        return prefs;
+      }, ['openrouter', 'settings']);
       // Changing what the account may spend is a decision about money, and the person should be
       // able to see later that it was made and when. The row names WHAT changed, not the values —
       // a budget is on the settings page, and a feed row is not a diff.

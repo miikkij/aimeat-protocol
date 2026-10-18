@@ -20,6 +20,9 @@
  *   await bookBeneficiaryShares(storage, { lines, trackingCode, fromGhii, unit, currency, ... });
  *   const owed = await listBeneficiaryEntries(storage, beneficiaryGhii);
  * @version-history
+ *   2026-10-18 — bookBeneficiaryShares, settleEntryStatus and markEntriesPaid write the record on its
+ *     version (updateBook, services/record-cas.ts) and decide on the stored entries, re-read when
+ *     another writer wrote in between (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-16 — Both reads return every entry, newest first, and `limit` caps what is returned, not
  *     what is read. The earnings read took the beneficiary's first N records in key order, and the
  *     obligations read the first 1000 records of every beneficiary on the node before filtering on the
@@ -28,6 +31,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { listAllMemoryPages } from '../storage/memory-pages.js';
+import { updateRecord, UNCHANGED } from '../services/record-cas.js';
 import type { SplitLine } from './beneficiary-split.js';
 
 /** One line in a beneficiary's book — a share of one settled call. */
@@ -96,31 +100,43 @@ export async function bookBeneficiaryShares(
   let booked = 0;
   for (const line of args.lines) {
     if (line.amount <= 0) continue;
-    const key = benefitKey(args.trackingCode);
-    const existing = await storage.getMemory(line.ghii, key);
-    const value = (existing?.value as { items?: BeneficiaryEntry[] } | undefined) ?? {};
-    const items = Array.isArray(value.items) ? value.items : [];
-    if (items.some(i => i.fromGhii === args.fromGhii)) continue;   // already booked — a retry, not a second sale
-    items.push({
-      amount: line.amount,
-      currency: args.currency,
-      fromGhii: args.fromGhii,
-      buyerGhii: args.buyerGhii,
-      reference: args.reference,
-      weight: line.weight,
-      kind: line.kind,
-      note: line.note || undefined,
-      status: 'accrued',
-      at: new Date().toISOString(),
+    let added = false;
+    await updateBook(storage, line.ghii, args.trackingCode, (value, items) => {
+      added = !items.some(i => i.fromGhii === args.fromGhii);   // already booked — a retry, not a second sale
+      if (!added) return UNCHANGED;
+      return { ...value, items: [...items, {
+        amount: line.amount,
+        currency: args.currency,
+        fromGhii: args.fromGhii,
+        buyerGhii: args.buyerGhii,
+        reference: args.reference,
+        weight: line.weight,
+        kind: line.kind,
+        note: line.note || undefined,
+        status: 'accrued',
+        at: new Date().toISOString(),
+      }] };
     });
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key, ownerGaii: line.ghii, value: { ...value, items }, visibility: 'owner', tags: ['commerce', 'beneficiary'],
-      ttlHours: null, version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
-    });
-    booked += 1;
+    if (added) booked += 1;
   }
   return booked;
+}
+
+type Book = { items?: BeneficiaryEntry[] } & Record<string, unknown>;
+const parseBook = (v: unknown): Book => ({ ...((v as Book | null | undefined) ?? {}) });
+
+/**
+ * Change one beneficiary's record of one tracking code on its version (services/record-cas.ts):
+ * `change` gets the stored value and a copy of its entries, and runs again on the fresh record when
+ * another writer wrote it in between, so a check it makes is made on what is stored.
+ */
+function updateBook(
+  storage: Storage, beneficiaryGhii: string, trackingCode: string,
+  change: (value: Book, items: BeneficiaryEntry[]) => Book | typeof UNCHANGED,
+): Promise<Book> {
+  return updateRecord(storage, beneficiaryGhii, benefitKey(trackingCode), parseBook,
+    cur => change(cur, Array.isArray(cur.items) ? cur.items.map(i => ({ ...i })) : []),
+    { tag: 'beneficiary', tags: ['commerce', 'beneficiary'], visibility: 'owner' });
 }
 
 /**
@@ -187,22 +203,19 @@ export async function settleEntryStatus(
     to: 'released' | 'reversed'; releaseMethod?: string;
   },
 ): Promise<(BeneficiaryEntry & { beneficiaryGhii: string }) | null> {
-  const key = benefitKey(args.trackingCode);
-  const rec = await storage.getMemory(args.beneficiaryGhii, key);
-  if (!rec) return null;
-  const value = rec.value as { items?: BeneficiaryEntry[] };
-  const items = Array.isArray(value.items) ? value.items : [];
-  const entry = items.find(i => i.fromGhii === args.fromGhii && i.status === 'accrued');
-  if (!entry) return null;
-  entry.status = args.to;
-  entry.releasedAt = new Date().toISOString();
-  if (args.releaseMethod) entry.releaseMethod = args.releaseMethod;
-  await storage.setMemory({
-    key, ownerGaii: args.beneficiaryGhii, value: { ...value, items }, visibility: 'owner',
-    tags: ['commerce', 'beneficiary'], ttlHours: null, version: (rec.version ?? 0) + 1,
-    createdAt: rec.createdAt, updatedAt: new Date().toISOString(),
+  // Decided on the stored record: of two releases at the same moment, one changes the entry and the
+  // other finds nothing accrued and answers null, so only one caller moves the money.
+  let changed: BeneficiaryEntry | null = null;
+  await updateBook(storage, args.beneficiaryGhii, args.trackingCode, (value, items) => {
+    const entry = items.find(i => i.fromGhii === args.fromGhii && i.status === 'accrued');
+    changed = entry ?? null;
+    if (!entry) return UNCHANGED;
+    entry.status = args.to;
+    entry.releasedAt = new Date().toISOString();
+    if (args.releaseMethod) entry.releaseMethod = args.releaseMethod;
+    return { ...value, items };
   });
-  return { ...entry, beneficiaryGhii: args.beneficiaryGhii };
+  return changed ? { ...(changed as BeneficiaryEntry), beneficiaryGhii: args.beneficiaryGhii } : null;
 }
 
 /**
@@ -240,23 +253,18 @@ export async function markEntriesPaid(
   const now = new Date().toISOString();
   let changed = 0;
   for (const trackingCode of args.trackingCodes) {
-    const key = benefitKey(trackingCode);
-    const rec = await storage.getMemory(args.beneficiaryGhii, key);
-    if (!rec) continue;
-    const value = rec.value as { items?: BeneficiaryEntry[] };
-    const items = Array.isArray(value.items) ? value.items : [];
-    const entry = items.find(i => i.fromGhii === args.fromGhii && i.status === 'released');
-    if (!entry) continue;
-    entry.status = 'paid';
-    entry.paidAt = now;
-    entry.payoutRail = args.rail;
-    if (args.reference) entry.payoutReference = args.reference;
-    await storage.setMemory({
-      key, ownerGaii: args.beneficiaryGhii, value: { ...value, items }, visibility: 'owner',
-      tags: ['commerce', 'beneficiary'], ttlHours: null, version: (rec.version ?? 0) + 1,
-      createdAt: rec.createdAt, updatedAt: now,
+    let found = false;
+    await updateBook(storage, args.beneficiaryGhii, trackingCode, (value, items) => {
+      const entry = items.find(i => i.fromGhii === args.fromGhii && i.status === 'released');
+      found = !!entry;
+      if (!entry) return UNCHANGED;
+      entry.status = 'paid';
+      entry.paidAt = now;
+      entry.payoutRail = args.rail;
+      if (args.reference) entry.payoutReference = args.reference;
+      return { ...value, items };
     });
-    changed += 1;
+    if (found) changed += 1;
   }
   return changed;
 }
