@@ -21,6 +21,8 @@
  *   const out = await applyOwnerSettingsUpdate(storage, config, target, { parked: true });
  *   if ('refusal' in out) return `${out.refusal.code}: ${out.refusal.message}`;
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A renamed or re-described app meets the detection rules written for apps
+ *     (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   v1.0.0 — 2026-09-27 — Extracted from routes/apps/fork-manage.ts (PATCH /v1/apps/:filename), so
  *     the MCP tool aimeat_app_manage (action "settings") calls the same code as the route.
  *   v1.1.0 — 2026-10-12 — `listing` (listed, community, unlisted) sets where the app is listed;
@@ -41,6 +43,8 @@ import { emitChange } from './event-bus.js';
 import { parseAppAccessInput, appAccessOf, type AppAccess } from './app-access.js';
 import { parseAudience } from './audience.js';
 import { announceAppBecamePublic } from './app-announce.js';
+import { classifyContainerAfterWrite } from './classify-on-write.js';
+import { appTarget } from './classification/containers.js';
 
 /** How an app presents itself: a rung that stops at `presentation` may write these. */
 export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions'] as const;
@@ -254,6 +258,10 @@ export async function applyOwnerSettingsUpdate(
     const metaUpdate = settings.meta;
     if (metaUpdate.name !== undefined || metaUpdate.description !== undefined || metaUpdate.descriptions !== undefined) {
         await storage.updateAppMeta(ownerGaii, filename, metaUpdate);
+        // The new name or description meets the detection rules written for apps (plan doc-mvdipuyqraas, L1.6).
+        if (metaUpdate.name !== undefined || metaUpdate.description !== undefined) {
+            classifyContainerAfterWrite({ storage, config }, appTarget(ownerGaii, filename), String(metaUpdate.name ?? filename), metaUpdate.description);
+        }
         if (metaUpdate.name !== undefined) await audit('name', { name: metaUpdate.name });
         if (metaUpdate.description !== undefined || metaUpdate.descriptions !== undefined) await audit('description');
         if (metaUpdate.name !== undefined && metaUpdate.description !== undefined) {

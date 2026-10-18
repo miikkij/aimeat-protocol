@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-18 — A copy keeps the source's effective classification, its workspace's or organism's when higher (plan doc-mvdipuyqraas, L1.3).
  *   2026-10-18 — The rule underneath: on a node closed to strangers a public write is saved for the signed-in accounts (plan V1.6).
  *   2026-10-18 — Section 2: an imported entry with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — The same wait for a file made public, an import, a bulk write and a copy
@@ -127,7 +128,9 @@ What an export leaves out, and why:
 - **An agent:** \`POST /v1/agents/import\` with the agent export. The agent gets new keys, and a high
   trust score is capped on the way in, so a moved agent earns the rest again on its new node.
 - **One public record of someone else**, copied into the person's own records:
-  \`POST /v1/memory/copy\` (an agent's call). It keeps the source's classification and never lowers it.
+  \`POST /v1/memory/copy\` (an agent's call). It keeps the source's classification and never lowers it;
+  for a record of a workspace or an organism that is the higher of its own and the workspace's or
+  organism's classification.
   A schema lock on the key holds for the copy too: a value that does not match is refused (422).
 
 ## 3. Who wrote this

@@ -18,6 +18,9 @@
  *   const { kept, leftOut } = await leaveMemories(reader, records, { kind: 'export', organismId: null });
  *   res.json(success(nodeId, { entries: kept, ...(leftOut.length ? { left_out: leftOut } : {}) }));
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A left-out item says `from` (its own label or its container's), the
+ *     federation log names it, and a copy carries its source's effective label (plan
+ *     doc-mvdipuyqraas, L1.3).
  *   v1.0.0 — 2026-09-29 — TARGET-082 review: the multi-item exits say what stayed behind.
  */
 import type { Storage, ContentLabelTarget } from '../storage/interface.js';
@@ -27,12 +30,16 @@ import { systemReader, type ContentReader, type EgressDestination } from './clas
 import { classificationActiveFor, policyFor } from './classification/policy.js';
 import { labelById } from './classification/defaults.js';
 import { classificationWarningOf } from './classification/present-memory.js';
+import { effectiveLabels, type EffectiveFrom } from './classification/effective.js';
 import { logger } from '../utils/logger.js';
 
 type Deps = { storage: Storage; config: Pick<AimeatConfig, 'classificationMode' | 'nodeId'> };
 
-/** One item that stayed behind: its key, its label id, and why. */
-export interface LeftOut { key: string; label: string; reason: string }
+/**
+ * One item that stayed behind: its key, its effective label id, why, and whether that label is the
+ * item's own or its workspace's, organism's, board's or app's (classification/effective.ts).
+ */
+export interface LeftOut { key: string; label: string; reason: string; from: EffectiveFrom }
 
 /** What a peer is told about what stayed behind: how many, and why, never which. */
 export interface Withheld { count: number; reason: string }
@@ -41,8 +48,8 @@ export interface Withheld { count: number; reason: string }
 export const WITHHELD_REASON = 'classified content that may not leave its organism';
 
 /** The `left` of a reader.leave call, named by key. */
-export function leftOutOf<T>(left: ReadonlyArray<{ item: T; label: string; reason: string }>, keyOf: (item: T) => string): LeftOut[] {
-  return left.map(l => ({ key: keyOf(l.item), label: l.label, reason: l.reason }));
+export function leftOutOf<T>(left: ReadonlyArray<{ item: T; label: string; reason: string; from: EffectiveFrom }>, keyOf: (item: T) => string): LeftOut[] {
+  return left.map(l => ({ key: keyOf(l.item), label: l.label, reason: l.reason, from: l.from }));
 }
 
 /** reader.leave for memory records, with what stayed behind named by key. Order is kept. */
@@ -66,6 +73,7 @@ export async function leaveMemoriesToPeer<T extends { ownerGaii: string; key: st
   if (!leftOut.length) return { kept, withheld: null };
   logger.info(`${what}: classified memory stayed on this node`, {
     peer, count: leftOut.length, keys: leftOut.slice(0, 20).map(l => l.key), labels: [...new Set(leftOut.map(l => l.label))],
+    from: [...new Set(leftOut.map(l => l.from))],
   });
   return { kept, withheld: { count: leftOut.length, reason: WITHHELD_REASON } };
 }
@@ -98,7 +106,8 @@ export async function carryLabelToCopy(deps: Deps, from: ContentLabelTarget, to:
   if (!(await classificationActiveFor(deps.storage, deps.config, from.scope))) return { carried: null };
   if (!(await classificationActiveFor(deps.storage, deps.config, to.scope))) return { carried: null };
   const fromPolicy = await policyFor(deps.storage, deps.config, from.scope);
-  const sourceId = (await labelsFor(deps.storage, fromPolicy, [from])).get(targetId(from))?.label ?? fromPolicy.defaultLabel;
+  // The source's EFFECTIVE label: a copy out of a confidential workspace stays confidential.
+  const sourceId = (await effectiveLabels(deps.storage, fromPolicy, [from])).get(targetId(from))?.label ?? fromPolicy.defaultLabel;
   const toPolicy = await policyFor(deps.storage, deps.config, to.scope);
   const source = labelById(toPolicy, sourceId);
   if (!source || source.status !== 'active') {

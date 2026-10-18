@@ -11,6 +11,8 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-18 — The aimeat://boards/{id} resource passes the posts through the session's
+ *     classification reader with the board's classification (plan doc-mvdipuyqraas, L1.3).
  *   2026-10-18 — aimeat_board_create asks the publish gate with the session's caller and renders
  *     `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — An organism board (`organism:<id>`, plan doc-mvcn6c7e4e5q V3.5): the list, the
@@ -62,6 +64,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { createBoardReply, boardPostPrice } from '../services/board-post.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
+import { classifiedBoardPosts } from '../services/board-read-access.js';
+import { readerFor } from '../services/classification/reader.js';
 import {
     boardVisibleToCaller, createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules,
     deleteBoardById, boardRulesBlock, type BoardWriteCaller,
@@ -178,7 +182,9 @@ export function registerBoardsTools(
                 return resourceRefusal(uri, 'ACCESS_DENIED', 'This board is not shared with you, so its posts cannot be read here. '
                     + 'Ask the board\'s owner to let you in, or list the boards you can read instead.');
             }
-            const posts = await withoutHiddenPosts({ storage, config }, board, agentGaii, await storage.listPosts(boardId, { limit: 50 }));
+            // A post reads as its board's classification (plan doc-mvdipuyqraas, L1.3), after the flags.
+            const posts = await classifiedBoardPosts(readerFor({ storage, config }, caller().auth), board,
+                await withoutHiddenPosts({ storage, config }, board, agentGaii, await storage.listPosts(boardId, { limit: 50 })));
             return {
                 contents: [{
                     uri: uri.toString(),

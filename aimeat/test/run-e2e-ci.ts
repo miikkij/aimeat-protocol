@@ -11,6 +11,7 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-18 -- e2e-classification-containers.ts joins the list (not the guard tier): the classification of containers and the effective label (plan doc-mvdipuyqraas, L1).
  *   2026-10-18 -- e2e-closed-node-levels.ts joins the list (not the guard tier): a public write on a node closed to strangers lands at the signed-in level, and the new-app feed.
  *   2026-10-18 -- e2e-page-access.ts joins the list (not the guard tier): who may open a welcome page and a company front page (V3.10).
  *   2026-10-18 -- e2e-content-defaults.ts joins the list (not the guard tier): the node's starting levels for content.
@@ -852,6 +853,9 @@ const ALL_SUITES = [
     // on REST, the node MCP, the connector daemon (spawned, as e2e-ai-provenance-connector does) and
     // an extension; the node switch and its audit rows; the explorer; the denials.
     'test/e2e-classification.ts',
+    // The classification of an organism, a workspace, a board and an app, and the effective label of
+    // what they hold: the label route, the reader, the federation exit, the refusals (plan doc-mvdipuyqraas, L1).
+    'test/e2e-classification-containers.ts',
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',

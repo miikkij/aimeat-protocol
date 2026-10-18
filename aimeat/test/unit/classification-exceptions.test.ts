@@ -17,6 +17,7 @@
  *      remove records, and a month with a person's exception in force stays.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-exceptions.test.ts
  * @version-history
+ *   v1.3.1 — 2026-10-18 — A left-behind item carries `from` (plan doc-mvdipuyqraas, L1.3).
  *   v1.3.0 — 2026-10-10 — An app's AI call refused for another item records no automatic 'ai-send'
  *     exception (secaudit 2026-10-10 I10).
  *   v1.2.0 — 2026-09-30 — An exception lapses when the item's label is raised after it (TARGET-082
@@ -176,7 +177,7 @@ describe('classification exceptions and apps (decided 2026-09-30)', () => {
       const ai = await readerForAgent(deps(), AGENT).leave(items, t, where);
       // Highly confidential is a warning by default (option B), so it goes; the hidden one stays.
       expect(ai.kept.map(r => r.key)).toEqual(['conf', 'plain']);
-      expect(ai.left).toEqual([{ item: own('secret'), label: 'salainen', reason: `classified Secret, which no AI may send out. ${EXCEPTION_HINT}` }]);
+      expect(ai.left).toEqual([{ item: own('secret'), label: 'salainen', from: 'own', reason: `classified Secret, which no AI may send out. ${EXCEPTION_HINT}` }]);
       // The person's own export takes everything, as before.
       expect((await readerFor(deps(), { sub: 'alice', owner: 'alice', roles: ['owner'] }).leave(items, t, where)).left).toEqual([]);
 

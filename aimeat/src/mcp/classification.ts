@@ -15,6 +15,9 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-18 — get, set and review take a container (kind organism, workspace, board with
+ *     board_id, app with app) through the catalog's input and targetOf; get answers `effective`
+ *     (plan doc-mvdipuyqraas, L1.5).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 — 2026-09-30 — exception_list (the exceptions list of a level) and exception_set, which

@@ -36,10 +36,17 @@
  *   The callers: services/memory-write.ts writeMemoryRecord, services/workspace-write.ts
  *   writeWorkspaceRecord, services/memory-batch-write.ts writeMemoryBatch, PUT and PATCH
  *   /v1/memory/:key, POST /v1/memory/copy, and the organism publish paths in routes/organisms/shared.ts.
+ *
+ *   A CONTAINER (an organism, a workspace, a board, an app) is judged on its name and description
+ *   when it is created or renamed (classifyContainerAfterWrite, plan doc-mvdipuyqraas, L1.6), by the
+ *   detection rules only, in the same list as the writes.
  * @structure WriteClassifier · WriteQueue · MAX_TEXT · contentText() · setWriteClassifier() ·
- *   classifyAfterWrite() · flushWriteClassification() · pendingWriteClassifications()
+ *   classifyAfterWrite() · classifyContainerAfterWrite() · flushWriteClassification() ·
+ *   pendingWriteClassifications()
  * @usage classifyAfterWrite({ storage, config }, record.ownerGaii, record.key, record.value);
  * @version-history
+ *   v1.3.0 — 2026-10-18 — classifyContainerAfterWrite: a container's name and description meet the
+ *     detection rules written for its kind (plan doc-mvdipuyqraas, L1.6).
  *   v1.2.0 — 2026-09-30 — At most MAX_PENDING_PER_OWNER writes of one owner are held with their
  *     values; the rest go to the persistent queue by address (TARGET-082 second review, S4).
  *   v1.1.0 — 2026-09-29 — Review fixes: past MAX_PENDING a write goes to the persistent queue in
@@ -80,7 +87,8 @@ const MAX_OVERFLOW = 20_000;
 // data and is classified like any other.
 const RESERVED_PREFIX = 'classification.policy.';
 
-interface PendingWrite { deps: Deps; ownerGaii: string; key: string; value: unknown }
+/** A write waiting for the classifier. `target` is set for a container, whose text is its name and description. */
+interface PendingWrite { deps: Deps; ownerGaii: string; key: string; value: unknown; target?: ContentLabelTarget }
 
 const pending: PendingWrite[] = [];
 let worker: Promise<void> | null = null;
@@ -114,14 +122,15 @@ function isContentWrite(ownerGaii: string, key: string, value: unknown): boolean
 
 async function classifyOne(fn: WriteClassifier, item: PendingWrite): Promise<void> {
   const { deps, ownerGaii, key, value } = item;
-  const target = memoryTarget(ownerGaii, key);
+  const target = item.target ?? memoryTarget(ownerGaii, key);
   try {
     const text = contentText(value);
     if (!text) return;
     // The switch and the policy, once; the classifier reads neither again.
     const policy = (await activePolicies(deps, [target.scope])).get(target.scope);
     if (!policy) return;
-    await fn(deps, target, text, { useModel: policy.classifier.onWrite.includes('memory'), policy });
+    // A container's name and description meet the detection rules only, never the model.
+    await fn(deps, target, text, { useModel: !item.target && policy.classifier.onWrite.includes('memory'), policy });
   } catch (e) {
     logger.warn('classification: classifying a memory write failed; the write stands', { key, error: String(e) });
   }
@@ -203,6 +212,22 @@ export function classifyAfterWrite(deps: Deps, ownerGaii: string, key: string, v
   }
   pending.push({ deps, ownerGaii, key, value });
   pendingByOwner.set(ownerGaii, (pendingByOwner.get(ownerGaii) ?? 0) + 1);
+  if (!worker) startWorker();
+}
+
+/**
+ * Schedule the detection rules over a container's name and description, after it was created or
+ * renamed (plan doc-mvdipuyqraas, L1.6). Only a rule whose appliesTo.kinds names the container's
+ * kind matches (detect.ts ruleApplies), and a rule never lowers a label. Returns at once; with
+ * classification off this does nothing. Past the in-process limit the container is not judged: the
+ * persistent queue reads a memory value, which a container is not.
+ */
+export function classifyContainerAfterWrite(deps: Deps, target: ContentLabelTarget, name: string, description?: string | null): void {
+  if (deps.config.classificationMode === 'off' || !classifier) return;
+  const text = [name, description ?? ''].filter(Boolean).join('\n');
+  if (!text.trim() || pending.length >= MAX_PENDING) return;
+  pending.push({ deps, ownerGaii: target.scope, key: target.key, value: text, target });
+  pendingByOwner.set(target.scope, (pendingByOwner.get(target.scope) ?? 0) + 1);
   if (!worker) startWorker();
 }
 

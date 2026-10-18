@@ -44,6 +44,8 @@
  *   firstJsonObject()
  * @usage const out = await classifyText(deps, target, text);
  * @version-history
+ *   v2.0.3 — 2026-10-18 — A queued item's kind is any label kind now (containers, plan
+ *     doc-mvdipuyqraas); onWrite still names content kinds only.
  *   v2.0.2 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     The classifier's decisions pass `limit: 'exempt'`: it is node-internal work drained from a queue.
  *   v2.0.1 — 2026-09-30 — readSystem, UNCHANGED and updateSystem moved unchanged to system-record.ts,
@@ -393,7 +395,7 @@ async function judge(deps: Deps, textOf: (item: QueuedItem) => Promise<string | 
     const target: ContentLabelTarget = { kind: item.kind, scope: item.scope, key: item.key };
     const policy = (await activePolicies(deps, [target.scope])).get(target.scope);
     if (!policy) return { kind: 'done', judged: false };
-    const useModel = item.origin === 'write' ? policy.classifier.onWrite.includes(item.kind) : true;
+    const useModel = item.origin === 'write' ? (policy.classifier.onWrite as readonly string[]).includes(item.kind) : true;
     const out = await classifyText(deps, target, text, { queueWhenCapped: false, policy, useModel });
     if (out.skipped === 'CAPPED') return { kind: 'capped', cap: out.cap ?? 'owner' };
     if (out.skipped === 'FAILED' && out.retry) return { kind: 'retry', reason: out.message ?? 'the model call failed' };

@@ -13,6 +13,9 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.13.0 — 2026-10-18 — The posts, a post and its replies pass the caller's classification reader
+ *     with the board's classification (classifiedBoardPosts; plan doc-mvdipuyqraas, L1.3): a board
+ *     hidden from AI reads as empty to an AI, a post of it as absent.
  *   v1.12.0 — 2026-10-18 — POST /v1/boards and PATCH /v1/boards/:boardId/visibility ask the publish
  *     gate: a public board by an agent without publish:public is made private (or keeps its level)
  *     and the answer is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4). The visibility
@@ -91,7 +94,8 @@ import { success, error } from '../middleware/envelope.js';
 import { BoardCreateSchema, BoardPostSchema, BoardPostUpdateSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { createBoardPost, createBoardReply, updateBoardPost } from '../services/board-post.js';
-import { boardReadRefusal, boardOrganismAudience, organismBoardAdmits } from '../services/board-read-access.js';
+import { boardReadRefusal, boardOrganismAudience, organismBoardAdmits, classifiedBoardPosts } from '../services/board-read-access.js';
+import { readerFor } from '../services/classification/reader.js';
 import { hiddenBoardPostIds, maySeeHiddenPost, withoutHiddenPosts } from '../services/board-moderation.js';
 import {
   createBoard, subscribeToBoard, reactToBoardPost, unreactToBoardPost, setBoardMembers, setBoardRules, deleteBoardById, boardRulesBlock,
@@ -411,7 +415,9 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // A page is `limit` live posts; the cursor for the next page is the last of them. A post flags
     // have hidden is dropped AFTER the page is cut, so the cursor still walks the whole board.
     const page = await storage.listPosts(boardId, { category, cursor, limit });
-    const posts = await withoutHiddenPosts({ storage, config }, board, gaii, page);
+    // A post reads as its board's classification (plan doc-mvdipuyqraas, L1.3), after the flags.
+    const posts = await classifiedBoardPosts(readerFor({ storage, config }, req.auth), board,
+      await withoutHiddenPosts({ storage, config }, board, gaii, page));
     // Who the posters are, for the reader deciding whom to trust: notices published, thanks received,
     // since when. One grouped query for the page's distinct authors.
     const authors = await storage.boardAuthorStanding([...new Set(posts.map(p => p.authorGaii))]);
@@ -462,7 +468,9 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const post = await storage.getPost(boardId, postId);
+    const stored = await storage.getPost(boardId, postId);
+    // A post the board's classification keeps from this reader reads as absent (plan doc-mvdipuyqraas, L1.3).
+    const [post] = stored ? await classifiedBoardPosts(readerFor({ storage, config }, req.auth), board, [stored]) : [];
     if (!post) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Post not found: ${postId}`));
       return;
@@ -521,7 +529,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Post not found: ${postId}`));
       return;
     }
-    const replies = await withoutHiddenPosts({ storage, config }, board, gaii, await storage.listReplies(boardId, postId));
+    const replies = await classifiedBoardPosts(readerFor({ storage, config }, req.auth), board,
+      await withoutHiddenPosts({ storage, config }, board, gaii, await storage.listReplies(boardId, postId)));
     const provById = await loadServedProvenanceMany(storage, config, replies.map(p => p.aiProvenanceId));
     const authors = await storage.boardAuthorStanding([...new Set(replies.map(p => p.authorGaii))]);
     res.json(success(config.nodeId, {

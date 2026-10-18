@@ -31,6 +31,9 @@
  *   const q = explorerQueryOf({ level: 'owner', pending: true });
  *   const page = await listLabels({ storage, config }, actor, q);
  * @version-history
+ *   v1.2.0 — 2026-10-18 — The containers are listed first: the organism and its workspaces at level
+ *     organism, the owner's boards and apps at level owner; `kind` takes them (plan doc-mvdipuyqraas,
+ *     L1.5). A cursor from before names a (scope, kind) pair that still exists.
  *   v1.1.0 — 2026-09-30 — A waiting suggestion on personal content that was deleted since is left
  *     out of the list (TARGET-082 second review).
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review: the explorer).
@@ -50,7 +53,7 @@ const MAX_LIMIT = 200;
 const SCAN_PAGE = 500;
 const SCAN_CALLS = 10;
 
-const KINDS: readonly ContentLabelKind[] = ['memory', 'file', 'row'];
+const KINDS: readonly ContentLabelKind[] = ['memory', 'file', 'row', 'organism', 'workspace', 'board', 'app'];
 
 export type ExplorerLevel = 'owner' | 'organism';
 
@@ -77,7 +80,10 @@ export interface LabelBrief {
 
 export interface ExplorerItem {
   kind: ContentLabelKind;
-  /** A memory key, a stored file key, or `<ws>/<space>/<rowId>` for a row. */
+  /**
+   * A memory key, a stored file key, `<ws>/<space>/<rowId>` for a row; for a container the
+   * organism id, the workspace id, the board id or the app's slug.
+   */
   key: string;
   /** The owner identity, or `organism:<id>`. */
   scope: string;
@@ -128,7 +134,7 @@ export function explorerQueryOf(input: Record<string, unknown>): ExplorerQuery {
     : input.pending === undefined || input.pending === null || input.pending === false || input.pending === 'false' || input.pending === '' ? false
       : bad('pending is true or false.');
   const kind = input.kind === undefined || input.kind === null || input.kind === '' ? null : input.kind;
-  if (kind !== null && !KINDS.includes(kind as ContentLabelKind)) bad('kind is memory, file or row.');
+  if (kind !== null && !KINDS.includes(kind as ContentLabelKind)) bad(`kind is ${KINDS.join(', ')}.`);
   const rawLimit = input.limit === undefined || input.limit === null || input.limit === '' ? DEFAULT_LIMIT : Number(input.limit);
   if (!Number.isInteger(rawLimit) || rawLimit < 1) bad(`limit is a whole number from 1 to ${MAX_LIMIT}.`);
   return {
@@ -194,8 +200,12 @@ function brief(policy: ClassificationPolicy, id: string): LabelBrief | null {
  */
 export async function listLabels(deps: ClassificationDeps, actor: LabelActor, q: ExplorerQuery): Promise<ExplorerPage> {
   const { subject, scopes } = await scopesFor(deps, actor, q);
+  // The containers first: an organism and its workspaces in the organism's scope, the owner's
+  // boards and apps in the owner's own scope (an agent's board sits in the agent's).
   const kindsOf = (scope: string): ContentLabelKind[] =>
-    (scopeOrganism(scope) ? ['memory', 'row'] as ContentLabelKind[] : ['memory', 'file'] as ContentLabelKind[])
+    (scopeOrganism(scope) ? ['organism', 'workspace', 'memory', 'row'] as ContentLabelKind[]
+      : scope === subject ? ['board', 'app', 'memory', 'file'] as ContentLabelKind[]
+        : ['board', 'memory', 'file'] as ContentLabelKind[])
       .filter(k => !q.kind || k === q.kind);
   const pairs = scopes.flatMap(scope => kindsOf(scope).map(kind => ({ scope, kind })));
 

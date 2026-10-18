@@ -4081,7 +4081,9 @@
     "- When an AI client drives your own signed-in REST session, the node cannot tell it apart from you, so it gets what you get.",
     "- A published data package is not yet classified file by file.",
     "- An organism's classification (its policy, audit log and exceptions list) has no web page yet. Its creator or an admin uses the MCP tool or the REST endpoints below.",
-    "- The MCP tool cannot withdraw an exception. You withdraw one in the Data Wallet, and the operator on the Security page; an app uses <code>AIMEAT.labels.withdrawException()</code>."
+    "- The MCP tool cannot withdraw an exception. You withdraw one in the Data Wallet, and the operator on the Security page; an app uses <code>AIMEAT.labels.withdrawException()</code>.",
+    "- An app's classification covers what the app keeps in its own namespace. What a hosted app saves in your own memory through its sign-in, and files it uploads there, cannot be told apart from your own content, so they keep their own classification.",
+    "- A container's classification has no web page yet: you set it with your AI or the REST endpoint."
    ],
    "columns": [
     "Feature",
@@ -4107,6 +4109,33 @@
       "Data Wallet, <code>aimeat_classification</code> (<code>get</code>, <code>set</code>, <code>review</code>, <code>explorer</code>), <code>GET /v1/classification/label</code>, <code>PUT /v1/classification/label</code>, <code>POST /v1/classification/label/review</code>, <code>GET /v1/classification/labels</code>"
      ],
      "plain": "Classify content off Give a memory record, a workspace record or document, a stored file or a workspace row its classification. See its classification now, a waiting suggestion, and its last changes. A workspace document has one classification for all its copies (draft, latest and each saved version), so publishing never makes an unclassified copy. An AI never lowers a classification and never changes one a person set: its choice becomes a suggestion that you accept or reject. An AI may pass on your own words: a raise recorded that way counts as yours at once, and a lowering still waits for you. Data Wallet, aimeat_classification (get, set, review, explorer), GET /v1/classification/label, PUT /v1/classification/label, POST /v1/classification/label/review, GET /v1/classification/labels"
+    },
+    {
+     "slug": "g-24-classify-a-shared-place-a-workspace-a-board-or-an-app",
+     "cells": [
+      "<strong>Classify a shared place, a workspace, a board or an app</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "Give an organism, a workspace, a board or an app a classification of its own, with the same rules as content: a person's classification locks, an AI never lowers it, and lowering it needs a reason. The organism's creator or an admin sets an organism's and its workspaces'; the owner sets a board's and an app's. A member who is not the creator or an admin, and another owner on a board everyone can read, get <code>403</code>; someone who cannot see the place gets <code>404</code>.",
+      "<code>aimeat_classification</code> (<code>get</code>, <code>set</code>, <code>review</code>, <code>explorer</code> with <code>kind</code> organism, workspace, board or app), <code>GET /v1/classification/label</code>, <code>PUT /v1/classification/label</code>"
+     ],
+     "plain": "Classify a shared place, a workspace, a board or an app off Give an organism, a workspace, a board or an app a classification of its own, with the same rules as content: a person's classification locks, an AI never lowers it, and lowering it needs a reason. The organism's creator or an admin sets an organism's and its workspaces'; the owner sets a board's and an app's. A member who is not the creator or an admin, and another owner on a board everyone can read, get 403; someone who cannot see the place gets 404. aimeat_classification (get, set, review, explorer with kind organism, workspace, board or app), GET /v1/classification/label, PUT /v1/classification/label"
+    },
+    {
+     "slug": "g-24-content-takes-its-place-s-classification",
+     "cells": [
+      "<strong>Content takes its place's classification</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "Content reads as at least as sensitive as the places it is in: a record in a confidential workspace counts as confidential, and so does everything in a confidential organism, a board's posts and what an app keeps in its own namespace. Who reads it, what an AI sees, what leaves the organism and the exposure report all follow that. The classification read says which place it came from.",
+      "<code>GET /v1/classification/label</code> (<code>effective</code>), every read, export and federation exit"
+     ],
+     "plain": "Content takes its place's classification off Content reads as at least as sensitive as the places it is in: a record in a confidential workspace counts as confidential, and so does everything in a confidential organism, a board's posts and what an app keeps in its own namespace. Who reads it, what an AI sees, what leaves the organism and the exposure report all follow that. The classification read says which place it came from. GET /v1/classification/label (effective), every read, export and federation exit"
+    },
+    {
+     "slug": "g-24-rules-on-a-place-s-name",
+     "cells": [
+      "<strong>Rules on a place's name</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "A detection rule you or an organism write for organisms, workspaces, boards or apps reads the name and description of a new or renamed one and raises its classification, never lowers it. A rule written for content does not read names.",
+      "<code>aimeat_classification</code> (<code>policy_set</code>, a rule's <code>appliesTo.kinds</code>)"
+     ],
+     "plain": "Rules on a place's name off A detection rule you or an organism write for organisms, workspaces, boards or apps reads the name and description of a new or renamed one and raises its classification, never lowers it. A rule written for content does not read names. aimeat_classification (policy_set, a rule's appliesTo.kinds)"
     },
     {
      "slug": "g-24-what-an-ai-sees",
@@ -4186,6 +4215,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 422
+  "rows": 425
  }
 }

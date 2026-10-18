@@ -12,6 +12,8 @@
  *   - WorkspaceProvisionError: thrown for a malformed manifest (surfaces as 400/validation)
  * @usage const { ws } = await provisionWorkspace(storage, config, { orgId, ownerName, ownerGhii, name, manifest, schemas });
  * @version-history
+ *   v1.4.0 -- 2026-10-18 -- A new workspace's name and summary meet the detection rules written for
+ *     workspaces (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   v1.3.0 -- 2026-09-28 -- checkWorkspaceManifest(): an install set checks every workspace of its
  *     bundle before it creates the first account or organism (services/install-set-apply.ts).
  *   v1.2.0 -- 2026-08-23 -- Rollback. The four writes had none, so a failure at write three left
@@ -31,6 +33,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } from './workspace-meta.js';
 import { validateMemoryWrite } from './schema-validator.js';
+import { classifyContainerAfterWrite } from './classify-on-write.js';
+import { workspaceTarget } from './classification/containers.js';
 
 export class WorkspaceProvisionError extends Error {
   constructor(message: string) { super(message); this.name = 'WorkspaceProvisionError'; }
@@ -168,6 +172,9 @@ export async function provisionWorkspace(
     await setMeta(storage, regKey, { workspaces: [...workspaces, { id: wsId, name: String(input.name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: input.ownerName }] }, input.ownerGhii, now);
     // The append landed, so there is nothing left to put back.
     registryBefore = undefined;
+    // The detection rules written for workspaces read its name and summary (off the request path).
+    classifyContainerAfterWrite({ storage, config: _config }, workspaceTarget(input.orgId, wsId),
+      String(input.name || man.name || ''), typeof summary === 'string' ? summary : null);
 
     return { ws: wsId, types: (man.objectTypes as Array<{ name?: string }>).map(o => o.name || '').filter(Boolean), schemas_locked: Object.keys(schemaMap) };
   } catch (err) {
