@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-18 — The data-map stamp is checked against the scopes the version declares, so an app asking for organism:invite whose map does not say it invites people is stamped with DATAMAP_INVITES_UNSTATED (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-18 — A first publish's default exposure is narrowed to the app's label's audience cap
  *     before the publish gate (capFirstPublishExposure; plan doc-mvdipuyqraas, L3.5).
  *   2026-10-18 — A published app's name and description meet the detection rules written for apps (plan doc-mvdipuyqraas, L1.6).
@@ -145,6 +146,7 @@ import { recordBookParts } from './app-book-parts.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
 import { stampFor } from './data-map/data-map-check.js';
+import { parseAppScopes } from './protected-resource.js';
 import type { DataMapStamp } from './data-map/data-map-types.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
@@ -548,7 +550,7 @@ export async function publishApp(
     const at = new Date().toISOString();
     const appId = filename.replace(/\.html$/i, '');
     const existing = await readAppDataMap(storage, ownerGhii, appId);
-    dataMap = stampFor(existing, appId, at);
+    dataMap = stampFor(existing, appId, at, parseAppScopes(html));
     manifest.dataMap = dataMap;
   }
 

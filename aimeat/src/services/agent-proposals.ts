@@ -31,6 +31,9 @@
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.8.0 — 2026-10-18 — proposalNextStep takes the proposal's permissions and adds one sentence when
+ *     they cover organism:invite: the agent may invite people, and an invitation can create an account
+ *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   v1.7.0 — 2026-10-11 — A proposal carries `warnings` for its definition (crew-def-warnings.ts): a
  *     definition that listens for direct messages and gives no member the dm tool is said at once.
  *   v1.6.0 — 2026-10-10 — A proposal may name one of the owner's connectors (`connector`, by id or
@@ -66,6 +69,7 @@ import { logger } from '../utils/logger.js';
 import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
 import { offerSignalError } from './agent-default-offer.js';
 import { browserDomainsError } from './crew-browser-domains.js';
+import { withInvitesSentence } from './agent-invites.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
@@ -81,12 +85,17 @@ export function proposalApprovalUrl(baseUrl: string): string {
 /**
  * What a proposing agent tells the person, written once for the REST answer and the MCP tool. It
  * names the address, because "in your profile under Agents" left an agent with nothing to hand
- * over and a person with a page to look for.
+ * over and a person with a page to look for. When the proposal's permissions cover organism:invite,
+ * the answer says that the agent may invite people and that an invitation can create an account
+ * (services/agent-invites.ts), so the person reads it before approving.
  */
-export function proposalNextStep(displayName: string, approvalUrl: string, alreadyWaiting: boolean): string {
-  return alreadyWaiting
+export function proposalNextStep(
+  displayName: string, approvalUrl: string, alreadyWaiting: boolean, scopes?: readonly string[],
+): string {
+  return withInvitesSentence(alreadyWaiting
     ? `${displayName} is already waiting for your approval. Open ${approvalUrl} and approve it there; nothing is made until you do.`
-    : `Nothing has been created yet. Open ${approvalUrl} and approve ${displayName} there; your press makes it and gives it its instructions.`;
+    : `Nothing has been created yet. Open ${approvalUrl} and approve ${displayName} there; your press makes it and gives it its instructions.`,
+  scopes);
 }
 
 export type ProposalState = 'proposed' | 'approved' | 'declined';

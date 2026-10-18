@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — GET /v1/agents answers `invites_people` per agent: true when its permissions cover organism:invite (services/agent-invites.ts; wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-18 — GET /v1/agents carries each agent's `clearance` (plan doc-mvdipuyqraas L2).
  *   2026-10-15 — GET /v1/agents answers `refusals: null` and `refusals_unreadable: true` on every row
  *     when the refusal notes cannot be read, instead of an empty list (feature-list audit #30).
@@ -89,6 +90,7 @@ import { credentialHealthForOwner, summariseCredentialHealth } from '../../servi
 import { portRedirectFor } from '../../services/agent-port-redirect.js';
 import { agentInstalls } from '../../services/connector-registry.js';
 import { stoppedView } from '../../services/agent-stop-rules.js';
+import { invitesPeople } from '../../services/agent-invites.js';
 
 /** HTTP status for a refusal from services/agent-profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
@@ -277,6 +279,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         domain_capabilities: a.domainCapabilities,
         languages: a.languages ?? [],
         default_scopes: a.defaultScopes ?? ['*'],
+        // May it invite people into organisms, where an invitation can create an account? Read from
+        // the permissions above on every call, so it is always true (services/agent-invites.ts).
+        invites_people: invitesPeople(a.defaultScopes ?? ['*']),
         trust_score: a.trustScore,
         morsel_balance: a.morselBalance,
         created_at: a.createdAt,

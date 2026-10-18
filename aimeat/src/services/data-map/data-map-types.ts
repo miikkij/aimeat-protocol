@@ -21,9 +21,13 @@
  *
  *   Full definition, including every axis and its values: docs/specs/datamap.md, which every node
  *   serves at /v1/specs/datamap.md. A field or a value added here is added there in the same change.
- * @structure DataMap · DataMapRow · ElsewhereRow · DataMapStamp · publicDataMap()
+ * @structure DataMap · DataMapRow · ElsewhereRow · InvitesStatement · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.4.0 — 2026-10-18 — The machinery word `invites-people` and the optional app-level `invites`
+ *     statement: the app invites people into organisms and an invitation can create an account
+ *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien). Additive, so the spec
+ *     stays /2.
  *   v2.3.0 — 2026-10-11 — A `held` row may carry `agent` and `madeFor`: the tie between an app and
  *     the agent whose work it shows (decision "From an agent to an app", Jouni, 2026-10-11).
  *     Optional and additive, so the spec stays /2.
@@ -101,10 +105,32 @@ export type Retention =
 export type LossRisk =
   | 'only-copy' | 'recoverable-from-source' | 'recomputable' | 'user-can-rewrite' | 'may-vanish';
 
-/** Machinery the app leans on. Free-form beyond these; an unknown name is kept as written. */
+/**
+ * Machinery the app leans on. Free-form beyond these; an unknown name is kept as written.
+ * `invites-people`: the app invites people into organisms, and an invitation can create a new
+ * account (the scope organism:invite). Allowed, and stated here so whoever installs the app knows.
+ */
 export type Machinery =
   | 'iam-and-roles' | 'workflows' | 'extensions' | 'cortex' | 'ai-generation' | 'scheduling'
-  | 'connections-and-publish' | 'payments' | 'federation';
+  | 'connections-and-publish' | 'payments' | 'federation' | 'invites-people';
+
+/** What an app does when it lets people in. Open like every other list: an unknown act is kept. */
+export type InviteAct =
+  | 'sends-email-invitations' | 'mints-access-codes' | 'creates-accounts'
+  | 'grants-workspace-access' | 'manages-members';
+
+/**
+ * The app-level statement that the app invites people, with what it does and into which organisms.
+ *
+ * OPTIONAL. The machinery word `invites-people` alone is a statement too; this one says more. An app
+ * that declares organism:invite and states neither is a finding (data-map-check.ts), never a refusal:
+ * inviting people and creating accounts is a legitimate part of an app's job (Jouni, 2026-10-18).
+ */
+export interface InvitesStatement {
+  does: (InviteAct | string)[];
+  /** Into which organisms, in the app's own words: "the team organism the person picks". */
+  into: string;
+}
 
 /* ── The two tables ──────────────────────────────────────────────────────────────────────────── */
 
@@ -202,6 +228,8 @@ export interface DataMap {
   arrangement: string;
   machinery: (Machinery | string)[];
   leaves: LeavesRow[];
+  /** Optional: the app invites people into organisms, and how. See InvitesStatement. */
+  invites?: InvitesStatement;
 
   /* ── The rows ── */
 

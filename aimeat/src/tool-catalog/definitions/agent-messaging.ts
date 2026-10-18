@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-18 — aimeat_agents_list's description names `invites_people` (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-17 — aimeat_dm_send_as_owner's description: the message names the sending agent to the owner
  *     and the recipient, and a group address reaches its thread.
  *   2026-10-17 — aimeat_agent_propose's description: an -as-owner word is ticked by the owner after approval (pitfall-list round).
@@ -711,7 +712,7 @@ export const agentMessagingTools = [
     },
     {
         name: 'aimeat_agents_list',
-        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create. Each agent also carries its permissions (default_scopes), what it asked for at its last approval (scope_request), and `refusals`: calls the node refused it for a missing permission that is still missing. A refusal is often why an agent's tasks do not move; tell the owner which permission to grant.",
+        description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create. Each agent also carries its permissions (default_scopes), what it asked for at its last approval (scope_request), and `refusals`: calls the node refused it for a missing permission that is still missing. A refusal is often why an agent's tasks do not move; tell the owner which permission to grant. `invites_people` is true when the agent's permissions cover organism:invite: it may invite people into the owner's organisms, and an invitation can create a new account; say so when you describe the agent.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List My Agents', readOnlyHint: true },

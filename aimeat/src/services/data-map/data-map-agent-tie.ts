@@ -21,13 +21,13 @@
  * @structure tieAgent · untieAgent
  * @usage const out = await tieAgent(storage, config, caller, 'alice/menu.html', 'morning-news', { madeFor: true }, at);
  * @version-history
+ *   v1.0.1 — 2026-10-18 — The findings come from putProgramMap, which checks the map against the app's declared scopes.
  *   v1.0.0 — 2026-10-11 — Initial (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { buildGAII, isValidAgentName } from '../../utils/gaii.js';
 import { readAppDataMap } from './data-map-store.js';
-import { checkMap } from './data-map-check.js';
 import {
   putProgramMap, splitAppRef, type DataMapCaller, type DataMapRefusal, type ProgramMapResult,
 } from './data-map-access.js';
@@ -103,7 +103,7 @@ export async function tieAgent(
 
   const put = await putProgramMap(storage, config, caller, own.ownerGhii, own.filename, { ...map, held }, at);
   if ('refusal' in put) return put;
-  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: checkMap(put.map, at).findings };
+  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: put.findings };
 }
 
 /**
@@ -129,5 +129,5 @@ export async function untieAgent(
     });
   const put = await putProgramMap(storage, config, caller, own.ownerGhii, own.filename, { ...map, held }, at);
   if ('refusal' in put) return put;
-  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: checkMap(put.map, at).findings };
+  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: put.findings };
 }

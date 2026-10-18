@@ -1,6 +1,6 @@
 # The data map: `aimeat.datamap/2`
 
-Status: current, checked against the code on 2026-10-11. Every node serves this file at
+Status: current, checked against the code on 2026-10-18. Every node serves this file at
 `GET /v1/specs/datamap.md`.
 
 A data map says what an app is, what it is used for, where its data actually lives, and why there.
@@ -49,6 +49,7 @@ in two lines, without anyone opening the source.
 | `arrangement` | string | Where the data actually is, as prose. |
 | `machinery` | list | What the app relies on (values below; an unknown name is kept as written). |
 | `leaves` | list of `{ what, to, recallable }` | What the app sends out: `what` it sends, `to` where, and `recallable`, whether it can be recalled. Sent mail cannot. |
+| `invites` | `{ does, into }`, optional | The app invites people into organisms, and an invitation can create a new account. `does` lists what it does (values below; an unknown one is kept as written), `into` names which organisms in the app's own words. |
 | `held` | list of rows | The key families the app keeps (section below). |
 | `elsewhere` | list of `{ what, status, where, controlledBy, deletion }` | What is not ours or not resolved: `status` is `work-in-progress`, `copy-of-anothers-record`, `already-left` or `account-in-a-foreign-system`; `where` names the real one, `controlledBy` who decides about it, `deletion` what deleting our side does. |
 | `source` | `"declared"` or `"none"` | Who wrote it. The node writes `declared` for every stated map; `none` means there is no map. |
@@ -64,7 +65,16 @@ The node never guesses a map: an app that states nothing has a map that says the
 invents.
 
 **`machinery`**: `iam-and-roles`, `workflows`, `extensions`, `cortex`, `ai-generation`,
-`scheduling`, `connections-and-publish`, `payments`, `federation`.
+`scheduling`, `connections-and-publish`, `payments`, `federation`, `invites-people`.
+
+**An app that invites people says so.** An app whose `<meta name="aimeat-scopes">` asks for
+`organism:invite` can invite people into the organisms its user belongs to, and an invitation can
+create a new account (an email invitation the person accepts, or an invitation code an organism
+owner makes). That is allowed: sometimes it is the app's job. The map states it with the machinery
+word `invites-people`, the `invites` statement, or both. **`invites.does`**:
+`sends-email-invitations`, `mints-access-codes`, `creates-accounts`, `grants-workspace-access`,
+`manages-members`. An app that asks for the scope and states neither has the finding
+`DATAMAP_INVITES_UNSTATED`.
 
 ### A row: one key family
 
@@ -116,7 +126,9 @@ belong in the row store.
 The node never invents a map; it reads the stated one, folds it into one line for a list, and names
 what is missing. The findings, worst first: `DATAMAP_MISSING`, `DATAMAP_NO_PURPOSE`,
 `DATAMAP_NO_ARRANGEMENT`, `DATAMAP_FORM_UNSTATED`, `DATAMAP_FORM_CONTRADICTED`,
-`DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_ROW_BAD_AGENT`, `DATAMAP_ROW_BAD_CLASSIFICATION`.
+`DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_INVITES_UNSTATED`, `DATAMAP_ROW_BAD_AGENT`,
+`DATAMAP_ROW_BAD_CLASSIFICATION`. The node reads the app's declared scopes for the invites finding,
+and an app with no map that asks for `organism:invite` has it beside `DATAMAP_MISSING`.
 A finding never refuses a map. The owner sees it; everyone else reads the map without it.
 
 The app's own list entry carries a summary (`spec`, `form`, `summary`, `heldRows`,
@@ -127,5 +139,5 @@ without reading every map.
 
 `/2` replaced `/1` on 2026-08-25: `/1` described key families and their compliance columns and never
 said what the app was for. Optional fields added since (`organism-rows`, `classification`, `agent`,
-`madeFor`) are additive and keep the format at `/2`; a map carries its own `spec` so a newer node can
+`madeFor`, `invites` and the machinery word `invites-people`) are additive and keep the format at `/2`; a map carries its own `spec` so a newer node can
 read an older map.

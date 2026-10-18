@@ -12,6 +12,7 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-10-18 — The map carries the optional `invites` statement through a write, and every read and write checks the map against the app's declared scopes (declaredScopesOf), so an app asking for organism:invite whose map does not say it invites people has the finding DATAMAP_INVITES_UNSTATED. putProgramMap answers the findings too (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-16 — readProgramMap answers the map of an app an operator hid, an app behind an access code, an unlisted app or a community-listed app only to a caller who may see that app (the owner's account, an operator, and for a community listing any signed-in member of this node); everyone else gets the 404 of an app that does not exist. The caller 'node' is the node's own check (decide service) and passes. (QA audit list review).
  *   v2.1.2 — 2026-09-26 — readProgramMap takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v2.1.1 — 2026-09-24 — readProgramMap strips the stamp's `gap` for everyone but the owner, as it
@@ -30,8 +31,9 @@ import { localAccountName } from '../../utils/gaii.js';
 import { operatorOverride, type OperatorAuth } from '../operator-override.js';
 import { appListingOf, type AppRecord } from '../../storage/types/apps.js';
 import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
-import { checkMap, stampFor } from './data-map-check.js';
-import { DATA_MAP_SPEC, type DataMap, type DataMapStamp } from './data-map-types.js';
+import { checkMap, stampFor, type MapCheck } from './data-map-check.js';
+import { DATA_MAP_SPEC, type DataMap, type DataMapStamp, type InvitesStatement } from './data-map-types.js';
+import { parseAppScopes } from '../protected-resource.js';
 
 export interface DataMapRefusal {
   refusal: { status: number; code: string; message: string };
@@ -66,6 +68,16 @@ export interface DataMapCaller {
 export const NODE_READ = 'node' as const;
 
 const appIdOf = (filename: string): string => filename.replace(/\.html$/i, '');
+
+/**
+ * The words of the app's `<meta name="aimeat-scopes">`, read from its stored bytes. They decide
+ * whether the map has to say that the app invites people (data-map-check.ts DATAMAP_INVITES_UNSTATED).
+ */
+export function declaredScopesOf(record: AppRecord | null): string[] {
+  const data = record?.data as Buffer | Uint8Array | string | undefined;
+  if (!data) return [];
+  return parseAppScopes(typeof data === 'string' ? data : Buffer.from(data).toString('utf-8'));
+}
 
 /** "owner/filename.html" → the pair every app address uses, or null when it is not that shape. */
 export function splitAppRef(ref: string): { owner: string; filename: string } | null {
@@ -104,13 +116,14 @@ export async function readProgramMap(
 
   const appId = appIdOf(ref.filename);
   const map = await readAppDataMap(storage, record.ownerGaii, appId);
-  const check = checkMap(map, at);
+  const scopes = declaredScopesOf(record);
+  const check = checkMap(map, at, scopes);
 
   // The stamp carries the worst finding as `gap`, and that is the same unfinished business as
   // `findings`, so it is stripped for everyone but the owner here, where every door reads the map.
   // It reached anybody who asked, a caller with no token included (A6-10). stampFor builds a new
   // object on every call, so removing the field touches nothing that is stored.
-  const stamp = stampFor(map, appId, at);
+  const stamp = stampFor(map, appId, at, scopes);
   if (!isOwn) delete stamp.gap;
 
   return {
@@ -141,6 +154,20 @@ async function mayReadMap(
   });
 }
 
+/**
+ * The optional `invites` statement as stored: the acts kept as written (an open list, like every
+ * axis), the text cut to a sane length. Anything that is not an object is no statement at all.
+ */
+function readInvites(v: unknown): InvitesStatement | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const raw = v as { does?: unknown; into?: unknown };
+  const does = Array.isArray(raw.does)
+    ? raw.does.filter((d): d is string => typeof d === 'string' && d.trim().length > 0).map(d => d.trim().slice(0, 80)).slice(0, 20)
+    : [];
+  const into = typeof raw.into === 'string' ? raw.into.trim().slice(0, 500) : '';
+  return { does, into };
+}
+
 /** Everything a stated map must carry before it is worth storing. */
 function readMap(body: Partial<DataMap>, at: string): DataMap | string {
   // The refusal says what to send. Three measured cold builds in a row (2026-09-19) sent a map
@@ -156,6 +183,7 @@ function readMap(body: Partial<DataMap>, at: string): DataMap | string {
       + 'the build specification: aimeat_handbook_get { tier: "build-app/data-map" }, or GET /v1/prompts/build-app/sections/data-map.';
   }
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  const invites = readInvites(body.invites);
   return {
     spec: DATA_MAP_SPEC,
     what: str(body.what),
@@ -164,6 +192,7 @@ function readMap(body: Partial<DataMap>, at: string): DataMap | string {
     arrangement: str(body.arrangement),
     machinery: Array.isArray(body.machinery) ? body.machinery : [],
     leaves: Array.isArray(body.leaves) ? body.leaves : [],
+    ...(invites ? { invites } : {}),
     held: Array.isArray(body.held) ? body.held : [],
     elsewhere: Array.isArray(body.elsewhere) ? body.elsewhere : [],
     // Somebody wrote this, so it is declared however it arrived. Nothing else may claim to be a map.
@@ -209,7 +238,7 @@ export async function stateProgramMap(
 
   const put = await putProgramMap(storage, config, caller, record.ownerGaii, ref.filename, body, at);
   if ('refusal' in put) return put;
-  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: checkMap(put.map, at).findings };
+  return { app: appRef, dataMap: put.map, stamp: put.stamp, findings: put.findings };
 }
 
 /**
@@ -227,7 +256,7 @@ export async function stateProgramMap(
 export async function putProgramMap(
   storage: Storage, config: AimeatConfig, caller: DataMapCaller,
   ownerGhii: string, filename: string, body: Partial<DataMap>, at: string,
-): Promise<{ map: DataMap; stamp: DataMapStamp } | DataMapRefusal> {
+): Promise<{ map: DataMap; stamp: DataMapStamp; findings: MapCheck['findings'] } | DataMapRefusal> {
   const parsed = readMap(body, at);
   if (typeof parsed === 'string') {
     return { refusal: { status: 400, code: 'INVALID_INPUT', message: parsed } };
@@ -249,9 +278,11 @@ export async function putProgramMap(
     };
   }
 
-  const stamp = stampFor(parsed, appId, at);
+  // The app's declared scopes decide whether the map must say that the app invites people.
+  const scopes = declaredScopesOf(await storage.getApp(ownerGhii, filename));
+  const stamp = stampFor(parsed, appId, at, scopes);
   await storage.updateAppMeta(ownerGhii, filename, { dataMap: stamp });
-  return { map: parsed, stamp };
+  return { map: parsed, stamp, findings: checkMap(parsed, at, scopes).findings };
 }
 
 export interface HandsAnswer {

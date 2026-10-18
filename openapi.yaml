@@ -12632,6 +12632,9 @@ paths:
                                 - $ref: '#/components/schemas/AgentProfile'
                                 - type: object
                                   properties:
+                                    invites_people:
+                                      type: boolean
+                                      description: True when the agent's permissions cover organism:invite. It may then invite people into the organisms its owner belongs to, and an invitation can create a new account. Read from default_scopes on every call.
                                     install_id:
                                       type: string
                                       nullable: true
@@ -17503,7 +17506,11 @@ paths:
               type: object
               description: >
                 The whole map, carrying spec "aimeat.datamap/2". Fields: what, usedFor, form,
-                arrangement, machinery, leaves, held and elsewhere.
+                arrangement, machinery, leaves, held and elsewhere, and the optional invites
+                ({ does, into }): the app invites people into organisms and an invitation can create
+                an account. An app whose declared scopes cover organism:invite and whose map has
+                neither invites nor the machinery word invites-people has the finding
+                DATAMAP_INVITES_UNSTATED.
       responses:
         '200':
           description: Stored. `hints` says what is still unfinished; it never refuses.

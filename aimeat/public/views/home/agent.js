@@ -23,6 +23,8 @@
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   v1.6.0 — 2026-10-18 — "What it reaches" says, under the areas, when the agent may invite people
+ *     and an invitation can create an account (organism:invite; wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   v1.5.1 — 2026-10-11 — The page opens the live stream itself (lib/live-updates.js
  *     relayLiveUpdates): it listened for a change and nothing sent one, so a finished task showed
  *     as "working" until a reload.
@@ -51,7 +53,7 @@ import { getSession } from '/js/services/auth.js';
 import { relayLiveUpdates } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { ago, dateTime } from '/js/format.js';
-import { areaLine } from '/js/consent-vocab.js';
+import { areaLine, invitesPeople, invitesSentence } from '/js/consent-vocab.js';
 import { PageFrame } from '/components/PageFrame.js';
 import { PageIntro } from '/components/PageIntro.js';
 import { BackLink } from '/components/BackLink.js';
@@ -248,7 +250,10 @@ export default function AgentView({ navigate }) {
           action: others.length > 0 && !moving
             ? html`<${Action} small onClick=${() => { setMoving(true); setTarget(others[0].id); }}>${p('move', 'Move to another computer')}<//>`
             : undefined },
-        { k: p('reach', 'What it reaches'), v: areaLine(record.default_scopes ?? [], t) },
+        // May it invite people, where an invitation can create an account: the node's answer from
+        // its permissions (GET /v1/agents invites_people), so the line is never out of date.
+        { k: p('reach', 'What it reaches'), v: areaLine(record.default_scopes ?? [], t),
+          sub: (record.invites_people ?? invitesPeople(record.default_scopes ?? [])) ? invitesSentence(t) : undefined },
         { k: p('goes', 'Where its work goes'),
           v: worker.work_goes_to ? placeWords(worker.work_goes_to) : p('goesOwn', 'The agent\'s own memory'),
           sub: worker.work_goes_to

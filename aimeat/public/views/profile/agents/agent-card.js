@@ -5,6 +5,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.30.0 -- 2026-10-18 -- InvitesLine: the open card says when the agent may invite people (organism:invite).
  *   v2.29.0 -- 2026-10-18 -- "May read at most" (ClearanceLine): the highest classification the agent may read, while classification is on (plan doc-mvdipuyqraas, L2.4).
  *   v2.28.0 -- 2026-10-11 -- "Takes new work" (StoppedLine): stop the agent and start it again.
  *   v2.27.0 -- 2026-10-02 -- The question mark that explains the run mode: agent.run_mode on its CardLine label (components/HelpTip.js).
@@ -150,7 +151,7 @@ import { GaiiChip } from './gaii-chip.js';
 import { deliveryLabel, renderPlatformBadge, renderModelBadge, renderReadinessBadge, stepTone } from './agent-card-badges.js';
 import { RunModeSwitch } from './agent-card-run-mode.js';
 import { FactsLine, LastTaskLine, PurchaseLimitLine, AutonomyLine, StoppedLine, WildcardLine } from './agent-card-autonomy.js';
-import { RefusalNote, AccessLine, hasRefusals } from './agent-card-access.js';
+import { RefusalNote, AccessLine, InvitesLine, hasRefusals } from './agent-card-access.js';
 import { ClearanceLine } from './agent-card-clearance.js';
 import { templateLabel } from './scope-config.js';
 import { detectTemplate } from './scope-model.js';
@@ -439,6 +440,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
       <${WildcardLine} agent=${agent} showToast=${showToast} />
       <${AccessLine} agent=${agent} />
       <${ClearanceLine} agent=${agent} showToast=${showToast} />
+      <${InvitesLine} agent=${agent} />
 
       ${/* What your AIMEAT refused this agent for a missing permission, with the way to grant it. */''}
       <${RefusalNote} agent=${agent} onScopesClick=${onScopesClick} showToast=${showToast} />

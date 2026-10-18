@@ -13,14 +13,16 @@
  *
  *   A refusal is shown while it stands: the agent still lacks the permission, and it is younger than
  *   14 days. Granting the permission closes it on the next read, so the note goes away by itself.
- * @structure RefusalNote({ agent, onScopesClick }) · AccessLine({ agent }) · hasRefusals(agent) ·
- *   permissionWords(scopes, anyOf)
+ * @structure RefusalNote({ agent, onScopesClick }) · AccessLine({ agent }) · InvitesLine({ agent }) ·
+ *   hasRefusals(agent) · permissionWords(scopes, anyOf)
  *   The method and the path of a refused call are joined by a no-break space, so a narrow card never
  *   leaves the method alone at the end of a line.
  * @usage
  *   import { RefusalNote, AccessLine, hasRefusals } from './agent-card-access.js';
  *   html`<${RefusalNote} agent=${agent} onScopesClick=${onScopesClick} showToast=${showToast} />`
  * @version-history
+ *   v1.2.0 — 2026-10-18 — InvitesLine: the agent may invite people and an invitation can create an
+ *     account, when its permissions cover organism:invite (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   v1.1.0 — 2026-09-30 — "Give the permission" opens the list of every needed permission
  *     (agent-refusal-grant.js): give all, some, or decline. The full dialog is one step further.
  *   v1.0.0 — 2026-09-30 — Initial.
@@ -36,6 +38,7 @@ import { Action, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { SubHeading } from '/components/SubHeading.js';
 import { RefusalGrantModal } from './agent-refusal-grant.js';
+import { invitesPeople, invitesSentence } from '/js/consent-vocab.js';
 
 const html = htm.bind(h);
 
@@ -89,6 +92,20 @@ export function RefusalNote({ agent, onScopesClick, showToast }) {
         <//>` : null}
       ${answering ? html`<${RefusalGrantModal} agent=${agent} showToast=${showToast}
         onClose=${() => setAnswering(false)} onEditAll=${onScopesClick} />` : null}
+    <//>`;
+}
+
+/**
+ * That the agent may invite people, and that an invitation can create a new account, when its
+ * permissions cover organism:invite. The node's own answer (`invites_people`) where the list
+ * carries it, else read from the permissions; nothing when the agent cannot invite.
+ */
+export function InvitesLine({ agent }) {
+  const may = agent?.invites_people ?? invitesPeople(agent?.default_scopes ?? ['*']);
+  if (!may) return null;
+  return html`
+    <${CardLine} label=${t('profile.agents.refusals.invitesLabel')}>
+      <span>${invitesSentence(t)}</span>
     <//>`;
 }
 
