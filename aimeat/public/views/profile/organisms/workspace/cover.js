@@ -15,6 +15,7 @@
  * @structure renderWorkspaceView (cover or page) · renderCover · renderPage · renderRail · renderTree
  * @usage import { renderWorkspaceView } from './workspace/cover.js';
  * @version-history
+ *   v1.14.1 -- 2026-10-18 -- The figure strip's "{n} types" and "{n} spaces" in the language's plural form (i18n.js tn): "1 space".
  *   v1.14.0 -- 2026-10-16 -- A document space's head offers "+ HTML page" beside "+ New document".
  *   v1.13.0 -- 2026-09-26 -- Every part is a library component that takes data: the cover and every page
  *     are the SettingsPage (the crumb's steps, the head's marks, the For-your-AI slab and the doors,
@@ -73,6 +74,7 @@ import { Note } from '/components/Note.js';
 import { Space } from '/components/Layout.js';
 import { List, Row, Name, Num, Cell, Doors, Group, SearchLine } from '/components/List.js';
 import { tr } from '/views/profile/organisms/poster-parts.js';
+import { tn } from '/js/i18n.js';
 import { gotoEvent, ovAddNew, renderWsSearchResults, renderObjectives } from './overview.js';
 import { renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab } from './panels.js';
 import { renderSpaceNotice, shortActor } from './helpers.js';
@@ -266,8 +268,8 @@ function renderCover(ctx) {
 
   const strip = html`
     <${FigureStrip} items=${[
-      { key: 'rec', n: records, label: tr('organisms.ws.figRecords', 'records'), sub: (tr('organisms.ws.figTypes', '{n} types')).replace('{n}', String(recordSpaces.length)) },
-      { key: 'doc', n: docs, label: tr('organisms.ws.figDocs', 'documents'), sub: (tr('organisms.ws.figSpaces', '{n} spaces')).replace('{n}', String(docSpaces.length)) },
+      { key: 'rec', n: records, label: tr('organisms.ws.figRecords', 'records'), sub: tn('organisms.ws.figTypes', recordSpaces.length) },
+      { key: 'doc', n: docs, label: tr('organisms.ws.figDocs', 'documents'), sub: tn('organisms.ws.figSpaces', docSpaces.length) },
       { key: 'rev', n: approvals.length, label: tr('organisms.ws.figReview', 'to review'), sub: approvals.length ? tr('organisms.ws.figReviewSub', 'a publish waits for your decision') : undefined },
       { key: 'last', n: last ? relTime(last.at) : '·', tone: last ? 'coral' : undefined, label: tr('organisms.figLast', 'last change'),
         sub: last ? `${shortActor(last.actor)} ${last.action === 'publish' ? tr('organisms.publishedVerb', 'published') : tr('organisms.editedVerb', 'edited')} ${(wsT('type.' + last.type) || last.type)} / ${instanceTitle(last.type, last.instance)}` : undefined },

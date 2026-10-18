@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.29.2 -- 2026-10-18 -- A key space's "{n} public" and "{n} for members" tags in the plural form too ("1 julkinen", "1 pública").
  *   v1.29.1 -- 2026-10-18 -- A count of keys is said in the language's plural form (i18n.js tn): "1 key", not "1 keys".
  *   v1.29.0 -- 2026-10-18 -- Who can read a key or a file is the AudienceBadge (Private, "<organism> members", Signed-in, Public), on the key lists, the search, the record page and each file's row, where it was the stored word (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.28.0 -- 2026-10-16 -- Until the records have loaded the cover says so: a failed load shows the
@@ -192,8 +193,8 @@ function spaceTable(ctx, list, { head: head0 = true, id = '' } = {}) {
           <${Num}><${Figure} small end n=${s.items.length} /><//>
           <${Name} onOpen=${() => ctx.pickView({ kind: 'space', id: s.id })}
             end=${s.publicN || s.membersN ? html`<${Marks}>
-              ${s.publicN ? html`<${Mark} tone="sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}<//>` : null}
-              ${s.membersN ? html`<${Mark}>${c('membersN', '{n} for members').replace('{n}', String(s.membersN))}<//>` : null}
+              ${s.publicN ? html`<${Mark} tone="sun">${tn('profile.memory.cover.publicN', s.publicN)}<//>` : null}
+              ${s.membersN ? html`<${Mark}>${tn('profile.memory.cover.membersN', s.membersN)}<//>` : null}
             <//>` : null}>${s.label}<//>
           <${Cell} meta>${formatBytes(s.bytes)}<//>
           ${s.latest
@@ -314,7 +315,7 @@ function renderCover(ctx) {
     <//>`;
   const strip = html`
     <${FigureStrip} items=${[
-      { key: 'keys', n: num(all.length), label: c('figKeys', 'keys'), sub: `${memQuota?.max_keys ? c('figOf', 'of {n}').replace('{n}', num(memQuota.max_keys)) + ' · ' : ''}${c('figSpaces', '{n} key spaces').replace('{n}', String(cls.spaces.size))}` },
+      { key: 'keys', n: num(all.length), label: c('figKeys', 'keys'), sub: `${memQuota?.max_keys ? c('figOf', 'of {n}').replace('{n}', num(memQuota.max_keys)) + ' · ' : ''}${tn('profile.memory.cover.figSpaces', cls.spaces.size)}` },
       { key: 'bytes', n: formatBytes(memQuota?.used_bytes ?? bytes), label: '', sub: memQuota?.max_bytes ? c('figOf', 'of {n}').replace('{n}', formatBytes(memQuota.max_bytes)) : '' },
       { key: 'stale', n: stale.length, label: c('figStale', 'stale'), sub: c('figStaleSub', 'not changed in 90 days') },
       { key: 'last', n: last ? formatRelativeTime(last.updated_at || last.created_at) : '·', tone: last ? 'coral' : undefined, label: c('figLast', 'last change'),
@@ -395,7 +396,7 @@ function renderSpace(ctx, id) {
   if (spaceSort === 'alpha') items.sort((a, b) => a.key.localeCompare(b.key));
   else if (spaceSort === 'size') items.sort((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0));
   const kind = s.bucket === 'org' ? c('kindOrg', 'organism') : s.bucket === 'sys' ? c('kindSys', 'bookkeeping') : c('kindOwn', 'your key space');
-  const sub = html`<span>${kind}</span><span>${keysN(s.items.length)}</span><span>${formatBytes(s.bytes)}</span>${s.publicN ? html`<${Mark} tone="sun">${c('publicN', '{n} public').replace('{n}', String(s.publicN))}<//>` : null}`;
+  const sub = html`<span>${kind}</span><span>${keysN(s.items.length)}</span><span>${formatBytes(s.bytes)}</span>${s.publicN ? html`<${Mark} tone="sun">${tn('profile.memory.cover.publicN', s.publicN)}<//>` : null}`;
   const doors = html`
     ${prefix ? html`<${Action} small soft onClick=${() => { setSearchScopePrefix(prefix); setShowSearch(true); pickView({ kind: 'cover' }); }}>${c('searchHere', 'Search this space')}<//>` : null}
     <${Action} small onClick=${() => setShowMemForm(v => !v)}>${c('newEntry', '+ New entry')}<//>`;
