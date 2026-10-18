@@ -11,7 +11,12 @@
  *   an organism A is not in is 400 NOT_ORGANISM_MEMBER and nothing is created or changed. Once B
  *   leaves, B is refused: the decision is the live membership. Such a board is not in the public
  *   board catalogue, and such a skill is not in the public agent-skills index.
+ *
+ *   An organism's own board follows the organism: a private organism's board is at organism:<id>,
+ *   so a member reads and posts and a non-member is refused; a public organism's board is public; a
+ *   change of the organism's visibility moves the board, unless its keeper set the level by hand.
  * @version-history
+ *   v1.1.0 — 2026-10-18 — O1-O6: the organism's own board follows the organism's visibility (V3.5).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.5 and V3.9).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=audience-boards-skills
@@ -244,8 +249,96 @@ await test('S7. A board or a skill at the organisation level follows the live me
     assert(skill.status === 403, `B's agent reads the skill after B left: ${skill.status}`);
 });
 
+// ── The organism's own board follows the organism's visibility (V3.5) ──
+
+let privOrgId = '', privOrgBoard = '', handOrgId = '', handOrgBoard = '';
+/** The board's stored visibility, as its keeper A lists it. */
+async function boardLevel(id: string): Promise<string | undefined> {
+    const r = await json('/v1/boards', { headers: auth(A.token) });
+    return r.body.data?.boards?.find((b: any) => b.id === id)?.visibility;
+}
+async function setOrgVisibility(id: string, visibility: string): Promise<void> {
+    const r = await json(`/v1/organisms/${id}`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ visibility }) });
+    assert(r.status === 200 && r.body.data.organism.visibility === visibility, `organism to ${visibility}: ${r.status} ${JSON.stringify(r.body)}`);
+}
+
+await test('O1. A private organism\'s board is at organism:<id>: a member and the member\'s agent read it and post on it', async () => {
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: `Aud Private Org ${stamp}`, type: 'project', join_policy: 'open', visibility: 'private' }) });
+    assert(org.status === 201, `organism ${org.status}: ${JSON.stringify(org.body)}`);
+    privOrgId = org.body.data.organism.id;
+    privOrgBoard = org.body.data.organism.boardId;
+    assert(privOrgBoard === `org-${privOrgId}`, `board id ${privOrgBoard}`);
+    assert(await boardLevel(privOrgBoard) === `organism:${privOrgId}`, `board level ${await boardLevel(privOrgBoard)}`);
+    const j = await json(`/v1/organisms/${privOrgId}/join`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({}) });
+    assert(j.status === 201 && j.body.data.status === 'joined', `join ${j.status}: ${JSON.stringify(j.body)}`);
+    for (const [who, tok] of [['B', B.token], ['B agent', agentB]] as const) {
+        const list = await json(`/v1/boards/${privOrgBoard}/posts`, { headers: auth(tok) });
+        assert(list.status === 200, `${who} reads the organism board: ${list.status} ${JSON.stringify(list.body.error)}`);
+        const p = await json(`/v1/boards/${privOrgBoard}/posts`, { method: 'POST', headers: auth(tok), body: JSON.stringify({ title: `From ${who}`, body: 'A member posts on the organism board.' }) });
+        assert(p.status === 201, `${who} posts on the organism board: ${p.status} ${JSON.stringify(p.body.error)}`);
+    }
+});
+
+await test('O2. On the private organism\'s board, a non-member and the non-member\'s agent are refused 403 on the read and on the POST', async () => {
+    for (const [who, tok] of [['C', C.token], ['C agent', agentC]] as const) {
+        const list = await json(`/v1/boards/${privOrgBoard}/posts`, { method: 'GET', headers: auth(tok) });
+        assert(list.status === 403, `${who} reads: ${list.status} ${JSON.stringify(list.body.error)}`);
+        const p = await json(`/v1/boards/${privOrgBoard}/posts`, { method: 'POST', headers: auth(tok), body: JSON.stringify({ title: 'Outsider', body: 'Should not land.' }) });
+        assert(p.status === 403, `${who} POST: ${p.status} ${JSON.stringify(p.body.error)}`);
+    }
+    const anon = await json(`/v1/boards/${privOrgBoard}/posts`, { method: 'GET' });
+    assert(anon.status === 401, `anonymous reads: ${anon.status}`);
+});
+
+await test('O3. The exposure report lists the private organism\'s board at the organism level', async () => {
+    const r = await json('/v1/exposure/mine', { headers: auth(A.token) });
+    assert(r.status === 200, `report ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const item = (r.body.data.items as any[]).find(i => i.kind === 'board' && i.id === privOrgBoard);
+    assert(!!item && item.level === 'organism' && item.organism_id === privOrgId, `board item: ${JSON.stringify(item)}`);
+});
+
+await test('O4. A public organism\'s board stays public: anonymous reads it', async () => {
+    const pubBoard = `org-${orgId}`;
+    assert(await boardLevel(pubBoard) === 'public', `public organism's board level ${await boardLevel(pubBoard)}`);
+    const anon = await json(`/v1/boards/${pubBoard}/posts`, { method: 'GET' });
+    assert(anon.status === 200, `anonymous reads the public organism's board: ${anon.status}`);
+});
+
+await test('O5. The organism from private to public moves its board to public, and back to private moves it to organism:<id>', async () => {
+    await setOrgVisibility(privOrgId, 'public');
+    assert(await boardLevel(privOrgBoard) === 'public', `after public: ${await boardLevel(privOrgBoard)}`);
+    const anon = await json(`/v1/boards/${privOrgBoard}/posts`, { method: 'GET' });
+    assert(anon.status === 200, `anonymous reads after public: ${anon.status}`);
+    await setOrgVisibility(privOrgId, 'private');
+    assert(await boardLevel(privOrgBoard) === `organism:${privOrgId}`, `after private: ${await boardLevel(privOrgBoard)}`);
+    const anonAfter = await json(`/v1/boards/${privOrgBoard}/posts`, { method: 'GET' });
+    assert(anonAfter.status === 401, `anonymous reads after private: ${anonAfter.status}`);
+    const b = await json(`/v1/boards/${privOrgBoard}/posts`, { method: 'GET', headers: auth(B.token) });
+    assert(b.status === 200, `B reads after private: ${b.status}`);
+    const c = await json(`/v1/boards/${privOrgBoard}/posts`, { method: 'GET', headers: auth(C.token) });
+    assert(c.status === 403, `C reads after private: ${c.status}`);
+    // listed and private give the board the same level: nothing moves.
+    await setOrgVisibility(privOrgId, 'listed');
+    assert(await boardLevel(privOrgBoard) === `organism:${privOrgId}`, `after listed: ${await boardLevel(privOrgBoard)}`);
+});
+
+await test('O6. A board whose keeper set its level by hand is left alone when the organism\'s visibility changes', async () => {
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: `Aud Hand Org ${stamp}`, type: 'project', join_policy: 'open', visibility: 'public' }) });
+    assert(org.status === 201, `organism ${org.status}`);
+    handOrgId = org.body.data.organism.id;
+    handOrgBoard = org.body.data.organism.boardId;
+    assert(await boardLevel(handOrgBoard) === 'public', `start level ${await boardLevel(handOrgBoard)}`);
+    const p = await json(`/v1/boards/${handOrgBoard}/visibility`, { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ visibility: 'private' }) });
+    assert(p.status === 200, `PATCH ${p.status}: ${JSON.stringify(p.body.error)}`);
+    await setOrgVisibility(handOrgId, 'private');
+    assert(await boardLevel(handOrgBoard) === 'private', `hand-set board moved to ${await boardLevel(handOrgBoard)}`);
+    await setOrgVisibility(handOrgId, 'public');
+    assert(await boardLevel(handOrgBoard) === 'private', `hand-set board moved to ${await boardLevel(handOrgBoard)}`);
+});
+
 await test('Cleanup', async () => {
-    for (const id of [boardId, privateBoardId]) if (id) await json(`/v1/boards/${id}`, { method: 'DELETE', headers: auth(A.token) });
+    for (const id of [boardId, privateBoardId, privOrgBoard, handOrgBoard]) if (id) await json(`/v1/boards/${id}`, { method: 'DELETE', headers: auth(A.token) });
+    for (const id of [privOrgId, handOrgId]) if (id) await json(`/v1/organisms/${id}`, { method: 'DELETE', headers: auth(A.token) });
     for (const n of [skillName, plainSkill]) await json(`/v1/skills/${n}`, { method: 'DELETE', headers: auth(A.token) });
     if (orgId) await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: auth(A.token) });
     if (foreignOrgId) await json(`/v1/organisms/${foreignOrgId}`, { method: 'DELETE', headers: auth(C.token) });

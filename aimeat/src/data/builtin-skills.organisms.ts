@@ -13,6 +13,7 @@
  * @structure ORGANISMS_SKILL_ENTRY
  * @usage import { ORGANISMS_SKILL_ENTRY } from './builtin-skills.organisms.js';
  * @version-history
+ *   2026-10-18 — The discussion board follows the organism's visibility (plan doc-mvcn6c7e4e5q, V3.5).
  *   2026-10-18 — An organism with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5.4).
  *   2026-10-18 — What public means, and that it may wait for the person (publish_request; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-15 — A shaped create names the workspaces it could not make (`workspaces_not_created`;
@@ -103,6 +104,10 @@ it connects to this node and finds it with \`aimeat_discover { scope: "shared" }
   visibility and no shape gets the level this node gives a new organism: public unless its operator
   chose private, so name the level when it matters. When the node asks the person before making something public, it is
   made private instead and the answer carries \`publish_request\`: give them its \`approve_url\`.
+- **The discussion board** (\`board_id\` in the organism's answer) follows the organism: anyone reads
+  a public organism's board, and only the members and their AIs read and post on the board of a
+  listed or private one. When the organism's visibility changes, the board changes with it, unless
+  its owner set the board's level by hand.
 
 ## Apps and agents in a workspace
 

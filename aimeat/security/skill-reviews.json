@@ -64,7 +64,7 @@
         "aimeat/src/services/organism-lifecycle.ts",
         "aimeat/src/services/organism-shape-apply.ts"
       ],
-      "digest": "sha256:6a27df9c92ef9217d56a5479",
+      "digest": "sha256:ade712ed66c21710a2f29320",
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
@@ -708,7 +708,7 @@
     },
     "node:aimeat-organisms": {
       "aimeat/src/data/organism-shapes.ts": "e876d870cd931846",
-      "aimeat/src/services/organism-lifecycle.ts": "60da2df8a0125559",
+      "aimeat/src/services/organism-lifecycle.ts": "c89128b2fabeed41",
       "aimeat/src/services/organism-shape-apply.ts": "190c0a20e5cb806c"
     },
     "node:aimeat-workspace-contracts": {

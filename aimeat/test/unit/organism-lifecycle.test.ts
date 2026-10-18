@@ -7,6 +7,7 @@
  * @structure describe('organism lifecycle') — create, update, join, leave.
  * @usage cd aimeat && pnpm exec vitest run test/unit/organism-lifecycle.test.ts
  * @version-history
+ *   2026-10-18 — A listed organism's board is at `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5).
  *   2026-10-15 — Join and leave record their account events under the full identity (feature-list audit #44).
  *   v1.1.0 — 2026-08-29 — The type is free text: the create case asserts the word is kept (trimmed,
  *     cut at 40) instead of replaced by "community"; a blank one still falls back.
@@ -88,7 +89,9 @@ describe('organism lifecycle (shared by /v1/organisms and the aimeat_organism_* 
         // routes/boards.ts compares ownerGaii by equality for update and delete.
         const board = await storage.getBoard(out.organism.boardId);
         expect(board?.ownerGaii).toBe(`${CREATOR}@${NODE}`);
-        expect(board?.visibility).toBe('shared');
+        // A listed organism's board is read by its members: the organism level, not a shared board
+        // with an empty roster (services/organism-board.ts).
+        expect(board?.visibility).toBe(`organism:${out.organism.id}`);
     });
 
     it('create keeps a free-text type and falls back to the defaults for an unrecognised policy', async () => {
